@@ -13,9 +13,12 @@ export const Route = createFileRoute("/admin")({
   component: AdminAccessPage,
 });
 
+// TEMP: bypass de login mientras se arregla Google OAuth
+const BYPASS_AUTH = true;
+
 function AdminAccessPage() {
   const { user, loading } = useAuth();
-  const isAdmin = isAdminEmail(user?.email);
+  const isAdmin = BYPASS_AUTH || isAdminEmail(user?.email);
 
   return (
     <div className="min-h-screen bg-background">
@@ -31,9 +34,9 @@ function AdminAccessPage() {
         </div>
         <h1 className="font-display text-3xl text-ink">Acceso admin</h1>
 
-        {loading ? (
+        {loading && !BYPASS_AUTH ? (
           <p className="mt-8 text-sm text-muted-foreground">Verificando sesión…</p>
-        ) : !user ? (
+        ) : !user && !BYPASS_AUTH ? (
           <StateCard
             tone="neutral"
             icon={<ShieldQuestion className="h-5 w-5" />}
@@ -53,7 +56,7 @@ function AdminAccessPage() {
             tone="warn"
             icon={<ShieldAlert className="h-5 w-5" />}
             title="Sin permisos de administración"
-            body={`La cuenta ${user.email} no figura como administradora.`}
+            body={`La cuenta ${user?.email ?? ""} no figura como administradora.`}
           >
             <div className="flex flex-wrap gap-3">
               <Link
@@ -75,7 +78,7 @@ function AdminAccessPage() {
             tone="ok"
             icon={<ShieldCheck className="h-5 w-5" />}
             title="Acceso autorizado"
-            body={`Logueado como ${user.email}.`}
+            body={`Logueado como ${user?.email ?? "modo bypass"}.`}
           >
             <a
               href={BACKOFFICE_URL}
