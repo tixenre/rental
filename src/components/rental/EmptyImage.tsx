@@ -1,12 +1,12 @@
-import { Camera, Aperture, Lightbulb, Mic, Tripod, Package, Cable } from "lucide-react";
+import { Camera, Aperture, Lightbulb, Mic, Triangle, Package, Cable, type LucideIcon } from "lucide-react";
 import type { Category } from "@/data/equipment";
 
-const map: Record<Category, React.ComponentType<{ className?: string }>> = {
+const map: Record<Category, LucideIcon> = {
   Cámaras: Camera,
   Lentes: Aperture,
   Iluminación: Lightbulb,
   Audio: Mic,
-  Soportes: Tripod,
+  Soportes: Triangle,
   Accesorios: Package,
   Adaptadores: Cable,
 };
