@@ -66,12 +66,19 @@ export function CartDrawer() {
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
           />
           <motion.aside
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
+            initial={isBottom ? { y: "100%" } : { x: "100%" }}
+            animate={isBottom ? { y: 0 } : { x: 0 }}
+            exit={isBottom ? { y: "100%" } : { x: "100%" }}
             transition={{ type: "tween", duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-            className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l hairline bg-background"
+            className={
+              isBottom
+                ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full flex-col rounded-t-2xl border-t hairline bg-background shadow-2xl"
+                : "fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l hairline bg-background"
+            }
           >
+            {isBottom && (
+              <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-foreground/20" />
+            )}
             <div className="flex items-center justify-between border-b hairline px-6 py-4">
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
