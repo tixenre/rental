@@ -1,44 +1,40 @@
-## Objetivo
+## Problemas a resolver
 
-Hoy el pill del header solo muestra "21 may → 22 may". El usuario no sabe a qué hora retira ni devuelve, ni cuántas jornadas le cobramos. Lo aclaramos en el pill (móvil + desktop) y reforzamos en el modal.
+1. En móvil el modal de fechas ocupa más de una pantalla y no se ven los botones "Aplicar" / "Limpiar". Hay que scrollear y no es obvio cómo confirmar.
+2. Los `<input type="time">` permiten cualquier minuto. Queremos restringir a `:00` y `:30` en todo el flujo (modal y header desktop).
 
 ## Cambios
 
-### 1. `src/components/rental/TopBar.tsx` — pill con horas y jornadas
+### 1. `RentalDateModal.tsx` — versión compacta en móvil
 
-Reemplazar el contenido del pill de fechas (línea ~144) por una composición de dos líneas en móvil y una sola en desktop:
+- Layout en columna full-height en móvil (`h-[100dvh]` o `max-h-[95dvh]`), con header sticky arriba y footer sticky abajo (con `safe-area-inset-bottom`). El calendario va en el medio con scroll propio.
+- Calendario en móvil: `numberOfMonths={1}` (1 mes); en `sm+` mantener `2`. Reducir padding a `p-2` y tamaño de celdas para que entre cómodo.
+- Reordenar resumen Retiro / Devolución apilado verticalmente en móvil (en vez de fila con flecha) para no quedar muy comprimido.
+- Footer siempre visible: botón "Aplicar" full-width amber + link "Limpiar fechas" arriba a la izquierda. En desktop mantener el layout actual (un row).
+- Agregar botón ✕ explícito en el header del modal (además del que trae Dialog) para ofrecer salida obvia.
+- Mostrar el badge "N jornada(s) · retiro · devolución" dentro del footer (sobre el botón Aplicar) en lugar de debajo del calendario, así queda siempre visible junto a la CTA.
 
-- Línea principal: `21 may 09:00 → 22 may 09:00` (con `tabular-nums` para los horarios)
-- Línea/badge secundaria: `· 1 jornada` o `· N jornadas` usando `useCart().days()`
+### 2. Selector de hora cada 30 min — nuevo componente `TimeStepSelect`
 
-Cuando no hay fechas elegidas: mantener "Elegir fechas" con un sub-texto tenue tipo "Definí retiro y devolución".
+Crear `src/components/rental/TimeStepSelect.tsx`: un `<select>` nativo con opciones `00:00, 00:30, 01:00, ... 23:30` (48 valores). Devuelve `string` formato `HH:mm`. Ventajas: nativo en móvil (rueda iOS), accesible con teclado, imposible elegir minutos intermedios.
 
-Ícono calendario sin cambios. Mantener el touch target y el estilo amber del borde.
+Reemplazar los `<input type="time">` actuales:
+- `RentalDateModal.tsx` (retiro y devolución).
+- `TopBar.tsx` `DateField` (desktop).
 
-### 2. `src/components/rental/RentalDateModal.tsx` — etiquetas más claras
+### 3. Normalizar horas existentes en el store
 
-- Renombrar headers de columna: `Inicio` → `Retiro` y `Devolver` → `Devolución`.
-- Debajo del calendario, agregar una fila pequeña centrada con el resumen: `N jornada(s) · retiro 09:00 · devolución 09:00`, leyendo `days()`, `startTime`, `endTime` del store.
-- Pequeño hint bajo los inputs `time`: "Horario sujeto a confirmación" (texto muted, 11px).
-
-### 3. Cálculo de jornadas — `src/lib/cart-store.ts`
-
-La función `days()` actual cuenta días naturales (`ceil(ms/día) + 1`) sin considerar las horas. Para que coincida con la lógica de retiro/devolución del rubro:
-
-- Si `endTime <= startTime` → jornadas = diferencia de días naturales (ej. retiro lunes 09:00, devolución martes 09:00 = 1 jornada).
-- Si `endTime > startTime` → jornadas = diferencia de días naturales + 1.
-- Mínimo 1.
-
-Esto se usa también para el subtotal del carrito, así que verificar que `CartDrawer` siga mostrando el total correcto (no debería cambiar para el caso típico de mismo horario de retiro/devolución).
+En `cart-store.ts`, los defaults `09:00` ya son válidos. Agregar utilitario `snapTo30(hhmm)` que redondee al múltiplo de 30 más cercano y aplicarlo en `setStartTime` / `setEndTime` para blindar cualquier valor que llegue de afuera (por ejemplo, persistencia previa).
 
 ## Fuera de alcance
 
-- Selector de horarios disponibles (slot picker). Seguimos con `<input type="time">`.
-- Reglas de horario por sucursal o feriados.
-- Cambios en el backend de pedidos.
+- Bloquear horarios pasados / fuera de horario comercial.
+- Mostrar disponibilidad por slot horario.
+- Cambiar el calendario por uno de otra librería.
 
 ## Archivos a tocar
 
-- `src/components/rental/TopBar.tsx`
 - `src/components/rental/RentalDateModal.tsx`
+- `src/components/rental/TopBar.tsx`
+- `src/components/rental/TimeStepSelect.tsx` (nuevo)
 - `src/lib/cart-store.ts`

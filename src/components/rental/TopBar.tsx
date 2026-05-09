@@ -9,6 +9,7 @@ import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, ShoppingBag, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RentalDateModal } from "./RentalDateModal";
+import { TimeStepSelect } from "./TimeStepSelect";
 
 function DateField({
   label,
@@ -50,11 +51,11 @@ function DateField({
           />
         </PopoverContent>
       </Popover>
-      <input
-        type="time"
+      <TimeStepSelect
         value={time}
-        onChange={(e) => onTime(e.target.value)}
-        className="rounded-md border hairline bg-surface px-2 py-1.5 text-sm tabular focus:border-amber/40 focus:outline-none"
+        onChange={onTime}
+        aria-label={`${label} hora`}
+        className="rounded-md border hairline bg-surface px-2 py-1.5 text-sm focus:border-amber/40"
       />
     </div>
   );
