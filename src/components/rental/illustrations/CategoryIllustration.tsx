@@ -119,7 +119,7 @@ function Cable(props: IllProps) {
   );
 }
 
-const map: Record<Category, (p: IllProps) => JSX.Element> = {
+const map: Record<Category, (p: IllProps) => React.ReactElement> = {
   Cámaras: Camara,
   Lentes: Lente,
   Iluminación: Iluminacion,
