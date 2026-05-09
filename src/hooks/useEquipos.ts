@@ -3,135 +3,86 @@ import { apiGetEquipos, apiGetCategorias, apiGetDisponibilidad, type BackendEqui
 import { type Equipment, type Category } from "@/data/equipment";
 import { format } from "date-fns";
 
-/* ─── Mapeo de etiquetas backend → categorías Lovable ─────────────────── */
+/* ─── Inferencia de categoría desde nombre/marca/etiquetas ────────────── */
+//
+// El backend guarda las etiquetas vacías para la mayoría de los equipos,
+// así que inferimos la categoría a partir del nombre y la marca del equipo.
+// Las reglas se evalúan en orden: la primera que matchea gana.
 
-const TAG_TO_CATEGORY: Record<string, Category> = {
-  // Cámaras
-  "cámara": "Cámaras",
-  "camera": "Cámaras",
-  "red": "Cámaras",
-  "cinema": "Cámaras",
-  "cinema line": "Cámaras",
-  "dslr": "Cámaras",
-  "mirrorless": "Cámaras",
-  "canon": "Cámaras",
-  "sony": "Cámaras",
-  "gopro": "Cámaras",
-  "insta360": "Cámaras",
-  "acción": "Cámaras",
+type Rule = { keywords: string[]; category: Category };
 
-  // Lentes
-  "lente": "Lentes",
-  "lens": "Lentes",
-  "zoom": "Lentes",
-  "prime": "Lentes",
-  "macro": "Lentes",
-  "sigma": "Lentes",
-  "laowa": "Lentes",
-
-  // Monitores
-  "monitor": "Monitores",
-  "atomos": "Monitores",
-  "smallhd": "Monitores",
-  "lilliput": "Monitores",
-  "hollyland": "Monitores",
-
-  // Iluminación
-  "luz": "Luces",
-  "light": "Luces",
-  "led": "Luces",
-  "aputure": "Luces",
-  "nanlite": "Luces",
-  "amaran": "Luces",
-  "godox": "Luces",
-  "arri": "Luces",
-
-  // Tungsteno
-  "tungsteno": "Tungsteno",
-  "fresnel": "Tungsteno",
-  "lowel": "Tungsteno",
-
-  // Modificadores
-  "softbox": "Modificadores",
-  "difusor": "Modificadores",
-  "bandera": "Modificadores",
-  "modificador": "Modificadores",
-  "lantern": "Modificadores",
-
-  // Comunicación
-  "intercom": "Comunicación",
-  "solidcom": "Comunicación",
-  "comunicación": "Comunicación",
-
-  // Flash
-  "flash": "Flash",
-
-  // Brazo Mágico
-  "brazo": "Brazo Mágico",
-  "magic arm": "Brazo Mágico",
-
-  // Stands
-  "stand": "Stands",
-  "c-stand": "Stands",
-  "roller": "Stands",
-  "lowboy": "Stands",
-
-  // Grips
-  "grip": "Grips",
-  "clamp": "Grips",
-  "car mount": "Grips",
-  "plate": "Grips",
-  "mafer": "Grips",
-
-  // Trípode
-  "trípode": "Trípode",
-  "tripod": "Trípode",
-  "manfrotto": "Trípode",
-  "sachtler": "Trípode",
-
-  // Sonido
-  "micrófono": "Sonido",
-  "microphone": "Sonido",
-  "shotgun": "Sonido",
-  "lavalier": "Sonido",
-  "wireless": "Sonido",
-  "rode": "Sonido",
-  "sony uwp": "Sonido",
-  "audio": "Sonido",
-  "sound": "Sonido",
-
-  // Baterías
-  "batería": "Baterías",
-  "battery": "Baterías",
-  "vmount": "Baterías",
-  "anton bauer": "Baterías",
+// Orden importa: más específico primero
+const RULES: Rule[] = [
+  // Baterías (antes de genéricos como "canon", "sony")
+  { keywords: ["batería", "bateria", "battery", "v-mount", "vmount", "np-f", "lp-e", "np-fz", "kit baterías", "kit bateria"], category: "Baterías" },
 
   // Filtros
-  "filtro": "Filtros",
-  "filter": "Filtros",
-  "nd": "Filtros",
-  "tiffen": "Filtros",
-};
+  { keywords: ["filtro", "filter", "polarizador", "difusión", "pro-mist", "tiffen"], category: "Filtros" },
 
-function mapTagToCategory(tags: string[]): Category {
-  if (!tags || tags.length === 0) return "Accesorios";
+  // Cámaras (antes de lentes para que "Canon" no matchee lentes)
+  { keywords: ["cámara", "camara", "camera", "gopro", "insta360", "komodo", "fx3", "zv-e1", "a7 v", "c200", "cinema line"], category: "Cámaras" },
 
-  // Buscar la primera etiqueta que tenga mapping
-  for (const tag of tags) {
-    const normalized = tag.toLowerCase().trim();
-    // Búsqueda exacta
-    if (TAG_TO_CATEGORY[normalized]) {
-      return TAG_TO_CATEGORY[normalized];
-    }
-    // Búsqueda parcial (si la etiqueta contiene una clave del mapping)
-    for (const [key, category] of Object.entries(TAG_TO_CATEGORY)) {
-      if (normalized.includes(key) || key.includes(normalized)) {
-        return category;
-      }
+  // Lentes
+  { keywords: ["lente", "lens", "lentes", "kit lentes", "laowa", "tokina", "zeiss", "speedbooster", "montura"], category: "Lentes" },
+
+  // Monitores
+  { keywords: ["monitor", "video assist", "smallhd", "lilliput", "viltrox", "atomos"], category: "Monitores" },
+
+  // Comunicación
+  { keywords: ["intercom", "solidcom", "hollyland"], category: "Comunicación" },
+
+  // Flash
+  { keywords: ["flash"], category: "Flash" },
+
+  // Sonido (antes de "wireless" genérico)
+  { keywords: ["micrófono", "microfono", "microphone", "lavalier", "shotgun", "wireless go", "dji mic", "rodecaster", "caña boom", "boom arm", "sennheiser", "zeppelin", "inalámbrico rode"], category: "Sonido" },
+
+  // Brazo Mágico
+  { keywords: ["brazo mágico", "brazo magico", "brazo articulado", "brazo avenger", "brazo con rótula", "magic arm", "superflex"], category: "Brazo Mágico" },
+
+  // Stands
+  { keywords: ["c-stand", "stand", "backdrop"], category: "Stands" },
+
+  // Tungsteno (antes de "luz" genérico)
+  { keywords: ["tungsteno", "fresnel tungsteno", "par mil", "mole richardson", "fresnel arri", "lowel"], category: "Tungsteno" },
+
+  // Modificadores de luz
+  { keywords: ["softbox", "bandera negra", "frame difusión", "frame difusion", "reflector", "fresnel attachment", "globo china", "lantern", "modificador"], category: "Modificadores" },
+
+  // Luces (genérico, después de Tungsteno y Modificadores)
+  { keywords: ["luz ", "luz led", "luz on-camera", "luz open face", "spotlight", "fresnel", "kino flo", "nanlite", "amaran", "aputure", "godox vl", "godox tl", "godox m1", "arri", "dracast", "yongnuo", "pampa tubo", "máquina de humo", "maquina de humo"], category: "Luces" },
+
+  // Trípode / movimiento
+  { keywords: ["trípode", "tripode", "tripod", "manfrotto", "sachtler", "slider", "riel dolly", "dolly", "steadicam", "gimbal", "ronin", "glidecam", "follow focus", "nucleus"], category: "Trípode" },
+
+  // Grips
+  { keywords: ["clamp", "car mount", "jaw clamp", "junior pin", "baby pin", "wall plate", "pinza", "sopapa", "matebox", "matte box"], category: "Grips" },
+];
+
+function inferCategory(nombre: string, marca: string): Category {
+  const text = `${nombre} ${marca}`.toLowerCase();
+
+  for (const rule of RULES) {
+    for (const kw of rule.keywords) {
+      if (text.includes(kw)) return rule.category;
     }
   }
 
   return "Accesorios";
+}
+
+function resolveCategory(etiquetas: string[], nombre: string, marca: string): Category {
+  // 1. Si hay etiquetas explícitas, intentar mapearlas
+  for (const tag of etiquetas) {
+    const t = tag.toLowerCase().trim();
+    for (const rule of RULES) {
+      for (const kw of rule.keywords) {
+        if (t.includes(kw)) return rule.category;
+      }
+    }
+  }
+  // 2. Inferir desde nombre y marca
+  return inferCategory(nombre, marca);
 }
 
 /* ─── Adaptador backend → tipo frontend ─────────────────────────────── */
@@ -149,8 +100,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
       .replace(/^-|-$/g, "") || `equipo-${e.id}`,
     name,
     brand: marca || "—",
-    // Mapear etiquetas del backend a categorías de Lovable
-    category: mapTagToCategory(e.etiquetas ?? []),
+    category: resolveCategory(e.etiquetas ?? [], nombre, marca),
     pricePerDay: e.precio_jornada ?? 0,
     fotoUrl: e.foto_url ?? null,
     cantidad: e.cantidad ?? 1,
