@@ -211,7 +211,7 @@ function Index() {
 
         {/* Toggle Modo + búsqueda sticky */}
         <div className="sticky top-14 sm:top-[60px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
-          <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 lg:px-12">
+          <div className="flex flex-col gap-1.5 px-3 py-2 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3 lg:px-12">
             {/* Mobile: pill fechas + lupa */}
             <MobileStickyBar query={query} setQuery={setQuery} />
 

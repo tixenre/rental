@@ -60,27 +60,22 @@ export function MobileStickyBar({ query, setQuery }: Props) {
           <>
             <button
               onClick={() => setDateModalOpen(true)}
-              className="flex flex-1 min-w-0 items-center gap-3 rounded-full border border-amber/40 bg-amber/5 px-4 py-2 text-left transition hover:border-amber"
+              className="flex flex-1 min-w-0 items-center gap-2 rounded-full border border-amber/40 bg-amber/5 px-3 py-2 text-left transition hover:border-amber"
               aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
             >
               <CalendarIcon className="h-4 w-4 shrink-0" />
               {hasDates ? (
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium leading-tight tabular-nums truncate">
-                    {format(startDate!, "dd MMM", { locale: es })} {startTime}
-                    <span className="mx-1 text-muted-foreground">→</span>
-                    {format(endDate!, "dd MMM", { locale: es })} {endTime}
-                  </div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground leading-tight mt-0.5">
-                    {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
-                  </div>
+                <div className="flex-1 min-w-0 text-[13px] font-medium leading-none tabular-nums truncate">
+                  {format(startDate!, "dd MMM", { locale: es })} {startTime}
+                  <span className="mx-1 text-muted-foreground">→</span>
+                  {format(endDate!, "dd MMM", { locale: es })} {endTime}
+                  <span className="ml-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    · {jornadas}j
+                  </span>
                 </div>
               ) : (
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium leading-tight">Elegir fechas</div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground leading-tight mt-0.5">
-                    Retiro y devolución
-                  </div>
+                <div className="flex-1 min-w-0 text-[13px] font-medium leading-none">
+                  Elegir fechas
                 </div>
               )}
             </button>
