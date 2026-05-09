@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Search, LayoutGrid, List, Star, ArrowDownAZ, DollarSign } from "lucide-react";
+import { LayoutGrid, List, ArrowRight } from "lucide-react";
 import { TopBar } from "@/components/rental/TopBar";
-import { CategorySidebar } from "@/components/rental/CategorySidebar";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
 import { CartDrawer } from "@/components/rental/CartDrawer";
-import { equipment, type Category } from "@/data/equipment";
+import { CarouselRow } from "@/components/rental/CarouselRow";
+import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
+import { ListFilters } from "@/components/rental/ListFilters";
+import { equipment, categories, type Category } from "@/data/equipment";
 import { CategoryIllustration } from "@/components/rental/illustrations/CategoryIllustration";
 import { cn } from "@/lib/utils";
 
@@ -17,30 +19,33 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Catálogo de cámaras, lentes, iluminación, audio y soportes para producciones audiovisuales.",
-      },
-      { property: "og:title", content: "Rambla Rental" },
-      {
-        property: "og:description",
-        content: "Equipos de cine y foto para alquilar por jornada.",
+          "Cámaras, lentes, iluminación, audio y soportes para producciones audiovisuales. Mar del Plata.",
       },
     ],
   }),
   component: Index,
 });
 
-type Sort = "relevancia" | "az" | "precio";
+type Mode = "grid" | "list";
 
 function Index() {
-  const [category, setCategory] = useState<Category | "Todos">("Todos");
+  const [mode, setMode] = useState<Mode>("grid");
+  const [selectedCats, setSelectedCats] = useState<Set<Category>>(new Set());
   const [brand, setBrand] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<Sort>("relevancia");
-  const [view, setView] = useState<"grid" | "list">("grid");
 
-  const items = useMemo(() => {
+  const toggleCat = (c: Category) => {
+    setSelectedCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c);
+      else next.add(c);
+      return next;
+    });
+  };
+
+  const filtered = useMemo(() => {
     let list = equipment.slice();
-    if (category !== "Todos") list = list.filter((e) => e.category === category);
+    if (selectedCats.size > 0) list = list.filter((e) => selectedCats.has(e.category));
     if (brand) list = list.filter((e) => e.brand === brand);
     if (query.trim()) {
       const q = query.toLowerCase();
@@ -51,168 +56,224 @@ function Index() {
           e.category.toLowerCase().includes(q),
       );
     }
-    if (sort === "az") list.sort((a, b) => a.name.localeCompare(b.name));
-    if (sort === "precio") list.sort((a, b) => a.pricePerDay - b.pricePerDay);
     return list;
-  }, [category, brand, query, sort]);
+  }, [selectedCats, brand, query]);
+
+  const jumpToList = (c: Category) => {
+    setSelectedCats(new Set([c]));
+    setMode("list");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <TopBar />
 
-      <div className="flex">
-        <CategorySidebar
-          activeCategory={category}
-          activeBrand={brand}
-          onCategory={(c) => setCategory(c)}
-          onBrand={setBrand}
-        />
-
-        <main className="flex-1 min-w-0">
-          {/* Hero — bloque amarillo brand */}
-          <section className="relative overflow-hidden border-b hairline bg-amber text-ink">
-            <div className="absolute inset-0 grain opacity-40" />
-            <div className="relative px-6 py-12 lg:px-12 lg:py-16">
-              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/70">
-                Catálogo · {equipment.length} equipos · Mar del Plata
-              </div>
-              <h1 className="mt-4 wordmark text-[14vw] leading-[0.85] md:text-[7rem] lg:text-[8.5rem] text-balance">
-                un lugar
-                <br />
-                donde pasan
-                <br />
-                cosas.
-              </h1>
-              <p className="mt-6 max-w-xl text-base text-ink/80">
-                Cámaras, ópticas, luces, audio y soportes para producciones
-                audiovisuales. Elegí fechas y armá tu pedido — te lo dejamos
-                listo para retirar.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-2 text-[10px] font-mono uppercase tracking-widest">
-                {["calidad", "variedad", "amistad", "comunidad", "intercambio", "local"].map((w) => (
-                  <span key={w} className="rounded-full border border-ink/25 px-3 py-1">
-                    {w}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-10 flex flex-wrap items-end gap-6 border-t border-ink/15 pt-6">
-                {(["Cámaras","Lentes","Iluminación","Audio","Soportes","Accesorios","Adaptadores"] as const).map((c) => (
-                  <div key={c} className="flex flex-col items-center gap-2 text-ink">
-                    <CategoryIllustration category={c} className="h-10 w-10" />
-                    <span className="font-mono text-[9px] uppercase tracking-widest text-ink/70">{c}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Search & sort */}
-          <div className="sticky top-[68px] z-30 border-b hairline bg-background/85 backdrop-blur-xl">
-            <div className="flex items-center gap-3 px-6 py-3 lg:px-12">
-              <div className="relative flex-1 max-w-xl">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar equipos…"
-                  className="w-full rounded-md border hairline bg-surface py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:border-amber/40 focus:outline-none"
-                />
-              </div>
-
-              <div className="ml-auto hidden md:flex items-center gap-1 rounded-md border hairline p-0.5 text-xs">
-                {(
-                  [
-                    ["relevancia", "Relevancia", Star],
-                    ["az", "A–Z", ArrowDownAZ],
-                    ["precio", "Precio", DollarSign],
-                  ] as const
-                ).map(([k, label, Icon]) => (
-                  <button
-                    key={k}
-                    onClick={() => setSort(k)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded px-3 py-1.5 transition",
-                      sort === k
-                        ? "bg-amber text-ink"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    <Icon className="h-3 w-3" />
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-1 rounded-md border hairline p-0.5">
-                <button
-                  onClick={() => setView("grid")}
-                  className={cn(
-                    "grid h-7 w-7 place-items-center rounded transition",
-                    view === "grid"
-                      ? "bg-amber text-ink"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                  aria-label="Vista grilla"
-                >
-                  <LayoutGrid className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={() => setView("list")}
-                  className={cn(
-                    "grid h-7 w-7 place-items-center rounded transition",
-                    view === "list"
-                      ? "bg-amber text-ink"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                  aria-label="Vista lista"
-                >
-                  <List className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
+      {/* Hero amarillo brand */}
+      <section className="relative overflow-hidden border-b hairline bg-amber text-ink">
+        <div className="absolute inset-0 grain opacity-40" />
+        <div className="relative px-6 py-12 lg:px-12 lg:py-16">
+          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/70">
+            Catálogo · {equipment.length} equipos · Mar del Plata
           </div>
-
-          {/* Section header */}
-          <div className="flex items-baseline justify-between px-6 pt-8 pb-4 lg:px-12">
-            <div className="flex items-baseline gap-3">
-              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                {category === "Todos" ? "Todos los equipos" : category}
-                {brand ? ` · ${brand}` : ""}
+          <h1 className="mt-4 wordmark text-[14vw] leading-[0.85] md:text-[7rem] lg:text-[8.5rem] text-balance">
+            un lugar
+            <br />
+            donde pasan
+            <br />
+            cosas.
+          </h1>
+          <p className="mt-6 max-w-xl text-base text-ink/80">
+            Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales.
+            Elegí fechas y armá tu pedido — te lo dejamos listo para retirar.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2 text-[10px] font-mono uppercase tracking-widest">
+            {["calidad", "variedad", "amistad", "comunidad", "intercambio", "local"].map((w) => (
+              <span key={w} className="rounded-full border border-ink/25 px-3 py-1">
+                {w}
               </span>
-              <span className="text-muted-foreground">—</span>
-              <span className="font-display text-lg tabular">{items.length}</span>
-            </div>
+            ))}
           </div>
+        </div>
+      </section>
 
-          {/* Grid / List */}
-          <div className="px-6 pb-24 lg:px-12">
-            {items.length === 0 ? (
-              <div className="rounded-lg border hairline bg-surface px-6 py-16 text-center">
-                <div className="font-display text-2xl text-muted-foreground">
-                  Sin resultados
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Probá con otra categoría, marca o término de búsqueda.
-                </p>
-              </div>
-            ) : view === "grid" ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                {items.map((item, i) => (
-                  <EquipmentCard key={item.id} item={item} index={i} />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {items.map((item) => (
-                  <EquipmentRow key={item.id} item={item} />
-                ))}
-              </div>
-            )}
+      {/* Toggle Modo */}
+      <div className="sticky top-[68px] z-30 border-b hairline bg-background/90 backdrop-blur-xl">
+        <div className="flex items-center gap-3 px-6 py-3 lg:px-12">
+          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            Modo
           </div>
-        </main>
+          <div className="flex items-center gap-1 rounded-full border hairline p-0.5">
+            <button
+              onClick={() => setMode("grid")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
+                mode === "grid" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
+              )}
+            >
+              <LayoutGrid className="h-3 w-3" /> Explorar
+            </button>
+            <button
+              onClick={() => setMode("list")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
+                mode === "list" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
+              )}
+            >
+              <List className="h-3 w-3" /> Lista completa
+            </button>
+          </div>
+          <div className="ml-auto font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
+            {mode === "list" ? `${filtered.length} resultados` : `${equipment.length} equipos`}
+          </div>
+        </div>
       </div>
+
+      {mode === "grid" ? (
+        <GridMode onJumpToList={jumpToList} />
+      ) : (
+        <ListMode
+          query={query}
+          setQuery={setQuery}
+          selectedCats={selectedCats}
+          toggleCat={toggleCat}
+          brand={brand}
+          setBrand={setBrand}
+          onClear={() => {
+            setSelectedCats(new Set());
+            setBrand(null);
+            setQuery("");
+          }}
+          filtered={filtered}
+        />
+      )}
 
       <CartDrawer />
     </div>
+  );
+}
+
+function GridMode({ onJumpToList }: { onJumpToList: (c: Category) => void }) {
+  const news = equipment.filter((e) => e.isNew);
+  const combos = equipment.filter((e) => e.isCombo);
+
+  // Ancho fijo de cards en carrusel para snap consistente
+  const cardW = 260;
+
+  return (
+    <div className="space-y-12 py-8 lg:py-12">
+      {news.length > 0 && (
+        <CarouselRow title="Ingresos" count={news.length}>
+          {news.map((item, i) => (
+            <EquipmentCard key={item.id} item={item} index={i} width={cardW} />
+          ))}
+        </CarouselRow>
+      )}
+
+      {combos.length > 0 && (
+        <CarouselRow title="Combos" count={combos.length}>
+          {combos.map((item, i) => (
+            <EquipmentCard key={item.id} item={item} index={i} width={cardW + 40} />
+          ))}
+        </CarouselRow>
+      )}
+
+      <CategoryMosaic onSelect={onJumpToList} />
+
+      {categories.map((c) => {
+        const items = equipment.filter((e) => e.category === c);
+        if (items.length === 0) return null;
+        return (
+          <CarouselRow
+            key={c}
+            title={c}
+            count={items.length}
+            action={
+              <button
+                onClick={() => onJumpToList(c)}
+                className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink"
+              >
+                Ver todas <ArrowRight className="h-3 w-3" />
+              </button>
+            }
+          >
+            {items.map((item, i) => (
+              <EquipmentCard key={item.id} item={item} index={i} width={cardW} />
+            ))}
+          </CarouselRow>
+        );
+      })}
+
+      {/* Footer mínimo */}
+      <footer className="border-t hairline px-6 py-12 lg:px-12">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <div className="wordmark text-4xl text-amber">rambla</div>
+            <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+              Rental · Mar del Plata
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-6 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            {(["Cámaras", "Lentes", "Luces", "Sonido", "Stands"] as const).map((c) => (
+              <div key={c} className="flex flex-col items-center gap-2 text-ink">
+                <CategoryIllustration category={c} className="h-6 w-6" />
+                <span>{c}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function ListMode({
+  query,
+  setQuery,
+  selectedCats,
+  toggleCat,
+  brand,
+  setBrand,
+  onClear,
+  filtered,
+}: {
+  query: string;
+  setQuery: (v: string) => void;
+  selectedCats: Set<Category>;
+  toggleCat: (c: Category) => void;
+  brand: string | null;
+  setBrand: (b: string | null) => void;
+  onClear: () => void;
+  filtered: typeof equipment;
+}) {
+  return (
+    <>
+      <ListFilters
+        query={query}
+        onQuery={setQuery}
+        selectedCategories={selectedCats}
+        onToggleCategory={toggleCat}
+        selectedBrand={brand}
+        onBrand={setBrand}
+        onClear={onClear}
+      />
+
+      <div className="px-6 py-6 pb-24 lg:px-12">
+        {filtered.length === 0 ? (
+          <div className="rounded-lg border hairline bg-surface px-6 py-16 text-center">
+            <div className="font-display text-2xl text-muted-foreground">Sin resultados</div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Probá con otra categoría, marca o término de búsqueda.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {filtered.map((item) => (
+              <EquipmentRow key={item.id} item={item} />
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
