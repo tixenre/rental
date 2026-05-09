@@ -34,9 +34,9 @@ function AdminAccessPage() {
         </div>
         <h1 className="font-display text-3xl text-ink">Acceso admin</h1>
 
-        {loading ? (
+        {loading && !BYPASS_AUTH ? (
           <p className="mt-8 text-sm text-muted-foreground">Verificando sesión…</p>
-        ) : !user ? (
+        ) : !user && !BYPASS_AUTH ? (
           <StateCard
             tone="neutral"
             icon={<ShieldQuestion className="h-5 w-5" />}
