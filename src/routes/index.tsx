@@ -68,20 +68,33 @@ function Index() {
         />
 
         <main className="flex-1 min-w-0">
-          {/* Hero */}
-          <section className="border-b hairline px-6 py-10 lg:px-12 lg:py-14 grain">
-            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber">
-              Catálogo · {equipment.length} equipos
+          {/* Hero — bloque amarillo brand */}
+          <section className="relative overflow-hidden border-b hairline bg-amber text-ink">
+            <div className="absolute inset-0 grain opacity-40" />
+            <div className="relative px-6 py-12 lg:px-12 lg:py-16">
+              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/70">
+                Catálogo · {equipment.length} equipos · Mar del Plata
+              </div>
+              <h1 className="mt-4 wordmark text-[14vw] leading-[0.85] md:text-[7rem] lg:text-[8.5rem] text-balance">
+                un lugar
+                <br />
+                donde pasan
+                <br />
+                cosas.
+              </h1>
+              <p className="mt-6 max-w-xl text-base text-ink/80">
+                Cámaras, ópticas, luces, audio y soportes para producciones
+                audiovisuales. Elegí fechas y armá tu pedido — te lo dejamos
+                listo para retirar.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-2 text-[10px] font-mono uppercase tracking-widest">
+                {["calidad", "variedad", "amistad", "comunidad", "intercambio", "local"].map((w) => (
+                  <span key={w} className="rounded-full border border-ink/25 px-3 py-1">
+                    {w}
+                  </span>
+                ))}
+              </div>
             </div>
-            <h1 className="mt-3 font-display text-4xl leading-[0.95] tracking-tight md:text-6xl text-balance">
-              Equipos de cine
-              <br />
-              <span className="text-muted-foreground italic">para tu próxima toma.</span>
-            </h1>
-            <p className="mt-4 max-w-xl text-sm text-muted-foreground">
-              Cámaras, ópticas, luces y soportes seleccionados, listos para
-              retirar. Elegí fechas y armá tu pedido.
-            </p>
           </section>
 
           {/* Search & sort */}
