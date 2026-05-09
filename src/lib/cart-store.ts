@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+type DrawerPlacement = "right" | "bottom";
+
 type CartState = {
   items: Record<string, number>;
   startDate: Date | undefined;
@@ -7,6 +9,7 @@ type CartState = {
   startTime: string;
   endTime: string;
   drawerOpen: boolean;
+  drawerPlacement: DrawerPlacement;
   add: (id: string) => void;
   remove: (id: string) => void;
   setQty: (id: string, qty: number) => void;
@@ -14,7 +17,7 @@ type CartState = {
   setDates: (start?: Date, end?: Date) => void;
   setStartTime: (t: string) => void;
   setEndTime: (t: string) => void;
-  setDrawerOpen: (open: boolean) => void;
+  setDrawerOpen: (open: boolean, placement?: DrawerPlacement) => void;
   totalItems: () => number;
   days: () => number;
 };
@@ -26,6 +29,7 @@ export const useCart = create<CartState>((set, get) => ({
   startTime: "09:00",
   endTime: "09:00",
   drawerOpen: false,
+  drawerPlacement: "right",
   add: (id) =>
     set((s) => ({ items: { ...s.items, [id]: (s.items[id] ?? 0) + 1 } })),
   remove: (id) =>
@@ -47,7 +51,11 @@ export const useCart = create<CartState>((set, get) => ({
   setDates: (start, end) => set({ startDate: start, endDate: end }),
   setStartTime: (t) => set({ startTime: t }),
   setEndTime: (t) => set({ endTime: t }),
-  setDrawerOpen: (open) => set({ drawerOpen: open }),
+  setDrawerOpen: (open, placement) =>
+    set((s) => ({
+      drawerOpen: open,
+      drawerPlacement: placement ?? s.drawerPlacement,
+    })),
   totalItems: () =>
     Object.values(get().items).reduce((a, b) => a + b, 0),
   days: () => {

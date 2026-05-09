@@ -5,7 +5,21 @@ export type Category =
   | "Audio"
   | "Soportes"
   | "Accesorios"
-  | "Adaptadores";
+  | "Adaptadores"
+  // Categorías inferidas desde el backend (useEquipos.inferCategory)
+  | "Baterías"
+  | "Filtros"
+  | "Monitores"
+  | "Comunicación"
+  | "Flash"
+  | "Sonido"
+  | "Brazo Mágico"
+  | "Stands"
+  | "Tungsteno"
+  | "Modificadores"
+  | "Luces"
+  | "Trípode"
+  | "Grips";
 
 export type IncludedItem = {
   /** Si está y matchea con un equipo del catálogo, se enriquece con su info. */

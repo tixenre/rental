@@ -217,7 +217,7 @@ function EstudioPage() {
         </div>
       </footer>
 
-      <CartDrawer />
+      <CartDrawer allEquipos={[]} />
     </div>
   );
 }
