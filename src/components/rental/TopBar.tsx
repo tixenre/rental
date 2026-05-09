@@ -106,13 +106,13 @@ export function TopBar() {
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setDrawerOpen(true)}
-            className="relative flex items-center gap-2 rounded-md bg-amber px-4 py-2 text-sm font-medium text-primary-foreground transition hover:brightness-110"
+            className="relative flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-amber hover:text-ink"
           >
             <ShoppingBag className="h-4 w-4" />
             <span className="tabular">{count}</span>
             <span>{count === 1 ? "ítem" : "ítems"}</span>
           </button>
-          <button className="flex items-center gap-2 rounded-md border hairline px-3 py-2 text-sm hover:border-amber/40">
+          <button className="flex items-center gap-2 rounded-full border hairline px-3 py-2 text-sm hover:border-foreground/40">
             <User className="h-4 w-4" />
             {user}
           </button>
