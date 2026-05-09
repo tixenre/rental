@@ -244,7 +244,7 @@ function Index() {
       )}
 
       <CartDrawer />
-      <GlobalDetailDialog />
+      <GlobalDetailDialog mode={mode} />
     </div>
     </EquipmentDetailProvider>
   );
@@ -252,26 +252,15 @@ function Index() {
 
 /**
  * Renders the equipment detail dialog at the route level whenever ?eq= matches
- * a known equipment. Guarantees the panel opens regardless of viewport, mode
- * or active filters that might hide the underlying card/row.
+ * a known equipment. In list mode, the row expands inline so we don't open the
+ * modal on top. In grid mode we always open the modal.
  */
-function GlobalDetailDialog() {
+function GlobalDetailDialog({ mode }: { mode: Mode }) {
   const { eq } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 639px)");
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
 
   const item = eq ? equipment.find((e) => e.id === eq) : undefined;
-  // En mobile el row se expande inline → no abrimos modal encima.
-  const open = !!item && !isMobile;
+  const open = !!item && mode === "grid";
 
   if (!item) return null;
   return (
