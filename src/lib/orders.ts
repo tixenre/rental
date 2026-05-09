@@ -31,6 +31,15 @@ export function isEditable(status: OrderStatus) {
   return status === "borrador" || status === "solicitado";
 }
 
+export type OrderItemInput = {
+  id: string;
+  name: string;
+  brand: string;
+  category: string;
+  qty: number;
+  pricePerDay: number;
+};
+
 export type CreateOrderInput = {
   status: OrderStatus;
   startDate?: Date;
@@ -38,7 +47,10 @@ export type CreateOrderInput = {
   startTime: string;
   endTime: string;
   days: number;
-  items: Record<string, number>; // equipment id -> qty
+  /** Mapa id→qty (compat con flujo viejo basado en mock estático). */
+  items?: Record<string, number>;
+  /** Items enriquecidos (preferido — funciona con backend o mock). */
+  resolvedItems?: OrderItemInput[];
   notes?: string;
 };
 
@@ -54,15 +66,27 @@ export async function createOrder(input: CreateOrderInput) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Necesitás iniciar sesión.");
 
-  const itemsList = Object.entries(input.items)
-    .map(([id, qty]) => {
-      const eq = equipment.find((e) => e.id === id);
-      if (!eq || qty <= 0) return null;
-      return { eq, qty };
-    })
-    .filter(Boolean) as { eq: (typeof equipment)[number]; qty: number }[];
+  let itemsList: OrderItemInput[];
+  if (input.resolvedItems && input.resolvedItems.length > 0) {
+    itemsList = input.resolvedItems;
+  } else {
+    itemsList = Object.entries(input.items ?? {})
+      .map(([id, qty]) => {
+        const eq = equipment.find((e) => e.id === id);
+        if (!eq || qty <= 0) return null;
+        return {
+          id: eq.id,
+          name: eq.name,
+          brand: eq.brand,
+          category: eq.category,
+          qty,
+          pricePerDay: eq.pricePerDay,
+        };
+      })
+      .filter(Boolean) as OrderItemInput[];
+  }
 
-  const subtotalPerDay = itemsList.reduce((s, { eq, qty }) => s + eq.pricePerDay * qty, 0);
+  const subtotalPerDay = itemsList.reduce((s, it) => s + it.pricePerDay * it.qty, 0);
   const total = subtotalPerDay * input.days;
 
   const { data: order, error } = await supabase
@@ -85,14 +109,14 @@ export async function createOrder(input: CreateOrderInput) {
 
   if (itemsList.length > 0) {
     const { error: itemsError } = await supabase.from("order_items").insert(
-      itemsList.map(({ eq, qty }) => ({
+      itemsList.map((it) => ({
         order_id: order.id,
-        equipment_id: eq.id,
-        name: eq.name,
-        brand: eq.brand,
-        category: eq.category,
-        qty,
-        price_per_day: eq.pricePerDay,
+        equipment_id: it.id,
+        name: it.name,
+        brand: it.brand,
+        category: it.category,
+        qty: it.qty,
+        price_per_day: it.pricePerDay,
       }))
     );
     if (itemsError) throw itemsError;
