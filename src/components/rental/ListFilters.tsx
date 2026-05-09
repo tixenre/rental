@@ -22,7 +22,7 @@ export function ListFilters({
   const hasFilters = selectedCategories.size > 0 || !!selectedBrand || !!query.trim();
 
   return (
-    <div className="sticky top-[116px] z-20 border-b hairline bg-background/90 backdrop-blur-xl">
+    <div className="sticky top-[180px] sm:top-[124px] z-20 border-b hairline bg-background/90 backdrop-blur-xl">
       <div className="flex flex-col gap-3 px-6 py-4 lg:px-12">
         {/* Buscador + marca + clear */}
         <div className="flex flex-wrap items-center gap-3">
