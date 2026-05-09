@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { DayPicker, type DateRange } from "react-day-picker";
 import { es } from "date-fns/locale";
 import { addDays, format, startOfDay } from "date-fns";
@@ -29,33 +28,20 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
     setEndTime,
   } = useCart();
 
-  const [range, setRange] = useState<DateRange | undefined>(
-    startDate ? { from: startDate, to: endDate } : undefined,
-  );
-  const [sTime, setSTime] = useState(startTime);
-  const [eTime, setETime] = useState(endTime);
-
-  useEffect(() => {
-    if (open) {
-      setRange(startDate ? { from: startDate, to: endDate } : undefined);
-      setSTime(startTime);
-      setETime(endTime);
-    }
-  }, [open, startDate, endDate, startTime, endTime]);
+  const range: DateRange | undefined = startDate
+    ? { from: startDate, to: endDate }
+    : undefined;
 
   const today = startOfDay(new Date());
   const busy = buildBusyDays();
 
-  const apply = () => {
-    setDates(range?.from, range?.to);
-    setStartTime(sTime);
-    setEndTime(eTime);
-    onOpenChange(false);
+  // Live: cualquier cambio se refleja al instante en el carrito
+  const handleRangeChange = (r: DateRange | undefined) => {
+    setDates(r?.from, r?.to);
   };
 
-  const clear = () => {
-    setRange(undefined);
-  };
+  const apply = () => onOpenChange(false);
+  const clear = () => setDates(undefined, undefined);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -84,8 +70,8 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
               </span>
               <input
                 type="time"
-                value={sTime}
-                onChange={(e) => setSTime(e.target.value)}
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
                 className="text-base font-semibold tabular text-rose-600 border-b-2 border-rose-500 pb-0.5 px-1 bg-transparent focus:outline-none"
               />
             </div>
@@ -101,8 +87,8 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
               </span>
               <input
                 type="time"
-                value={eTime}
-                onChange={(e) => setETime(e.target.value)}
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
                 className="text-base font-semibold tabular text-rose-600 border-b-2 border-rose-500 pb-0.5 px-1 bg-transparent focus:outline-none"
               />
             </div>
@@ -114,7 +100,7 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
           <DayPicker
             mode="range"
             selected={range}
-            onSelect={setRange}
+            onSelect={handleRangeChange}
             numberOfMonths={2}
             locale={es}
             disabled={{ before: today }}
