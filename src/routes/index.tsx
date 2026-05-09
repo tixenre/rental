@@ -7,6 +7,7 @@ import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
 import { CartDrawer } from "@/components/rental/CartDrawer";
 import { equipment, type Category } from "@/data/equipment";
+import { CategoryIllustration } from "@/components/rental/illustrations/CategoryIllustration";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
