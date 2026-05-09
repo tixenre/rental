@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
+import { useEquipos } from "@/hooks/useEquipos";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -45,12 +46,19 @@ export function TopBar() {
     totalItems,
   } = useCart();
   const [dateOpen, setDateOpen] = useState(false);
+  const { usingFallback } = useEquipos();
   const count = totalItems();
   const hasDates = !!(startDate && endDate);
   const label = formatRentalRange(startDate, endDate, startTime, endTime);
+  const showOfflineBadge = usingFallback && import.meta.env.DEV;
 
   return (
     <header className="sticky top-0 z-40 border-b hairline bg-background/85 backdrop-blur-xl">
+      {showOfflineBadge && (
+        <div className="border-b border-amber/40 bg-amber/15 px-4 py-1 text-center font-mono text-[10px] uppercase tracking-[0.25em] text-ink">
+          Modo offline · usando catálogo local
+        </div>
+      )}
       {/* Single row centered en sm+; en mobile la pill de fecha pasa a una segunda fila */}
       <div className="relative hidden sm:flex items-center justify-between gap-3 px-4 py-3 md:px-6">
         <Link to="/" className="flex items-center shrink-0" aria-label="Rambla Rental">
