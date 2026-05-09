@@ -1,79 +1,52 @@
-## Objetivo
-Reemplazar el catálogo estático por el backend `https://ramblarental.up.railway.app`, agregar disponibilidad real por fechas y enviar pedidos al endpoint `/api/alquileres`. Si el backend falla, caer al mock para no romper la preview.
+# Bug: se pueden seleccionar más unidades que el stock
 
-## Lo que ya funciona en el backend (verificado con curl)
-- `GET /api/equipos?per_page=500&solo_visibles=true` → 142 equipos. Devuelve `id, nombre, marca, modelo, cantidad, precio_jornada, foto_url, etiquetas[], kit[]`.
-- `GET /api/disponibilidad?fecha_desde&fecha_hasta` → mapa `{ "<id>": unidades_disponibles }`.
-- CORS habilitado para `https://ramblarental.lovable.app` (dominio publicado).
+## Diagnóstico
+El control "+" se deshabilita cuando `qty >= disponible`, pero `disponible` solo existe cuando el usuario eligió fechas (`useDisponibilidad`). Sin fechas, `disponible === undefined` y el botón nunca se bloquea, por lo que el carrito acepta cantidades ilimitadas.
 
-## Lo que NO funciona todavía (Claude/back lo resuelve)
-Estos puntos los dejo documentados pero NO los toco desde el front:
-1. `GET /api/categorias` devuelve `[]` (vacío).
-2. Los equipos vienen con `etiquetas: []`, así que no hay categoría real → todos caerían como "Accesorios".
-3. CORS solo permite el dominio publicado. Las URLs de preview (`id-preview--*.lovable.app`) están bloqueadas — agregar wildcard o lista.
-4. Falta confirmar el shape de `POST /api/alquileres` (probablemente ya implementado por Claude).
+Además:
+- El botón inicial "Agregar" (cuando `qty === 0`) solo valida `sinStock`, no el tope.
+- En `CartDrawer` el "+" hace lo mismo: solo valida contra `disponible`.
+- `useCart.add` no aplica ningún tope.
 
-## Cambios en el frontend
+El equipo siempre trae `cantidad` (stock total) desde el backend, así que podemos usarlo como tope cuando no hay fechas.
 
-### 1. Variable de entorno
-- Crear `.env.local` con `VITE_API_URL=https://ramblarental.up.railway.app`.
+## Solución (solo frontend)
 
-### 2. Adaptador `backendToEquipment` (`src/hooks/useEquipos.ts`)
-- Mapear `foto_url` → `fotoUrl`, ya existente.
-- Cuando `etiquetas[]` está vacío: derivar categoría heurísticamente desde `nombre/modelo` (palabras clave: "lente", "cámara", "luz", "trípode", etc.) en una util `inferCategory()`. Es paliativo hasta que el back tagee.
-- Mantener `_backendId` como número para el POST de pedido.
+### 1. Tope efectivo = `min(disponible ?? cantidad, cantidad)`
+Helper local en cada componente que muestra el control:
+```ts
+const cap = disponible ?? item.cantidad ?? Infinity;
+const reachedMax = qty >= cap;
+```
 
-### 3. Hook `useEquipos` con fallback al mock
-- Envolver la query en try/catch: si falla o devuelve 0 items, retornar `equipment` (mock estático) y exponer flag `usingFallback`.
-- En dev, mostrar un pill discreto en `TopBar` cuando `usingFallback === true` ("Modo offline").
+### 2. `EquipmentRow.tsx` y `EquipmentCard.tsx`
+- Reemplazar la condición actual (`disponible !== undefined && qty >= disponible`) por `reachedMax`.
+- Botón "+" (incremento) deshabilitado si `reachedMax`.
+- Mostrar tooltip / título "Stock máximo alcanzado" cuando aplica.
+- En el botón inicial "Agregar" (qty===0): si `cap <= 0` → "Sin stock" (ya cubierto), pero también respetar `reachedMax` por si `cantidad` viene en 0.
 
-### 4. Disponibilidad real
-- En `src/routes/index.tsx`, `useDisponibilidad(startDate, endDate)` ya está conectado.
-- En `EquipmentRow` y `EquipmentCard`: si hay rango y el equipo tiene `_backendId`, leer `disponibilidad[_backendId]`. Mostrar "X disponibles" debajo del precio. Deshabilitar "Agregar" cuando `qty solicitada > disponibles`.
-- Toast cuando el usuario intenta superar el stock.
+### 3. `CartDrawer.tsx`
+- Reemplazar la lectura de `getDisponible(it)` por `min(getDisponible(it) ?? it.cantidad, it.cantidad)` y bloquear "+" igual que arriba.
+- Si una cantidad ya cargada supera el tope (porque cambiaron fechas y bajó el stock), mostrar warning visual y un botón "Ajustar al máximo".
 
-### 5. Envío de pedido (`CartDrawer`)
-- Agregar paso final con form mínimo: nombre, email, teléfono opcional. Validación con Zod.
-- Al confirmar:
-  ```ts
-  apiPostPedido({
-    cliente_nombre, cliente_email, cliente_telefono,
-    fecha_desde: format(startDate, "yyyy-MM-dd"),
-    fecha_hasta: format(endDate, "yyyy-MM-dd"),
-    items: cart.map(c => ({
-      equipo_id: c.eq._backendId!,
-      cantidad: c.qty,
-      precio_jornada: c.eq.pricePerDay,
-    })),
-  })
-  ```
-- Filtrar items sin `_backendId` (mock-only) con warning.
-- Estados: loading, success (toast + clear cart + cerrar drawer), error (mostrar mensaje del backend).
+### 4. `cart-store.ts` — defensa en profundidad
+- Cambiar `add(id)` a `add(id, max?: number)` y aplicar `Math.min(next, max)` cuando se pase.
+- Pasar `max` desde los call sites (Card, Row, Drawer).
+- `setQty` opcional: aceptar `max` y clamp.
 
-### 6. Memoria
-- Actualizar `mem://index.md`: el catálogo ya no es estático, ahora viene del backend con fallback al mock.
+### 5. Toast cuando se intenta superar
+- Reutilizar `sonner` ya configurado.
+- Mensaje: "Stock máximo: {cap} unidades".
 
 ## Archivos a tocar
 ```
-.env.local                          (crear, VITE_API_URL)
-src/hooks/useEquipos.ts             (fallback + inferCategory + estado disponibilidad)
-src/lib/cart-store.ts               (helpers para validar stock, si hace falta)
-src/components/rental/EquipmentRow.tsx     (badge disponibilidad)
-src/components/rental/EquipmentCard.tsx    (badge disponibilidad)
-src/components/rental/CartDrawer.tsx       (form cliente + submit)
-src/components/rental/TopBar.tsx           (badge "modo offline" en dev)
-src/routes/index.tsx                       (pasar disponibilidad a las rows)
-mem://index.md                             (actualizar nota)
+src/lib/cart-store.ts                  (add/setQty con max opcional)
+src/components/rental/EquipmentRow.tsx (cap + disable + toast)
+src/components/rental/EquipmentCard.tsx (cap + disable + toast)
+src/components/rental/CartDrawer.tsx   (cap + warning si supera)
 ```
 
-## Lo que queda pendiente para Claude (back)
-- Llenar `etiquetas` en cada equipo o devolver `categoria` explícita.
-- Implementar `GET /api/categorias` con totales reales.
-- Ampliar CORS a `*.lovable.app` (o al menos a las URLs de preview).
-- Confirmar/exponer `POST /api/alquileres` con el shape del cliente (ver `apiPostPedido` en `src/lib/api.ts`).
-- Idealmente: campos `descripcion`, `specs`, `is_combo`, `kit/includes` en `/api/equipos` para no perder esa info al migrar.
-
-## Out of scope (esta tanda)
-- Auth de usuario (signup/login contra el backend Python).
-- Fotos reales en equipos / lazy loading.
-- Pantalla "mis pedidos" leyendo del backend.
+## Out of scope
+- Validación server-side (la hace el backend al `POST /api/alquileres`).
+- Sincronización en tiempo real del stock.
+- Cambios visuales mayores: solo el disable + un toast discreto.
