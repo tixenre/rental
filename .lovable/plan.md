@@ -1,25 +1,43 @@
-## Problema
+Vamos a implementar todas las mejoras de a una, en orden de impacto vs esfuerzo. Cada paso es un commit independiente que podés revisar antes de seguir al siguiente.
 
-En la vista de lista, al expandir un equipo la página entera se desplaza para centrar la fila clickeada. Esto pasa porque el `useEffect` de `src/routes/index.tsx` (líneas 68–74) llama a `scrollIntoView({ block: "center" })` cada vez que cambia `?eq=` — incluyendo cuando el usuario hace click. Como resultado, el ítem clickeado "salta" a otra posición y el usuario pierde la referencia visual.
+## Orden de implementación
 
-## Cambio
+### Fase 1 — UX inmediato (alto impacto, bajo esfuerzo)
+1. **Resaltar fila expandida** en list view (borde/acento de color primario + fondo sutil).
+2. **Animación de chevron** ▶ → ▼ al expandir/colapsar.
+3. **Cerrar con `Esc`** la fila expandida (y el modal/sheet en grid).
+4. **`aria-expanded` + focus management** en filas (foco vuelve al trigger al cerrar).
 
-Limitar el auto-scroll a un solo caso: **deep-link inicial** (entrar a la página con `?eq=...` ya en la URL, o compartir un link). Cuando el usuario expande/colapsa una fila por click, no se mueve nada — la fila permanece donde está y el contenido se despliega hacia abajo empujando solo a los ítems siguientes.
+### Fase 2 — Mobile polish
+5. **Swipe-down para cerrar** el bottom sheet en mobile (gesto nativo).
+6. **Filtros en bottom sheet** en mobile (en vez de modal centrado).
+7. **Sticky header de filtros** al hacer scroll en listados largos.
 
-### Implementación
+### Fase 3 — Performance
+8. **Lazy-load de imágenes** (`loading="lazy"` + `decoding="async"`) y `srcset` responsive donde aplique.
+9. **Prefetch de ficha al hover** en grid (precargar datos del equipo).
+10. **Virtualización** del listado si hay 50+ equipos (react-virtual / tanstack-virtual).
 
-En `src/routes/index.tsx`:
+### Fase 4 — Navegación por teclado
+11. **Enter/Space** para expandir fila enfocada, **flechas ↑↓** para moverse entre filas, **Home/End** para saltar.
 
-- Agregar un `useRef<boolean>` (`didInitialScrollRef`) que arranca en `false`.
-- Reescribir el efecto de scroll para que:
-  - Si `didInitialScrollRef.current === false` y hay `eq` al montar → hacer `scrollIntoView` y marcar `didInitialScrollRef.current = true`.
-  - Si ya se hizo el scroll inicial (o `eq` cambió por interacción del usuario) → no hacer nada.
-- Quitar `mode` de las dependencias del efecto (ya no es necesario).
+### Fase 5 — SEO / Compartir (cambio estructural)
+12. **Ruta dedicada `/equipo/$slug`** con su propio `head()` (title, description, og:image del equipo, twitter card).
+13. **JSON-LD `Product`** por equipo para rich snippets.
+14. Mantener `/?eq=xxx` como redirect a `/equipo/$slug` para no romper links existentes.
 
-El `motion.div` con `height: 0 → auto` de `EquipmentRow.tsx` ya anima la expansión hacia abajo correctamente; no hace falta tocarlo.
+## Detalles técnicos
 
-### Resultado
+- **Resaltado**: usar tokens semánticos (`ring-primary`, `bg-accent/30`) — sin colores hardcodeados.
+- **Animación chevron**: `transition-transform rotate-90` cuando `aria-expanded=true`.
+- **Esc**: hook `useEffect` con `keydown` listener cuando hay fila abierta.
+- **Sheet swipe**: shadcn `Sheet` ya soporta drag, sólo configurar.
+- **Lazy images**: pasar `loading`/`decoding` props al componente de imagen en `EquipmentCard` y `EquipmentRow`.
+- **Virtualización**: solo activarla con threshold (>50 items) para no complicar el caso común.
+- **Ruta `/equipo/$slug`**: nueva file-based route, loader que trae el equipo desde Lovable Cloud, `head()` dinámico desde loader data, JSON-LD inyectado en el render.
 
-- Click en una fila → se despliega inline sin mover la página.
-- Abrir `/?eq=cm3` directo (link compartido) → sigue centrando el ítem como hoy.
-- Vista grilla (modal) → sin cambios.
+## Plan de trabajo
+
+Voy a ir implementando **una mejora por turno** (a veces dos si son muy chicas y relacionadas, ej. 1+2). Después de cada cambio, te confirmo qué se hizo y seguimos con la siguiente. Si en algún punto querés saltarte una o cambiar el orden, me avisás.
+
+¿Arrancamos con la Fase 1 (mejoras 1+2 juntas: resaltar fila + chevron animado)?
