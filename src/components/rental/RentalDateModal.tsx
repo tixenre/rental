@@ -122,6 +122,12 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
           />
         </div>
 
+        {range?.from && range?.to && (
+          <div className="px-6 pb-3 -mt-1 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+            {jornadas} {jornadas === 1 ? "jornada" : "jornadas"} · retiro {startTime} · devolución {endTime}
+          </div>
+        )}
+
         {/* Footer */}
         <div className="px-6 py-4 border-t hairline flex items-center justify-between bg-surface">
           <button
