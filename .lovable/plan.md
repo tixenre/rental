@@ -1,62 +1,44 @@
-# Optimizar header + hero en mobile
+## Objetivo
 
-## Diagnóstico
-Lo que se ve "raro" no es solo el header — es que toda la página tiene **overflow horizontal en mobile** y por eso el pill "Elegir fechas" y el botón del carrito aparecen cortados a la derecha.
+Hoy el pill del header solo muestra "21 may → 22 may". El usuario no sabe a qué hora retira ni devuelve, ni cuántas jornadas le cobramos. Lo aclaramos en el pill (móvil + desktop) y reforzamos en el modal.
 
-Causas concretas:
+## Cambios
 
-1. **Hero `h1` con `text-[14vw]`** (`src/routes/index.tsx:170`). A 402px de ancho, "donde pasan" mide ~620px → fuerza scroll horizontal de toda la página, lo que arrastra al header.
-2. **Línea "Catálogo · 142 equipos · Mar del Plata"** con `tracking-[0.3em]` y `whitespace` por defecto: en mobile no wrappea bien y se corta ("MAR DEL PLA…").
-3. **TopBar en mobile usa 3 filas** (`flex-col`): logo, pill de fechas, botones (carrito + user). Ocupa demasiado alto y el bloque de carrito queda alineado a la derecha solo, raro visualmente.
-4. **`backdrop-blur-xl`** en el header sobre el hero amarillo animado (grain) genera jitter en scroll en iOS.
+### 1. `src/components/rental/TopBar.tsx` — pill con horas y jornadas
 
-## Solución (solo frontend / presentación)
+Reemplazar el contenido del pill de fechas (línea ~144) por una composición de dos líneas en móvil y una sola en desktop:
 
-### 1. Hero — tipografía responsive sana
-- Reemplazar `text-[14vw]` por escala Tailwind con clamp:
-  `text-5xl sm:text-7xl md:text-[7rem] lg:text-[8.5rem]` (o `clamp(2.75rem, 12vw, 8.5rem)`).
-- Mantener el impacto visual en desktop, pero garantizando que en 360–414px no desborde.
-- Agregar `break-words` o `hyphens-auto` por si acaso.
+- Línea principal: `21 may 09:00 → 22 may 09:00` (con `tabular-nums` para los horarios)
+- Línea/badge secundaria: `· 1 jornada` o `· N jornadas` usando `useCart().days()`
 
-### 2. Línea de meta del hero
-- Wrap permitido (`flex-wrap` o quitar nowrap).
-- En mobile, reducir tracking a `tracking-[0.2em]` o partir en dos líneas: "Catálogo · 142 equipos" / "Mar del Plata".
+Cuando no hay fechas elegidas: mantener "Elegir fechas" con un sub-texto tenue tipo "Definí retiro y devolución".
 
-### 3. TopBar mobile — 2 filas compactas
-**Fila 1**: logo (izq) + carrito icon-only + user icon-only (der).
-**Fila 2**: pill "Elegir fechas" full-width.
+Ícono calendario sin cambios. Mantener el touch target y el estilo amber del borde.
 
-Ventajas:
-- El carrito queda al lado del logo (patrón estándar app móvil), no flotando solo.
-- La pill ocupa todo el ancho disponible y nunca se corta.
-- Reduce el alto del header de ~140px a ~96px → más contenido visible above the fold.
+### 2. `src/components/rental/RentalDateModal.tsx` — etiquetas más claras
 
-Cambios concretos en `TopBar.tsx`:
-- Estructura: `<div class="flex items-center justify-between gap-2">` (logo + acciones) y debajo `<button class="flex md:hidden w-full">` (pill).
-- Mover los botones de carrito/user al row del logo en mobile (hoy están en su propio bloque `sm:ml-auto`).
-- Carrito mobile: solo icono + badge numérico (chip pequeño en esquina si `count > 0`).
+- Renombrar headers de columna: `Inicio` → `Retiro` y `Devolver` → `Devolución`.
+- Debajo del calendario, agregar una fila pequeña centrada con el resumen: `N jornada(s) · retiro 09:00 · devolución 09:00`, leyendo `days()`, `startTime`, `endTime` del store.
+- Pequeño hint bajo los inputs `time`: "Horario sujeto a confirmación" (texto muted, 11px).
 
-### 4. Header — performance
-- Cambiar `backdrop-blur-xl` → `backdrop-blur-md` o quitar blur en mobile (`md:backdrop-blur-xl`) y dejar `bg-background/95` sólido en mobile. Reduce jank de scroll sobre el hero animado.
+### 3. Cálculo de jornadas — `src/lib/cart-store.ts`
 
-### 5. Defensa contra overflow horizontal
-- En `<body>` o root: `overflow-x-hidden` (en `index.css` o el root layout) como red de seguridad para que ningún hijo accidentalmente scrollee la página completa.
+La función `days()` actual cuenta días naturales (`ceil(ms/día) + 1`) sin considerar las horas. Para que coincida con la lógica de retiro/devolución del rubro:
+
+- Si `endTime <= startTime` → jornadas = diferencia de días naturales (ej. retiro lunes 09:00, devolución martes 09:00 = 1 jornada).
+- Si `endTime > startTime` → jornadas = diferencia de días naturales + 1.
+- Mínimo 1.
+
+Esto se usa también para el subtotal del carrito, así que verificar que `CartDrawer` siga mostrando el total correcto (no debería cambiar para el caso típico de mismo horario de retiro/devolución).
+
+## Fuera de alcance
+
+- Selector de horarios disponibles (slot picker). Seguimos con `<input type="time">`.
+- Reglas de horario por sucursal o feriados.
+- Cambios en el backend de pedidos.
 
 ## Archivos a tocar
-```
-src/components/rental/TopBar.tsx     (re-layout mobile + blur)
-src/routes/index.tsx                  (h1 + meta line del hero)
-src/styles.css                        (overflow-x-hidden en body)
-```
 
-## Out of scope
-- Cambiar copy del hero o branding.
-- Tocar el modal `RentalDateModal`.
-- Animación de grain.
-- Cambios en desktop (queda igual).
-
-## QA
-Testear en 360, 390, 414 px de ancho:
-- Sin scroll horizontal.
-- Pill "Elegir fechas" entera, carrito visible al lado del logo.
-- Hero legible sin desbordar.
+- `src/components/rental/TopBar.tsx`
+- `src/components/rental/RentalDateModal.tsx`
+- `src/lib/cart-store.ts`
