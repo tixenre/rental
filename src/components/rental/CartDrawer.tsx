@@ -64,9 +64,6 @@ export function CartDrawer({
   const subtotal = list.reduce((s, { it, qty }) => s + it.pricePerDay * qty, 0);
   const total = subtotal * d;
 
-  const formatFecha = (date: Date, time: string) =>
-    `${format(date, "yyyy-MM-dd")}T${time}:00`;
-
   // Lock scroll del body + guardar foco al abrir, restaurar al cerrar
   useEffect(() => {
     if (!drawerOpen) return;
