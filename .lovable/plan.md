@@ -1,59 +1,85 @@
+## Objetivo
+
+Eliminar el "lío visual" del sticky en móviles consolidando todo en **una sola barra coherente** y moviendo el modo grid a un menú secundario.
+
 ## Diagnóstico
 
-**1. El botón de usuario no hace nada (móvil y desktop).**
-En `src/components/rental/TopBar.tsx` (líneas 127–133), el `<button>` con el ícono `User` no tiene `onClick` ni es un `<Link>`. Es decorativo. Por eso no pasa nada al tocarlo, en ningún tamaño de pantalla.
+Hoy en móvil hay **3 bloques apilados** dentro del sticky + un 4° debajo:
 
-```tsx
-<button
-  className="..."
-  aria-label={user}      // user = "Invitado" hardcodeado, useState dummy
->
-  <User .../>
-  <span className="hidden md:inline">{user}</span>
-</button>
+```text
+┌─ TopBar (logo/cart/user) ─────────────────────────┐  56px
+├─ [📅 fechas]      [🔍]                            │  ~56px  ← MobileStickyBar
+├─ [⊞ Explorar | ☰ Lista]            142 RESULTADOS │  ~44px  ← toggle row
+├─ [Todas las marcas ▾] [Limpiar]                   │  ~96px  ← ListFilters (otro sticky!)
+│  [Accesorios] [Baterías] [Brazo Mágico] …         │
+└────────────────────────────────────────────────────┘
 ```
 
-Además `const [user] = useState("Invitado")` ignora el hook real `useAuth()` que sí existe (`src/hooks/use-auth.ts`).
-
-**2. Google Login: sí, sigue funcionando.**
-- `src/routes/login.tsx` invoca `supabase.auth.signInWithOAuth({ provider: "google" })` → la integración con Google está activa.
-- Lovable Cloud trae credenciales OAuth managed por defecto, así que no requiere setup adicional.
-- La ruta `/login` y `/cuenta`, `/mis-pedidos` ya existen.
-
-Detalle: el código usa el cliente Supabase directo en lugar del módulo Lovable Cloud managed (`@/integrations/lovable`). Funciona igual, pero si más adelante se quiere migrar a la API managed (`lovable.auth.signInWithOAuth`) se haría con la herramienta `configure_social_auth`. **Fuera de alcance ahora** — el botón actual sigue andando.
+Problemas:
+- Dos barras sticky distintas con `top` diferentes → se ve un "salto" entre ellas.
+- Toggle Grid/Lista ocupa espacio aunque en móvil casi nadie usa grid.
+- Contador "142 resultados" compite con el resto.
+- Marca + chips de categorías son ~100px verticales antes de ver un equipo.
 
 ## Propuesta
 
-Convertir el botón usuario en un control real con dos estados:
+### 1. Barra única sticky (móvil)
 
-### Si NO hay sesión
-- Tap → navega a `/login`.
-- Mobile: solo ícono `User`.
-- Desktop: ícono + texto "Ingresar".
+Una sola fila, una sola altura, un solo `sticky`:
 
-### Si HAY sesión
-- Mobile: tap directo → navega a `/mis-pedidos` (camino más corto, evita menús).
-- Desktop: dropdown (`DropdownMenu` shadcn ya disponible) con avatar/inicial + nombre, opciones:
-  - Mis pedidos → `/mis-pedidos`
-  - Mi cuenta → `/cuenta`
-  - Cerrar sesión → `signOut()` y redirige a `/`.
+```text
+┌─ TopBar ────────────────────────────────────────────┐  56px
+└─ [📅 04 jun → 06 jun · 2j]  [🔍]  [⚙ 3]            │  ~52px
+```
 
-### Cambios técnicos
-- `src/components/rental/TopBar.tsx`:
-  - Eliminar `useState("Invitado")`.
-  - Usar `useAuth()` para obtener `user`, `signOut`.
-  - Reemplazar el `<button>` por:
-    - `<Link to="/login">` cuando no hay sesión.
-    - `<DropdownMenu>` (desktop) o `<Link to="/mis-pedidos">` (mobile) cuando sí.
-  - Mantener el mismo tamaño/forma para no afectar el layout sticky.
-  - Mostrar inicial del email (avatar circular `bg-amber text-ink`) en lugar del ícono cuando hay sesión.
+- **Pill fechas** (igual que ahora) — flex-1, truncate.
+- **Botón 🔍 búsqueda** — abre el input expandido in-place (igual que hoy).
+- **Botón ⚙ filtros** — abre un **bottom sheet** con marcas + categorías + "Limpiar". Badge con count de filtros activos.
 
-### Sin cambios
-- `useAuth`, `login.tsx`, rutas `_auth/*`, OAuth provider.
-- TopBar layout general (logo + carrito + botón usuario en la misma fila mobile).
+Sin segunda fila, sin contador inline, sin chips horizontales visibles por defecto.
 
-## Resultado esperado
+### 2. Modo lista forzado en móvil
 
-- Mobile invitado: tap en 👤 → pantalla de login con "Continuar con Google".
-- Mobile logueado: tap en 👤 → mis pedidos.
-- Desktop logueado: dropdown con cuenta / pedidos / cerrar sesión.
+- Móvil: siempre `mode = "list"`. El toggle desaparece de la barra.
+- El acceso a "Vista grid / Explorar" se mueve a un item dentro del sheet de filtros (al final, como opción de visualización), o directamente se omite en móvil. Recomendación: omitirlo del todo en móvil — la grid en pantalla angosta no aporta vs la lista.
+- Desktop (`sm+`): se mantiene tal cual está hoy (search input visible, toggle Grid/Lista, contador).
+
+### 3. Contador de resultados
+
+- Móvil: aparece **dentro** del sheet de filtros (header: "142 equipos · 3 filtros activos") y como sutil texto debajo del primer item de la lista, no en la barra.
+- Desktop: sin cambios.
+
+### 4. Eliminar el segundo sticky de ListFilters en móvil
+
+`ListFilters` deja de ser sticky en móvil — su contenido vive ahora dentro del sheet. En desktop sigue como está (chips visibles arriba de la lista).
+
+## Cambios técnicos
+
+- `src/components/rental/MobileStickyBar.tsx`: agregar tercer botón (filtros) con badge. Estado de sheet.
+- **Nuevo** `src/components/rental/MobileFiltersSheet.tsx`: bottom sheet (usar `Sheet` de shadcn, `side="bottom"`) con marca select, chips de categorías wrapped, contador, botón "Limpiar todo" y "Aplicar/Cerrar".
+- `src/components/rental/ListFilters.tsx`: en `md:` y arriba mantener; en móvil ocultarlo (`hidden md:block`).
+- `src/routes/index.tsx`:
+  - Forzar `mode = "list"` en móvil y no permitir cambiarlo desde la UI móvil.
+  - Mostrar el toggle Grid/Lista solo en `sm:flex`.
+  - Mover contador "N resultados" al desktop only (`hidden sm:block`).
+  - Pasar `selectedCats`, `brand`, `setBrand`, `toggleCat`, `onClear`, `apiBrands`, `apiCategories` al `MobileStickyBar` para alimentar el sheet.
+
+## Fuera de alcance
+
+- No tocar desktop salvo el `hidden sm:` ya mencionado.
+- No cambiar la pill cuando hay/no hay fechas (ya quedó bien).
+- No cambiar TopBar.
+- No tocar la lógica de filtrado.
+
+## Resultado visual esperado (móvil)
+
+```text
+┌─ logo · carrito · user ────────────────────────────┐
+├─ 📅 04 jun 11:00 → 06 jun 09:00 · 2j   🔍    ⚙ ③  │  ← único sticky
+├──────────────────────────────────────────────────────
+│  ▸ Adaptador EF-RF con ND Vari…  $13.500 /día  +  │
+│  ▸ Adaptador EF-RF Canon…        $10.500 /día  +  │
+│  ▸ …                                                │
+```
+
+Todo lo demás (marcas, categorías, contador, vista grid) vive a un tap de distancia en el sheet.
