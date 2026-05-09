@@ -4,12 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 
 /*
- * Rambla Rental — Editorial / Cinematic
- * Deep black background, ivory text, single amber accent.
- * All colors in oklch.
+ * Rambla Rental — basado en el branding oficial (BATTI 2023)
+ * Amarillo brand + blanco/hueso + negro tinta + paleta secundaria (rosa, azul, naranja, verde).
+ * Tono: joven, amigable, comunidad, "un lugar donde pasan cosas".
  */
 
 @theme inline {
@@ -21,7 +21,7 @@
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
 
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
@@ -50,6 +50,11 @@
   --color-hairline: var(--hairline);
   --color-amber: var(--amber);
   --color-amber-soft: var(--amber-soft);
+  --color-ink: var(--ink);
+  --color-rosa: var(--rosa);
+  --color-azul: var(--azul);
+  --color-naranja: var(--naranja);
+  --color-verde: var(--verde);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -66,63 +71,80 @@
 }
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 
-  /* Editorial dark palette */
-  --background: oklch(0.14 0.005 60);
-  --foreground: oklch(0.96 0.01 80);
+  /* Brand light palette */
+  --background: oklch(0.985 0.005 90);          /* hueso casi blanco */
+  --foreground: oklch(0.18 0.01 60);            /* tinta negra cálida */
+  --ink: oklch(0.14 0.01 60);
 
-  --surface: oklch(0.18 0.006 60);
-  --surface-elevated: oklch(0.22 0.008 60);
-  --hairline: oklch(1 0 0 / 8%);
+  --surface: oklch(0.97 0.008 85);
+  --surface-elevated: oklch(1 0 0);
+  --hairline: oklch(0.18 0.01 60 / 12%);
 
-  --card: oklch(0.18 0.006 60);
-  --card-foreground: oklch(0.96 0.01 80);
-  --popover: oklch(0.18 0.006 60);
-  --popover-foreground: oklch(0.96 0.01 80);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.01 60);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.01 60);
 
-  --amber: oklch(0.82 0.14 78);
-  --amber-soft: oklch(0.82 0.14 78 / 12%);
+  /* Amarillo brand (≈ #F2A81D / mostaza brillante) */
+  --amber: oklch(0.82 0.16 78);
+  --amber-soft: oklch(0.82 0.16 78 / 18%);
 
-  --primary: oklch(0.82 0.14 78);
-  --primary-foreground: oklch(0.16 0.005 60);
+  --primary: oklch(0.18 0.01 60);
+  --primary-foreground: oklch(0.985 0.005 90);
 
-  --secondary: oklch(0.24 0.008 60);
-  --secondary-foreground: oklch(0.96 0.01 80);
+  --secondary: oklch(0.94 0.008 85);
+  --secondary-foreground: oklch(0.18 0.01 60);
 
-  --muted: oklch(0.22 0.006 60);
-  --muted-foreground: oklch(0.68 0.012 70);
+  --muted: oklch(0.94 0.008 85);
+  --muted-foreground: oklch(0.42 0.01 70);
 
-  --accent: oklch(0.82 0.14 78);
-  --accent-foreground: oklch(0.16 0.005 60);
+  --accent: oklch(0.82 0.16 78);
+  --accent-foreground: oklch(0.18 0.01 60);
 
   --destructive: oklch(0.62 0.22 27);
   --destructive-foreground: oklch(0.98 0.005 80);
 
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.82 0.14 78 / 50%);
+  --border: oklch(0.18 0.01 60 / 12%);
+  --input: oklch(0.18 0.01 60 / 16%);
+  --ring: oklch(0.82 0.16 78 / 60%);
 
-  --chart-1: oklch(0.82 0.14 78);
-  --chart-2: oklch(0.7 0.12 200);
-  --chart-3: oklch(0.6 0.16 30);
-  --chart-4: oklch(0.75 0.13 140);
-  --chart-5: oklch(0.65 0.18 320);
+  /* Paleta secundaria (del manual) */
+  --rosa: oklch(0.78 0.14 0);
+  --azul: oklch(0.7 0.16 235);
+  --naranja: oklch(0.74 0.18 45);
+  --verde: oklch(0.78 0.13 155);
 
-  --sidebar: oklch(0.16 0.005 60);
-  --sidebar-foreground: oklch(0.96 0.01 80);
-  --sidebar-primary: oklch(0.82 0.14 78);
-  --sidebar-primary-foreground: oklch(0.16 0.005 60);
-  --sidebar-accent: oklch(0.22 0.006 60);
-  --sidebar-accent-foreground: oklch(0.96 0.01 80);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.82 0.14 78 / 50%);
+  --chart-1: var(--amber);
+  --chart-2: var(--azul);
+  --chart-3: var(--naranja);
+  --chart-4: var(--verde);
+  --chart-5: var(--rosa);
+
+  --sidebar: oklch(0.985 0.005 90);
+  --sidebar-foreground: oklch(0.18 0.01 60);
+  --sidebar-primary: oklch(0.82 0.16 78);
+  --sidebar-primary-foreground: oklch(0.18 0.01 60);
+  --sidebar-accent: oklch(0.94 0.008 85);
+  --sidebar-accent-foreground: oklch(0.18 0.01 60);
+  --sidebar-border: oklch(0.18 0.01 60 / 12%);
+  --sidebar-ring: oklch(0.82 0.16 78 / 50%);
 }
 
 .dark {
-  /* Same — site is dark-only */
-  --background: oklch(0.14 0.005 60);
-  --foreground: oklch(0.96 0.01 80);
+  /* Variante invertida: tinta oscura + amarillo (igual que merch negro del brand) */
+  --background: oklch(0.16 0.01 60);
+  --foreground: oklch(0.97 0.008 85);
+  --surface: oklch(0.2 0.01 60);
+  --surface-elevated: oklch(0.24 0.01 60);
+  --hairline: oklch(1 0 0 / 12%);
+  --card: oklch(0.2 0.01 60);
+  --card-foreground: oklch(0.97 0.008 85);
+  --muted: oklch(0.24 0.01 60);
+  --muted-foreground: oklch(0.72 0.01 70);
+  --primary: oklch(0.82 0.16 78);
+  --primary-foreground: oklch(0.16 0.01 60);
 }
 
 @layer base {
@@ -135,14 +157,14 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    font-feature-settings: "ss01", "cv11";
     -webkit-font-smoothing: antialiased;
   }
 
   .font-display {
     font-family: var(--font-display);
     font-optical-sizing: auto;
-    letter-spacing: -0.02em;
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
 
   .font-mono {
@@ -155,7 +177,7 @@
 
   ::selection {
     background-color: var(--amber);
-    color: var(--primary-foreground);
+    color: var(--ink);
   }
 }
 
@@ -166,8 +188,20 @@
   .text-balance {
     text-wrap: balance;
   }
-  .grain {
-    position: relative;
+  .bg-amber-tape {
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--amber) 0 24px,
+      oklch(0.86 0.14 78) 24px 48px
+    );
+  }
+  /* Wordmark "rambla" chunky redondeado al estilo del brand */
+  .wordmark {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-stretch: 75%;
+    letter-spacing: -0.04em;
+    font-feature-settings: "ss01";
   }
   .grain::before {
     content: "";
@@ -175,10 +209,12 @@
     inset: 0;
     pointer-events: none;
     background-image: radial-gradient(
-      oklch(1 0 0 / 0.025) 1px,
+      oklch(0.18 0.01 60 / 0.05) 1px,
       transparent 1px
     );
-    background-size: 3px 3px;
-    mix-blend-mode: overlay;
+    background-size: 4px 4px;
+  }
+  .grain {
+    position: relative;
   }
 }

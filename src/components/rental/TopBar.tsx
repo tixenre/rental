@@ -76,11 +76,11 @@ export function TopBar() {
   return (
     <header className="sticky top-0 z-40 border-b hairline bg-background/85 backdrop-blur-xl">
       <div className="flex items-center gap-6 px-6 py-3">
-        <Link to="/" className="flex items-baseline gap-2 group">
-          <span className="font-display text-2xl font-medium tracking-tight">
-            Rambla
+        <Link to="/" className="flex items-center gap-2 group">
+          <span className="wordmark text-3xl text-amber leading-none">
+            rambla
           </span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-amber">
+          <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
             Rental
           </span>
         </Link>
@@ -106,13 +106,13 @@ export function TopBar() {
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setDrawerOpen(true)}
-            className="relative flex items-center gap-2 rounded-md bg-amber px-4 py-2 text-sm font-medium text-primary-foreground transition hover:brightness-110"
+            className="relative flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-amber hover:text-ink"
           >
             <ShoppingBag className="h-4 w-4" />
             <span className="tabular">{count}</span>
             <span>{count === 1 ? "ítem" : "ítems"}</span>
           </button>
-          <button className="flex items-center gap-2 rounded-md border hairline px-3 py-2 text-sm hover:border-amber/40">
+          <button className="flex items-center gap-2 rounded-full border hairline px-3 py-2 text-sm hover:border-foreground/40">
             <User className="h-4 w-4" />
             {user}
           </button>
