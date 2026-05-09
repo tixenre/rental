@@ -23,8 +23,7 @@ export function CartMiniBar() {
     return acc + item.pricePerDay * qty;
   }, 0);
   const total = perDay * days;
-
-  if (count === 0) return null;
+  const isEmpty = count === 0;
 
   return (
     <div className="sticky bottom-0 z-30 border-t hairline bg-background/95 backdrop-blur-xl">
