@@ -39,6 +39,15 @@ export const Route = createFileRoute("/")({
 type Mode = "grid" | "list";
 
 function Index() {
+  const { eq } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const setOpenId = (id: string | null) => {
+    navigate({
+      search: (prev) => ({ ...prev, eq: id ?? undefined }),
+      replace: true,
+    });
+  };
+
   const [mode, setMode] = useState<Mode>("grid");
 
   useEffect(() => {
@@ -49,6 +58,15 @@ function Index() {
   const [selectedCats, setSelectedCats] = useState<Set<Category>>(new Set());
   const [brand, setBrand] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+
+  // Scroll into view the deep-linked equipment when present
+  useEffect(() => {
+    if (!eq) return;
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`eq-${eq}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [eq, mode]);
 
   const toggleCat = (c: Category) => {
     setSelectedCats((prev) => {
