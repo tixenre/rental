@@ -11,7 +11,7 @@ function AuthLayout() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/login" });
+    if (!loading && !user) navigate({ to: "/login", search: { redirect: undefined } });
   }, [user, loading, navigate]);
 
   if (loading || !user) {
