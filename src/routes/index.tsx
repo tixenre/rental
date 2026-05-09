@@ -105,6 +105,7 @@ function Index() {
   };
 
   return (
+    <EquipmentDetailProvider value={{ openId: eq ?? null, setOpenId }}>
     <div className="min-h-screen bg-background text-foreground">
       <TopBar />
 
