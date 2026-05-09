@@ -190,14 +190,24 @@ function GridMode({
   onJumpToCategory,
   selectedCats,
   onClearCats,
+  query,
 }: {
   onJumpToCategory: (c: Category) => void;
   selectedCats: Set<Category>;
   onClearCats: () => void;
+  query: string;
 }) {
-  const news = equipment.filter((e) => e.isNew);
-  const combos = equipment.filter((e) => e.isCombo);
+  const q = query.trim().toLowerCase();
+  const matches = (e: (typeof equipment)[number]) =>
+    !q ||
+    e.name.toLowerCase().includes(q) ||
+    e.brand.toLowerCase().includes(q) ||
+    e.category.toLowerCase().includes(q);
+
+  const news = equipment.filter((e) => e.isNew && matches(e));
+  const combos = equipment.filter((e) => e.isCombo && matches(e));
   const isFiltered = selectedCats.size > 0;
+  const isSearching = q.length > 0;
   const visibleCategories = isFiltered
     ? categories.filter((c) => selectedCats.has(c))
     : categories;
@@ -205,10 +215,16 @@ function GridMode({
   // Ancho fijo de cards en carrusel para snap consistente
   const cardW = 260;
 
+  // Total de items visibles para mostrar "sin resultados"
+  const totalVisible = visibleCategories.reduce(
+    (acc, c) => acc + equipment.filter((e) => e.category === c && matches(e)).length,
+    0,
+  );
+
   return (
-    <div className="space-y-12 py-8 lg:py-12">
+    <div className="space-y-10 py-6 sm:space-y-12 sm:py-8 lg:py-12">
       {isFiltered && (
-        <div className="px-6 lg:px-12">
+        <div className="px-4 lg:px-12">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
               Filtrando por
@@ -231,7 +247,7 @@ function GridMode({
         </div>
       )}
 
-      {!isFiltered && news.length > 0 && (
+      {!isFiltered && !isSearching && news.length > 0 && (
         <CarouselRow title="Ingresos" count={news.length}>
           {news.map((item, i) => (
             <EquipmentCard key={item.id} item={item} index={i} width={cardW} />
@@ -239,7 +255,7 @@ function GridMode({
         </CarouselRow>
       )}
 
-      {!isFiltered && combos.length > 0 && (
+      {!isFiltered && !isSearching && combos.length > 0 && (
         <CarouselRow title="Combos" count={combos.length}>
           {combos.map((item, i) => (
             <EquipmentCard key={item.id} item={item} index={i} width={cardW + 40} />
@@ -247,18 +263,18 @@ function GridMode({
         </CarouselRow>
       )}
 
-      {!isFiltered && <CategoryMosaic onSelect={onJumpToCategory} />}
+      {!isFiltered && !isSearching && <CategoryMosaic onSelect={onJumpToCategory} />}
 
       {visibleCategories.map((c) => {
-        const items = equipment.filter((e) => e.category === c);
+        const items = equipment.filter((e) => e.category === c && matches(e));
         if (items.length === 0) return null;
         return (
-          <div key={c} id={`cat-${c}`} className="scroll-mt-32">
+          <div key={c} id={`cat-${c}`} className="scroll-mt-40">
             <CarouselRow
               title={c}
               count={items.length}
               action={
-                !isFiltered ? (
+                !isFiltered && !isSearching ? (
                   <button
                     onClick={() => onJumpToCategory(c)}
                     className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink"
@@ -275,6 +291,15 @@ function GridMode({
           </div>
         );
       })}
+
+      {isSearching && totalVisible === 0 && (
+        <div className="mx-4 rounded-lg border hairline bg-surface px-6 py-16 text-center lg:mx-12">
+          <div className="font-display text-2xl text-muted-foreground">Sin resultados</div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Probá con otro término — ningún equipo coincide con "{query}".
+          </p>
+        </div>
+      )}
 
       {/* Footer mínimo */}
       <footer className="border-t hairline px-6 py-12 lg:px-12">
