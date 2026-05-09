@@ -31,7 +31,12 @@ export const Route = createFileRoute("/")({
 type Mode = "grid" | "list";
 
 function Index() {
-  const [mode, setMode] = useState<Mode>("grid");
+  const [mode, setMode] = useState<Mode>(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches) {
+      return "list";
+    }
+    return "grid";
+  });
   const [selectedCats, setSelectedCats] = useState<Set<Category>>(new Set());
   const [brand, setBrand] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -390,7 +395,7 @@ function ListMode({
         onClear={onClear}
       />
 
-      <div className="px-6 py-6 pb-32 lg:px-12 lg:pb-32">
+      <div className="px-3 py-4 pb-28 sm:px-6 sm:py-6 sm:pb-32 lg:px-12 lg:pb-32">
         {filtered.length === 0 ? (
           <div className="rounded-lg border hairline bg-surface px-6 py-16 text-center">
             <div className="font-display text-2xl text-muted-foreground">Sin resultados</div>
