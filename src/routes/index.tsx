@@ -228,7 +228,6 @@ function GridMode({
     e.brand.toLowerCase().includes(q) ||
     e.category.toLowerCase().includes(q);
 
-  const news = equipment.filter((e) => e.isNew && matches(e));
   const combos = equipment.filter((e) => e.isCombo && matches(e));
   const isFiltered = selectedCats.size > 0;
   const isSearching = q.length > 0;
