@@ -117,24 +117,30 @@ export function CartDrawer({
     return () => document.removeEventListener("keydown", onKey);
   }, [drawerOpen, setDrawerOpen]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     if (!startDate || !endDate) return;
     if (list.length === 0) return;
+    if (!user) return;
 
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await apiPostPedido({
-        cliente_nombre: nombre,
-        cliente_email: email,
-        cliente_telefono: telefono || undefined,
-        fecha_desde: formatFecha(startDate, startTime),
-        fecha_hasta: formatFecha(endDate, endTime),
-        items: list.map(({ it, qty }) => ({
-          equipo_id: it._backendId!,
-          cantidad: qty,
-          precio_jornada: it.pricePerDay,
+      await createOrder({
+        status: "solicitado",
+        startDate,
+        endDate,
+        startTime,
+        endTime,
+        days: d,
+        notes: notas.trim() || undefined,
+        resolvedItems: list.map(({ it, qty }) => ({
+          id: it.id,
+          name: it.name,
+          brand: it.brand,
+          category: it.category,
+          qty,
+          pricePerDay: it.pricePerDay,
+          backendId: it._backendId,
         })),
       });
       setSubmitted(true);
@@ -149,10 +155,8 @@ export function CartDrawer({
   function reset() {
     setSubmitted(false);
     setSubmitError(null);
-    setShowForm(false);
-    setNombre("");
-    setEmail("");
-    setTelefono("");
+    setShowNotas(false);
+    setNotas("");
     setDrawerOpen(false);
   }
 
