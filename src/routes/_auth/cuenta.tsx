@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, LogOut } from "lucide-react";
+import { ArrowLeft, ExternalLink, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { isAdminEmail, BACKOFFICE_URL } from "@/lib/admin-emails";
 
 export const Route = createFileRoute("/_auth/cuenta")({
   head: () => ({ meta: [{ title: "Mi cuenta — Rambla Rental" }] }),
@@ -128,6 +129,22 @@ function AccountPage() {
             Guardar
           </button>
         </div>
+
+        {isAdminEmail(user?.email) && (
+          <div className="mt-12 border-t hairline pt-6">
+            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              Administración
+            </div>
+            <a
+              href={BACKOFFICE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-2 rounded-md border hairline px-4 py-2 text-sm text-ink hover:bg-accent/30"
+            >
+              Ir al back-office <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );
