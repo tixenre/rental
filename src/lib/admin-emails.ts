@@ -1,7 +1,7 @@
 // Lista de emails con acceso al back-office FastAPI.
 // Editar acá para agregar/quitar admins del frontend.
 export const ADMIN_EMAILS: string[] = [
-  // "tu-email@dominio.com",
+  "tinchosantini@gmail.com",
 ];
 
 export const BACKOFFICE_URL = "https://ramblarental.up.railway.app/login";

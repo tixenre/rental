@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 import { ArrowLeft } from "lucide-react";
 
@@ -39,17 +40,16 @@ function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: window.location.origin + "/mis-pedidos",
-        },
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
       });
-      if (error) {
+      if (result.error) {
         setError("No pudimos iniciar sesión. Probá de nuevo.");
         setBusy(false);
         return;
       }
+      // Si redirected, el browser ya se va a Google
+      // Si no, los tokens se setearon — el efecto de useAuth nos manda a /mis-pedidos
     } catch (err) {
       setError("No pudimos iniciar sesión. Probá de nuevo.");
       setBusy(false);
