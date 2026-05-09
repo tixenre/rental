@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import { adminApi, type PedidoResumen } from "@/lib/admin/api";
-import { formatCurrencyARS } from "@/lib/format";
+import { formatARS } from "@/lib/format";
 
 export const Route = createFileRoute("/admin/")({
   component: AdminDashboard,
@@ -69,7 +69,7 @@ function AdminDashboard() {
             />
             <Stat
               label="Ingresos mes"
-              value={formatCurrencyARS(Number(data.ingresos_mes ?? 0))}
+              value={formatARS(Number(data.ingresos_mes ?? 0))}
               icon={<DollarSign className="h-4 w-4" />}
             />
             <Stat
@@ -169,7 +169,7 @@ function PedidosCard({
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-ink truncate">{p.cliente_nombre}</div>
                   <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                    #{p.id} · {formatCurrencyARS(Number(p.monto_total ?? 0))}
+                    #{p.id} · {formatARS(Number(p.monto_total ?? 0))}
                   </div>
                 </div>
                 <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
