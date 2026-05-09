@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { TopBar } from "@/components/rental/TopBar";
+import { MobileStickyBar } from "@/components/rental/MobileStickyBar";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
 import { CartDrawer } from "@/components/rental/CartDrawer";
