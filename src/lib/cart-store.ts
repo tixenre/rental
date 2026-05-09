@@ -59,9 +59,20 @@ export const useCart = create<CartState>((set, get) => ({
   totalItems: () =>
     Object.values(get().items).reduce((a, b) => a + b, 0),
   days: () => {
-    const { startDate, endDate } = get();
+    const { startDate, endDate, startTime, endTime } = get();
     if (!startDate || !endDate) return 1;
-    const ms = endDate.getTime() - startDate.getTime();
-    return Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)) + 1);
+    const startOfDay = (d: Date) => {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      return x;
+    };
+    const dayDiff = Math.round(
+      (startOfDay(endDate).getTime() - startOfDay(startDate).getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+    const [sh = 0, sm = 0] = (startTime ?? "00:00").split(":").map(Number);
+    const [eh = 0, em = 0] = (endTime ?? "00:00").split(":").map(Number);
+    const endsLater = eh * 60 + em > sh * 60 + sm;
+    return Math.max(1, dayDiff + (endsLater ? 1 : 0));
   },
 }));
