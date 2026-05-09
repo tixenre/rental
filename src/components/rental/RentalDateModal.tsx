@@ -1,17 +1,23 @@
-import { DayPicker, type DateRange } from "react-day-picker";
+import { type DateRange } from "react-day-picker";
 import { es } from "date-fns/locale";
 import { addDays, format, startOfDay } from "date-fns";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Calendar } from "@/components/ui/calendar";
 import { useCart } from "@/lib/cart-store";
-import { cn } from "@/lib/utils";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 type Props = {
   open: boolean;
   onOpenChange: (o: boolean) => void;
 };
 
-// Mock de días "ocupados" para demo visual (hasta tener backend)
 function buildBusyDays(): Date[] {
   const today = startOfDay(new Date());
   return [addDays(today, 5), addDays(today, 12), addDays(today, 13), addDays(today, 27)];
@@ -35,7 +41,6 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   const today = startOfDay(new Date());
   const busy = buildBusyDays();
 
-  // Live: cualquier cambio se refleja al instante en el carrito
   const handleRangeChange = (r: DateRange | undefined) => {
     setDates(r?.from, r?.to);
   };
@@ -45,20 +50,18 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-3xl p-0 gap-0 overflow-hidden bg-background border hairline [&>button[aria-label='Close']]:hidden"
-      >
+      <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden bg-background">
+        <VisuallyHidden>
+          <DialogTitle>Tu Rental — Seleccionar fechas</DialogTitle>
+          <DialogDescription>
+            Elegí la fecha de inicio y devolución del alquiler.
+          </DialogDescription>
+        </VisuallyHidden>
+
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b hairline">
+        <DialogHeader className="flex flex-row items-center justify-between px-6 py-4 border-b hairline space-y-0">
           <h2 className="wordmark text-xl text-foreground">Tu Rental</h2>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="rounded-full p-1.5 hover:bg-muted transition"
-            aria-label="Cerrar"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        </DialogHeader>
 
         {/* Resumen Inicio / Devolver */}
         <div className="px-6 pt-5 pb-3 flex items-center justify-between gap-4">
@@ -96,43 +99,20 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
         </div>
 
         {/* Calendario doble */}
-        <div className="px-4 pb-2 overflow-x-auto">
-          <DayPicker
+        <div className="flex justify-center px-4 pb-2">
+          <Calendar
             mode="range"
             selected={range}
             onSelect={handleRangeChange}
             numberOfMonths={2}
             locale={es}
             disabled={{ before: today }}
-            modifiers={{ busy, available: (d) => d >= today && !busy.some((b) => b.getTime() === d.getTime()) }}
+            modifiers={{ busy }}
+            modifiersClassNames={{
+              busy: "bg-amber/30 text-ink rounded-full",
+            }}
             showOutsideDays={false}
-            className={cn("p-3 pointer-events-auto rdp-rambla")}
-            classNames={{
-              months: "flex gap-8 justify-center",
-              month: "space-y-3",
-              caption: "flex justify-center relative items-center h-9",
-              caption_label: "text-sm font-semibold",
-              nav: "flex items-center gap-1",
-              nav_button:
-                "h-7 w-7 inline-flex items-center justify-center rounded hover:bg-muted",
-              nav_button_previous: "absolute left-1",
-              nav_button_next: "absolute right-1",
-              table: "w-full border-collapse",
-              head_row: "flex",
-              head_cell:
-                "w-10 text-[10px] uppercase tracking-wider text-muted-foreground font-medium",
-              row: "flex w-full mt-1",
-              cell: "w-10 h-10 p-0 relative",
-              day: "h-10 w-10 p-0 font-medium text-sm",
-            }}
-            components={{
-              Chevron: ({ orientation }) =>
-                orientation === "left" ? (
-                  <ChevronLeft className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                ),
-            }}
+            className="p-3 pointer-events-auto"
           />
         </div>
 
