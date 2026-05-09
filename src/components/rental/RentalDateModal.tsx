@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { DayPicker, type DateRange } from "react-day-picker";
 import { es } from "date-fns/locale";
 import { addDays, format, startOfDay } from "date-fns";
