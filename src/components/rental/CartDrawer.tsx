@@ -442,53 +442,6 @@ export function CartDrawer({
                     </button>
                   )}
                 </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Footer sticky con totales */}
-                <div
-                  className="border-t hairline bg-background px-5 py-4 space-y-3 sm:px-6"
-                  style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
-                >
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal por jornada</span>
-                    <span className="tabular">{formatARS(subtotal)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                      Total · {d} {d === 1 ? "jornada" : "jornadas"}
-                    </span>
-                    <span className="font-display text-3xl tabular text-ink">
-                      {formatARS(total)}
-                    </span>
-                  </div>
-
-                  {!showForm ? (
-                    <button
-                      disabled={list.length === 0 || !startDate || !endDate}
-                      onClick={() => setShowForm(true)}
-                      className="w-full rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
-                    >
-                      Solicitar cotización
-                    </button>
-                  ) : null}
-
-                  {(!startDate || !endDate) ? (
-                    <p className="text-center text-xs text-muted-foreground">
-                      Elegí fechas para solicitar la cotización
-                    </p>
-                  ) : null}
-
-                  {list.length > 0 && (
-                    <button
-                      onClick={clear}
-                      className="w-full text-xs text-muted-foreground hover:text-destructive focus:outline-none focus-visible:underline"
-                    >
-                      Vaciar pedido
-                    </button>
-                  )}
-                </div>
               </>
             )}
           </motion.aside>
