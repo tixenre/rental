@@ -87,7 +87,7 @@ export function CartDrawer() {
                   </div>
                 </div>
               </div>
-              <div className="mt-3 font-mono text-[11px] uppercase tracking-widest text-amber">
+              <div className="mt-3 font-mono text-[11px] uppercase tracking-widest text-ink">
                 {d} {d === 1 ? "jornada" : "jornadas"}
               </div>
             </div>
@@ -123,7 +123,7 @@ export function CartDrawer() {
                           <div className="flex items-center gap-1 rounded border hairline">
                             <button
                               onClick={() => remove(it.id)}
-                              className="grid h-6 w-6 place-items-center hover:text-amber"
+                              className="grid h-6 w-6 place-items-center hover:text-ink"
                             >
                               <Minus className="h-3 w-3" />
                             </button>
@@ -132,12 +132,12 @@ export function CartDrawer() {
                             </span>
                             <button
                               onClick={() => add(it.id)}
-                              className="grid h-6 w-6 place-items-center hover:text-amber"
+                              className="grid h-6 w-6 place-items-center hover:text-ink"
                             >
                               <Plus className="h-3 w-3" />
                             </button>
                           </div>
-                          <div className="text-xs tabular text-amber">
+                          <div className="text-xs tabular text-ink">
                             ${formatPrice(it.pricePerDay * qty)}
                             <span className="text-muted-foreground"> /día</span>
                           </div>
@@ -164,13 +164,13 @@ export function CartDrawer() {
                 <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
                   Total estimado
                 </span>
-                <span className="font-display text-3xl tabular text-amber">
+                <span className="font-display text-3xl tabular text-ink">
                   ${formatPrice(total)}
                 </span>
               </div>
               <button
                 disabled={list.length === 0}
-                className="w-full rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-primary-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                className="w-full rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Solicitar cotización
               </button>

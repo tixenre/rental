@@ -33,14 +33,14 @@ export function EquipmentRow({ item }: { item: Equipment }) {
         <Link
           to="/equipo/$slug"
           params={{ slug: item.slug }}
-          className="block font-display text-base leading-tight hover:text-amber"
+          className="block font-display text-base leading-tight hover:text-ink"
         >
           {item.name}
         </Link>
       </div>
 
       <div className="text-right">
-        <div className="font-display text-base tabular text-amber">
+        <div className="font-display text-base tabular text-ink">
           ${formatPrice(item.pricePerDay)}
         </div>
         <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
@@ -51,7 +51,7 @@ export function EquipmentRow({ item }: { item: Equipment }) {
       {qty === 0 ? (
         <button
           onClick={() => add(item.id)}
-          className="flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-xs uppercase tracking-wider hover:border-amber hover:bg-amber hover:text-primary-foreground"
+          className="flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-xs uppercase tracking-wider hover:border-amber hover:bg-amber hover:text-ink"
         >
           <Plus className="h-3 w-3" /> Agregar
         </button>

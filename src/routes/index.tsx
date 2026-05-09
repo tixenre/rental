@@ -124,7 +124,7 @@ function Index() {
                     className={cn(
                       "flex items-center gap-1.5 rounded px-3 py-1.5 transition",
                       sort === k
-                        ? "bg-amber text-primary-foreground"
+                        ? "bg-amber text-ink"
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
@@ -140,7 +140,7 @@ function Index() {
                   className={cn(
                     "grid h-7 w-7 place-items-center rounded transition",
                     view === "grid"
-                      ? "bg-amber text-primary-foreground"
+                      ? "bg-amber text-ink"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                   aria-label="Vista grilla"
@@ -152,7 +152,7 @@ function Index() {
                   className={cn(
                     "grid h-7 w-7 place-items-center rounded transition",
                     view === "list"
-                      ? "bg-amber text-primary-foreground"
+                      ? "bg-amber text-ink"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                   aria-label="Vista lista"

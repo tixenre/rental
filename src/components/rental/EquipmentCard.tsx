@@ -37,7 +37,7 @@ export function EquipmentCard({
       >
         <EmptyImage category={item.category} brand={item.brand} />
         {selected && (
-          <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-amber text-primary-foreground">
+          <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-amber text-ink">
             <Check className="h-3.5 w-3.5" strokeWidth={3} />
           </div>
         )}
@@ -51,7 +51,7 @@ export function EquipmentCard({
           <Link
             to="/equipo/$slug"
             params={{ slug: item.slug }}
-            className="mt-1 block font-display text-lg leading-tight tracking-tight hover:text-amber transition"
+            className="mt-1 block font-display text-lg leading-tight tracking-tight hover:text-foreground transition"
           >
             {item.name}
           </Link>
@@ -59,7 +59,7 @@ export function EquipmentCard({
 
         <div className="mt-auto flex items-end justify-between gap-2">
           <div>
-            <div className="font-display text-xl tabular text-amber">
+            <div className="font-display text-xl tabular text-ink">
               ${formatPrice(item.pricePerDay)}
             </div>
             <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -70,7 +70,7 @@ export function EquipmentCard({
           {qty === 0 ? (
             <button
               onClick={() => add(item.id)}
-              className="flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition hover:border-amber hover:bg-amber hover:text-primary-foreground"
+              className="flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition hover:border-amber hover:bg-amber hover:text-ink"
             >
               <Plus className="h-3 w-3" />
               Agregar
