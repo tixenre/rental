@@ -1,4 +1,5 @@
-import { Plus, Minus, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Plus, Minus, Sparkles, Share2, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
