@@ -14,6 +14,13 @@ import { Route as EstudioRouteImport } from './routes/estudio'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
+import { Route as AdminPedidosRouteImport } from './routes/admin/pedidos'
+import { Route as AdminEstadisticasRouteImport } from './routes/admin/estadisticas'
+import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
+import { Route as AdminClientesRouteImport } from './routes/admin/clientes'
+import { Route as AdminCalendarioRouteImport } from './routes/admin/calendario'
 import { Route as AuthCuentaRouteImport } from './routes/_auth/cuenta'
 import { Route as AuthMisPedidosIndexRouteImport } from './routes/_auth/mis-pedidos/index'
 import { Route as AuthMisPedidosIdRouteImport } from './routes/_auth/mis-pedidos/$id'
@@ -42,6 +49,41 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPedidosRoute = AdminPedidosRouteImport.update({
+  id: '/pedidos',
+  path: '/pedidos',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminEstadisticasRoute = AdminEstadisticasRouteImport.update({
+  id: '/estadisticas',
+  path: '/estadisticas',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminEquiposRoute = AdminEquiposRouteImport.update({
+  id: '/equipos',
+  path: '/equipos',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminClientesRoute = AdminClientesRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCalendarioRoute = AdminCalendarioRouteImport.update({
+  id: '/calendario',
+  path: '/calendario',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AuthCuentaRoute = AuthCuentaRouteImport.update({
   id: '/cuenta',
   path: '/cuenta',
@@ -60,19 +102,32 @@ const AuthMisPedidosIdRoute = AuthMisPedidosIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/login': typeof LoginRoute
   '/cuenta': typeof AuthCuentaRoute
+  '/admin/calendario': typeof AdminCalendarioRoute
+  '/admin/clientes': typeof AdminClientesRoute
+  '/admin/equipos': typeof AdminEquiposRoute
+  '/admin/estadisticas': typeof AdminEstadisticasRoute
+  '/admin/pedidos': typeof AdminPedidosRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/': typeof AdminIndexRoute
   '/mis-pedidos/$id': typeof AuthMisPedidosIdRoute
   '/mis-pedidos/': typeof AuthMisPedidosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/estudio': typeof EstudioRoute
   '/login': typeof LoginRoute
   '/cuenta': typeof AuthCuentaRoute
+  '/admin/calendario': typeof AdminCalendarioRoute
+  '/admin/clientes': typeof AdminClientesRoute
+  '/admin/equipos': typeof AdminEquiposRoute
+  '/admin/estadisticas': typeof AdminEstadisticasRoute
+  '/admin/pedidos': typeof AdminPedidosRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin': typeof AdminIndexRoute
   '/mis-pedidos/$id': typeof AuthMisPedidosIdRoute
   '/mis-pedidos': typeof AuthMisPedidosIndexRoute
 }
@@ -80,10 +135,17 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_auth': typeof AuthRouteWithChildren
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/login': typeof LoginRoute
   '/_auth/cuenta': typeof AuthCuentaRoute
+  '/admin/calendario': typeof AdminCalendarioRoute
+  '/admin/clientes': typeof AdminClientesRoute
+  '/admin/equipos': typeof AdminEquiposRoute
+  '/admin/estadisticas': typeof AdminEstadisticasRoute
+  '/admin/pedidos': typeof AdminPedidosRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/': typeof AdminIndexRoute
   '/_auth/mis-pedidos/$id': typeof AuthMisPedidosIdRoute
   '/_auth/mis-pedidos/': typeof AuthMisPedidosIndexRoute
 }
@@ -95,15 +157,28 @@ export interface FileRouteTypes {
     | '/estudio'
     | '/login'
     | '/cuenta'
+    | '/admin/calendario'
+    | '/admin/clientes'
+    | '/admin/equipos'
+    | '/admin/estadisticas'
+    | '/admin/pedidos'
+    | '/admin/settings'
+    | '/admin/'
     | '/mis-pedidos/$id'
     | '/mis-pedidos/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/admin'
     | '/estudio'
     | '/login'
     | '/cuenta'
+    | '/admin/calendario'
+    | '/admin/clientes'
+    | '/admin/equipos'
+    | '/admin/estadisticas'
+    | '/admin/pedidos'
+    | '/admin/settings'
+    | '/admin'
     | '/mis-pedidos/$id'
     | '/mis-pedidos'
   id:
@@ -114,6 +189,13 @@ export interface FileRouteTypes {
     | '/estudio'
     | '/login'
     | '/_auth/cuenta'
+    | '/admin/calendario'
+    | '/admin/clientes'
+    | '/admin/equipos'
+    | '/admin/estadisticas'
+    | '/admin/pedidos'
+    | '/admin/settings'
+    | '/admin/'
     | '/_auth/mis-pedidos/$id'
     | '/_auth/mis-pedidos/'
   fileRoutesById: FileRoutesById
@@ -121,7 +203,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRouteWithChildren
-  AdminRoute: typeof AdminRoute
+  AdminRoute: typeof AdminRouteWithChildren
   EstudioRoute: typeof EstudioRoute
   LoginRoute: typeof LoginRoute
 }
@@ -163,6 +245,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/pedidos': {
+      id: '/admin/pedidos'
+      path: '/pedidos'
+      fullPath: '/admin/pedidos'
+      preLoaderRoute: typeof AdminPedidosRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/estadisticas': {
+      id: '/admin/estadisticas'
+      path: '/estadisticas'
+      fullPath: '/admin/estadisticas'
+      preLoaderRoute: typeof AdminEstadisticasRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/equipos': {
+      id: '/admin/equipos'
+      path: '/equipos'
+      fullPath: '/admin/equipos'
+      preLoaderRoute: typeof AdminEquiposRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/clientes': {
+      id: '/admin/clientes'
+      path: '/clientes'
+      fullPath: '/admin/clientes'
+      preLoaderRoute: typeof AdminClientesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/calendario': {
+      id: '/admin/calendario'
+      path: '/calendario'
+      fullPath: '/admin/calendario'
+      preLoaderRoute: typeof AdminCalendarioRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/_auth/cuenta': {
       id: '/_auth/cuenta'
       path: '/cuenta'
@@ -201,10 +332,32 @@ const AuthRouteChildren: AuthRouteChildren = {
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
+interface AdminRouteChildren {
+  AdminCalendarioRoute: typeof AdminCalendarioRoute
+  AdminClientesRoute: typeof AdminClientesRoute
+  AdminEquiposRoute: typeof AdminEquiposRoute
+  AdminEstadisticasRoute: typeof AdminEstadisticasRoute
+  AdminPedidosRoute: typeof AdminPedidosRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminCalendarioRoute: AdminCalendarioRoute,
+  AdminClientesRoute: AdminClientesRoute,
+  AdminEquiposRoute: AdminEquiposRoute,
+  AdminEstadisticasRoute: AdminEstadisticasRoute,
+  AdminPedidosRoute: AdminPedidosRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRouteWithChildren,
-  AdminRoute: AdminRoute,
+  AdminRoute: AdminRouteWithChildren,
   EstudioRoute: EstudioRoute,
   LoginRoute: LoginRoute,
 }
