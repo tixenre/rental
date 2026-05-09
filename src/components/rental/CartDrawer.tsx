@@ -387,6 +387,7 @@ export function CartDrawer({
                   {!user ? (
                     <Link
                       to="/login"
+                      search={{}}
                       onClick={() => setDrawerOpen(false)}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
                     >

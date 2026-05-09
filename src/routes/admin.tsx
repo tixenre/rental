@@ -42,6 +42,7 @@ function AdminAccessPage() {
           >
             <Link
               to="/login"
+              search={{ redirect: "/admin" }}
               className="inline-flex items-center justify-center rounded-md bg-amber px-4 py-2 text-sm font-medium uppercase tracking-widest text-ink hover:brightness-110"
             >
               Iniciar sesión
