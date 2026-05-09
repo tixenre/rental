@@ -1,0 +1,52 @@
+"""
+middleware.py — Protección de rutas con sesión.
+"""
+
+from fastapi import Request
+from fastapi.responses import RedirectResponse, JSONResponse
+from routes.auth import get_session
+
+# Rutas exactas que NO requieren autenticación
+PUBLIC_EXACT = {"/", "/login", "/cliente"}
+
+# Prefijos que NO requieren autenticación
+PUBLIC_PREFIXES = (
+    "/auth/",
+    "/static/",
+    "/equipo/",    # fichas públicas
+    "/cliente/",   # portal de clientes (autenticación propia)
+)
+
+# Rutas de API que son públicas (catálogo, disponibilidad, config)
+PUBLIC_API = (
+    "/api/equipos",
+    "/api/categorias",
+    "/api/etiquetas",
+    "/api/disponibilidad",
+    "/api/public/",
+)
+
+
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+
+    # Permitir rutas exactas públicas
+    if path in PUBLIC_EXACT:
+        return await call_next(request)
+
+    # Permitir rutas por prefijo
+    if any(path.startswith(p) for p in PUBLIC_PREFIXES):
+        return await call_next(request)
+
+    # APIs públicas del catálogo
+    if any(path.startswith(p) for p in PUBLIC_API):
+        return await call_next(request)
+
+    # Verificar sesión
+    session = get_session(request)
+    if not session:
+        if path.startswith("/api/"):
+            return JSONResponse({"detail": "No autenticado"}, status_code=401)
+        return RedirectResponse("/login")
+
+    return await call_next(request)
