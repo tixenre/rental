@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiGetEquipos, apiGetCategorias, apiGetDisponibilidad, type BackendEquipo } from "@/lib/api";
-import { type Equipment, type Category } from "@/data/equipment";
+import { type Equipment, type Category, equipment as MOCK_EQUIPMENT } from "@/data/equipment";
 import { format } from "date-fns";
 
 /* ─── Inferencia de categoría desde nombre/marca/etiquetas ────────────── */
