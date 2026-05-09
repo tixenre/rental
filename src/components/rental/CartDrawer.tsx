@@ -122,10 +122,15 @@ export function CartDrawer() {
                 </div>
               ) : (
                 <ul className="space-y-3">
-                  {list.map(({ it, qty }) => (
+                  {list.map(({ it, qty, availability, conflict }) => (
                     <li
                       key={it.id}
-                      className="flex gap-3 rounded-lg border hairline bg-surface p-3"
+                      className={
+                        "flex gap-3 rounded-lg border p-3 transition " +
+                        (conflict
+                          ? "border-destructive/50 bg-destructive/5"
+                          : "hairline bg-surface")
+                      }
                     >
                       <div className="h-16 w-20 shrink-0 overflow-hidden rounded">
                         <EmptyImage category={it.category} brand={it.brand} />
@@ -137,6 +142,17 @@ export function CartDrawer() {
                         <div className="truncate font-display text-sm leading-tight">
                           {it.name}
                         </div>
+                        {conflict ? (
+                          <div className="mt-1 flex items-center gap-1 text-[11px] text-destructive">
+                            <AlertTriangle className="h-3 w-3" />
+                            {availability.reason ??
+                              `Solo ${availability.stock} disponible${availability.stock === 1 ? "" : "s"}`}
+                          </div>
+                        ) : availability.stock <= 1 ? (
+                          <div className="mt-1 text-[11px] text-amber-600">
+                            Último disponible
+                          </div>
+                        ) : null}
                         <div className="mt-1 flex items-center justify-between">
                           <div className="flex items-center gap-1 rounded border hairline">
                             <button
@@ -150,12 +166,18 @@ export function CartDrawer() {
                             </span>
                             <button
                               onClick={() => add(it.id)}
-                              className="grid h-6 w-6 place-items-center hover:text-ink"
+                              disabled={qty >= availability.stock}
+                              className="grid h-6 w-6 place-items-center hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
                             >
                               <Plus className="h-3 w-3" />
                             </button>
                           </div>
-                          <div className="text-xs tabular text-ink">
+                          <div
+                            className={
+                              "text-xs tabular " +
+                              (conflict ? "text-muted-foreground line-through" : "text-ink")
+                            }
+                          >
                             ${formatPrice(it.pricePerDay * qty)}
                             <span className="text-muted-foreground"> /día</span>
                           </div>
