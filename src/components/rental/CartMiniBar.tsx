@@ -59,7 +59,7 @@ export function CartMiniBar() {
         </div>
 
         <button
-          onClick={() => setDrawerOpen(true)}
+          onClick={() => setDrawerOpen(true, "bottom")}
           disabled={isEmpty}
           className="rounded-full bg-amber px-4 py-2.5 text-sm font-semibold text-ink transition hover:bg-amber/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
