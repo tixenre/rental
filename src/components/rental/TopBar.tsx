@@ -78,7 +78,6 @@ export function TopBar() {
     setDrawerOpen,
     totalItems,
   } = useCart();
-  const [user] = useState("Invitado");
   const count = totalItems();
   const { user: authUser, signOut } = useAuth();
   const navigate = useNavigate();
