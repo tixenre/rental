@@ -14,6 +14,7 @@ import { CartMiniBar } from "@/components/rental/CartMiniBar";
 import { CarouselRow } from "@/components/rental/CarouselRow";
 import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { ListFilters } from "@/components/rental/ListFilters";
+import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { CategoryIllustration } from "@/components/rental/illustrations/CategoryIllustration";
 import { EquipmentDetailProvider } from "@/lib/equipment-detail-context";
 import { useEquipos, useDisponibilidad } from "@/hooks/useEquipos";
