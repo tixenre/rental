@@ -78,7 +78,7 @@ function AdminAccessPage() {
             tone="ok"
             icon={<ShieldCheck className="h-5 w-5" />}
             title="Acceso autorizado"
-            body={`Logueado como ${user.email}.`}
+            body={`Logueado como ${user?.email ?? "modo bypass"}.`}
           >
             <a
               href={BACKOFFICE_URL}
