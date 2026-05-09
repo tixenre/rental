@@ -93,6 +93,28 @@ function Index() {
             Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales.
             Elegí fechas y armá tu pedido — te lo dejamos listo para retirar.
           </p>
+
+          {/* CTA Estudio — producto estrella */}
+          <div className="mt-8 inline-flex max-w-xl flex-col gap-3 rounded-2xl border border-ink/15 bg-ink/5 p-4 sm:flex-row sm:items-center sm:gap-4 sm:p-5">
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-ink px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.25em] text-amber">
+                <Sparkles className="h-3 w-3" /> Producto estrella
+              </div>
+              <div className="mt-2 font-display text-xl sm:text-2xl">
+                Conocé el Estudio
+              </div>
+              <div className="text-xs text-ink/70">
+                Foto y video · reservá por hora · pack de luces y grips opcional
+              </div>
+            </div>
+            <Link
+              to="/estudio"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-3 text-sm font-semibold text-amber transition hover:bg-foreground"
+            >
+              Ver estudio <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
           <div className="mt-6 flex flex-wrap gap-2 text-[10px] font-mono uppercase tracking-widest">
             {["calidad", "variedad", "amistad", "comunidad", "intercambio", "local"].map((w) => (
               <span key={w} className="rounded-full border border-ink/25 px-3 py-1">
