@@ -1,10 +1,12 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Trash2, Plus, Minus } from "lucide-react";
+import { X, Trash2, Plus, Minus, AlertTriangle } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
 import { equipment, formatPrice } from "@/data/equipment";
+import { getAvailability } from "@/lib/availability";
 import { EmptyImage } from "./EmptyImage";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useMemo } from "react";
 
 export function CartDrawer() {
   const {
@@ -22,16 +24,32 @@ export function CartDrawer() {
     endTime,
   } = useCart();
 
-  const list = Object.entries(items)
-    .map(([id, qty]) => {
-      const it = equipment.find((e) => e.id === id);
-      return it ? { it, qty } : null;
-    })
-    .filter(Boolean) as { it: (typeof equipment)[number]; qty: number }[];
-
   const d = days();
-  const subtotal = list.reduce((s, { it, qty }) => s + it.pricePerDay * qty, 0);
+
+  // Recalcula disponibilidad + precios cada vez que cambian fechas o ítems
+  const list = useMemo(() => {
+    return Object.entries(items)
+      .map(([id, qty]) => {
+        const it = equipment.find((e) => e.id === id);
+        if (!it) return null;
+        const availability = getAvailability(it, startDate, endDate);
+        const conflict = !availability.available || qty > availability.stock;
+        return { it, qty, availability, conflict };
+      })
+      .filter(Boolean) as {
+      it: (typeof equipment)[number];
+      qty: number;
+      availability: ReturnType<typeof getAvailability>;
+      conflict: boolean;
+    }[];
+  }, [items, startDate, endDate]);
+
+  const subtotal = list
+    .filter((l) => !l.conflict)
+    .reduce((s, { it, qty }) => s + it.pricePerDay * qty, 0);
   const total = subtotal * d;
+  const conflictCount = list.filter((l) => l.conflict).length;
+
 
   return (
     <AnimatePresence>
@@ -104,10 +122,15 @@ export function CartDrawer() {
                 </div>
               ) : (
                 <ul className="space-y-3">
-                  {list.map(({ it, qty }) => (
+                  {list.map(({ it, qty, availability, conflict }) => (
                     <li
                       key={it.id}
-                      className="flex gap-3 rounded-lg border hairline bg-surface p-3"
+                      className={
+                        "flex gap-3 rounded-lg border p-3 transition " +
+                        (conflict
+                          ? "border-destructive/50 bg-destructive/5"
+                          : "hairline bg-surface")
+                      }
                     >
                       <div className="h-16 w-20 shrink-0 overflow-hidden rounded">
                         <EmptyImage category={it.category} brand={it.brand} />
@@ -119,6 +142,17 @@ export function CartDrawer() {
                         <div className="truncate font-display text-sm leading-tight">
                           {it.name}
                         </div>
+                        {conflict ? (
+                          <div className="mt-1 flex items-center gap-1 text-[11px] text-destructive">
+                            <AlertTriangle className="h-3 w-3" />
+                            {availability.reason ??
+                              `Solo ${availability.stock} disponible${availability.stock === 1 ? "" : "s"}`}
+                          </div>
+                        ) : availability.stock <= 1 ? (
+                          <div className="mt-1 text-[11px] text-amber-600">
+                            Último disponible
+                          </div>
+                        ) : null}
                         <div className="mt-1 flex items-center justify-between">
                           <div className="flex items-center gap-1 rounded border hairline">
                             <button
@@ -132,12 +166,18 @@ export function CartDrawer() {
                             </span>
                             <button
                               onClick={() => add(it.id)}
-                              className="grid h-6 w-6 place-items-center hover:text-ink"
+                              disabled={qty >= availability.stock}
+                              className="grid h-6 w-6 place-items-center hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
                             >
                               <Plus className="h-3 w-3" />
                             </button>
                           </div>
-                          <div className="text-xs tabular text-ink">
+                          <div
+                            className={
+                              "text-xs tabular " +
+                              (conflict ? "text-muted-foreground line-through" : "text-ink")
+                            }
+                          >
                             ${formatPrice(it.pricePerDay * qty)}
                             <span className="text-muted-foreground"> /día</span>
                           </div>
@@ -156,9 +196,20 @@ export function CartDrawer() {
             </div>
 
             <div className="border-t hairline px-6 py-5 space-y-3">
+              {conflictCount > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-[11px] text-destructive">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    {conflictCount} {conflictCount === 1 ? "ítem no está" : "ítems no están"} disponible{conflictCount === 1 ? "" : "s"} en estas fechas y se excluye{conflictCount === 1 ? "" : "n"} del total.
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal por jornada</span>
                 <span className="tabular">${formatPrice(subtotal)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>× {d} {d === 1 ? "jornada" : "jornadas"}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
