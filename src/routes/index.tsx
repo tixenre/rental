@@ -415,6 +415,7 @@ function ListMode({
           </div>
         )}
       </div>
+      <CartMiniBar />
     </>
   );
 }
