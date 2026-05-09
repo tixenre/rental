@@ -1,67 +1,35 @@
+## Ilustraciones de categoría al estilo Rambla
 
-# Rediseño Rambla Rental — editorial / cinematográfico
+Voy a crear ilustraciones SVG hechas a mano (inspiradas en las del manual: trazo grueso, esquinas redondeadas, monocromas en amarillo/tinta) para cada categoría del catálogo y usarlas en dos lugares: el **sidebar de categorías** y los **placeholders de los equipos**.
 
-Voy a reconstruir la interfaz del catálogo de alquiler con una estética editorial cinematográfica (pensada para rental de equipos de cine/foto), manteniendo el flujo actual pero más claro, rápido y con mucha más jerarquía visual. Todo con datos simulados (mock) en español.
+## Ilustraciones a crear
 
-## Dirección visual
+Componentes React-SVG en `src/components/rental/illustrations/`, una por categoría, todas con `currentColor` (heredan el color del contenedor → se pintan amarillo o tinta según el contexto):
 
-- **Paleta**: negro profundo de fondo, blanco hueso para texto, un único acento ámbar/dorado (similar al amarillo actual pero más sofisticado) y grises neutros para superficies.
-- **Tipografía**: una display serif de alto contraste para títulos (tipo editorial de revista de cine) + una sans geométrica para UI y datos. Números tabulares para precios.
-- **Tono**: mucho aire, tipografía grande, fotos protagonistas, microdetalles (líneas finas, etiquetas tipo "ficha técnica", numeración de items, badges discretos).
-- **Movimiento**: transiciones sutiles con framer-motion (fade/slide al cargar grid, hover en tarjetas, entrada del carrito).
+| Categoría     | Ilustración                                  |
+|---------------|----------------------------------------------|
+| Cámaras       | Cámara de cine con lente y ojo de visor      |
+| Lentes        | Lente con anillos de foco y reflejo          |
+| Iluminación   | Foco/reflector tipo Aputure con trípode      |
+| Audio         | Micrófono shotgun con peluche                |
+| Soportes      | **Silla** de director plegable (del manual)  |
+| Accesorios    | **Claqueta** abierta                         |
+| Adaptadores   | Cable con conectores XLR                     |
 
-## Estructura de la app
+(Silla, claqueta y cámara son las tres que pediste explícitamente; sumo el resto para cubrir todas las categorías y mantener coherencia visual.)
 
-Una sola ruta principal `/` (catálogo) más una ruta de detalle `/equipo/$slug`.
+Estilo: stroke ~2.5px, line-cap/line-join redondos, sin relleno (o con un fill amarillo opcional), pensadas para verse bien a 24px (sidebar) y a ~120px (placeholder de tarjeta).
 
-```
-src/routes/
-  index.tsx              → Catálogo (hero + filtros + grid)
-  equipo.$slug.tsx       → Ficha de equipo
-src/components/rental/
-  TopBar.tsx             → Logo, selector de fechas, usuario, contador de ítems
-  CategorySidebar.tsx    → Categorías + Marcas (colapsable en mobile)
-  SearchSortBar.tsx      → Búsqueda + ordenamiento + toggle grid/lista
-  EquipmentCard.tsx      → Tarjeta de equipo (grid)
-  EquipmentRow.tsx       → Fila de equipo (lista)
-  CartDrawer.tsx         → Panel lateral con ítems seleccionados
-  DateRangePicker.tsx    → Desde / Hasta con horas
-  EmptyImage.tsx         → Placeholder "sin foto" estilizado
-src/data/equipment.ts    → Mock data (categorías, marcas, ~40 equipos)
-src/lib/cart-store.ts    → Estado global del carrito (zustand)
-```
+## Integración
 
-## Mejoras de UX clave sobre el sitio actual
+1. **`CategoryIcon.tsx`**: componente que recibe `category` y devuelve la ilustración correcta. Reemplaza el `lucide-react` actual.
+2. **Sidebar (`CategorySidebar.tsx`)**: cada item de categoría muestra el ícono a la izquierda del nombre, en tinta normal y amarillo cuando está activo.
+3. **`EmptyImage.tsx`**: usa la nueva ilustración (más grande, ~96–128px) sobre fondo amarillo suave o crema, manteniendo la marca de agua del brand en la esquina.
+4. **Hero**: agrego una fila pequeña de las ilustraciones flotando en el bloque amarillo, como guiño al spread "universo Rambla" del manual.
 
-1. **Hero compacto** arriba con el nombre del rental, tagline y selector de fechas grande y claro (en lugar de inputs apretados arriba a la izquierda).
-2. **Sidebar de categorías** con conteo por categoría, marca activa resaltada, búsqueda dentro de marcas, colapsable en mobile como drawer.
-3. **Tarjetas de equipo** rediseñadas: imagen 4:3, marca como kicker pequeño, nombre prominente, precio con jerarquía clara, botón "Agregar" en lugar de stepper visible siempre (el stepper aparece al agregar). Hover muestra acciones secundarias (ver detalle, favorito).
-4. **Estado seleccionado**: borde sutil + check en esquina, no marco amarillo grueso.
-5. **Carrito como drawer lateral** persistente, con resumen de fechas, subtotal por jornada y total estimado, botón "Solicitar cotización".
-6. **Vista lista** densa con miniatura, specs y precio alineados — útil para usuarios que conocen el equipo.
-7. **Búsqueda con resultados instantáneos** y resaltado del término.
-8. **Página de detalle** por equipo con galería, descripción, specs, precio por jornada / fin de semana / semana, "Agregar al pedido".
-9. **Skeletons** al cargar y empty states cuidados.
-10. **Responsive real**: en mobile, sidebar como bottom sheet, grid 2 columnas, top bar sticky.
+## Lo que NO incluye
 
-## Datos mock
+- No reemplazo las imágenes de la página de detalle por ilustraciones — ahí queda lugar para fotos reales en el futuro.
+- No genero imágenes raster (PNG/JPG) — todo SVG inline para que escalen y tomen el color del tema.
 
-Un archivo `src/data/equipment.ts` con ~40 equipos repartidos en categorías (Cámaras, Lentes, Iluminación, Audio, Soportes, Accesorios, Adaptadores) y marcas reales (Canon, Sony, Sigma, Aputure, Godox, Manfrotto, DJI, etc.), con precios en pesos por jornada. Sin imágenes reales — uso un placeholder editorial bonito (gradiente + ícono + marca de agua de la marca).
-
-## Detalles técnicos
-
-- Tokens de color y tipografía definidos en `src/styles.css` con `oklch`. Sin colores hardcodeados en componentes.
-- Estado del carrito y filtros en `zustand` (ligero, sin servidor).
-- Animaciones con `framer-motion` (ya usable, lo instalo).
-- Tipografías cargadas desde Google Fonts en `__root.tsx` (por ejemplo *Fraunces* display + *Inter Tight* sans, o *Editorial New* alternativa).
-- SEO: `head()` en cada ruta con título y descripción propios, H1 único.
-- Sin backend — todo cliente. Si más adelante querés persistir pedidos o tener panel admin, activamos Lovable Cloud.
-
-## Lo que NO incluye (pueden ser próximos pasos)
-
-- Checkout real, pagos, login.
-- Imágenes reales de los equipos (uso placeholders; podés subir fotos después).
-- Panel de administración del catálogo.
-- Disponibilidad real según fechas (se muestra como UI pero no valida stock).
-
-¿Le doy para adelante con esto?
+¿Avanzo así?
