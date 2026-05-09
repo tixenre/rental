@@ -209,10 +209,13 @@ function Index() {
         </section>
 
         {/* Toggle Modo + búsqueda sticky */}
-        <div className="sticky top-[116px] sm:top-[60px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
+        <div className="sticky top-14 sm:top-[60px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
           <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 lg:px-12">
-            {/* Search input */}
-            <div className="relative flex-1 min-w-0 sm:max-w-xl">
+            {/* Mobile: pill fechas + lupa */}
+            <MobileStickyBar query={query} setQuery={setQuery} />
+
+            {/* Desktop: search input */}
+            <div className="relative hidden sm:block flex-1 min-w-0 sm:max-w-xl">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={query}
