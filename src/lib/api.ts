@@ -76,13 +76,5 @@ export function apiGetDisponibilidad(fechaDesde: string, fechaHasta: string) {
   });
 }
 
-export function apiPostPedido(body: {
-  cliente_nombre: string;
-  cliente_email: string;
-  cliente_telefono?: string;
-  fecha_desde: string;
-  fecha_hasta: string;
-  items: { equipo_id: number; cantidad: number; precio_jornada: number }[];
-}) {
-  return post<{ id: number }>("/api/alquileres", { ...body, estado: "presupuesto" });
-}
+// NOTA: la creación de pedidos se movió a `src/lib/orders.ts → createOrder()`
+// usando el endpoint autenticado /api/cliente/pedidos del backend FastAPI.
