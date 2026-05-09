@@ -49,7 +49,6 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   const apply = () => {
     setDates(range?.from, range?.to);
     setStartTime(sTime);
-    setETime(eTime);
     setEndTime(eTime);
     onOpenChange(false);
   };
