@@ -123,11 +123,19 @@ function Cable(props: IllProps) {
 const map: Record<Category, (p: IllProps) => React.ReactElement> = {
   Cámaras: Camara,
   Lentes: Lente,
-  Iluminación: Iluminacion,
-  Audio: Audio,
-  Soportes: Silla,
-  Accesorios: Claqueta,
-  Adaptadores: Cable,
+  Monitores: Claqueta,
+  Luces: Iluminacion,
+  Tungsteno: Iluminacion,
+  Modificadores: Silla,
+  Comunicación: Cable,
+  Flash: Iluminacion,
+  "Brazo Mágico": Cable,
+  Stands: Silla,
+  Grips: Cable,
+  Trípode: Silla,
+  Sonido: Audio,
+  Baterías: Cable,
+  Filtros: Lente,
 };
 
 export function CategoryIllustration({
