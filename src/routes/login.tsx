@@ -6,6 +6,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Iniciar sesión — Rambla Rental" },
@@ -29,19 +32,21 @@ function GoogleIcon({ className }: { className?: string }) {
 function LoginPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { redirect } = Route.useSearch();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && user) navigate({ to: "/mis-pedidos" });
-  }, [user, loading, navigate]);
+    if (!loading && user) navigate({ to: redirect === "/admin" ? "/admin" : "/mis-pedidos" });
+  }, [user, loading, navigate, redirect]);
 
   const handleGoogle = async () => {
     setBusy(true);
     setError(null);
     try {
+      const redirectPath = redirect === "/admin" ? "/admin" : "/mis-pedidos";
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}${redirectPath}`,
       });
       if (result.error) {
         setError("No pudimos iniciar sesión. Probá de nuevo.");
@@ -49,7 +54,7 @@ function LoginPage() {
         return;
       }
       // Si redirected, el browser ya se va a Google
-      // Si no, los tokens se setearon — el efecto de useAuth nos manda a /mis-pedidos
+      // Si no, los tokens se setearon — el efecto de useAuth redirige al destino correcto
     } catch (err) {
       setError("No pudimos iniciar sesión. Probá de nuevo.");
       setBusy(false);
