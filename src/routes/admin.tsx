@@ -17,28 +17,34 @@ export const Route = createFileRoute("/admin")({
   component: AdminLayout,
 });
 
+// ⚠️ AUTH BYPASS TEMPORAL — back-office abierto mientras la web no esté lista.
+// Para reactivar: descomentar el bloque de useAuth + redirect + isAdminEmail.
+const ADMIN_AUTH_BYPASS = true;
+
 function AdminLayout() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (ADMIN_AUTH_BYPASS) return;
     if (loading) return;
     if (!user) {
       navigate({ to: "/login", search: { redirect: "/admin" } });
     }
   }, [user, loading, navigate]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen grid place-items-center text-sm text-muted-foreground">
-        Cargando…
-      </div>
-    );
-  }
-  if (!user) return null;
-
-  if (!isAdminEmail(user.email)) {
-    return <NoAutorizado email={user.email ?? ""} />;
+  if (!ADMIN_AUTH_BYPASS) {
+    if (loading) {
+      return (
+        <div className="min-h-screen grid place-items-center text-sm text-muted-foreground">
+          Cargando…
+        </div>
+      );
+    }
+    if (!user) return null;
+    if (!isAdminEmail(user.email)) {
+      return <NoAutorizado email={user.email ?? ""} />;
+    }
   }
 
   return (

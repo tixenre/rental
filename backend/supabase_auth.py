@@ -226,9 +226,12 @@ def require_admin(request: Request) -> dict:
       1. Bearer JWT de Supabase + email en ADMIN_EMAILS  → frontend Lovable.
       2. Cookie de sesión clásica del FastAPI            → back-office HTML viejo.
 
-    Devuelve un dict con {kind, email, claims?, session?} para que el endpoint
-    pueda loggear quién hizo la acción si lo necesita.
+    Si la env var ADMIN_BYPASS_AUTH=1 está seteada, deja pasar a cualquiera
+    (modo desarrollo / web aún no funcional). NUNCA dejar esto en prod abierto.
     """
+    if os.getenv("ADMIN_BYPASS_AUTH", "").strip() in ("1", "true", "yes"):
+        return {"kind": "bypass", "email": "bypass@local"}
+
     # 1) Bearer JWT
     try:
         claims = get_supabase_claims(request)
