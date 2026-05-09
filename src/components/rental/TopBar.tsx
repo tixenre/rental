@@ -1,13 +1,19 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
-import { useEquipos } from "@/hooks/useEquipos";
-import { useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, ShoppingBag, User } from "lucide-react";
+import { Calendar as CalendarIcon, ShoppingBag, User, LogOut, Package, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 import { TimeStepSelect } from "./TimeStepSelect";
 
 function DateField({
@@ -74,6 +80,14 @@ export function TopBar() {
   } = useCart();
   const [user] = useState("Invitado");
   const count = totalItems();
+  const { user: authUser, signOut } = useAuth();
+  const navigate = useNavigate();
+  const isLoggedIn = !!authUser;
+  const initial = (authUser?.email ?? "?").trim().charAt(0).toUpperCase();
+  const handleSignOut = async () => {
+    await signOut();
+    navigate({ to: "/" });
+  };
 
   return (
     <>
