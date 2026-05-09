@@ -51,7 +51,11 @@ export const useCart = create<CartState>((set, get) => ({
   setDates: (start, end) => set({ startDate: start, endDate: end }),
   setStartTime: (t) => set({ startTime: t }),
   setEndTime: (t) => set({ endTime: t }),
-  setDrawerOpen: (open) => set({ drawerOpen: open }),
+  setDrawerOpen: (open, placement) =>
+    set((s) => ({
+      drawerOpen: open,
+      drawerPlacement: placement ?? s.drawerPlacement,
+    })),
   totalItems: () =>
     Object.values(get().items).reduce((a, b) => a + b, 0),
   days: () => {
