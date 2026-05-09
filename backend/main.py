@@ -3,11 +3,14 @@ Rambla Rental API — FastAPI + PostgreSQL
 Run: uvicorn main:app --reload --port 8000
 """
 
+import threading
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, FRONT, FRONT_NEW
@@ -35,7 +38,9 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-app.mount("/static", StaticFiles(directory=str(FRONT)), name="static")
+# Montar el frontend clásico solo si existe (no existe en el monorepo rental-refine)
+if FRONT.exists():
+    app.mount("/static", StaticFiles(directory=str(FRONT)), name="static")
 
 # Nuevo frontend (Vite SPA — rental-refine)
 if FRONT_NEW.exists():
@@ -61,41 +66,51 @@ def health():
 
 # ── Páginas ──────────────────────────────────────────────────────────────────
 
+def _serve_frontend(path: str = "index.html"):
+    """Helper: sirve desde FRONT_NEW (Vite SPA) o FRONT (clásico) si existe."""
+    new_file = FRONT_NEW / path
+    if new_file.exists():
+        return FileResponse(str(new_file))
+    classic_file = FRONT / path
+    if classic_file.exists():
+        return FileResponse(str(classic_file))
+    # Fallback: serve SPA index (TanStack Router maneja el 404 en cliente)
+    spa_index = FRONT_NEW / "index.html"
+    if spa_index.exists():
+        return FileResponse(str(spa_index))
+    return JSONResponse({"error": "Frontend not built"}, status_code=503)
+
 @app.get("/", include_in_schema=False)
 def root():
-    # Servir el nuevo frontend si existe el build; si no, el clásico
-    new_index = FRONT_NEW / "index.html"
-    if new_index.exists():
-        return FileResponse(str(new_index))
-    return FileResponse(FRONT / "index.html")
+    return _serve_frontend("index.html")
 
 @app.get("/login", include_in_schema=False)
 def login_page():
-    return FileResponse(FRONT / "login.html")
+    # En el nuevo SPA, /login es una ruta de TanStack Router
+    return _serve_frontend("index.html")
 
 @app.get("/admin", include_in_schema=False)
 def admin():
-    return FileResponse(FRONT / "admin.html")
+    return _serve_frontend("admin.html")
 
 @app.get("/equipo/{id}", include_in_schema=False)
 def equipo_page(id: int):
-    return FileResponse(FRONT / "equipo.html")
+    return _serve_frontend("index.html")
 
 @app.get("/cliente", include_in_schema=False)
 def cliente_login_page():
-    return FileResponse(FRONT / "cliente.html")
+    return _serve_frontend("cliente.html")
 
 @app.get("/cliente/portal", include_in_schema=False)
 def cliente_portal_page():
-    return FileResponse(FRONT / "cliente" / "portal.html")
+    return _serve_frontend("cliente/portal.html")
 
 @app.get("/cliente/registro", include_in_schema=False)
 def cliente_registro_page():
-    return FileResponse(FRONT / "cliente" / "registro.html")
+    return _serve_frontend("cliente/registro.html")
 
 # ── SPA catch-all: rutas del nuevo frontend (TanStack Router) ────────────────
 # Debe ir AL FINAL para no interceptar rutas de API ni páginas de admin.
-from fastapi import Request as FastAPIRequest
 
 @app.get("/{full_path:path}", include_in_schema=False)
 def spa_fallback(full_path: str):
@@ -104,14 +119,10 @@ def spa_fallback(full_path: str):
     TanStack Router maneja el enrutamiento del lado del cliente.
     Las rutas /api/* y /static/* se capturan antes que esta.
     """
-    new_index = FRONT_NEW / "index.html"
-    if new_index.exists():
-        return FileResponse(str(new_index))
-    return FileResponse(FRONT / "index.html")
+    return _serve_frontend("index.html")
 
 # ── Init DB (non-blocking) ───────────────────────────────────────────────────
-# Initialize DB in background to avoid blocking startup
-import threading
+# Initialize DB in background thread to not block app startup / healthcheck
 
 def init_db_bg():
     try:
@@ -121,6 +132,5 @@ def init_db_bg():
         print(f"⚠️  No se pudo inicializar BD: {e}")
         print("   La app continuará ejecutándose. Verifica DATABASE_URL.")
 
-# Start DB init in a background thread so healthcheck endpoint is available immediately
 db_init_thread = threading.Thread(target=init_db_bg, daemon=True)
 db_init_thread.start()
