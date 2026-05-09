@@ -63,10 +63,10 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
           <h2 className="wordmark text-xl text-foreground">Tu Rental</h2>
         </DialogHeader>
 
-        {/* Resumen Inicio / Devolver */}
+        {/* Resumen Retiro / Devolución */}
         <div className="px-6 pt-5 pb-3 flex items-center justify-between gap-4">
           <div className="flex flex-col">
-            <span className="text-xs font-medium text-foreground mb-1">Inicio</span>
+            <span className="text-xs font-medium text-foreground mb-1">Retiro</span>
             <div className="flex items-center gap-3">
               <span className="text-base font-semibold tabular text-sky-600 border-b-2 border-sky-500 pb-0.5 px-1 bg-sky-50/60">
                 {range?.from ? format(range.from, "dd-MM-yyyy") : "--/--/----"}
@@ -83,7 +83,7 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
           <div className="text-muted-foreground text-2xl">→</div>
 
           <div className="flex flex-col items-end">
-            <span className="text-xs font-medium text-foreground mb-1">Devolver</span>
+            <span className="text-xs font-medium text-foreground mb-1">Devolución</span>
             <div className="flex items-center gap-3">
               <span className="text-base font-semibold tabular text-rose-600 border-b-2 border-rose-500 pb-0.5 px-1">
                 {range?.to ? format(range.to, "dd-MM-yyyy") : "--/--/----"}
@@ -97,6 +97,10 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
             </div>
           </div>
         </div>
+
+        <p className="px-6 -mt-1 pb-2 text-[11px] text-muted-foreground">
+          Horario sujeto a confirmación con el equipo.
+        </p>
 
         {/* Calendario doble */}
         <div className="flex justify-center px-4 pb-2">
