@@ -7,6 +7,7 @@ import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
 import { CartDrawer } from "@/components/rental/CartDrawer";
 import { equipment, type Category } from "@/data/equipment";
+import { CategoryIllustration } from "@/components/rental/illustrations/CategoryIllustration";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -92,6 +93,14 @@ function Index() {
                   <span key={w} className="rounded-full border border-ink/25 px-3 py-1">
                     {w}
                   </span>
+                ))}
+              </div>
+              <div className="mt-10 flex flex-wrap items-end gap-6 border-t border-ink/15 pt-6">
+                {(["Cámaras","Lentes","Iluminación","Audio","Soportes","Accesorios","Adaptadores"] as const).map((c) => (
+                  <div key={c} className="flex flex-col items-center gap-2 text-ink">
+                    <CategoryIllustration category={c} className="h-10 w-10" />
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-ink/70">{c}</span>
+                  </div>
                 ))}
               </div>
             </div>
