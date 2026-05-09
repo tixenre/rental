@@ -92,7 +92,7 @@ function Index() {
                   <span key={w} className="rounded-full border border-ink/25 px-3 py-1">
                     {w}
                   </span>
-                ))}
+              </div>
               <div className="mt-10 flex flex-wrap items-end gap-6 border-t border-ink/15 pt-6">
                 {(["Cámaras","Lentes","Iluminación","Audio","Soportes","Accesorios","Adaptadores"] as const).map((c) => (
                   <div key={c} className="flex flex-col items-center gap-2 text-ink">
