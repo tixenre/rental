@@ -1,4 +1,4 @@
-import { categories, brands, type Category } from "@/data/equipment";
+import { categories as STATIC_CATS, brands as STATIC_BRANDS } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -9,15 +9,21 @@ export function ListFilters({
   selectedBrand,
   onBrand,
   onClear,
+  categories,
+  brands,
 }: {
   query: string;
   onQuery: (v: string) => void;
-  selectedCategories: Set<Category>;
-  onToggleCategory: (c: Category) => void;
+  selectedCategories: Set<string>;
+  onToggleCategory: (c: string) => void;
   selectedBrand: string | null;
   onBrand: (b: string | null) => void;
   onClear: () => void;
+  categories?: string[];
+  brands?: string[];
 }) {
+  const cats = categories && categories.length > 0 ? categories : (STATIC_CATS as readonly string[]);
+  const brandList = brands && brands.length > 0 ? brands : STATIC_BRANDS;
   const hasFilters = selectedCategories.size > 0 || !!selectedBrand || !!query.trim();
 
   return (
@@ -30,7 +36,7 @@ export function ListFilters({
             className="rounded-md border hairline bg-surface px-3 py-1.5 text-xs focus:border-amber/40 focus:outline-none"
           >
             <option value="">Todas las marcas</option>
-            {brands.map((b) => (
+            {brandList.map((b) => (
               <option key={b} value={b}>
                 {b}
               </option>
@@ -48,7 +54,7 @@ export function ListFilters({
 
         {/* Chips de categorías — scroll horizontal en mobile */}
         <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:px-0 lg:overflow-visible lg:pb-0">
-          {categories.map((c) => {
+          {cats.map((c) => {
             const active = selectedCategories.has(c);
             return (
               <button

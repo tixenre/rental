@@ -9,13 +9,15 @@ import { IncludedList } from "./IncludedList";
 import { useEquipmentDetail } from "@/lib/equipment-detail-context";
 import { cn } from "@/lib/utils";
 
-export function EquipmentRow({ item }: { item: Equipment }) {
+export function EquipmentRow({ item, disponible }: { item: Equipment; disponible?: number }) {
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
   const remove = useCart((s) => s.remove);
   const selected = qty > 0;
   const { openId, setOpenId } = useEquipmentDetail();
   const expanded = openId === item.id;
+  const noStock = disponible !== undefined && disponible <= 0;
+  const reachedMax = disponible !== undefined && qty >= disponible;
 
   return (
     <div
@@ -88,18 +90,33 @@ export function EquipmentRow({ item }: { item: Equipment }) {
           <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
             / 1 jornada
           </div>
+          {disponible !== undefined && (
+            <div
+              className={cn(
+                "mt-0.5 font-mono text-[9px] uppercase tracking-widest tabular",
+                disponible <= 0
+                  ? "text-destructive"
+                  : disponible === 1
+                    ? "text-amber-600"
+                    : "text-muted-foreground",
+              )}
+            >
+              {disponible <= 0 ? "sin stock" : `${disponible} disp.`}
+            </div>
+          )}
         </div>
 
         {/* CTA */}
         {qty === 0 ? (
           <button
             onClick={() => add(item.id)}
+            disabled={noStock}
             aria-label={`Agregar ${item.name}`}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border hairline hover:border-amber hover:bg-amber hover:text-ink sm:h-auto sm:w-auto sm:rounded-md sm:px-3 sm:py-1.5"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border hairline hover:border-amber hover:bg-amber hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-current sm:h-auto sm:w-auto sm:rounded-md sm:px-3 sm:py-1.5"
           >
             <Plus className="h-4 w-4 sm:hidden" />
             <span className="hidden items-center gap-1.5 text-xs uppercase tracking-wider sm:flex">
-              <Plus className="h-3 w-3" /> Agregar
+              <Plus className="h-3 w-3" /> {noStock ? "Sin stock" : "Agregar"}
             </span>
           </button>
         ) : (
@@ -116,8 +133,9 @@ export function EquipmentRow({ item }: { item: Equipment }) {
             </span>
             <button
               onClick={() => add(item.id)}
+              disabled={reachedMax}
               aria-label="Agregar uno"
-              className="grid h-7 w-7 place-items-center rounded-full text-amber hover:bg-amber/20 sm:rounded"
+              className="grid h-7 w-7 place-items-center rounded-full text-amber hover:bg-amber/20 disabled:cursor-not-allowed disabled:opacity-30 sm:rounded"
             >
               <Plus className="h-3 w-3" />
             </button>
