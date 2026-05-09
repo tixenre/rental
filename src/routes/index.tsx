@@ -79,6 +79,22 @@ function Index() {
     });
   }, [eq]);
 
+  // Esc cierra la fila expandida en list mode (Dialog ya maneja Esc en grid).
+  useEffect(() => {
+    if (!eq || mode !== "list") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const trigger = document.querySelector<HTMLButtonElement>(
+        `#eq-${eq} button[aria-expanded="true"]`,
+      );
+      setOpenId(null);
+      requestAnimationFrame(() => trigger?.focus());
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eq, mode]);
+
   const toggleCat = (c: Category) => {
     setSelectedCats((prev) => {
       const next = new Set(prev);
