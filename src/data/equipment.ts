@@ -15,6 +15,14 @@ export type Category =
   | "Baterías"
   | "Filtros";
 
+export type IncludedItem = {
+  /** Si está y matchea con un equipo del catálogo, se enriquece con su info. */
+  id?: string;
+  name: string;
+  qty?: number;
+  note?: string;
+};
+
 export type Equipment = {
   id: string;
   slug: string;
@@ -26,6 +34,7 @@ export type Equipment = {
   isNew?: boolean;
   isCombo?: boolean;
   specs: { label: string; value: string }[];
+  includes?: IncludedItem[];
 };
 
 const e = (
@@ -36,7 +45,7 @@ const e = (
   pricePerDay: number,
   description: string,
   specs: { label: string; value: string }[] = [],
-  flags: { isNew?: boolean; isCombo?: boolean } = {},
+  flags: { isNew?: boolean; isCombo?: boolean; includes?: IncludedItem[] } = {},
 ): Equipment => ({
   id,
   slug: `${brand}-${name}`
