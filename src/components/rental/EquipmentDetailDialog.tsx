@@ -60,7 +60,25 @@ export function EquipmentDetailDialog({
               <span className="rounded-full bg-amber px-1.5 py-0.5 text-ink">combo</span>
             )}
           </div>
-          <DialogTitle className="font-display text-2xl leading-tight">{item.name}</DialogTitle>
+          <div className="flex items-start justify-between gap-3">
+            <DialogTitle className="font-display text-2xl leading-tight">{item.name}</DialogTitle>
+            <button
+              type="button"
+              onClick={handleShare}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border hairline px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition hover:border-amber hover:text-ink"
+              aria-label="Compartir enlace"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3 w-3" /> Copiado
+                </>
+              ) : (
+                <>
+                  <Share2 className="h-3 w-3" /> Compartir
+                </>
+              )}
+            </button>
+          </div>
           <DialogDescription className="sr-only">
             Detalle del equipo {item.name}
           </DialogDescription>
