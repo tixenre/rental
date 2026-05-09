@@ -93,6 +93,13 @@ function Index() {
                     {w}
                   </span>
                 ))}
+              <div className="mt-10 flex flex-wrap items-end gap-6 border-t border-ink/15 pt-6">
+                {(["Cámaras","Lentes","Iluminación","Audio","Soportes","Accesorios","Adaptadores"] as const).map((c) => (
+                  <div key={c} className="flex flex-col items-center gap-2 text-ink">
+                    <CategoryIllustration category={c} className="h-10 w-10" />
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-ink/70">{c}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
