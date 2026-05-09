@@ -399,7 +399,7 @@ function ListMode({
         onClear={onClear}
       />
 
-      <div className="px-6 py-6 pb-24 lg:px-12">
+      <div className="px-6 py-6 pb-32 lg:px-12 lg:pb-32">
         {filtered.length === 0 ? (
           <div className="rounded-lg border hairline bg-surface px-6 py-16 text-center">
             <div className="font-display text-2xl text-muted-foreground">Sin resultados</div>
