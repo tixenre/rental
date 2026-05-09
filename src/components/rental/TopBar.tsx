@@ -139,33 +139,6 @@ export function TopBar() {
             </div>
           </div>
 
-          {/* Fila 2 mobile: pill de fechas full-width */}
-          <button
-            onClick={() => setDateModalOpen(true)}
-            className="md:hidden flex w-full items-center justify-between gap-3 rounded-2xl border border-amber/40 bg-amber/5 px-4 py-2.5 text-left transition hover:border-amber hover:bg-amber hover:text-ink"
-            aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
-          >
-            <CalendarIcon className="h-4 w-4 shrink-0" />
-            {hasDates ? (
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium leading-tight tabular-nums truncate">
-                  {format(startDate!, "dd MMM", { locale: es })} {startTime}
-                  <span className="mx-1.5 text-muted-foreground">→</span>
-                  {format(endDate!, "dd MMM", { locale: es })} {endTime}
-                </div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground leading-tight mt-0.5">
-                  {jornadas} {jornadas === 1 ? "jornada" : "jornadas"} · retiro y devolución
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium leading-tight">Elegir fechas</div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground leading-tight mt-0.5">
-                  Definí retiro y devolución
-                </div>
-              </div>
-            )}
-          </button>
         </div>
       </header>
       <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
