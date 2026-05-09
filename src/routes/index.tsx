@@ -271,13 +271,7 @@ function GridMode({
         </div>
       )}
 
-      {!isFiltered && !isSearching && news.length > 0 && (
-        <CarouselRow title="Ingresos" count={news.length}>
-          {news.map((item, i) => (
-            <EquipmentCard key={item.id} item={item} index={i} width={cardW} />
-          ))}
-        </CarouselRow>
-      )}
+      {!isFiltered && !isSearching && <CategoryMosaic onSelect={onJumpToCategory} />}
 
       {!isFiltered && !isSearching && combos.length > 0 && (
         <CarouselRow title="Combos" count={combos.length}>
@@ -286,8 +280,6 @@ function GridMode({
           ))}
         </CarouselRow>
       )}
-
-      {!isFiltered && !isSearching && <CategoryMosaic onSelect={onJumpToCategory} />}
 
       {visibleCategories.map((c) => {
         const items = equipment.filter((e) => e.category === c && matches(e));
