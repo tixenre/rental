@@ -21,8 +21,8 @@ export function ListFilters({
   onBrand: (b: string | null) => void;
   onClear: () => void;
 }) {
-  const cats = categories && categories.length > 0 ? categories : (STATIC_CATS as readonly string[]);
-  const brandList = brands && brands.length > 0 ? brands : STATIC_BRANDS;
+  const cats = categories ?? [];
+  const brandList = brands ?? [];
   const hasFilters = selectedCategories.size > 0 || !!selectedBrand || !!query.trim();
 
   return (
