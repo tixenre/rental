@@ -224,6 +224,9 @@ def init_db():
     """)
     # Migration: add maps URL column if not present
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS direccion_maps_url TEXT")
+    # Migration: link clientes to Supabase Auth users (Phase 1 of unified backend)
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS supabase_uid UUID UNIQUE")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_clientes_supabase_uid ON clientes(supabase_uid)")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (
