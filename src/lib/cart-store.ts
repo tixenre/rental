@@ -50,8 +50,8 @@ export const useCart = create<CartState>((set, get) => ({
     }),
   clear: () => set({ items: {} }),
   setDates: (start, end) => set({ startDate: start, endDate: end }),
-  setStartTime: (t) => set({ startTime: t }),
-  setEndTime: (t) => set({ endTime: t }),
+  setStartTime: (t) => set({ startTime: snapTo30(t) }),
+  setEndTime: (t) => set({ endTime: snapTo30(t) }),
   setDrawerOpen: (open, placement) =>
     set((s) => ({
       drawerOpen: open,
