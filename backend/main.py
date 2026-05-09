@@ -109,11 +109,18 @@ def spa_fallback(full_path: str):
         return FileResponse(str(new_index))
     return FileResponse(FRONT / "index.html")
 
-# ── Init DB ──────────────────────────────────────────────────────────────────
+# ── Init DB (non-blocking) ───────────────────────────────────────────────────
+# Initialize DB in background to avoid blocking startup
+import threading
 
-try:
-    init_db()
-    print("✅ BD PostgreSQL inicializada")
-except Exception as e:
-    print(f"⚠️  No se pudo inicializar BD: {e}")
-    print("   La app continuará ejecutándose. Verifica DATABASE_URL.")
+def init_db_bg():
+    try:
+        init_db()
+        print("✅ BD PostgreSQL inicializada")
+    except Exception as e:
+        print(f"⚠️  No se pudo inicializar BD: {e}")
+        print("   La app continuará ejecutándose. Verifica DATABASE_URL.")
+
+# Start DB init in a background thread so healthcheck endpoint is available immediately
+db_init_thread = threading.Thread(target=init_db_bg, daemon=True)
+db_init_thread.start()
