@@ -140,9 +140,6 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
   const nombre = e.nombre ?? "";
   const marca  = e.marca  ?? "";
   const name   = [nombre, e.modelo].filter(Boolean).join(" ") || "Sin nombre";
-  const category =
-    ((e.etiquetas ?? [])[0] as Category | undefined) ??
-    inferCategory(nombre, marca, e.modelo);
 
   return {
     id: String(e.id),
