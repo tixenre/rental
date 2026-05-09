@@ -78,61 +78,75 @@ export function TopBar() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b hairline bg-background/85 backdrop-blur-xl">
-        <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-6 sm:px-6">
-          <Link to="/" className="flex items-center gap-2 group shrink-0">
-            <span className="wordmark text-2xl sm:text-3xl text-amber leading-none">
-              rambla
-            </span>
-            <span className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
-              Rental
-            </span>
-          </Link>
+      <header className="sticky top-0 z-40 border-b hairline bg-background/95 backdrop-blur-md md:bg-background/85 md:backdrop-blur-xl">
+        <div className="flex flex-col gap-2 px-4 py-3 sm:gap-3 md:flex-row md:items-center md:gap-6 md:px-6">
+          {/* Fila 1 mobile / izq desktop: logo + acciones */}
+          <div className="flex items-center justify-between gap-2 md:contents">
+            <Link to="/" className="flex items-center gap-2 group shrink-0">
+              <span className="wordmark text-2xl sm:text-3xl text-amber leading-none">
+                rambla
+              </span>
+              <span className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
+                Rental
+              </span>
+            </Link>
 
-          <div className="hidden md:flex items-center gap-4 ml-4">
-            <DateField
-              label="Desde"
-              date={startDate}
-              time={startTime}
-              onDate={(d) => setDates(d, endDate)}
-              onTime={setStartTime}
-            />
-            <span className="text-muted-foreground">→</span>
-            <DateField
-              label="Hasta"
-              date={endDate}
-              time={endTime}
-              onDate={(d) => setDates(startDate, d)}
-              onTime={setEndTime}
-            />
+            <div className="hidden md:flex items-center gap-4 ml-4">
+              <DateField
+                label="Desde"
+                date={startDate}
+                time={startTime}
+                onDate={(d) => setDates(d, endDate)}
+                onTime={setStartTime}
+              />
+              <span className="text-muted-foreground">→</span>
+              <DateField
+                label="Hasta"
+                date={endDate}
+                time={endTime}
+                onDate={(d) => setDates(startDate, d)}
+                onTime={setEndTime}
+              />
+            </div>
+
+            {/* Acciones — junto al logo en mobile, a la derecha en desktop */}
+            <div className="flex items-center gap-2 md:ml-auto">
+              <button
+                onClick={() => setDrawerOpen(true, "bottom")}
+                className="relative flex items-center gap-2 rounded-full bg-foreground px-3 py-1.5 text-xs sm:text-sm md:px-4 md:py-2 font-medium text-background transition hover:bg-amber hover:text-ink"
+                aria-label={`Carrito (${count})`}
+              >
+                <ShoppingBag className="h-4 w-4" />
+                <span className="tabular hidden md:inline">{count}</span>
+                <span className="hidden md:inline">{count === 1 ? "ítem" : "ítems"}</span>
+                {count > 0 && (
+                  <span className="md:hidden absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-amber px-1 font-mono text-[10px] font-semibold leading-none text-ink">
+                    {count}
+                  </span>
+                )}
+              </button>
+              <button
+                className="flex items-center gap-1.5 rounded-full border hairline px-2 py-1.5 text-xs md:px-3 md:py-2 md:text-sm hover:border-foreground/40"
+                aria-label={user}
+              >
+                <User className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span className="hidden md:inline">{user}</span>
+              </button>
+            </div>
           </div>
 
+          {/* Fila 2 mobile: pill de fechas full-width */}
           <button
             onClick={() => setDateModalOpen(true)}
-            className="md:hidden flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-full border border-amber/40 bg-amber/5 px-3 py-2 text-sm font-medium transition hover:border-amber hover:bg-amber hover:text-ink"
+            className="md:hidden flex w-full items-center justify-center gap-2 rounded-full border border-amber/40 bg-amber/5 px-3 py-2 text-sm font-medium transition hover:border-amber hover:bg-amber hover:text-ink"
           >
             <CalendarIcon className="h-4 w-4" />
             {startDate && endDate
               ? `${format(startDate, "dd MMM", { locale: es })} → ${format(endDate, "dd MMM", { locale: es })}`
               : "Elegir fechas"}
           </button>
-
-          <div className="flex items-center justify-end gap-2 sm:ml-auto">
-            <button
-              onClick={() => setDrawerOpen(true)}
-              className="relative flex items-center gap-2 rounded-full bg-foreground px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm font-medium text-background transition hover:bg-amber hover:text-ink"
-            >
-              <ShoppingBag className="h-4 w-4" />
-              <span className="tabular hidden sm:inline">{count}</span>
-              <span className="hidden sm:inline">{count === 1 ? "ítem" : "ítems"}</span>
-            </button>
-            <button className="flex items-center gap-1.5 rounded-full border hairline px-2 py-1.5 text-xs sm:px-3 sm:py-2 sm:text-sm hover:border-foreground/40">
-              <User className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">{user}</span>
-            </button>
-          </div>
-      </div>
-    </header>
+        </div>
+      </header>
       <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
     </>
   );
