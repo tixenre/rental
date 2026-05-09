@@ -136,7 +136,7 @@ export function TopBar() {
 
         </div>
       </header>
-      <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
+      <RentalDateModalRemoved />
     </>
   );
 }
