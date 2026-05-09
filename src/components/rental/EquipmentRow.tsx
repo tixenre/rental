@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, Minus, Sparkles, ChevronDown } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
@@ -6,6 +5,7 @@ import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
 import { IncludedList } from "./IncludedList";
+import { useEquipmentDetail } from "@/lib/equipment-detail-context";
 import { cn } from "@/lib/utils";
 
 export function EquipmentRow({ item }: { item: Equipment }) {
