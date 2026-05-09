@@ -51,10 +51,14 @@ function Index() {
 
   const [mode, setMode] = useState<Mode>("grid");
 
+  // Pick the best mode for the viewport on mount.
+  // If the URL has ?eq=, prefer the inline experience on mobile (list)
+  // and the modal on desktop (grid).
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 639px)");
-    if (mq.matches) setMode("list");
+    const isMobile = window.matchMedia("(max-width: 639px)").matches;
+    setMode(isMobile ? "list" : "grid");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [selectedCats, setSelectedCats] = useState<Set<Category>>(new Set());
   const [brand, setBrand] = useState<string | null>(null);
