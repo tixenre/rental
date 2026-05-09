@@ -6,6 +6,7 @@ import { TopBar } from "@/components/rental/TopBar";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
 import { CartDrawer } from "@/components/rental/CartDrawer";
+import { CartMiniBar } from "@/components/rental/CartMiniBar";
 import { CarouselRow } from "@/components/rental/CarouselRow";
 import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { ListFilters } from "@/components/rental/ListFilters";
@@ -414,6 +415,7 @@ function ListMode({
           </div>
         )}
       </div>
+      <CartMiniBar />
     </>
   );
 }
