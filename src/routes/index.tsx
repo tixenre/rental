@@ -103,7 +103,7 @@ function Index() {
       </section>
 
       {/* Toggle Modo + búsqueda sticky */}
-      <div className="sticky top-[68px] sm:top-[60px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
+      <div className="sticky top-[116px] sm:top-[60px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
         <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 lg:px-12">
           {/* Search input */}
           <div className="relative flex-1 min-w-0 sm:max-w-xl">
