@@ -1,9 +1,10 @@
-import { categories, brands, type Category } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
 export function ListFilters({
   query,
+  categories,
+  brands,
   selectedCategories,
   onToggleCategory,
   selectedBrand,
@@ -12,8 +13,10 @@ export function ListFilters({
 }: {
   query: string;
   onQuery: (v: string) => void;
-  selectedCategories: Set<Category>;
-  onToggleCategory: (c: Category) => void;
+  categories: string[];
+  brands: string[];
+  selectedCategories: Set<string>;
+  onToggleCategory: (c: string) => void;
   selectedBrand: string | null;
   onBrand: (b: string | null) => void;
   onClear: () => void;

@@ -1,21 +1,25 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Trash2, Plus, Minus, AlertTriangle, Loader2 } from "lucide-react";
+import { X, Trash2, Plus, Minus, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { useCart } from "@/lib/cart-store";
-import { equipment, formatPrice } from "@/data/equipment";
-import { getAvailability } from "@/lib/availability";
+import { type Equipment } from "@/data/equipment";
+import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
+import { apiPostPedido } from "@/lib/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useMemo, useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
-import { createOrder } from "@/lib/orders";
-import { useNavigate } from "@tanstack/react-router";
 
-export function CartDrawer() {
+export function CartDrawer({
+  allEquipos,
+  getDisponible,
+}: {
+  allEquipos: Equipment[];
+  getDisponible?: (item: Equipment) => number | undefined;
+}) {
   const {
     drawerOpen,
-    setDrawerOpen,
     drawerPlacement,
+    setDrawerOpen,
     items,
     add,
     remove,
@@ -29,37 +33,70 @@ export function CartDrawer() {
   } = useCart();
 
   const isBottom = drawerPlacement === "bottom";
-  const navigate = useNavigate();
-  const { user } = useAuth();
+
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Form de contacto (mínimo para crear el pedido)
+  const [nombre, setNombre] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [showForm, setShowForm] = useState(false);
+
+  // Resolver equipos desde el store usando la data real de la API
+  const list = Object.entries(items)
+    .map(([id, qty]) => {
+      const it = allEquipos.find((e) => e.id === id);
+      return it ? { it, qty } : null;
+    })
+    .filter(Boolean) as { it: Equipment; qty: number }[];
 
   const d = days();
-
-  // Recalcula disponibilidad + precios cada vez que cambian fechas o ítems
-  const list = useMemo(() => {
-    return Object.entries(items)
-      .map(([id, qty]) => {
-        const it = equipment.find((e) => e.id === id);
-        if (!it) return null;
-        const availability = getAvailability(it, startDate, endDate);
-        const conflict = !availability.available || qty > availability.stock;
-        return { it, qty, availability, conflict };
-      })
-      .filter(Boolean) as {
-      it: (typeof equipment)[number];
-      qty: number;
-      availability: ReturnType<typeof getAvailability>;
-      conflict: boolean;
-    }[];
-  }, [items, startDate, endDate]);
-
-  const subtotal = list
-    .filter((l) => !l.conflict)
-    .reduce((s, { it, qty }) => s + it.pricePerDay * qty, 0);
+  const subtotal = list.reduce((s, { it, qty }) => s + it.pricePerDay * qty, 0);
   const total = subtotal * d;
-  const conflictCount = list.filter((l) => l.conflict).length;
 
+  const formatFecha = (date: Date, time: string) =>
+    `${format(date, "yyyy-MM-dd")}T${time}:00`;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!startDate || !endDate) return;
+    if (list.length === 0) return;
+
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await apiPostPedido({
+        cliente_nombre: nombre,
+        cliente_email: email,
+        cliente_telefono: telefono || undefined,
+        fecha_desde: formatFecha(startDate, startTime),
+        fecha_hasta: formatFecha(endDate, endTime),
+        items: list.map(({ it, qty }) => ({
+          equipo_id: it._backendId!,
+          cantidad: qty,
+          precio_jornada: it.pricePerDay,
+        })),
+      });
+      setSubmitted(true);
+      clear();
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : "Error al enviar el pedido");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function reset() {
+    setSubmitted(false);
+    setSubmitError(null);
+    setShowForm(false);
+    setNombre("");
+    setEmail("");
+    setTelefono("");
+    setDrawerOpen(false);
+  }
 
   return (
     <AnimatePresence>
@@ -94,6 +131,8 @@ export function CartDrawer() {
             {isBottom && (
               <div className="mx-auto mt-2 h-1 w-10 shrink-0 cursor-grab rounded-full bg-foreground/20 active:cursor-grabbing" />
             )}
+
+            {/* Header */}
             <div className="flex items-center justify-between border-b hairline px-6 py-4">
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
@@ -109,6 +148,7 @@ export function CartDrawer() {
               </button>
             </div>
 
+            {/* Fechas */}
             <div className="border-b hairline px-6 py-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
@@ -135,167 +175,202 @@ export function CartDrawer() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              {list.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center text-center">
-                  <div className="font-display text-xl text-muted-foreground">
-                    Tu pedido está vacío
-                  </div>
-                  <p className="mt-2 max-w-xs text-sm text-muted-foreground">
-                    Elegí equipos del catálogo y se sumarán acá.
-                  </p>
-                </div>
-              ) : (
-                <ul className="space-y-3">
-                  {list.map(({ it, qty, availability, conflict }) => (
-                    <li
-                      key={it.id}
-                      className={
-                        "flex gap-3 rounded-lg border p-3 transition " +
-                        (conflict
-                          ? "border-destructive/50 bg-destructive/5"
-                          : "hairline bg-surface")
-                      }
-                    >
-                      <div className="h-16 w-20 shrink-0 overflow-hidden rounded">
-                        <EmptyImage category={it.category} brand={it.brand} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-                          {it.brand}
-                        </div>
-                        <div className="truncate font-display text-sm leading-tight">
-                          {it.name}
-                        </div>
-                        {conflict ? (
-                          <div className="mt-1 flex items-center gap-1 text-[11px] text-destructive">
-                            <AlertTriangle className="h-3 w-3" />
-                            {availability.reason ??
-                              `Solo ${availability.stock} disponible${availability.stock === 1 ? "" : "s"}`}
-                          </div>
-                        ) : availability.stock <= 1 ? (
-                          <div className="mt-1 text-[11px] text-amber-600">
-                            Último disponible
-                          </div>
-                        ) : null}
-                        <div className="mt-1 flex items-center justify-between">
-                          <div className="flex items-center gap-1 rounded border hairline">
-                            <button
-                              onClick={() => remove(it.id)}
-                              className="grid h-6 w-6 place-items-center hover:text-ink"
-                            >
-                              <Minus className="h-3 w-3" />
-                            </button>
-                            <span className="w-5 text-center text-xs tabular">
-                              {qty}
-                            </span>
-                            <button
-                              onClick={() => add(it.id)}
-                              disabled={qty >= availability.stock}
-                              className="grid h-6 w-6 place-items-center hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
-                            >
-                              <Plus className="h-3 w-3" />
-                            </button>
-                          </div>
-                          <div
-                            className={
-                              "text-xs tabular " +
-                              (conflict ? "text-muted-foreground line-through" : "text-ink")
-                            }
-                          >
-                            ${formatPrice(it.pricePerDay * qty)}
-                            <span className="text-muted-foreground"> /día</span>
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setQty(it.id, 0)}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="border-t hairline px-6 py-5 space-y-3">
-              {conflictCount > 0 && (
-                <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-[11px] text-destructive">
-                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  <span>
-                    {conflictCount} {conflictCount === 1 ? "ítem no está" : "ítems no están"} disponible{conflictCount === 1 ? "" : "s"} en estas fechas y se excluye{conflictCount === 1 ? "" : "n"} del total.
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal por jornada</span>
-                <span className="tabular">${formatPrice(subtotal)}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>× {d} {d === 1 ? "jornada" : "jornadas"}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                  Total estimado
-                </span>
-                <span className="font-display text-3xl tabular text-ink">
-                  ${formatPrice(total)}
-                </span>
-              </div>
-              {error && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-[11px] text-destructive">
-                  {error}
-                </div>
-              )}
-              <button
-                disabled={list.length === 0 || submitting}
-                onClick={async () => {
-                  if (!user) {
-                    setDrawerOpen(false);
-                    navigate({ to: "/login" });
-                    return;
-                  }
-                  setError(null);
-                  setSubmitting(true);
-                  try {
-                    const validItems: Record<string, number> = {};
-                    list.filter((l) => !l.conflict).forEach((l) => {
-                      validItems[l.it.id] = l.qty;
-                    });
-                    const order = await createOrder({
-                      status: "solicitado",
-                      startDate,
-                      endDate,
-                      startTime,
-                      endTime,
-                      days: d,
-                      items: validItems,
-                    });
-                    clear();
-                    setDrawerOpen(false);
-                    navigate({ to: "/mis-pedidos/$id", params: { id: order.id } });
-                  } catch (e: any) {
-                    setError(e.message ?? "No pudimos enviar el pedido.");
-                  } finally {
-                    setSubmitting(false);
-                  }
-                }}
-                className="w-full rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 inline-flex items-center justify-center gap-2"
-              >
-                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {user ? "Enviar pedido" : "Iniciar sesión para enviar"}
-              </button>
-              {list.length > 0 && (
+            {/* Contenido */}
+            {submitted ? (
+              /* Confirmación */
+              <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+                <div className="text-4xl">✓</div>
+                <div className="font-display text-2xl">¡Pedido enviado!</div>
+                <p className="text-sm text-muted-foreground">
+                  Recibimos tu solicitud. Te contactaremos a la brevedad para confirmar disponibilidad y coordinar el retiro.
+                </p>
                 <button
-                  onClick={clear}
-                  className="w-full text-xs text-muted-foreground hover:text-destructive"
+                  onClick={reset}
+                  className="mt-4 rounded-md border hairline px-6 py-2 text-sm hover:bg-surface"
                 >
-                  Vaciar pedido
+                  Cerrar
                 </button>
-              )}
-            </div>
+              </div>
+            ) : (
+              <>
+                {/* Lista de items */}
+                <div className="flex-1 overflow-y-auto px-6 py-4">
+                  {list.length === 0 ? (
+                    <div className="flex h-full flex-col items-center justify-center text-center">
+                      <div className="font-display text-xl text-muted-foreground">
+                        Tu pedido está vacío
+                      </div>
+                      <p className="mt-2 max-w-xs text-sm text-muted-foreground">
+                        Elegí equipos del catálogo y se sumarán acá.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <ul className="space-y-3">
+                        {list.map(({ it, qty }) => (
+                          <li
+                            key={it.id}
+                            className="flex gap-3 rounded-lg border hairline bg-surface p-3"
+                          >
+                            <div className="h-16 w-20 shrink-0 overflow-hidden rounded">
+                              {it.fotoUrl ? (
+                                <img
+                                  src={it.fotoUrl}
+                                  alt={it.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <EmptyImage category={it.category} brand={it.brand} />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                                {it.brand}
+                              </div>
+                              <div className="truncate font-display text-sm leading-tight">
+                                {it.name}
+                              </div>
+                              <div className="mt-1 flex items-center justify-between">
+                                <div className="flex items-center gap-1 rounded border hairline">
+                                  <button
+                                    onClick={() => remove(it.id)}
+                                    className="grid h-6 w-6 place-items-center hover:text-ink"
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </button>
+                                  <span className="w-5 text-center text-xs tabular">
+                                    {qty}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      const disponible = getDisponible?.(it);
+                                      if (disponible === undefined || qty < disponible) {
+                                        add(it.id);
+                                      }
+                                    }}
+                                    disabled={
+                                      getDisponible !== undefined &&
+                                      getDisponible(it) !== undefined &&
+                                      qty >= getDisponible(it)!
+                                    }
+                                    className="grid h-6 w-6 place-items-center hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </button>
+                                </div>
+                                <div className="text-xs tabular text-ink">
+                                  {formatARS(it.pricePerDay * qty)}
+                                  <span className="text-muted-foreground"> /día</span>
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => setQty(it.id, 0)}
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+
+                      {/* Formulario de contacto */}
+                      {showForm && (
+                        <form
+                          onSubmit={handleSubmit}
+                          className="mt-4 space-y-3 rounded-lg border hairline bg-surface p-4"
+                        >
+                          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-3">
+                            Tus datos de contacto
+                          </div>
+                          <input
+                            required
+                            placeholder="Nombre completo"
+                            value={nombre}
+                            onChange={(e) => setNombre(e.target.value)}
+                            className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm focus:border-amber/40 focus:outline-none"
+                          />
+                          <input
+                            required
+                            type="email"
+                            placeholder="Email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm focus:border-amber/40 focus:outline-none"
+                          />
+                          <input
+                            placeholder="Teléfono (opcional)"
+                            value={telefono}
+                            onChange={(e) => setTelefono(e.target.value)}
+                            className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm focus:border-amber/40 focus:outline-none"
+                          />
+                          {submitError && (
+                            <p className="text-xs text-destructive">{submitError}</p>
+                          )}
+                          <button
+                            type="submit"
+                            disabled={submitting}
+                            className="w-full rounded-md bg-amber py-2.5 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                          >
+                            {submitting ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" /> Enviando…
+                              </>
+                            ) : (
+                              "Confirmar solicitud"
+                            )}
+                          </button>
+                        </form>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Footer con totales */}
+                <div className="border-t hairline px-6 py-5 space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal por jornada</span>
+                    <span className="tabular">{formatARS(subtotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>× {d} {d === 1 ? "jornada" : "jornadas"}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+                      Total estimado
+                    </span>
+                    <span className="font-display text-3xl tabular text-ink">
+                      {formatARS(total)}
+                    </span>
+                  </div>
+
+                  {!showForm ? (
+                    <button
+                      disabled={list.length === 0 || !startDate || !endDate}
+                      onClick={() => setShowForm(true)}
+                      className="w-full rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Solicitar cotización
+                    </button>
+                  ) : null}
+
+                  {(!startDate || !endDate) ? (
+                    <p className="text-center text-xs text-muted-foreground">
+                      Elegí fechas para solicitar la cotización
+                    </p>
+                  ) : null}
+
+                  {list.length > 0 && (
+                    <button
+                      onClick={clear}
+                      className="w-full text-xs text-muted-foreground hover:text-destructive"
+                    >
+                      Vaciar pedido
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </motion.aside>
         </>
       )}

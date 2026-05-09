@@ -1,15 +1,20 @@
-import { categories, equipment, type Category } from "@/data/equipment";
+import { type Equipment, type Category } from "@/data/equipment";
 import { CategoryIllustration } from "./illustrations/CategoryIllustration";
 import { cn } from "@/lib/utils";
 
 /**
  * Mosaico de categorías estilo brand: ilustración + nombre + contador.
  * Click → activa esa categoría como filtro y salta al modo Lista.
+ * Acepta allEquipos (data real de la API) y categories (lista dinámica).
  */
 export function CategoryMosaic({
+  allEquipos,
+  categories,
   onSelect,
 }: {
-  onSelect: (c: Category) => void;
+  allEquipos: Equipment[];
+  categories: string[];
+  onSelect: (c: string) => void;
 }) {
   return (
     <section className="px-6 py-8 lg:px-12 lg:py-12">
@@ -27,7 +32,7 @@ export function CategoryMosaic({
 
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {categories.map((c) => {
-          const count = equipment.filter((e) => e.category === c).length;
+          const count = allEquipos.filter((e) => e.category === c).length;
           return (
             <li key={c}>
               <button
@@ -38,7 +43,7 @@ export function CategoryMosaic({
                 )}
               >
                 <span className="grid h-12 w-12 place-items-center rounded-lg bg-amber-soft text-amber transition group-hover:bg-amber group-hover:text-ink">
-                  <CategoryIllustration category={c} className="h-8 w-8" />
+                  <CategoryIllustration category={c as Category} className="h-8 w-8" />
                 </span>
                 <div className="flex w-full items-baseline justify-between gap-2">
                   <span className="font-display text-base leading-tight text-ink">{c}</span>

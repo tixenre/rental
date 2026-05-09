@@ -1,19 +1,11 @@
 export type Category =
   | "Cámaras"
   | "Lentes"
-  | "Monitores"
-  | "Luces"
-  | "Tungsteno"
-  | "Modificadores"
-  | "Comunicación"
-  | "Flash"
-  | "Brazo Mágico"
-  | "Stands"
-  | "Grips"
-  | "Trípode"
-  | "Sonido"
-  | "Baterías"
-  | "Filtros";
+  | "Iluminación"
+  | "Audio"
+  | "Soportes"
+  | "Accesorios"
+  | "Adaptadores";
 
 export type IncludedItem = {
   /** Si está y matchea con un equipo del catálogo, se enriquece con su info. */
@@ -24,21 +16,22 @@ export type IncludedItem = {
 };
 
 export type Equipment = {
-  id: string;
+  id: string;        // string-ificado del ID numérico del backend
   slug: string;
   name: string;
   brand: string;
   category: Category;
   pricePerDay: number;
   description: string;
+  specs: { label: string; value: string }[];
+  // Campos de Lovable
   isNew?: boolean;
   isCombo?: boolean;
-  specs: { label: string; value: string }[];
   includes?: IncludedItem[];
-  // Campos del backend real (opcionales para mantener compat con datos locales)
+  // Campos extra del backend (opcionales para mantener compat con datos locales)
   fotoUrl?: string | null;
-  cantidad?: number;
-  _backendId?: number;
+  cantidad?: number;    // stock total
+  _backendId?: number;  // ID numérico original, para POST /api/alquileres
 };
 
 const e = (
@@ -48,8 +41,7 @@ const e = (
   category: Category,
   pricePerDay: number,
   description: string,
-  specs: { label: string; value: string }[] = [],
-  flags: { isNew?: boolean; isCombo?: boolean; includes?: IncludedItem[] } = {},
+  specs: { label: string; value: string }[],
 ): Equipment => ({
   id,
   slug: `${brand}-${name}`
@@ -62,226 +54,139 @@ const e = (
   pricePerDay,
   description,
   specs,
-  ...flags,
 });
 
 export const equipment: Equipment[] = [
-  // ─── Cámaras ─────────────────────────────────────────
-  e("c1", "Red", "Komodo X", "Cámaras", 359000, "Cinema 6K Super35 con global shutter.", [], { isNew: true }),
-  e("c2", "Sony", "FX3", "Cámaras", 122500, "Full-frame cinema compacta, S-Log3.", []),
-  e("c3", "Sony", "7V", "Cámaras", 97500, "Full-frame híbrida 33MP / 4K.", [], { isNew: true }),
-  e("c4", "Sony", "ZVE1", "Cámaras", 72500, "Full-frame compacta para creadores.", []),
-  e("c5", "Red", "Komodo", "Cámaras", 140000, "Cinema 6K compacta con RAW.", []),
-  e("c6", "Canon", "C200", "Cámaras", 91000, "Cinema EOS Super35 con DGO.", []),
-  e("c7", "Insta360", "x4 8K", "Cámaras", 19000, "360º 8K para acción y POV.", []),
-  e("c8", "Sony", "FX6", "Cámaras", 165000, "Full-frame cinema con ND eléctrico.", []),
+  // Cámaras
+  e("c1", "Sony", "FX3 Cuerpo", "Cámaras", 95000, "Cámara cinema full-frame compacta con sensor retroiluminado.", [
+    { label: "Sensor", value: "Full-frame 10.2MP" },
+    { label: "Montura", value: "Sony E" },
+    { label: "Video", value: "4K 120p / S-Log3" },
+  ]),
+  e("c2", "Sony", "A7S III Cuerpo", "Cámaras", 75000, "Sensibilidad ISO extrema, ideal para baja luz.", [
+    { label: "Sensor", value: "Full-frame 12MP" },
+    { label: "Video", value: "4K 120p 10-bit" },
+  ]),
+  e("c3", "Canon", "C70 Cuerpo", "Cámaras", 110000, "Cinema EOS Super35 con DGO.", [
+    { label: "Sensor", value: "Super35 DGO" },
+    { label: "Montura", value: "Canon RF" },
+  ]),
+  e("c4", "Blackmagic", "Pocket 6K G2", "Cámaras", 65000, "Super35 con grabación BRAW interna.", [
+    { label: "Sensor", value: "Super35 6K" },
+    { label: "Montura", value: "EF" },
+  ]),
+  e("c5", "Canon", "R5 C", "Cámaras", 85000, "Híbrida foto/cine 8K RAW.", [
+    { label: "Sensor", value: "Full-frame 45MP" },
+    { label: "Video", value: "8K 30p RAW" },
+  ]),
+  e("c6", "DJI", "Ronin 4D 6K", "Cámaras", 180000, "Sistema cine integrado con estabilización 4 ejes.", [
+    { label: "Sensor", value: "Full-frame 6K" },
+  ]),
 
-  // ─── Lentes ──────────────────────────────────────────
-  e("l1", "Sony", "GM 24-70 f/2.8 vii", "Lentes", 76500, "Zoom estándar G Master.", []),
-  e("l2", "Sony", "GM 12-24 f/2.8", "Lentes", 91500, "Ultra gran angular G Master.", []),
-  e("l3", "Sony", "GM 70-200 f/2.8", "Lentes", 78000, "Telezoom G Master.", []),
-  e("l4", "Sigma", "Art 35mm f/1.4 EF", "Lentes", 28500, "Prime full-frame.", [], { isNew: true }),
-  e("l5", "Sigma", "Art 50mm f/1.4 EF", "Lentes", 28500, "Prime estándar full-frame.", []),
-  e("l6", "Sigma", "18-35 f/1.8 EF", "Lentes", 32000, "Zoom luminoso Super35.", []),
-  e("l7", "Laowa", "Macro Probe 24mm", "Lentes", 56000, "Macro tipo sonda.", []),
-  e("l8", "Canon", "RF 24-70 f/2.8L", "Lentes", 64000, "Zoom estándar L-series.", []),
+  // Lentes
+  e("l1", "Sigma", "24-70 f/2.8 DG DN E", "Lentes", 18500, "Zoom estándar profesional para Sony E.", [
+    { label: "Distancia", value: "24-70mm" },
+    { label: "Apertura", value: "f/2.8" },
+  ]),
+  e("l2", "Sigma", "18-35 f/1.8 EF", "Lentes", 16000, "Zoom luminoso clásico para Super35.", [
+    { label: "Distancia", value: "18-35mm" },
+    { label: "Apertura", value: "f/1.8" },
+  ]),
+  e("l3", "Canon", "RF 24-70 f/2.8L", "Lentes", 22000, "Zoom estándar L-series.", [
+    { label: "Apertura", value: "f/2.8 IS" },
+  ]),
+  e("l4", "Canon", "RF 70-200 f/2.8L", "Lentes", 24000, "Telezoom L-series compacto.", [
+    { label: "Apertura", value: "f/2.8 IS" },
+  ]),
+  e("l5", "Sony", "GM 35mm f/1.4", "Lentes", 17500, "Prime gran angular G Master.", [
+    { label: "Distancia", value: "35mm" },
+  ]),
+  e("l6", "Sony", "GM 85mm f/1.4", "Lentes", 18000, "Prime retrato G Master.", [
+    { label: "Distancia", value: "85mm" },
+  ]),
+  e("l7", "Laowa", "12mm T2.9 Zero-D Cine", "Lentes", 19000, "Ultra gran angular sin distorsión.", [
+    { label: "Distancia", value: "12mm" },
+  ]),
 
-  // ─── Monitores ───────────────────────────────────────
-  e("m1", "Atomos", "Ninja V", "Monitores", 22000, "Monitor-grabador 5\" 4K HDR.", []),
-  e("m2", "SmallHD", "Cine 7", "Monitores", 36000, "Monitor de campo 7\" 1800 nits.", []),
-  e("m3", "Lilliput", "A7s 7\"", "Monitores", 9500, "Monitor de campo 7\".", []),
-  e("m4", "Hollyland", "Mars M1", "Monitores", 28000, "Monitor + transmisor inalámbrico.", []),
+  // Iluminación
+  e("i1", "Aputure", "300X Bi-color", "Iluminación", 14000, "LED COB bicolor 2700-6500K con bowens.", [
+    { label: "Potencia", value: "350W" },
+    { label: "CCT", value: "2700-6500K" },
+  ]),
+  e("i2", "Aputure", "600D Pro", "Iluminación", 22000, "LED COB daylight de alta potencia.", [
+    { label: "Potencia", value: "600W" },
+  ]),
+  e("i3", "Aputure", "Nova P300c", "Iluminación", 28000, "Panel RGBWW con efectos integrados.", [
+    { label: "Tipo", value: "RGBWW" },
+  ]),
+  e("i4", "Godox", "SL-150W II", "Iluminación", 8500, "LED COB daylight económico y confiable.", [
+    { label: "Potencia", value: "150W" },
+  ]),
+  e("i5", "Nanlite", "Forza 500", "Iluminación", 16000, "LED COB compacto con FX.", [
+    { label: "Potencia", value: "500W" },
+  ]),
+  e("i6", "Kino Flo", "Diva-Lite 401", "Iluminación", 12000, "Panel fluorescente clásico bicolor.", [
+    { label: "Tipo", value: "Fluorescente bicolor" },
+  ]),
+  e("i7", "Amaran", "200X S Bi-color", "Iluminación", 7500, "LED COB compacto bicolor.", [
+    { label: "Potencia", value: "200W" },
+  ]),
 
-  // ─── Luces ───────────────────────────────────────────
-  e("li1", "Aputure", "300X Bi-color", "Luces", 28000, "LED COB bicolor con bowens.", []),
-  e("li2", "Aputure", "600D Pro", "Luces", 38000, "LED COB daylight 600W.", []),
-  e("li3", "Nanlite", "Forza 500", "Luces", 32000, "LED COB 500W.", []),
-  e("li4", "Amaran", "300C", "Luces", 24500, "LED RGBWW COB con FX.", []),
-  e("li5", "Godox", "Tubo TL60", "Luces", 8500, "Tubo RGB 60cm.", []),
-  e("li6", "Aputure", "Nova P300c", "Luces", 56000, "Panel RGBWW.", []),
-  e("li7", "Aputure", "MC Pro", "Luces", 7800, "Mini panel RGB de bolsillo.", []),
+  // Audio
+  e("a1", "Rode", "NTG-3 Shotgun", "Audio", 6500, "Micrófono direccional de referencia.", [
+    { label: "Tipo", value: "Shotgun condenser" },
+  ]),
+  e("a2", "Sony", "UWP-D21 Lavalier", "Audio", 7000, "Sistema inalámbrico de solapa UHF.", [
+    { label: "Banda", value: "UHF" },
+  ]),
+  e("a3", "Rode", "Wireless GO II", "Audio", 5500, "Sistema inalámbrico digital de bolsillo.", [
+    { label: "Canales", value: "2" },
+  ]),
 
-  // ─── Tungsteno ───────────────────────────────────────
-  e("t1", "Arri", "Kit Fresnel 3und", "Tungsteno", 90000, "Kit Arri tungsteno 650+300+150W.", []),
-  e("t2", "Arri", "Fresnel 1K", "Tungsteno", 38000, "Foco Fresnel 1000W.", []),
-  e("t3", "Lowel", "Pro Light", "Tungsteno", 12000, "Tungsteno open-face 250W.", []),
+  // Soportes
+  e("s1", "Manfrotto", "504X Trípode", "Soportes", 6500, "Trípode video con cabezal fluido.", [
+    { label: "Cabezal", value: "504X" },
+  ]),
+  e("s2", "Manfrotto", "Magic Arm + Super Clamp", "Soportes", 1800, "Brazo articulado para rigging.", []),
+  e("s3", "Avenger", "C-Stand C1510", "Soportes", 1500, "Pie C clásico con barra y cabezal.", []),
+  e("s4", "Avenger", "C-Stand C4462", "Soportes", 1500, "Pie C corto con base plegable.", []),
+  e("s5", "Avenger", "Roller Stand E390", "Soportes", 500, "Pie con ruedas para iluminación pesada.", []),
+  e("s6", "Glidecam", "HD-4000", "Soportes", 8500, "Estabilizador mecánico para cámaras medianas.", []),
+  e("s7", "Edelkrone", "SliderPLUS V5", "Soportes", 9500, "Slider compacto con doble recorrido.", []),
 
-  // ─── Modificadores ───────────────────────────────────
-  e("mo1", "Aputure", "Light Dome III", "Modificadores", 9500, "Softbox 90cm bowens.", []),
-  e("mo2", "Aputure", "Lantern", "Modificadores", 8500, "Lantern soft 360º.", []),
-  e("mo3", "Matthews", "Bandera 60×90 black", "Modificadores", 4500, "Bandera black solid.", []),
-  e("mo4", "Matthews", "Bandera 35×40 black", "Modificadores", 3500, "Bandera black solid.", []),
-  e("mo5", "Rambla", "Difusor 1.2×1.2 + Frame", "Modificadores", 6500, "Difusor con frame de aluminio.", []),
+  // Accesorios
+  e("ac1", "Hollyland", "Mars 400S Pro", "Accesorios", 7500, "Transmisión de video inalámbrica HD.", []),
+  e("ac2", "Atomos", "Ninja V Monitor", "Accesorios", 8500, "Monitor-grabador 5\" 4K HDR.", []),
+  e("ac3", "Lilliput", "A7S Monitor 7\"", "Accesorios", 4500, "Monitor de campo 7 pulgadas.", []),
+  e("ac4", "Angelbird", "AV Pro CFexpress 512GB", "Accesorios", 3500, "Tarjeta CFexpress de alto rendimiento.", []),
+  e("ac5", "Canon", "Batería LP-E6", "Accesorios", 5500, "Batería original Canon.", []),
+  e("ac6", "Backdrop", "Fondo Negro 3x6m", "Accesorios", 13500, "Fondo de tela negro con trípodes y barral.", []),
+  e("ac7", "Matthews", "Bandera Negra 60x90cm", "Accesorios", 2500, "Bandera black solid.", []),
+  e("ac8", "Matthews", "Bandera Negra 35x40cm", "Accesorios", 2500, "Bandera black solid pequeña.", []),
+  e("ac9", "Impact", "Baby Pin Wall Plate 3\"", "Accesorios", 500, "Plate de pared con baby pin 5/8\".", []),
+  e("ac10", "Impact", "Baby Pin Wall Plate 6\"", "Accesorios", 500, "Plate de pared con baby pin extendido.", []),
+  e("ac11", "Pampa", "Alargue Eléctrico 25m", "Accesorios", 1500, "Alargue eléctrico profesional.", []),
+  e("ac12", "DJI", "RS 3 Pro Gimbal", "Accesorios", 14000, "Estabilizador para cámaras cinema.", []),
 
-  // ─── Comunicación ────────────────────────────────────
-  e("co1", "Hollyland", "Solidcom C1 4 headsets", "Comunicación", 68000, "Sistema de intercom inalámbrico 1.9 GHz.", [], { isNew: true }),
-
-  // ─── Flash ───────────────────────────────────────────
-  e("f1", "Godox", "V100 Flash Sony", "Flash", 20500, "Flash de cámara TTL.", [], { isNew: true }),
-  e("f2", "Godox", "AD200 Pro", "Flash", 18000, "Flash portátil 200W.", []),
-
-  // ─── Brazo Mágico ────────────────────────────────────
-  e("bm1", "Impact", "Brazo Mágico", "Brazo Mágico", 3500, "Brazo articulado para rigging.", [], { isNew: true }),
-
-  // ─── Stands ──────────────────────────────────────────
-  e("st1", "Avenger", "C-Stand 40\"", "Stands", 4500, "C-Stand clásico con barra y cabezal.", []),
-  e("st2", "Avenger", "C-Stand corto", "Stands", 4500, "C-Stand corto con base plegable.", []),
-  e("st3", "Manfrotto", "Roller Stand", "Stands", 5500, "Pie con ruedas para luces pesadas.", []),
-  e("st4", "Avenger", "Lowboy", "Stands", 3500, "Pie bajo para luz a ras de piso.", []),
-
-  // ─── Grips ───────────────────────────────────────────
-  e("g1", "Tilta", "Car Mount Hydra 3 ventosas", "Grips", 35000, "Car mount con ventosas eléctricas.", [], { isNew: true }),
-  e("g2", "Manfrotto", "Magic Arm + Super Clamp", "Grips", 4500, "Brazo articulado para rigging.", []),
-  e("g3", "Matthews", "Super Mafer Clamp", "Grips", 3500, "Clamp profesional.", []),
-  e("g4", "Impact", "Baby Pin Plate 3\"", "Grips", 1500, "Plate de pared con baby pin 5/8\".", []),
-
-  // ─── Trípode ─────────────────────────────────────────
-  e("tr1", "Manfrotto", "504X + Trípode", "Trípode", 12500, "Trípode video con cabezal fluido.", []),
-  e("tr2", "Sachtler", "FSB-8 + Trípode", "Trípode", 22000, "Trípode video pro.", []),
-  e("tr3", "Manfrotto", "190 + Bola", "Trípode", 6500, "Trípode foto con cabezal de bola.", []),
-
-  // ─── Sonido ──────────────────────────────────────────
-  e("s1", "Rode", "NTG-3 Shotgun", "Sonido", 9500, "Micrófono direccional de referencia.", []),
-  e("s2", "Sony", "UWP-D21 Lavalier", "Sonido", 12000, "Sistema inalámbrico de solapa UHF.", []),
-  e("s3", "Rode", "Wireless GO II", "Sonido", 9500, "Sistema inalámbrico digital de bolsillo.", []),
-  e("s4", "Zoom", "H6 Grabador", "Sonido", 8500, "Grabador portátil 6 pistas.", []),
-
-  // ─── Baterías ────────────────────────────────────────
-  e("b1", "Anton Bauer", "VMount 4und + Cargador doble", "Baterías", 36750, "Kit baterías VMount.", []),
-  e("b2", "Anton Bauer", "VMount 150Wh", "Baterías", 9500, "Batería VMount unitaria.", []),
-  e("b3", "Canon", "LP-E6 (par)", "Baterías", 3500, "Par de baterías originales.", []),
-
-  // ─── Filtros ─────────────────────────────────────────
-  e("fi1", "Tiffen", "Set ND + ProMist + PC", "Filtros", 12000, "Set de filtros para lentes.", []),
-
-  // ─── Combos ──────────────────────────────────────────
-  e(
-    "cm1",
-    "Rambla",
-    "Combo RGB · Amaran 300 + 2 tubos + C-Stand + Softbox",
-    "Luces",
-    87900,
-    "Kit completo de iluminación RGB para producción.",
-    [],
-    {
-      isCombo: true,
-      includes: [
-        { name: "Amaran 300c", qty: 1 },
-        { name: "Tubo RGB Amaran T2c", qty: 2 },
-        { name: "C-Stand", qty: 1 },
-        { name: "Softbox 60×60cm", qty: 1 },
-      ],
-    },
-  ),
-  e(
-    "cm2",
-    "Rambla",
-    "Combo Nanlite Forza 500 + Softbox + C-Stand",
-    "Luces",
-    73450,
-    "Kit luz dura con softbox y C-Stand.",
-    [],
-    {
-      isCombo: true,
-      includes: [
-        { name: "Nanlite Forza 500", qty: 1 },
-        { name: "Softbox parabólico 90cm", qty: 1 },
-        { name: "C-Stand", qty: 1 },
-      ],
-    },
-  ),
-  e(
-    "cm3",
-    "Rambla",
-    "Combo Evento · Sony ZVE1 + GM 24/70 vii",
-    "Cámaras",
-    128025,
-    "Kit listo para cobertura de evento.",
-    [],
-    {
-      isCombo: true,
-      includes: [
-        { id: "c4", name: "Sony ZVE1", qty: 1 },
-        { id: "l1", name: "Sony GM 24-70 f/2.8 vii", qty: 1 },
-        { name: "Batería extra + cargador", qty: 1 },
-        { name: "Tarjeta SD 128GB", qty: 1 },
-      ],
-    },
-  ),
-  e(
-    "cm4",
-    "Rambla",
-    "Monitor de Producción + Monitoreo Inalámbrico",
-    "Monitores",
-    81450,
-    "Set completo de monitoreo en producción.",
-    [],
-    {
-      isCombo: true,
-      includes: [
-        { id: "m2", name: "SmallHD Cine 7", qty: 1 },
-        { id: "m4", name: "Hollyland Mars M1", qty: 1 },
-        { name: "Cables SDI/HDMI", qty: 1 },
-      ],
-    },
-  ),
-  e(
-    "cm5",
-    "Rambla",
-    "Combo Macro · FX3 + Laowa Macro + Forza 500",
-    "Cámaras",
-    227700,
-    "Kit macro cinematográfico.",
-    [],
-    {
-      isCombo: true,
-      includes: [
-        { id: "c2", name: "Sony FX3", qty: 1 },
-        { id: "l7", name: "Laowa Macro Probe 24mm", qty: 1 },
-        { name: "Nanlite Forza 500", qty: 1 },
-        { name: "Trípode + cabezal fluido", qty: 1 },
-      ],
-    },
-  ),
-  e(
-    "cm6",
-    "Rambla",
-    "Trío Sony GM · 12/24 + 24/70 + 70/200",
-    "Lentes",
-    226100,
-    "Set completo de zooms G Master.",
-    [],
-    {
-      isCombo: true,
-      includes: [
-        { id: "l2", name: "Sony GM 12-24 f/2.8", qty: 1 },
-        { id: "l1", name: "Sony GM 24-70 f/2.8 vii", qty: 1 },
-        { id: "l3", name: "Sony GM 70-200 f/2.8", qty: 1 },
-      ],
-    },
-  ),
+  // Adaptadores
+  e("ad1", "Canon", "Adaptador EF-RF", "Adaptadores", 20500, "Adaptador original sin filtro.", []),
+  e("ad2", "Sigma", "Adaptador EF-E MC-11", "Adaptadores", 8500, "Adaptador EF a Sony E con AF.", []),
+  e("ad3", "Canon", "Adaptador EF-RF con ND Variable", "Adaptadores", 13500, "Adaptador con drop-in ND variable.", []),
+  e("ad4", "Canon", "Adaptador EF-RF Speedbooster", "Adaptadores", 20500, "Speedbooster óptico.", []),
+  e("ad5", "Rambla", "Adaptador M42 a Montura E", "Adaptadores", 2500, "Adaptador mecánico clásico.", []),
 ];
 
 export const categories: Category[] = [
   "Cámaras",
   "Lentes",
-  "Monitores",
-  "Luces",
-  "Tungsteno",
-  "Modificadores",
-  "Comunicación",
-  "Flash",
-  "Brazo Mágico",
-  "Stands",
-  "Grips",
-  "Trípode",
-  "Sonido",
-  "Baterías",
-  "Filtros",
+  "Iluminación",
+  "Audio",
+  "Soportes",
+  "Accesorios",
+  "Adaptadores",
 ];
 
 export const brands = Array.from(new Set(equipment.map((x) => x.brand))).sort();
 
-/** Legacy helper; prefer `formatARS` from `@/lib/format`. */
 export const formatPrice = (n: number) =>
   new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(n);

@@ -9,133 +9,38 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as EstudioRouteImport } from './routes/estudio'
-import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthCuentaRouteImport } from './routes/_auth/cuenta'
-import { Route as AuthMisPedidosIndexRouteImport } from './routes/_auth/mis-pedidos/index'
-import { Route as AuthMisPedidosIdRouteImport } from './routes/_auth/mis-pedidos/$id'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EstudioRoute = EstudioRouteImport.update({
-  id: '/estudio',
-  path: '/estudio',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/_auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthCuentaRoute = AuthCuentaRouteImport.update({
-  id: '/cuenta',
-  path: '/cuenta',
-  getParentRoute: () => AuthRoute,
-} as any)
-const AuthMisPedidosIndexRoute = AuthMisPedidosIndexRouteImport.update({
-  id: '/mis-pedidos/',
-  path: '/mis-pedidos/',
-  getParentRoute: () => AuthRoute,
-} as any)
-const AuthMisPedidosIdRoute = AuthMisPedidosIdRouteImport.update({
-  id: '/mis-pedidos/$id',
-  path: '/mis-pedidos/$id',
-  getParentRoute: () => AuthRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/estudio': typeof EstudioRoute
-  '/login': typeof LoginRoute
-  '/cuenta': typeof AuthCuentaRoute
-  '/mis-pedidos/$id': typeof AuthMisPedidosIdRoute
-  '/mis-pedidos/': typeof AuthMisPedidosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/estudio': typeof EstudioRoute
-  '/login': typeof LoginRoute
-  '/cuenta': typeof AuthCuentaRoute
-  '/mis-pedidos/$id': typeof AuthMisPedidosIdRoute
-  '/mis-pedidos': typeof AuthMisPedidosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/_auth': typeof AuthRouteWithChildren
-  '/estudio': typeof EstudioRoute
-  '/login': typeof LoginRoute
-  '/_auth/cuenta': typeof AuthCuentaRoute
-  '/_auth/mis-pedidos/$id': typeof AuthMisPedidosIdRoute
-  '/_auth/mis-pedidos/': typeof AuthMisPedidosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/estudio'
-    | '/login'
-    | '/cuenta'
-    | '/mis-pedidos/$id'
-    | '/mis-pedidos/'
+  fullPaths: '/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/estudio'
-    | '/login'
-    | '/cuenta'
-    | '/mis-pedidos/$id'
-    | '/mis-pedidos'
-  id:
-    | '__root__'
-    | '/'
-    | '/_auth'
-    | '/estudio'
-    | '/login'
-    | '/_auth/cuenta'
-    | '/_auth/mis-pedidos/$id'
-    | '/_auth/mis-pedidos/'
+  to: '/'
+  id: '__root__' | '/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AuthRoute: typeof AuthRouteWithChildren
-  EstudioRoute: typeof EstudioRoute
-  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/estudio': {
-      id: '/estudio'
-      path: '/estudio'
-      fullPath: '/estudio'
-      preLoaderRoute: typeof EstudioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_auth': {
-      id: '/_auth'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -143,49 +48,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_auth/cuenta': {
-      id: '/_auth/cuenta'
-      path: '/cuenta'
-      fullPath: '/cuenta'
-      preLoaderRoute: typeof AuthCuentaRouteImport
-      parentRoute: typeof AuthRoute
-    }
-    '/_auth/mis-pedidos/': {
-      id: '/_auth/mis-pedidos/'
-      path: '/mis-pedidos'
-      fullPath: '/mis-pedidos/'
-      preLoaderRoute: typeof AuthMisPedidosIndexRouteImport
-      parentRoute: typeof AuthRoute
-    }
-    '/_auth/mis-pedidos/$id': {
-      id: '/_auth/mis-pedidos/$id'
-      path: '/mis-pedidos/$id'
-      fullPath: '/mis-pedidos/$id'
-      preLoaderRoute: typeof AuthMisPedidosIdRouteImport
-      parentRoute: typeof AuthRoute
-    }
   }
 }
 
-interface AuthRouteChildren {
-  AuthCuentaRoute: typeof AuthCuentaRoute
-  AuthMisPedidosIdRoute: typeof AuthMisPedidosIdRoute
-  AuthMisPedidosIndexRoute: typeof AuthMisPedidosIndexRoute
-}
-
-const AuthRouteChildren: AuthRouteChildren = {
-  AuthCuentaRoute: AuthCuentaRoute,
-  AuthMisPedidosIdRoute: AuthMisPedidosIdRoute,
-  AuthMisPedidosIndexRoute: AuthMisPedidosIndexRoute,
-}
-
-const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AuthRoute: AuthRouteWithChildren,
-  EstudioRoute: EstudioRoute,
-  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

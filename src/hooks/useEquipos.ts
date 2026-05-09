@@ -1,7 +1,139 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiGetEquipos, apiGetCategorias, apiGetDisponibilidad, type BackendEquipo } from "@/lib/api";
-import { type Equipment } from "@/data/equipment";
+import { type Equipment, type Category } from "@/data/equipment";
 import { format } from "date-fns";
+
+/* ─── Mapeo de etiquetas backend → categorías Lovable ─────────────────── */
+
+const TAG_TO_CATEGORY: Record<string, Category> = {
+  // Cámaras
+  "cámara": "Cámaras",
+  "camera": "Cámaras",
+  "red": "Cámaras",
+  "cinema": "Cámaras",
+  "cinema line": "Cámaras",
+  "dslr": "Cámaras",
+  "mirrorless": "Cámaras",
+  "canon": "Cámaras",
+  "sony": "Cámaras",
+  "gopro": "Cámaras",
+  "insta360": "Cámaras",
+  "acción": "Cámaras",
+
+  // Lentes
+  "lente": "Lentes",
+  "lens": "Lentes",
+  "zoom": "Lentes",
+  "prime": "Lentes",
+  "macro": "Lentes",
+  "sigma": "Lentes",
+  "laowa": "Lentes",
+
+  // Monitores
+  "monitor": "Monitores",
+  "atomos": "Monitores",
+  "smallhd": "Monitores",
+  "lilliput": "Monitores",
+  "hollyland": "Monitores",
+
+  // Iluminación
+  "luz": "Luces",
+  "light": "Luces",
+  "led": "Luces",
+  "aputure": "Luces",
+  "nanlite": "Luces",
+  "amaran": "Luces",
+  "godox": "Luces",
+  "arri": "Luces",
+
+  // Tungsteno
+  "tungsteno": "Tungsteno",
+  "fresnel": "Tungsteno",
+  "lowel": "Tungsteno",
+
+  // Modificadores
+  "softbox": "Modificadores",
+  "difusor": "Modificadores",
+  "bandera": "Modificadores",
+  "modificador": "Modificadores",
+  "lantern": "Modificadores",
+
+  // Comunicación
+  "intercom": "Comunicación",
+  "solidcom": "Comunicación",
+  "comunicación": "Comunicación",
+
+  // Flash
+  "flash": "Flash",
+
+  // Brazo Mágico
+  "brazo": "Brazo Mágico",
+  "magic arm": "Brazo Mágico",
+
+  // Stands
+  "stand": "Stands",
+  "c-stand": "Stands",
+  "roller": "Stands",
+  "lowboy": "Stands",
+
+  // Grips
+  "grip": "Grips",
+  "clamp": "Grips",
+  "car mount": "Grips",
+  "plate": "Grips",
+  "mafer": "Grips",
+
+  // Trípode
+  "trípode": "Trípode",
+  "tripod": "Trípode",
+  "manfrotto": "Trípode",
+  "sachtler": "Trípode",
+
+  // Sonido
+  "micrófono": "Sonido",
+  "microphone": "Sonido",
+  "shotgun": "Sonido",
+  "lavalier": "Sonido",
+  "wireless": "Sonido",
+  "rode": "Sonido",
+  "sony uwp": "Sonido",
+  "zoom": "Sonido",
+  "audio": "Sonido",
+  "sound": "Sonido",
+
+  // Baterías
+  "batería": "Baterías",
+  "battery": "Baterías",
+  "vmount": "Baterías",
+  "anton bauer": "Baterías",
+
+  // Filtros
+  "filtro": "Filtros",
+  "filter": "Filtros",
+  "nd": "Filtros",
+  "tiffen": "Filtros",
+};
+
+function mapTagToCategory(tags: string[]): Category {
+  if (!tags || tags.length === 0) return "Accesorios";
+
+  // Buscar la primera etiqueta que tenga mapping
+  for (const tag of tags) {
+    const normalized = tag.toLowerCase().trim();
+    // Búsqueda exacta
+    if (TAG_TO_CATEGORY[normalized]) {
+      return TAG_TO_CATEGORY[normalized];
+    }
+    // Búsqueda parcial (si la etiqueta contiene una clave del mapping)
+    for (const [key, category] of Object.entries(TAG_TO_CATEGORY)) {
+      if (normalized.includes(key) || key.includes(normalized)) {
+        return category;
+      }
+    }
+  }
+
+  return "Accesorios";
+}
 
 /* ─── Adaptador backend → tipo frontend ─────────────────────────────── */
 
@@ -18,8 +150,8 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
       .replace(/^-|-$/g, "") || `equipo-${e.id}`,
     name,
     brand: marca || "—",
-    // La primera etiqueta es la categoría principal; fallback a "Accesorios"
-    category: ((e.etiquetas ?? [])[0] as Equipment["category"]) ?? "Accesorios",
+    // Mapear etiquetas del backend a categorías de Lovable
+    category: mapTagToCategory(e.etiquetas ?? []),
     pricePerDay: e.precio_jornada ?? 0,
     fotoUrl: e.foto_url ?? null,
     cantidad: e.cantidad ?? 1,

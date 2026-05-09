@@ -5,17 +5,25 @@ import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
 import { IncludedList } from "./IncludedList";
-
 import { useEquipmentDetail } from "@/lib/equipment-detail-context";
 import { cn } from "@/lib/utils";
 
-export function EquipmentRow({ item }: { item: Equipment }) {
+export function EquipmentRow({
+  item,
+  disponible,
+}: {
+  item: Equipment;
+  disponible?: number;
+}) {
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
   const remove = useCart((s) => s.remove);
   const selected = qty > 0;
   const { openId, setOpenId } = useEquipmentDetail();
   const expanded = openId === item.id;
+
+  const sinStock = disponible !== undefined && disponible <= 0;
+  const stockBajo = disponible !== undefined && disponible > 0 && disponible <= 2;
 
   return (
     <div
@@ -26,6 +34,8 @@ export function EquipmentRow({ item }: { item: Equipment }) {
           ? "border-ink/40 bg-accent/30 shadow-sm ring-1 ring-ink/10"
           : selected
             ? "border-amber/60 bg-amber-soft/30"
+            : sinStock
+            ? "hairline opacity-50"
             : "hairline hover:border-foreground/20",
       )}
     >
@@ -39,7 +49,11 @@ export function EquipmentRow({ item }: { item: Equipment }) {
         >
           {/* Thumb */}
           <div className="relative aspect-square w-14 shrink-0 overflow-hidden rounded-md sm:aspect-[4/3] sm:w-16">
-            <EmptyImage category={item.category} brand={item.brand} />
+            {item.fotoUrl ? (
+              <img src={item.fotoUrl} alt={item.name} className="h-full w-full object-cover" />
+            ) : (
+              <EmptyImage category={item.category} brand={item.brand} />
+            )}
           </div>
 
           {/* Info */}
@@ -55,6 +69,14 @@ export function EquipmentRow({ item }: { item: Equipment }) {
               )}
               {item.isCombo && (
                 <span className="shrink-0 rounded-full bg-amber px-1.5 py-0.5 text-ink">combo</span>
+              )}
+              {disponible !== undefined && (
+                <span className={cn(
+                  "shrink-0 hidden sm:inline",
+                  sinStock ? "text-destructive/70" : stockBajo ? "text-amber" : "",
+                )}>
+                  · {sinStock ? "sin stock" : `${disponible} disp.`}
+                </span>
               )}
             </div>
             <div className="flex items-center gap-1.5">
@@ -93,9 +115,10 @@ export function EquipmentRow({ item }: { item: Equipment }) {
         {/* CTA */}
         {qty === 0 ? (
           <button
-            onClick={() => add(item.id)}
+            onClick={() => !sinStock && add(item.id)}
+            disabled={sinStock}
             aria-label={`Agregar ${item.name}`}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border hairline hover:border-amber hover:bg-amber hover:text-ink sm:h-auto sm:w-auto sm:rounded-md sm:px-3 sm:py-1.5"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border hairline hover:border-amber hover:bg-amber hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:w-auto sm:rounded-md sm:px-3 sm:py-1.5"
           >
             <Plus className="h-4 w-4 sm:hidden" />
             <span className="hidden items-center gap-1.5 text-xs uppercase tracking-wider sm:flex">
@@ -115,9 +138,14 @@ export function EquipmentRow({ item }: { item: Equipment }) {
               {qty}
             </span>
             <button
-              onClick={() => add(item.id)}
+              onClick={() => {
+                if (disponible === undefined || qty < disponible) {
+                  add(item.id);
+                }
+              }}
+              disabled={disponible !== undefined && qty >= disponible}
               aria-label="Agregar uno"
-              className="grid h-7 w-7 place-items-center rounded-full text-amber hover:bg-amber/20 sm:rounded"
+              className="grid h-7 w-7 place-items-center rounded-full text-amber hover:bg-amber/20 disabled:opacity-40 disabled:cursor-not-allowed sm:rounded"
             >
               <Plus className="h-3 w-3" />
             </button>

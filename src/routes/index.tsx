@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { LayoutGrid, List, ArrowRight, Search, X, Sparkles } from "lucide-react";
+import { LayoutGrid, List, ArrowRight, Search, X, Sparkles, Loader2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -13,11 +13,11 @@ import { CartMiniBar } from "@/components/rental/CartMiniBar";
 import { CarouselRow } from "@/components/rental/CarouselRow";
 import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { ListFilters } from "@/components/rental/ListFilters";
-import { type Equipment } from "@/data/equipment";
 import { CategoryIllustration } from "@/components/rental/illustrations/CategoryIllustration";
 import { EquipmentDetailProvider } from "@/lib/equipment-detail-context";
 import { useEquipos, useDisponibilidad } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
+import { type Equipment, type Category } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 
 const searchSchema = z.object({
@@ -34,6 +34,11 @@ export const Route = createFileRoute("/")({
         content:
           "Cámaras, lentes, iluminación, audio y soportes para producciones audiovisuales. Mar del Plata.",
       },
+      { property: "og:title", content: "Rambla Rental" },
+      {
+        property: "og:description",
+        content: "Equipos de cine y foto para alquilar por jornada.",
+      },
     ],
   }),
   component: Index,
@@ -44,6 +49,22 @@ type Mode = "grid" | "list";
 function Index() {
   const { eq } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
+
+  // Datos de la API
+  const { data: allEquipos = [], isLoading, isError } = useEquipos();
+  const { startDate, endDate } = useCart();
+  const { data: disponibilidad } = useDisponibilidad(startDate, endDate);
+
+  // Categorías y marcas derivadas de la data real de la API
+  const apiCategories = useMemo(
+    () => Array.from(new Set(allEquipos.map((e) => e.category))).sort(),
+    [allEquipos],
+  );
+  const apiBrands = useMemo(
+    () => Array.from(new Set(allEquipos.map((e) => e.brand).filter(Boolean))).sort(),
+    [allEquipos],
+  );
+
   const setOpenId = (id: string | null) => {
     navigate({
       search: (prev: { eq?: string }) => ({ ...prev, eq: id ?? undefined }),
@@ -54,39 +75,17 @@ function Index() {
 
   const [mode, setMode] = useState<Mode>("grid");
 
-  // Pick the best mode for the viewport on mount.
-  // If the URL has ?eq=, prefer the inline experience on mobile (list)
-  // and the modal on desktop (grid).
   useEffect(() => {
     if (typeof window === "undefined") return;
     const isMobile = window.matchMedia("(max-width: 639px)").matches;
     setMode(isMobile ? "list" : "grid");
   }, []);
-  // Datos de la API real (reemplaza el array hardcodeado)
-  const { data: allEquipos = [], isLoading } = useEquipos();
-  const { startDate, endDate } = useCart();
-  const { data: disponibilidad } = useDisponibilidad(startDate, endDate);
-
-  const apiCategories = useMemo(
-    () => Array.from(new Set(allEquipos.map((e) => e.category))).sort(),
-    [allEquipos],
-  );
-  const apiBrands = useMemo(
-    () => Array.from(new Set(allEquipos.map((e) => e.brand).filter(Boolean))).sort(),
-    [allEquipos],
-  );
-
-  const getDisponible = (item: Equipment) =>
-    disponibilidad
-      ? (disponibilidad[String(item._backendId)] ?? item.cantidad ?? 1)
-      : undefined;
 
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [brand, setBrand] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
-  // Scroll into view only on initial deep-link (when ?eq= is present at mount).
-  // Subsequent expand/collapse interactions must NOT scroll the page.
+  // Scroll into view only on initial deep-link
   const shouldScrollInitialDeepLinkRef = useRef(Boolean(eq));
   const didInitialScrollRef = useRef(false);
   useEffect(() => {
@@ -100,7 +99,7 @@ function Index() {
     });
   }, [eq]);
 
-  // Esc cierra la fila expandida en list mode (Dialog ya maneja Esc en grid).
+  // Esc cierra la fila expandida en list mode
   useEffect(() => {
     if (!eq || mode !== "list") return;
     const onKey = (e: KeyboardEvent) => {
@@ -133,24 +132,28 @@ function Index() {
       const q = query.toLowerCase();
       list = list.filter(
         (e) =>
-          e.name.toLowerCase().includes(q) ||
-          e.brand.toLowerCase().includes(q) ||
-          e.category.toLowerCase().includes(q),
+          (e.name ?? "").toLowerCase().includes(q) ||
+          (e.brand ?? "").toLowerCase().includes(q) ||
+          (e.category ?? "").toLowerCase().includes(q),
       );
     }
     return list;
-  }, [selectedCats, brand, query]);
+  }, [selectedCats, brand, query, allEquipos]);
 
   const jumpToCategory = (c: string) => {
     setSelectedCats(new Set([c]));
     setMode("grid");
-    // scroll suave a la sección de categoría
     requestAnimationFrame(() => {
       const el = document.getElementById(`cat-${c}`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
       else window.scrollTo({ top: 0, behavior: "smooth" });
     });
   };
+
+  const getDisponible = (item: Equipment) =>
+    disponibilidad
+      ? (disponibilidad[String(item._backendId)] ?? item.cantidad ?? 1)
+      : undefined;
 
   return (
     <EquipmentDetailProvider value={{ openId: eq ?? null, setOpenId }}>
@@ -162,7 +165,7 @@ function Index() {
           <div className="absolute inset-0 grain opacity-40" />
           <div className="relative px-6 py-12 lg:px-12 lg:py-16">
             <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/70">
-              Catálogo · {allEquipos.length} equipos · Mar del Plata
+              Catálogo · {isLoading ? "…" : allEquipos.length} equipos · Mar del Plata
             </div>
             <h1 className="mt-4 wordmark text-[14vw] leading-[0.85] md:text-[7rem] lg:text-[8.5rem] text-balance">
               un lugar
@@ -176,7 +179,7 @@ function Index() {
               fechas y armá tu pedido — te lo dejamos listo para retirar.
             </p>
 
-            {/* CTA Estudio — producto estrella */}
+            {/* CTA Estudio */}
             <div className="mt-8 inline-flex max-w-xl flex-col gap-3 rounded-2xl border border-ink/15 bg-ink/5 p-4 sm:flex-row sm:items-center sm:gap-4 sm:p-5">
               <div className="flex-1">
                 <div className="inline-flex items-center gap-1.5 rounded-full bg-ink px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.25em] text-amber">
@@ -260,7 +263,22 @@ function Index() {
           </div>
         </div>
 
-        {mode === "grid" ? (
+        {/* Loading / Error states */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-24 text-muted-foreground">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            Cargando catálogo…
+          </div>
+        ) : isError ? (
+          <div className="mx-4 rounded-lg border hairline bg-surface px-6 py-16 text-center mt-8 lg:mx-12">
+            <div className="font-display text-2xl text-muted-foreground">
+              No se pudo cargar el catálogo
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Verificá tu conexión e intentá de nuevo.
+            </p>
+          </div>
+        ) : mode === "grid" ? (
           <GridMode
             allEquipos={allEquipos}
             apiCategories={apiCategories}
@@ -272,6 +290,9 @@ function Index() {
           />
         ) : (
           <ListMode
+            allEquipos={allEquipos}
+            apiCategories={apiCategories}
+            apiBrands={apiBrands}
             query={query}
             setQuery={setQuery}
             selectedCats={selectedCats}
@@ -284,14 +305,12 @@ function Index() {
               setQuery("");
             }}
             filtered={filtered}
-            apiCategories={apiCategories}
-            apiBrands={apiBrands}
             getDisponible={getDisponible}
           />
         )}
 
-        <CartDrawer />
-        <GlobalDetailDialog mode={mode} />
+        <CartDrawer allEquipos={allEquipos} getDisponible={getDisponible} />
+        <GlobalDetailDialog allEquipos={allEquipos} mode={mode} getDisponible={getDisponible} />
       </div>
     </EquipmentDetailProvider>
   );
@@ -302,7 +321,15 @@ function Index() {
  * a known equipment. In list mode, the row expands inline so we don't open the
  * modal on top. In grid mode we always open the modal.
  */
-function GlobalDetailDialog({ mode }: { mode: Mode }) {
+function GlobalDetailDialog({
+  allEquipos,
+  mode,
+  getDisponible,
+}: {
+  allEquipos: Equipment[];
+  mode: Mode;
+  getDisponible: (item: Equipment) => number | undefined;
+}) {
   const { eq } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
@@ -314,6 +341,7 @@ function GlobalDetailDialog({ mode }: { mode: Mode }) {
     <EquipmentDetailDialog
       item={item}
       open={open}
+      disponible={getDisponible(item)}
       onOpenChange={(v) => {
         if (!v) {
           navigate({
@@ -353,12 +381,13 @@ function GridMode({
   const combos = allEquipos.filter((e) => e.isCombo && matches(e));
   const isFiltered = selectedCats.size > 0;
   const isSearching = q.length > 0;
-  const visibleCategories = isFiltered ? apiCategories.filter((c) => selectedCats.has(c)) : apiCategories;
+  const visibleCategories = isFiltered
+    ? apiCategories.filter((c) => selectedCats.has(c))
+    : apiCategories;
 
   // Ancho fijo de cards en carrusel para snap consistente
   const cardW = 260;
 
-  // Total de items visibles para mostrar "sin resultados"
   const totalVisible = visibleCategories.reduce(
     (acc, c) => acc + allEquipos.filter((e) => e.category === c && matches(e)).length,
     0,
@@ -390,12 +419,24 @@ function GridMode({
         </div>
       )}
 
-      {!isFiltered && !isSearching && <CategoryMosaic onSelect={onJumpToCategory} />}
+      {!isFiltered && !isSearching && (
+        <CategoryMosaic
+          allEquipos={allEquipos}
+          categories={apiCategories}
+          onSelect={onJumpToCategory}
+        />
+      )}
 
       {!isFiltered && !isSearching && combos.length > 0 && (
         <CarouselRow title="Combos" count={combos.length}>
           {combos.map((item, i) => (
-            <EquipmentCard key={item.id} item={item} index={i} width={cardW + 40} disponible={getDisponible(item)} />
+            <EquipmentCard
+              key={item.id}
+              item={item}
+              index={i}
+              width={cardW + 40}
+              disponible={getDisponible(item)}
+            />
           ))}
         </CarouselRow>
       )}
@@ -404,7 +445,6 @@ function GridMode({
         const items = allEquipos.filter((e) => e.category === c && matches(e));
         if (items.length === 0) return null;
 
-        // Cuando hay categoría seleccionada → grid real (no carrusel)
         if (isFiltered) {
           return (
             <section key={c} id={`cat-${c}`} className="scroll-mt-40 px-4 lg:px-12">
@@ -416,7 +456,12 @@ function GridMode({
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
                 {items.map((item, i) => (
-                  <EquipmentCard key={item.id} item={item} index={i} disponible={getDisponible(item)} />
+                  <EquipmentCard
+                    key={item.id}
+                    item={item}
+                    index={i}
+                    disponible={getDisponible(item)}
+                  />
                 ))}
               </div>
             </section>
@@ -440,7 +485,13 @@ function GridMode({
               }
             >
               {items.map((item, i) => (
-                <EquipmentCard key={item.id} item={item} index={i} width={cardW} disponible={getDisponible(item)} />
+                <EquipmentCard
+                  key={item.id}
+                  item={item}
+                  index={i}
+                  width={cardW}
+                  disponible={getDisponible(item)}
+                />
               ))}
             </CarouselRow>
           </div>
@@ -466,7 +517,7 @@ function GridMode({
             </div>
           </div>
           <div className="flex flex-wrap gap-6 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            {(["Cámaras", "Lentes", "Luces", "Sonido", "Stands"] as const).map((c) => (
+            {(["Cámaras", "Lentes", "Iluminación", "Audio", "Soportes"] as Category[]).map((c) => (
               <div key={c} className="flex flex-col items-center gap-2 text-ink">
                 <CategoryIllustration category={c} className="h-6 w-6" />
                 <span>{c}</span>
@@ -480,6 +531,9 @@ function GridMode({
 }
 
 function ListMode({
+  allEquipos,
+  apiCategories,
+  apiBrands,
   query,
   setQuery,
   selectedCats,
@@ -488,7 +542,11 @@ function ListMode({
   setBrand,
   onClear,
   filtered,
+  getDisponible,
 }: {
+  allEquipos: Equipment[];
+  apiCategories: string[];
+  apiBrands: string[];
   query: string;
   setQuery: (v: string) => void;
   selectedCats: Set<string>;
@@ -497,9 +555,7 @@ function ListMode({
   setBrand: (b: string | null) => void;
   onClear: () => void;
   filtered: Equipment[];
-  apiCategories?: string[];
-  apiBrands?: string[];
-  getDisponible?: (item: Equipment) => number | undefined;
+  getDisponible: (item: Equipment) => number | undefined;
 }) {
   const PAGE_SIZE = 20;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -534,13 +590,13 @@ function ListMode({
       <ListFilters
         query={query}
         onQuery={setQuery}
+        categories={apiCategories}
+        brands={apiBrands}
         selectedCategories={selectedCats}
         onToggleCategory={toggleCat}
         selectedBrand={brand}
         onBrand={setBrand}
         onClear={onClear}
-        categories={apiCategories ?? []}
-        brands={apiBrands ?? []}
       />
 
       <div className="px-3 py-4 pb-28 sm:px-6 sm:py-6 sm:pb-32 lg:px-12 lg:pb-32">
@@ -555,7 +611,11 @@ function ListMode({
           <>
             <div className="space-y-1.5">
               {visibleItems.map((item) => (
-                <EquipmentRow key={item.id} item={item} disponible={getDisponible?.(item)} />
+                <EquipmentRow
+                  key={item.id}
+                  item={item}
+                  disponible={getDisponible(item)}
+                />
               ))}
             </div>
             {hasMore && (
@@ -574,7 +634,7 @@ function ListMode({
           </>
         )}
       </div>
-      <CartMiniBar />
+      <CartMiniBar allEquipos={allEquipos} />
     </>
   );
 }

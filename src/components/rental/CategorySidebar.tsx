@@ -1,26 +1,57 @@
-import { categories, brands, equipment, type Category } from "@/data/equipment";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Search, LayoutGrid } from "lucide-react";
 import { CategoryIllustration } from "./illustrations/CategoryIllustration";
+import { type Equipment, type Category } from "@/data/equipment";
+
+const KNOWN_CATEGORIES: Category[] = [
+  "Cámaras",
+  "Lentes",
+  "Iluminación",
+  "Audio",
+  "Soportes",
+  "Accesorios",
+  "Adaptadores",
+];
 
 export function CategorySidebar({
   activeCategory,
   activeBrand,
+  allEquipos,
   onCategory,
   onBrand,
 }: {
-  activeCategory: Category | "Todos";
+  activeCategory: string;
   activeBrand: string | null;
-  onCategory: (c: Category | "Todos") => void;
+  allEquipos: Equipment[];
+  onCategory: (c: string) => void;
   onBrand: (b: string | null) => void;
 }) {
   const [brandQuery, setBrandQuery] = useState("");
-  const filteredBrands = brands.filter((b) =>
-    b.toLowerCase().includes(brandQuery.toLowerCase()),
+
+  // Categorías presentes en la API, manteniendo el orden canónico
+  const categories = useMemo(() => {
+    const inApi = new Set(allEquipos.map((e) => e.category));
+    // Primero las conocidas que existen, luego cualquier extra de la API
+    const known = KNOWN_CATEGORIES.filter((c) => inApi.has(c));
+    const extras = Array.from(inApi).filter((c) => !KNOWN_CATEGORIES.includes(c as Category)).sort();
+    return [...known, ...extras];
+  }, [allEquipos]);
+
+  // Marcas derivadas de la data real de la API (filtrando nulls/vacíos)
+  const brands = useMemo(
+    () => Array.from(new Set(allEquipos.map((e) => e.brand).filter(Boolean))).sort(),
+    [allEquipos],
   );
-  const countByCategory = (c: Category | "Todos") =>
-    c === "Todos" ? equipment.length : equipment.filter((e) => e.category === c).length;
+
+  const filteredBrands = brands.filter((b) =>
+    (b ?? "").toLowerCase().includes(brandQuery.toLowerCase()),
+  );
+
+  const countByCategory = (c: string) =>
+    c === "Todos"
+      ? allEquipos.length
+      : allEquipos.filter((e) => e.category === c).length;
 
   return (
     <aside className="hidden lg:flex w-64 shrink-0 flex-col gap-8 border-r hairline px-6 py-8 sticky top-[68px] h-[calc(100vh-68px)] overflow-y-auto">
@@ -51,7 +82,10 @@ export function CategorySidebar({
                     {c === "Todos" ? (
                       <LayoutGrid className="h-4 w-4" strokeWidth={2} />
                     ) : (
-                      <CategoryIllustration category={c} className="h-6 w-6" />
+                      <CategoryIllustration
+                        category={KNOWN_CATEGORIES.includes(c as Category) ? (c as Category) : "Accesorios"}
+                        className="h-6 w-6"
+                      />
                     )}
                   </span>
                   <span className="font-display text-base flex-1 text-left">{c}</span>

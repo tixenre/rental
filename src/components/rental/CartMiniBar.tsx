@@ -1,25 +1,19 @@
 import { ShoppingBag } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
-import { equipment } from "@/data/equipment";
+import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
-import { getAvailability } from "@/lib/availability";
 
-export function CartMiniBar() {
+export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
   const items = useCart((s) => s.items);
-  const startDate = useCart((s) => s.startDate);
-  const endDate = useCart((s) => s.endDate);
   const days = useCart((s) => s.days)();
   const setDrawerOpen = useCart((s) => s.setDrawerOpen);
 
   const entries = Object.entries(items);
   const count = entries.reduce((a, [, q]) => a + q, 0);
 
-  // Subtotal por día respetando disponibilidad (mismas reglas del drawer)
   const perDay = entries.reduce((acc, [id, qty]) => {
-    const item = equipment.find((e) => e.id === id);
+    const item = allEquipos.find((e) => e.id === id);
     if (!item) return acc;
-    const av = getAvailability(item, startDate, endDate);
-    if (!av.available || qty > av.stock) return acc;
     return acc + item.pricePerDay * qty;
   }, 0);
   const total = perDay * days;

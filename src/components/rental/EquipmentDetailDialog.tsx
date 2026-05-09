@@ -17,14 +17,19 @@ export function EquipmentDetailDialog({
   item,
   open,
   onOpenChange,
+  disponible,
 }: {
   item: Equipment;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  disponible?: number;
 }) {
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
   const [copied, setCopied] = useState(false);
+
+  const sinStock = disponible !== undefined && disponible <= 0;
+  const canAddMore = disponible === undefined || qty < disponible;
 
   const handleShare = async () => {
     if (typeof window === "undefined") return;
@@ -102,8 +107,9 @@ export function EquipmentDetailDialog({
 
           {qty === 0 ? (
             <button
-              onClick={() => add(item.id)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-ink px-4 py-2.5 text-sm font-medium uppercase tracking-wider text-amber transition hover:bg-foreground"
+              onClick={() => !sinStock && add(item.id)}
+              disabled={sinStock}
+              className="inline-flex items-center gap-1.5 rounded-md bg-ink px-4 py-2.5 text-sm font-medium uppercase tracking-wider text-amber transition hover:bg-foreground disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Plus className="h-4 w-4" /> Agregar al carrito
             </button>
@@ -117,8 +123,9 @@ export function EquipmentDetailDialog({
               </button>
               <span className="w-8 text-center text-base font-semibold tabular">{qty}</span>
               <button
-                onClick={() => add(item.id)}
-                className="grid h-9 w-9 place-items-center rounded text-amber hover:bg-amber/20"
+                onClick={() => canAddMore && add(item.id)}
+                disabled={!canAddMore}
+                className="grid h-9 w-9 place-items-center rounded text-amber hover:bg-amber/20 disabled:opacity-40"
               >
                 <Plus className="h-4 w-4" />
               </button>
