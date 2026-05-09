@@ -9,6 +9,7 @@ import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, ShoppingBag, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RentalDateModal } from "./RentalDateModal";
+import { TimeStepSelect } from "./TimeStepSelect";
 
 function DateField({
   label,
