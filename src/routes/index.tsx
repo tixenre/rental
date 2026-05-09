@@ -212,8 +212,23 @@ function Index() {
         {/* Toggle Modo + búsqueda sticky */}
         <div className="sticky top-14 sm:top-[60px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
           <div className="flex flex-col gap-1.5 px-3 py-2 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3 lg:px-12">
-            {/* Mobile: pill fechas + lupa */}
-            <MobileStickyBar query={query} setQuery={setQuery} />
+            {/* Mobile: pill fechas + lupa + filtros */}
+            <MobileStickyBar
+              query={query}
+              setQuery={setQuery}
+              categories={apiCategories}
+              brands={apiBrands}
+              selectedCategories={selectedCats}
+              onToggleCategory={toggleCat}
+              selectedBrand={brand}
+              onBrand={setBrand}
+              onClear={() => {
+                setSelectedCats(new Set());
+                setBrand(null);
+                setQuery("");
+              }}
+              resultCount={filtered.length}
+            />
 
             {/* Desktop: search input */}
             <div className="relative hidden sm:block flex-1 min-w-0 sm:max-w-xl">
@@ -235,7 +250,8 @@ function Index() {
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-3 sm:ml-auto">
+            {/* Desktop only: toggle Grid/Lista + contador */}
+            <div className="hidden sm:flex items-center justify-between gap-3 sm:ml-auto">
               <div className="flex items-center gap-1 rounded-full border hairline p-0.5">
                 <button
                   onClick={() => setMode("grid")}
@@ -245,7 +261,7 @@ function Index() {
                   )}
                 >
                   <LayoutGrid className="h-3 w-3" />
-                  <span className="hidden xs:inline sm:inline">Explorar</span>
+                  <span>Explorar</span>
                 </button>
                 <button
                   onClick={() => setMode("list")}
@@ -255,7 +271,7 @@ function Index() {
                   )}
                 >
                   <List className="h-3 w-3" />
-                  <span className="hidden xs:inline sm:inline">Lista</span>
+                  <span>Lista</span>
                 </button>
               </div>
               <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
