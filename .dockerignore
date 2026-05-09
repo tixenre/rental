@@ -1,0 +1,12 @@
+node_modules
+.git
+backend/data
+**/__pycache__
+*.pyc
+venv
+.venv
+dist
+.wrangler
+.output
+.vinxi
+.tanstack
