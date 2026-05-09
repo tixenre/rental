@@ -88,6 +88,7 @@ def get_dashboard(_admin: dict = Depends(require_admin)):
 def get_calendario(
     desde: str = Query(..., description="YYYY-MM-DD"),
     hasta: str = Query(..., description="YYYY-MM-DD"),
+    _admin: dict = Depends(require_admin),
 ):
     conn = get_db()
     try:
