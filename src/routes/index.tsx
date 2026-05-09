@@ -268,13 +268,33 @@ function GridMode({
       {visibleCategories.map((c) => {
         const items = equipment.filter((e) => e.category === c && matches(e));
         if (items.length === 0) return null;
+
+        // Cuando hay categoría seleccionada → grid real (no carrusel)
+        if (isFiltered) {
+          return (
+            <section key={c} id={`cat-${c}`} className="scroll-mt-40 px-4 lg:px-12">
+              <div className="mb-4 flex items-end justify-between gap-3">
+                <h2 className="font-display text-2xl sm:text-3xl">{c}</h2>
+                <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
+                  {items.length} {items.length === 1 ? "equipo" : "equipos"}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+                {items.map((item, i) => (
+                  <EquipmentCard key={item.id} item={item} index={i} />
+                ))}
+              </div>
+            </section>
+          );
+        }
+
         return (
           <div key={c} id={`cat-${c}`} className="scroll-mt-40">
             <CarouselRow
               title={c}
               count={items.length}
               action={
-                !isFiltered && !isSearching ? (
+                !isSearching ? (
                   <button
                     onClick={() => onJumpToCategory(c)}
                     className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink"
