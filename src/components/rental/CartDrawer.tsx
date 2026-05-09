@@ -1,12 +1,15 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Trash2, Plus, Minus, AlertTriangle } from "lucide-react";
+import { X, Trash2, Plus, Minus, AlertTriangle, Loader2 } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
 import { equipment, formatPrice } from "@/data/equipment";
 import { getAvailability } from "@/lib/availability";
 import { EmptyImage } from "./EmptyImage";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { createOrder } from "@/lib/orders";
+import { useNavigate } from "@tanstack/react-router";
 
 export function CartDrawer() {
   const {
@@ -26,6 +29,10 @@ export function CartDrawer() {
   } = useCart();
 
   const isBottom = drawerPlacement === "bottom";
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const d = days();
 
@@ -229,11 +236,48 @@ export function CartDrawer() {
                   ${formatPrice(total)}
                 </span>
               </div>
+              {error && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-[11px] text-destructive">
+                  {error}
+                </div>
+              )}
               <button
-                disabled={list.length === 0}
-                className="w-full rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={list.length === 0 || submitting}
+                onClick={async () => {
+                  if (!user) {
+                    setDrawerOpen(false);
+                    navigate({ to: "/login" });
+                    return;
+                  }
+                  setError(null);
+                  setSubmitting(true);
+                  try {
+                    const validItems: Record<string, number> = {};
+                    list.filter((l) => !l.conflict).forEach((l) => {
+                      validItems[l.it.id] = l.qty;
+                    });
+                    const order = await createOrder({
+                      status: "solicitado",
+                      startDate,
+                      endDate,
+                      startTime,
+                      endTime,
+                      days: d,
+                      items: validItems,
+                    });
+                    clear();
+                    setDrawerOpen(false);
+                    navigate({ to: "/mis-pedidos/$id", params: { id: order.id } });
+                  } catch (e: any) {
+                    setError(e.message ?? "No pudimos enviar el pedido.");
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                className="w-full rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 inline-flex items-center justify-center gap-2"
               >
-                Solicitar cotización
+                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {user ? "Enviar pedido" : "Iniciar sesión para enviar"}
               </button>
               {list.length > 0 && (
                 <button

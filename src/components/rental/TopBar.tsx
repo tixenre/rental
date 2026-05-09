@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Calendar as CalendarIcon,
   ShoppingBag,
@@ -8,6 +9,8 @@ import {
   HelpCircle,
   Menu,
   LogIn,
+  ClipboardList,
+  LogOut,
 } from "lucide-react";
 import { RentalDateModal } from "./RentalDateModal";
 import { formatRentalRange } from "@/lib/format";
@@ -113,6 +116,7 @@ function RightActions({
   onCartOpen: () => void;
   compact?: boolean;
 }) {
+  const { user, signOut } = useAuth();
   return (
     <div className="flex items-center gap-2">
       {!compact && (
@@ -134,7 +138,15 @@ function RightActions({
             aria-label="Menú"
             className="flex h-9 w-9 items-center justify-center rounded-full border hairline text-muted-foreground transition hover:border-ink hover:text-ink"
           >
-            <Menu className="h-4 w-4" />
+            {user?.user_metadata?.avatar_url ? (
+              <img
+                src={user.user_metadata.avatar_url}
+                alt=""
+                className="h-7 w-7 rounded-full object-cover"
+              />
+            ) : (
+              <Menu className="h-4 w-4" />
+            )}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
@@ -156,14 +168,33 @@ function RightActions({
             </a>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="flex items-center gap-2">
-            <User className="h-4 w-4" />
-            Invitado
-          </DropdownMenuItem>
-          <DropdownMenuItem className="flex items-center gap-2">
-            <LogIn className="h-4 w-4" />
-            Iniciar sesión
-          </DropdownMenuItem>
+          {user ? (
+            <>
+              <DropdownMenuItem asChild>
+                <Link to="/mis-pedidos" className="flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4" />
+                  Mis pedidos
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/cuenta" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Mi cuenta
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => signOut()} className="flex items-center gap-2">
+                <LogOut className="h-4 w-4" />
+                Cerrar sesión
+              </DropdownMenuItem>
+            </>
+          ) : (
+            <DropdownMenuItem asChild>
+              <Link to="/login" className="flex items-center gap-2">
+                <LogIn className="h-4 w-4" />
+                Iniciar sesión
+              </Link>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
