@@ -71,10 +71,13 @@ export function TopBar() {
     setEndTime,
     setDrawerOpen,
     totalItems,
+    days,
   } = useCart();
   const [user] = useState("Invitado");
   const [dateModalOpen, setDateModalOpen] = useState(false);
   const count = totalItems();
+  const jornadas = days();
+  const hasDates = !!(startDate && endDate);
 
   return (
     <>
