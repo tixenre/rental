@@ -5,8 +5,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, ShoppingBag, User } from "lucide-react";
+import { Calendar as CalendarIcon, ShoppingBag, User, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { WhatsappPill } from "./WhatsappPill";
 
 function DateField({
   label,
@@ -104,6 +105,16 @@ export function TopBar() {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          <div className="hidden md:block">
+            <WhatsappPill />
+          </div>
+          <a
+            href="#como-funciona"
+            className="hidden md:flex items-center gap-1.5 rounded-full border hairline px-3 py-1.5 text-xs hover:border-ink"
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+            ¿Cómo funciona?
+          </a>
           <button
             onClick={() => setDrawerOpen(true)}
             className="relative flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-amber hover:text-ink"
@@ -112,7 +123,7 @@ export function TopBar() {
             <span className="tabular">{count}</span>
             <span>{count === 1 ? "ítem" : "ítems"}</span>
           </button>
-          <button className="flex items-center gap-2 rounded-full border hairline px-3 py-2 text-sm hover:border-foreground/40">
+          <button className="hidden sm:flex items-center gap-2 rounded-full border hairline px-3 py-2 text-sm hover:border-foreground/40">
             <User className="h-4 w-4" />
             {user}
           </button>
