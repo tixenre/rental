@@ -1,7 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LayoutGrid, List, ArrowRight, Search, X, Sparkles } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { TopBar } from "@/components/rental/TopBar";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
@@ -12,9 +14,15 @@ import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { ListFilters } from "@/components/rental/ListFilters";
 import { equipment, categories, type Category } from "@/data/equipment";
 import { CategoryIllustration } from "@/components/rental/illustrations/CategoryIllustration";
+import { EquipmentDetailProvider } from "@/lib/equipment-detail-context";
 import { cn } from "@/lib/utils";
 
+const searchSchema = z.object({
+  eq: fallback(z.string().optional(), undefined),
+});
+
 export const Route = createFileRoute("/")({
+  validateSearch: zodValidator(searchSchema),
   head: () => ({
     meta: [
       { title: "Rambla Rental — Alquiler de equipos de cine y foto" },
