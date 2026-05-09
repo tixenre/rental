@@ -18,7 +18,7 @@ ENV PATH="/root/.bun/bin:$PATH"
 RUN mkdir -p /app/backend/data
 
 # -- Copiar código fuente --
-COPY package.json bun.lock vite.config.ts tsconfig.json ./
+COPY package.json bun.lock vite.config.ts tsconfig.json index.html ./
 COPY src/ ./src/
 COPY backend/ ./backend/
 
