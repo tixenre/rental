@@ -56,7 +56,7 @@ function AdminAccessPage() {
             tone="warn"
             icon={<ShieldAlert className="h-5 w-5" />}
             title="Sin permisos de administración"
-            body={`La cuenta ${user.email} no figura como administradora.`}
+            body={`La cuenta ${user?.email ?? ""} no figura como administradora.`}
           >
             <div className="flex flex-wrap gap-3">
               <Link
