@@ -117,141 +117,139 @@ function Index() {
 
   return (
     <EquipmentDetailProvider value={{ openId: eq ?? null, setOpenId }}>
-    <div className="min-h-screen bg-background text-foreground">
-      <TopBar />
+      <div className="min-h-screen bg-background text-foreground">
+        <TopBar />
 
-      {/* Hero amarillo brand */}
-      <section className="relative overflow-hidden border-b hairline bg-amber text-ink">
-        <div className="absolute inset-0 grain opacity-40" />
-        <div className="relative px-6 py-12 lg:px-12 lg:py-16">
-          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/70">
-            Catálogo · {equipment.length} equipos · Mar del Plata
+        {/* Hero amarillo brand */}
+        <section className="relative overflow-hidden border-b hairline bg-amber text-ink">
+          <div className="absolute inset-0 grain opacity-40" />
+          <div className="relative px-6 py-12 lg:px-12 lg:py-16">
+            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/70">
+              Catálogo · {equipment.length} equipos · Mar del Plata
+            </div>
+            <h1 className="mt-4 wordmark text-[14vw] leading-[0.85] md:text-[7rem] lg:text-[8.5rem] text-balance">
+              un lugar
+              <br />
+              donde pasan
+              <br />
+              cosas.
+            </h1>
+            <p className="mt-6 max-w-xl text-base text-ink/80">
+              Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales. Elegí
+              fechas y armá tu pedido — te lo dejamos listo para retirar.
+            </p>
+
+            {/* CTA Estudio — producto estrella */}
+            <div className="mt-8 inline-flex max-w-xl flex-col gap-3 rounded-2xl border border-ink/15 bg-ink/5 p-4 sm:flex-row sm:items-center sm:gap-4 sm:p-5">
+              <div className="flex-1">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-ink px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.25em] text-amber">
+                  <Sparkles className="h-3 w-3" /> Producto estrella
+                </div>
+                <div className="mt-2 font-display text-xl sm:text-2xl">Conocé el Estudio</div>
+                <div className="text-xs text-ink/70">
+                  Foto y video · reservá por hora · pack de luces y grips opcional
+                </div>
+              </div>
+              <Link
+                to="/estudio"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-3 text-sm font-semibold text-amber transition hover:bg-foreground"
+              >
+                Ver estudio <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-2 text-[10px] font-mono uppercase tracking-widest">
+              {["calidad", "variedad", "amistad", "comunidad", "intercambio", "local"].map((w) => (
+                <span key={w} className="rounded-full border border-ink/25 px-3 py-1">
+                  {w}
+                </span>
+              ))}
+            </div>
           </div>
-          <h1 className="mt-4 wordmark text-[14vw] leading-[0.85] md:text-[7rem] lg:text-[8.5rem] text-balance">
-            un lugar
-            <br />
-            donde pasan
-            <br />
-            cosas.
-          </h1>
-          <p className="mt-6 max-w-xl text-base text-ink/80">
-            Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales.
-            Elegí fechas y armá tu pedido — te lo dejamos listo para retirar.
-          </p>
+        </section>
 
-          {/* CTA Estudio — producto estrella */}
-          <div className="mt-8 inline-flex max-w-xl flex-col gap-3 rounded-2xl border border-ink/15 bg-ink/5 p-4 sm:flex-row sm:items-center sm:gap-4 sm:p-5">
-            <div className="flex-1">
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-ink px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.25em] text-amber">
-                <Sparkles className="h-3 w-3" /> Producto estrella
+        {/* Toggle Modo + búsqueda sticky */}
+        <div className="sticky top-[116px] sm:top-[60px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
+          <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 lg:px-12">
+            {/* Search input */}
+            <div className="relative flex-1 min-w-0 sm:max-w-xl">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar equipo, marca…"
+                className="w-full rounded-full border hairline bg-surface py-2 pl-9 pr-9 text-sm placeholder:text-muted-foreground focus:border-amber focus:outline-none"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  aria-label="Limpiar búsqueda"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-foreground/10 hover:text-ink"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 sm:ml-auto">
+              <div className="flex items-center gap-1 rounded-full border hairline p-0.5">
+                <button
+                  onClick={() => setMode("grid")}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
+                    mode === "grid" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
+                  )}
+                >
+                  <LayoutGrid className="h-3 w-3" />
+                  <span className="hidden xs:inline sm:inline">Explorar</span>
+                </button>
+                <button
+                  onClick={() => setMode("list")}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
+                    mode === "list" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
+                  )}
+                >
+                  <List className="h-3 w-3" />
+                  <span className="hidden xs:inline sm:inline">Lista</span>
+                </button>
               </div>
-              <div className="mt-2 font-display text-xl sm:text-2xl">
-                Conocé el Estudio
-              </div>
-              <div className="text-xs text-ink/70">
-                Foto y video · reservá por hora · pack de luces y grips opcional
+              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
+                {query.trim() || mode === "list"
+                  ? `${filtered.length} resultados`
+                  : `${equipment.length} equipos`}
               </div>
             </div>
-            <Link
-              to="/estudio"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-3 text-sm font-semibold text-amber transition hover:bg-foreground"
-            >
-              Ver estudio <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-2 text-[10px] font-mono uppercase tracking-widest">
-            {["calidad", "variedad", "amistad", "comunidad", "intercambio", "local"].map((w) => (
-              <span key={w} className="rounded-full border border-ink/25 px-3 py-1">
-                {w}
-              </span>
-            ))}
           </div>
         </div>
-      </section>
 
-      {/* Toggle Modo + búsqueda sticky */}
-      <div className="sticky top-[116px] sm:top-[60px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
-        <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 lg:px-12">
-          {/* Search input */}
-          <div className="relative flex-1 min-w-0 sm:max-w-xl">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar equipo, marca…"
-              className="w-full rounded-full border hairline bg-surface py-2 pl-9 pr-9 text-sm placeholder:text-muted-foreground focus:border-amber focus:outline-none"
-            />
-            {query && (
-              <button
-                onClick={() => setQuery("")}
-                aria-label="Limpiar búsqueda"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-foreground/10 hover:text-ink"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
+        {mode === "grid" ? (
+          <GridMode
+            onJumpToCategory={jumpToCategory}
+            selectedCats={selectedCats}
+            onClearCats={() => setSelectedCats(new Set())}
+            query={query}
+          />
+        ) : (
+          <ListMode
+            query={query}
+            setQuery={setQuery}
+            selectedCats={selectedCats}
+            toggleCat={toggleCat}
+            brand={brand}
+            setBrand={setBrand}
+            onClear={() => {
+              setSelectedCats(new Set());
+              setBrand(null);
+              setQuery("");
+            }}
+            filtered={filtered}
+          />
+        )}
 
-          <div className="flex items-center justify-between gap-3 sm:ml-auto">
-            <div className="flex items-center gap-1 rounded-full border hairline p-0.5">
-              <button
-                onClick={() => setMode("grid")}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
-                  mode === "grid" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
-                )}
-              >
-                <LayoutGrid className="h-3 w-3" />
-                <span className="hidden xs:inline sm:inline">Explorar</span>
-              </button>
-              <button
-                onClick={() => setMode("list")}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
-                  mode === "list" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
-                )}
-              >
-                <List className="h-3 w-3" />
-                <span className="hidden xs:inline sm:inline">Lista</span>
-              </button>
-            </div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
-              {query.trim() || mode === "list"
-                ? `${filtered.length} resultados`
-                : `${equipment.length} equipos`}
-            </div>
-          </div>
-        </div>
+        <CartDrawer />
+        <GlobalDetailDialog mode={mode} />
       </div>
-
-      {mode === "grid" ? (
-        <GridMode
-          onJumpToCategory={jumpToCategory}
-          selectedCats={selectedCats}
-          onClearCats={() => setSelectedCats(new Set())}
-          query={query}
-        />
-      ) : (
-        <ListMode
-          query={query}
-          setQuery={setQuery}
-          selectedCats={selectedCats}
-          toggleCat={toggleCat}
-          brand={brand}
-          setBrand={setBrand}
-          onClear={() => {
-            setSelectedCats(new Set());
-            setBrand(null);
-            setQuery("");
-          }}
-          filtered={filtered}
-        />
-      )}
-
-      <CartDrawer />
-      <GlobalDetailDialog mode={mode} />
-    </div>
     </EquipmentDetailProvider>
   );
 }
@@ -306,9 +304,7 @@ function GridMode({
   const combos = equipment.filter((e) => e.isCombo && matches(e));
   const isFiltered = selectedCats.size > 0;
   const isSearching = q.length > 0;
-  const visibleCategories = isFiltered
-    ? categories.filter((c) => selectedCats.has(c))
-    : categories;
+  const visibleCategories = isFiltered ? categories.filter((c) => selectedCats.has(c)) : categories;
 
   // Ancho fijo de cards en carrusel para snap consistente
   const cardW = 260;
