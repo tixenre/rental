@@ -59,7 +59,6 @@ function Index() {
     if (typeof window === "undefined") return;
     const isMobile = window.matchMedia("(max-width: 639px)").matches;
     setMode(isMobile ? "list" : "grid");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [selectedCats, setSelectedCats] = useState<Set<Category>>(new Set());
   const [brand, setBrand] = useState<string | null>(null);
