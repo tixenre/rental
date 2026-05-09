@@ -18,6 +18,7 @@ PUBLIC_EXACT = {"/", "/login", "/cliente"}
 PUBLIC_PREFIXES = (
     "/auth/",
     "/static/",
+    "/assets/",   # bundles JS/CSS del frontend Vite
     "/equipo/",    # fichas públicas
     "/cliente/",   # portal de clientes (autenticación propia)
 )
