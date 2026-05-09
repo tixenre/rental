@@ -240,6 +240,7 @@ function Index() {
 
       <CartDrawer />
     </div>
+    </EquipmentDetailProvider>
   );
 }
 
