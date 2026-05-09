@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LayoutGrid, List, ArrowRight, Search, X, Sparkles } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { TopBar } from "@/components/rental/TopBar";
