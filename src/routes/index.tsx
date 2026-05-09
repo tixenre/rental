@@ -46,6 +46,7 @@ function Index() {
     navigate({
       search: (prev: { eq?: string }) => ({ ...prev, eq: id ?? undefined }),
       replace: true,
+      resetScroll: false,
     });
   };
 
@@ -66,8 +67,10 @@ function Index() {
 
   // Scroll into view only on initial deep-link (when ?eq= is present at mount).
   // Subsequent expand/collapse interactions must NOT scroll the page.
+  const shouldScrollInitialDeepLinkRef = useRef(Boolean(eq));
   const didInitialScrollRef = useRef(false);
   useEffect(() => {
+    if (!shouldScrollInitialDeepLinkRef.current) return;
     if (didInitialScrollRef.current) return;
     if (!eq) return;
     didInitialScrollRef.current = true;
