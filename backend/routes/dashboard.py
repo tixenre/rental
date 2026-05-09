@@ -4,15 +4,16 @@ routes/dashboard.py — Dashboard de métricas y calendario de pedidos.
 
 import datetime
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from database import get_db, row_to_dict
+from supabase_auth import require_admin
 
 router = APIRouter()
 
 
 @router.get("/dashboard")
-def get_dashboard():
+def get_dashboard(_admin: dict = Depends(require_admin)):
     conn    = get_db()
     hoy     = datetime.date.today().isoformat()
     manana  = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
