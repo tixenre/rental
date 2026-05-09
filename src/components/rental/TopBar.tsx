@@ -1,13 +1,19 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
-import { useEquipos } from "@/hooks/useEquipos";
-import { useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, ShoppingBag, User } from "lucide-react";
+import { Calendar as CalendarIcon, ShoppingBag, User, LogOut, Package, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 import { TimeStepSelect } from "./TimeStepSelect";
 
 function DateField({
@@ -72,8 +78,15 @@ export function TopBar() {
     setDrawerOpen,
     totalItems,
   } = useCart();
-  const [user] = useState("Invitado");
   const count = totalItems();
+  const { user: authUser, signOut } = useAuth();
+  const navigate = useNavigate();
+  const isLoggedIn = !!authUser;
+  const initial = (authUser?.email ?? "?").trim().charAt(0).toUpperCase();
+  const handleSignOut = async () => {
+    await signOut();
+    navigate({ to: "/" });
+  };
 
   return (
     <>
@@ -124,13 +137,59 @@ export function TopBar() {
                   </span>
                 )}
               </button>
-              <button
-                className="flex items-center gap-1.5 rounded-full border hairline px-2 py-1.5 text-xs md:px-3 md:py-2 md:text-sm hover:border-foreground/40"
-                aria-label={user}
-              >
-                <User className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span className="hidden md:inline">{user}</span>
-              </button>
+              {!isLoggedIn ? (
+                <Link
+                  to="/login"
+                  className="flex items-center gap-1.5 rounded-full border hairline px-2 py-1.5 text-xs md:px-3 md:py-2 md:text-sm hover:border-foreground/40"
+                  aria-label="Ingresar"
+                >
+                  <User className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                  <span className="hidden md:inline">Ingresar</span>
+                </Link>
+              ) : (
+                <>
+                  {/* Mobile: tap directo a mis pedidos */}
+                  <Link
+                    to="/mis-pedidos"
+                    className="md:hidden grid h-8 w-8 place-items-center rounded-full bg-amber text-ink font-semibold text-xs"
+                    aria-label="Mi cuenta"
+                  >
+                    {initial}
+                  </Link>
+                  {/* Desktop: dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="hidden md:flex items-center gap-2 rounded-full border hairline px-2 py-1.5 text-xs md:px-3 md:py-2 md:text-sm hover:border-foreground/40"
+                        aria-label={authUser?.email ?? "Mi cuenta"}
+                      >
+                        <span className="grid h-6 w-6 place-items-center rounded-full bg-amber text-ink font-semibold text-[11px]">
+                          {initial}
+                        </span>
+                        <span className="hidden md:inline max-w-[140px] truncate">
+                          {authUser?.email}
+                        </span>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem asChild>
+                        <Link to="/mis-pedidos" className="flex items-center gap-2">
+                          <Package className="h-4 w-4" /> Mis pedidos
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/cuenta" className="flex items-center gap-2">
+                          <UserCircle className="h-4 w-4" /> Mi cuenta
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2 text-destructive focus:text-destructive">
+                        <LogOut className="h-4 w-4" /> Cerrar sesión
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              )}
             </div>
           </div>
 
