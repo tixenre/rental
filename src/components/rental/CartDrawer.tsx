@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Trash2, Plus, Minus, AlertTriangle, Loader2 } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
-import { equipment, formatPrice } from "@/data/equipment";
+import { formatPrice } from "@/data/equipment";
 import { getAvailability } from "@/lib/availability";
 import { EmptyImage } from "./EmptyImage";
 import { format } from "date-fns";
@@ -10,6 +10,16 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { createOrder } from "@/lib/orders";
 import { useNavigate } from "@tanstack/react-router";
+import { useEquipos, useDisponibilidad } from "@/hooks/useEquipos";
+import { apiPostPedido } from "@/lib/api";
+
+function toIsoDate(d?: Date) {
+  if (!d) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export function CartDrawer() {
   const {
@@ -31,28 +41,39 @@ export function CartDrawer() {
   const isBottom = drawerPlacement === "bottom";
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { data: allEquipos = [] } = useEquipos();
+  const { data: disponibilidad } = useDisponibilidad(startDate, endDate);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const d = days();
 
-  // Recalcula disponibilidad + precios cada vez que cambian fechas o ítems
+  // Recalcula disponibilidad + precios cada vez que cambian fechas o ítems.
+  // Si tenemos el dato real del backend lo usamos; si no, caemos al mock.
   const list = useMemo(() => {
     return Object.entries(items)
       .map(([id, qty]) => {
-        const it = equipment.find((e) => e.id === id);
+        const it = allEquipos.find((e) => e.id === id);
         if (!it) return null;
-        const availability = getAvailability(it, startDate, endDate);
+        let availability;
+        if (it._backendId !== undefined && disponibilidad) {
+          const stock = disponibilidad[String(it._backendId)] ?? it.cantidad ?? 0;
+          availability = stock <= 0
+            ? { available: false, stock: 0, reason: "No disponible en estas fechas" as string | undefined }
+            : { available: true, stock, reason: undefined as string | undefined };
+        } else {
+          availability = getAvailability(it, startDate, endDate);
+        }
         const conflict = !availability.available || qty > availability.stock;
         return { it, qty, availability, conflict };
       })
       .filter(Boolean) as {
-      it: (typeof equipment)[number];
+      it: (typeof allEquipos)[number];
       qty: number;
-      availability: ReturnType<typeof getAvailability>;
+      availability: { available: boolean; stock: number; reason?: string };
       conflict: boolean;
     }[];
-  }, [items, startDate, endDate]);
+  }, [items, startDate, endDate, allEquipos, disponibilidad]);
 
   const subtotal = list
     .filter((l) => !l.conflict)
