@@ -73,7 +73,6 @@ export function TopBar() {
     totalItems,
   } = useCart();
   const [user] = useState("Invitado");
-  const [dateModalOpen, setDateModalOpen] = useState(false);
   const count = totalItems();
 
   return (
