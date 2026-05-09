@@ -32,7 +32,9 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
     setDates,
     setStartTime,
     setEndTime,
+    days,
   } = useCart();
+  const jornadas = days();
 
   const range: DateRange | undefined = startDate
     ? { from: startDate, to: endDate }
