@@ -8,6 +8,7 @@ import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, ShoppingBag, User, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WhatsappPill } from "./WhatsappPill";
+import wordmark from "@/assets/rambla-wordmark.png";
 
 function DateField({
   label,
@@ -77,13 +78,8 @@ export function TopBar() {
   return (
     <header className="sticky top-0 z-40 border-b hairline bg-background/85 backdrop-blur-xl">
       <div className="flex items-center gap-6 px-6 py-3">
-        <Link to="/" className="flex items-center gap-2 group">
-          <span className="wordmark text-3xl text-amber leading-none">
-            rambla
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
-            Rental
-          </span>
+        <Link to="/" className="flex items-center group" aria-label="Rambla Rental">
+          <img src={wordmark} alt="Rambla Rental" className="h-9 w-auto" />
         </Link>
 
         <div className="hidden md:flex items-center gap-4 ml-4">
