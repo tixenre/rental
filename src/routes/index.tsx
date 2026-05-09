@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { LayoutGrid, List, ArrowRight, Search, X } from "lucide-react";
+import { LayoutGrid, List, ArrowRight, Search, X, Sparkles } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { TopBar } from "@/components/rental/TopBar";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
