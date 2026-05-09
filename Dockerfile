@@ -21,7 +21,6 @@ RUN mkdir -p /app/backend/data
 COPY package.json bun.lock vite.config.ts tsconfig.json ./
 COPY src/ ./src/
 COPY backend/ ./backend/
-COPY public/ ./public/
 
 # -- Dependencias Python --
 COPY backend/requirements.txt .
