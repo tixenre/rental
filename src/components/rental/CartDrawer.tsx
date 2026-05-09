@@ -241,22 +241,21 @@ export function CartDrawer({
                                   <span className="w-5 text-center text-xs tabular">
                                     {qty}
                                   </span>
-                                  <button
-                                    onClick={() => {
-                                      const disponible = getDisponible?.(it);
-                                      if (disponible === undefined || qty < disponible) {
-                                        add(it.id);
-                                      }
-                                    }}
-                                    disabled={
-                                      getDisponible !== undefined &&
-                                      getDisponible(it) !== undefined &&
-                                      qty >= getDisponible(it)!
-                                    }
-                                    className="grid h-6 w-6 place-items-center hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </button>
+                                  {(() => {
+                                    const cap = getDisponible?.(it) ?? it.cantidad ?? Infinity;
+                                    const reachedMax = qty >= cap;
+                                    return (
+                                      <button
+                                        onClick={() => {
+                                          if (!reachedMax) add(it.id);
+                                        }}
+                                        disabled={reachedMax}
+                                        className="grid h-6 w-6 place-items-center hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed"
+                                      >
+                                        <Plus className="h-3 w-3" />
+                                      </button>
+                                    );
+                                  })()}
                                 </div>
                                 <div className="text-xs tabular text-ink">
                                   {formatARS(it.pricePerDay * qty)}
