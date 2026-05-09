@@ -22,7 +22,9 @@ export function EquipmentCard({
   const add = useCart((s) => s.add);
   const remove = useCart((s) => s.remove);
   const selected = qty > 0;
-  const [open, setOpen] = useState(false);
+  const { openId, setOpenId } = useEquipmentDetail();
+  const open = openId === item.id;
+  const setOpen = (v: boolean) => setOpenId(v ? item.id : null);
 
   return (
     <>
