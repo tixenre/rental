@@ -1,131 +1,83 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, ExternalLink, ShieldCheck, ShieldAlert, ShieldQuestion } from "lucide-react";
+import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { Menu } from "lucide-react";
+
 import { useAuth } from "@/hooks/use-auth";
-import { isAdminEmail, BACKOFFICE_URL } from "@/lib/admin-emails";
+import { isAdminEmail } from "@/lib/admin-emails";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Acceso admin — Rambla Rental" },
+      { title: "Back-office — Rambla Rental" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
-  component: AdminAccessPage,
+  component: AdminLayout,
 });
 
-// TEMP: bypass de login mientras se arregla Google OAuth
-const BYPASS_AUTH = true;
-
-function AdminAccessPage() {
+function AdminLayout() {
   const { user, loading } = useAuth();
-  const isAdmin = BYPASS_AUTH || isAdminEmail(user?.email);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      navigate({ to: "/login", search: { redirect: "/admin" } });
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen grid place-items-center text-sm text-muted-foreground">
+        Cargando…
+      </div>
+    );
+  }
+  if (!user) return null;
+
+  if (!isAdminEmail(user.email)) {
+    return <NoAutorizado email={user.email ?? ""} />;
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="border-b hairline px-4 py-4 md:px-8">
-        <Link to="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-ink">
-          <ArrowLeft className="h-3.5 w-3.5" /> Catálogo
-        </Link>
-      </div>
-
-      <div className="mx-auto max-w-md px-4 py-12 md:px-8">
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-          Administración
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <AdminSidebar />
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className="h-12 flex items-center gap-2 border-b hairline px-3 md:px-4 bg-background sticky top-0 z-10">
+            <SidebarTrigger aria-label="Alternar sidebar">
+              <Menu className="h-4 w-4" />
+            </SidebarTrigger>
+          </header>
+          <main className="flex-1 min-w-0">
+            <Outlet />
+          </main>
         </div>
-        <h1 className="font-display text-3xl text-ink">Acceso admin</h1>
-
-        {loading && !BYPASS_AUTH ? (
-          <p className="mt-8 text-sm text-muted-foreground">Verificando sesión…</p>
-        ) : !user && !BYPASS_AUTH ? (
-          <StateCard
-            tone="neutral"
-            icon={<ShieldQuestion className="h-5 w-5" />}
-            title="No iniciaste sesión"
-            body="Necesitás iniciar sesión para acceder al área de administración."
-          >
-            <Link
-              to="/login"
-              search={{ redirect: "/admin" }}
-              className="inline-flex items-center justify-center rounded-md bg-amber px-4 py-2 text-sm font-medium uppercase tracking-widest text-ink hover:brightness-110"
-            >
-              Iniciar sesión
-            </Link>
-          </StateCard>
-        ) : !isAdmin ? (
-          <StateCard
-            tone="warn"
-            icon={<ShieldAlert className="h-5 w-5" />}
-            title="Sin permisos de administración"
-            body={`La cuenta ${user?.email ?? ""} no figura como administradora.`}
-          >
-            <div className="flex flex-wrap gap-3">
-              <Link
-                to="/cuenta"
-                className="inline-flex items-center justify-center rounded-md border hairline px-4 py-2 text-sm text-ink hover:bg-accent/30"
-              >
-                Mi cuenta
-              </Link>
-              <Link
-                to="/"
-                className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm text-muted-foreground hover:text-ink"
-              >
-                Volver al catálogo
-              </Link>
-            </div>
-          </StateCard>
-        ) : (
-          <StateCard
-            tone="ok"
-            icon={<ShieldCheck className="h-5 w-5" />}
-            title="Acceso autorizado"
-            body={`Logueado como ${user?.email ?? "modo bypass"}.`}
-          >
-            <a
-              href={BACKOFFICE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-md bg-amber px-4 py-2 text-sm font-medium uppercase tracking-widest text-ink hover:brightness-110"
-            >
-              Abrir back-office <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Vas a tener que loguearte ahí con tu usuario admin del back-office (sesión separada).
-            </p>
-          </StateCard>
-        )}
       </div>
-    </div>
+    </SidebarProvider>
   );
 }
 
-function StateCard({
-  tone,
-  icon,
-  title,
-  body,
-  children,
-}: {
-  tone: "ok" | "warn" | "neutral";
-  icon: React.ReactNode;
-  title: string;
-  body: string;
-  children: React.ReactNode;
-}) {
-  const toneClasses =
-    tone === "ok"
-      ? "border-green-600/30 bg-green-50/50 text-green-900"
-      : tone === "warn"
-      ? "border-amber-600/30 bg-amber-50/50 text-amber-900"
-      : "border-ink/20 bg-muted/40 text-ink";
-
+function NoAutorizado({ email }: { email: string }) {
   return (
-    <div className="mt-8 space-y-5">
-      <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${toneClasses}`}>
-        {icon}
-        <span className="font-mono uppercase tracking-widest">{title}</span>
+    <div className="min-h-screen bg-background grid place-items-center px-4">
+      <div className="max-w-md w-full text-center space-y-4">
+        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          Sin permisos
+        </div>
+        <h1 className="font-display text-3xl text-ink">Acceso no autorizado</h1>
+        <p className="text-sm text-muted-foreground">
+          La cuenta <span className="text-ink">{email}</span> no figura como administradora.
+        </p>
+        <a
+          href="/"
+          className="inline-flex items-center justify-center rounded-md border hairline px-4 py-2 text-sm text-ink hover:bg-accent/30"
+        >
+          Volver al catálogo
+        </a>
       </div>
-      <p className="text-sm text-muted-foreground">{body}</p>
-      <div>{children}</div>
     </div>
   );
 }
