@@ -13,10 +13,12 @@ export function EquipmentRow({ item }: { item: Equipment }) {
   const add = useCart((s) => s.add);
   const remove = useCart((s) => s.remove);
   const selected = qty > 0;
-  const [expanded, setExpanded] = useState(false);
+  const { openId, setOpenId } = useEquipmentDetail();
+  const expanded = openId === item.id;
 
   return (
     <div
+      id={`eq-${item.id}`}
       className={cn(
         "rounded-lg border bg-surface transition",
         selected ? "border-amber/60 bg-amber-soft/30" : "hairline hover:border-foreground/20",
@@ -26,7 +28,7 @@ export function EquipmentRow({ item }: { item: Equipment }) {
         {/* Toggle area: thumb + info */}
         <button
           type="button"
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => setOpenId(expanded ? null : item.id)}
           aria-expanded={expanded}
           className="flex min-w-0 flex-1 items-center gap-3 text-left sm:gap-4"
         >
