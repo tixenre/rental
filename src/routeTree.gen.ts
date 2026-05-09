@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as EstudioRouteImport } from './routes/estudio'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthCuentaRouteImport } from './routes/_auth/cuenta'
@@ -25,6 +26,11 @@ const LoginRoute = LoginRouteImport.update({
 const EstudioRoute = EstudioRouteImport.update({
   id: '/estudio',
   path: '/estudio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -54,6 +60,7 @@ const AuthMisPedidosIdRoute = AuthMisPedidosIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/estudio': typeof EstudioRoute
   '/login': typeof LoginRoute
   '/cuenta': typeof AuthCuentaRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/estudio': typeof EstudioRoute
   '/login': typeof LoginRoute
   '/cuenta': typeof AuthCuentaRoute
@@ -72,6 +80,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_auth': typeof AuthRouteWithChildren
+  '/admin': typeof AdminRoute
   '/estudio': typeof EstudioRoute
   '/login': typeof LoginRoute
   '/_auth/cuenta': typeof AuthCuentaRoute
@@ -82,6 +91,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/estudio'
     | '/login'
     | '/cuenta'
@@ -90,6 +100,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/estudio'
     | '/login'
     | '/cuenta'
@@ -99,6 +110,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_auth'
+    | '/admin'
     | '/estudio'
     | '/login'
     | '/_auth/cuenta'
@@ -109,6 +121,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRouteWithChildren
+  AdminRoute: typeof AdminRoute
   EstudioRoute: typeof EstudioRoute
   LoginRoute: typeof LoginRoute
 }
@@ -127,6 +140,13 @@ declare module '@tanstack/react-router' {
       path: '/estudio'
       fullPath: '/estudio'
       preLoaderRoute: typeof EstudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_auth': {
@@ -184,6 +204,7 @@ const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRouteWithChildren,
+  AdminRoute: AdminRoute,
   EstudioRoute: EstudioRoute,
   LoginRoute: LoginRoute,
 }

@@ -547,14 +547,12 @@ function GridMode({
           </div>
         </div>
         <div className="mt-8 flex justify-end">
-          <a
-            href="https://ramblarental.up.railway.app/login"
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            to="/admin"
             className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground hover:text-ink"
           >
             Admin
-          </a>
+          </Link>
         </div>
       </footer>
     </div>
