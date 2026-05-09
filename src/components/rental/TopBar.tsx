@@ -48,16 +48,16 @@ export function TopBar() {
 
   return (
     <header className="sticky top-0 z-40 border-b hairline bg-background/85 backdrop-blur-xl">
-      <div className="flex items-center gap-3 px-6 py-3">
+      <div className="relative flex items-center justify-between gap-3 px-6 py-3">
         <Link to="/" className="flex items-center shrink-0" aria-label="Rambla Rental">
           <img src={wordmark} alt="Rambla Rental" className="h-9 w-auto" />
         </Link>
 
-        {/* Date pill — primary action, jerarquía alta */}
+        {/* Date pill — centrada, jerarquía alta */}
         <button
           onClick={() => setDateOpen(true)}
           className={
-            "ml-2 flex items-center gap-2.5 rounded-full px-5 py-2.5 text-sm shadow-sm transition " +
+            "absolute left-1/2 -translate-x-1/2 flex items-center gap-2.5 rounded-full px-5 py-2.5 text-sm shadow-sm transition " +
             (hasDates
               ? "bg-foreground text-background font-semibold hover:bg-amber hover:text-ink"
               : "bg-amber text-ink font-semibold hover:bg-amber/90 ring-1 ring-amber/40")
@@ -68,7 +68,8 @@ export function TopBar() {
           <span className="sm:hidden">{hasDates ? label : "Elegir fechas"}</span>
         </button>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex items-center gap-2">
+
           {/* WhatsApp — icon only, sutil */}
           <a
             href={WA_HREF}

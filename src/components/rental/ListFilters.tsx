@@ -22,17 +22,18 @@ export function ListFilters({
   const hasFilters = selectedCategories.size > 0 || !!selectedBrand || !!query.trim();
 
   return (
-    <div className="border-b hairline bg-background/90 backdrop-blur-xl">
+    <div className="sticky top-[116px] z-20 border-b hairline bg-background/90 backdrop-blur-xl">
       <div className="flex flex-col gap-3 px-6 py-4 lg:px-12">
         {/* Buscador + marca + clear */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[240px] max-w-xl">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative flex-1 min-w-[240px] max-w-2xl">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             <input
               value={query}
               onChange={(e) => onQuery(e.target.value)}
               placeholder="Buscar equipo, marca o categoría…"
-              className="w-full rounded-md border hairline bg-surface py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:border-amber/40 focus:outline-none"
+              autoFocus
+              className="w-full rounded-full border-2 hairline bg-surface py-3 pl-12 pr-4 text-base placeholder:text-muted-foreground focus:border-amber focus:outline-none"
             />
           </div>
           <select
