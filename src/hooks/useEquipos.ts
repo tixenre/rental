@@ -97,7 +97,6 @@ const TAG_TO_CATEGORY: Record<string, Category> = {
   "wireless": "Sonido",
   "rode": "Sonido",
   "sony uwp": "Sonido",
-  "zoom": "Sonido",
   "audio": "Sonido",
   "sound": "Sonido",
 
