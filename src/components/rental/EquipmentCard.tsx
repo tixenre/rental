@@ -26,11 +26,13 @@ export function EquipmentCard({
   const selected = qty > 0;
   const { setOpenId } = useEquipmentDetail();
   const setOpen = (v: boolean) => setOpenId(v ? item.id : null);
-  const noStock = disponible !== undefined && disponible <= 0;
-  const reachedMax = disponible !== undefined && qty >= disponible;
+  // Tope efectivo: disponibilidad real (con fechas) o stock total del equipo
+  const cap = disponible ?? item.cantidad ?? Infinity;
+  const noStock = cap <= 0;
+  const reachedMax = qty >= cap;
 
-  const sinStock = disponible !== undefined && disponible <= 0;
-  const stockBajo = disponible !== undefined && disponible > 0 && disponible <= 2;
+  const sinStock = noStock;
+  const stockBajo = !noStock && cap > 0 && cap <= 2;
 
   return (
     <motion.article
