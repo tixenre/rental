@@ -29,6 +29,10 @@ export function CartDrawer() {
   } = useCart();
 
   const isBottom = drawerPlacement === "bottom";
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const d = days();
 
