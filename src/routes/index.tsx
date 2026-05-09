@@ -13,9 +13,11 @@ import { CartMiniBar } from "@/components/rental/CartMiniBar";
 import { CarouselRow } from "@/components/rental/CarouselRow";
 import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { ListFilters } from "@/components/rental/ListFilters";
-import { equipment, categories, type Category } from "@/data/equipment";
+import { type Equipment } from "@/data/equipment";
 import { CategoryIllustration } from "@/components/rental/illustrations/CategoryIllustration";
 import { EquipmentDetailProvider } from "@/lib/equipment-detail-context";
+import { useEquipos, useDisponibilidad } from "@/hooks/useEquipos";
+import { useCart } from "@/lib/cart-store";
 import { cn } from "@/lib/utils";
 
 const searchSchema = z.object({
@@ -60,7 +62,26 @@ function Index() {
     const isMobile = window.matchMedia("(max-width: 639px)").matches;
     setMode(isMobile ? "list" : "grid");
   }, []);
-  const [selectedCats, setSelectedCats] = useState<Set<Category>>(new Set());
+  // Datos de la API real (reemplaza el array hardcodeado)
+  const { data: allEquipos = [], isLoading } = useEquipos();
+  const { startDate, endDate } = useCart();
+  const { data: disponibilidad } = useDisponibilidad(startDate, endDate);
+
+  const apiCategories = useMemo(
+    () => Array.from(new Set(allEquipos.map((e) => e.category))).sort(),
+    [allEquipos],
+  );
+  const apiBrands = useMemo(
+    () => Array.from(new Set(allEquipos.map((e) => e.brand).filter(Boolean))).sort(),
+    [allEquipos],
+  );
+
+  const getDisponible = (item: Equipment) =>
+    disponibilidad
+      ? (disponibilidad[String(item._backendId)] ?? item.cantidad ?? 1)
+      : undefined;
+
+  const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [brand, setBrand] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
@@ -95,7 +116,7 @@ function Index() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eq, mode]);
 
-  const toggleCat = (c: Category) => {
+  const toggleCat = (c: string) => {
     setSelectedCats((prev) => {
       const next = new Set(prev);
       if (next.has(c)) next.delete(c);
@@ -105,7 +126,7 @@ function Index() {
   };
 
   const filtered = useMemo(() => {
-    let list = equipment.slice();
+    let list = allEquipos.slice();
     if (selectedCats.size > 0) list = list.filter((e) => selectedCats.has(e.category));
     if (brand) list = list.filter((e) => e.brand === brand);
     if (query.trim()) {
@@ -120,7 +141,7 @@ function Index() {
     return list;
   }, [selectedCats, brand, query]);
 
-  const jumpToCategory = (c: Category) => {
+  const jumpToCategory = (c: string) => {
     setSelectedCats(new Set([c]));
     setMode("grid");
     // scroll suave a la sección de categoría
@@ -141,7 +162,7 @@ function Index() {
           <div className="absolute inset-0 grain opacity-40" />
           <div className="relative px-6 py-12 lg:px-12 lg:py-16">
             <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/70">
-              Catálogo · {equipment.length} equipos · Mar del Plata
+              Catálogo · {allEquipos.length} equipos · Mar del Plata
             </div>
             <h1 className="mt-4 wordmark text-[14vw] leading-[0.85] md:text-[7rem] lg:text-[8.5rem] text-balance">
               un lugar
@@ -233,7 +254,7 @@ function Index() {
               <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
                 {query.trim() || mode === "list"
                   ? `${filtered.length} resultados`
-                  : `${equipment.length} equipos`}
+                  : `${allEquipos.length} equipos`}
               </div>
             </div>
           </div>
@@ -241,10 +262,13 @@ function Index() {
 
         {mode === "grid" ? (
           <GridMode
+            allEquipos={allEquipos}
+            apiCategories={apiCategories}
             onJumpToCategory={jumpToCategory}
             selectedCats={selectedCats}
             onClearCats={() => setSelectedCats(new Set())}
             query={query}
+            getDisponible={getDisponible}
           />
         ) : (
           <ListMode
@@ -260,6 +284,9 @@ function Index() {
               setQuery("");
             }}
             filtered={filtered}
+            apiCategories={apiCategories}
+            apiBrands={apiBrands}
+            getDisponible={getDisponible}
           />
         )}
 
@@ -279,7 +306,7 @@ function GlobalDetailDialog({ mode }: { mode: Mode }) {
   const { eq } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
-  const item = eq ? equipment.find((e) => e.id === eq) : undefined;
+  const item = eq ? allEquipos.find((e) => e.id === eq) : undefined;
   const open = !!item && mode === "grid";
 
   if (!item) return null;
@@ -300,34 +327,40 @@ function GlobalDetailDialog({ mode }: { mode: Mode }) {
 }
 
 function GridMode({
+  allEquipos,
+  apiCategories,
   onJumpToCategory,
   selectedCats,
   onClearCats,
   query,
+  getDisponible,
 }: {
-  onJumpToCategory: (c: Category) => void;
-  selectedCats: Set<Category>;
+  allEquipos: Equipment[];
+  apiCategories: string[];
+  onJumpToCategory: (c: string) => void;
+  selectedCats: Set<string>;
   onClearCats: () => void;
   query: string;
+  getDisponible: (item: Equipment) => number | undefined;
 }) {
   const q = query.trim().toLowerCase();
-  const matches = (e: (typeof equipment)[number]) =>
+  const matches = (e: Equipment) =>
     !q ||
-    e.name.toLowerCase().includes(q) ||
-    e.brand.toLowerCase().includes(q) ||
-    e.category.toLowerCase().includes(q);
+    (e.name ?? "").toLowerCase().includes(q) ||
+    (e.brand ?? "").toLowerCase().includes(q) ||
+    (e.category ?? "").toLowerCase().includes(q);
 
-  const combos = equipment.filter((e) => e.isCombo && matches(e));
+  const combos = allEquipos.filter((e) => e.isCombo && matches(e));
   const isFiltered = selectedCats.size > 0;
   const isSearching = q.length > 0;
-  const visibleCategories = isFiltered ? categories.filter((c) => selectedCats.has(c)) : categories;
+  const visibleCategories = isFiltered ? apiCategories.filter((c) => selectedCats.has(c)) : apiCategories;
 
   // Ancho fijo de cards en carrusel para snap consistente
   const cardW = 260;
 
   // Total de items visibles para mostrar "sin resultados"
   const totalVisible = visibleCategories.reduce(
-    (acc, c) => acc + equipment.filter((e) => e.category === c && matches(e)).length,
+    (acc, c) => acc + allEquipos.filter((e) => e.category === c && matches(e)).length,
     0,
   );
 
@@ -362,13 +395,13 @@ function GridMode({
       {!isFiltered && !isSearching && combos.length > 0 && (
         <CarouselRow title="Combos" count={combos.length}>
           {combos.map((item, i) => (
-            <EquipmentCard key={item.id} item={item} index={i} width={cardW + 40} />
+            <EquipmentCard key={item.id} item={item} index={i} width={cardW + 40} disponible={getDisponible(item)} />
           ))}
         </CarouselRow>
       )}
 
       {visibleCategories.map((c) => {
-        const items = equipment.filter((e) => e.category === c && matches(e));
+        const items = allEquipos.filter((e) => e.category === c && matches(e));
         if (items.length === 0) return null;
 
         // Cuando hay categoría seleccionada → grid real (no carrusel)
@@ -383,7 +416,7 @@ function GridMode({
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
                 {items.map((item, i) => (
-                  <EquipmentCard key={item.id} item={item} index={i} />
+                  <EquipmentCard key={item.id} item={item} index={i} disponible={getDisponible(item)} />
                 ))}
               </div>
             </section>
@@ -407,7 +440,7 @@ function GridMode({
               }
             >
               {items.map((item, i) => (
-                <EquipmentCard key={item.id} item={item} index={i} width={cardW} />
+                <EquipmentCard key={item.id} item={item} index={i} width={cardW} disponible={getDisponible(item)} />
               ))}
             </CarouselRow>
           </div>
@@ -458,12 +491,15 @@ function ListMode({
 }: {
   query: string;
   setQuery: (v: string) => void;
-  selectedCats: Set<Category>;
-  toggleCat: (c: Category) => void;
+  selectedCats: Set<string>;
+  toggleCat: (c: string) => void;
   brand: string | null;
   setBrand: (b: string | null) => void;
   onClear: () => void;
-  filtered: typeof equipment;
+  filtered: Equipment[];
+  apiCategories?: string[];
+  apiBrands?: string[];
+  getDisponible?: (item: Equipment) => number | undefined;
 }) {
   const PAGE_SIZE = 20;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -503,6 +539,8 @@ function ListMode({
         selectedBrand={brand}
         onBrand={setBrand}
         onClear={onClear}
+        categories={apiCategories ?? []}
+        brands={apiBrands ?? []}
       />
 
       <div className="px-3 py-4 pb-28 sm:px-6 sm:py-6 sm:pb-32 lg:px-12 lg:pb-32">
@@ -517,7 +555,7 @@ function ListMode({
           <>
             <div className="space-y-1.5">
               {visibleItems.map((item) => (
-                <EquipmentRow key={item.id} item={item} />
+                <EquipmentRow key={item.id} item={item} disponible={getDisponible?.(item)} />
               ))}
             </div>
             {hasMore && (

@@ -35,6 +35,10 @@ export type Equipment = {
   isCombo?: boolean;
   specs: { label: string; value: string }[];
   includes?: IncludedItem[];
+  // Campos del backend real (opcionales para mantener compat con datos locales)
+  fotoUrl?: string | null;
+  cantidad?: number;
+  _backendId?: number;
 };
 
 const e = (
