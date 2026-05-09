@@ -135,7 +135,11 @@ function Index() {
       </div>
 
       {mode === "grid" ? (
-        <GridMode onJumpToList={jumpToList} />
+        <GridMode
+          onJumpToCategory={jumpToCategory}
+          selectedCats={selectedCats}
+          onClearCats={() => setSelectedCats(new Set())}
+        />
       ) : (
         <ListMode
           query={query}
@@ -158,16 +162,52 @@ function Index() {
   );
 }
 
-function GridMode({ onJumpToList }: { onJumpToList: (c: Category) => void }) {
+function GridMode({
+  onJumpToCategory,
+  selectedCats,
+  onClearCats,
+}: {
+  onJumpToCategory: (c: Category) => void;
+  selectedCats: Set<Category>;
+  onClearCats: () => void;
+}) {
   const news = equipment.filter((e) => e.isNew);
   const combos = equipment.filter((e) => e.isCombo);
+  const isFiltered = selectedCats.size > 0;
+  const visibleCategories = isFiltered
+    ? categories.filter((c) => selectedCats.has(c))
+    : categories;
 
   // Ancho fijo de cards en carrusel para snap consistente
   const cardW = 260;
 
   return (
     <div className="space-y-12 py-8 lg:py-12">
-      {news.length > 0 && (
+      {isFiltered && (
+        <div className="px-6 lg:px-12">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              Filtrando por
+            </span>
+            {[...selectedCats].map((c) => (
+              <span
+                key={c}
+                className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs text-amber"
+              >
+                {c}
+              </span>
+            ))}
+            <button
+              onClick={onClearCats}
+              className="ml-1 rounded-full border hairline px-3 py-1 text-xs text-muted-foreground hover:border-ink hover:text-ink"
+            >
+              Ver todo
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!isFiltered && news.length > 0 && (
         <CarouselRow title="Ingresos" count={news.length}>
           {news.map((item, i) => (
             <EquipmentCard key={item.id} item={item} index={i} width={cardW} />
@@ -175,7 +215,7 @@ function GridMode({ onJumpToList }: { onJumpToList: (c: Category) => void }) {
         </CarouselRow>
       )}
 
-      {combos.length > 0 && (
+      {!isFiltered && combos.length > 0 && (
         <CarouselRow title="Combos" count={combos.length}>
           {combos.map((item, i) => (
             <EquipmentCard key={item.id} item={item} index={i} width={cardW + 40} />
@@ -183,29 +223,32 @@ function GridMode({ onJumpToList }: { onJumpToList: (c: Category) => void }) {
         </CarouselRow>
       )}
 
-      <CategoryMosaic onSelect={onJumpToList} />
+      {!isFiltered && <CategoryMosaic onSelect={onJumpToCategory} />}
 
-      {categories.map((c) => {
+      {visibleCategories.map((c) => {
         const items = equipment.filter((e) => e.category === c);
         if (items.length === 0) return null;
         return (
-          <CarouselRow
-            key={c}
-            title={c}
-            count={items.length}
-            action={
-              <button
-                onClick={() => onJumpToList(c)}
-                className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink"
-              >
-                Ver todas <ArrowRight className="h-3 w-3" />
-              </button>
-            }
-          >
-            {items.map((item, i) => (
-              <EquipmentCard key={item.id} item={item} index={i} width={cardW} />
-            ))}
-          </CarouselRow>
+          <div key={c} id={`cat-${c}`} className="scroll-mt-32">
+            <CarouselRow
+              title={c}
+              count={items.length}
+              action={
+                !isFiltered ? (
+                  <button
+                    onClick={() => onJumpToCategory(c)}
+                    className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink"
+                  >
+                    Ver sólo {c} <ArrowRight className="h-3 w-3" />
+                  </button>
+                ) : undefined
+              }
+            >
+              {items.map((item, i) => (
+                <EquipmentCard key={item.id} item={item} index={i} width={cardW} />
+              ))}
+            </CarouselRow>
+          </div>
         );
       })}
 
