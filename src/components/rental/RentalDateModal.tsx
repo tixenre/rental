@@ -61,8 +61,7 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-3xl p-0 gap-0 overflow-hidden bg-background border hairline"
-        showCloseButton={false}
+        className="max-w-3xl p-0 gap-0 overflow-hidden bg-background border hairline [&>button[aria-label='Close']]:hidden"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b hairline">
