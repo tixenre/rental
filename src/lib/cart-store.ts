@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+type DrawerPlacement = "right" | "bottom";
+
 type CartState = {
   items: Record<string, number>;
   startDate: Date | undefined;
@@ -7,6 +9,7 @@ type CartState = {
   startTime: string;
   endTime: string;
   drawerOpen: boolean;
+  drawerPlacement: DrawerPlacement;
   add: (id: string) => void;
   remove: (id: string) => void;
   setQty: (id: string, qty: number) => void;
@@ -14,7 +17,7 @@ type CartState = {
   setDates: (start?: Date, end?: Date) => void;
   setStartTime: (t: string) => void;
   setEndTime: (t: string) => void;
-  setDrawerOpen: (open: boolean) => void;
+  setDrawerOpen: (open: boolean, placement?: DrawerPlacement) => void;
   totalItems: () => number;
   days: () => number;
 };
