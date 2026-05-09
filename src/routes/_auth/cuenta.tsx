@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { isAdminEmail, BACKOFFICE_URL } from "@/lib/admin-emails";
+import { isAdminEmail } from "@/lib/admin-emails";
 
 export const Route = createFileRoute("/_auth/cuenta")({
   head: () => ({ meta: [{ title: "Mi cuenta — Rambla Rental" }] }),
