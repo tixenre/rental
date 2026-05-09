@@ -31,12 +31,13 @@ export const Route = createFileRoute("/")({
 type Mode = "grid" | "list";
 
 function Index() {
-  const [mode, setMode] = useState<Mode>(() => {
-    if (typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches) {
-      return "list";
-    }
-    return "grid";
-  });
+  const [mode, setMode] = useState<Mode>("grid");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 639px)");
+    if (mq.matches) setMode("list");
+  }, []);
   const [selectedCats, setSelectedCats] = useState<Set<Category>>(new Set());
   const [brand, setBrand] = useState<string | null>(null);
   const [query, setQuery] = useState("");
