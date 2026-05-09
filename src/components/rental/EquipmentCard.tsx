@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Plus, Minus, Sparkles } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
@@ -6,6 +5,7 @@ import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
 import { EquipmentDetailDialog } from "./EquipmentDetailDialog";
+import { useEquipmentDetail } from "@/lib/equipment-detail-context";
 import { cn } from "@/lib/utils";
 
 export function EquipmentCard({
@@ -22,11 +22,14 @@ export function EquipmentCard({
   const add = useCart((s) => s.add);
   const remove = useCart((s) => s.remove);
   const selected = qty > 0;
-  const [open, setOpen] = useState(false);
+  const { openId, setOpenId } = useEquipmentDetail();
+  const open = openId === item.id;
+  const setOpen = (v: boolean) => setOpenId(v ? item.id : null);
 
   return (
     <>
       <motion.article
+        id={`eq-${item.id}`}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: Math.min(index * 0.012, 0.25) }}

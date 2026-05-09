@@ -1,4 +1,5 @@
-import { Plus, Minus, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Plus, Minus, Sparkles, Share2, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,23 @@ export function EquipmentDetailDialog({
 }) {
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    if (typeof window === "undefined") return;
+    const url = `${window.location.origin}${window.location.pathname}?eq=${item.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: item.name, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1800);
+      }
+    } catch {
+      /* cancelled */
+    }
+  };
   const remove = useCart((s) => s.remove);
 
   return (
@@ -42,7 +60,25 @@ export function EquipmentDetailDialog({
               <span className="rounded-full bg-amber px-1.5 py-0.5 text-ink">combo</span>
             )}
           </div>
-          <DialogTitle className="font-display text-2xl leading-tight">{item.name}</DialogTitle>
+          <div className="flex items-start justify-between gap-3">
+            <DialogTitle className="font-display text-2xl leading-tight">{item.name}</DialogTitle>
+            <button
+              type="button"
+              onClick={handleShare}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border hairline px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition hover:border-amber hover:text-ink"
+              aria-label="Compartir enlace"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3 w-3" /> Copiado
+                </>
+              ) : (
+                <>
+                  <Share2 className="h-3 w-3" /> Compartir
+                </>
+              )}
+            </button>
+          </div>
           <DialogDescription className="sr-only">
             Detalle del equipo {item.name}
           </DialogDescription>

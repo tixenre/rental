@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, Minus, Sparkles, ChevronDown } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
@@ -6,6 +5,8 @@ import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
 import { IncludedList } from "./IncludedList";
+import { ShareEquipmentButton } from "./ShareEquipmentButton";
+import { useEquipmentDetail } from "@/lib/equipment-detail-context";
 import { cn } from "@/lib/utils";
 
 export function EquipmentRow({ item }: { item: Equipment }) {
@@ -13,10 +14,12 @@ export function EquipmentRow({ item }: { item: Equipment }) {
   const add = useCart((s) => s.add);
   const remove = useCart((s) => s.remove);
   const selected = qty > 0;
-  const [expanded, setExpanded] = useState(false);
+  const { openId, setOpenId } = useEquipmentDetail();
+  const expanded = openId === item.id;
 
   return (
     <div
+      id={`eq-${item.id}`}
       className={cn(
         "rounded-lg border bg-surface transition",
         selected ? "border-amber/60 bg-amber-soft/30" : "hairline hover:border-foreground/20",
@@ -26,7 +29,7 @@ export function EquipmentRow({ item }: { item: Equipment }) {
         {/* Toggle area: thumb + info */}
         <button
           type="button"
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => setOpenId(expanded ? null : item.id)}
           aria-expanded={expanded}
           className="flex min-w-0 flex-1 items-center gap-3 text-left sm:gap-4"
         >
@@ -130,6 +133,9 @@ export function EquipmentRow({ item }: { item: Equipment }) {
           >
             <div className="border-t hairline px-3 py-3 sm:px-4 sm:py-4">
               <IncludedList item={item} />
+              <div className="mt-3 flex justify-end">
+                <ShareEquipmentButton id={item.id} name={item.name} />
+              </div>
             </div>
           </motion.div>
         )}
