@@ -196,9 +196,20 @@ export function CartDrawer() {
             </div>
 
             <div className="border-t hairline px-6 py-5 space-y-3">
+              {conflictCount > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-[11px] text-destructive">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    {conflictCount} {conflictCount === 1 ? "ítem no está" : "ítems no están"} disponible{conflictCount === 1 ? "" : "s"} en estas fechas y se excluye{conflictCount === 1 ? "" : "n"} del total.
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal por jornada</span>
                 <span className="tabular">${formatPrice(subtotal)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>× {d} {d === 1 ? "jornada" : "jornadas"}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
