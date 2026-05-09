@@ -159,7 +159,15 @@ export const equipment: Equipment[] = [
     87900,
     "Kit completo de iluminación RGB para producción.",
     [],
-    { isCombo: true },
+    {
+      isCombo: true,
+      includes: [
+        { name: "Amaran 300c", qty: 1 },
+        { name: "Tubo RGB Amaran T2c", qty: 2 },
+        { name: "C-Stand", qty: 1 },
+        { name: "Softbox 60×60cm", qty: 1 },
+      ],
+    },
   ),
   e(
     "cm2",
@@ -169,7 +177,14 @@ export const equipment: Equipment[] = [
     73450,
     "Kit luz dura con softbox y C-Stand.",
     [],
-    { isCombo: true },
+    {
+      isCombo: true,
+      includes: [
+        { name: "Nanlite Forza 500", qty: 1 },
+        { name: "Softbox parabólico 90cm", qty: 1 },
+        { name: "C-Stand", qty: 1 },
+      ],
+    },
   ),
   e(
     "cm3",
@@ -179,7 +194,15 @@ export const equipment: Equipment[] = [
     128025,
     "Kit listo para cobertura de evento.",
     [],
-    { isCombo: true },
+    {
+      isCombo: true,
+      includes: [
+        { id: "c4", name: "Sony ZVE1", qty: 1 },
+        { id: "l1", name: "Sony GM 24-70 f/2.8 vii", qty: 1 },
+        { name: "Batería extra + cargador", qty: 1 },
+        { name: "Tarjeta SD 128GB", qty: 1 },
+      ],
+    },
   ),
   e(
     "cm4",
@@ -189,7 +212,14 @@ export const equipment: Equipment[] = [
     81450,
     "Set completo de monitoreo en producción.",
     [],
-    { isCombo: true },
+    {
+      isCombo: true,
+      includes: [
+        { id: "m2", name: "SmallHD Cine 7", qty: 1 },
+        { id: "m4", name: "Hollyland Mars M1", qty: 1 },
+        { name: "Cables SDI/HDMI", qty: 1 },
+      ],
+    },
   ),
   e(
     "cm5",
@@ -199,7 +229,15 @@ export const equipment: Equipment[] = [
     227700,
     "Kit macro cinematográfico.",
     [],
-    { isCombo: true },
+    {
+      isCombo: true,
+      includes: [
+        { id: "c2", name: "Sony FX3", qty: 1 },
+        { id: "l7", name: "Laowa Macro Probe 24mm", qty: 1 },
+        { name: "Nanlite Forza 500", qty: 1 },
+        { name: "Trípode + cabezal fluido", qty: 1 },
+      ],
+    },
   ),
   e(
     "cm6",
@@ -209,7 +247,14 @@ export const equipment: Equipment[] = [
     226100,
     "Set completo de zooms G Master.",
     [],
-    { isCombo: true },
+    {
+      isCombo: true,
+      includes: [
+        { id: "l2", name: "Sony GM 12-24 f/2.8", qty: 1 },
+        { id: "l1", name: "Sony GM 24-70 f/2.8 vii", qty: 1 },
+        { id: "l3", name: "Sony GM 70-200 f/2.8", qty: 1 },
+      ],
+    },
   ),
 ];
 
