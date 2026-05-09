@@ -282,9 +282,19 @@ export function CartDrawer() {
                   setSubmitting(true);
                   try {
                     const validItems: Record<string, number> = {};
-                    list.filter((l) => !l.conflict).forEach((l) => {
-                      validItems[l.it.id] = l.qty;
-                    });
+                    const resolvedItems = list
+                      .filter((l) => !l.conflict)
+                      .map((l) => {
+                        validItems[l.it.id] = l.qty;
+                        return {
+                          id: l.it.id,
+                          name: l.it.name,
+                          brand: l.it.brand,
+                          category: l.it.category,
+                          qty: l.qty,
+                          pricePerDay: l.it.pricePerDay,
+                        };
+                      });
                     const order = await createOrder({
                       status: "solicitado",
                       startDate,
@@ -293,6 +303,7 @@ export function CartDrawer() {
                       endTime,
                       days: d,
                       items: validItems,
+                      resolvedItems,
                     });
 
                     // Best-effort: replicar el pedido al backend FastAPI.
