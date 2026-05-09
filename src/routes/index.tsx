@@ -621,6 +621,15 @@ function ListMode({
       />
 
       <div className="px-3 py-4 pb-28 sm:px-6 sm:py-6 sm:pb-32 lg:px-12 lg:pb-32">
+        <ActiveFiltersChips
+          selectedCategories={selectedCats}
+          onToggleCategory={toggleCat}
+          selectedBrand={brand}
+          onBrand={setBrand}
+          query={query}
+          onQuery={setQuery}
+          onClear={onClear}
+        />
         {filtered.length === 0 ? (
           <div className="rounded-lg border hairline bg-surface px-6 py-16 text-center">
             <div className="font-display text-2xl text-muted-foreground">Sin resultados</div>
