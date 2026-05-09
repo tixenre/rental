@@ -43,7 +43,7 @@ function Index() {
   const navigate = useNavigate({ from: Route.fullPath });
   const setOpenId = (id: string | null) => {
     navigate({
-      search: (prev) => ({ ...prev, eq: id ?? undefined }),
+      search: (prev: { eq?: string }) => ({ ...prev, eq: id ?? undefined }),
       replace: true,
     });
   };
