@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
+import { useEquipos } from "@/hooks/useEquipos";
 import { useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";

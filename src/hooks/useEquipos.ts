@@ -141,6 +141,9 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
   const nombre = e.nombre ?? "";
   const marca  = e.marca  ?? "";
   const name   = [nombre, e.modelo].filter(Boolean).join(" ") || "Sin nombre";
+  const category =
+    ((e.etiquetas ?? [])[0] as Category | undefined) ??
+    inferCategory(nombre, marca, e.modelo);
 
   return {
     id: String(e.id),
@@ -166,15 +169,34 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
 
 /* ─── Hooks ─────────────────────────────────────────────────────────── */
 
+type EquiposQueryResult = { items: Equipment[]; usingFallback: boolean };
+
 export function useEquipos() {
-  return useQuery({
+  const q = useQuery<EquiposQueryResult>({
     queryKey: ["equipos"],
     queryFn: async () => {
-      const data = await apiGetEquipos();
-      return data.items.map(backendToEquipment);
+      try {
+        const data = await apiGetEquipos();
+        const items = (data?.items ?? []).map(backendToEquipment);
+        if (items.length === 0) {
+          console.warn("[useEquipos] backend devolvió 0 items, fallback al mock");
+          return { items: MOCK_EQUIPMENT, usingFallback: true };
+        }
+        return { items, usingFallback: false };
+      } catch (err) {
+        console.warn("[useEquipos] backend offline, fallback al mock:", err);
+        return { items: MOCK_EQUIPMENT, usingFallback: true };
+      }
     },
     staleTime: 5 * 60 * 1000,
+    retry: 1,
   });
+
+  return {
+    ...q,
+    data: q.data?.items ?? [],
+    usingFallback: q.data?.usingFallback ?? false,
+  };
 }
 
 export function useCategorias() {
@@ -191,8 +213,16 @@ export function useDisponibilidad(startDate?: Date, endDate?: Date) {
 
   return useQuery({
     queryKey: ["disponibilidad", desde, hasta],
-    queryFn: () => apiGetDisponibilidad(desde, hasta),
+    queryFn: async () => {
+      try {
+        return await apiGetDisponibilidad(desde, hasta);
+      } catch (err) {
+        console.warn("[useDisponibilidad] backend no responde:", err);
+        return {} as Record<string, number>;
+      }
+    },
     enabled: !!(desde && hasta),
     staleTime: 2 * 60 * 1000,
+    retry: 1,
   });
 }

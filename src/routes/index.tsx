@@ -332,8 +332,9 @@ function GlobalDetailDialog({
 }) {
   const { eq } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
+  const { data: allEquipos = [] } = useEquipos();
 
-  const item = eq ? allEquipos.find((e) => e.id === eq) : undefined;
+  const item = eq ? allEquipos.find((e: Equipment) => e.id === eq) : undefined;
   const open = !!item && mode === "grid";
 
   if (!item) return null;

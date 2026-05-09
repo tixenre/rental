@@ -26,6 +26,8 @@ export function EquipmentCard({
   const selected = qty > 0;
   const { setOpenId } = useEquipmentDetail();
   const setOpen = (v: boolean) => setOpenId(v ? item.id : null);
+  const noStock = disponible !== undefined && disponible <= 0;
+  const reachedMax = disponible !== undefined && qty >= disponible;
 
   const sinStock = disponible !== undefined && disponible <= 0;
   const stockBajo = disponible !== undefined && disponible > 0 && disponible <= 2;
@@ -113,6 +115,22 @@ export function EquipmentCard({
             <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               / 1 jornada
             </div>
+            {disponible !== undefined && (
+              <div
+                className={cn(
+                  "mt-1 font-mono text-[9px] uppercase tracking-widest tabular",
+                  disponible <= 0
+                    ? "text-destructive"
+                    : disponible === 1
+                      ? "text-amber-600"
+                      : "text-muted-foreground",
+                )}
+              >
+                {disponible <= 0
+                  ? "Sin stock"
+                  : `${disponible} disp${disponible === 1 ? "." : "."}`}
+              </div>
+            )}
           </div>
 
           {qty === 0 ? (
@@ -122,7 +140,7 @@ export function EquipmentCard({
               className="flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition hover:border-amber hover:bg-amber hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Plus className="h-3 w-3" />
-              Agregar
+              {noStock ? "Sin stock" : "Agregar"}
             </button>
           ) : (
             <div className="flex items-center gap-1 rounded-md border border-amber/40 bg-amber-soft p-0.5">

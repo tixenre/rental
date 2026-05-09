@@ -21,6 +21,8 @@ export function EquipmentRow({
   const selected = qty > 0;
   const { openId, setOpenId } = useEquipmentDetail();
   const expanded = openId === item.id;
+  const noStock = disponible !== undefined && disponible <= 0;
+  const reachedMax = disponible !== undefined && qty >= disponible;
 
   const sinStock = disponible !== undefined && disponible <= 0;
   const stockBajo = disponible !== undefined && disponible > 0 && disponible <= 2;
@@ -110,6 +112,20 @@ export function EquipmentRow({
           <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
             / 1 jornada
           </div>
+          {disponible !== undefined && (
+            <div
+              className={cn(
+                "mt-0.5 font-mono text-[9px] uppercase tracking-widest tabular",
+                disponible <= 0
+                  ? "text-destructive"
+                  : disponible === 1
+                    ? "text-amber-600"
+                    : "text-muted-foreground",
+              )}
+            >
+              {disponible <= 0 ? "sin stock" : `${disponible} disp.`}
+            </div>
+          )}
         </div>
 
         {/* CTA */}
@@ -122,7 +138,7 @@ export function EquipmentRow({
           >
             <Plus className="h-4 w-4 sm:hidden" />
             <span className="hidden items-center gap-1.5 text-xs uppercase tracking-wider sm:flex">
-              <Plus className="h-3 w-3" /> Agregar
+              <Plus className="h-3 w-3" /> {noStock ? "Sin stock" : "Agregar"}
             </span>
           </button>
         ) : (
