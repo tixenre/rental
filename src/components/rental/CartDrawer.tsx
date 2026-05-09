@@ -1,10 +1,12 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Trash2, Plus, Minus } from "lucide-react";
+import { X, Trash2, Plus, Minus, AlertTriangle } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
 import { equipment, formatPrice } from "@/data/equipment";
+import { getAvailability } from "@/lib/availability";
 import { EmptyImage } from "./EmptyImage";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useMemo } from "react";
 
 export function CartDrawer() {
   const {
@@ -22,16 +24,32 @@ export function CartDrawer() {
     endTime,
   } = useCart();
 
-  const list = Object.entries(items)
-    .map(([id, qty]) => {
-      const it = equipment.find((e) => e.id === id);
-      return it ? { it, qty } : null;
-    })
-    .filter(Boolean) as { it: (typeof equipment)[number]; qty: number }[];
-
   const d = days();
-  const subtotal = list.reduce((s, { it, qty }) => s + it.pricePerDay * qty, 0);
+
+  // Recalcula disponibilidad + precios cada vez que cambian fechas o ítems
+  const list = useMemo(() => {
+    return Object.entries(items)
+      .map(([id, qty]) => {
+        const it = equipment.find((e) => e.id === id);
+        if (!it) return null;
+        const availability = getAvailability(it, startDate, endDate);
+        const conflict = !availability.available || qty > availability.stock;
+        return { it, qty, availability, conflict };
+      })
+      .filter(Boolean) as {
+      it: (typeof equipment)[number];
+      qty: number;
+      availability: ReturnType<typeof getAvailability>;
+      conflict: boolean;
+    }[];
+  }, [items, startDate, endDate]);
+
+  const subtotal = list
+    .filter((l) => !l.conflict)
+    .reduce((s, { it, qty }) => s + it.pricePerDay * qty, 0);
   const total = subtotal * d;
+  const conflictCount = list.filter((l) => l.conflict).length;
+
 
   return (
     <AnimatePresence>
