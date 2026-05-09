@@ -59,10 +59,15 @@ function Index() {
     return list;
   }, [selectedCats, brand, query]);
 
-  const jumpToList = (c: Category) => {
+  const jumpToCategory = (c: Category) => {
     setSelectedCats(new Set([c]));
-    setMode("list");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setMode("grid");
+    // scroll suave a la sección de categoría
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`cat-${c}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      else window.scrollTo({ top: 0, behavior: "smooth" });
+    });
   };
 
   return (
