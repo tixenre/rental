@@ -1,52 +1,62 @@
-# Bug: se pueden seleccionar más unidades que el stock
+# Optimizar header + hero en mobile
 
 ## Diagnóstico
-El control "+" se deshabilita cuando `qty >= disponible`, pero `disponible` solo existe cuando el usuario eligió fechas (`useDisponibilidad`). Sin fechas, `disponible === undefined` y el botón nunca se bloquea, por lo que el carrito acepta cantidades ilimitadas.
+Lo que se ve "raro" no es solo el header — es que toda la página tiene **overflow horizontal en mobile** y por eso el pill "Elegir fechas" y el botón del carrito aparecen cortados a la derecha.
 
-Además:
-- El botón inicial "Agregar" (cuando `qty === 0`) solo valida `sinStock`, no el tope.
-- En `CartDrawer` el "+" hace lo mismo: solo valida contra `disponible`.
-- `useCart.add` no aplica ningún tope.
+Causas concretas:
 
-El equipo siempre trae `cantidad` (stock total) desde el backend, así que podemos usarlo como tope cuando no hay fechas.
+1. **Hero `h1` con `text-[14vw]`** (`src/routes/index.tsx:170`). A 402px de ancho, "donde pasan" mide ~620px → fuerza scroll horizontal de toda la página, lo que arrastra al header.
+2. **Línea "Catálogo · 142 equipos · Mar del Plata"** con `tracking-[0.3em]` y `whitespace` por defecto: en mobile no wrappea bien y se corta ("MAR DEL PLA…").
+3. **TopBar en mobile usa 3 filas** (`flex-col`): logo, pill de fechas, botones (carrito + user). Ocupa demasiado alto y el bloque de carrito queda alineado a la derecha solo, raro visualmente.
+4. **`backdrop-blur-xl`** en el header sobre el hero amarillo animado (grain) genera jitter en scroll en iOS.
 
-## Solución (solo frontend)
+## Solución (solo frontend / presentación)
 
-### 1. Tope efectivo = `min(disponible ?? cantidad, cantidad)`
-Helper local en cada componente que muestra el control:
-```ts
-const cap = disponible ?? item.cantidad ?? Infinity;
-const reachedMax = qty >= cap;
-```
+### 1. Hero — tipografía responsive sana
+- Reemplazar `text-[14vw]` por escala Tailwind con clamp:
+  `text-5xl sm:text-7xl md:text-[7rem] lg:text-[8.5rem]` (o `clamp(2.75rem, 12vw, 8.5rem)`).
+- Mantener el impacto visual en desktop, pero garantizando que en 360–414px no desborde.
+- Agregar `break-words` o `hyphens-auto` por si acaso.
 
-### 2. `EquipmentRow.tsx` y `EquipmentCard.tsx`
-- Reemplazar la condición actual (`disponible !== undefined && qty >= disponible`) por `reachedMax`.
-- Botón "+" (incremento) deshabilitado si `reachedMax`.
-- Mostrar tooltip / título "Stock máximo alcanzado" cuando aplica.
-- En el botón inicial "Agregar" (qty===0): si `cap <= 0` → "Sin stock" (ya cubierto), pero también respetar `reachedMax` por si `cantidad` viene en 0.
+### 2. Línea de meta del hero
+- Wrap permitido (`flex-wrap` o quitar nowrap).
+- En mobile, reducir tracking a `tracking-[0.2em]` o partir en dos líneas: "Catálogo · 142 equipos" / "Mar del Plata".
 
-### 3. `CartDrawer.tsx`
-- Reemplazar la lectura de `getDisponible(it)` por `min(getDisponible(it) ?? it.cantidad, it.cantidad)` y bloquear "+" igual que arriba.
-- Si una cantidad ya cargada supera el tope (porque cambiaron fechas y bajó el stock), mostrar warning visual y un botón "Ajustar al máximo".
+### 3. TopBar mobile — 2 filas compactas
+**Fila 1**: logo (izq) + carrito icon-only + user icon-only (der).
+**Fila 2**: pill "Elegir fechas" full-width.
 
-### 4. `cart-store.ts` — defensa en profundidad
-- Cambiar `add(id)` a `add(id, max?: number)` y aplicar `Math.min(next, max)` cuando se pase.
-- Pasar `max` desde los call sites (Card, Row, Drawer).
-- `setQty` opcional: aceptar `max` y clamp.
+Ventajas:
+- El carrito queda al lado del logo (patrón estándar app móvil), no flotando solo.
+- La pill ocupa todo el ancho disponible y nunca se corta.
+- Reduce el alto del header de ~140px a ~96px → más contenido visible above the fold.
 
-### 5. Toast cuando se intenta superar
-- Reutilizar `sonner` ya configurado.
-- Mensaje: "Stock máximo: {cap} unidades".
+Cambios concretos en `TopBar.tsx`:
+- Estructura: `<div class="flex items-center justify-between gap-2">` (logo + acciones) y debajo `<button class="flex md:hidden w-full">` (pill).
+- Mover los botones de carrito/user al row del logo en mobile (hoy están en su propio bloque `sm:ml-auto`).
+- Carrito mobile: solo icono + badge numérico (chip pequeño en esquina si `count > 0`).
+
+### 4. Header — performance
+- Cambiar `backdrop-blur-xl` → `backdrop-blur-md` o quitar blur en mobile (`md:backdrop-blur-xl`) y dejar `bg-background/95` sólido en mobile. Reduce jank de scroll sobre el hero animado.
+
+### 5. Defensa contra overflow horizontal
+- En `<body>` o root: `overflow-x-hidden` (en `index.css` o el root layout) como red de seguridad para que ningún hijo accidentalmente scrollee la página completa.
 
 ## Archivos a tocar
 ```
-src/lib/cart-store.ts                  (add/setQty con max opcional)
-src/components/rental/EquipmentRow.tsx (cap + disable + toast)
-src/components/rental/EquipmentCard.tsx (cap + disable + toast)
-src/components/rental/CartDrawer.tsx   (cap + warning si supera)
+src/components/rental/TopBar.tsx     (re-layout mobile + blur)
+src/routes/index.tsx                  (h1 + meta line del hero)
+src/styles.css                        (overflow-x-hidden en body)
 ```
 
 ## Out of scope
-- Validación server-side (la hace el backend al `POST /api/alquileres`).
-- Sincronización en tiempo real del stock.
-- Cambios visuales mayores: solo el disable + un toast discreto.
+- Cambiar copy del hero o branding.
+- Tocar el modal `RentalDateModal`.
+- Animación de grain.
+- Cambios en desktop (queda igual).
+
+## QA
+Testear en 360, 390, 414 px de ancho:
+- Sin scroll horizontal.
+- Pill "Elegir fechas" entera, carrito visible al lado del logo.
+- Hero legible sin desbordar.

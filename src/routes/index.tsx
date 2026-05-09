@@ -164,10 +164,10 @@ function Index() {
         <section className="relative overflow-hidden border-b hairline bg-amber text-ink">
           <div className="absolute inset-0 grain opacity-40" />
           <div className="relative px-6 py-12 lg:px-12 lg:py-16">
-            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/70">
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] sm:tracking-[0.3em] text-ink/70 break-words">
               Catálogo · {isLoading ? "…" : allEquipos.length} equipos · Mar del Plata
             </div>
-            <h1 className="mt-4 wordmark text-[14vw] leading-[0.85] md:text-[7rem] lg:text-[8.5rem] text-balance">
+            <h1 className="mt-4 wordmark text-5xl sm:text-7xl md:text-[7rem] lg:text-[8.5rem] leading-[0.9] md:leading-[0.85] text-balance break-words">
               un lugar
               <br />
               donde pasan
