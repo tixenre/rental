@@ -1,40 +1,53 @@
-## Problemas a resolver
+## Idea
 
-1. En móvil el modal de fechas ocupa más de una pantalla y no se ven los botones "Aplicar" / "Limpiar". Hay que scrollear y no es obvio cómo confirmar.
-2. Los `<input type="time">` permiten cualquier minuto. Queremos restringir a `:00` y `:30` en todo el flujo (modal y header desktop).
+En móvil, juntar el pill de fechas y la búsqueda en una sola fila sticky justo debajo del header. El pill ocupa la mayor parte del ancho con la info de fechas/jornadas; al lado, un botón redondo con la lupa que abre un campo de búsqueda expandible. Así ambas funciones quedan siempre a mano sin gastar dos filas.
+
+```
+┌──────────────────────────────────────┐
+│ rambla | RENTAL    🛒²   👤          │  ← TopBar (sin pill)
+├──────────────────────────────────────┤
+│ 📅 04 jun 11:00 → 06 jun 09:00  · 2j │ 🔍│  ← sticky bar nueva
+│                                      │   │
+└──────────────────────────────────────┘
+```
+
+Tap en 🔍 → la fila se transforma: input full-width con el campo abierto + ✕ para volver al estado pill.
+
+En desktop el TopBar ya tiene los selectores de fecha. Mantenemos la barra sticky actual (búsqueda + toggle grid/list + contador) sin cambios visibles.
 
 ## Cambios
 
-### 1. `RentalDateModal.tsx` — versión compacta en móvil
+### 1. `TopBar.tsx`
 
-- Layout en columna full-height en móvil (`h-[100dvh]` o `max-h-[95dvh]`), con header sticky arriba y footer sticky abajo (con `safe-area-inset-bottom`). El calendario va en el medio con scroll propio.
-- Calendario en móvil: `numberOfMonths={1}` (1 mes); en `sm+` mantener `2`. Reducir padding a `p-2` y tamaño de celdas para que entre cómodo.
-- Reordenar resumen Retiro / Devolución apilado verticalmente en móvil (en vez de fila con flecha) para no quedar muy comprimido.
-- Footer siempre visible: botón "Aplicar" full-width amber + link "Limpiar fechas" arriba a la izquierda. En desktop mantener el layout actual (un row).
-- Agregar botón ✕ explícito en el header del modal (además del que trae Dialog) para ofrecer salida obvia.
-- Mostrar el badge "N jornada(s) · retiro · devolución" dentro del footer (sobre el botón Aplicar) en lugar de debajo del calendario, así queda siempre visible junto a la CTA.
+Eliminar la fila 2 mobile (el pill `Elegir fechas`). El TopBar mobile queda en una sola fila compacta: logo + carrito + usuario. Esto reduce su altura a ~56px y libera espacio para la nueva barra sticky.
 
-### 2. Selector de hora cada 30 min — nuevo componente `TimeStepSelect`
+### 2. `src/routes/index.tsx` — barra sticky combinada (mobile)
 
-Crear `src/components/rental/TimeStepSelect.tsx`: un `<select>` nativo con opciones `00:00, 00:30, 01:00, ... 23:30` (48 valores). Devuelve `string` formato `HH:mm`. Ventajas: nativo en móvil (rueda iOS), accesible con teclado, imposible elegir minutos intermedios.
+En el contenedor sticky existente (línea ~212), agregar una nueva fila visible solo en móvil (`md:hidden`) por encima del search/toggle actual:
 
-Reemplazar los `<input type="time">` actuales:
-- `RentalDateModal.tsx` (retiro y devolución).
-- `TopBar.tsx` `DateField` (desktop).
+- Estado por defecto (`searchOpen=false`): `[ pill fechas (flex-1) ] [ botón lupa 40x40 ]`. El pill es el mismo trigger del modal de fechas (reutilizar lógica de `TopBar`: abrir `RentalDateModal`). Muestra la misma info que ahora: `dd MMM HH:mm → dd MMM HH:mm` + `· N j`.
+- Estado abierto (`searchOpen=true`): `[ input full-width con lupa interna y autoFocus ] [ ✕ ]`. Al cerrar vuelve al estado pill y limpia query si está vacío.
 
-### 3. Normalizar horas existentes en el store
+El `RentalDateModal` ya existe y se controla con `dateModalOpen`. Levantamos ese estado al index (o creamos un store mínimo) — opción más simple: extraer un componente `<MobileStickyBar />` que maneja su propio `dateModalOpen` y `searchOpen` y recibe `query`/`setQuery` por props.
 
-En `cart-store.ts`, los defaults `09:00` ya son válidos. Agregar utilitario `snapTo30(hhmm)` que redondee al múltiplo de 30 más cercano y aplicarlo en `setStartTime` / `setEndTime` para blindar cualquier valor que llegue de afuera (por ejemplo, persistencia previa).
+El bloque sticky existente (search input + toggle grid/list + contador) pasa a `hidden md:flex` para no duplicar la búsqueda en mobile. El toggle grid/list y el contador quedan en una fila secundaria mobile (sin la búsqueda).
+
+Ajustar `top-[...]` del sticky: ahora que el TopBar mobile baja a ~56px, usar `top-14` (56px) en mobile y mantener `sm:top-[60px]`.
+
+### 3. Persistencia visual
+
+- La barra nueva usa el mismo fondo `bg-background/95 backdrop-blur-md` y `border-b hairline` para integrarse con el TopBar.
+- Toque mínimo 40px para el botón de lupa.
+- El pill conserva las dos líneas de info (fecha+hora arriba, "N jornadas" abajo) pero más compactas si hace falta.
 
 ## Fuera de alcance
 
-- Bloquear horarios pasados / fuera de horario comercial.
-- Mostrar disponibilidad por slot horario.
-- Cambiar el calendario por uno de otra librería.
+- Cambios en desktop (mantiene la barra sticky actual con search + toggle).
+- Búsqueda con sugerencias/autocomplete.
+- Persistir `searchOpen` entre navegaciones.
 
 ## Archivos a tocar
 
-- `src/components/rental/RentalDateModal.tsx`
 - `src/components/rental/TopBar.tsx`
-- `src/components/rental/TimeStepSelect.tsx` (nuevo)
-- `src/lib/cart-store.ts`
+- `src/routes/index.tsx`
+- (posible) `src/components/rental/MobileStickyBar.tsx` (nuevo, para no inflar `index.tsx`)
