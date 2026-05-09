@@ -29,7 +29,8 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # -- Playwright + Chromium (necesario para PDF generation) --
-RUN playwright install --with-deps chromium
+# RUN playwright install --with-deps chromium
+# NOTA: Deshabilitado para ahorrar memoria en Railway. Si se necesita, descomentar.
 
 # -- Build del frontend (Vite SPA) --
 RUN bun install
