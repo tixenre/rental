@@ -64,14 +64,18 @@ function Index() {
   const [brand, setBrand] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
-  // Scroll into view the deep-linked equipment when present
+  // Scroll into view only on initial deep-link (when ?eq= is present at mount).
+  // Subsequent expand/collapse interactions must NOT scroll the page.
+  const didInitialScrollRef = useRef(false);
   useEffect(() => {
+    if (didInitialScrollRef.current) return;
     if (!eq) return;
+    didInitialScrollRef.current = true;
     requestAnimationFrame(() => {
       const el = document.getElementById(`eq-${eq}`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
     });
-  }, [eq, mode]);
+  }, [eq]);
 
   const toggleCat = (c: Category) => {
     setSelectedCats((prev) => {
