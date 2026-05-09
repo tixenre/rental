@@ -102,34 +102,57 @@ function Index() {
         </div>
       </section>
 
-      {/* Toggle Modo */}
-      <div className="sticky top-[68px] z-30 border-b hairline bg-background/90 backdrop-blur-xl">
-        <div className="flex items-center gap-3 px-6 py-3 lg:px-12">
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            Modo
+      {/* Toggle Modo + búsqueda sticky */}
+      <div className="sticky top-[68px] sm:top-[60px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
+        <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 lg:px-12">
+          {/* Search input */}
+          <div className="relative flex-1 min-w-0 sm:max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar equipo, marca…"
+              className="w-full rounded-full border hairline bg-surface py-2 pl-9 pr-9 text-sm placeholder:text-muted-foreground focus:border-amber focus:outline-none"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-foreground/10 hover:text-ink"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-          <div className="flex items-center gap-1 rounded-full border hairline p-0.5">
-            <button
-              onClick={() => setMode("grid")}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
-                mode === "grid" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
-              )}
-            >
-              <LayoutGrid className="h-3 w-3" /> Explorar
-            </button>
-            <button
-              onClick={() => setMode("list")}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
-                mode === "list" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
-              )}
-            >
-              <List className="h-3 w-3" /> Lista completa
-            </button>
-          </div>
-          <div className="ml-auto font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
-            {mode === "list" ? `${filtered.length} resultados` : `${equipment.length} equipos`}
+
+          <div className="flex items-center justify-between gap-3 sm:ml-auto">
+            <div className="flex items-center gap-1 rounded-full border hairline p-0.5">
+              <button
+                onClick={() => setMode("grid")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
+                  mode === "grid" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
+                )}
+              >
+                <LayoutGrid className="h-3 w-3" />
+                <span className="hidden xs:inline sm:inline">Explorar</span>
+              </button>
+              <button
+                onClick={() => setMode("list")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
+                  mode === "list" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
+                )}
+              >
+                <List className="h-3 w-3" />
+                <span className="hidden xs:inline sm:inline">Lista</span>
+              </button>
+            </div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
+              {query.trim() || mode === "list"
+                ? `${filtered.length} resultados`
+                : `${equipment.length} equipos`}
+            </div>
           </div>
         </div>
       </div>
@@ -139,6 +162,7 @@ function Index() {
           onJumpToCategory={jumpToCategory}
           selectedCats={selectedCats}
           onClearCats={() => setSelectedCats(new Set())}
+          query={query}
         />
       ) : (
         <ListMode
