@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { snapTo30 } from "@/components/rental/TimeStepSelect";
 
 type DrawerPlacement = "right" | "bottom";
 
