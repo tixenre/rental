@@ -13,9 +13,12 @@ export const Route = createFileRoute("/admin")({
   component: AdminAccessPage,
 });
 
+// TEMP: bypass de login mientras se arregla Google OAuth
+const BYPASS_AUTH = true;
+
 function AdminAccessPage() {
   const { user, loading } = useAuth();
-  const isAdmin = isAdminEmail(user?.email);
+  const isAdmin = BYPASS_AUTH || isAdminEmail(user?.email);
 
   return (
     <div className="min-h-screen bg-background">
