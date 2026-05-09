@@ -132,6 +132,9 @@ export function EquipmentRow({ item }: { item: Equipment }) {
           >
             <div className="border-t hairline px-3 py-3 sm:px-4 sm:py-4">
               <IncludedList item={item} />
+              <div className="mt-3 flex justify-end">
+                <ShareEquipmentButton id={item.id} name={item.name} />
+              </div>
             </div>
           </motion.div>
         )}
