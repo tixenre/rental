@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Calendar as CalendarIcon,
   ShoppingBag,
@@ -8,6 +9,8 @@ import {
   HelpCircle,
   Menu,
   LogIn,
+  ClipboardList,
+  LogOut,
 } from "lucide-react";
 import { RentalDateModal } from "./RentalDateModal";
 import { formatRentalRange } from "@/lib/format";
