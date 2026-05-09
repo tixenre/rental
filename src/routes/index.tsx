@@ -228,7 +228,6 @@ function GridMode({
     e.brand.toLowerCase().includes(q) ||
     e.category.toLowerCase().includes(q);
 
-  const news = equipment.filter((e) => e.isNew && matches(e));
   const combos = equipment.filter((e) => e.isCombo && matches(e));
   const isFiltered = selectedCats.size > 0;
   const isSearching = q.length > 0;
@@ -271,13 +270,7 @@ function GridMode({
         </div>
       )}
 
-      {!isFiltered && !isSearching && news.length > 0 && (
-        <CarouselRow title="Ingresos" count={news.length}>
-          {news.map((item, i) => (
-            <EquipmentCard key={item.id} item={item} index={i} width={cardW} />
-          ))}
-        </CarouselRow>
-      )}
+      {!isFiltered && !isSearching && <CategoryMosaic onSelect={onJumpToCategory} />}
 
       {!isFiltered && !isSearching && combos.length > 0 && (
         <CarouselRow title="Combos" count={combos.length}>
@@ -286,8 +279,6 @@ function GridMode({
           ))}
         </CarouselRow>
       )}
-
-      {!isFiltered && !isSearching && <CategoryMosaic onSelect={onJumpToCategory} />}
 
       {visibleCategories.map((c) => {
         const items = equipment.filter((e) => e.category === c && matches(e));
