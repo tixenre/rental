@@ -21,8 +21,12 @@ export function EquipmentRow({ item }: { item: Equipment }) {
     <div
       id={`eq-${item.id}`}
       className={cn(
-        "rounded-lg border bg-surface transition",
-        selected ? "border-amber/60 bg-amber-soft/30" : "hairline hover:border-foreground/20",
+        "rounded-lg border bg-surface transition-all",
+        expanded
+          ? "border-ink/40 bg-accent/30 shadow-sm ring-1 ring-ink/10"
+          : selected
+            ? "border-amber/60 bg-amber-soft/30"
+            : "hairline hover:border-foreground/20",
       )}
     >
       <div className="group flex items-center gap-3 p-2.5 sm:gap-4 sm:px-3">
