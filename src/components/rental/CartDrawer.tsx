@@ -12,6 +12,7 @@ export function CartDrawer() {
   const {
     drawerOpen,
     setDrawerOpen,
+    drawerPlacement,
     items,
     add,
     remove,
@@ -23,6 +24,8 @@ export function CartDrawer() {
     startTime,
     endTime,
   } = useCart();
+
+  const isBottom = drawerPlacement === "bottom";
 
   const d = days();
 
