@@ -48,12 +48,12 @@ export function TopBar() {
 
   return (
     <header className="sticky top-0 z-40 border-b hairline bg-background/85 backdrop-blur-xl">
-      <div className="relative flex items-center justify-between gap-3 px-6 py-3">
+      {/* Single row centered en sm+; en mobile la pill de fecha pasa a una segunda fila */}
+      <div className="relative hidden sm:flex items-center justify-between gap-3 px-4 py-3 md:px-6">
         <Link to="/" className="flex items-center shrink-0" aria-label="Rambla Rental">
           <img src={wordmark} alt="Rambla Rental" className="h-9 w-auto" />
         </Link>
 
-        {/* Date pill — centrada, jerarquía alta */}
         <button
           onClick={() => setDateOpen(true)}
           className={
@@ -64,78 +64,119 @@ export function TopBar() {
           }
         >
           <CalendarIcon className="h-4 w-4" />
-          <span className="hidden sm:inline">{label}</span>
-          <span className="sm:hidden">{hasDates ? label : "Elegir fechas"}</span>
+          <span>{label}</span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <RightActions
+          count={count}
+          onCartOpen={() => setDrawerOpen(true)}
+        />
+      </div>
 
-          {/* WhatsApp — icon only, sutil */}
-          <a
-            href={WA_HREF}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`WhatsApp ${WA_DISPLAY}`}
-            title={`WhatsApp ${WA_DISPLAY}`}
-            className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full border hairline text-muted-foreground transition hover:border-ink hover:text-ink"
-          >
-            <WhatsAppIcon className="h-4 w-4" />
-          </a>
-
-          {/* Menu: cómo funciona + sesión */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                aria-label="Menú"
-                className="flex h-9 items-center gap-1.5 rounded-full border hairline px-3 text-muted-foreground transition hover:border-ink hover:text-ink"
-              >
-                <Menu className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem asChild>
-                <a href="#como-funciona" className="flex items-center gap-2">
-                  <HelpCircle className="h-4 w-4" />
-                  ¿Cómo funciona?
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <a
-                  href={WA_HREF}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 sm:hidden"
-                >
-                  <WhatsAppIcon className="h-4 w-4" />
-                  WhatsApp
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Invitado
-              </DropdownMenuItem>
-              <DropdownMenuItem className="flex items-center gap-2">
-                <LogIn className="h-4 w-4" />
-                Iniciar sesión
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Cart — siempre al final */}
-          <button
-            onClick={() => setDrawerOpen(true)}
-            aria-label={`Carrito (${count})`}
-            className="relative flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-amber hover:text-ink"
-          >
-            <ShoppingBag className="h-4 w-4" />
-            <span className="tabular">{count}</span>
-            <span className="hidden sm:inline">{count === 1 ? "ítem" : "ítems"}</span>
-          </button>
-        </div>
+      {/* Mobile: dos filas */}
+      <div className="sm:hidden flex items-center justify-between gap-2 px-4 pt-3">
+        <Link to="/" className="flex items-center shrink-0" aria-label="Rambla Rental">
+          <img src={wordmark} alt="Rambla Rental" className="h-8 w-auto" />
+        </Link>
+        <RightActions
+          count={count}
+          onCartOpen={() => setDrawerOpen(true)}
+          compact
+        />
+      </div>
+      <div className="sm:hidden px-4 pb-3 pt-2">
+        <button
+          onClick={() => setDateOpen(true)}
+          className={
+            "w-full flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm shadow-sm transition " +
+            (hasDates
+              ? "bg-foreground text-background font-semibold"
+              : "bg-amber text-ink font-semibold ring-1 ring-amber/40")
+          }
+        >
+          <CalendarIcon className="h-4 w-4" />
+          <span className="truncate">{hasDates ? label : "Elegir fechas"}</span>
+        </button>
       </div>
 
       <RentalDateModal open={dateOpen} onOpenChange={setDateOpen} />
     </header>
   );
 }
+
+function RightActions({
+  count,
+  onCartOpen,
+  compact = false,
+}: {
+  count: number;
+  onCartOpen: () => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {!compact && (
+        <a
+          href={WA_HREF}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`WhatsApp ${WA_DISPLAY}`}
+          title={`WhatsApp ${WA_DISPLAY}`}
+          className="flex h-9 w-9 items-center justify-center rounded-full border hairline text-muted-foreground transition hover:border-ink hover:text-ink"
+        >
+          <WhatsAppIcon className="h-4 w-4" />
+        </a>
+      )}
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            aria-label="Menú"
+            className="flex h-9 w-9 items-center justify-center rounded-full border hairline text-muted-foreground transition hover:border-ink hover:text-ink"
+          >
+            <Menu className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem asChild>
+            <a href="#como-funciona" className="flex items-center gap-2">
+              <HelpCircle className="h-4 w-4" />
+              ¿Cómo funciona?
+            </a>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <a
+              href={WA_HREF}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2"
+            >
+              <WhatsAppIcon className="h-4 w-4" />
+              WhatsApp
+            </a>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Invitado
+          </DropdownMenuItem>
+          <DropdownMenuItem className="flex items-center gap-2">
+            <LogIn className="h-4 w-4" />
+            Iniciar sesión
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <button
+        onClick={onCartOpen}
+        aria-label={`Carrito (${count})`}
+        className="relative flex items-center gap-2 rounded-full bg-foreground px-3 py-2 text-sm font-medium text-background transition hover:bg-amber hover:text-ink sm:px-4"
+      >
+        <ShoppingBag className="h-4 w-4" />
+        <span className="tabular">{count}</span>
+        <span className="hidden md:inline">{count === 1 ? "ítem" : "ítems"}</span>
+      </button>
+    </div>
+  );
+}
+

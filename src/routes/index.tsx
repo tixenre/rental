@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { LayoutGrid, List, ArrowRight } from "lucide-react";
+import { LayoutGrid, List, ArrowRight, Search, X } from "lucide-react";
 import { TopBar } from "@/components/rental/TopBar";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
@@ -102,34 +102,57 @@ function Index() {
         </div>
       </section>
 
-      {/* Toggle Modo */}
-      <div className="sticky top-[68px] z-30 border-b hairline bg-background/90 backdrop-blur-xl">
-        <div className="flex items-center gap-3 px-6 py-3 lg:px-12">
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            Modo
+      {/* Toggle Modo + búsqueda sticky */}
+      <div className="sticky top-[116px] sm:top-[60px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
+        <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 lg:px-12">
+          {/* Search input */}
+          <div className="relative flex-1 min-w-0 sm:max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar equipo, marca…"
+              className="w-full rounded-full border hairline bg-surface py-2 pl-9 pr-9 text-sm placeholder:text-muted-foreground focus:border-amber focus:outline-none"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-foreground/10 hover:text-ink"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-          <div className="flex items-center gap-1 rounded-full border hairline p-0.5">
-            <button
-              onClick={() => setMode("grid")}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
-                mode === "grid" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
-              )}
-            >
-              <LayoutGrid className="h-3 w-3" /> Explorar
-            </button>
-            <button
-              onClick={() => setMode("list")}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
-                mode === "list" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
-              )}
-            >
-              <List className="h-3 w-3" /> Lista completa
-            </button>
-          </div>
-          <div className="ml-auto font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
-            {mode === "list" ? `${filtered.length} resultados` : `${equipment.length} equipos`}
+
+          <div className="flex items-center justify-between gap-3 sm:ml-auto">
+            <div className="flex items-center gap-1 rounded-full border hairline p-0.5">
+              <button
+                onClick={() => setMode("grid")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
+                  mode === "grid" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
+                )}
+              >
+                <LayoutGrid className="h-3 w-3" />
+                <span className="hidden xs:inline sm:inline">Explorar</span>
+              </button>
+              <button
+                onClick={() => setMode("list")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
+                  mode === "list" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
+                )}
+              >
+                <List className="h-3 w-3" />
+                <span className="hidden xs:inline sm:inline">Lista</span>
+              </button>
+            </div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
+              {query.trim() || mode === "list"
+                ? `${filtered.length} resultados`
+                : `${equipment.length} equipos`}
+            </div>
           </div>
         </div>
       </div>
@@ -139,6 +162,7 @@ function Index() {
           onJumpToCategory={jumpToCategory}
           selectedCats={selectedCats}
           onClearCats={() => setSelectedCats(new Set())}
+          query={query}
         />
       ) : (
         <ListMode
@@ -166,14 +190,24 @@ function GridMode({
   onJumpToCategory,
   selectedCats,
   onClearCats,
+  query,
 }: {
   onJumpToCategory: (c: Category) => void;
   selectedCats: Set<Category>;
   onClearCats: () => void;
+  query: string;
 }) {
-  const news = equipment.filter((e) => e.isNew);
-  const combos = equipment.filter((e) => e.isCombo);
+  const q = query.trim().toLowerCase();
+  const matches = (e: (typeof equipment)[number]) =>
+    !q ||
+    e.name.toLowerCase().includes(q) ||
+    e.brand.toLowerCase().includes(q) ||
+    e.category.toLowerCase().includes(q);
+
+  const news = equipment.filter((e) => e.isNew && matches(e));
+  const combos = equipment.filter((e) => e.isCombo && matches(e));
   const isFiltered = selectedCats.size > 0;
+  const isSearching = q.length > 0;
   const visibleCategories = isFiltered
     ? categories.filter((c) => selectedCats.has(c))
     : categories;
@@ -181,10 +215,16 @@ function GridMode({
   // Ancho fijo de cards en carrusel para snap consistente
   const cardW = 260;
 
+  // Total de items visibles para mostrar "sin resultados"
+  const totalVisible = visibleCategories.reduce(
+    (acc, c) => acc + equipment.filter((e) => e.category === c && matches(e)).length,
+    0,
+  );
+
   return (
-    <div className="space-y-12 py-8 lg:py-12">
+    <div className="space-y-10 py-6 sm:space-y-12 sm:py-8 lg:py-12">
       {isFiltered && (
-        <div className="px-6 lg:px-12">
+        <div className="px-4 lg:px-12">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
               Filtrando por
@@ -207,7 +247,7 @@ function GridMode({
         </div>
       )}
 
-      {!isFiltered && news.length > 0 && (
+      {!isFiltered && !isSearching && news.length > 0 && (
         <CarouselRow title="Ingresos" count={news.length}>
           {news.map((item, i) => (
             <EquipmentCard key={item.id} item={item} index={i} width={cardW} />
@@ -215,7 +255,7 @@ function GridMode({
         </CarouselRow>
       )}
 
-      {!isFiltered && combos.length > 0 && (
+      {!isFiltered && !isSearching && combos.length > 0 && (
         <CarouselRow title="Combos" count={combos.length}>
           {combos.map((item, i) => (
             <EquipmentCard key={item.id} item={item} index={i} width={cardW + 40} />
@@ -223,18 +263,18 @@ function GridMode({
         </CarouselRow>
       )}
 
-      {!isFiltered && <CategoryMosaic onSelect={onJumpToCategory} />}
+      {!isFiltered && !isSearching && <CategoryMosaic onSelect={onJumpToCategory} />}
 
       {visibleCategories.map((c) => {
-        const items = equipment.filter((e) => e.category === c);
+        const items = equipment.filter((e) => e.category === c && matches(e));
         if (items.length === 0) return null;
         return (
-          <div key={c} id={`cat-${c}`} className="scroll-mt-32">
+          <div key={c} id={`cat-${c}`} className="scroll-mt-40">
             <CarouselRow
               title={c}
               count={items.length}
               action={
-                !isFiltered ? (
+                !isFiltered && !isSearching ? (
                   <button
                     onClick={() => onJumpToCategory(c)}
                     className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink"
@@ -251,6 +291,15 @@ function GridMode({
           </div>
         );
       })}
+
+      {isSearching && totalVisible === 0 && (
+        <div className="mx-4 rounded-lg border hairline bg-surface px-6 py-16 text-center lg:mx-12">
+          <div className="font-display text-2xl text-muted-foreground">Sin resultados</div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Probá con otro término — ningún equipo coincide con "{query}".
+          </p>
+        </div>
+      )}
 
       {/* Footer mínimo */}
       <footer className="border-t hairline px-6 py-12 lg:px-12">
