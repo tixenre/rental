@@ -120,7 +120,7 @@ function Cable(props: IllProps) {
   );
 }
 
-const map: Record<Category, (p: IllProps) => React.ReactElement> = {
+const map: Partial<Record<Category, (p: IllProps) => React.ReactElement>> = {
   Cámaras: Camara,
   Lentes: Lente,
   Iluminación: Iluminacion,
