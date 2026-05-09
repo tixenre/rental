@@ -344,56 +344,104 @@ export function CartDrawer({
                         })}
                       </ul>
 
-                      {/* Formulario de contacto */}
-                      {showForm && (
-                        <form
-                          onSubmit={handleSubmit}
-                          className="mt-4 space-y-3 rounded-lg border hairline bg-surface p-4"
-                        >
+                      {/* Notas opcionales */}
+                      {showNotas && (
+                        <div className="mt-4 space-y-2 rounded-lg border hairline bg-surface p-4">
                           <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
-                            Tus datos de contacto
+                            Notas para nosotros (opcional)
                           </div>
-                          <input
-                            required
-                            placeholder="Nombre completo"
-                            value={nombre}
-                            onChange={(e) => setNombre(e.target.value)}
-                            className="w-full rounded-md border hairline bg-background px-3 py-2.5 text-sm focus:border-amber/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+                          <textarea
+                            value={notas}
+                            onChange={(e) => setNotas(e.target.value)}
+                            rows={3}
+                            maxLength={500}
+                            placeholder="Ej: necesito dolly extra, retiro fuera de horario, etc."
+                            className="w-full resize-none rounded-md border hairline bg-background px-3 py-2 text-sm focus:border-amber/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
                           />
-                          <input
-                            required
-                            type="email"
-                            placeholder="Email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full rounded-md border hairline bg-background px-3 py-2.5 text-sm focus:border-amber/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
-                          />
-                          <input
-                            placeholder="Teléfono (opcional)"
-                            value={telefono}
-                            onChange={(e) => setTelefono(e.target.value)}
-                            className="w-full rounded-md border hairline bg-background px-3 py-2.5 text-sm focus:border-amber/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
-                          />
-                          {submitError && (
-                            <p role="alert" className="text-xs text-destructive">
-                              {submitError}
-                            </p>
-                          )}
-                          <button
-                            type="submit"
-                            disabled={submitting}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
-                          >
-                            {submitting ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin" /> Enviando…
-                              </>
-                            ) : (
-                              "Confirmar solicitud"
-                            )}
-                          </button>
-                        </form>
+                        </div>
                       )}
+                      {submitError && (
+                        <p role="alert" className="mt-3 text-xs text-destructive">
+                          {submitError}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Footer sticky con totales */}
+                <div
+                  className="border-t hairline bg-background px-5 py-4 space-y-3 sm:px-6"
+                  style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+                >
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal por jornada</span>
+                    <span className="tabular">{formatARS(subtotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+                      Total · {d} {d === 1 ? "jornada" : "jornadas"}
+                    </span>
+                    <span className="font-display text-3xl tabular text-ink">
+                      {formatARS(total)}
+                    </span>
+                  </div>
+
+                  {!user ? (
+                    <Link
+                      to="/login"
+                      onClick={() => setDrawerOpen(false)}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                    >
+                      <LogIn className="h-4 w-4" /> Iniciar sesión para enviar
+                    </Link>
+                  ) : (
+                    <>
+                      {!showNotas && list.length > 0 && (
+                        <button
+                          onClick={() => setShowNotas(true)}
+                          className="w-full text-xs text-muted-foreground hover:text-ink focus:outline-none focus-visible:underline"
+                        >
+                          Agregar una nota
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={
+                          submitting ||
+                          list.length === 0 ||
+                          !startDate ||
+                          !endDate
+                        }
+                        onClick={handleSubmit}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" /> Enviando…
+                          </>
+                        ) : (
+                          "Confirmar solicitud"
+                        )}
+                      </button>
+                    </>
+                  )}
+
+                  {(!startDate || !endDate) ? (
+                    <p className="text-center text-xs text-muted-foreground">
+                      Elegí fechas para solicitar la cotización
+                    </p>
+                  ) : null}
+
+                  {list.length > 0 && (
+                    <button
+                      onClick={clear}
+                      className="w-full text-xs text-muted-foreground hover:text-destructive focus:outline-none focus-visible:underline"
+                    >
+                      Vaciar pedido
+                    </button>
+                  )}
+                </div>
                     </>
                   )}
                 </div>
