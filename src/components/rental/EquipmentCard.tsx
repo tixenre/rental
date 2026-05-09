@@ -11,11 +11,14 @@ export function EquipmentCard({
   item,
   index,
   width,
+  disponible,
 }: {
   item: Equipment;
   index: number;
   /** Ancho fijo en px para uso dentro de carrusel; si no, ocupa la celda. */
   width?: number;
+  /** Unidades disponibles según el rango de fechas; undefined si aún no hay rango. */
+  disponible?: number;
 }) {
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
@@ -23,6 +26,8 @@ export function EquipmentCard({
   const selected = qty > 0;
   const { setOpenId } = useEquipmentDetail();
   const setOpen = (v: boolean) => setOpenId(v ? item.id : null);
+  const noStock = disponible !== undefined && disponible <= 0;
+  const reachedMax = disponible !== undefined && qty >= disponible;
 
   return (
     <motion.article
@@ -80,15 +85,32 @@ export function EquipmentCard({
             <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               / 1 jornada
             </div>
+            {disponible !== undefined && (
+              <div
+                className={cn(
+                  "mt-1 font-mono text-[9px] uppercase tracking-widest tabular",
+                  disponible <= 0
+                    ? "text-destructive"
+                    : disponible === 1
+                      ? "text-amber-600"
+                      : "text-muted-foreground",
+                )}
+              >
+                {disponible <= 0
+                  ? "Sin stock"
+                  : `${disponible} disp${disponible === 1 ? "." : "."}`}
+              </div>
+            )}
           </div>
 
           {qty === 0 ? (
             <button
               onClick={() => add(item.id)}
-              className="flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition hover:border-amber hover:bg-amber hover:text-ink"
+              disabled={noStock}
+              className="flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition hover:border-amber hover:bg-amber hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-current"
             >
               <Plus className="h-3 w-3" />
-              Agregar
+              {noStock ? "Sin stock" : "Agregar"}
             </button>
           ) : (
             <div className="flex items-center gap-1 rounded-md border border-amber/40 bg-amber-soft p-0.5">
@@ -101,7 +123,8 @@ export function EquipmentCard({
               <span className="w-6 text-center text-sm tabular">{qty}</span>
               <button
                 onClick={() => add(item.id)}
-                className="grid h-7 w-7 place-items-center rounded text-amber hover:bg-amber/20"
+                disabled={reachedMax}
+                className="grid h-7 w-7 place-items-center rounded text-amber hover:bg-amber/20 disabled:cursor-not-allowed disabled:opacity-30"
               >
                 <Plus className="h-3 w-3" />
               </button>
