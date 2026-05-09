@@ -1,7 +1,8 @@
 import { categories, brands, equipment, type Category } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { Search } from "lucide-react";
+import { Search, LayoutGrid } from "lucide-react";
+import { CategoryIllustration } from "./illustrations/CategoryIllustration";
 
 export function CategorySidebar({
   activeCategory,
