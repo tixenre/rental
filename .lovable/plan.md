@@ -1,43 +1,79 @@
-Vamos a implementar todas las mejoras de a una, en orden de impacto vs esfuerzo. Cada paso es un commit independiente que podés revisar antes de seguir al siguiente.
+## Objetivo
+Reemplazar el catálogo estático por el backend `https://ramblarental.up.railway.app`, agregar disponibilidad real por fechas y enviar pedidos al endpoint `/api/alquileres`. Si el backend falla, caer al mock para no romper la preview.
 
-## Orden de implementación
+## Lo que ya funciona en el backend (verificado con curl)
+- `GET /api/equipos?per_page=500&solo_visibles=true` → 142 equipos. Devuelve `id, nombre, marca, modelo, cantidad, precio_jornada, foto_url, etiquetas[], kit[]`.
+- `GET /api/disponibilidad?fecha_desde&fecha_hasta` → mapa `{ "<id>": unidades_disponibles }`.
+- CORS habilitado para `https://ramblarental.lovable.app` (dominio publicado).
 
-### Fase 1 — UX inmediato (alto impacto, bajo esfuerzo)
-1. **Resaltar fila expandida** en list view (borde/acento de color primario + fondo sutil).
-2. **Animación de chevron** ▶ → ▼ al expandir/colapsar.
-3. **Cerrar con `Esc`** la fila expandida (y el modal/sheet en grid).
-4. **`aria-expanded` + focus management** en filas (foco vuelve al trigger al cerrar).
+## Lo que NO funciona todavía (Claude/back lo resuelve)
+Estos puntos los dejo documentados pero NO los toco desde el front:
+1. `GET /api/categorias` devuelve `[]` (vacío).
+2. Los equipos vienen con `etiquetas: []`, así que no hay categoría real → todos caerían como "Accesorios".
+3. CORS solo permite el dominio publicado. Las URLs de preview (`id-preview--*.lovable.app`) están bloqueadas — agregar wildcard o lista.
+4. Falta confirmar el shape de `POST /api/alquileres` (probablemente ya implementado por Claude).
 
-### Fase 2 — Mobile polish
-5. **Swipe-down para cerrar** el bottom sheet en mobile (gesto nativo).
-6. **Filtros en bottom sheet** en mobile (en vez de modal centrado).
-7. **Sticky header de filtros** al hacer scroll en listados largos.
+## Cambios en el frontend
 
-### Fase 3 — Performance
-8. **Lazy-load de imágenes** (`loading="lazy"` + `decoding="async"`) y `srcset` responsive donde aplique.
-9. **Prefetch de ficha al hover** en grid (precargar datos del equipo).
-10. **Virtualización** del listado si hay 50+ equipos (react-virtual / tanstack-virtual).
+### 1. Variable de entorno
+- Crear `.env.local` con `VITE_API_URL=https://ramblarental.up.railway.app`.
 
-### Fase 4 — Navegación por teclado
-11. **Enter/Space** para expandir fila enfocada, **flechas ↑↓** para moverse entre filas, **Home/End** para saltar.
+### 2. Adaptador `backendToEquipment` (`src/hooks/useEquipos.ts`)
+- Mapear `foto_url` → `fotoUrl`, ya existente.
+- Cuando `etiquetas[]` está vacío: derivar categoría heurísticamente desde `nombre/modelo` (palabras clave: "lente", "cámara", "luz", "trípode", etc.) en una util `inferCategory()`. Es paliativo hasta que el back tagee.
+- Mantener `_backendId` como número para el POST de pedido.
 
-### Fase 5 — SEO / Compartir (cambio estructural)
-12. **Ruta dedicada `/equipo/$slug`** con su propio `head()` (title, description, og:image del equipo, twitter card).
-13. **JSON-LD `Product`** por equipo para rich snippets.
-14. Mantener `/?eq=xxx` como redirect a `/equipo/$slug` para no romper links existentes.
+### 3. Hook `useEquipos` con fallback al mock
+- Envolver la query en try/catch: si falla o devuelve 0 items, retornar `equipment` (mock estático) y exponer flag `usingFallback`.
+- En dev, mostrar un pill discreto en `TopBar` cuando `usingFallback === true` ("Modo offline").
 
-## Detalles técnicos
+### 4. Disponibilidad real
+- En `src/routes/index.tsx`, `useDisponibilidad(startDate, endDate)` ya está conectado.
+- En `EquipmentRow` y `EquipmentCard`: si hay rango y el equipo tiene `_backendId`, leer `disponibilidad[_backendId]`. Mostrar "X disponibles" debajo del precio. Deshabilitar "Agregar" cuando `qty solicitada > disponibles`.
+- Toast cuando el usuario intenta superar el stock.
 
-- **Resaltado**: usar tokens semánticos (`ring-primary`, `bg-accent/30`) — sin colores hardcodeados.
-- **Animación chevron**: `transition-transform rotate-90` cuando `aria-expanded=true`.
-- **Esc**: hook `useEffect` con `keydown` listener cuando hay fila abierta.
-- **Sheet swipe**: shadcn `Sheet` ya soporta drag, sólo configurar.
-- **Lazy images**: pasar `loading`/`decoding` props al componente de imagen en `EquipmentCard` y `EquipmentRow`.
-- **Virtualización**: solo activarla con threshold (>50 items) para no complicar el caso común.
-- **Ruta `/equipo/$slug`**: nueva file-based route, loader que trae el equipo desde Lovable Cloud, `head()` dinámico desde loader data, JSON-LD inyectado en el render.
+### 5. Envío de pedido (`CartDrawer`)
+- Agregar paso final con form mínimo: nombre, email, teléfono opcional. Validación con Zod.
+- Al confirmar:
+  ```ts
+  apiPostPedido({
+    cliente_nombre, cliente_email, cliente_telefono,
+    fecha_desde: format(startDate, "yyyy-MM-dd"),
+    fecha_hasta: format(endDate, "yyyy-MM-dd"),
+    items: cart.map(c => ({
+      equipo_id: c.eq._backendId!,
+      cantidad: c.qty,
+      precio_jornada: c.eq.pricePerDay,
+    })),
+  })
+  ```
+- Filtrar items sin `_backendId` (mock-only) con warning.
+- Estados: loading, success (toast + clear cart + cerrar drawer), error (mostrar mensaje del backend).
 
-## Plan de trabajo
+### 6. Memoria
+- Actualizar `mem://index.md`: el catálogo ya no es estático, ahora viene del backend con fallback al mock.
 
-Voy a ir implementando **una mejora por turno** (a veces dos si son muy chicas y relacionadas, ej. 1+2). Después de cada cambio, te confirmo qué se hizo y seguimos con la siguiente. Si en algún punto querés saltarte una o cambiar el orden, me avisás.
+## Archivos a tocar
+```
+.env.local                          (crear, VITE_API_URL)
+src/hooks/useEquipos.ts             (fallback + inferCategory + estado disponibilidad)
+src/lib/cart-store.ts               (helpers para validar stock, si hace falta)
+src/components/rental/EquipmentRow.tsx     (badge disponibilidad)
+src/components/rental/EquipmentCard.tsx    (badge disponibilidad)
+src/components/rental/CartDrawer.tsx       (form cliente + submit)
+src/components/rental/TopBar.tsx           (badge "modo offline" en dev)
+src/routes/index.tsx                       (pasar disponibilidad a las rows)
+mem://index.md                             (actualizar nota)
+```
 
-¿Arrancamos con la Fase 1 (mejoras 1+2 juntas: resaltar fila + chevron animado)?
+## Lo que queda pendiente para Claude (back)
+- Llenar `etiquetas` en cada equipo o devolver `categoria` explícita.
+- Implementar `GET /api/categorias` con totales reales.
+- Ampliar CORS a `*.lovable.app` (o al menos a las URLs de preview).
+- Confirmar/exponer `POST /api/alquileres` con el shape del cliente (ver `apiPostPedido` en `src/lib/api.ts`).
+- Idealmente: campos `descripcion`, `specs`, `is_combo`, `kit/includes` en `/api/equipos` para no perder esa info al migrar.
+
+## Out of scope (esta tanda)
+- Auth de usuario (signup/login contra el backend Python).
+- Fotos reales en equipos / lazy loading.
+- Pantalla "mis pedidos" leyendo del backend.
