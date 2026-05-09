@@ -294,6 +294,33 @@ export function CartDrawer() {
                       days: d,
                       items: validItems,
                     });
+
+                    // Best-effort: replicar el pedido al backend FastAPI.
+                    // Solo incluye items con _backendId (los del backend real).
+                    const backendItems = list
+                      .filter((l) => !l.conflict && l.it._backendId !== undefined)
+                      .map((l) => ({
+                        equipo_id: l.it._backendId!,
+                        cantidad: l.qty,
+                        precio_jornada: l.it.pricePerDay,
+                      }));
+                    if (backendItems.length > 0 && startDate && endDate) {
+                      apiPostPedido({
+                        cliente_nombre:
+                          (user.user_metadata?.full_name as string) ??
+                          (user.user_metadata?.name as string) ??
+                          user.email ??
+                          "Sin nombre",
+                        cliente_email: user.email ?? "",
+                        cliente_telefono: (user.user_metadata?.phone as string) ?? undefined,
+                        fecha_desde: toIsoDate(startDate),
+                        fecha_hasta: toIsoDate(endDate),
+                        items: backendItems,
+                      }).catch((err) => {
+                        console.warn("[apiPostPedido] backend no aceptó el pedido:", err);
+                      });
+                    }
+
                     clear();
                     setDrawerOpen(false);
                     navigate({ to: "/mis-pedidos/$id", params: { id: order.id } });
