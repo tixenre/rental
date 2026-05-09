@@ -29,6 +29,7 @@ export function EquipmentCard({
   return (
     <>
       <motion.article
+        id={`eq-${item.id}`}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: Math.min(index * 0.012, 0.25) }}
