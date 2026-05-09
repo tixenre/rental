@@ -24,6 +24,23 @@ export function EquipmentDetailDialog({
 }) {
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    if (typeof window === "undefined") return;
+    const url = `${window.location.origin}${window.location.pathname}?eq=${item.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: item.name, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1800);
+      }
+    } catch {
+      /* cancelled */
+    }
+  };
   const remove = useCart((s) => s.remove);
 
   return (
