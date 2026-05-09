@@ -36,13 +36,25 @@ export function CategorySidebar({
                 <button
                   onClick={() => onCategory(c)}
                   className={cn(
-                    "group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm transition",
+                    "group flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-sm transition",
                     active
-                      ? "bg-amber-soft text-amber"
+                      ? "bg-amber-soft text-ink"
                       : "text-foreground/80 hover:bg-surface hover:text-foreground",
                   )}
                 >
-                  <span className="font-display text-base">{c}</span>
+                  <span
+                    className={cn(
+                      "grid h-7 w-7 shrink-0 place-items-center rounded-md transition",
+                      active ? "text-ink" : "text-foreground/40 group-hover:text-foreground/70",
+                    )}
+                  >
+                    {c === "Todos" ? (
+                      <LayoutGrid className="h-4 w-4" strokeWidth={2} />
+                    ) : (
+                      <CategoryIllustration category={c} className="h-6 w-6" />
+                    )}
+                  </span>
+                  <span className="font-display text-base flex-1 text-left">{c}</span>
                   <span className="font-mono text-[10px] tabular text-muted-foreground">
                     {countByCategory(c)}
                   </span>
