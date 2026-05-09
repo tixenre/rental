@@ -1,12 +1,15 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Trash2, Plus, Minus, AlertTriangle } from "lucide-react";
+import { X, Trash2, Plus, Minus, AlertTriangle, Loader2 } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
 import { equipment, formatPrice } from "@/data/equipment";
 import { getAvailability } from "@/lib/availability";
 import { EmptyImage } from "./EmptyImage";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { createOrder } from "@/lib/orders";
+import { useNavigate } from "@tanstack/react-router";
 
 export function CartDrawer() {
   const {
