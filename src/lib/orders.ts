@@ -1,5 +1,12 @@
-import { supabase } from "@/integrations/supabase/client";
-import { equipment } from "@/data/equipment";
+/**
+ * orders.ts — API de pedidos del cliente.
+ *
+ * Habla con el backend FastAPI (Railway) usando el JWT de Supabase Auth.
+ * El backend valida el JWT, hace upsert del cliente y crea/lee `alquileres`.
+ * Antes esto vivía duplicado en una tabla `orders` de Supabase; ya no.
+ */
+
+import { authedJson, authedPostJson, authedFetch } from "./authedFetch";
 
 export type OrderStatus =
   | "borrador"
@@ -38,6 +45,8 @@ export type OrderItemInput = {
   category: string;
   qty: number;
   pricePerDay: number;
+  /** ID numérico del equipo en el backend FastAPI. Requerido para crear pedido. */
+  backendId?: number;
 };
 
 export type CreateOrderInput = {
@@ -47,123 +56,177 @@ export type CreateOrderInput = {
   startTime: string;
   endTime: string;
   days: number;
-  /** Mapa id→qty (compat con flujo viejo basado en mock estático). */
-  items?: Record<string, number>;
-  /** Items enriquecidos (preferido — funciona con backend o mock). */
-  resolvedItems?: OrderItemInput[];
+  resolvedItems: OrderItemInput[];
   notes?: string;
 };
 
-function toIsoDate(d?: Date) {
-  if (!d) return null;
+export type Order = {
+  id: string;
+  status: OrderStatus;
+  start_date: string | null;
+  end_date: string | null;
+  start_time: string;
+  end_time: string;
+  days: number;
+  total: number;
+  notes: string | null;
+};
+
+export type OrderItem = {
+  id: string;
+  name: string;
+  brand: string;
+  qty: number;
+  price_per_day: number;
+};
+
+export type ChangeRequest = {
+  id: string;
+  status: "pendiente" | "aceptado" | "rechazado";
+  message: string;
+  created_at: string;
+};
+
+/* ── Mapeo backend → frontend ─────────────────────────────────────────────── */
+
+const ESTADO_MAP: Record<string, OrderStatus> = {
+  borrador: "borrador",
+  presupuesto: "solicitado",
+  solicitado: "solicitado",
+  confirmado: "confirmado",
+  entregado: "entregado",
+  devuelto: "devuelto",
+  cancelado: "cancelado",
+  finalizado: "devuelto",
+};
+
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function fmtIsoLocal(d: Date, time: string) {
   const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return `${y}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${time}:00`;
 }
 
-export async function createOrder(input: CreateOrderInput) {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Necesitás iniciar sesión.");
-
-  let itemsList: OrderItemInput[];
-  if (input.resolvedItems && input.resolvedItems.length > 0) {
-    itemsList = input.resolvedItems;
-  } else {
-    itemsList = Object.entries(input.items ?? {})
-      .map(([id, qty]) => {
-        const eq = equipment.find((e) => e.id === id);
-        if (!eq || qty <= 0) return null;
-        return {
-          id: eq.id,
-          name: eq.name,
-          brand: eq.brand,
-          category: eq.category,
-          qty,
-          pricePerDay: eq.pricePerDay,
-        };
-      })
-      .filter(Boolean) as OrderItemInput[];
-  }
-
-  const subtotalPerDay = itemsList.reduce((s, it) => s + it.pricePerDay * it.qty, 0);
-  const total = subtotalPerDay * input.days;
-
-  const { data: order, error } = await supabase
-    .from("orders")
-    .insert({
-      user_id: u.user.id,
-      status: input.status,
-      start_date: toIsoDate(input.startDate),
-      end_date: toIsoDate(input.endDate),
-      start_time: input.startTime,
-      end_time: input.endTime,
-      days: input.days,
-      subtotal_per_day: subtotalPerDay,
-      total,
-      notes: input.notes ?? null,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-
-  if (itemsList.length > 0) {
-    const { error: itemsError } = await supabase.from("order_items").insert(
-      itemsList.map((it) => ({
-        order_id: order.id,
-        equipment_id: it.id,
-        name: it.name,
-        brand: it.brand,
-        category: it.category,
-        qty: it.qty,
-        price_per_day: it.pricePerDay,
-      }))
-    );
-    if (itemsError) throw itemsError;
-  }
-
-  return order;
+function timePart(d: Date | null, fallback: string) {
+  if (!d || isNaN(d.getTime())) return fallback;
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export async function listOrders() {
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data;
-}
-
-export async function getOrder(id: string) {
-  const [orderRes, itemsRes, requestsRes] = await Promise.all([
-    supabase.from("orders").select("*").eq("id", id).single(),
-    supabase.from("order_items").select("*").eq("order_id", id),
-    supabase
-      .from("order_change_requests")
-      .select("*")
-      .eq("order_id", id)
-      .order("created_at", { ascending: false }),
-  ]);
-  if (orderRes.error) throw orderRes.error;
+function adaptOrder(b: Record<string, unknown>): Order {
+  const fd = b.fecha_desde ? new Date(String(b.fecha_desde)) : null;
+  const fh = b.fecha_hasta ? new Date(String(b.fecha_hasta)) : null;
+  const days =
+    fd && fh
+      ? Math.max(1, Math.ceil((fh.getTime() - fd.getTime()) / 86_400_000))
+      : 1;
   return {
-    order: orderRes.data,
-    items: itemsRes.data ?? [],
-    changeRequests: requestsRes.data ?? [],
+    id: String(b.id),
+    status: ESTADO_MAP[String(b.estado)] ?? "solicitado",
+    start_date: fd ? fd.toISOString() : null,
+    end_date: fh ? fh.toISOString() : null,
+    start_time: timePart(fd, "09:00"),
+    end_time: timePart(fh, "18:00"),
+    days,
+    total: Number(b.monto_total ?? 0),
+    notes: (b.notas as string | null) ?? null,
   };
 }
 
-export async function cancelOrder(id: string) {
-  const { error } = await supabase.from("orders").update({ status: "cancelado" }).eq("id", id);
-  if (error) throw error;
+function adaptItems(items: Array<Record<string, unknown>>): OrderItem[] {
+  return items.map((it, i) => ({
+    id: String(it.equipo_id ?? i),
+    name: String(it.nombre ?? ""),
+    brand: String(it.marca ?? ""),
+    qty: Number(it.cantidad ?? 0),
+    price_per_day: Number(it.precio_jornada ?? 0),
+  }));
+}
+
+const SOLIC_MAP: Record<string, ChangeRequest["status"]> = {
+  pendiente: "pendiente",
+  aprobada: "aceptado",
+  rechazada: "rechazado",
+};
+
+function adaptChangeRequests(
+  arr: Array<Record<string, unknown>>,
+): ChangeRequest[] {
+  return arr.map((s) => ({
+    id: String(s.id),
+    status: SOLIC_MAP[String(s.estado)] ?? "pendiente",
+    message: String(s.mensaje ?? ""),
+    created_at: String(s.created_at ?? new Date().toISOString()),
+  }));
+}
+
+/* ── API pública ──────────────────────────────────────────────────────────── */
+
+export async function createOrder(input: CreateOrderInput): Promise<Order> {
+  const items = (input.resolvedItems ?? []).filter((it) => it.qty > 0);
+  if (items.length === 0) throw new Error("El pedido está vacío.");
+
+  const missing = items.find((it) => !it.backendId);
+  if (missing) {
+    throw new Error(
+      `No se puede solicitar "${missing.name}" porque el catálogo está en modo offline.`,
+    );
+  }
+
+  const body = {
+    fecha_desde: input.startDate
+      ? fmtIsoLocal(input.startDate, input.startTime)
+      : null,
+    fecha_hasta: input.endDate ? fmtIsoLocal(input.endDate, input.endTime) : null,
+    notas: input.notes ?? null,
+    items: items.map((it) => ({
+      equipo_id: it.backendId!,
+      cantidad: it.qty,
+      precio_jornada: Math.round(it.pricePerDay),
+    })),
+  };
+
+  const created = await authedPostJson<Record<string, unknown>>(
+    "/api/cliente/pedidos",
+    body,
+  );
+  return adaptOrder(created);
+}
+
+export async function listOrders(): Promise<Order[]> {
+  const arr = await authedJson<Array<Record<string, unknown>>>(
+    "/api/cliente/pedidos",
+  );
+  return arr.map(adaptOrder);
+}
+
+export async function getOrder(id: string) {
+  const b = await authedJson<Record<string, unknown>>(
+    `/api/cliente/pedidos/${id}`,
+  );
+  return {
+    order: adaptOrder(b),
+    items: adaptItems((b.items as Array<Record<string, unknown>>) ?? []),
+    changeRequests: adaptChangeRequests(
+      (b.solicitudes as Array<Record<string, unknown>>) ?? [],
+    ),
+  };
+}
+
+export async function cancelOrder(id: string): Promise<void> {
+  const res = await authedFetch(`/api/cliente/pedidos/${id}/cancelar`, {
+    method: "PATCH",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? `PATCH cancelar → ${res.status}`);
+  }
 }
 
 export async function createChangeRequest(orderId: string, message: string) {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Necesitás iniciar sesión.");
-  const { error } = await supabase.from("order_change_requests").insert({
-    order_id: orderId,
-    user_id: u.user.id,
-    message,
-  });
-  if (error) throw error;
+  await authedPostJson(
+    `/api/cliente/pedidos/${orderId}/solicitar-modificacion`,
+    { mensaje: message },
+  );
 }

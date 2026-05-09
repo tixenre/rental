@@ -1,11 +1,13 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Trash2, Plus, Minus, Loader2 } from "lucide-react";
+import { X, Trash2, Plus, Minus, Loader2, LogIn } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
-import { apiPostPedido } from "@/lib/api";
+import { createOrder } from "@/lib/orders";
+import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -37,15 +39,12 @@ export function CartDrawer({
 
   const isBottom = drawerPlacement === "bottom";
 
+  const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  // Form de contacto (mínimo para crear el pedido)
-  const [nombre, setNombre] = useState("");
-  const [email, setEmail] = useState("");
-  const [telefono, setTelefono] = useState("");
-  const [showForm, setShowForm] = useState(false);
+  const [notas, setNotas] = useState("");
+  const [showNotas, setShowNotas] = useState(false);
 
   // Refs para focus trap + restauración de foco
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -64,9 +63,6 @@ export function CartDrawer({
   const d = days();
   const subtotal = list.reduce((s, { it, qty }) => s + it.pricePerDay * qty, 0);
   const total = subtotal * d;
-
-  const formatFecha = (date: Date, time: string) =>
-    `${format(date, "yyyy-MM-dd")}T${time}:00`;
 
   // Lock scroll del body + guardar foco al abrir, restaurar al cerrar
   useEffect(() => {
@@ -118,24 +114,30 @@ export function CartDrawer({
     return () => document.removeEventListener("keydown", onKey);
   }, [drawerOpen, setDrawerOpen]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     if (!startDate || !endDate) return;
     if (list.length === 0) return;
+    if (!user) return;
 
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await apiPostPedido({
-        cliente_nombre: nombre,
-        cliente_email: email,
-        cliente_telefono: telefono || undefined,
-        fecha_desde: formatFecha(startDate, startTime),
-        fecha_hasta: formatFecha(endDate, endTime),
-        items: list.map(({ it, qty }) => ({
-          equipo_id: it._backendId!,
-          cantidad: qty,
-          precio_jornada: it.pricePerDay,
+      await createOrder({
+        status: "solicitado",
+        startDate,
+        endDate,
+        startTime,
+        endTime,
+        days: d,
+        notes: notas.trim() || undefined,
+        resolvedItems: list.map(({ it, qty }) => ({
+          id: it.id,
+          name: it.name,
+          brand: it.brand,
+          category: it.category,
+          qty,
+          pricePerDay: it.pricePerDay,
+          backendId: it._backendId,
         })),
       });
       setSubmitted(true);
@@ -150,10 +152,8 @@ export function CartDrawer({
   function reset() {
     setSubmitted(false);
     setSubmitError(null);
-    setShowForm(false);
-    setNombre("");
-    setEmail("");
-    setTelefono("");
+    setShowNotas(false);
+    setNotas("");
     setDrawerOpen(false);
   }
 
@@ -341,55 +341,26 @@ export function CartDrawer({
                         })}
                       </ul>
 
-                      {/* Formulario de contacto */}
-                      {showForm && (
-                        <form
-                          onSubmit={handleSubmit}
-                          className="mt-4 space-y-3 rounded-lg border hairline bg-surface p-4"
-                        >
+                      {/* Notas opcionales */}
+                      {showNotas && (
+                        <div className="mt-4 space-y-2 rounded-lg border hairline bg-surface p-4">
                           <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
-                            Tus datos de contacto
+                            Notas para nosotros (opcional)
                           </div>
-                          <input
-                            required
-                            placeholder="Nombre completo"
-                            value={nombre}
-                            onChange={(e) => setNombre(e.target.value)}
-                            className="w-full rounded-md border hairline bg-background px-3 py-2.5 text-sm focus:border-amber/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+                          <textarea
+                            value={notas}
+                            onChange={(e) => setNotas(e.target.value)}
+                            rows={3}
+                            maxLength={500}
+                            placeholder="Ej: necesito dolly extra, retiro fuera de horario, etc."
+                            className="w-full resize-none rounded-md border hairline bg-background px-3 py-2 text-sm focus:border-amber/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
                           />
-                          <input
-                            required
-                            type="email"
-                            placeholder="Email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full rounded-md border hairline bg-background px-3 py-2.5 text-sm focus:border-amber/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
-                          />
-                          <input
-                            placeholder="Teléfono (opcional)"
-                            value={telefono}
-                            onChange={(e) => setTelefono(e.target.value)}
-                            className="w-full rounded-md border hairline bg-background px-3 py-2.5 text-sm focus:border-amber/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
-                          />
-                          {submitError && (
-                            <p role="alert" className="text-xs text-destructive">
-                              {submitError}
-                            </p>
-                          )}
-                          <button
-                            type="submit"
-                            disabled={submitting}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
-                          >
-                            {submitting ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin" /> Enviando…
-                              </>
-                            ) : (
-                              "Confirmar solicitud"
-                            )}
-                          </button>
-                        </form>
+                        </div>
+                      )}
+                      {submitError && (
+                        <p role="alert" className="mt-3 text-xs text-destructive">
+                          {submitError}
+                        </p>
                       )}
                     </>
                   )}
@@ -413,15 +384,45 @@ export function CartDrawer({
                     </span>
                   </div>
 
-                  {!showForm ? (
-                    <button
-                      disabled={list.length === 0 || !startDate || !endDate}
-                      onClick={() => setShowForm(true)}
-                      className="w-full rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                  {!user ? (
+                    <Link
+                      to="/login"
+                      onClick={() => setDrawerOpen(false)}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
                     >
-                      Solicitar cotización
-                    </button>
-                  ) : null}
+                      <LogIn className="h-4 w-4" /> Iniciar sesión para enviar
+                    </Link>
+                  ) : (
+                    <>
+                      {!showNotas && list.length > 0 && (
+                        <button
+                          onClick={() => setShowNotas(true)}
+                          className="w-full text-xs text-muted-foreground hover:text-ink focus:outline-none focus-visible:underline"
+                        >
+                          Agregar una nota
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={
+                          submitting ||
+                          list.length === 0 ||
+                          !startDate ||
+                          !endDate
+                        }
+                        onClick={handleSubmit}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" /> Enviando…
+                          </>
+                        ) : (
+                          "Confirmar solicitud"
+                        )}
+                      </button>
+                    </>
+                  )}
 
                   {(!startDate || !endDate) ? (
                     <p className="text-center text-xs text-muted-foreground">

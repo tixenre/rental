@@ -9,6 +9,7 @@ from typing import Optional
 
 from database import get_db, row_to_dict
 from routes.auth import get_session, signer, COOKIE_SECURE, SESSION_MAX_AGE
+from supabase_auth import upsert_cliente_from_claims
 from itsdangerous import BadSignature, SignatureExpired
 
 router = APIRouter()
@@ -17,6 +18,20 @@ router = APIRouter()
 # ── Auth helper ───────────────────────────────────────────────────────────────
 
 def require_cliente(request: Request) -> dict:
+    """
+    Devuelve `{cliente_id, email, name, role}` aceptando dos métodos:
+      1. JWT de Supabase Auth (frontend Lovable) — se hace upsert en `clientes`.
+      2. Cookie de sesión clásica (portal cliente con login propio).
+    """
+    claims = getattr(request.state, "supabase_claims", None)
+    if claims:
+        cliente = upsert_cliente_from_claims(claims)
+        return {
+            "cliente_id": cliente["id"],
+            "email": cliente.get("email"),
+            "name": cliente.get("nombre"),
+            "role": "cliente",
+        }
     session = get_session(request)
     if not session or session.get("role") != "cliente":
         raise HTTPException(401, "Sesión de cliente requerida")
@@ -119,6 +134,72 @@ def cliente_me(request: Request):
         if not row:
             raise HTTPException(404, "Cliente no encontrado")
         return row_to_dict(row)
+    finally:
+        conn.close()
+
+
+# ── Crear / cancelar pedido ───────────────────────────────────────────────────
+
+class CartItemIn(BaseModel):
+    equipo_id:      int
+    cantidad:       int
+    precio_jornada: int = 0
+
+
+class PedidoClienteCreate(BaseModel):
+    fecha_desde: Optional[str] = None
+    fecha_hasta: Optional[str] = None
+    notas:       Optional[str] = None
+    items:       list[CartItemIn] = []
+
+
+@router.post("/api/cliente/pedidos", status_code=201)
+def cliente_crear_pedido(data: PedidoClienteCreate, request: Request):
+    """Crea un pedido (estado 'presupuesto') ligado al cliente autenticado."""
+    session = require_cliente(request)
+    cliente_id = session["cliente_id"]
+
+    if not data.items:
+        raise HTTPException(400, "El pedido debe tener al menos un ítem")
+
+    # Reusamos la lógica de creación del back-office para mantener una sola fuente.
+    from routes.alquileres import create_pedido, PedidoCreate, PedidoItem
+
+    payload = PedidoCreate(
+        cliente_id=cliente_id,
+        fecha_desde=data.fecha_desde,
+        fecha_hasta=data.fecha_hasta,
+        notas=data.notas,
+        estado="presupuesto",
+        items=[
+            PedidoItem(
+                equipo_id=i.equipo_id,
+                cantidad=i.cantidad,
+                precio_jornada=i.precio_jornada,
+            )
+            for i in data.items
+        ],
+    )
+    return create_pedido(payload)
+
+
+@router.patch("/api/cliente/pedidos/{id}/cancelar")
+def cliente_cancelar_pedido(id: int, request: Request):
+    session = require_cliente(request)
+    cliente_id = session["cliente_id"]
+    conn = get_db()
+    try:
+        p = conn.execute(
+            "SELECT estado FROM alquileres WHERE id = ? AND cliente_id = ?",
+            (id, cliente_id),
+        ).fetchone()
+        if not p:
+            raise HTTPException(404, "Pedido no encontrado")
+        if p["estado"] not in ("borrador", "presupuesto", "solicitado"):
+            raise HTTPException(400, "Este pedido ya no se puede cancelar")
+        conn.execute("UPDATE alquileres SET estado = 'cancelado' WHERE id = ?", (id,))
+        conn.commit()
+        return {"ok": True}
     finally:
         conn.close()
 
