@@ -383,6 +383,34 @@ function ListMode({
   onClear: () => void;
   filtered: typeof equipment;
 }) {
+  const PAGE_SIZE = 20;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset paging when filters/search change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [query, brand, selectedCats, filtered.length]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    if (visibleCount >= filtered.length) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount((c) => Math.min(c + PAGE_SIZE, filtered.length));
+        }
+      },
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visibleCount, filtered.length]);
+
+  const visibleItems = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
+
   return (
     <>
       <ListFilters
@@ -404,11 +432,26 @@ function ListMode({
             </p>
           </div>
         ) : (
-          <div className="space-y-1.5">
-            {filtered.map((item) => (
-              <EquipmentRow key={item.id} item={item} />
-            ))}
-          </div>
+          <>
+            <div className="space-y-1.5">
+              {visibleItems.map((item) => (
+                <EquipmentRow key={item.id} item={item} />
+              ))}
+            </div>
+            {hasMore && (
+              <div
+                ref={sentinelRef}
+                className="flex items-center justify-center py-6 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground"
+              >
+                Cargando más equipos…
+              </div>
+            )}
+            {!hasMore && filtered.length > PAGE_SIZE && (
+              <div className="py-6 text-center font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                Fin del catálogo · {filtered.length} equipos
+              </div>
+            )}
+          </>
         )}
       </div>
       <CartMiniBar />
