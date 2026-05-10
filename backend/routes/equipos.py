@@ -307,7 +307,10 @@ def get_ficha(id: int):
         ).fetchone()
         if row:
             return row_to_dict(row)
-        return {"equipo_id": id, "descripcion": None, "notas": None, "specs_json": None}
+        return {
+            "equipo_id": id, "descripcion": None, "notas": None, "specs_json": None,
+            "montura": None, "formato": None, "resolucion": None,
+        }
     finally:
         conn.close()
 
@@ -319,14 +322,19 @@ def upsert_ficha(id: int, data: FichaUpdate):
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
         conn.execute("""
-            INSERT INTO equipo_fichas (equipo_id, descripcion, notas, specs_json, updated_at)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO equipo_fichas
+                (equipo_id, descripcion, notas, specs_json, montura, formato, resolucion, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(equipo_id) DO UPDATE SET
                 descripcion = excluded.descripcion,
                 notas       = excluded.notas,
                 specs_json  = excluded.specs_json,
+                montura     = excluded.montura,
+                formato     = excluded.formato,
+                resolucion  = excluded.resolucion,
                 updated_at  = CURRENT_TIMESTAMP
-        """, (id, data.descripcion, data.notas, data.specs_json))
+        """, (id, data.descripcion, data.notas, data.specs_json,
+              data.montura, data.formato, data.resolucion))
         conn.commit()
         row = conn.execute(
             "SELECT * FROM equipo_fichas WHERE equipo_id = ?", (id,)
