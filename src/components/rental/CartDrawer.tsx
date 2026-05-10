@@ -1,13 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Trash2, Plus, Minus, Loader2, LogIn } from "lucide-react";
+import { X, Trash2, Plus, Minus, Loader2 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
 import { createOrder } from "@/lib/orders";
-import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -39,7 +37,6 @@ export function CartDrawer({
 
   const isBottom = drawerPlacement === "bottom";
 
-  const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
