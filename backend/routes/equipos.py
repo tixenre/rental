@@ -139,7 +139,8 @@ def list_equipos(
     if solo_visibles or not is_admin:
         base_sql += " AND e.visible_catalogo = 1 AND e.estado != 'fuera_servicio'"
     if q:
-        base_sql += " AND (e.nombre LIKE ? OR e.marca LIKE ? OR e.modelo LIKE ?)"
+        # ILIKE = case-insensitive (Postgres). Permite buscar "sony" / "Sony" / "SONY".
+        base_sql += " AND (e.nombre ILIKE ? OR e.marca ILIKE ? OR e.modelo ILIKE ?)"
         like = f"%{q}%"
         params += [like, like, like]
     if categoria:
