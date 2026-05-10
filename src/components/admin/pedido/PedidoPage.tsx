@@ -47,7 +47,7 @@ import {
 import { pedidoEstadoVariant } from "@/components/admin/PedidoDetailSheet";
 import {
   usePedidoDraft, jornadasEntre,
-  type DraftItem, type SaveStatus,
+  type DraftItem, type DraftDatos, type SaveStatus,
 } from "./usePedidoDraft";
 
 const fmtArs = (n: number | null | undefined) =>
