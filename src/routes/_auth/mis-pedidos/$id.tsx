@@ -55,7 +55,7 @@ function OrderDetailPage() {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Cargando…</div>;
   }
 
-  const { order, items, changeRequests } = data;
+  const { order, items, changeRequests, documentosDisponibles } = data;
   const status = order.status as OrderStatus;
   const editable = isEditable(status);
 
