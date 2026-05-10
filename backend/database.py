@@ -295,36 +295,82 @@ def init_db():
         )
     """)
 
+    # ── Etiquetas (bolsa libre / índice de búsqueda) ─────────────────────
+    # Las etiquetas son strings libres: incluyen marca, modelo, palabras del
+    # nombre, nombres de categorías asignadas y lo que el admin agregue.
+    # NO son jerárquicas — la jerarquía vive en la tabla `categorias`.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS etiquetas (
             id     SERIAL PRIMARY KEY,
             nombre TEXT UNIQUE NOT NULL
         )
     """)
-
-    # Prioridad para ordenar categorías (menor = más arriba)
+    # Columna prioridad legacy — se mantiene pero ya no se usa para ordenar
+    # categorías. Queda por compat con datos viejos.
     conn.execute("""
         ALTER TABLE etiquetas
         ADD COLUMN IF NOT EXISTS prioridad INTEGER NOT NULL DEFAULT 100
     """)
-    # Jerarquía: parent_id para soportar 2 niveles (categoría → subcategoría).
-    # NULL = categoría raíz. Los hijos no pueden tener hijos a su vez (validado en API).
+    # parent_id legacy: se va a dropear más abajo, después de migrar a `categorias`.
     conn.execute("""
         ALTER TABLE etiquetas
         ADD COLUMN IF NOT EXISTS parent_id INTEGER
-            REFERENCES etiquetas(id) ON DELETE SET NULL
-    """)
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_etiq_prioridad ON etiquetas(prioridad, nombre)
-    """)
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_etiq_parent ON etiquetas(parent_id, prioridad, nombre)
     """)
 
-    # Seed del árbol de categorías. Idempotente: usa ON CONFLICT (nombre).
-    # Cada raíz se crea/actualiza con su prioridad. Luego sus hijos.
-    # Nota: el seed solo PISA prioridad si la etiqueta todavía está en 100 (default),
-    # así nunca rompe ajustes hechos desde el back-office.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS equipo_etiquetas (
+            equipo_id   INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            etiqueta_id INTEGER NOT NULL REFERENCES etiquetas(id) ON DELETE CASCADE,
+            orden       INTEGER DEFAULT 0,
+            PRIMARY KEY (equipo_id, etiqueta_id)
+        )
+    """)
+    # `origen` distingue etiquetas auto-generadas (a partir de categorías,
+    # marca, modelo, nombre) de las puestas a mano por el admin. Permite
+    # regenerar las auto sin tocar las manuales.
+    conn.execute("""
+        ALTER TABLE equipo_etiquetas
+        ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT 'manual'
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_eq_etiq ON equipo_etiquetas(equipo_id)
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_eq_etiq_origen
+            ON equipo_etiquetas(equipo_id, origen)
+    """)
+
+    # ── Categorías (taxonomía dedicada, árbol de 2 niveles) ──────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS categorias (
+            id        SERIAL PRIMARY KEY,
+            nombre    TEXT UNIQUE NOT NULL,
+            prioridad INTEGER NOT NULL DEFAULT 100,
+            parent_id INTEGER REFERENCES categorias(id) ON DELETE SET NULL
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_cat_prioridad ON categorias(prioridad, nombre)
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_cat_parent ON categorias(parent_id, prioridad, nombre)
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS equipo_categorias (
+            equipo_id    INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            categoria_id INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+            orden        INTEGER DEFAULT 0,
+            PRIMARY KEY (equipo_id, categoria_id)
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_eq_cat ON equipo_categorias(equipo_id)
+    """)
+
+    # Seed del árbol de categorías (en la tabla `categorias`, no en etiquetas).
+    # Idempotente: ON CONFLICT (nombre). Solo pisa prioridad cuando está en
+    # default (100), así no rompe ajustes manuales del back-office.
     SEED_TREE = [
         # (prioridad, nombre_padre, [hijos…])
         (10,  "Cámaras",              ["Video", "Foto", "Acción"]),
@@ -346,49 +392,66 @@ def init_db():
         (110, "Estudio y Producción", ["Set / Backdrops", "Paquetes"]),
     ]
 
+    # Set de todos los nombres del árbol — se usa abajo para migrar etiquetas
+    # legacy (las que actualmente viven en `etiquetas` como nodos del árbol)
+    # hacia `categorias`.
+    SEED_NAMES: set[str] = set()
     for pri, parent_name, children in SEED_TREE:
-        # Upsert padre (sin parent_id).
+        SEED_NAMES.add(parent_name)
+        SEED_NAMES.update(children)
+
+    for pri, parent_name, children in SEED_TREE:
         conn.execute("""
-            INSERT INTO etiquetas (nombre, prioridad, parent_id)
+            INSERT INTO categorias (nombre, prioridad, parent_id)
             VALUES (%s, %s, NULL)
             ON CONFLICT (nombre) DO UPDATE
                 SET prioridad = CASE
-                        WHEN etiquetas.prioridad = 100 THEN EXCLUDED.prioridad
-                        ELSE etiquetas.prioridad
+                        WHEN categorias.prioridad = 100 THEN EXCLUDED.prioridad
+                        ELSE categorias.prioridad
                     END,
                     parent_id = NULL
         """, (parent_name, pri))
-        # Obtener id del padre.
         prow = conn.execute(
-            "SELECT id FROM etiquetas WHERE nombre = %s", (parent_name,)
+            "SELECT id FROM categorias WHERE nombre = %s", (parent_name,)
         ).fetchone()
-        parent_id = prow["id"]
-        # Upsert hijos con prioridad escalonada (10, 20, 30…) y parent_id.
+        parent_cat_id = prow["id"]
         for idx, child_name in enumerate(children, start=1):
             child_pri = idx * 10
             conn.execute("""
-                INSERT INTO etiquetas (nombre, prioridad, parent_id)
+                INSERT INTO categorias (nombre, prioridad, parent_id)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (nombre) DO UPDATE
                     SET parent_id = EXCLUDED.parent_id,
                         prioridad = CASE
-                            WHEN etiquetas.prioridad = 100 THEN EXCLUDED.prioridad
-                            ELSE etiquetas.prioridad
+                            WHEN categorias.prioridad = 100 THEN EXCLUDED.prioridad
+                            ELSE categorias.prioridad
                         END
-            """, (child_name, child_pri, parent_id))
+            """, (child_name, child_pri, parent_cat_id))
 
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS equipo_etiquetas (
-            equipo_id   INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
-            etiqueta_id INTEGER NOT NULL REFERENCES etiquetas(id) ON DELETE CASCADE,
-            orden       INTEGER DEFAULT 0,
-            PRIMARY KEY (equipo_id, etiqueta_id)
-        )
-    """)
+    # ── Migración: mover nodos del árbol que viven en `etiquetas` → `categorias` ──
+    # Esta migración corre una sola vez por el ciclo de vida de cada nombre:
+    # busca etiquetas cuyo nombre coincide con un nodo del árbol, mueve sus
+    # asignaciones desde `equipo_etiquetas` → `equipo_categorias`, y borra
+    # la etiqueta original. Idempotente: si ya está migrada, no encuentra nada.
+    legacy_rows = conn.execute("""
+        SELECT et.id AS etiq_id, et.nombre, c.id AS cat_id
+        FROM etiquetas et
+        JOIN categorias c ON c.nombre = et.nombre
+    """).fetchall()
+    for r in legacy_rows:
+        # Copiar asignaciones: equipo_etiquetas → equipo_categorias.
+        conn.execute("""
+            INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
+            SELECT equipo_id, %s, orden
+            FROM equipo_etiquetas
+            WHERE etiqueta_id = %s
+            ON CONFLICT (equipo_id, categoria_id) DO NOTHING
+        """, (r["cat_id"], r["etiq_id"]))
+        # Borrar la etiqueta vieja (CASCADE elimina equipo_etiquetas).
+        conn.execute("DELETE FROM etiquetas WHERE id = %s", (r["etiq_id"],))
 
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_eq_etiq ON equipo_etiquetas(equipo_id)
-    """)
+    # Drop legacy parent_id de etiquetas — ya no se usa (la jerarquía vive en categorias).
+    conn.execute("ALTER TABLE etiquetas DROP COLUMN IF EXISTS parent_id")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_precio_historial (
