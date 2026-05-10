@@ -39,6 +39,21 @@ export type EquipoAfuera = {
 
 // ── Equipos ──────────────────────────────────────────────────────────────
 
+export type Ficha = {
+  descripcion: string | null;
+  notas:       string | null;
+  specs_json:  string | null;
+  montura:     string | null;
+  formato:     string | null;
+  resolucion:  string | null;
+};
+
+export type CategoriaRef = {
+  id: number;
+  nombre: string;
+  parent_id: number | null;
+};
+
 export type Equipo = {
   id: number;
   nombre: string;
@@ -58,6 +73,8 @@ export type Equipo = {
   estado: string;
   etiquetas?: string[];
   kit?: KitComponente[];
+  categorias?: CategoriaRef[];
+  ficha?: Ficha;
 };
 
 export type KitComponente = {
@@ -75,7 +92,7 @@ export type EquiposListResp = {
   items: Equipo[];
 };
 
-export type EquipoInput = Partial<Omit<Equipo, "id" | "etiquetas">> & {
+export type EquipoInput = Partial<Omit<Equipo, "id" | "etiquetas" | "kit" | "categorias" | "ficha">> & {
   nombre: string;
 };
 
