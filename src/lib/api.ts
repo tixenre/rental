@@ -40,6 +40,7 @@ export type BackendFicha = {
   montura: string | null;
   formato: string | null;
   resolucion: string | null;
+  keywords_json: string | null;
 };
 
 export type BackendCategoriaRef = {
