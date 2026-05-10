@@ -71,11 +71,9 @@ export function EnriquecerEquipoDialog({
     setResult(null);
     try {
       const r = await enriquecer({
-        data: {
-          nombre: equipo.nombre,
-          marca: equipo.marca,
-          modelo: equipo.modelo,
-        },
+        nombre: equipo.nombre,
+        marca: equipo.marca,
+        modelo: equipo.modelo,
       });
       setResult(r);
       setMarca(r.marca ?? "");
