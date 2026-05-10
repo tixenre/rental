@@ -136,17 +136,26 @@ function Index() {
   };
 
   const filtered = useMemo(() => {
+    // Normaliza: minúsculas + sin acentos. Así "baterias" matchea "Batería".
+    const norm = (s: string) =>
+      (s ?? "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
     let list = allEquipos.slice();
     if (selectedCats.size > 0) list = list.filter((e) => selectedCats.has(e.category));
     if (brand) list = list.filter((e) => e.brand === brand);
     if (query.trim()) {
-      const q = query.toLowerCase();
-      list = list.filter(
-        (e) =>
-          (e.name ?? "").toLowerCase().includes(q) ||
-          (e.brand ?? "").toLowerCase().includes(q) ||
-          (e.category ?? "").toLowerCase().includes(q),
-      );
+      // Cada palabra de la query debe aparecer en el "haystack" del equipo.
+      const tokens = norm(query).split(/\s+/).filter(Boolean);
+      list = list.filter((e) => {
+        const specsText = (e.specs ?? []).map((s) => `${s.label} ${s.value}`).join(" ");
+        const haystack = norm(
+          [e.name, e.brand, e.category, e.description ?? "", specsText].join(" "),
+        );
+        return tokens.every((t) => haystack.includes(t));
+      });
     }
     return list;
   }, [selectedCats, brand, query, allEquipos]);

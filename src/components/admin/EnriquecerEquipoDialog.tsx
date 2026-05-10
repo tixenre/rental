@@ -105,20 +105,19 @@ export function EnriquecerEquipoDialog({
     if (!result) return;
     const patch: Record<string, unknown> = {};
     const aplicados: string[] = [];
+    const fallidos: string[] = [];
 
-    if (aplicarMarca && marca) { patch.marca = marca; aplicados.push(`marca: ${marca}`); }
-    if (aplicarModelo && modelo) { patch.modelo = modelo; aplicados.push(`modelo: ${modelo}`); }
-    if (aplicarBh && bhUrl) { patch.bh_url = bhUrl; aplicados.push("link fuente"); }
+    if (aplicarMarca && marca) { patch.marca = marca; }
+    if (aplicarModelo && modelo) { patch.modelo = modelo; }
+    if (aplicarBh && bhUrl) { patch.bh_url = bhUrl; }
 
     // Ficha (descripción + specs) — se persiste aparte
     const fichaPatch: { descripcion?: string | null; specs_json?: string | null } = {};
     if (aplicarDescripcion && result.descripcion) {
       fichaPatch.descripcion = result.descripcion;
-      aplicados.push("descripción");
     }
     if (aplicarSpecs && result.specs.length > 0) {
       fichaPatch.specs_json = JSON.stringify(result.specs);
-      aplicados.push(`${result.specs.length} specs`);
     }
 
     const willApplyFoto = aplicarFoto && !!fotoUrl;
@@ -141,29 +140,68 @@ export function EnriquecerEquipoDialog({
             ? fotoUrl
             : await uploadExternalUrlToBucket(equipo.id, fotoUrl);
           patch.foto_url = finalUrl;
-          aplicados.push(isBucketUrl(fotoUrl) ? "foto" : "foto (subida al storage)");
         } catch (e) {
-          toast.error(`No se pudo guardar la foto: ${e instanceof Error ? e.message : ""}`);
-          // seguimos con el resto
+          fallidos.push(`foto (${e instanceof Error ? e.message : "error"})`);
         }
       }
 
       // 2) Datos básicos del equipo
       if (Object.keys(patch).length > 0) {
-        await adminApi.updateEquipo(equipo.id, patch as Partial<Equipo>);
+        try {
+          await adminApi.updateEquipo(equipo.id, patch as Partial<Equipo>);
+          if (patch.marca) aplicados.push(`marca: ${patch.marca}`);
+          if (patch.modelo) aplicados.push(`modelo: ${patch.modelo}`);
+          if (patch.bh_url) aplicados.push("link fuente");
+          if (patch.foto_url) aplicados.push("foto");
+        } catch (e) {
+          fallidos.push(`datos básicos (${e instanceof Error ? e.message : "error"})`);
+        }
       }
 
       // 3) Ficha (descripción / specs)
       if (Object.keys(fichaPatch).length > 0) {
-        await adminApi.setFicha(equipo.id, fichaPatch);
+        try {
+          await adminApi.setFicha(equipo.id, fichaPatch);
+          if (fichaPatch.descripcion) aplicados.push("descripción");
+          if (fichaPatch.specs_json) aplicados.push(`${result.specs.length} specs`);
+        } catch (e) {
+          fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
+        }
       }
 
-      toast.success("Equipo actualizado ✨", {
-        description: aplicados.join(" · "),
-        duration: 5000,
-      });
+      // 4) Verificar que la ficha quedó persistida releyéndola
+      let verificada = true;
+      if (Object.keys(fichaPatch).length > 0) {
+        try {
+          const f = await adminApi.getFicha(equipo.id);
+          const okDesc = !fichaPatch.descripcion || (f.descripcion ?? "").length > 0;
+          const okSpecs = !fichaPatch.specs_json || !!f.specs_json;
+          verificada = okDesc && okSpecs;
+        } catch {
+          verificada = false;
+        }
+      }
+
+      if (aplicados.length === 0 && fallidos.length > 0) {
+        toast.error(`No se pudo guardar: ${fallidos.join(" · ")}`);
+      } else if (fallidos.length > 0) {
+        toast.warning(`Guardado parcial`, {
+          description: `OK: ${aplicados.join(" · ")}. Falló: ${fallidos.join(" · ")}`,
+          duration: 7000,
+        });
+      } else if (!verificada) {
+        toast.warning("Guardado pero la ficha no se ve al releer. Refrescá y revisá.", {
+          duration: 7000,
+        });
+      } else {
+        toast.success("Equipo actualizado ✨", {
+          description: aplicados.join(" · "),
+          duration: 5000,
+        });
+      }
+
       onApplied();
-      onOpenChange(false);
+      if (fallidos.length === 0) onOpenChange(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al guardar");
     } finally {
