@@ -160,11 +160,6 @@ function CalendarioPage() {
         ))}
       </div>
 
-      <PedidoDetailSheet
-        pedidoId={openId}
-        open={!!openId}
-        onOpenChange={(v) => { if (!v) setOpenId(null); }}
-      />
     </div>
   );
 }
