@@ -4,15 +4,16 @@ routes/dashboard.py — Dashboard de métricas y calendario de pedidos.
 
 import datetime
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from database import get_db, row_to_dict
+from admin_guard import require_admin
 
 router = APIRouter()
 
 
 @router.get("/dashboard")
-def get_dashboard():
+def get_dashboard(_admin: dict = Depends(require_admin)):
     conn    = get_db()
     hoy     = datetime.date.today().isoformat()
     manana  = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
@@ -85,8 +86,9 @@ def get_dashboard():
 
 @router.get("/calendario")
 def get_calendario(
-    desde: str = Query(...),
-    hasta: str = Query(...),
+    desde: str = Query(..., description="YYYY-MM-DD"),
+    hasta: str = Query(..., description="YYYY-MM-DD"),
+    _admin: dict = Depends(require_admin),
 ):
     conn = get_db()
     try:

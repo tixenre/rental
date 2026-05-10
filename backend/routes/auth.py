@@ -1,82 +1,72 @@
 """
-routes/auth.py — Login local (email+contraseña) y Google OAuth 2.0 (opcional)
+routes/auth.py — Google OAuth 2.0 + cookie de sesión firmada.
 """
 
 import os
 import time
-import httpx
-import hashlib
-import secrets
 from collections import defaultdict
-from urllib.parse import quote
 
+from authlib.integrations.httpx_client import OAuth2Client
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-from database import get_db
 
 router = APIRouter()
 
-# ── Config desde variables de entorno ──────────────────────────────────────
+# ── Config ──────────────────────────────────────────────────────────────────
 
-CLIENT_ID      = os.getenv("GOOGLE_CLIENT_ID", "")
-CLIENT_SECRET  = os.getenv("GOOGLE_CLIENT_SECRET", "")
-MAPS_API_KEY   = os.getenv("GOOGLE_MAPS_API_KEY", "")
-SECRET_KEY     = os.getenv("SECRET_KEY", "dev-secret-cambiame-en-produccion")
-if not SECRET_KEY or SECRET_KEY == "dev-secret-cambiame-en-produccion":
-    raise RuntimeError("SECRET_KEY no configurada — generá una con: python3 -c \"import secrets; print(secrets.token_hex(32))\"")
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY no configurada — generá una con: "
+        "python3 -c \"import secrets; print(secrets.token_urlsafe(32))\""
+    )
 
-REDIRECT_URI   = os.getenv("REDIRECT_URI", "http://localhost:8000/auth/callback")
-ALLOWED_EMAILS = set(
-    e.strip() for e in os.getenv("ALLOWED_EMAILS", "").split(",") if e.strip()
+GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+REDIRECT_URI         = os.getenv("REDIRECT_URI", "https://ramblarental.up.railway.app/auth/callback")
+POST_LOGIN_URL       = os.getenv("POST_LOGIN_URL", "/admin")
+FRONTEND_BASE        = os.getenv("FRONTEND_BASE_URL", "")   # e.g. http://localhost:3000 en dev
+MAPS_API_KEY         = os.getenv("GOOGLE_MAPS_API_KEY", "")
+
+ALLOWED_EMAILS: set[str] = {
+    e.strip().lower()
+    for e in os.getenv("ALLOWED_EMAILS", "").split(",")
+    if e.strip()
+}
+
+COOKIE_SECURE = (
+    os.getenv("RAILWAY_ENVIRONMENT") is not None
+    or os.getenv("COOKIE_SECURE", "").lower() == "true"
 )
-COOKIE_SECURE = os.getenv("RAILWAY_ENVIRONMENT") is not None or os.getenv("COOKIE_SECURE", "").lower() == "true"
-
-SESSION_MAX_AGE = 60 * 60 * 24 * 30
-
-signer = URLSafeTimedSerializer(SECRET_KEY)
+SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 días
 
 GOOGLE_AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO  = "https://www.googleapis.com/oauth2/v3/userinfo"
 
+signer = URLSafeTimedSerializer(SECRET_KEY)
 
-def _hash_password(password: str) -> str:
-    salt = secrets.token_hex(16)
-    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260_000)
-    return f"{salt}:{h.hex()}"
+# ── Rate limiting (para /auth/callback) ─────────────────────────────────────
 
-def _verify_password(password: str, stored: str) -> bool:
-    try:
-        salt, h = stored.split(":", 1)
-        candidate = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260_000)
-        return secrets.compare_digest(candidate.hex(), h)
-    except Exception:
-        return False
-
-def _needs_setup() -> bool:
-    conn = get_db()
-    count = conn.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]
-    conn.close()
-    return count == 0
-
-
-_login_failures: dict[str, list[float]] = defaultdict(list)
+_failures: dict[str, list[float]] = defaultdict(list)
 _RATE_WINDOW = 600
-_RATE_MAX    = 5
+_RATE_MAX = 10
 
 
-def _check_rate_limit(ip: str) -> None:
-    now    = time.time()
-    recent = [t for t in _login_failures[ip] if now - t < _RATE_WINDOW]
-    _login_failures[ip] = recent
+def _check_rate(ip: str) -> None:
+    now = time.time()
+    recent = [t for t in _failures[ip] if now - t < _RATE_WINDOW]
+    _failures[ip] = recent
     if len(recent) >= _RATE_MAX:
-        raise HTTPException(429, "Demasiados intentos fallidos. Intentá en 10 minutos.")
+        raise HTTPException(429, "Demasiados intentos. Intentá en 10 minutos.")
 
 
-def _record_failed_login(ip: str) -> None:
-    _login_failures[ip].append(time.time())
+def _record_fail(ip: str) -> None:
+    _failures[ip].append(time.time())
 
+
+# ── Sesión ──────────────────────────────────────────────────────────────────
 
 def get_session(request: Request) -> dict | None:
     token = request.cookies.get("session")
@@ -95,188 +85,159 @@ def require_session(request: Request) -> dict:
     return session
 
 
-@router.get("/auth/login")
-def auth_login(request: Request, tipo: str = "admin"):
-    if not CLIENT_ID:
-        raise HTTPException(500, "GOOGLE_CLIENT_ID no configurado")
-    nonce = secrets.token_urlsafe(16)
-    state = f"{tipo}:{nonce}"
-    params = "&".join([
-        f"client_id={CLIENT_ID}",
-        f"redirect_uri={REDIRECT_URI}",
-        "response_type=code",
-        "scope=openid%20email%20profile",
-        "access_type=offline",
-        "prompt=select_account",
-        f"state={state}",
-    ])
-    response = RedirectResponse(f"{GOOGLE_AUTH_URL}?{params}")
-    response.set_cookie("oauth_state", state, httponly=True, samesite="lax",
-                        secure=COOKIE_SECURE, max_age=300)
-    return response
-
-
-@router.get("/auth/callback")
-async def auth_callback(request: Request, code: str = "", error: str = "", state: str = ""):
-    if error:
-        return RedirectResponse(f"/login?error={error}")
-    if not code:
-        return RedirectResponse("/login?error=sin_codigo")
-
-    expected_state = request.cookies.get("oauth_state", "")
-    if not expected_state or state != expected_state:
-        return RedirectResponse("/login?error=estado_invalido")
-
-    tipo = "admin"
-    if ":" in expected_state:
-        tipo = expected_state.split(":", 1)[0]
-    login_error_redirect = "/cliente?error=no_autorizado" if tipo == "cliente" else "/login?error=no_autorizado"
-
-    async with httpx.AsyncClient() as client:
-        token_res = await client.post(GOOGLE_TOKEN_URL, data={
-            "code":          code,
-            "client_id":     CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
-            "redirect_uri":  REDIRECT_URI,
-            "grant_type":    "authorization_code",
-        })
-
-    tokens = token_res.json()
-    access_token = tokens.get("access_token")
-    if not access_token:
-        return RedirectResponse("/login?error=token_fallido")
-
-    async with httpx.AsyncClient() as client:
-        info_res = await client.get(
-            GOOGLE_USERINFO,
-            headers={"Authorization": f"Bearer {access_token}"},
+def _make_session_response(email: str, name: str, redirect: str | None = None):
+    token = signer.dumps({"email": email, "name": name})
+    if redirect:
+        # Use 200 + JS redirect so the browser processes Set-Cookie before navigating.
+        # A 303 redirect through the Vite proxy drops Set-Cookie headers.
+        safe_url = redirect.replace('"', "%22")
+        res = HTMLResponse(
+            f'<!DOCTYPE html><html><head>'
+            f'<script>window.location.replace("{safe_url}")</script>'
+            f'</head><body>Redirigiendo...</body></html>'
         )
-    info = info_res.json()
-    email = info.get("email", "")
-    name  = info.get("name", email)
-
-    if tipo == "cliente":
-        conn = get_db()
-        try:
-            row = conn.execute(
-                "SELECT id, nombre, apellido FROM clientes WHERE LOWER(email) = LOWER(?)",
-                (email,)
-            ).fetchone()
-        finally:
-            conn.close()
-        if not row:
-            reg_token = signer.dumps({"email": email, "name": name, "tipo": "registro"})
-            return RedirectResponse(f"/cliente/registro?t={quote(reg_token)}")
-        session_data = {
-            "email":      email,
-            "name":       name,
-            "role":       "cliente",
-            "cliente_id": row["id"],
-        }
-        redirect_to = "/cliente/portal"
     else:
-        if ALLOWED_EMAILS and email not in ALLOWED_EMAILS:
-            return RedirectResponse(login_error_redirect)
-        session_data = {"email": email, "name": name, "role": "admin"}
-        redirect_to = "/admin"
-
-    token = signer.dumps(session_data)
-    response = RedirectResponse(redirect_to)
-    response.set_cookie(
-        key="session",
-        value=token,
+        res = JSONResponse({"ok": True, "email": email, "name": name})
+    res.set_cookie(
+        "session", token,
         httponly=True,
         samesite="lax",
         secure=COOKIE_SECURE,
         max_age=SESSION_MAX_AGE,
     )
-    response.delete_cookie("oauth_state")
-    return response
+    return res
+
+
+# ── Helpers OAuth ────────────────────────────────────────────────────────────
+
+def _oauth_client() -> OAuth2Client:
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(503, "Google OAuth no configurado en el servidor.")
+    return OAuth2Client(
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        redirect_uri=REDIRECT_URI,
+        scope="openid email profile",
+    )
+
+
+# ── Endpoints ────────────────────────────────────────────────────────────────
+
+@router.get("/auth/me")
+def auth_me(request: Request):
+    return require_session(request)
 
 
 @router.get("/auth/logout")
 def auth_logout():
-    response = RedirectResponse("/login")
-    response.delete_cookie("session")
-    return response
+    res = RedirectResponse(f"{FRONTEND_BASE}/admin/login", status_code=303)
+    res.delete_cookie("session")
+    return res
 
 
-@router.get("/auth/me")
-def auth_me(request: Request):
-    session = require_session(request)
-    return session
+@router.post("/auth/logout")
+def auth_logout_post():
+    res = JSONResponse({"ok": True})
+    res.delete_cookie("session")
+    return res
+
+
+@router.get("/auth/google")
+def auth_google(request: Request):
+    """Redirige al usuario a la pantalla de selección de cuenta de Google."""
+    client = _oauth_client()
+    uri, state = client.create_authorization_url(
+        GOOGLE_AUTH_URL,
+        access_type="online",
+        prompt="select_account",
+    )
+    res = RedirectResponse(uri, status_code=302)
+    # Guardamos el state en cookie para verificarlo en el callback
+    res.set_cookie("oauth_state", state, httponly=True, samesite="lax",
+                   secure=COOKIE_SECURE, max_age=600)
+    return res
+
+
+@router.get("/auth/callback")
+def auth_callback(request: Request):
+    """Google redirige acá con el código de autorización."""
+    ip = request.client.host if request.client else "unknown"
+    _check_rate(ip)
+
+    error = request.query_params.get("error")
+    if error:
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error={error}", status_code=303)
+
+    code  = request.query_params.get("code")
+    state = request.query_params.get("state")
+
+    if not code:
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=no_code", status_code=303)
+
+    # Verificar state anti-CSRF
+    saved_state = request.cookies.get("oauth_state")
+    if not saved_state or saved_state != state:
+        _record_fail(ip)
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=state_mismatch", status_code=303)
+
+    # Intercambiar código por token
+    client = _oauth_client()
+    try:
+        token = client.fetch_token(GOOGLE_TOKEN_URL, code=code)
+    except Exception as e:
+        print(f"[auth] token_error: {e}")
+        _record_fail(ip)
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=token_error", status_code=303)
+
+    # Obtener datos del usuario — authlib ya tiene el token guardado tras fetch_token()
+    try:
+        resp = client.get(GOOGLE_USERINFO)
+        resp.raise_for_status()
+        userinfo = resp.json()
+    except Exception as e:
+        print(f"[auth] userinfo_error: {e}")
+        _record_fail(ip)
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=userinfo_error", status_code=303)
+
+    email = userinfo.get("email", "").lower()
+    name  = userinfo.get("name", email)
+
+    if not email:
+        _record_fail(ip)
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=no_email", status_code=303)
+
+    # Verificar email autorizado
+    if ALLOWED_EMAILS and email not in ALLOWED_EMAILS:
+        _record_fail(ip)
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=not_allowed", status_code=303)
+
+    res = _make_session_response(email, name, redirect=POST_LOGIN_URL)
+    # Limpiar cookie de state
+    res.delete_cookie("oauth_state")
+    return res
+
+
+@router.get("/auth/config")
+def auth_config():
+    dev_mode = os.getenv("ADMIN_BYPASS_AUTH", "").strip() in ("1", "true", "yes")
+    return {
+        "google_enabled": bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET),
+        "dev_mode": dev_mode,
+    }
+
+
+@router.get("/auth/dev-login")
+def auth_dev_login():
+    """Login directo sin OAuth — solo funciona con ADMIN_BYPASS_AUTH=1."""
+    if os.getenv("ADMIN_BYPASS_AUTH", "").strip() not in ("1", "true", "yes"):
+        raise HTTPException(403, "Solo disponible en modo desarrollo.")
+    return _make_session_response(
+        email="dev@local",
+        name="Dev Admin",
+        redirect="/admin",
+    )
 
 
 @router.get("/api/public/maps-key")
 def public_maps_key():
     return {"key": MAPS_API_KEY or None}
-
-
-@router.get("/auth/config")
-def auth_config():
-    return {
-        "google":      bool(CLIENT_ID),
-        "setup_needed": _needs_setup(),
-    }
-
-
-@router.post("/auth/login-local")
-async def auth_login_local(request: Request):
-    ip = request.client.host if request.client else "unknown"
-    _check_rate_limit(ip)
-
-    body = await request.json()
-    email    = body.get("email", "").strip().lower()
-    password = body.get("password", "")
-    if not email or not password:
-        raise HTTPException(400, "Email y contraseña requeridos")
-
-    conn = get_db()
-    row = conn.execute(
-        "SELECT nombre, password_hash FROM usuarios WHERE email = ?", (email,)
-    ).fetchone()
-    conn.close()
-
-    if not row or not _verify_password(password, row["password_hash"]):
-        _record_failed_login(ip)
-        raise HTTPException(401, "Email o contraseña incorrectos")
-
-    token = signer.dumps({"email": email, "name": row["nombre"]})
-    res   = JSONResponse({"ok": True})
-    res.set_cookie("session", token, httponly=True, samesite="lax", secure=COOKIE_SECURE, max_age=SESSION_MAX_AGE)
-    return res
-
-
-@router.post("/auth/register")
-async def auth_register(request: Request):
-    if not _needs_setup():
-        raise HTTPException(403, "El registro está cerrado")
-
-    body     = await request.json()
-    nombre   = body.get("nombre", "").strip()
-    email    = body.get("email", "").strip().lower()
-    password = body.get("password", "")
-
-    if not nombre or not email or not password:
-        raise HTTPException(400, "Completá todos los campos")
-    if len(password) < 8:
-        raise HTTPException(400, "La contraseña debe tener al menos 8 caracteres")
-
-    pw_hash = _hash_password(password)
-
-    conn = get_db()
-    try:
-        conn.execute(
-            "INSERT INTO usuarios (email, nombre, password_hash) VALUES (?,?,?)",
-            (email, nombre, pw_hash),
-        )
-        conn.commit()
-    except Exception:
-        conn.close()
-        raise HTTPException(409, "Ese email ya está registrado")
-    conn.close()
-
-    token = signer.dumps({"email": email, "name": nombre})
-    res   = JSONResponse({"ok": True})
-    res.set_cookie("session", token, httponly=True, samesite="lax", secure=COOKIE_SECURE, max_age=SESSION_MAX_AGE)
-    return res

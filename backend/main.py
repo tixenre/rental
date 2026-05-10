@@ -3,11 +3,15 @@ Rambla Rental API — FastAPI + PostgreSQL
 Run: uvicorn main:app --reload --port 8000
 """
 
-from fastapi import FastAPI
+import os
+import threading
+from pathlib import Path
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, FRONT, FRONT_NEW
@@ -25,21 +29,31 @@ from middleware          import auth_middleware
 
 app = FastAPI(title="Rambla Rental API", version="2.0")
 
+# Orígenes permitidos para CORS con credenciales (cookie de sesión).
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv(
+        "FRONTEND_ORIGINS",
+        "https://id-preview--cd1cc884-084b-435b-8af0-167f25bc78ca.lovable.app,"
+        "http://localhost:5173,http://localhost:8000",
+    ).split(",") if o.strip()
+]
+
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.lovable\.app",
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
 )
 
-# Frontend clásico (admin, login, etc.) — opcional, solo si existe
+# Montar el frontend clásico solo si existe (no existe en el monorepo rental-refine)
 if FRONT.exists():
     app.mount("/static", StaticFiles(directory=str(FRONT)), name="static")
 
-# Nuevo frontend (Vite SPA)
+# Nuevo frontend (Vite SPA — rental-refine)
 if FRONT_NEW.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONT_NEW / "assets")), name="assets")
 
@@ -58,79 +72,75 @@ app.include_router(cliente_portal_router)
 
 @app.get("/health", include_in_schema=False)
 def health():
+    """Health check endpoint para Railway."""
     return {"status": "ok"}
 
 # ── Páginas ──────────────────────────────────────────────────────────────────
 
-def _serve_or_spa(static_path):
-    """Sirve un archivo del frontend clásico si existe; si no, sirve la SPA."""
-    if FRONT.exists() and static_path.exists():
-        return FileResponse(str(static_path))
-    new_index = FRONT_NEW / "index.html"
-    if new_index.exists():
-        return FileResponse(str(new_index))
-    return RedirectResponse("/")
-
+def _serve_frontend(path: str = "index.html"):
+    """Helper: sirve desde FRONT_NEW (Vite SPA) o FRONT (clásico) si existe."""
+    new_file = FRONT_NEW / path
+    if new_file.exists():
+        return FileResponse(str(new_file))
+    classic_file = FRONT / path
+    if classic_file.exists():
+        return FileResponse(str(classic_file))
+    spa_index = FRONT_NEW / "index.html"
+    if spa_index.exists():
+        return FileResponse(str(spa_index))
+    return JSONResponse({"error": "Frontend not built"}, status_code=503)
 
 @app.get("/", include_in_schema=False)
 def root():
-    new_index = FRONT_NEW / "index.html"
-    if new_index.exists():
-        return FileResponse(str(new_index))
-    if FRONT.exists() and (FRONT / "index.html").exists():
-        return FileResponse(FRONT / "index.html")
-    return {"message": "Rambla Rental API"}
-
+    return _serve_frontend("index.html")
 
 @app.get("/login", include_in_schema=False)
 def login_page():
-    return _serve_or_spa(FRONT / "login.html")
-
+    # El login del admin vive en el SPA en /admin/login.
+    return RedirectResponse("/admin/login", status_code=307)
 
 @app.get("/admin", include_in_schema=False)
 def admin():
-    return _serve_or_spa(FRONT / "admin.html")
-
+    return _serve_frontend("admin.html")
 
 @app.get("/equipo/{id}", include_in_schema=False)
 def equipo_page(id: int):
-    return _serve_or_spa(FRONT / "equipo.html")
-
+    return _serve_frontend("index.html")
 
 @app.get("/cliente", include_in_schema=False)
 def cliente_login_page():
-    return _serve_or_spa(FRONT / "cliente.html")
-
+    return _serve_frontend("cliente.html")
 
 @app.get("/cliente/portal", include_in_schema=False)
 def cliente_portal_page():
-    return _serve_or_spa(FRONT / "cliente" / "portal.html")
-
+    return _serve_frontend("cliente/portal.html")
 
 @app.get("/cliente/registro", include_in_schema=False)
 def cliente_registro_page():
-    return _serve_or_spa(FRONT / "cliente" / "registro.html")
+    return _serve_frontend("cliente/registro.html")
 
-
-# ── SPA catch-all ─────────────────────────────────────────────────────────────
-from fastapi import Request as FastAPIRequest
-
+# ── SPA catch-all: rutas del nuevo frontend (TanStack Router) ────────────────
+# Debe ir AL FINAL para no interceptar rutas de API ni páginas de admin.
 
 @app.get("/{full_path:path}", include_in_schema=False)
 def spa_fallback(full_path: str):
-    new_index = FRONT_NEW / "index.html"
-    if new_index.exists():
-        return FileResponse(str(new_index))
-    if FRONT.exists() and (FRONT / "index.html").exists():
-        return FileResponse(FRONT / "index.html")
-    return {"message": "Not found"}
+    """
+    Devuelve index.html del nuevo frontend para cualquier ruta no reconocida.
+    TanStack Router maneja el enrutamiento del lado del cliente.
+    Las rutas /api/* y /static/* se capturan antes que esta.
+    """
+    return _serve_frontend("index.html")
 
+# ── Init DB (non-blocking) ───────────────────────────────────────────────────
+# Initialize DB in background thread to not block app startup / healthcheck
 
-# ── Init DB ──────────────────────────────────────────────────────────────────
+def init_db_bg():
+    try:
+        init_db()
+        print("✅ BD PostgreSQL inicializada")
+    except Exception as e:
+        print(f"⚠️  No se pudo inicializar BD: {e}")
+        print("   La app continuará ejecutándose. Verifica DATABASE_URL.")
 
-try:
-    init_db()
-    print("✅ BD PostgreSQL inicializada")
-except Exception as e:
-    print(f"⚠️  No se pudo inicializar BD: {e}")
-    print("   La app continuará ejecutándose. Verifica DATABASE_URL.")
+db_init_thread = threading.Thread(target=init_db_bg, daemon=True)
+db_init_thread.start()

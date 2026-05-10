@@ -5,10 +5,32 @@ export type Category =
   | "Audio"
   | "Soportes"
   | "Accesorios"
-  | "Adaptadores";
+  | "Adaptadores"
+  // Categorías inferidas desde el backend (useEquipos.inferCategory)
+  | "Baterías"
+  | "Filtros"
+  | "Monitores"
+  | "Comunicación"
+  | "Flash"
+  | "Sonido"
+  | "Brazo Mágico"
+  | "Stands"
+  | "Tungsteno"
+  | "Modificadores"
+  | "Luces"
+  | "Trípode"
+  | "Grips";
+
+export type IncludedItem = {
+  /** Si está y matchea con un equipo del catálogo, se enriquece con su info. */
+  id?: string;
+  name: string;
+  qty?: number;
+  note?: string;
+};
 
 export type Equipment = {
-  id: string;
+  id: string;        // string-ificado del ID numérico del backend
   slug: string;
   name: string;
   brand: string;
@@ -16,6 +38,16 @@ export type Equipment = {
   pricePerDay: number;
   description: string;
   specs: { label: string; value: string }[];
+  /** Palabras clave editoriales (selling points) — distintas de las etiquetas de búsqueda. */
+  keywords?: string[];
+  // Campos de Lovable
+  isNew?: boolean;
+  isCombo?: boolean;
+  includes?: IncludedItem[];
+  // Campos extra del backend (opcionales para mantener compat con datos locales)
+  fotoUrl?: string | null;
+  cantidad?: number;    // stock total
+  _backendId?: number;  // ID numérico original, para POST /api/alquileres
 };
 
 const e = (

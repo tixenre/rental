@@ -10,28 +10,33 @@ from typing import Optional
 from fastapi import APIRouter, Query, HTTPException, Request
 from pydantic import BaseModel
 
-from database import get_db, row_to_dict, attach_tags, attach_kit
+from database import (
+    get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
+    attach_ficha, regenerate_auto_tags,
+)
 from routes.auth import get_session
 
 router = APIRouter()
 
+
+# ── Modelos ──────────────────────────────────────────────────────────────────
 
 class EquipoCreate(BaseModel):
     nombre:           str
     marca:            Optional[str]   = None
     modelo:           Optional[str]   = None
     cantidad:         int             = 1
-    precio_jornada:   Optional[int]   = None
-    precio_usd:       Optional[float] = None
-    roi_pct:          Optional[float] = None
-    valor_reposicion: Optional[float] = None
+    precio_jornada:   Optional[int]   = None   # precio diario de alquiler (ARS)
+    precio_usd:       Optional[float] = None   # valor de mercado (USD)
+    roi_pct:          Optional[float] = None   # retorno % (ej: 2.0 → precio = valor*0.02)
+    valor_reposicion: Optional[float] = None   # valor para seguro (USD)
     foto_url:         Optional[str]   = None
     fecha_compra:     Optional[str]   = None
     serie:            Optional[str]   = None
     bh_url:           Optional[str]   = None
     dueno:            Optional[str]   = "Rambla"
     visible_catalogo: Optional[int]   = 1
-    estado:           Optional[str]   = "operativo"
+    estado:           Optional[str]   = "operativo"   # operativo / en_mantenimiento / fuera_servicio
 
 
 class EquipoUpdate(BaseModel):
@@ -53,9 +58,14 @@ class EquipoUpdate(BaseModel):
 
 
 class FichaUpdate(BaseModel):
-    descripcion: Optional[str] = None
-    notas:       Optional[str] = None
-    specs_json:  Optional[str] = None
+    descripcion:   Optional[str] = None
+    notas:         Optional[str] = None
+    specs_json:    Optional[str] = None
+    montura:       Optional[str] = None
+    formato:       Optional[str] = None
+    resolucion:    Optional[str] = None
+    keywords_json: Optional[str] = None
+    nombre_publico_template: Optional[str] = None
 
 
 class KitItem(BaseModel):
@@ -64,11 +74,25 @@ class KitItem(BaseModel):
 
 
 class EtiquetasUpdate(BaseModel):
+    # Lista ordenada de etiquetas MANUALES. Las auto (marca/modelo/nombre/categorías)
+    # se regeneran solas, no las toques desde acá.
     etiquetas: list[str]
 
 
+class CategoriasUpdate(BaseModel):
+    # Lista de IDs de categorías hoja (o raíz) asignadas al equipo.
+    categoria_ids: list[int]
+
+
+# ── Disponibilidad en tiempo real ────────────────────────────────────────────
+
 @router.get("/equipos/afuera")
 def equipos_afuera():
+    """
+    Devuelve los equipos actualmente retirados (pedidos en estado 'retirado'
+    con fecha_hasta >= hoy), con cantidad afuera y fecha de devolución.
+    Respuesta: { "equipo_id": { cantidad_afuera, stock_total, devuelve, pedidos } }
+    """
     conn  = get_db()
     today = datetime.date.today().isoformat()
     try:
@@ -96,11 +120,14 @@ def equipos_afuera():
         conn.close()
 
 
+# ── Rutas de equipos ─────────────────────────────────────────────────────────
+
 @router.get("/equipos")
 def list_equipos(
     request:       Request,
     q:             Optional[str]  = Query(None),
     etiqueta:      Optional[str]  = Query(None),
+    categoria:     Optional[str]  = Query(None),
     solo_visibles: Optional[bool] = Query(None),
     page:          int = Query(1, ge=1),
     per_page:      int = Query(200, ge=1, le=500),
@@ -114,15 +141,49 @@ def list_equipos(
     if solo_visibles or not is_admin:
         base_sql += " AND e.visible_catalogo = 1 AND e.estado != 'fuera_servicio'"
     if q:
-        base_sql += " AND (e.nombre LIKE ? OR e.marca LIKE ? OR e.modelo LIKE ?)"
+        # ILIKE = case-insensitive (Postgres). Permite buscar "sony" / "Sony" / "SONY".
+        base_sql += " AND (e.nombre ILIKE ? OR e.marca ILIKE ? OR e.modelo ILIKE ?)"
         like = f"%{q}%"
         params += [like, like, like]
+    if categoria:
+        # Filtro recursivo: si es padre, incluye descendientes (árbol de `categorias`).
+        # Acepta id numérico o nombre.
+        try:
+            cat_id_int = int(categoria)
+            base_sql += """
+              AND e.id IN (
+                SELECT ec.equipo_id FROM equipo_categorias ec
+                WHERE ec.categoria_id IN (
+                    WITH RECURSIVE sub AS (
+                        SELECT id FROM categorias WHERE id = ?
+                        UNION ALL
+                        SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
+                    )
+                    SELECT id FROM sub
+                )
+              )"""
+            params.append(cat_id_int)
+        except (TypeError, ValueError):
+            base_sql += """
+              AND e.id IN (
+                SELECT ec.equipo_id FROM equipo_categorias ec
+                WHERE ec.categoria_id IN (
+                    WITH RECURSIVE sub AS (
+                        SELECT id FROM categorias WHERE nombre = ?
+                        UNION ALL
+                        SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
+                    )
+                    SELECT id FROM sub
+                )
+              )"""
+            params.append(categoria)
     if etiqueta:
+        # Filtro plano por nombre de etiqueta (la bolsa ya no es jerárquica).
         base_sql += """
           AND e.id IN (
             SELECT ee.equipo_id FROM equipo_etiquetas ee
             JOIN etiquetas et ON et.id = ee.etiqueta_id
-            WHERE et.nombre = ?
+            WHERE LOWER(et.nombre) = LOWER(?)
           )"""
         params.append(etiqueta)
 
@@ -135,6 +196,8 @@ def list_equipos(
         equipos = [row_to_dict(r) for r in rows]
         equipos = attach_tags(conn, equipos)
         equipos = attach_kit(conn, equipos)
+        equipos = attach_categorias(conn, equipos)
+        equipos = attach_ficha(conn, equipos)
         return {"total": total, "page": page, "per_page": per_page, "items": equipos}
     finally:
         conn.close()
@@ -195,6 +258,7 @@ def update_equipo(id: int, data: EquipoUpdate):
         updates = data.model_dump(exclude_unset=True)
         if not updates:
             raise HTTPException(400, "Nada para actualizar")
+        # Registrar cambio de precio si cambió
         if "precio_jornada" in updates and updates["precio_jornada"] != existing["precio_jornada"]:
             conn.execute(
                 "INSERT INTO equipo_precio_historial (equipo_id, precio_jornada) VALUES (?,?)",
@@ -204,6 +268,9 @@ def update_equipo(id: int, data: EquipoUpdate):
         set_clause += ", updated_at = CURRENT_TIMESTAMP"
         conn.execute(f"UPDATE equipos SET {set_clause} WHERE id = ?",
                      list(updates.values()) + [id])
+        # Si cambió algo que alimenta auto-tags, regenerar.
+        if any(k in updates for k in ("nombre", "marca", "modelo")):
+            regenerate_auto_tags(conn, id)
         conn.commit()
         row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
@@ -230,6 +297,8 @@ def delete_equipo(id: int):
         conn.close()
 
 
+# ── Ficha por equipo ─────────────────────────────────────────────────────────
+
 @router.get("/equipos/{id}/ficha")
 def get_ficha(id: int):
     conn = get_db()
@@ -241,26 +310,40 @@ def get_ficha(id: int):
         ).fetchone()
         if row:
             return row_to_dict(row)
-        return {"equipo_id": id, "descripcion": None, "notas": None, "specs_json": None}
+        return {
+            "equipo_id": id, "descripcion": None, "notas": None, "specs_json": None,
+            "montura": None, "formato": None, "resolucion": None, "keywords_json": None,
+            "nombre_publico_template": None,
+        }
     finally:
         conn.close()
 
 
 @router.put("/equipos/{id}/ficha")
 def upsert_ficha(id: int, data: FichaUpdate):
+    """
+    PATCH-style upsert: solo actualiza columnas que vinieron en el body
+    (no las nullea si el cliente no las mandó). Esto evita que enriquecer con
+    IA borre montura/formato/resolución existentes.
+    """
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
-        conn.execute("""
-            INSERT INTO equipo_fichas (equipo_id, descripcion, notas, specs_json, updated_at)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(equipo_id) DO UPDATE SET
-                descripcion = excluded.descripcion,
-                notas       = excluded.notas,
-                specs_json  = excluded.specs_json,
-                updated_at  = CURRENT_TIMESTAMP
-        """, (id, data.descripcion, data.notas, data.specs_json))
+
+        patch = data.model_dump(exclude_unset=True)
+        # Inserta una fila vacía si no existe (para que el UPDATE encuentre algo).
+        conn.execute(
+            "INSERT INTO equipo_fichas (equipo_id) VALUES (?) ON CONFLICT(equipo_id) DO NOTHING",
+            (id,),
+        )
+        if patch:
+            set_clause = ", ".join(f"{k} = ?" for k in patch)
+            set_clause += ", updated_at = CURRENT_TIMESTAMP"
+            conn.execute(
+                f"UPDATE equipo_fichas SET {set_clause} WHERE equipo_id = ?",
+                list(patch.values()) + [id],
+            )
         conn.commit()
         row = conn.execute(
             "SELECT * FROM equipo_fichas WHERE equipo_id = ?", (id,)
@@ -273,12 +356,15 @@ def upsert_ficha(id: int, data: FichaUpdate):
         conn.close()
 
 
+# ── Historial de alquileres por equipo ───────────────────────────────────────
+
 @router.get("/equipos/{id}/historial")
 def get_equipo_historial(id: int):
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
+
         rows = conn.execute("""
             SELECT
                 p.id, p.numero_pedido, p.estado,
@@ -292,9 +378,11 @@ def get_equipo_historial(id: int):
             WHERE pi.equipo_id = ?
             ORDER BY p.fecha_desde DESC
         """, (id,)).fetchall()
+
         items      = [row_to_dict(r) for r in rows]
         total_dias = sum(r["dias"] or 1 for r in items)
         total_rev  = sum((r["precio_item"] or 0) * (r["cantidad"] or 1) * (r["dias"] or 1) for r in items)
+
         return {
             "historial": items,
             "stats": {
@@ -307,6 +395,8 @@ def get_equipo_historial(id: int):
     finally:
         conn.close()
 
+
+# ── Kit / Componentes ────────────────────────────────────────────────────────
 
 @router.get("/equipos/{id}/kit")
 def get_kit(id: int):
@@ -370,6 +460,8 @@ def remove_kit_item(id: int, componente_id: int):
         conn.close()
 
 
+# ── Historial de precios ─────────────────────────────────────────────────────
+
 @router.get("/equipos/{id}/precio-historial")
 def get_precio_historial(id: int):
     conn = get_db()
@@ -387,27 +479,39 @@ def get_precio_historial(id: int):
         conn.close()
 
 
+# ── Etiquetas por equipo (reemplaza todas) ────────────────────────────────────
+
 @router.put("/equipos/{id}/etiquetas", status_code=200)
 def set_etiquetas(id: int, data: EtiquetasUpdate):
+    """Reemplaza SOLO las etiquetas manuales del equipo. Las auto se preservan."""
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
-        conn.execute("DELETE FROM equipo_etiquetas WHERE equipo_id = ?", (id,))
+        # Borrar solo manuales; las auto siguen vivas.
+        conn.execute(
+            "DELETE FROM equipo_etiquetas WHERE equipo_id = %s AND origen = 'manual'",
+            (id,),
+        )
         for orden, nombre in enumerate(data.etiquetas):
-            nombre = nombre.strip()
+            nombre = (nombre or "").strip()
             if not nombre:
                 continue
-            row = conn.execute("SELECT id FROM etiquetas WHERE nombre = ?", (nombre,)).fetchone()
-            if row:
-                etiqueta_id = row["id"]
-            else:
-                cur = conn.execute("INSERT INTO etiquetas (nombre) VALUES (?)", (nombre,))
-                etiqueta_id = cur.lastrowid
             conn.execute(
-                "INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden) VALUES (?,?,?) ON CONFLICT (equipo_id, etiqueta_id) DO UPDATE SET orden=EXCLUDED.orden",
-                (id, etiqueta_id, orden),
+                "INSERT INTO etiquetas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING",
+                (nombre,),
             )
+            row = conn.execute(
+                "SELECT id FROM etiquetas WHERE nombre = %s", (nombre,)
+            ).fetchone()
+            if not row:
+                continue
+            conn.execute("""
+                INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen)
+                VALUES (%s, %s, %s, 'manual')
+                ON CONFLICT (equipo_id, etiqueta_id)
+                DO UPDATE SET orden = EXCLUDED.orden, origen = 'manual'
+            """, (id, row["id"], orden))
         conn.commit()
         row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
@@ -419,65 +523,660 @@ def set_etiquetas(id: int, data: EtiquetasUpdate):
         conn.close()
 
 
-@router.get("/etiquetas")
-def list_etiquetas():
+# ── Categorías por equipo ────────────────────────────────────────────────────
+
+@router.put("/equipos/{id}/categorias", status_code=200)
+def set_categorias(id: int, data: CategoriasUpdate):
+    """
+    Reemplaza la lista de categorías asignadas al equipo y regenera auto-tags
+    (porque los nombres de categoría alimentan la bolsa de etiquetas auto).
+    """
     conn = get_db()
     try:
-        rows = conn.execute("""
-            SELECT et.nombre, COUNT(ee.equipo_id) as total
-            FROM etiquetas et
-            LEFT JOIN equipo_etiquetas ee ON ee.etiqueta_id = et.id
-            GROUP BY et.id ORDER BY et.nombre
-        """).fetchall()
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+        conn.execute("DELETE FROM equipo_categorias WHERE equipo_id = %s", (id,))
+        for orden, cid in enumerate(data.categoria_ids):
+            try:
+                cid_int = int(cid)
+            except (TypeError, ValueError):
+                continue
+            conn.execute("""
+                INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (equipo_id, categoria_id) DO UPDATE SET orden = EXCLUDED.orden
+            """, (id, cid_int, orden))
+        regenerate_auto_tags(conn, id)
+        conn.commit()
+        row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
+        equipo = attach_tags(conn, [row_to_dict(row)])[0]
+        equipo = attach_categorias(conn, [equipo])[0]
+        return equipo
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# ── Etiquetas / Categorías ───────────────────────────────────────────────────
+
+@router.get("/etiquetas")
+def list_etiquetas(incluir_auto: int = Query(0)):
+    """
+    Lista etiquetas. Por defecto devuelve solo las que tienen al menos un uso
+    MANUAL (las auto inflan demasiado). `incluir_auto=1` devuelve todo.
+    """
+    conn = get_db()
+    try:
+        if incluir_auto:
+            rows = conn.execute("""
+                SELECT et.nombre, COUNT(ee.equipo_id) AS total
+                FROM etiquetas et
+                LEFT JOIN equipo_etiquetas ee ON ee.etiqueta_id = et.id
+                GROUP BY et.id, et.nombre
+                ORDER BY LOWER(et.nombre)
+            """).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT et.nombre, COUNT(ee.equipo_id) AS total
+                FROM etiquetas et
+                JOIN equipo_etiquetas ee ON ee.etiqueta_id = et.id
+                WHERE ee.origen = 'manual'
+                GROUP BY et.id, et.nombre
+                ORDER BY LOWER(et.nombre)
+            """).fetchall()
         return [{"nombre": r["nombre"], "total": r["total"]} for r in rows]
     finally:
         conn.close()
 
 
 @router.get("/categorias")
-def get_categorias():
+def get_categorias(flat: int = Query(0)):
+    """
+    Devuelve el árbol de categorías desde la tabla `categorias`.
+    `total` cuenta equipos asignados a esa categoría o a cualquier descendiente
+    (vía `equipo_categorias`).
+    """
+    conn = get_db()
+    try:
+        cats = conn.execute("""
+            SELECT id, nombre, prioridad, parent_id
+            FROM categorias
+            ORDER BY prioridad ASC, LOWER(nombre) ASC
+        """).fetchall()
+
+        nodes = {
+            r["id"]: {
+                "id": r["id"], "nombre": r["nombre"], "prioridad": r["prioridad"],
+                "parent_id": r["parent_id"], "total": 0, "children": [],
+            }
+            for r in cats
+        }
+        roots = []
+        for r in cats:
+            n = nodes[r["id"]]
+            if r["parent_id"] and r["parent_id"] in nodes:
+                nodes[r["parent_id"]]["children"].append(n)
+            else:
+                roots.append(n)
+
+        # Conteo por subárbol: equipos distintos asignados a la categoría o a un descendiente.
+        eq_rows = conn.execute(
+            "SELECT equipo_id, categoria_id FROM equipo_categorias"
+        ).fetchall()
+        from collections import defaultdict
+        eq_cats: dict[int, set] = defaultdict(set)
+        for r in eq_rows:
+            eq_cats[r["equipo_id"]].add(r["categoria_id"])
+
+        def descendants(nid: int) -> set:
+            out = {nid}
+            stack = [nid]
+            while stack:
+                cur = stack.pop()
+                for n in nodes.values():
+                    if n["parent_id"] == cur:
+                        out.add(n["id"]); stack.append(n["id"])
+            return out
+
+        for nid, n in nodes.items():
+            sub = descendants(nid)
+            n["total"] = sum(1 for tags in eq_cats.values() if tags & sub)
+
+        for n in nodes.values():
+            n["children"].sort(key=lambda x: (x["prioridad"], x["nombre"].lower()))
+        roots.sort(key=lambda x: (x["prioridad"], x["nombre"].lower()))
+
+        if flat:
+            return [
+                {
+                    "nombre": r["nombre"], "total": r["total"], "prioridad": r["prioridad"],
+                    "subtags": [{"nombre": c["nombre"], "total": c["total"]} for c in r["children"]],
+                }
+                for r in roots
+            ]
+
+        def clean(n):
+            return {
+                "id": n["id"], "nombre": n["nombre"], "prioridad": n["prioridad"],
+                "total": n["total"], "parent_id": n["parent_id"],
+                "children": [clean(c) for c in n["children"]],
+            }
+        return [clean(r) for r in roots]
+    finally:
+        conn.close()
+
+
+# ── Admin: gestión de etiquetas / categorías ─────────────────────────────────
+
+class EtiquetaCreate(BaseModel):
+    nombre:    str
+    prioridad: Optional[int] = 100
+    parent_id: Optional[int] = None
+
+
+class EtiquetaPatch(BaseModel):
+    nombre:    Optional[str] = None
+    prioridad: Optional[int] = None
+    parent_id: Optional[int] = None  # explícito None para "limpiar" no soportado vía PATCH; usar -1 para nullear
+    set_parent_null: Optional[bool] = False
+
+
+class EtiquetasReorder(BaseModel):
+    ids: list[int]
+
+
+@router.get("/admin/etiquetas")
+def admin_list_etiquetas(request: Request):
+    from admin_guard import require_admin
+    require_admin(request)
     conn = get_db()
     try:
         rows = conn.execute("""
-            SELECT ee.equipo_id, et.nombre, ee.orden
-            FROM equipo_etiquetas ee
-            JOIN etiquetas et ON et.id = ee.etiqueta_id
-            ORDER BY ee.equipo_id, ee.orden
+            SELECT et.id, et.nombre, et.prioridad, et.parent_id,
+                   COUNT(ee.equipo_id) AS total
+            FROM etiquetas et
+            LEFT JOIN equipo_etiquetas ee ON ee.etiqueta_id = et.id
+            GROUP BY et.id, et.nombre, et.prioridad, et.parent_id
+            ORDER BY et.prioridad ASC, LOWER(et.nombre) ASC
         """).fetchall()
-
-        from collections import defaultdict
-        tree:        dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-        main_counts: dict[str, int]            = defaultdict(int)
-        item_main:   dict[int, str]            = {}
-
-        for r in rows:
-            if r["orden"] == 0:
-                item_main[r["equipo_id"]] = r["nombre"]
-                main_counts[r["nombre"]] += 1
-
-        for r in rows:
-            if r["orden"] > 0 and r["equipo_id"] in item_main:
-                tree[item_main[r["equipo_id"]]][r["nombre"]] += 1
-
         return [
             {
-                "nombre": main,
-                "total":  main_counts[main],
-                "subtags": [
-                    {"nombre": sub, "total": cnt}
-                    for sub, cnt in sorted(tree[main].items(), key=lambda x: -x[1])
-                ],
+                "id":        r["id"],
+                "nombre":    r["nombre"],
+                "prioridad": r["prioridad"],
+                "parent_id": r["parent_id"],
+                "total":     r["total"],
             }
-            for main in sorted(main_counts.keys())
+            for r in rows
         ]
     finally:
         conn.close()
 
 
+@router.post("/admin/etiquetas", status_code=201)
+def admin_create_etiqueta(data: EtiquetaCreate, request: Request):
+    from admin_guard import require_admin
+    require_admin(request)
+    nombre = (data.nombre or "").strip()
+    if not nombre:
+        raise HTTPException(400, "Nombre vacío")
+    conn = get_db()
+    try:
+        # Validar parent: debe existir y ser raíz (forzar 2 niveles).
+        if data.parent_id is not None:
+            prow = conn.execute(
+                "SELECT id, parent_id FROM etiquetas WHERE id = %s", (data.parent_id,)
+            ).fetchone()
+            if not prow:
+                raise HTTPException(400, "parent_id no existe")
+            if prow["parent_id"] is not None:
+                raise HTTPException(400, "Solo se permiten 2 niveles (el padre ya es subcategoría)")
+        cur = conn.execute("""
+            INSERT INTO etiquetas (nombre, prioridad, parent_id)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (nombre) DO UPDATE
+                SET prioridad = EXCLUDED.prioridad,
+                    parent_id = EXCLUDED.parent_id
+            RETURNING id, nombre, prioridad, parent_id
+        """, (nombre, data.prioridad or 100, data.parent_id))
+        row = cur.fetchone()
+        conn.commit()
+        return {
+            "id": row["id"], "nombre": row["nombre"],
+            "prioridad": row["prioridad"], "parent_id": row["parent_id"],
+            "total": 0,
+        }
+    except HTTPException:
+        conn.rollback(); raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(400, str(e))
+    finally:
+        conn.close()
+
+
+@router.patch("/admin/etiquetas/{eid}")
+def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
+    from admin_guard import require_admin
+    require_admin(request)
+    sets, vals = [], []
+    if patch.nombre is not None:
+        sets.append("nombre = %s"); vals.append(patch.nombre.strip())
+    if patch.prioridad is not None:
+        sets.append("prioridad = %s"); vals.append(int(patch.prioridad))
+    if patch.set_parent_null:
+        sets.append("parent_id = NULL")
+    elif patch.parent_id is not None:
+        if patch.parent_id == eid:
+            raise HTTPException(400, "Una etiqueta no puede ser su propio padre")
+        # Validar que el padre exista y sea raíz.
+        conn0 = get_db()
+        try:
+            prow = conn0.execute(
+                "SELECT id, parent_id FROM etiquetas WHERE id = %s", (patch.parent_id,)
+            ).fetchone()
+            if not prow:
+                raise HTTPException(400, "parent_id no existe")
+            if prow["parent_id"] is not None:
+                raise HTTPException(400, "Solo se permiten 2 niveles")
+            # Verificar que esta etiqueta no tenga hijos (sino bajaríamos un nivel raíz).
+            chrow = conn0.execute(
+                "SELECT 1 FROM etiquetas WHERE parent_id = %s LIMIT 1", (eid,)
+            ).fetchone()
+            if chrow:
+                raise HTTPException(400, "Esta etiqueta tiene hijos; no puede convertirse en hija")
+        finally:
+            conn0.close()
+        sets.append("parent_id = %s"); vals.append(int(patch.parent_id))
+    if not sets:
+        raise HTTPException(400, "Sin cambios")
+    conn = get_db()
+    try:
+        vals.append(eid)
+        conn.execute(f"UPDATE etiquetas SET {', '.join(sets)} WHERE id = %s", tuple(vals))
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@router.delete("/admin/etiquetas/{eid}", status_code=204)
+def admin_delete_etiqueta(eid: int, request: Request):
+    from admin_guard import require_admin
+    require_admin(request)
+    conn = get_db()
+    try:
+        # ON DELETE CASCADE en equipo_etiquetas + SET NULL en parent_id de hijos.
+        conn.execute("DELETE FROM etiquetas WHERE id = %s", (eid,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+@router.post("/admin/etiquetas/reorder")
+def admin_reorder_etiquetas(payload: EtiquetasReorder, request: Request):
+    from admin_guard import require_admin
+    require_admin(request)
+    conn = get_db()
+    try:
+        for idx, eid in enumerate(payload.ids):
+            conn.execute(
+                "UPDATE etiquetas SET prioridad = %s WHERE id = %s",
+                ((idx + 1) * 10, eid),
+            )
+        conn.commit()
+        return {"ok": True, "count": len(payload.ids)}
+    finally:
+        conn.close()
+
+
+# ── Admin: clasificación automática de equipos ───────────────────────────────
+
+# Reglas leaf → keywords. Orden importa: más específico primero.
+# Cada equipo recibe TODAS las hojas que matcheen (multi-asignación).
+# Se aplica sobre nombre + marca + modelo (lowercase).
+_RULES_LEAF = [
+    # ── CÁMARAS (multi: foto+video para mirrorless híbridas) ────────────
+    ("Foto",           ["a7 v", "zv-e1"]),  # mirrorless híbridas → también foto
+    ("Video",          ["a7 v", "zv-e1", "fx3", "komodo", "c200"]),
+    ("Acción",         ["gopro", "insta360"]),
+    # ── LENTES ─────────────────────────────────────────────────────────
+    ("Vintage",        ["vintage", "carl zeiss jena"]),
+    ("Especiales",     ["laowa", "probe macro"]),
+    ("Zoom E-mount",   ["sony gm", "montura e"]),
+    ("Zoom EF",        ["sigma art 18-35", "sigma art 24-70", "tokina 11-16", "canon 70-200"]),
+    ("Fijos EF",       ["sigma art 35mm", "sigma art 50mm"]),
+    # ── ADAPTADORES Y FILTROS ──────────────────────────────────────────
+    ("Adaptadores de montura", ["adaptador "]),
+    ("Filtros 82mm",   ["filtro "]),
+    # ── ILUMINACIÓN ────────────────────────────────────────────────────
+    ("LED RGB",        ["rgb", "tl60", "m1 mini", "amaran 300c", "accent b7c"]),
+    ("LED daylight/bicolor", ["led", "amaran", "nanlite", "godox vl", "spotlight"]),
+    ("Tungsteno",      ["tungsteno", "fresnel arri", "mole richardson", "lowel par", "open face", "focus light"]),
+    ("Fluorescente",   ["kino flo", "caselight", "pampa tubo", "fluorescente"]),
+    ("On-camera / Flash", ["flash godox", "luz on-camera", "yongnuo yn300", "dracast bicolor"]),
+    ("Práctica / efecto", ["globo china", "máquina de humo", "smokegenie"]),
+    # ── MODIFICADORES ──────────────────────────────────────────────────
+    ("Softbox",        ["softbox", "light dome", "ad-s60"]),
+    ("Difusión / Frame", ["frame difusión", "fresnel attachment"]),
+    ("Reflectores",    ["reflector"]),
+    ("Banderas",       ["bandera"]),
+    # ── SOPORTES ───────────────────────────────────────────────────────
+    ("Trípodes video", ["manfrotto 502", "manfrotto 504", "manfrotto 529", "trípode fluido", "trípode galera"]),
+    ("Trípodes foto",  ["xpro 4s", "trípode foto", "manfrotto elements"]),
+    ("C-Stands",       ["c-stand"]),
+    ("Estabilización", ["gimbal", "ronin", "steadicam", "glidecam", "tilta gravity"]),
+    ("Slider / Dolly / Riel", ["slider", "dolly", "riel "]),
+    ("Car Mount",      ["car mount", "tilta hydra"]),
+    # ── GRIP ───────────────────────────────────────────────────────────
+    ("Brazos",         ["brazo ", "boom arm", "magic arm", "superflex", "brazo mágico"]),
+    ("Clamps",         ["clamp", "superclamp", "avenger c1510", "avenger c4462", "avenger e390"]),
+    ("Wall plates / pins", ["wall plate", "baby pin", "junior pin"]),
+    ("Pinzas",         ["pinza"]),
+    ("Líneas de seguridad", ["línea de seguridad", "linea de seguridad"]),
+    ("Sopapa",         ["sopapa"]),
+    ("Lastre",         ["bolsa de arena", "saco de arena"]),
+    # ── SONIDO ─────────────────────────────────────────────────────────
+    ("Inalámbricos / Lavalier", ["dji mic", "wireless go", "lavalier"]),
+    ("Shotgun / Boom", ["shotgun", "ntg2", "mke 600", "caña boom", "zeppelin"]),
+    ("On-camera (sonido)", ["videomic", "mke 400"]),
+    ("Estudio / Podcast", ["procaster", "rodecaster"]),
+    ("Intercom",       ["intercom", "solidcom", "hollyland"]),
+    # ── MONITORES Y VIDEO ──────────────────────────────────────────────
+    ("Monitores",      ["monitor de campo", "smallhd", "lilliput", "viltrox 6", "monitor on-camera"]),
+    ("Grabadores",     ["video assist", "grabador"]),
+    ("Transmisión inalámbrica", ["sdr transmission", "transmisor inalámbrico"]),
+    ("Follow Focus / Matebox", ["follow focus", "nucleus", "matebox", "matte box"]),
+    # ── ENERGÍA ────────────────────────────────────────────────────────
+    ("V-Mount",        ["v-mount", "vmount"]),
+    ("NP / LP-E6",     ["np-f", "np-fz", "lp-e6", "np serie-l"]),
+    ("Distribución eléctrica", ["zapatilla", "alargue eléctrico"]),
+    # ── MEDIA Y DATOS ──────────────────────────────────────────────────
+    ("Tarjetas SD",    ["tarjeta sd"]),
+    ("Tarjetas CFexpress", ["cfexpress"]),
+    ("Lectores",       ["lector"]),
+    # ── ESTUDIO Y PRODUCCIÓN ───────────────────────────────────────────
+    ("Set / Backdrops", ["backdrop", "mesa de producción"]),
+    ("Paquetes",       ["rambla estudio", "estudio equipos promo"]),
+]
+
+
+def _propose_tags(nombre: str, marca: str, modelo: str) -> list[str]:
+    """Devuelve la lista de etiquetas hoja propuestas para un equipo."""
+    text = f"{nombre} {marca or ''} {modelo or ''}".lower()
+    matches = []
+    for leaf, kws in _RULES_LEAF:
+        for kw in kws:
+            if kw in text:
+                matches.append(leaf)
+                break
+    # Dedupe preservando orden
+    seen = set()
+    out = []
+    for m in matches:
+        if m not in seen:
+            out.append(m); seen.add(m)
+    return out
+
+
+# ── Admin: CRUD de categorías (árbol propio) ─────────────────────────────────
+
+class CategoriaCreate(BaseModel):
+    nombre:    str
+    prioridad: Optional[int] = 100
+    parent_id: Optional[int] = None
+
+
+class CategoriaPatch(BaseModel):
+    nombre:    Optional[str] = None
+    prioridad: Optional[int] = None
+    parent_id: Optional[int] = None
+    set_parent_null: Optional[bool] = False
+
+
+class CategoriasReorder(BaseModel):
+    ids: list[int]
+
+
+@router.get("/admin/categorias")
+def admin_list_categorias(request: Request):
+    from admin_guard import require_admin
+    require_admin(request)
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT c.id, c.nombre, c.prioridad, c.parent_id,
+                   COUNT(ec.equipo_id) AS total
+            FROM categorias c
+            LEFT JOIN equipo_categorias ec ON ec.categoria_id = c.id
+            GROUP BY c.id, c.nombre, c.prioridad, c.parent_id
+            ORDER BY c.prioridad ASC, LOWER(c.nombre) ASC
+        """).fetchall()
+        return [
+            {"id": r["id"], "nombre": r["nombre"], "prioridad": r["prioridad"],
+             "parent_id": r["parent_id"], "total": r["total"]}
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
+@router.post("/admin/categorias", status_code=201)
+def admin_create_categoria(data: CategoriaCreate, request: Request):
+    from admin_guard import require_admin
+    require_admin(request)
+    nombre = (data.nombre or "").strip()
+    if not nombre:
+        raise HTTPException(400, "Nombre vacío")
+    conn = get_db()
+    try:
+        if data.parent_id is not None:
+            prow = conn.execute(
+                "SELECT id, parent_id FROM categorias WHERE id = %s", (data.parent_id,)
+            ).fetchone()
+            if not prow:
+                raise HTTPException(400, "parent_id no existe")
+            if prow["parent_id"] is not None:
+                raise HTTPException(400, "Solo se permiten 2 niveles")
+        cur = conn.execute("""
+            INSERT INTO categorias (nombre, prioridad, parent_id)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (nombre) DO UPDATE
+                SET prioridad = EXCLUDED.prioridad,
+                    parent_id = EXCLUDED.parent_id
+            RETURNING id, nombre, prioridad, parent_id
+        """, (nombre, data.prioridad or 100, data.parent_id))
+        row = cur.fetchone()
+        conn.commit()
+        return {"id": row["id"], "nombre": row["nombre"],
+                "prioridad": row["prioridad"], "parent_id": row["parent_id"], "total": 0}
+    except HTTPException:
+        conn.rollback(); raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(400, str(e))
+    finally:
+        conn.close()
+
+
+@router.patch("/admin/categorias/{cid}")
+def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
+    from admin_guard import require_admin
+    require_admin(request)
+    sets, vals = [], []
+    if patch.nombre is not None:
+        sets.append("nombre = %s"); vals.append(patch.nombre.strip())
+    if patch.prioridad is not None:
+        sets.append("prioridad = %s"); vals.append(int(patch.prioridad))
+    if patch.set_parent_null:
+        sets.append("parent_id = NULL")
+    elif patch.parent_id is not None:
+        if patch.parent_id == cid:
+            raise HTTPException(400, "Una categoría no puede ser su propio padre")
+        conn0 = get_db()
+        try:
+            prow = conn0.execute(
+                "SELECT id, parent_id FROM categorias WHERE id = %s", (patch.parent_id,)
+            ).fetchone()
+            if not prow:
+                raise HTTPException(400, "parent_id no existe")
+            if prow["parent_id"] is not None:
+                raise HTTPException(400, "Solo se permiten 2 niveles")
+            chrow = conn0.execute(
+                "SELECT 1 FROM categorias WHERE parent_id = %s LIMIT 1", (cid,)
+            ).fetchone()
+            if chrow:
+                raise HTTPException(400, "Esta categoría tiene hijos")
+        finally:
+            conn0.close()
+        sets.append("parent_id = %s"); vals.append(int(patch.parent_id))
+    if not sets:
+        raise HTTPException(400, "Sin cambios")
+    conn = get_db()
+    try:
+        vals.append(cid)
+        conn.execute(f"UPDATE categorias SET {', '.join(sets)} WHERE id = %s", tuple(vals))
+        # Si renombró, regenerar auto-tags de los equipos afectados.
+        if patch.nombre is not None:
+            eq_rows = conn.execute(
+                "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = %s", (cid,)
+            ).fetchall()
+            for r in eq_rows:
+                regenerate_auto_tags(conn, r["equipo_id"])
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@router.delete("/admin/categorias/{cid}", status_code=204)
+def admin_delete_categoria(cid: int, request: Request):
+    from admin_guard import require_admin
+    require_admin(request)
+    conn = get_db()
+    try:
+        eq_rows = conn.execute(
+            "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = %s", (cid,)
+        ).fetchall()
+        affected = [r["equipo_id"] for r in eq_rows]
+        conn.execute("DELETE FROM categorias WHERE id = %s", (cid,))
+        for eid in affected:
+            regenerate_auto_tags(conn, eid)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+@router.post("/admin/categorias/reorder")
+def admin_reorder_categorias(payload: CategoriasReorder, request: Request):
+    from admin_guard import require_admin
+    require_admin(request)
+    conn = get_db()
+    try:
+        for idx, cid in enumerate(payload.ids):
+            conn.execute(
+                "UPDATE categorias SET prioridad = %s WHERE id = %s",
+                ((idx + 1) * 10, cid),
+            )
+        conn.commit()
+        return {"ok": True, "count": len(payload.ids)}
+    finally:
+        conn.close()
+
+
+# ── Admin: clasificación automática (escribe en equipo_categorias) ───────────
+
+@router.post("/admin/categorias/clasificar")
+def admin_clasificar(request: Request, apply: int = Query(0)):
+    """
+    Calcula categorías hoja propuestas para todos los equipos.
+    - apply=0: dry-run.
+    - apply=1: REEMPLAZA las categorías de cada equipo que matchee al menos 1
+      regla; los que no matchean no se tocan. Regenera auto-tags después.
+    """
+    from admin_guard import require_admin
+    require_admin(request)
+
+    conn = get_db()
+    try:
+        equipos = conn.execute("""
+            SELECT e.id, e.nombre, e.marca, e.modelo
+            FROM equipos e
+            ORDER BY e.nombre
+        """).fetchall()
+
+        # Categorías actuales por equipo (para mostrar el diff).
+        rows = conn.execute("""
+            SELECT ec.equipo_id, c.nombre
+            FROM equipo_categorias ec
+            JOIN categorias c ON c.id = ec.categoria_id
+        """).fetchall()
+        from collections import defaultdict
+        actuales: dict[int, list[str]] = defaultdict(list)
+        for r in rows:
+            actuales[r["equipo_id"]].append(r["nombre"])
+
+        # Mapa nombre→id de categorías hoja válidas.
+        leaf_rows = conn.execute(
+            "SELECT id, nombre FROM categorias WHERE parent_id IS NOT NULL"
+        ).fetchall()
+        leaf_id = {r["nombre"]: r["id"] for r in leaf_rows}
+
+        items = []
+        matched = 0
+        applied = 0
+        for eq in equipos:
+            propuestas = _propose_tags(eq["nombre"], eq["marca"] or "", eq["modelo"] or "")
+            propuestas = [p for p in propuestas if p in leaf_id]
+            if propuestas:
+                matched += 1
+                if apply:
+                    conn.execute(
+                        "DELETE FROM equipo_categorias WHERE equipo_id = %s", (eq["id"],)
+                    )
+                    for orden, name in enumerate(propuestas):
+                        conn.execute("""
+                            INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (equipo_id, categoria_id)
+                            DO UPDATE SET orden = EXCLUDED.orden
+                        """, (eq["id"], leaf_id[name], orden))
+                    regenerate_auto_tags(conn, eq["id"])
+                    applied += 1
+            items.append({
+                "id":        eq["id"],
+                "nombre":    eq["nombre"],
+                "marca":     eq["marca"],
+                "propuestas": propuestas,
+                "actuales":  actuales.get(eq["id"], []),
+            })
+
+        if apply:
+            conn.commit()
+
+        return {
+            "total":     len(equipos),
+            "matched":   matched,
+            "unmatched": len(equipos) - matched,
+            "applied":   applied,
+            "items":     items,
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+
 @router.get("/equipos/{id}/calendario")
 def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(...)):
+    """Per-day available unit count for a given equipment and month."""
     if not (1 <= month <= 12):
         raise HTTPException(400, "Mes inválido")
+
     conn = get_db()
     try:
         equipo = conn.execute(
@@ -493,6 +1192,7 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
 
         ESTADOS = "('presupuesto','confirmado','retirado')"
 
+        # Direct reservations that overlap this month
         directas = conn.execute(f"""
             SELECT LEFT(p.fecha_desde, 10) AS desde,
                    LEFT(p.fecha_hasta, 10) AS hasta,
@@ -505,6 +1205,7 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
               AND LEFT(p.fecha_hasta, 10) > ?
         """, (id, last_day, first_day)).fetchall()
 
+        # Via-kit reservations: this equipment is a component of a rented kit
         via_kit = conn.execute(f"""
             SELECT LEFT(p.fecha_desde, 10) AS desde,
                    LEFT(p.fecha_hasta, 10) AS hasta,
@@ -533,3 +1234,615 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
         return result
     finally:
         conn.close()
+
+
+# ── Admin: enriquecimiento con IA (Firecrawl + Lovable AI) ────────────────────
+
+class EnriquecerInput(BaseModel):
+    nombre: str
+    marca:  Optional[str] = None
+    modelo: Optional[str] = None
+
+
+@router.post("/admin/equipos/enriquecer")
+def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
+    """
+    Busca el equipo en B&H/Adorama, scrapea la página y usa Lovable AI para
+    extraer marca/modelo/specs/foto en JSON estructurado. Devuelve un preview;
+    el frontend decide qué campos aplicar via PATCH normal.
+    """
+    from admin_guard import require_admin
+    require_admin(request)
+
+    import os, httpx
+
+    FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+    if not FIRECRAWL_API_KEY:
+        raise HTTPException(500, "FIRECRAWL_API_KEY no configurado en el backend")
+
+    query = " ".join(x for x in [payload.marca, payload.nombre, payload.modelo] if x).strip()
+    if not query:
+        raise HTTPException(400, "Faltan datos para buscar")
+
+    headers_fc = {
+        "Authorization": f"Bearer {FIRECRAWL_API_KEY}",
+        "Content-Type":  "application/json",
+    }
+
+    def _extract_results(j: dict) -> list[dict]:
+        data = j.get("data")
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return data.get("web", []) or []
+        return []
+
+    OFFICIAL_SITES = (
+        "site:canon.com OR site:usa.canon.com OR site:sony.com OR site:nikon.com OR "
+        "site:fujifilm.com OR site:fujifilm-x.com OR site:panasonic.com OR "
+        "site:blackmagicdesign.com OR site:aputure.com OR site:godox.com OR "
+        "site:rode.com OR site:sennheiser.com OR site:dji.com OR site:atomos.com OR "
+        "site:tilta.com OR site:smallrig.com OR site:zoom-na.com OR site:zhiyun-tech.com"
+    )
+
+    def _search(q: str, client: "httpx.Client") -> list[dict]:
+        try:
+            rr = client.post(
+                "https://api.firecrawl.dev/v2/search",
+                headers=headers_fc,
+                json={"query": q, "limit": 3},
+            )
+        except httpx.HTTPError:
+            return []
+        if rr.status_code != 200:
+            return []
+        return _extract_results(rr.json())
+
+    def _first_valid(results: list[dict]) -> dict | None:
+        for r in results:
+            u = (r.get("url") or "").strip()
+            if u.lower().startswith(("http://", "https://")) and not u.lower().endswith(".pdf"):
+                return r
+        return None
+
+    json_format = {
+        "type": "json",
+        "prompt": (
+            "Extraé la información del equipo audiovisual (cámara, lente, "
+            "luz, audio) desde la ficha de producto. Specs: máximo 8, label "
+            "corto y value conciso. Descripcion: 1-2 oraciones en español. "
+            "foto_url: URL ABSOLUTA (http/https) a una imagen JPG/PNG/WebP del "
+            "producto principal. NO uses placeholders, sprites, SVGs decorativos, "
+            "tracking pixels, ni rutas relativas. Si no estás 100% seguro de que "
+            "la URL existe y apunta al producto, dejá el campo vacío. "
+            "Keywords: 3-6 palabras clave cortas en español, lowercase, "
+            "que describan la PERSONALIDAD del equipo (ej: 'bicolor', "
+            "'silenciosa', 'v-mount', 'global shutter', 'weather sealed', "
+            "'cri 96', 'cine-ready'). Distintas y específicas — nada genérico "
+            "como 'profesional' o 'calidad'. Si no hay nada distintivo, "
+            "devolvé un array vacío."
+        ),
+        "schema": {
+            "type": "object",
+            "properties": {
+                "marca":  {"type": "string"},
+                "modelo": {"type": "string"},
+                "nombre_normalizado": {"type": "string"},
+                "descripcion": {"type": "string"},
+                "foto_url": {"type": "string"},
+                "specs": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {"type": "string"},
+                            "value": {"type": "string"},
+                        },
+                        "required": ["label", "value"],
+                    },
+                },
+                "keywords": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+            },
+            "required": ["marca", "modelo", "descripcion", "specs"],
+        },
+    }
+
+    def _scrape(url: str, client: "httpx.Client") -> dict | None:
+        """Devuelve {extracted, foto_candidate, meta} o None si falló."""
+        try:
+            rs = client.post(
+                "https://api.firecrawl.dev/v2/scrape",
+                headers=headers_fc,
+                json={
+                    "url": url,
+                    "formats": ["markdown", json_format],
+                    "onlyMainContent": True,
+                },
+            )
+        except httpx.HTTPError:
+            return None
+        if rs.status_code == 402:
+            raise HTTPException(402, "Sin créditos de Firecrawl. Recargá tu plan.")
+        if rs.status_code == 429:
+            raise HTTPException(429, "Rate-limit de Firecrawl. Probá en un minuto.")
+        if rs.status_code != 200:
+            return None
+        sj = rs.json()
+        sd = sj.get("data") or sj
+        meta      = sd.get("metadata") or {}
+        extracted = sd.get("json") or {}
+        og_image = meta.get("ogImage") or meta.get("og:image") or None
+        # Priorizar og:image (más confiable) sobre lo extraído por LLM
+        llm_img = extracted.get("foto_url")
+        if llm_img and not str(llm_img).lower().startswith(("http://", "https://")):
+            llm_img = None
+        cand = og_image or llm_img
+        return {"extracted": extracted, "foto_candidate": cand or None, "meta": meta}
+
+    with httpx.Client(timeout=45.0) as client:
+        # Etapa A: B&H (canónico para bh_url)
+        bh_results = _search(f"{query} site:bhphotovideo.com", client)
+        bh_top = _first_valid(bh_results)
+
+        # Etapa B: sitios oficiales del fabricante
+        alt_results = _search(f"{query} ({OFFICIAL_SITES})", client)
+        alt_top = _first_valid(alt_results)
+
+        # Etapa C: Adorama / Amazon (último recurso)
+        if not alt_top:
+            adoram_results = _search(f"{query} site:adorama.com OR site:amazon.com", client)
+            alt_top = _first_valid(adoram_results)
+
+        if not bh_top and not alt_top:
+            raise HTTPException(404, "No se encontraron resultados en internet")
+
+        bh_scrape  = _scrape(bh_top["url"], client) if bh_top else None
+        alt_scrape = None
+        # Sólo scrapeamos alternativa si B&H no aportó datos o foto
+        needs_alt = (
+            alt_top is not None and (
+                bh_scrape is None
+                or not bh_scrape.get("foto_candidate")
+                or not (bh_scrape.get("extracted") or {}).get("descripcion")
+            )
+        )
+        if needs_alt:
+            alt_scrape = _scrape(alt_top["url"], client)
+
+    # ── Merge B&H + alt (B&H pisa) ──────────────────────────────────────────
+    primary = bh_scrape or alt_scrape or {}
+    secondary = alt_scrape if bh_scrape else None
+    extracted = dict(primary.get("extracted") or {})
+    if secondary:
+        sec_ext = secondary.get("extracted") or {}
+        for k in ("descripcion", "specs", "keywords", "marca", "modelo", "nombre_normalizado"):
+            if not extracted.get(k):
+                extracted[k] = sec_ext.get(k)
+
+    if not extracted:
+        raise HTTPException(422, "No se pudo extraer información estructurada")
+
+    # ── Validación de foto: HEAD/GET parcial antes de devolver ──────────────
+    def _validate_image(url: str | None) -> tuple[bool, str]:
+        """Devuelve (ok, motivo). motivo es '' si ok=True."""
+        if not url:
+            return False, "sin candidata"
+        if not url.lower().startswith(("http://", "https://")):
+            return False, "URL no absoluta"
+        from urllib.parse import urlparse as _up
+        host = (_up(url).hostname or "").lower()
+        ref = f"https://{host}/" if host else None
+        hdrs = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/*,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        if ref:
+            hdrs["Referer"] = ref
+        try:
+            with httpx.Client(timeout=10.0, follow_redirects=True) as c:
+                # HEAD primero
+                try:
+                    rh = c.head(url, headers=hdrs)
+                    if rh.status_code == 200:
+                        ct = rh.headers.get("content-type", "")
+                        cl = int(rh.headers.get("content-length", "0") or "0")
+                        if ct.startswith("image/") and (cl == 0 or cl > 1024):
+                            return True, ""
+                        if not ct.startswith("image/"):
+                            return False, f"content-type {ct or 'desconocido'}"
+                        if cl and cl <= 1024:
+                            return False, "imagen muy chica (<1KB)"
+                except httpx.HTTPError:
+                    pass
+                # GET con Range como fallback (HEAD a veces no está soportado)
+                hdrs["Range"] = "bytes=0-2048"
+                rg = c.get(url, headers=hdrs)
+                if rg.status_code in (200, 206):
+                    ct = rg.headers.get("content-type", "")
+                    if ct.startswith("image/"):
+                        return True, ""
+                    return False, f"content-type {ct or 'desconocido'}"
+                return False, f"HTTP {rg.status_code} en origen"
+        except httpx.HTTPError as e:
+            return False, f"error de red: {type(e).__name__}"
+
+    bh_foto = (bh_scrape or {}).get("foto_candidate") if bh_scrape else None
+    alt_foto = (alt_scrape or {}).get("foto_candidate") if alt_scrape else None
+
+    foto_url = None
+    fuente_foto_url = None
+    foto_motivo = ""
+
+    # Probar B&H primero
+    if bh_foto:
+        ok, motivo = _validate_image(bh_foto)
+        if ok:
+            foto_url = bh_foto
+            fuente_foto_url = bh_top["url"] if bh_top else None
+        else:
+            foto_motivo = f"B&H: {motivo}"
+
+    # Si B&H no validó, probar alternativa (incluso si no scrapeada antes)
+    if not foto_url:
+        if not alt_scrape and alt_top:
+            try:
+                with httpx.Client(timeout=45.0) as c2:
+                    alt_scrape = _scrape(alt_top["url"], c2)
+                alt_foto = (alt_scrape or {}).get("foto_candidate") if alt_scrape else None
+            except Exception:
+                pass
+        if alt_foto:
+            ok, motivo = _validate_image(alt_foto)
+            if ok:
+                foto_url = alt_foto
+                fuente_foto_url = alt_top["url"] if alt_top else None
+            else:
+                foto_motivo = (foto_motivo + f" | alt: {motivo}").strip(" |")
+
+    if not foto_url and not foto_motivo:
+        foto_motivo = "no se encontró imagen en ninguna fuente"
+
+    # bh_url canónico = el de B&H si hubo, sino el alternativo (como referencia)
+    canonical_url = (bh_top or alt_top)["url"]
+    canonical_title = (bh_top or alt_top).get("title") or canonical_url
+
+    # Sanitizar keywords: lowercase, trim, dedupe, max 6
+    raw_kws = extracted.get("keywords") or []
+    seen_kw: set[str] = set()
+    keywords: list[str] = []
+    for k in raw_kws:
+        if not isinstance(k, str):
+            continue
+        kk = k.strip().lower()
+        if not kk or kk in seen_kw or len(kk) > 40:
+            continue
+        seen_kw.add(kk)
+        keywords.append(kk)
+        if len(keywords) >= 6:
+            break
+
+    return {
+        "marca":  (extracted.get("marca")  or payload.marca  or "").strip() or None,
+        "modelo": (extracted.get("modelo") or payload.modelo or "").strip() or None,
+        "nombre_normalizado": (extracted.get("nombre_normalizado") or payload.nombre).strip(),
+        "descripcion": (extracted.get("descripcion") or "").strip(),
+        "specs": (extracted.get("specs") or [])[:12],
+        "keywords": keywords,
+        "foto_url": foto_url,
+        "fuente_url": canonical_url,
+        "fuente_titulo": canonical_title,
+        "fuente_foto_url": fuente_foto_url,
+        "foto_motivo": foto_motivo or None,
+    }
+
+
+# ── Admin: proxy de imágenes (para evitar hotlink-block de B&H/Adorama) ──────
+
+@router.get("/admin/proxy-image")
+def admin_proxy_image(url: str, request: Request):
+    """
+    Descarga una imagen desde una URL externa con un User-Agent normal y la
+    devuelve al cliente. Útil porque B&H/Adorama bloquean hotlinking pero el
+    frontend necesita los bytes para subirlos a Supabase Storage.
+    """
+    from admin_guard import require_admin
+    require_admin(request)
+
+    import httpx
+    from fastapi.responses import Response
+
+    if not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "URL inválida")
+
+    from urllib.parse import urlparse
+    host = (urlparse(url).hostname or "").lower()
+
+    def _headers(referer: str | None) -> dict:
+        h = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Sec-Fetch-Dest": "image",
+            "Sec-Fetch-Mode": "no-cors",
+            "Sec-Fetch-Site": "cross-site",
+            "Cache-Control": "no-cache",
+        }
+        if referer:
+            h["Referer"] = referer
+        return h
+
+    # Referer "creíble" según el host (B&H, Adorama, Amazon, etc.)
+    referer_map = {
+        "bhphotovideo.com": "https://www.bhphotovideo.com/",
+        "www.bhphotovideo.com": "https://www.bhphotovideo.com/",
+        "adorama.com": "https://www.adorama.com/",
+        "www.adorama.com": "https://www.adorama.com/",
+    }
+    primary_referer = next((v for k, v in referer_map.items() if host.endswith(k)), f"https://{host}/")
+
+    last_status = None
+    last_body = b""
+    r = None
+    try:
+        with httpx.Client(timeout=20.0, follow_redirects=True, http2=False) as client:
+            # 1º intento: con Referer del propio dominio
+            r = client.get(url, headers=_headers(primary_referer))
+            last_status, last_body = r.status_code, r.content
+            # 2º intento: sin Referer
+            if r.status_code == 403:
+                r2 = client.get(url, headers=_headers(None))
+                if r2.status_code == 200:
+                    r = r2
+                else:
+                    last_status, last_body = r2.status_code, r2.content
+            # 3º intento: Referer = google
+            if r.status_code == 403:
+                r3 = client.get(url, headers=_headers("https://www.google.com/"))
+                if r3.status_code == 200:
+                    r = r3
+                else:
+                    last_status, last_body = r3.status_code, r3.content
+            # 4º intento: proxy público images.weserv.nl (esquiva hotlink-block)
+            if r.status_code in (401, 403, 404, 429) or r.status_code >= 500:
+                from urllib.parse import quote
+                # weserv requiere la URL sin esquema
+                stripped = url.split("://", 1)[1] if "://" in url else url
+                weserv_url = f"https://images.weserv.nl/?url={quote(stripped, safe='')}"
+                r4 = client.get(weserv_url, headers={
+                    "User-Agent": "Mozilla/5.0",
+                    "Accept": "image/*,*/*;q=0.8",
+                })
+                if r4.status_code == 200 and r4.headers.get("content-type", "").startswith("image/"):
+                    r = r4
+                else:
+                    last_status, last_body = r4.status_code, r4.content
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"No se pudo descargar la imagen: {e}")
+
+    if r is None or r.status_code != 200:
+        snippet = ""
+        try:
+            snippet = last_body[:200].decode("utf-8", errors="ignore")
+        except Exception:
+            pass
+        raise HTTPException(
+            last_status or 502,
+            f"Origen devolvió {last_status} para host {host}. {snippet}".strip(),
+        )
+
+    ctype = r.headers.get("content-type", "image/jpeg")
+    if not ctype.startswith("image/"):
+        raise HTTPException(415, f"La URL no devolvió una imagen ({ctype})")
+
+    return Response(
+        content=r.content,
+        media_type=ctype,
+        headers={"Cache-Control": "private, max-age=300"},
+    )
+
+
+# ── Admin: descargar imagen externa y subirla a Supabase Storage ──────────────
+#
+# El frontend NO sube directamente al bucket porque depende de tener una sesión
+# Supabase válida en el browser (que a veces expira o no existe si el admin
+# entró con la cookie clásica). Acá lo hacemos en el backend con el
+# SUPABASE_SERVICE_ROLE_KEY → bypassa RLS y nunca falla por "rol anon".
+
+def _download_image_bytes(url: str) -> tuple[bytes, str]:
+    """Descarga una imagen externa con todos los fallbacks del proxy
+    (Referer del host, sin Referer, Referer=google, weserv).
+    Devuelve (bytes, content_type). Eleva HTTPException si no se pudo.
+    """
+    import httpx
+    from urllib.parse import urlparse, quote
+
+    if not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "URL inválida")
+
+    host = (urlparse(url).hostname or "").lower()
+
+    def _headers(referer: str | None) -> dict:
+        h = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Sec-Fetch-Dest": "image",
+            "Sec-Fetch-Mode": "no-cors",
+            "Sec-Fetch-Site": "cross-site",
+            "Cache-Control": "no-cache",
+        }
+        if referer:
+            h["Referer"] = referer
+        return h
+
+    referer_map = {
+        "bhphotovideo.com": "https://www.bhphotovideo.com/",
+        "www.bhphotovideo.com": "https://www.bhphotovideo.com/",
+        "adorama.com": "https://www.adorama.com/",
+        "www.adorama.com": "https://www.adorama.com/",
+    }
+    primary_referer = next(
+        (v for k, v in referer_map.items() if host.endswith(k)),
+        f"https://{host}/",
+    )
+
+    last_status = None
+    last_body = b""
+    r = None
+    try:
+        with httpx.Client(timeout=20.0, follow_redirects=True, http2=False) as client:
+            r = client.get(url, headers=_headers(primary_referer))
+            last_status, last_body = r.status_code, r.content
+            if r.status_code == 403:
+                r2 = client.get(url, headers=_headers(None))
+                if r2.status_code == 200:
+                    r = r2
+                else:
+                    last_status, last_body = r2.status_code, r2.content
+            if r.status_code == 403:
+                r3 = client.get(url, headers=_headers("https://www.google.com/"))
+                if r3.status_code == 200:
+                    r = r3
+                else:
+                    last_status, last_body = r3.status_code, r3.content
+            if r.status_code in (401, 403, 404, 429) or r.status_code >= 500:
+                stripped = url.split("://", 1)[1] if "://" in url else url
+                weserv_url = f"https://images.weserv.nl/?url={quote(stripped, safe='')}"
+                r4 = client.get(weserv_url, headers={
+                    "User-Agent": "Mozilla/5.0",
+                    "Accept": "image/*,*/*;q=0.8",
+                })
+                if r4.status_code == 200 and r4.headers.get("content-type", "").startswith("image/"):
+                    r = r4
+                else:
+                    last_status, last_body = r4.status_code, r4.content
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"No se pudo descargar la imagen: {e}")
+
+    if r is None or r.status_code != 200:
+        snippet = ""
+        try:
+            snippet = last_body[:200].decode("utf-8", errors="ignore")
+        except Exception:
+            pass
+        raise HTTPException(
+            502,
+            f"Origen devolvió {last_status} para host {host}. {snippet}".strip(),
+        )
+
+    ctype = r.headers.get("content-type", "image/jpeg")
+    if not ctype.startswith("image/"):
+        raise HTTPException(415, f"La URL no devolvió una imagen ({ctype})")
+
+    if len(r.content) < 1024:
+        raise HTTPException(415, f"Imagen muy chica ({len(r.content)} bytes)")
+
+    return r.content, ctype
+
+
+def _ext_from_ctype(ct: str) -> str:
+    ct = (ct or "").lower()
+    if "png" in ct:  return "png"
+    if "webp" in ct: return "webp"
+    if "avif" in ct: return "avif"
+    if "gif" in ct:  return "gif"
+    return "jpg"
+
+
+def _upload_to_supabase_storage(path: str, content: bytes, content_type: str) -> str:
+    """Sube `content` al bucket equipos-fotos vía REST API usando service role.
+    Devuelve la URL pública. Eleva HTTPException si falla.
+    """
+    import os
+    import httpx
+
+    base = (
+        os.getenv("SUPABASE_URL")
+        or os.getenv("SUPABASE_PROJECT_URL")
+        or "https://ytujjqoffcdsdowfqaex.supabase.co"
+    ).rstrip("/")
+    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not service_key:
+        raise HTTPException(
+            500,
+            "Falta SUPABASE_SERVICE_ROLE_KEY en el backend. "
+            "Configurala como env var en Railway.",
+        )
+
+    bucket = "equipos-fotos"
+    upload_url = f"{base}/storage/v1/object/{bucket}/{path}"
+    headers = {
+        "Authorization": f"Bearer {service_key}",
+        "apikey": service_key,
+        "Content-Type": content_type,
+        "x-upsert": "false",
+        "Cache-Control": "3600",
+    }
+    try:
+        with httpx.Client(timeout=30.0) as c:
+            r = c.post(upload_url, headers=headers, content=content)
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"No se pudo subir a Storage: {e}")
+
+    if r.status_code not in (200, 201):
+        snippet = (r.text or "")[:300]
+        raise HTTPException(
+            r.status_code if r.status_code >= 400 else 502,
+            f"Storage devolvió {r.status_code}: {snippet}",
+        )
+
+    return f"{base}/storage/v1/object/public/{bucket}/{path}"
+
+
+class UploadFotoFromUrlInput(BaseModel):
+    url: str
+
+
+@router.post("/admin/equipos/{equipo_id}/upload-foto-from-url")
+def admin_upload_foto_from_url(
+    equipo_id: int,
+    payload: UploadFotoFromUrlInput,
+    request: Request,
+):
+    """Descarga la imagen de `payload.url` y la sube al bucket `equipos-fotos`
+    vía service-role (bypassa RLS). Devuelve `{public_url, path}`.
+
+    Esto reemplaza el upload directo desde el browser, que requería sesión
+    Supabase activa y fallaba con "rol anon" cuando el JWT expiraba.
+    """
+    from admin_guard import require_admin
+    require_admin(request)
+
+    url = (payload.url or "").strip()
+    if not url:
+        raise HTTPException(400, "URL vacía")
+
+    # Si ya es una URL del propio bucket, no hacemos nada.
+    if "/storage/v1/object/public/equipos-fotos/" in url:
+        return {"public_url": url, "path": None, "skipped": True}
+
+    content, ctype = _download_image_bytes(url)
+    ext = _ext_from_ctype(ctype)
+
+    import time as _time
+    path = f"equipos/{equipo_id}/foto-{int(_time.time() * 1000)}.{ext}"
+    public_url = _upload_to_supabase_storage(path, content, ctype)
+
+    return {
+        "public_url": public_url,
+        "path": path,
+        "size": len(content),
+        "content_type": ctype,
+    }

@@ -1,5 +1,6 @@
 """
 routes/estadisticas.py — Análisis y estadísticas de alquileres.
+Lee directo de pedidos + alquiler_items + equipos. Sin tablas intermedias.
 """
 
 from fastapi import APIRouter, Query
@@ -13,6 +14,7 @@ router = APIRouter()
 def get_estadisticas():
     conn = get_db()
     try:
+        # ── Totales generales (solo pedidos confirmados/finalizados) ──────────────
         totales = conn.execute("""
             SELECT
                 COUNT(DISTINCT p.id)           AS total_pedidos,
@@ -25,6 +27,7 @@ def get_estadisticas():
             WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
         """).fetchone()
 
+        # ── Por mes ───────────────────────────────────────────────────────────────
         por_mes = conn.execute("""
             SELECT
                 substr(p.fecha_desde, 1, 7)    AS mes,
@@ -38,6 +41,7 @@ def get_estadisticas():
             LIMIT 24
         """).fetchall()
 
+        # ── Top equipos ───────────────────────────────────────────────────────────
         top_equipos = conn.execute("""
             SELECT
                 e.nombre                       AS equipo,
@@ -52,6 +56,7 @@ def get_estadisticas():
             LIMIT 15
         """).fetchall()
 
+        # ── Top clientes ──────────────────────────────────────────────────────────
         top_clientes = conn.execute("""
             SELECT
                 MAX(COALESCE(c.apellido || ', ' || c.nombre, p.cliente_nombre)) AS cliente,
@@ -65,6 +70,7 @@ def get_estadisticas():
             LIMIT 10
         """).fetchall()
 
+        # ── Por dueño (basado en equipos.dueno) ───────────────────────────────────
         por_dueno = conn.execute("""
             SELECT
                 COALESCE(e.dueno, 'Rambla')    AS dueno,
@@ -78,19 +84,29 @@ def get_estadisticas():
             ORDER BY total_ars DESC
         """).fetchall()
 
+        # ── Crecimiento mes a mes ──────────────────────────────────────────────────
         por_mes_calc = [row_to_dict(r) for r in por_mes]
         por_mes_calc.sort(key=lambda x: x['mes'])
+
         crecimiento = []
         for i, mes in enumerate(por_mes_calc):
             if i > 0:
                 mes_anterior = por_mes_calc[i - 1]
                 total_ant = mes_anterior['total_ars'] or 0
-                pct = ((mes['total_ars'] - total_ant) / total_ant * 100) if total_ant > 0 else (0 if mes['total_ars'] == 0 else 100)
+                if total_ant > 0:
+                    pct = ((mes['total_ars'] - total_ant) / total_ant) * 100
+                else:
+                    pct = 0 if mes['total_ars'] == 0 else 100
             else:
                 pct = 0
-            crecimiento.append({'mes': mes['mes'], 'total_ars': mes['total_ars'], 'crecimiento_pct': round(pct, 1) if pct else 0})
+            crecimiento.append({
+                'mes':             mes['mes'],
+                'total_ars':       mes['total_ars'],
+                'crecimiento_pct': round(pct, 1) if pct else 0,
+            })
         crecimiento.sort(key=lambda x: x['mes'], reverse=True)
 
+        # ── Clientes más recurrentes ───────────────────────────────────────────────
         clientes_recurrentes = conn.execute("""
             SELECT
                 MAX(COALESCE(c.apellido || ', ' || c.nombre, p.cliente_nombre)) AS cliente,
@@ -105,6 +121,49 @@ def get_estadisticas():
             LIMIT 10
         """).fetchall()
 
+        # ── Mejor y peor mes ───────────────────────────────────────────────────────
+        mejor_peor = conn.execute("""
+            SELECT
+                (SELECT mes FROM (
+                    SELECT substr(p.fecha_desde, 1, 7) AS mes, SUM(pi.subtotal) AS total
+                    FROM alquileres p
+                    JOIN alquiler_items pi ON pi.pedido_id = p.id
+                    WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
+                    GROUP BY substr(p.fecha_desde, 1, 7)
+                    ORDER BY total DESC LIMIT 1
+                ) t1) AS mejor_mes,
+                (SELECT MAX(total) FROM (
+                    SELECT SUM(pi.subtotal) AS total
+                    FROM alquileres p
+                    JOIN alquiler_items pi ON pi.pedido_id = p.id
+                    WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
+                    GROUP BY substr(p.fecha_desde, 1, 7)
+                ) t2) AS mejor_total,
+                (SELECT mes FROM (
+                    SELECT substr(p.fecha_desde, 1, 7) AS mes, SUM(pi.subtotal) AS total
+                    FROM alquileres p
+                    JOIN alquiler_items pi ON pi.pedido_id = p.id
+                    WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
+                    GROUP BY substr(p.fecha_desde, 1, 7)
+                    ORDER BY total ASC LIMIT 1
+                ) t3) AS peor_mes,
+                (SELECT MIN(total) FROM (
+                    SELECT SUM(pi.subtotal) AS total
+                    FROM alquileres p
+                    JOIN alquiler_items pi ON pi.pedido_id = p.id
+                    WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
+                    GROUP BY substr(p.fecha_desde, 1, 7)
+                ) t4) AS peor_total
+        """).fetchone()
+
+        mejor_peor_dict = row_to_dict(mejor_peor) if mejor_peor else {}
+        mejor_peor_mes = {
+            'mejor_mes':   mejor_peor_dict.get('mejor_mes'),
+            'mejor_total': mejor_peor_dict.get('mejor_total'),
+            'peor_mes':    mejor_peor_dict.get('peor_mes'),
+            'peor_total':  mejor_peor_dict.get('peor_total'),
+        }
+
         return {
             "totales":              row_to_dict(totales),
             "por_mes":              [row_to_dict(r) for r in por_mes],
@@ -112,6 +171,7 @@ def get_estadisticas():
             "top_equipos":          [row_to_dict(r) for r in top_equipos],
             "top_clientes":         [row_to_dict(r) for r in top_clientes],
             "clientes_recurrentes": [row_to_dict(r) for r in clientes_recurrentes],
+            "mejor_peor_mes":       mejor_peor_mes,
             "por_dueno":            [row_to_dict(r) for r in por_dueno],
         }
     finally:
@@ -125,6 +185,7 @@ def list_pedidos_stats(
     page:     int = Query(1, ge=1),
     per_page: int = Query(80, ge=1, le=500),
 ):
+    """Lista de pedidos confirmados con sus items para la tabla de detalle."""
     conn   = get_db()
     offset = (page - 1) * per_page
     where  = "WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')"
@@ -158,6 +219,11 @@ def list_pedidos_stats(
             LIMIT ? OFFSET ?
         """, params + [per_page, offset]).fetchall()
 
-        return {"total": total, "page": page, "per_page": per_page, "items": [row_to_dict(r) for r in rows]}
+        return {
+            "total":    total,
+            "page":     page,
+            "per_page": per_page,
+            "items":    [row_to_dict(r) for r in rows],
+        }
     finally:
         conn.close()

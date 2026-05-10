@@ -31,12 +31,10 @@ dist-ssr
 *.sln
 *.sw?
 
-# Python / Backend
+# Python / backend
 __pycache__/
 *.pyc
-*.pyo
-backend/.env
-backend/data/
-venv/
 .venv/
-*.egg-info/
+venv/
+backend/.env
+backend/.env.local

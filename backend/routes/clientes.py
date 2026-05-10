@@ -1,5 +1,5 @@
 """
-routes/clientes.py — CRUD de clientes.
+routes/clientes.py — CRUD de clientes e importación desde histórico.
 """
 
 from typing import Optional
@@ -11,6 +11,8 @@ from database import get_db, row_to_dict
 
 router = APIRouter()
 
+
+# ── Modelos ──────────────────────────────────────────────────────────────────
 
 class ClienteCreate(BaseModel):
     nombre:             str
@@ -36,6 +38,9 @@ class ClienteUpdate(BaseModel):
     perfil_impuestos:   Optional[str]   = None
     notas:              Optional[str]   = None
     direccion_maps_url: Optional[str]   = None
+
+
+# ── Rutas ────────────────────────────────────────────────────────────────────
 
 
 @router.get("/clientes")
