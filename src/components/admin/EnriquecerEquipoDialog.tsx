@@ -28,6 +28,7 @@ export type EnriquecerResult = {
   fuente_url: string;
   fuente_titulo: string;
   fuente_foto_url?: string | null;
+  foto_motivo?: string | null;
 };
 
 export function EnriquecerEquipoDialog({
