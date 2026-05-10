@@ -618,3 +618,133 @@ def attach_kit(conn, equipos: list[dict]) -> list[dict]:
 
     cur.close()
     return equipos
+
+
+def attach_categorias(conn, equipos: list[dict]) -> list[dict]:
+    """Agrega `categorias` (lista de {id, nombre, parent_id}) a cada equipo."""
+    if not equipos:
+        return equipos
+    ids = [e["id"] for e in equipos]
+    placeholders = ",".join(["%s"] * len(ids))
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT ec.equipo_id, c.id, c.nombre, c.parent_id
+        FROM equipo_categorias ec
+        JOIN categorias c ON c.id = ec.categoria_id
+        WHERE ec.equipo_id IN ({placeholders})
+        ORDER BY ec.equipo_id, ec.orden
+    """, ids)
+    rows = cur.fetchall()
+    cat_map: dict[int, list] = {e["id"]: [] for e in equipos}
+    for r in rows:
+        cat_map[r["equipo_id"]].append({
+            "id": r["id"], "nombre": r["nombre"], "parent_id": r["parent_id"],
+        })
+    for e in equipos:
+        e["categorias"] = cat_map[e["id"]]
+    cur.close()
+    return equipos
+
+
+# ── Auto-tags: regenerar etiquetas derivadas (origen='auto') ────────────────
+#
+# Las etiquetas auto se sintetizan desde marca, modelo, palabras del nombre
+# y nombres de cada categoría asignada (incluyendo padres del árbol).
+# Sirven como índice de búsqueda libre. El admin puede agregar etiquetas
+# manuales encima sin que se pisen.
+
+import re as _re
+
+_WORD_SPLIT = _re.compile(r"[^\wáéíóúñü]+", flags=_re.UNICODE)
+
+
+def _auto_tags_for_equipo(conn, equipo: dict) -> list[str]:
+    """Calcula la lista de strings que deberían ser etiquetas auto."""
+    bag: list[str] = []
+
+    def add(val):
+        if not val:
+            return
+        s = str(val).strip().lower()
+        if not s:
+            return
+        if s not in bag:
+            bag.append(s)
+
+    add(equipo.get("marca"))
+    add(equipo.get("modelo"))
+    # Palabras del nombre (descarta tokens muy cortos / numéricos sueltos).
+    for word in _WORD_SPLIT.split(str(equipo.get("nombre") or "")):
+        w = word.strip().lower()
+        if len(w) >= 3 and not w.isdigit():
+            add(w)
+
+    # Nombres de categorías asignadas + sus padres (árbol completo hacia arriba).
+    cat_rows = conn.execute("""
+        WITH RECURSIVE up AS (
+            SELECT c.id, c.nombre, c.parent_id
+            FROM equipo_categorias ec
+            JOIN categorias c ON c.id = ec.categoria_id
+            WHERE ec.equipo_id = %s
+            UNION
+            SELECT p.id, p.nombre, p.parent_id
+            FROM categorias p
+            JOIN up ON up.parent_id = p.id
+        )
+        SELECT DISTINCT nombre FROM up
+    """, (equipo["id"],)).fetchall()
+    for r in cat_rows:
+        add(r["nombre"])
+
+    return bag
+
+
+def regenerate_auto_tags(conn, equipo_id: int) -> int:
+    """
+    Regenera las etiquetas `origen='auto'` para un equipo.
+    No toca las `origen='manual'`. Devuelve cuántas auto-tags quedaron asignadas.
+    """
+    eq = conn.execute(
+        "SELECT id, nombre, marca, modelo FROM equipos WHERE id = %s", (equipo_id,)
+    ).fetchone()
+    if not eq:
+        return 0
+    equipo = {"id": eq["id"], "nombre": eq["nombre"], "marca": eq["marca"], "modelo": eq["modelo"]}
+
+    # 1) Borrar las auto actuales del equipo.
+    conn.execute(
+        "DELETE FROM equipo_etiquetas WHERE equipo_id = %s AND origen = 'auto'",
+        (equipo_id,),
+    )
+
+    # 2) Calcular nuevas y asegurar que cada nombre exista en `etiquetas`.
+    tags = _auto_tags_for_equipo(conn, equipo)
+    count = 0
+    for orden, name in enumerate(tags):
+        # Upsert de la etiqueta (la tabla tiene UNIQUE(nombre)).
+        conn.execute(
+            "INSERT INTO etiquetas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING",
+            (name,),
+        )
+        row = conn.execute("SELECT id FROM etiquetas WHERE nombre = %s", (name,)).fetchone()
+        if not row:
+            continue
+        # Insertar como auto. Si el admin ya tenía esta etiqueta como manual,
+        # respetamos su origen (DO NOTHING).
+        conn.execute("""
+            INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen)
+            VALUES (%s, %s, %s, 'auto')
+            ON CONFLICT (equipo_id, etiqueta_id) DO NOTHING
+        """, (equipo_id, row["id"], orden))
+        count += 1
+    return count
+
+
+def regenerate_auto_tags_all(conn) -> int:
+    """Regenera auto-tags para todos los equipos. Devuelve cantidad procesada."""
+    rows = conn.execute("SELECT id FROM equipos").fetchall()
+    n = 0
+    for r in rows:
+        regenerate_auto_tags(conn, r["id"])
+        n += 1
+    return n
