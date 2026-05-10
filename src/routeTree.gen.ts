@@ -26,6 +26,7 @@ import { Route as AuthMisPedidosIndexRouteImport } from './routes/_auth/mis-pedi
 import { Route as AdminPedidosNuevoRouteImport } from './routes/admin/pedidos.nuevo'
 import { Route as AdminPedidosIdRouteImport } from './routes/admin/pedidos.$id'
 import { Route as AuthMisPedidosIdRouteImport } from './routes/_auth/mis-pedidos/$id'
+import { Route as ApiAdminEquiposEquipoIdUploadFotoFromUrlRouteImport } from './routes/api/admin/equipos/$equipoId/upload-foto-from-url'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -111,6 +112,12 @@ const AuthMisPedidosIdRoute = AuthMisPedidosIdRouteImport.update({
   path: '/mis-pedidos/$id',
   getParentRoute: () => AuthRoute,
 } as any)
+const ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute =
+  ApiAdminEquiposEquipoIdUploadFotoFromUrlRouteImport.update({
+    id: '/api/admin/equipos/$equipoId/upload-foto-from-url',
+    path: '/api/admin/equipos/$equipoId/upload-foto-from-url',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
   '/mis-pedidos/': typeof AuthMisPedidosIndexRoute
   '/admin/pedidos/': typeof AdminPedidosIndexRoute
+  '/api/admin/equipos/$equipoId/upload-foto-from-url': typeof ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -146,6 +154,7 @@ export interface FileRoutesByTo {
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
   '/mis-pedidos': typeof AuthMisPedidosIndexRoute
   '/admin/pedidos': typeof AdminPedidosIndexRoute
+  '/api/admin/equipos/$equipoId/upload-foto-from-url': typeof ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -166,6 +175,7 @@ export interface FileRoutesById {
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
   '/_auth/mis-pedidos/': typeof AuthMisPedidosIndexRoute
   '/admin/pedidos/': typeof AdminPedidosIndexRoute
+  '/api/admin/equipos/$equipoId/upload-foto-from-url': typeof ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos/nuevo'
     | '/mis-pedidos/'
     | '/admin/pedidos/'
+    | '/api/admin/equipos/$equipoId/upload-foto-from-url'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos/nuevo'
     | '/mis-pedidos'
     | '/admin/pedidos'
+    | '/api/admin/equipos/$equipoId/upload-foto-from-url'
   id:
     | '__root__'
     | '/'
@@ -222,6 +234,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos/nuevo'
     | '/_auth/mis-pedidos/'
     | '/admin/pedidos/'
+    | '/api/admin/equipos/$equipoId/upload-foto-from-url'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -230,6 +243,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   EstudioRoute: typeof EstudioRoute
   LoginRoute: typeof LoginRoute
+  ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute: typeof ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -353,6 +367,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthMisPedidosIdRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/api/admin/equipos/$equipoId/upload-foto-from-url': {
+      id: '/api/admin/equipos/$equipoId/upload-foto-from-url'
+      path: '/api/admin/equipos/$equipoId/upload-foto-from-url'
+      fullPath: '/api/admin/equipos/$equipoId/upload-foto-from-url'
+      preLoaderRoute: typeof ApiAdminEquiposEquipoIdUploadFotoFromUrlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -402,6 +423,8 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   EstudioRoute: EstudioRoute,
   LoginRoute: LoginRoute,
+  ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute:
+    ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
