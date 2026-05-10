@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { authedJson } from "@/lib/authedFetch";
+import { uploadExternalUrlToBucket, isBucketUrl } from "@/lib/equipment/photos";
 
 export type EnriquecerResult = {
   marca: string | null;
