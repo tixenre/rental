@@ -82,6 +82,17 @@ class PGCursor:
         self.raw_cursor = raw_cursor
 
     def execute(self, sql, params=()):
+        # Validación defensiva: si el SQL tiene `?` pero `params` está vacío,
+        # eso es muy probablemente un bug del caller (olvidó pasar el tuple).
+        # Antes el `replace` igual procedía y psycopg2 fallaba con un error
+        # críptico ("syntax error at or near %s"). Ahora avisamos claro.
+        if not isinstance(sql, str):
+            raise TypeError(f"execute() recibió SQL no-string: {type(sql).__name__}")
+        if '?' in sql and not params:
+            raise ValueError(
+                f"SQL tiene placeholders `?` pero `params` está vacío. "
+                f"SQL: {sql[:100]!r}"
+            )
         sql = sql.replace('?', '%s')
         return self.raw_cursor.execute(sql, params)
 
@@ -152,6 +163,13 @@ class PGConnection:
 
     def execute(self, sql, params=()):
         """Ejecuta una query y retorna un cursor tipo sqlite3."""
+        if not isinstance(sql, str):
+            raise TypeError(f"execute() recibió SQL no-string: {type(sql).__name__}")
+        if '?' in sql and not params:
+            raise ValueError(
+                f"SQL tiene placeholders `?` pero `params` está vacío. "
+                f"SQL: {sql[:100]!r}"
+            )
         cur = self.raw_conn.cursor()
         # Convertir placeholders de ? (sqlite3) a %s (psycopg2)
         sql = sql.replace('?', '%s')
@@ -160,6 +178,8 @@ class PGConnection:
 
     def executemany(self, sql, params_list):
         """Ejecuta una query con múltiples filas de parámetros."""
+        if not isinstance(sql, str):
+            raise TypeError(f"executemany() recibió SQL no-string: {type(sql).__name__}")
         cur = self.raw_conn.cursor()
         sql = sql.replace('?', '%s')
         for params in params_list:
