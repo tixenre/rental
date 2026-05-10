@@ -228,7 +228,7 @@ function Index() {
         </section>
 
         {/* Toggle Modo + búsqueda sticky */}
-        <div className="sticky top-14 sm:top-[68px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
+        <div className="sticky top-14 sm:top-[69px] z-30 border-b hairline bg-background">
           {/* Mobile */}
           <div className="sm:hidden">
             <MobileStickyBar
