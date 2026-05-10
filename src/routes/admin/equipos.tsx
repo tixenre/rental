@@ -321,10 +321,16 @@ function RoiInline({
     mutationFn: async (newRoi: number) => {
       // Actualiza ROI; si tenemos USD, también recalcula precio_jornada
       // y lo manda en el mismo PATCH para que ambos cambien atómicamente.
+      // Editar el ROI = volver a la fórmula → marcar precio como AUTO
+      // (precio_jornada_manual = false). Esto deja el equipo elegible
+      // para futuros recálculos masivos.
       const patch: Partial<EquipoInput> = { roi_pct: newRoi };
       if (equipo.precio_usd) {
         const nuevoPrecio = calcularPrecioJornada(equipo.precio_usd, usdRate, newRoi);
-        if (nuevoPrecio !== null) patch.precio_jornada = nuevoPrecio;
+        if (nuevoPrecio !== null) {
+          patch.precio_jornada = nuevoPrecio;
+          patch.precio_jornada_manual = false;
+        }
       }
       return adminApi.updateEquipo(equipo.id, patch);
     },
@@ -416,7 +422,13 @@ function PrecioJornadaInline({
 
   const saveMut = useMutation({
     mutationFn: async (newPrecio: number | null) => {
-      const patch: Partial<EquipoInput> = { precio_jornada: newPrecio };
+      // Editar el precio directo = override manual → flag = TRUE.
+      // Esto evita que el próximo recálculo masivo (al cambiar el USD)
+      // pise el precio que el admin acaba de definir a mano.
+      const patch: Partial<EquipoInput> = {
+        precio_jornada: newPrecio,
+        precio_jornada_manual: true,
+      };
       // Si tenemos USD y el nuevo precio no es null, derivamos el ROI
       // implícito y lo persistimos también para que la fórmula quede
       // coherente. Si el equipo no tiene USD, no podemos calcular ROI.
@@ -453,6 +465,8 @@ function PrecioJornadaInline({
     saveMut.mutate(num);
   };
 
+  const isManual = !!equipo.precio_jornada_manual;
+
   return (
     <div className="relative ml-auto w-28">
       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">
@@ -475,8 +489,24 @@ function PrecioJornadaInline({
         }}
         placeholder="—"
         disabled={saveMut.isPending}
-        className="h-7 text-right text-xs tabular-nums pl-5 pr-2 py-0"
+        title={
+          isManual
+            ? "Precio fijado manualmente — no se actualiza al recalcular masivo"
+            : "Precio automático (calculado desde USD × ROI%)"
+        }
+        className={
+          "h-7 text-right text-xs tabular-nums pl-5 pr-2 py-0 " +
+          (isManual ? "border-amber/60 bg-amber-soft/30" : "")
+        }
       />
+      {isManual && (
+        <span
+          className="absolute -top-1.5 -right-1 rounded-full bg-amber px-1 text-[8px] font-mono uppercase tracking-wide text-ink"
+          title="Manual"
+        >
+          M
+        </span>
+      )}
     </div>
   );
 }

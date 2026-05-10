@@ -64,6 +64,11 @@ class EquipoUpdate(BaseModel):
     modelo:           Optional[str]   = None
     cantidad:         Optional[int]   = None
     precio_jornada:   Optional[int]   = None
+    # Flag explícito que el frontend manda para indicar si el precio
+    # viene de la fórmula (auto, false) o lo tipeó el admin a mano (true).
+    # Si no se manda y se cambia precio_jornada, el endpoint infiere
+    # según contexto (ver update_equipo).
+    precio_jornada_manual: Optional[bool] = None
     precio_usd:       Optional[float] = None
     roi_pct:          Optional[float] = None
     valor_reposicion: Optional[float] = None
@@ -297,6 +302,20 @@ def update_equipo(id: int, data: EquipoUpdate):
                 "INSERT INTO equipo_precio_historial (equipo_id, precio_jornada) VALUES (?,?)",
                 (id, updates["precio_jornada"]),
             )
+        # Inferencia del flag `precio_jornada_manual` cuando el cliente
+        # no lo manda explícito. Heurística:
+        #   - Si llega precio_jornada SIN roi_pct → asumimos override
+        #     manual del admin (editó el precio directamente).
+        #   - Si llega precio_jornada JUNTO con roi_pct → asumimos
+        #     cálculo automático (el frontend recalculó la fórmula
+        #     desde el ROI nuevo).
+        # El frontend puede enviar `precio_jornada_manual` para ser
+        # explícito y este bloque se saltea.
+        if (
+            "precio_jornada" in updates
+            and "precio_jornada_manual" not in updates
+        ):
+            updates["precio_jornada_manual"] = "roi_pct" not in updates
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         set_clause += ", updated_at = CURRENT_TIMESTAMP"
         conn.execute(f"UPDATE equipos SET {set_clause} WHERE id = ?",
