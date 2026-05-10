@@ -20,6 +20,7 @@ export type EnriquecerResult = {
   nombre_normalizado: string;
   descripcion: string;
   specs: { label: string; value: string }[];
+  keywords: string[];
   foto_url: string | null;
   fuente_url: string;
   fuente_titulo: string;
