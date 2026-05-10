@@ -14,6 +14,7 @@ PUBLIC_PREFIXES = (
     "/auth/logout",
     "/auth/me",
     "/auth/config",
+    "/auth/dev-login",
     "/static/",
     "/assets/",
     "/equipo/",

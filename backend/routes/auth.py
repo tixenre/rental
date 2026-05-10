@@ -208,9 +208,23 @@ def auth_callback(request: Request):
 
 @router.get("/auth/config")
 def auth_config():
+    dev_mode = os.getenv("ADMIN_BYPASS_AUTH", "").strip() in ("1", "true", "yes")
     return {
         "google_enabled": bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET),
+        "dev_mode": dev_mode,
     }
+
+
+@router.get("/auth/dev-login")
+def auth_dev_login():
+    """Login directo sin OAuth — solo funciona con ADMIN_BYPASS_AUTH=1."""
+    if os.getenv("ADMIN_BYPASS_AUTH", "").strip() not in ("1", "true", "yes"):
+        raise HTTPException(403, "Solo disponible en modo desarrollo.")
+    return _make_session_response(
+        email="dev@local",
+        name="Dev Admin",
+        redirect="/admin",
+    )
 
 
 @router.get("/api/public/maps-key")

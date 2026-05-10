@@ -24,23 +24,35 @@ const ERROR_MESSAGES: Record<string, string> = {
 function AdminLoginPage() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [devMode, setDevMode] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(true);
 
   useEffect(() => {
-    // Leer error de query param si Google redirigió con error
     const params = new URLSearchParams(window.location.search);
     const errCode = params.get("error");
     if (errCode) {
       setError(ERROR_MESSAGES[errCode] ?? `Error: ${errCode}`);
     }
 
-    // Si ya hay sesión activa, ir directo al admin
     authedFetch("/auth/me").then((r) => {
       if (r.ok) navigate({ to: "/admin" });
+    });
+
+    authedFetch("/auth/config").then(async (r) => {
+      if (r.ok) {
+        const data = await r.json();
+        setDevMode(data.dev_mode ?? false);
+        setGoogleEnabled(data.google_enabled ?? true);
+      }
     });
   }, [navigate]);
 
   function handleGoogleLogin() {
     window.location.href = "/auth/google";
+  }
+
+  function handleDevLogin() {
+    window.location.href = "/auth/dev-login";
   }
 
   return (
@@ -52,7 +64,9 @@ function AdminLoginPage() {
           </div>
           <h1 className="mt-1 font-display text-2xl text-ink">Acceso admin</h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            Ingresá con tu cuenta de Google autorizada.
+            {devMode
+              ? "Modo desarrollo — sin OAuth requerido."
+              : "Ingresá con tu cuenta de Google autorizada."}
           </p>
         </div>
 
@@ -62,13 +76,24 @@ function AdminLoginPage() {
           </div>
         )}
 
-        <button
-          onClick={handleGoogleLogin}
-          className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-background py-2.5 text-sm font-medium text-ink transition hover:bg-surface active:scale-[0.98]"
-        >
-          <GoogleIcon />
-          Entrar con Google
-        </button>
+        {devMode && (
+          <button
+            onClick={handleDevLogin}
+            className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-amber-50 border-amber-300 py-2.5 text-sm font-medium text-amber-900 transition hover:bg-amber-100 active:scale-[0.98]"
+          >
+            Entrar en modo desarrollo
+          </button>
+        )}
+
+        {googleEnabled && (
+          <button
+            onClick={handleGoogleLogin}
+            className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-background py-2.5 text-sm font-medium text-ink transition hover:bg-surface active:scale-[0.98]"
+          >
+            <GoogleIcon />
+            Entrar con Google
+          </button>
+        )}
       </div>
     </div>
   );
