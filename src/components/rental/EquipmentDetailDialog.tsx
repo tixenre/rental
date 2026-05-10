@@ -27,6 +27,12 @@ export function EquipmentDetailDialog({
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
   const [copied, setCopied] = useState(false);
+  const [specsOpen, setSpecsOpen] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
+  const DESC_LIMIT = 240;
+  const desc = item.description ?? "";
+  const isLongDesc = desc.length > DESC_LIMIT;
+  const shownDesc = !isLongDesc || descExpanded ? desc : desc.slice(0, DESC_LIMIT).trimEnd() + "…";
 
   const sinStock = disponible !== undefined && disponible <= 0;
   const canAddMore = disponible === undefined || qty < disponible;
