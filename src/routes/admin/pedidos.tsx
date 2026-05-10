@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Trash2, ExternalLink } from "lucide-react";
+import { Search, Trash2, ExternalLink, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
 
 import { adminApi, ESTADO_LABEL, type Pedido, type PedidoEstado } from "@/lib/admin/api";
 import { PedidoDetailSheet, pedidoEstadoVariant } from "@/components/admin/PedidoDetailSheet";
+import { NuevoPedidoWizard } from "@/components/admin/NuevoPedidoWizard";
 
 export const Route = createFileRoute("/admin/pedidos")({
   component: PedidosPage,
@@ -40,6 +41,7 @@ function PedidosPage() {
   const [estado, setEstado] = useState<string>("");
   const [openId, setOpenId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<Pedido | null>(null);
+  const [openWizard, setOpenWizard] = useState(false);
 
   const pedidosQ = useQuery({
     queryKey: ["admin", "pedidos", { q, estado }],
@@ -65,14 +67,19 @@ function PedidosPage() {
 
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-7xl mx-auto">
-      <header>
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-          Back-office
+      <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            Back-office
+          </div>
+          <h1 className="font-display text-3xl text-ink">Pedidos</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {pedidosQ.isLoading ? "Cargando…" : `${total} pedidos`}
+          </p>
         </div>
-        <h1 className="font-display text-3xl text-ink">Pedidos</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {pedidosQ.isLoading ? "Cargando…" : `${total} pedidos`}
-        </p>
+        <Button onClick={() => setOpenWizard(true)}>
+          <Plus className="h-4 w-4 mr-1" /> Nuevo pedido
+        </Button>
       </header>
 
       <div className="flex flex-col md:flex-row gap-2">
@@ -175,6 +182,12 @@ function PedidosPage() {
         pedidoId={openId}
         open={!!openId}
         onOpenChange={(v) => { if (!v) setOpenId(null); }}
+      />
+
+      <NuevoPedidoWizard
+        open={openWizard}
+        onOpenChange={setOpenWizard}
+        onCreated={(id) => setOpenId(id)}
       />
 
       <AlertDialog open={!!deleting} onOpenChange={(v) => { if (!v) setDeleting(null); }}>

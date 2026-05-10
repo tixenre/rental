@@ -146,6 +146,68 @@ export const adminApi = {
     }
     return res.json();
   },
+
+  // clientes
+  listClientes: (params: { q?: string; per_page?: number } = {}) => {
+    const sp = new URLSearchParams();
+    if (params.q) sp.set("q", params.q);
+    sp.set("per_page", String(params.per_page ?? 200));
+    return authedJson<ClientesListResp>(`/api/clientes?${sp.toString()}`);
+  },
+  createCliente: (data: ClienteInput) => authedPostJson<Cliente>("/api/clientes", data),
+
+  // disponibilidad por rango (mapa equipo_id → { cantidad, reservado })
+  getDisponibilidad: (
+    fechaDesde: string,
+    fechaHasta: string,
+    excludePedidoId?: number,
+  ) => {
+    const sp = new URLSearchParams({ fecha_desde: fechaDesde, fecha_hasta: fechaHasta });
+    if (excludePedidoId) sp.set("exclude_pedido_id", String(excludePedidoId));
+    return authedJson<Record<string, { cantidad: number; reservado: number }>>(
+      `/api/disponibilidad?${sp.toString()}`,
+    );
+  },
+
+  // crear pedido nuevo (wizard)
+  createPedido: (data: PedidoCreateInput) => authedPostJson<Pedido>("/api/alquileres", data),
+};
+
+export type Cliente = {
+  id: number;
+  nombre: string;
+  apellido: string;
+  telefono: string | null;
+  email: string | null;
+  direccion: string | null;
+  cuit: string | null;
+  descuento: number | null;
+  perfil_impuestos: string | null;
+};
+export type ClientesListResp = {
+  total: number; page: number; per_page: number; items: Cliente[];
+};
+export type ClienteInput = {
+  nombre: string;
+  apellido: string;
+  telefono?: string;
+  email?: string;
+  direccion?: string;
+  cuit?: string;
+  descuento?: number;
+  perfil_impuestos?: string;
+};
+
+export type PedidoCreateInput = {
+  cliente_id?: number | null;
+  cliente_nombre?: string;
+  cliente_email?: string | null;
+  cliente_telefono?: string | null;
+  notas?: string | null;
+  fecha_desde?: string | null;
+  fecha_hasta?: string | null;
+  items: { equipo_id: number; cantidad: number; precio_jornada: number }[];
+  estado?: "borrador" | "presupuesto";
 };
 
 // ── Tipos pedidos ────────────────────────────────────────────────────────
