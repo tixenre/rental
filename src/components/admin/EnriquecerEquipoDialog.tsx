@@ -61,6 +61,8 @@ export function EnriquecerEquipoDialog({
   const [aplicarBh, setAplicarBh] = useState(true);
   const [aplicarDescripcion, setAplicarDescripcion] = useState(true);
   const [aplicarSpecs, setAplicarSpecs] = useState(true);
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [aplicarKeywords, setAplicarKeywords] = useState(true);
 
   useEffect(() => {
     if (!open) {
