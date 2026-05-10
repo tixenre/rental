@@ -5,6 +5,8 @@ routes/equipos.py — CRUD de equipos, kits, etiquetas, categorías y fichas.
 import calendar as _cal
 import datetime
 import os
+import re
+import unicodedata
 from datetime import date as _date
 from typing import Optional
 
@@ -2347,6 +2349,27 @@ def _get_r2_client(cfg: dict) -> object:
     return client
 
 
+def _foto_path(equipo_id: int, ext: str) -> str:
+    """Genera path R2: equipos/{id}/{id}-{slug}.{ext}
+    Busca el nombre del equipo en la BD; si falla usa solo el id."""
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT nombre FROM equipos WHERE id = %s", (equipo_id,)).fetchone()
+        conn.close()
+        nombre = row[0] if row else ""
+    except Exception:
+        nombre = ""
+
+    if nombre:
+        slug = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode()
+        slug = re.sub(r"[^a-z0-9]+", "-", slug.lower()).strip("-")[:50]
+    else:
+        slug = ""
+
+    filename = f"{equipo_id}-{slug}.{ext}" if slug else f"{equipo_id}.{ext}"
+    return f"equipos/{equipo_id}/{filename}"
+
+
 def _upload_to_r2(path: str, content: bytes, content_type: str) -> str:
     """Sube `content` al bucket R2 vía S3 API (boto3). Devuelve la URL pública."""
     cfg = _r2_config()
@@ -2445,8 +2468,7 @@ def admin_upload_foto_from_url(
     content, ctype, w, h = _optimize_image(raw_content)
     ext = _ext_from_ctype(ctype)
 
-    import time as _time
-    path = f"equipos/{equipo_id}/foto-{int(_time.time() * 1000)}.{ext}"
+    path = _foto_path(equipo_id, ext)
     public_url = _upload_to_r2(path, content, ctype)
 
     return {
@@ -2487,8 +2509,7 @@ async def admin_upload_foto_file(
     content, ctype, w, h = _optimize_image(raw_content)
     ext = _ext_from_ctype(ctype)
 
-    import time as _time
-    path = f"equipos/{equipo_id}/foto-{int(_time.time() * 1000)}.{ext}"
+    path = _foto_path(equipo_id, ext)
     public_url = _upload_to_r2(path, content, ctype)
 
     return {
