@@ -58,12 +58,13 @@ class EquipoUpdate(BaseModel):
 
 
 class FichaUpdate(BaseModel):
-    descripcion: Optional[str] = None
-    notas:       Optional[str] = None
-    specs_json:  Optional[str] = None
-    montura:     Optional[str] = None
-    formato:     Optional[str] = None
-    resolucion:  Optional[str] = None
+    descripcion:   Optional[str] = None
+    notas:         Optional[str] = None
+    specs_json:    Optional[str] = None
+    montura:       Optional[str] = None
+    formato:       Optional[str] = None
+    resolucion:    Optional[str] = None
+    keywords_json: Optional[str] = None
 
 
 class KitItem(BaseModel):
@@ -310,7 +311,7 @@ def get_ficha(id: int):
             return row_to_dict(row)
         return {
             "equipo_id": id, "descripcion": None, "notas": None, "specs_json": None,
-            "montura": None, "formato": None, "resolucion": None,
+            "montura": None, "formato": None, "resolucion": None, "keywords_json": None,
         }
     finally:
         conn.close()
@@ -318,24 +319,29 @@ def get_ficha(id: int):
 
 @router.put("/equipos/{id}/ficha")
 def upsert_ficha(id: int, data: FichaUpdate):
+    """
+    PATCH-style upsert: solo actualiza columnas que vinieron en el body
+    (no las nullea si el cliente no las mandó). Esto evita que enriquecer con
+    IA borre montura/formato/resolución existentes.
+    """
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
-        conn.execute("""
-            INSERT INTO equipo_fichas
-                (equipo_id, descripcion, notas, specs_json, montura, formato, resolucion, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(equipo_id) DO UPDATE SET
-                descripcion = excluded.descripcion,
-                notas       = excluded.notas,
-                specs_json  = excluded.specs_json,
-                montura     = excluded.montura,
-                formato     = excluded.formato,
-                resolucion  = excluded.resolucion,
-                updated_at  = CURRENT_TIMESTAMP
-        """, (id, data.descripcion, data.notas, data.specs_json,
-              data.montura, data.formato, data.resolucion))
+
+        patch = data.model_dump(exclude_unset=True)
+        # Inserta una fila vacía si no existe (para que el UPDATE encuentre algo).
+        conn.execute(
+            "INSERT INTO equipo_fichas (equipo_id) VALUES (?) ON CONFLICT(equipo_id) DO NOTHING",
+            (id,),
+        )
+        if patch:
+            set_clause = ", ".join(f"{k} = ?" for k in patch)
+            set_clause += ", updated_at = CURRENT_TIMESTAMP"
+            conn.execute(
+                f"UPDATE equipo_fichas SET {set_clause} WHERE equipo_id = ?",
+                list(patch.values()) + [id],
+            )
         conn.commit()
         row = conn.execute(
             "SELECT * FROM equipo_fichas WHERE equipo_id = ?", (id,)
@@ -1309,7 +1315,13 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
                 "Extraé la información del equipo audiovisual (cámara, lente, "
                 "luz, audio) desde la ficha de producto. Specs: máximo 8, label "
                 "corto y value conciso. Descripcion: 1-2 oraciones en español. "
-                "Si la foto_url no es absoluta (http/https), dejala vacía."
+                "Si la foto_url no es absoluta (http/https), dejala vacía. "
+                "Keywords: 3-6 palabras clave cortas en español, lowercase, "
+                "que describan la PERSONALIDAD del equipo (ej: 'bicolor', "
+                "'silenciosa', 'v-mount', 'global shutter', 'weather sealed', "
+                "'cri 96', 'cine-ready'). Distintas y específicas — nada genérico "
+                "como 'profesional' o 'calidad'. Si no hay nada distintivo, "
+                "devolvé un array vacío."
             ),
             "schema": {
                 "type": "object",
@@ -1329,6 +1341,10 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
                             },
                             "required": ["label", "value"],
                         },
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {"type": "string"},
                     },
                 },
                 "required": ["marca", "modelo", "descripcion", "specs"],
@@ -1364,12 +1380,28 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         candidate = og_image
     foto_url = candidate or None
 
+    # Sanitizar keywords: lowercase, trim, dedupe, max 6
+    raw_kws = extracted.get("keywords") or []
+    seen_kw: set[str] = set()
+    keywords: list[str] = []
+    for k in raw_kws:
+        if not isinstance(k, str):
+            continue
+        kk = k.strip().lower()
+        if not kk or kk in seen_kw or len(kk) > 40:
+            continue
+        seen_kw.add(kk)
+        keywords.append(kk)
+        if len(keywords) >= 6:
+            break
+
     return {
         "marca":  (extracted.get("marca")  or payload.marca  or "").strip() or None,
         "modelo": (extracted.get("modelo") or payload.modelo or "").strip() or None,
         "nombre_normalizado": (extracted.get("nombre_normalizado") or payload.nombre).strip(),
         "descripcion": (extracted.get("descripcion") or "").strip(),
         "specs": (extracted.get("specs") or [])[:12],
+        "keywords": keywords,
         "foto_url": foto_url,
         "fuente_url": top_url,
         "fuente_titulo": top_title,

@@ -20,6 +20,7 @@ export type EnriquecerResult = {
   nombre_normalizado: string;
   descripcion: string;
   specs: { label: string; value: string }[];
+  keywords: string[];
   foto_url: string | null;
   fuente_url: string;
   fuente_titulo: string;
@@ -60,6 +61,8 @@ export function EnriquecerEquipoDialog({
   const [aplicarBh, setAplicarBh] = useState(true);
   const [aplicarDescripcion, setAplicarDescripcion] = useState(true);
   const [aplicarSpecs, setAplicarSpecs] = useState(true);
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [aplicarKeywords, setAplicarKeywords] = useState(true);
 
   useEffect(() => {
     if (!open) {
@@ -89,6 +92,8 @@ export function EnriquecerEquipoDialog({
       setAplicarBh(!equipo.bh_url);
       setAplicarDescripcion(!!r.descripcion);
       setAplicarSpecs(r.specs.length > 0);
+      setKeywords(r.keywords ?? []);
+      setAplicarKeywords((r.keywords ?? []).length > 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error desconocido");
     } finally {
@@ -98,7 +103,7 @@ export function EnriquecerEquipoDialog({
 
   const setAll = (v: boolean) => {
     setAplicarMarca(v); setAplicarModelo(v); setAplicarFoto(v); setAplicarBh(v);
-    setAplicarDescripcion(v); setAplicarSpecs(v);
+    setAplicarDescripcion(v); setAplicarSpecs(v); setAplicarKeywords(v);
   };
 
   const aplicar = async () => {
@@ -111,13 +116,16 @@ export function EnriquecerEquipoDialog({
     if (aplicarModelo && modelo) { patch.modelo = modelo; }
     if (aplicarBh && bhUrl) { patch.bh_url = bhUrl; }
 
-    // Ficha (descripción + specs) — se persiste aparte
-    const fichaPatch: { descripcion?: string | null; specs_json?: string | null } = {};
+    // Ficha (descripción + specs + keywords) — se persiste aparte
+    const fichaPatch: { descripcion?: string | null; specs_json?: string | null; keywords_json?: string | null } = {};
     if (aplicarDescripcion && result.descripcion) {
       fichaPatch.descripcion = result.descripcion;
     }
     if (aplicarSpecs && result.specs.length > 0) {
       fichaPatch.specs_json = JSON.stringify(result.specs);
+    }
+    if (aplicarKeywords && keywords.length > 0) {
+      fichaPatch.keywords_json = JSON.stringify(keywords);
     }
 
     const willApplyFoto = aplicarFoto && !!fotoUrl;
@@ -164,6 +172,7 @@ export function EnriquecerEquipoDialog({
           await adminApi.setFicha(equipo.id, fichaPatch);
           if (fichaPatch.descripcion) aplicados.push("descripción");
           if (fichaPatch.specs_json) aplicados.push(`${result.specs.length} specs`);
+          if (fichaPatch.keywords_json) aplicados.push(`${keywords.length} keywords`);
         } catch (e) {
           fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
         }

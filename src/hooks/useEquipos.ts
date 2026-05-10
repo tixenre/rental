@@ -144,6 +144,20 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     }
   }
 
+  let parsedKeywords: string[] = [];
+  if (ficha?.keywords_json) {
+    try {
+      const arr = JSON.parse(ficha.keywords_json);
+      if (Array.isArray(arr)) {
+        parsedKeywords = arr
+          .filter((k) => typeof k === "string" && k.trim())
+          .map((k: string) => k.trim());
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   const kit = Array.isArray(e.kit) ? e.kit as Array<{ componente_id: number; nombre: string; cantidad: number }> : [];
   const includes = kit.map((k) => ({
     id: String(k.componente_id),
@@ -165,6 +179,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     cantidad: e.cantidad ?? 1,
     description: ficha?.descripcion ?? "",
     specs: parsedSpecs,
+    keywords: parsedKeywords,
     isNew: false,
     isCombo: includes.length > 0,
     includes,

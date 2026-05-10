@@ -38,6 +38,8 @@ export type Equipment = {
   pricePerDay: number;
   description: string;
   specs: { label: string; value: string }[];
+  /** Palabras clave editoriales (selling points) — distintas de las etiquetas de búsqueda. */
+  keywords?: string[];
   // Campos de Lovable
   isNew?: boolean;
   isCombo?: boolean;

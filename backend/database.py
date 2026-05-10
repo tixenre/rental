@@ -299,6 +299,10 @@ def init_db():
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS montura   TEXT")
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS formato   TEXT")
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS resolucion TEXT")
+    # Keywords/palabras clave libres por equipo (array JSON de strings).
+    # Distintas de las etiquetas de búsqueda: estas son selling-points editoriales
+    # ("bicolor", "silenciosa", "V-mount", "global shutter") visibles en la ficha.
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS keywords_json TEXT")
 
     # ── Etiquetas (bolsa libre / índice de búsqueda) ─────────────────────
     # Las etiquetas son strings libres: incluyen marca, modelo, palabras del
@@ -670,7 +674,7 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     placeholders = ",".join(["%s"] * len(ids))
     cur = conn.cursor()
     cur.execute(f"""
-        SELECT equipo_id, descripcion, notas, specs_json, montura, formato, resolucion
+        SELECT equipo_id, descripcion, notas, specs_json, montura, formato, resolucion, keywords_json
         FROM equipo_fichas
         WHERE equipo_id IN ({placeholders})
     """, ids)
@@ -678,17 +682,19 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     f_map: dict[int, dict] = {}
     for r in rows:
         f_map[r["equipo_id"]] = {
-            "descripcion": r["descripcion"],
-            "notas":       r["notas"],
-            "specs_json":  r["specs_json"],
-            "montura":     r["montura"],
-            "formato":     r["formato"],
-            "resolucion":  r["resolucion"],
+            "descripcion":   r["descripcion"],
+            "notas":         r["notas"],
+            "specs_json":    r["specs_json"],
+            "montura":       r["montura"],
+            "formato":       r["formato"],
+            "resolucion":    r["resolucion"],
+            "keywords_json": r["keywords_json"],
         }
     for e in equipos:
         e["ficha"] = f_map.get(e["id"]) or {
             "descripcion": None, "notas": None, "specs_json": None,
             "montura": None, "formato": None, "resolucion": None,
+            "keywords_json": None,
         }
     cur.close()
     return equipos
