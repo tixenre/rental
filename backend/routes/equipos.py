@@ -1213,3 +1213,189 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
         return result
     finally:
         conn.close()
+
+
+# ── Admin: enriquecimiento con IA (Firecrawl + Lovable AI) ────────────────────
+
+class EnriquecerInput(BaseModel):
+    nombre: str
+    marca:  Optional[str] = None
+    modelo: Optional[str] = None
+
+
+@router.post("/admin/equipos/enriquecer")
+def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
+    """
+    Busca el equipo en B&H/Adorama, scrapea la página y usa Lovable AI para
+    extraer marca/modelo/specs/foto en JSON estructurado. Devuelve un preview;
+    el frontend decide qué campos aplicar via PATCH normal.
+    """
+    from supabase_auth import require_admin
+    require_admin(request)
+
+    import os, json, httpx
+
+    FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+    LOVABLE_API_KEY   = os.getenv("LOVABLE_API_KEY")
+    if not FIRECRAWL_API_KEY:
+        raise HTTPException(500, "FIRECRAWL_API_KEY no configurado en el backend")
+    if not LOVABLE_API_KEY:
+        raise HTTPException(500, "LOVABLE_API_KEY no configurado en el backend")
+
+    query = " ".join(x for x in [payload.marca, payload.nombre, payload.modelo] if x).strip()
+    if not query:
+        raise HTTPException(400, "Faltan datos para buscar")
+
+    headers_fc = {
+        "Authorization": f"Bearer {FIRECRAWL_API_KEY}",
+        "Content-Type":  "application/json",
+    }
+
+    def _extract_results(j: dict) -> list[dict]:
+        data = j.get("data")
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return data.get("web", []) or []
+        return []
+
+    with httpx.Client(timeout=45.0) as client:
+        # 1. Búsqueda preferida (B&H + Adorama)
+        try:
+            r = client.post(
+                "https://api.firecrawl.dev/v2/search",
+                headers=headers_fc,
+                json={"query": f"{query} site:bhphotovideo.com OR site:adorama.com", "limit": 3},
+            )
+        except httpx.HTTPError as e:
+            raise HTTPException(502, f"Firecrawl search falló: {e}")
+        results: list[dict] = []
+        if r.status_code == 200:
+            results = _extract_results(r.json())
+
+        # Fallback web abierta
+        if not results:
+            r2 = client.post(
+                "https://api.firecrawl.dev/v2/search",
+                headers=headers_fc,
+                json={"query": query, "limit": 3},
+            )
+            if r2.status_code == 200:
+                results = _extract_results(r2.json())
+
+        if not results:
+            raise HTTPException(404, "No se encontraron resultados en internet")
+
+        top = results[0]
+        top_url   = top.get("url")
+        top_title = top.get("title") or top_url
+        if not top_url:
+            raise HTTPException(404, "El primer resultado no tiene URL")
+
+        # 2. Scrape
+        rs = client.post(
+            "https://api.firecrawl.dev/v2/scrape",
+            headers=headers_fc,
+            json={"url": top_url, "formats": ["markdown"], "onlyMainContent": True},
+        )
+        if rs.status_code != 200:
+            raise HTTPException(502, f"Firecrawl scrape {rs.status_code}: {rs.text[:200]}")
+        sj = rs.json()
+        sd = sj.get("data") or sj
+        markdown = (sd.get("markdown") or "")
+        meta     = sd.get("metadata") or {}
+
+        if len(markdown) < 100:
+            raise HTTPException(422, "La página no devolvió contenido útil")
+
+        # 3. Lovable AI — extracción estructurada via tool calling
+        ai_payload = {
+            "model": "google/gemini-2.5-flash",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Extraés información de equipos audiovisuales (cámaras, lentes, "
+                        "luces, audio) desde páginas de e-commerce. Usá SIEMPRE la "
+                        "herramienta extract_equipo. Specs: máximo 8, label corto, "
+                        "value conciso. Descripcion: 1-2 oraciones en español. "
+                        "Si la foto_url no es absoluta, dejala vacía."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"URL: {top_url}\nBúsqueda: {query}\n\nContenido:\n{markdown[:12000]}",
+                },
+            ],
+            "tools": [{
+                "type": "function",
+                "function": {
+                    "name": "extract_equipo",
+                    "description": "Extrae datos del equipo",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "marca":  {"type": "string"},
+                            "modelo": {"type": "string"},
+                            "nombre_normalizado": {"type": "string"},
+                            "descripcion": {"type": "string"},
+                            "specs": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "label": {"type": "string"},
+                                        "value": {"type": "string"},
+                                    },
+                                    "required": ["label", "value"],
+                                    "additionalProperties": False,
+                                },
+                            },
+                            "foto_url": {"type": "string"},
+                        },
+                        "required": ["marca", "modelo", "descripcion", "specs"],
+                        "additionalProperties": False,
+                    },
+                },
+            }],
+            "tool_choice": {"type": "function", "function": {"name": "extract_equipo"}},
+        }
+
+        ra = client.post(
+            "https://ai.gateway.lovable.dev/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {LOVABLE_API_KEY}",
+                "Content-Type":  "application/json",
+            },
+            json=ai_payload,
+        )
+        if ra.status_code == 429:
+            raise HTTPException(429, "Rate-limit de Lovable AI. Probá en un minuto.")
+        if ra.status_code == 402:
+            raise HTTPException(402, "Sin créditos de Lovable AI. Recargá en Settings → Workspace → Usage.")
+        if ra.status_code != 200:
+            raise HTTPException(502, f"Lovable AI {ra.status_code}: {ra.text[:200]}")
+
+        aj = ra.json()
+        try:
+            args_str = aj["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+            extracted = json.loads(args_str)
+        except (KeyError, IndexError, json.JSONDecodeError):
+            raise HTTPException(502, "La IA no devolvió extracción estructurada válida")
+
+    og_image = meta.get("ogImage") or meta.get("og:image") or None
+    candidate = extracted.get("foto_url") or og_image
+    if candidate and not str(candidate).lower().startswith(("http://", "https://")):
+        candidate = og_image
+    foto_url = candidate or None
+
+    return {
+        "marca":  (extracted.get("marca")  or payload.marca  or "").strip() or None,
+        "modelo": (extracted.get("modelo") or payload.modelo or "").strip() or None,
+        "nombre_normalizado": (extracted.get("nombre_normalizado") or payload.nombre).strip(),
+        "descripcion": (extracted.get("descripcion") or "").strip(),
+        "specs": (extracted.get("specs") or [])[:12],
+        "foto_url": foto_url,
+        "fuente_url": top_url,
+        "fuente_titulo": top_title,
+    }
