@@ -286,12 +286,6 @@ function ClienteHistorialSheet({
           )}
         </SheetContent>
       </Sheet>
-
-      <PedidoDetailSheet
-        pedidoId={openPedidoId}
-        open={!!openPedidoId}
-        onOpenChange={(v) => { if (!v) setOpenPedidoId(null); }}
-      />
     </>
   );
 }
