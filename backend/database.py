@@ -302,6 +302,35 @@ def init_db():
         )
     """)
 
+    # Prioridad para ordenar categorías (menor = más arriba)
+    conn.execute("""
+        ALTER TABLE etiquetas
+        ADD COLUMN IF NOT EXISTS prioridad INTEGER NOT NULL DEFAULT 100
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_etiq_prioridad ON etiquetas(prioridad, nombre)
+    """)
+
+    # Seed: solo aplica a etiquetas todavía con prioridad por defecto.
+    # Así nunca pisa cambios manuales hechos desde el back-office.
+    seed_pri = [
+        (10,  ["Cámaras", "Camaras", "Camara", "Cámara"]),
+        (20,  ["Lentes", "Lente"]),
+        (30,  ["Luces", "Luz", "Iluminación"]),
+        (40,  ["Modificadores", "Modificador"]),
+        (50,  ["Soportes", "Soporte", "Trípode", "Tripode", "Tripodes", "Trípodes"]),
+        (60,  ["Grips", "Griperia", "Gripería", "Grip"]),
+        (70,  ["Sonido", "Audio", "Micrófonos", "Microfonos"]),
+        (80,  ["Monitores", "Monitor"]),
+        (90,  ["Baterías", "Baterias", "Batería"]),
+    ]
+    for pri, names in seed_pri:
+        conn.execute(
+            f"UPDATE etiquetas SET prioridad = %s "
+            f"WHERE prioridad = 100 AND nombre IN ({','.join(['%s'] * len(names))})",
+            (pri, *names),
+        )
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_etiquetas (
             equipo_id   INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
@@ -416,7 +445,7 @@ def row_to_dict(row) -> dict:
 # ── Helpers de equipos ─────────────────────────────────────────────────────
 
 def attach_tags(conn, equipos: list[dict]) -> list[dict]:
-    """Agrega etiquetas a la lista de equipos."""
+    """Agrega etiquetas a la lista de equipos (ordenadas por `orden`)."""
     if not equipos:
         return equipos
 
@@ -425,7 +454,7 @@ def attach_tags(conn, equipos: list[dict]) -> list[dict]:
 
     cur = conn.cursor()
     cur.execute(f"""
-        SELECT ee.equipo_id, et.nombre
+        SELECT ee.equipo_id, et.nombre, et.prioridad
         FROM equipo_etiquetas ee
         JOIN etiquetas et ON et.id = ee.etiqueta_id
         WHERE ee.equipo_id IN ({placeholders})

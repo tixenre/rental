@@ -49,9 +49,11 @@ export type BackendEquipo = {
 };
 
 export type BackendCategoria = {
-  id: number;
+  id?: number;
   nombre: string;
   total: number;
+  prioridad?: number;
+  subtags?: { nombre: string; total: number }[];
 };
 
 export type Disponibilidad = Record<string, number>; // equipo_id (string) → unidades disponibles

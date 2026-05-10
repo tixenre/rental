@@ -486,6 +486,12 @@ function EquipoSearchSheet({
     queryFn: () => adminApi.listEquipos({ per_page: 500 }),
   });
 
+  const categoriasQ = useQuery({
+    queryKey: ["categorias"],
+    queryFn: () => adminApi.listCategorias(),
+    staleTime: 60_000,
+  });
+
   const lista = useMemo(() => {
     const all = equiposQ.data?.items ?? [];
     const ql = q.trim().toLowerCase();
@@ -498,6 +504,27 @@ function EquipoSearchSheet({
       );
   }, [equiposQ.data, q]);
 
+  const grupos = useMemo(() => {
+    const SIN = "Sin categoría";
+    const map = new Map<string, Equipo[]>();
+    for (const eq of lista) {
+      const cat = eq.etiquetas?.[0] ?? SIN;
+      const arr = map.get(cat) ?? [];
+      arr.push(eq);
+      map.set(cat, arr);
+    }
+    const pri: Record<string, number> = {};
+    (categoriasQ.data ?? []).forEach((c) => { pri[c.nombre] = c.prioridad; });
+    return Array.from(map.entries()).sort(([a], [b]) => {
+      if (a === SIN) return 1;
+      if (b === SIN) return -1;
+      const pa = pri[a] ?? 999;
+      const pb = pri[b] ?? 999;
+      if (pa !== pb) return pa - pb;
+      return a.localeCompare(b, "es");
+    });
+  }, [lista, categoriasQ.data]);
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[80vh] flex flex-col">
@@ -509,33 +536,41 @@ function EquipoSearchSheet({
           <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" className="pl-9" />
         </div>
         <ScrollArea className="flex-1 -mx-6 px-6">
-          <ul className="divide-y hairline">
-            {lista.map((eq) => {
-              const stock = stockMap[String(eq.id)];
-              const inCart = existing.find((i) => i.equipo_id === eq.id);
-              const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : eq.cantidad;
-              const usado = inCart?.cantidad ?? 0;
-              const disponible = max - usado;
-              return (
-                <li key={eq.id} className="flex items-center justify-between gap-2 py-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm text-ink truncate">{eq.nombre}</div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {[eq.marca, eq.modelo].filter(Boolean).join(" / ")}
-                      <> · <span className={disponible <= 0 ? "text-destructive" : ""}>{disponible} libres</span></>
-                      {eq.precio_jornada ? ` · ${fmtArs(eq.precio_jornada)}/día` : ""}
-                    </div>
-                  </div>
-                  <Button size="sm" disabled={disponible <= 0} onClick={() => onAdd(eq)}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </li>
-              );
-            })}
-            {lista.length === 0 && (
-              <li className="py-8 text-center text-sm text-muted-foreground">Sin equipos.</li>
-            )}
-          </ul>
+          {grupos.length === 0 && (
+            <div className="py-8 text-center text-sm text-muted-foreground">Sin equipos.</div>
+          )}
+          {grupos.map(([cat, equipos]) => (
+            <section key={cat} className="mb-2">
+              <div className="sticky top-0 z-10 bg-background/95 backdrop-blur py-2 flex items-center justify-between border-b hairline">
+                <h4 className="font-display text-sm text-ink">{cat}</h4>
+                <span className="text-[11px] text-muted-foreground tabular-nums">{equipos.length}</span>
+              </div>
+              <ul className="divide-y hairline">
+                {equipos.map((eq) => {
+                  const stock = stockMap[String(eq.id)];
+                  const inCart = existing.find((i) => i.equipo_id === eq.id);
+                  const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : eq.cantidad;
+                  const usado = inCart?.cantidad ?? 0;
+                  const disponible = max - usado;
+                  return (
+                    <li key={eq.id} className="flex items-center justify-between gap-2 py-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-ink truncate">{eq.nombre}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {[eq.marca, eq.modelo].filter(Boolean).join(" / ")}
+                          <> · <span className={disponible <= 0 ? "text-destructive" : ""}>{disponible} libres</span></>
+                          {eq.precio_jornada ? ` · ${fmtArs(eq.precio_jornada)}/día` : ""}
+                        </div>
+                      </div>
+                      <Button size="sm" disabled={disponible <= 0} onClick={() => onAdd(eq)}>
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
         </ScrollArea>
       </SheetContent>
     </Sheet>

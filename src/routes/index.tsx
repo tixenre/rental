@@ -17,7 +17,7 @@ import { ListFilters } from "@/components/rental/ListFilters";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { CategoryIllustration } from "@/components/rental/illustrations/CategoryIllustration";
 import { EquipmentDetailProvider } from "@/lib/equipment-detail-context";
-import { useEquipos, useDisponibilidad } from "@/hooks/useEquipos";
+import { useEquipos, useDisponibilidad, useCategorias } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment, type Category } from "@/data/equipment";
 import { cn } from "@/lib/utils";
@@ -54,14 +54,23 @@ function Index() {
 
   // Datos de la API
   const { data: allEquipos = [], isLoading, isError } = useEquipos();
+  const { data: backendCats = [] } = useCategorias();
   const { startDate, endDate } = useCart();
   const { data: disponibilidad } = useDisponibilidad(startDate, endDate);
 
-  // Categorías y marcas derivadas de la data real de la API
-  const apiCategories = useMemo(
-    () => Array.from(new Set(allEquipos.map((e) => e.category))).sort(),
-    [allEquipos],
-  );
+  // Categorías derivadas, ordenadas por prioridad del backend.
+  // Las que no aparecen en /api/categorias quedan al final, alfabéticas.
+  const apiCategories = useMemo(() => {
+    const cats = Array.from(new Set(allEquipos.map((e) => e.category)));
+    const pri: Record<string, number> = {};
+    backendCats.forEach((c: { nombre: string; prioridad?: number }) => { pri[c.nombre] = c.prioridad ?? 100; });
+    return cats.sort((a, b) => {
+      const pa = pri[a] ?? 999;
+      const pb = pri[b] ?? 999;
+      if (pa !== pb) return pa - pb;
+      return a.localeCompare(b, "es");
+    });
+  }, [allEquipos, backendCats]);
   const apiBrands = useMemo(
     () => Array.from(new Set(allEquipos.map((e) => e.brand).filter(Boolean))).sort(),
     [allEquipos],
