@@ -52,6 +52,7 @@ ALLOWED_SETTINGS_KEYS = {
     "usd_rate",          # ARS por 1 USD. Float.
     "roi_pct_default",   # % default para nuevos equipos. Float.
     "shipping_usd",      # Envío default en USD para cálculo de reposición. Float.
+    "logo_url",          # URL pública del logo (imagen). String.
 }
 
 
@@ -778,5 +779,50 @@ async def reset_clientes_desde_backup(request: Request = None):
     except Exception as e:
         conn.rollback()
         raise HTTPException(500, f"Error: {str(e)}")
+    finally:
+        conn.close()
+
+
+# ── Upload logo a R2 ──────────────────────────────────────────────────────────
+
+@router.post("/admin/settings/upload-logo")
+async def upload_logo(request: Request):
+    """Sube una imagen como logo a R2 y guarda la URL en app_settings."""
+    session = require_admin(request)
+    actor = (session.get("email") or session.get("user_id") or "admin")[:255]
+
+    form = await request.form()
+    file = form.get("file")
+    if file is None or not hasattr(file, "read"):
+        raise HTTPException(400, "Falta el campo 'file'")
+
+    raw_content = await file.read()
+    if not raw_content:
+        raise HTTPException(400, "Archivo vacío")
+    if len(raw_content) > 5 * 1024 * 1024:
+        raise HTTPException(413, "Archivo muy grande (máx 5MB)")
+
+    # Reutilizar helpers de equipos.py
+    from routes.equipos import _optimize_image, _ext_from_ctype, _upload_to_r2
+    content, ctype, _, _ = _optimize_image(raw_content)
+    ext = _ext_from_ctype(ctype)
+
+    import time as _time
+    path = f"branding/logo-{int(_time.time() * 1000)}.{ext}"
+    public_url = _upload_to_r2(path, content, ctype)
+
+    # Guardar en app_settings
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT INTO app_settings (key, value, updated_at, updated_by)
+            VALUES ('logo_url', %s, CURRENT_TIMESTAMP, %s)
+            ON CONFLICT (key) DO UPDATE
+            SET value = EXCLUDED.value,
+                updated_at = CURRENT_TIMESTAMP,
+                updated_by = EXCLUDED.updated_by
+        """, (public_url, actor))
+        conn.commit()
+        return {"ok": True, "url": public_url}
     finally:
         conn.close()
