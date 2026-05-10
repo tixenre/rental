@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
+import { PdfViewerModal } from "@/components/PdfViewerModal";
 
 export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mi cuenta — Rambla Rental" }] }),
@@ -132,9 +133,13 @@ export default function ClientePortal() {
   );
 }
 
+type PdfDoc = { url: string; filename: string; titulo: string };
+
 function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: boolean; onToggle: () => void }) {
   const { documentos_disponibles: docs } = pedido;
   const estadoClass = ESTADO_COLOR[pedido.estado] ?? "bg-muted text-muted-foreground";
+  const [pdfDoc, setPdfDoc] = useState<PdfDoc | null>(null);
+  const numero = pedido.numero_pedido ?? pedido.id;
 
   return (
     <div className="rounded-xl border hairline bg-surface overflow-hidden">
@@ -215,26 +220,50 @@ function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: 
           {(docs.remito || docs.contrato || docs.albaran) && (
             <div className="border-t hairline pt-3 flex flex-wrap gap-2">
               {docs.remito && (
-                <a href={`/api/cliente/pedidos/${pedido.id}/remito.pdf`} target="_blank" rel="noopener noreferrer"
+                <button
+                  onClick={() => setPdfDoc({
+                    url: `/api/cliente/pedidos/${pedido.id}/remito.pdf`,
+                    filename: `remito-${numero}.pdf`,
+                    titulo: "Remito",
+                  })}
                   className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition">
                   <PdfIcon /> Remito
-                </a>
+                </button>
               )}
               {docs.contrato && (
-                <a href={`/api/cliente/pedidos/${pedido.id}/contrato.pdf`} target="_blank" rel="noopener noreferrer"
+                <button
+                  onClick={() => setPdfDoc({
+                    url: `/api/cliente/pedidos/${pedido.id}/contrato.pdf`,
+                    filename: `contrato-${numero}.pdf`,
+                    titulo: "Contrato",
+                  })}
                   className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition">
                   <PdfIcon /> Contrato
-                </a>
+                </button>
               )}
               {docs.albaran && (
-                <a href={`/api/cliente/pedidos/${pedido.id}/albaran.pdf`} target="_blank" rel="noopener noreferrer"
+                <button
+                  onClick={() => setPdfDoc({
+                    url: `/api/cliente/pedidos/${pedido.id}/albaran.pdf`,
+                    filename: `albaran-${numero}.pdf`,
+                    titulo: "Albarán",
+                  })}
                   className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition">
                   <PdfIcon /> Albarán
-                </a>
+                </button>
               )}
             </div>
           )}
         </div>
+      )}
+
+      {pdfDoc && (
+        <PdfViewerModal
+          url={pdfDoc.url}
+          filename={pdfDoc.filename}
+          titulo={`${pdfDoc.titulo} · #${numero}`}
+          onClose={() => setPdfDoc(null)}
+        />
       )}
     </div>
   );

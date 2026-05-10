@@ -39,6 +39,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { PdfViewerModal } from "@/components/PdfViewerModal";
 
 import {
   adminApi, ESTADO_LABEL, pedidoPdfUrl,
@@ -853,25 +854,36 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
 // ─────────────────────────────────────────────────────────────────────────
 
 function DocsTab({ pedidoId }: { pedidoId: number }) {
-  const docs = [
-    { kind: "pdf" as const,      label: "Presupuesto", icon: <FileText className="h-4 w-4" /> },
-    { kind: "albaran" as const,  label: "Albarán",     icon: <Truck className="h-4 w-4" /> },
-    { kind: "contrato" as const, label: "Contrato",    icon: <FileSignature className="h-4 w-4" /> },
+  type DocKind = "pdf" | "albaran" | "contrato";
+  const docs: { kind: DocKind; label: string; icon: React.ReactNode; filenameBase: string }[] = [
+    { kind: "pdf",      label: "Presupuesto", icon: <FileText className="h-4 w-4" />,      filenameBase: "presupuesto" },
+    { kind: "albaran",  label: "Albarán",     icon: <Truck className="h-4 w-4" />,         filenameBase: "albaran" },
+    { kind: "contrato", label: "Contrato",    icon: <FileSignature className="h-4 w-4" />, filenameBase: "contrato" },
   ];
+  const [open, setOpen] = useState<DocKind | null>(null);
+  const current = docs.find((d) => d.kind === open);
+
   return (
     <div className="px-4 md:px-6 py-4 space-y-2 max-w-xl">
       {docs.map((d) => (
-        <a
+        <button
           key={d.kind}
-          href={pedidoPdfUrl(pedidoId, d.kind)}
-          target="_blank" rel="noreferrer"
-          className="flex items-center gap-3 rounded-md border hairline p-4 hover:bg-accent/30"
+          onClick={() => setOpen(d.kind)}
+          className="w-full flex items-center gap-3 rounded-md border hairline p-4 hover:bg-accent/30 text-left"
         >
           {d.icon}
           <span className="text-sm text-ink">{d.label}</span>
           <span className="ml-auto text-xs text-muted-foreground">PDF</span>
-        </a>
+        </button>
       ))}
+      {current && (
+        <PdfViewerModal
+          url={pedidoPdfUrl(pedidoId, current.kind)}
+          filename={`${current.filenameBase}-${pedidoId}.pdf`}
+          titulo={`${current.label} · pedido #${pedidoId}`}
+          onClose={() => setOpen(null)}
+        />
+      )}
     </div>
   );
 }
