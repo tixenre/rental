@@ -85,7 +85,7 @@ function EquiposPage() {
   const total = equiposQ.data?.total ?? 0;
 
   const etiquetasOpts = useMemo(
-    () => (etiquetasQ.data ?? []).filter((e) => (e.uso_count ?? 0) > 0),
+    () => (etiquetasQ.data ?? []).filter((e) => (e.total ?? 0) > 0),
     [etiquetasQ.data],
   );
 
