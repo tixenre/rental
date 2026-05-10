@@ -1,45 +1,27 @@
 ## Diagnóstico
 
-El 404 viene de esta URL:
-
-```text
-https://ramblarental.up.railway.app/~oauth/initiate?provider=google&redirect_uri=...
-```
-
-Ese endpoint `~oauth/initiate` no existe en Railway. Es parte del flujo administrado por Lovable Cloud y debe ejecutarse desde el dominio del frontend de Lovable, no desde el backend FastAPI/Railway.
-
-En el código actual, `src/routes/login.tsx` usa:
+Después del OAuth de Google volvés a `/login`, pero el query `?redirect=/admin` se pierde en el rebote del broker. Como `redirect` queda `undefined`, este código en `src/routes/login.tsx`:
 
 ```ts
-window.location.origin
+if (!loading && user) navigate({ to: redirect === "/admin" ? "/admin" : "/mis-pedidos" });
 ```
 
-Si el usuario abre `/login` desde `ramblarental.up.railway.app`, el login intenta iniciar OAuth en Railway y termina en 404.
+manda siempre a `/mis-pedidos`.
 
-## Plan de implementación
+## Plan
 
-1. **Reescribir el inicio de Google en `src/routes/login.tsx`**
-   - Mantener la UI actual del login.
-   - Cambiar el `redirect_uri` para que use el origen correcto del frontend Lovable cuando corresponda.
-   - Evitar que el flujo administrado de Google intente correr en `ramblarental.up.railway.app`.
+1. **Persistir el destino antes de iniciar OAuth**
+   - En `handleGoogle` (login.tsx), guardar el `redirectPath` en `sessionStorage` (clave `postLoginRedirect`) justo antes de llamar a `signInWithOAuth`.
 
-2. **Agregar fallback claro si el login se abre desde Railway**
-   - Si el origen actual es Railway, redirigir al login del frontend Lovable con el mismo `redirect=/admin`.
-   - Así el botón Google nunca dispara `https://ramblarental.up.railway.app/~oauth/initiate`.
+2. **Leer el destino al detectar sesión**
+   - En el `useEffect` de `LoginPage`, al ver que hay `user`:
+     - Tomar primero `sessionStorage.getItem("postLoginRedirect")`.
+     - Si no existe, usar el search param `redirect`.
+     - Limpiar la clave de sessionStorage.
+     - Navegar a `/admin` o `/mis-pedidos` según corresponda.
 
-3. **Mantener la redirección post-login existente**
-   - Después de Google, volver a `/login?redirect=/admin`.
-   - `useAuth` detecta la sesión y manda al usuario a `/admin`.
+3. **Verificación**
+   - Loguearse con Google desde el botón de admin → caer en `/admin`.
+   - Loguearse desde el flujo normal de cliente → caer en `/mis-pedidos`.
 
-4. **Revisar el botón “Back-office viejo”**
-   - Hoy apunta a `https://ramblarental.up.railway.app/login`.
-   - No lo mezclaría con el nuevo login de Lovable, salvo que queramos que ese enlace sea explícitamente “login viejo”.
-
-5. **Verificación**
-   - Confirmar que al hacer click en Google ya no aparece `ramblarental.up.railway.app/~oauth/initiate`.
-   - Confirmar que el flujo inicia desde el dominio Lovable y vuelve a `/admin`.
-   - Confirmar que cerrar sesión sigue llevando a `/login?redirect=/admin`.
-
-## Nota importante
-
-Esto no requiere tocar credenciales de Google ni reconfigurar Railway. El problema es de origen/dominio: se está abriendo el flujo administrado de Lovable Cloud desde el backend Railway.
+Cambios acotados a `src/routes/login.tsx`. Sin tocar Supabase, ni el layout admin, ni el módulo `lovable`.

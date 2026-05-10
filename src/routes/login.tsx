@@ -38,7 +38,11 @@ function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && user) navigate({ to: redirect === "/admin" ? "/admin" : "/mis-pedidos" });
+    if (loading || !user) return;
+    const stored = typeof window !== "undefined" ? sessionStorage.getItem("postLoginRedirect") : null;
+    if (stored) sessionStorage.removeItem("postLoginRedirect");
+    const target = stored ?? redirect;
+    navigate({ to: target === "/admin" ? "/admin" : "/mis-pedidos" });
   }, [user, loading, navigate, redirect]);
 
   const handleGoogle = async () => {
@@ -46,6 +50,10 @@ function LoginPage() {
     setError(null);
     try {
       const redirectPath = redirect === "/admin" ? "/admin" : "/mis-pedidos";
+
+      // Persistimos el destino: el broker OAuth pierde el query string al
+      // rebotar, así que sin esto siempre caeríamos en /mis-pedidos.
+      sessionStorage.setItem("postLoginRedirect", redirectPath);
 
       // El broker OAuth de Lovable (/~oauth/initiate) sólo existe en hosts
       // Lovable. Si estamos en otro origen (p. ej. ramblarental.up.railway.app),
