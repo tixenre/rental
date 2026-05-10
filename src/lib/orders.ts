@@ -201,17 +201,86 @@ export async function listOrders(): Promise<Order[]> {
   return arr.map(adaptOrder);
 }
 
+export type DocumentosDisponibles = {
+  remito: boolean;
+  contrato: boolean;
+  albaran: boolean;
+};
+
+export type DocumentoTipo = keyof DocumentosDisponibles;
+
+export const DOCUMENTO_LABEL: Record<DocumentoTipo, string> = {
+  remito: "Remito",
+  contrato: "Contrato",
+  albaran: "Albarán",
+};
+
+export const DOCUMENTO_HINT: Record<DocumentoTipo, string> = {
+  remito: "Disponible cuando confirmemos el pedido",
+  contrato: "Disponible cuando confirmemos el pedido",
+  albaran: "Disponible al momento de la entrega",
+};
+
 export async function getOrder(id: string) {
   const b = await authedJson<Record<string, unknown>>(
     `/api/cliente/pedidos/${id}`,
   );
+  const docs = (b.documentos_disponibles ?? {}) as Partial<DocumentosDisponibles>;
   return {
     order: adaptOrder(b),
     items: adaptItems((b.items as Array<Record<string, unknown>>) ?? []),
     changeRequests: adaptChangeRequests(
       (b.solicitudes as Array<Record<string, unknown>>) ?? [],
     ),
+    documentosDisponibles: {
+      remito: !!docs.remito,
+      contrato: !!docs.contrato,
+      albaran: !!docs.albaran,
+    } as DocumentosDisponibles,
   };
+}
+
+/** Descarga un PDF del pedido como Blob (con Authorization header). */
+export async function fetchOrderDocument(
+  orderId: string,
+  tipo: DocumentoTipo,
+): Promise<Blob> {
+  const res = await authedFetch(
+    `/api/cliente/pedidos/${orderId}/${tipo}.pdf`,
+    { headers: { Accept: "application/pdf" } },
+  );
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail?.detail ?? `No se pudo descargar el ${tipo}.`);
+  }
+  return res.blob();
+}
+
+/** Abre el PDF en una nueva pestaña. Devuelve la URL para limpiar luego. */
+export async function openOrderDocument(
+  orderId: string,
+  tipo: DocumentoTipo,
+): Promise<void> {
+  const blob = await fetchOrderDocument(orderId, tipo);
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener,noreferrer");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Fuerza la descarga del PDF con nombre amigable. */
+export async function downloadOrderDocument(
+  orderId: string,
+  tipo: DocumentoTipo,
+): Promise<void> {
+  const blob = await fetchOrderDocument(orderId, tipo);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `pedido-${orderId}-${tipo}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export async function cancelOrder(id: string): Promise<void> {
