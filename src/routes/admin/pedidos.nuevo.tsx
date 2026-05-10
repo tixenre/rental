@@ -15,9 +15,17 @@ function NuevoPedidoPage() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    // El backend exige fecha_desde/fecha_hasta NOT NULL, así que arrancamos
+    // con hoy → mañana como placeholder editable desde la pestaña Info.
+    const hoy = new Date();
+    const manana = new Date(hoy);
+    manana.setDate(manana.getDate() + 1);
+    const ymd = (d: Date) => d.toISOString().slice(0, 10);
     adminApi.createPedido({
       estado: "borrador",
       cliente_nombre: "",
+      fecha_desde: ymd(hoy),
+      fecha_hasta: ymd(manana),
       items: [],
     })
       .then((p) => {
