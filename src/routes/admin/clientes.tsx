@@ -196,7 +196,7 @@ function ClienteHistorialSheet({
   onOpenChange: (v: boolean) => void;
   onEdit: (c: Cliente) => void;
 }) {
-  const [openPedidoId, setOpenPedidoId] = useState<number | null>(null);
+  const navigate = useNavigate();
   const pedidosQ = useQuery({
     queryKey: ["admin", "cliente-pedidos", cliente?.id],
     queryFn: () => adminApi.getClientePedidos(cliente!.id),
