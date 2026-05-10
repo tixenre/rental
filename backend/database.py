@@ -303,6 +303,9 @@ def init_db():
     # Distintas de las etiquetas de búsqueda: estas son selling-points editoriales
     # ("bicolor", "silenciosa", "V-mount", "global shutter") visibles en la ficha.
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS keywords_json TEXT")
+    # Template editable para el "nombre público" (con placeholders {marca}, {montura}, etc.).
+    # Si está NULL/vacío, se usa el auto-build del frontend.
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS nombre_publico_template TEXT")
 
     # ── Etiquetas (bolsa libre / índice de búsqueda) ─────────────────────
     # Las etiquetas son strings libres: incluyen marca, modelo, palabras del
