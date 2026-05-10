@@ -1277,110 +1277,159 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
             return data.get("web", []) or []
         return []
 
-    with httpx.Client(timeout=45.0) as client:
-        # 1. Búsqueda preferida (B&H + Adorama)
+    OFFICIAL_SITES = (
+        "site:canon.com OR site:usa.canon.com OR site:sony.com OR site:nikon.com OR "
+        "site:fujifilm.com OR site:fujifilm-x.com OR site:panasonic.com OR "
+        "site:blackmagicdesign.com OR site:aputure.com OR site:godox.com OR "
+        "site:rode.com OR site:sennheiser.com OR site:dji.com OR site:atomos.com OR "
+        "site:tilta.com OR site:smallrig.com OR site:zoom-na.com OR site:zhiyun-tech.com"
+    )
+
+    def _search(q: str, client: "httpx.Client") -> list[dict]:
         try:
-            r = client.post(
+            rr = client.post(
                 "https://api.firecrawl.dev/v2/search",
                 headers=headers_fc,
-                json={"query": f"{query} site:bhphotovideo.com OR site:adorama.com", "limit": 3},
+                json={"query": q, "limit": 3},
             )
-        except httpx.HTTPError as e:
-            raise HTTPException(502, f"Firecrawl search falló: {e}")
-        results: list[dict] = []
-        if r.status_code == 200:
-            results = _extract_results(r.json())
+        except httpx.HTTPError:
+            return []
+        if rr.status_code != 200:
+            return []
+        return _extract_results(rr.json())
 
-        # Fallback web abierta
-        if not results:
-            r2 = client.post(
-                "https://api.firecrawl.dev/v2/search",
-                headers=headers_fc,
-                json={"query": query, "limit": 3},
-            )
-            if r2.status_code == 200:
-                results = _extract_results(r2.json())
+    def _first_valid(results: list[dict]) -> dict | None:
+        for r in results:
+            u = (r.get("url") or "").strip()
+            if u.lower().startswith(("http://", "https://")) and not u.lower().endswith(".pdf"):
+                return r
+        return None
 
-        if not results:
-            raise HTTPException(404, "No se encontraron resultados en internet")
-
-        top = results[0]
-        top_url   = top.get("url")
-        top_title = top.get("title") or top_url
-        if not top_url:
-            raise HTTPException(404, "El primer resultado no tiene URL")
-
-        # 2. Scrape + extracción JSON estructurada (Firecrawl LLM interno)
-        json_format = {
-            "type": "json",
-            "prompt": (
-                "Extraé la información del equipo audiovisual (cámara, lente, "
-                "luz, audio) desde la ficha de producto. Specs: máximo 8, label "
-                "corto y value conciso. Descripcion: 1-2 oraciones en español. "
-                "Si la foto_url no es absoluta (http/https), dejala vacía. "
-                "Keywords: 3-6 palabras clave cortas en español, lowercase, "
-                "que describan la PERSONALIDAD del equipo (ej: 'bicolor', "
-                "'silenciosa', 'v-mount', 'global shutter', 'weather sealed', "
-                "'cri 96', 'cine-ready'). Distintas y específicas — nada genérico "
-                "como 'profesional' o 'calidad'. Si no hay nada distintivo, "
-                "devolvé un array vacío."
-            ),
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "marca":  {"type": "string"},
-                    "modelo": {"type": "string"},
-                    "nombre_normalizado": {"type": "string"},
-                    "descripcion": {"type": "string"},
-                    "foto_url": {"type": "string"},
-                    "specs": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "label": {"type": "string"},
-                                "value": {"type": "string"},
-                            },
-                            "required": ["label", "value"],
+    json_format = {
+        "type": "json",
+        "prompt": (
+            "Extraé la información del equipo audiovisual (cámara, lente, "
+            "luz, audio) desde la ficha de producto. Specs: máximo 8, label "
+            "corto y value conciso. Descripcion: 1-2 oraciones en español. "
+            "Si la foto_url no es absoluta (http/https), dejala vacía. "
+            "Keywords: 3-6 palabras clave cortas en español, lowercase, "
+            "que describan la PERSONALIDAD del equipo (ej: 'bicolor', "
+            "'silenciosa', 'v-mount', 'global shutter', 'weather sealed', "
+            "'cri 96', 'cine-ready'). Distintas y específicas — nada genérico "
+            "como 'profesional' o 'calidad'. Si no hay nada distintivo, "
+            "devolvé un array vacío."
+        ),
+        "schema": {
+            "type": "object",
+            "properties": {
+                "marca":  {"type": "string"},
+                "modelo": {"type": "string"},
+                "nombre_normalizado": {"type": "string"},
+                "descripcion": {"type": "string"},
+                "foto_url": {"type": "string"},
+                "specs": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {"type": "string"},
+                            "value": {"type": "string"},
                         },
-                    },
-                    "keywords": {
-                        "type": "array",
-                        "items": {"type": "string"},
+                        "required": ["label", "value"],
                     },
                 },
-                "required": ["marca", "modelo", "descripcion", "specs"],
+                "keywords": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
             },
-        }
+            "required": ["marca", "modelo", "descripcion", "specs"],
+        },
+    }
 
-        rs = client.post(
-            "https://api.firecrawl.dev/v2/scrape",
-            headers=headers_fc,
-            json={
-                "url": top_url,
-                "formats": ["markdown", json_format],
-                "onlyMainContent": True,
-            },
-        )
+    def _scrape(url: str, client: "httpx.Client") -> dict | None:
+        """Devuelve {extracted, foto_candidate, meta} o None si falló."""
+        try:
+            rs = client.post(
+                "https://api.firecrawl.dev/v2/scrape",
+                headers=headers_fc,
+                json={
+                    "url": url,
+                    "formats": ["markdown", json_format],
+                    "onlyMainContent": True,
+                },
+            )
+        except httpx.HTTPError:
+            return None
         if rs.status_code == 402:
             raise HTTPException(402, "Sin créditos de Firecrawl. Recargá tu plan.")
         if rs.status_code == 429:
             raise HTTPException(429, "Rate-limit de Firecrawl. Probá en un minuto.")
         if rs.status_code != 200:
-            raise HTTPException(502, f"Firecrawl scrape {rs.status_code}: {rs.text[:200]}")
+            return None
         sj = rs.json()
         sd = sj.get("data") or sj
         meta      = sd.get("metadata") or {}
         extracted = sd.get("json") or {}
+        og_image = meta.get("ogImage") or meta.get("og:image") or None
+        cand = extracted.get("foto_url") or og_image
+        if cand and not str(cand).lower().startswith(("http://", "https://")):
+            cand = og_image
+        return {"extracted": extracted, "foto_candidate": cand or None, "meta": meta}
 
-        if not extracted:
-            raise HTTPException(422, "Firecrawl no devolvió extracción estructurada")
+    with httpx.Client(timeout=45.0) as client:
+        # Etapa A: B&H (canónico para bh_url)
+        bh_results = _search(f"{query} site:bhphotovideo.com", client)
+        bh_top = _first_valid(bh_results)
 
-    og_image = meta.get("ogImage") or meta.get("og:image") or None
-    candidate = extracted.get("foto_url") or og_image
-    if candidate and not str(candidate).lower().startswith(("http://", "https://")):
-        candidate = og_image
-    foto_url = candidate or None
+        # Etapa B: sitios oficiales del fabricante
+        alt_results = _search(f"{query} ({OFFICIAL_SITES})", client)
+        alt_top = _first_valid(alt_results)
+
+        # Etapa C: Adorama / Amazon (último recurso)
+        if not alt_top:
+            adoram_results = _search(f"{query} site:adorama.com OR site:amazon.com", client)
+            alt_top = _first_valid(adoram_results)
+
+        if not bh_top and not alt_top:
+            raise HTTPException(404, "No se encontraron resultados en internet")
+
+        bh_scrape  = _scrape(bh_top["url"], client) if bh_top else None
+        alt_scrape = None
+        # Sólo scrapeamos alternativa si B&H no aportó datos o foto
+        needs_alt = (
+            alt_top is not None and (
+                bh_scrape is None
+                or not bh_scrape.get("foto_candidate")
+                or not (bh_scrape.get("extracted") or {}).get("descripcion")
+            )
+        )
+        if needs_alt:
+            alt_scrape = _scrape(alt_top["url"], client)
+
+    # ── Merge B&H + alt (B&H pisa) ──────────────────────────────────────────
+    primary = bh_scrape or alt_scrape or {}
+    secondary = alt_scrape if bh_scrape else None
+    extracted = dict(primary.get("extracted") or {})
+    if secondary:
+        sec_ext = secondary.get("extracted") or {}
+        for k in ("descripcion", "specs", "keywords", "marca", "modelo", "nombre_normalizado"):
+            if not extracted.get(k):
+                extracted[k] = sec_ext.get(k)
+
+    if not extracted:
+        raise HTTPException(422, "No se pudo extraer información estructurada")
+
+    # Foto: B&H primero, sino alternativa
+    foto_url = (bh_scrape or {}).get("foto_candidate") if bh_scrape else None
+    fuente_foto_url = bh_top["url"] if (foto_url and bh_top) else None
+    if not foto_url and alt_scrape:
+        foto_url = alt_scrape.get("foto_candidate")
+        fuente_foto_url = alt_top["url"] if foto_url else None
+
+    # bh_url canónico = el de B&H si hubo, sino el alternativo (como referencia)
+    canonical_url = (bh_top or alt_top)["url"]
+    canonical_title = (bh_top or alt_top).get("title") or canonical_url
 
     # Sanitizar keywords: lowercase, trim, dedupe, max 6
     raw_kws = extracted.get("keywords") or []
@@ -1405,8 +1454,9 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         "specs": (extracted.get("specs") or [])[:12],
         "keywords": keywords,
         "foto_url": foto_url,
-        "fuente_url": top_url,
-        "fuente_titulo": top_title,
+        "fuente_url": canonical_url,
+        "fuente_titulo": canonical_title,
+        "fuente_foto_url": fuente_foto_url,
     }
 
 
