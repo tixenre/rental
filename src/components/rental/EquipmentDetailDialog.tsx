@@ -109,6 +109,10 @@ export function EquipmentDetailDialog({
           )}
         </div>
 
+        {item.keywords && item.keywords.length > 0 && (
+          <KeywordChips keywords={item.keywords} />
+        )}
+
         {desc && (
           <div className="space-y-2">
             <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
