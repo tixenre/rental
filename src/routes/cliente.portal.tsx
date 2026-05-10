@@ -12,7 +12,16 @@ type Perfil = {
   telefono: string; direccion: string;
 };
 
-type Item = { nombre: string; marca: string; cantidad: number; precio_jornada: number; subtotal: number; foto_url?: string };
+type Item = {
+  nombre: string;
+  marca: string;
+  cantidad: number;
+  precio_jornada: number;
+  subtotal: number;
+  foto_url?: string;
+  nombre_publico?: string | null;
+  nombre_publico_largo?: string | null;
+};
 type Pedido = {
   id: number; numero_pedido: string; estado: string;
   fecha_desde?: string; fecha_hasta?: string;
@@ -168,19 +177,22 @@ function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: 
 
           {/* Items */}
           <div className="space-y-2">
-            {pedido.items.map((item, i) => (
-              <div key={i} className="flex items-center gap-3 text-sm">
-                {item.foto_url && (
-                  <img src={item.foto_url} alt={item.nombre}
-                    className="h-8 w-8 rounded object-cover shrink-0 bg-muted" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <span className="text-ink truncate block">{item.nombre}</span>
-                  <span className="text-xs text-muted-foreground">{item.marca} · ×{item.cantidad}</span>
+            {pedido.items.map((item, i) => {
+              const display = item.nombre_publico || item.nombre;
+              return (
+                <div key={i} className="flex items-center gap-3 text-sm">
+                  {item.foto_url && (
+                    <img src={item.foto_url} alt={display}
+                      className="h-8 w-8 rounded object-cover shrink-0 bg-muted" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <span className="text-ink truncate block">{display}</span>
+                    <span className="text-xs text-muted-foreground">{item.marca} · ×{item.cantidad}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0">{fmt(item.subtotal)}</span>
                 </div>
-                <span className="text-xs text-muted-foreground shrink-0">{fmt(item.subtotal)}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Resumen financiero */}

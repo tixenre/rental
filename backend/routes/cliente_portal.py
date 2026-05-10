@@ -225,7 +225,8 @@ def cliente_pedidos(request: Request):
             d = row_to_dict(p)
             items = conn.execute("""
                 SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                       e.nombre, e.marca, e.foto_url
+                       e.nombre, e.marca, e.foto_url,
+                       e.nombre_publico, e.nombre_publico_largo
                 FROM alquiler_items ai
                 JOIN equipos e ON e.id = ai.equipo_id
                 WHERE ai.pedido_id = ?
@@ -268,7 +269,8 @@ def cliente_pedido_detalle(id: int, request: Request):
 
         items = conn.execute("""
             SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                   e.id AS equipo_id, e.nombre, e.marca, e.foto_url
+                   e.id AS equipo_id, e.nombre, e.marca, e.foto_url,
+                   e.nombre_publico, e.nombre_publico_largo
             FROM alquiler_items ai
             JOIN equipos e ON e.id = ai.equipo_id
             WHERE ai.pedido_id = ?
@@ -409,7 +411,8 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
 
     items = conn.execute("""
         SELECT pi.cantidad, e.id AS equipo_id, e.nombre, e.marca, e.modelo,
-               e.serie, e.valor_reposicion, e.foto_url, pi.precio_jornada, pi.subtotal
+               e.serie, e.valor_reposicion, e.foto_url, pi.precio_jornada, pi.subtotal,
+               e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
         JOIN equipos e ON e.id = pi.equipo_id
         WHERE pi.pedido_id = ?
@@ -419,7 +422,8 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
 
     for item in pedido["items"]:
         comp_rows = conn.execute("""
-            SELECT ec.nombre, ec.marca, ec.modelo, ec.serie, ec.valor_reposicion, kc.cantidad
+            SELECT ec.nombre, ec.marca, ec.modelo, ec.serie, ec.valor_reposicion,
+                   ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id
             WHERE kc.equipo_id = ?
