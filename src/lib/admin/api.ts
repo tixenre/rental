@@ -85,14 +85,35 @@ export type EtiquetaAdmin = {
   id: number;
   nombre: string;
   prioridad: number;
+  parent_id: number | null;
   total: number;
 };
 
 export type Categoria = {
+  id?: number;
   nombre: string;
   total: number;
   prioridad: number;
-  subtags: { nombre: string; total: number }[];
+  parent_id?: number | null;
+  children?: Categoria[];
+  // legacy flat
+  subtags?: { nombre: string; total: number }[];
+};
+
+export type ClasificarItem = {
+  id: number;
+  nombre: string;
+  marca: string | null;
+  propuestas: string[];
+  actuales: string[];
+};
+
+export type ClasificarResult = {
+  total: number;
+  matched: number;
+  unmatched: number;
+  applied: number;
+  items: ClasificarItem[];
 };
 
 export const adminApi = {
