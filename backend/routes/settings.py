@@ -39,6 +39,179 @@ async def parse_csv_file(file: UploadFile) -> list[dict]:
         raise HTTPException(400, f"Error leyendo CSV: {str(e)}")
 
 
+# ── App settings (key/value config global) ───────────────────────────────────
+#
+# Tipo de cambio, defaults y otras configs globales que el admin edita
+# desde el panel. Storage: tabla `app_settings` (key TEXT pk + value TEXT).
+# Los valores se guardan siempre como string; el cliente parsea (Number,
+# bool, etc.) según conozca el tipo.
+
+# Whitelist de keys editables por la UI. Cualquier otra key se rechaza
+# para no exponer settings internos accidentalmente.
+ALLOWED_SETTINGS_KEYS = {
+    "usd_rate",          # ARS por 1 USD. Float.
+    "roi_pct_default",   # % default para nuevos equipos. Float.
+    "shipping_usd",      # Envío default en USD para cálculo de reposición. Float.
+}
+
+
+@router.get("/settings/{key}")
+def get_setting(key: str):
+    """Devuelve el valor de una setting. Lectura pública (el USD rate
+    afecta cálculos en el frontend público también)."""
+    if key not in ALLOWED_SETTINGS_KEYS:
+        raise HTTPException(404, f"Setting '{key}' no existe")
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT value, updated_at, updated_by FROM app_settings WHERE key = ?",
+            (key,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, f"Setting '{key}' sin valor")
+        return {
+            "key": key,
+            "value": row["value"],
+            "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
+            "updated_by": row["updated_by"],
+        }
+    finally:
+        conn.close()
+
+
+@router.get("/settings")
+def list_settings():
+    """Lista todas las settings públicas. Útil para el panel admin."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT key, value, updated_at, updated_by FROM app_settings ORDER BY key"
+        ).fetchall()
+        return {
+            "items": [
+                {
+                    "key": r["key"],
+                    "value": r["value"],
+                    "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
+                    "updated_by": r["updated_by"],
+                }
+                for r in rows
+                if r["key"] in ALLOWED_SETTINGS_KEYS
+            ]
+        }
+    finally:
+        conn.close()
+
+
+@router.put("/admin/settings/{key}")
+def update_setting(key: str, payload: dict, request: Request):
+    """Actualiza una setting (solo admin)."""
+    session = require_admin(request)
+    if key not in ALLOWED_SETTINGS_KEYS:
+        raise HTTPException(400, f"Setting '{key}' no es editable")
+    value = payload.get("value")
+    if value is None or str(value).strip() == "":
+        raise HTTPException(400, "El valor no puede estar vacío")
+    value = str(value).strip()
+    # Validación específica por key: ciertas settings son numéricas.
+    if key in ("usd_rate", "roi_pct_default", "shipping_usd"):
+        try:
+            v = float(value)
+            if v < 0:
+                raise ValueError("debe ser >= 0")
+        except (ValueError, TypeError) as e:
+            raise HTTPException(400, f"Valor inválido para '{key}': debe ser un número >= 0 ({e})")
+    actor = (session.get("email") or session.get("user_id") or "admin")[:255]
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT INTO app_settings (key, value, updated_at, updated_by)
+            VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+            ON CONFLICT (key) DO UPDATE
+            SET value      = EXCLUDED.value,
+                updated_at = CURRENT_TIMESTAMP,
+                updated_by = EXCLUDED.updated_by
+        """, (key, value, actor))
+        conn.commit()
+        return {"key": key, "value": value, "updated_by": actor}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# ── Recálculo masivo de precio_jornada según USD rate actual ─────────────────
+
+@router.post("/admin/settings/recalcular-precios")
+def recalcular_precios(payload: dict, request: Request):
+    """Recalcula el precio_jornada de todos los equipos con precio_usd y
+    roi_pct definidos. Fórmula:
+
+        precio_jornada (ARS) = precio_usd × usd_rate × (roi_pct / 100)
+
+    Útil cuando el admin actualiza el tipo de cambio mensual.
+
+    Payload opcional:
+        - dry_run: bool — si True, no escribe, solo devuelve el preview.
+        - only_missing: bool — si True, solo recalcula equipos sin
+          precio_jornada (no pisa valores manuales).
+    """
+    require_admin(request)
+    dry_run = bool(payload.get("dry_run"))
+    only_missing = bool(payload.get("only_missing"))
+
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT value FROM app_settings WHERE key = ?", ("usd_rate",)
+        ).fetchone()
+        if not row:
+            raise HTTPException(400, "usd_rate no configurado")
+        try:
+            usd_rate = float(row["value"])
+        except (ValueError, TypeError):
+            raise HTTPException(400, f"usd_rate inválido: {row['value']}")
+
+        where = "precio_usd IS NOT NULL AND roi_pct IS NOT NULL"
+        if only_missing:
+            where += " AND precio_jornada IS NULL"
+        rows = conn.execute(
+            f"SELECT id, nombre, precio_usd, roi_pct, precio_jornada "
+            f"FROM equipos WHERE {where}"
+        ).fetchall()
+
+        cambios: list[dict] = []
+        for r in rows:
+            nuevo = round(r["precio_usd"] * usd_rate * (r["roi_pct"] / 100))
+            anterior = r["precio_jornada"]
+            if anterior != nuevo:
+                cambios.append({
+                    "id": r["id"], "nombre": r["nombre"],
+                    "antes": anterior, "despues": nuevo,
+                    "delta": nuevo - (anterior or 0),
+                })
+                if not dry_run:
+                    conn.execute(
+                        "UPDATE equipos SET precio_jornada = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (nuevo, r["id"]),
+                    )
+        if not dry_run:
+            conn.commit()
+        return {
+            "usd_rate": usd_rate,
+            "total_evaluados": len(rows),
+            "total_cambios": len(cambios),
+            "cambios": cambios[:50],  # cap por si son muchos
+            "dry_run": dry_run,
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("/settings/import-equipos")

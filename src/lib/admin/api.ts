@@ -288,6 +288,37 @@ export const adminApi = {
   adminClasificarApply: () =>
     authedPostJson<ClasificarResult>("/api/admin/categorias/clasificar?apply=1", {}),
 
+  // ── App settings (key/value globales) ─────────────────────────────────
+  getSetting: (key: string) =>
+    authedJson<{ key: string; value: string; updated_at: string | null; updated_by: string | null }>(
+      `/api/settings/${encodeURIComponent(key)}`,
+    ),
+  listSettings: () =>
+    authedJson<{ items: Array<{ key: string; value: string; updated_at: string | null; updated_by: string | null }> }>(
+      "/api/settings",
+    ),
+  updateSetting: (key: string, value: string | number) =>
+    authedJson<{ key: string; value: string; updated_by: string }>(
+      `/api/admin/settings/${encodeURIComponent(key)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: String(value) }),
+      },
+    ),
+  recalcularPreciosDryRun: (only_missing = false) =>
+    authedPostJson<{
+      usd_rate: number; total_evaluados: number; total_cambios: number;
+      cambios: Array<{ id: number; nombre: string; antes: number | null; despues: number; delta: number }>;
+      dry_run: boolean;
+    }>("/api/admin/settings/recalcular-precios", { dry_run: true, only_missing }),
+  recalcularPreciosApply: (only_missing = false) =>
+    authedPostJson<{
+      usd_rate: number; total_evaluados: number; total_cambios: number;
+      cambios: Array<{ id: number; nombre: string; antes: number | null; despues: number; delta: number }>;
+      dry_run: boolean;
+    }>("/api/admin/settings/recalcular-precios", { dry_run: false, only_missing }),
+
   // pedidos / alquileres
   listPedidos: (params: { estado?: string; q?: string; per_page?: number; page?: number } = {}) => {
     const sp = new URLSearchParams();

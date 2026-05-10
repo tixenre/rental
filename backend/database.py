@@ -585,6 +585,26 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_solicitudes_estado ON solicitudes_modificacion(estado)
     """)
 
+    # Configuración global de la app (tipo de cambio, defaults, etc.).
+    # Es un key-value simple: clave única + valor (string serializado).
+    # Se accede vía /api/settings/:key (público read) y PUT /api/admin/settings/:key.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key         VARCHAR(64) PRIMARY KEY,
+            value       TEXT NOT NULL,
+            updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_by  VARCHAR(255)
+        )
+    """)
+    # Seed inicial: tipo de cambio default si no existe.
+    # 1000 ARS/USD es un placeholder razonable; el admin lo actualiza
+    # cuando entra al panel.
+    conn.execute("""
+        INSERT INTO app_settings (key, value, updated_by)
+        VALUES ('usd_rate', '1000', 'system-seed')
+        ON CONFLICT (key) DO NOTHING
+    """)
+
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
 
     # Seed the sequence to the current max so nextval never collides with existing data.
