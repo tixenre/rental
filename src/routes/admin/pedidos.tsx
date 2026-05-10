@@ -184,6 +184,12 @@ function PedidosPage() {
         onOpenChange={(v) => { if (!v) setOpenId(null); }}
       />
 
+      <NuevoPedidoWizard
+        open={openWizard}
+        onOpenChange={setOpenWizard}
+        onCreated={(id) => setOpenId(id)}
+      />
+
       <AlertDialog open={!!deleting} onOpenChange={(v) => { if (!v) setDeleting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
