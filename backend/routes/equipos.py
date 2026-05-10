@@ -1375,9 +1375,11 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         meta      = sd.get("metadata") or {}
         extracted = sd.get("json") or {}
         og_image = meta.get("ogImage") or meta.get("og:image") or None
-        cand = extracted.get("foto_url") or og_image
-        if cand and not str(cand).lower().startswith(("http://", "https://")):
-            cand = og_image
+        # Priorizar og:image (más confiable) sobre lo extraído por LLM
+        llm_img = extracted.get("foto_url")
+        if llm_img and not str(llm_img).lower().startswith(("http://", "https://")):
+            llm_img = None
+        cand = og_image or llm_img
         return {"extracted": extracted, "foto_candidate": cand or None, "meta": meta}
 
     with httpx.Client(timeout=45.0) as client:
