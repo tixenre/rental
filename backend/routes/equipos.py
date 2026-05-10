@@ -313,6 +313,7 @@ def get_ficha(id: int):
         return {
             "equipo_id": id, "descripcion": None, "notas": None, "specs_json": None,
             "montura": None, "formato": None, "resolucion": None, "keywords_json": None,
+            "nombre_publico_template": None,
         }
     finally:
         conn.close()
