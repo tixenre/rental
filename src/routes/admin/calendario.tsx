@@ -132,7 +132,7 @@ function CalendarioPage() {
                   {pedidos.slice(0, 3).map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => setOpenId(p.id)}
+                      onClick={() => navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })}
                       className="block w-full text-left rounded-sm bg-accent/40 hover:bg-accent/70 px-1 py-0.5 text-[10px] leading-tight"
                       title={`#${p.numero_pedido ?? p.id} · ${p.cliente_nombre ?? ""} · ${p.equipos ?? ""}`}
                     >
