@@ -1,74 +1,60 @@
-# Plan
+## Nombre público editable con placeholders
 
-## 1. Debuggear fotos paso a paso
+Hoy el nombre público de cada equipo se arma automáticamente combinando: `tipo + marca + modelo + montura + formato + resolución` (ver `buildPublicName` en `src/hooks/useEquipos.ts`). No se puede editar.
 
-El enriquecedor encuentra la foto pero no se ve en la web. Voy a instrumentar el flujo para ver exactamente dónde se rompe.
+La idea es darte un **template editable** por equipo, donde podés escribir libre y meter "comodines" que se reemplazan con datos reales del equipo.
 
-**Qué agrego en `EnriquecerEquipoDialog`:**
-- Un panel de "Diagnóstico de foto" debajo del preview que muestra en vivo:
-  1. URL externa detectada
-  2. Status HTTP del proxy `/api/admin/proxy-image`
-  3. Tamaño/tipo del blob descargado
-  4. Resultado del upload a `equipos-fotos` (URL final o error exacto de Supabase)
-  5. Resultado del `update_equipo` (foto_url guardada vs lo que devuelve el GET)
-- Cada paso con check verde / cruz roja, para que veamos juntos en qué eslabón falla.
+### Cómo va a funcionar
 
-**Posibles causas que el diagnóstico va a confirmar o descartar:**
-- Proxy devuelve 403/404 (B&H bloquea ese endpoint puntual)
-- Blob llega vacío o con content-type raro
-- Upload a Supabase Storage rechazado (RLS / sesión no autenticada del lado del browser)
-- El backend no persiste `foto_url` en el `update_equipo` (improbable pero lo verificamos releyendo)
-- La URL queda guardada bien pero el `<img>` del catálogo cachea una versión vieja
+En el editor admin (tab **Ficha técnica**) aparece un campo nuevo:
 
-Una vez identificado, aplico el fix puntual (ej: si el browser no está autenticado contra Supabase Storage, hago el upload server-side desde el backend; si es cache, agrego cache-buster).
+> **Nombre público (template)**
+> `{marca} {modelo} — {montura}`
 
-## 2. Reorganizar specs en la ficha pública
+Y debajo, una fila de chips clickeables: `{tipo}` `{marca}` `{modelo}` `{nombre}` `{montura}` `{formato}` `{resolucion}` — al clickear, se inserta el token donde está el cursor.
 
-**Selección de destacados (3-4):**
-- Heurística por categoría del equipo:
-  - Cámara → Sensor / Resolución / Montura / ISO
-  - Lente → Focal / Apertura / Montura / Estabilización
-  - Luz → Potencia / Temperatura color / CRI / Alimentación
-  - Audio → Tipo / Patrón / Conexión
-  - Default → primeras 4 specs no vacías
-- Las destacadas se muestran como **chips grandes** arriba del bloque (label arriba, valor abajo, tipografía display).
-- El resto va en un acordeón **"Ver todas las specs"** con tabla key/value.
+También una **previsualización en vivo** abajo del campo:
+> Vista previa: *Sony FX3 — Sony E*
 
-**Dónde:**
-- `EquipmentDetailDialog` (modal de detalle): destacados + acordeón completo.
-- `EquipmentRow` expandida y `EquipmentCard`: solo 2 chips destacados pequeños (los más distintivos).
+### Reglas del render
 
-## 3. Tags/keywords libres por equipo (nueva feature)
+- Un token vacío (ej: `{montura}` cuando no hay montura) → se borra junto con el separador inmediato (espacio, guion, coma) para que no queden cosas tipo "Sony FX3 — ".
+- Si el template está **vacío** → se sigue usando el auto-build actual (no rompe nada existente).
+- Si el template tiene **solo espacios o solo separadores** después del reemplazo → fallback al auto-build.
+- Tokens desconocidos se dejan literales (ej: si escribís `{foo}` queda `{foo}`).
+- Case-insensitive: `{Marca}` y `{marca}` son lo mismo.
 
-**Concepto:** cada equipo tiene una lista corta de palabras clave editables que describen su personalidad ("bicolor", "silenciosa", "V-mount", "cine-ready", "global shutter", "weather-sealed"). Distintas de las etiquetas de búsqueda actuales, que son auto-generadas desde marca/modelo/categorías.
+### Dónde se aplica
 
-**Backend:**
-- Nueva columna en `equipo_fichas`: `keywords_json TEXT` (array JSON de strings) — o tabla aparte `equipo_keywords` si preferimos relacional. Voto por JSON simple porque es solo display, no se filtra.
-- Endpoints existentes `GET/PUT /equipos/{id}/ficha` ya pasan por `setFicha`; agregar `keywords_json` al modelo Pydantic y al SELECT.
-- El público `/api/equipos` ya retorna `ficha`; agregar `keywords` al payload.
+`buildPublicName(e)` en `src/hooks/useEquipos.ts` pasa a chequear primero `e.ficha.nombre_publico_template` y, si existe, lo renderiza con los reemplazos. Esto hace que aparezca automáticamente en:
+- catálogo público (cards / filas)
+- modal de detalle
+- carrito y pedidos
+- back-office (lista de equipos)
 
-**IA:**
-- En el prompt del enriquecedor agregar un campo `keywords` (array de 3-6 strings cortos, en español, lowercase, distintivos del equipo, no genéricos).
-- En el dialog: mostrar las keywords propuestas como chips toggleables (el admin puede tildar/destildar y editar el texto antes de aplicar).
+### Cambios técnicos
 
-**UI admin:**
-- En el editor de equipo (`EquipoFormDialog` → tab "Ficha técnica"): input tipo "tag input" (chip + Enter para agregar, X para borrar). Esto hace que el admin pueda manejarlas también sin pasar por la IA.
+**1. Base de datos** — nueva columna en `equipo_fichas`:
+```sql
+ALTER TABLE equipo_fichas ADD COLUMN nombre_publico_template TEXT;
+```
 
-**UI pública:**
-- En **card y fila del catálogo**: hasta 2 keywords como chips chiquitos al lado del nombre/precio (las más cortas primero), con un look distinto a las categorías para no confundir.
-- En **modal de detalle**: todas las keywords como chips arriba de la descripción.
+**2. Backend** (`backend/database.py`, `backend/routes/equipos.py`):
+- Agregar `nombre_publico_template` al modelo Pydantic `FichaIn` / response.
+- Sigue usando `model_dump(exclude_unset=True)` → no destructivo.
 
-## 4. Verificación
+**3. Frontend**:
+- `src/lib/api.ts` (tipos `Ficha`): agregar `nombre_publico_template?: string | null`.
+- `src/hooks/useEquipos.ts` `buildPublicName`: nueva función `renderTemplate(tpl, vars)` que reemplaza tokens y limpia separadores huérfanos. Si el template está vacío o queda vacío después del render, fallback al combo actual.
+- `src/components/admin/EquipoFormDialog.tsx` (tab Ficha técnica): nuevo `Field` con `Input` + chips de tokens + preview en vivo. Persistir en `upsert_ficha`.
 
-- Re-enriquecer 1-2 equipos (una luz y una cámara).
-- Confirmar que en el diagnóstico la foto aparece check-verde end-to-end.
-- Confirmar que el chip de keywords aparece en card y modal.
-- Confirmar que los specs destacados son los correctos para esa categoría y el acordeón abre el resto.
+### Verificación
 
-## Detalles técnicos
+1. Editar un equipo, escribir `{marca} {modelo} — {montura}`, guardar → ver el cambio en el catálogo.
+2. Vaciar el template → vuelve al nombre automático.
+3. Probar template con un token sin valor (ej: equipo sin montura) → no quedan separadores sueltos.
+4. Confirmar que el enriquecedor IA no pisa el template (gracias al `exclude_unset`).
 
-- Migración SQL backend (SQLite/Postgres según corresponda): `ALTER TABLE equipo_fichas ADD COLUMN keywords_json TEXT`.
-- `EnriquecerResult` suma `keywords: string[]`.
-- `IncludedList` y `EquipmentDetailDialog` reciben `ficha.keywords` y `ficha.specs_json` ya parseados.
-- Helper `pickHighlightSpecs(category, specs)` centralizado en `src/lib/equipment/specs.ts`.
-- El input de tags reusa `Badge` + `Input` con manejo de Enter/Backspace; nada de libs nuevas.
+### Nota
+
+El template se guarda en `equipo_fichas`, así que un equipo nuevo sin ficha no tiene template y se sigue comportando exacto como hoy. Cero riesgo de regresión.

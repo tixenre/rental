@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -19,6 +19,32 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin, type KitComponente } from "@/lib/admin/api";
 import { uploadFileToBucket } from "@/lib/equipment/photos";
 import { EnriquecerEquipoDialog } from "./EnriquecerEquipoDialog";
+
+const TPL_TOKENS = ["tipo", "marca", "modelo", "nombre", "montura", "formato", "resolucion"] as const;
+
+/** Render preview del template (mismas reglas que useEquipos.renderNameTemplate). */
+function renderTplPreview(tpl: string, vars: Record<string, string>): string {
+  const lower: Record<string, string> = {};
+  for (const k of Object.keys(vars)) lower[k.toLowerCase()] = vars[k] ?? "";
+  const SEP = "[\\s\\-–—,/|·]";
+  let out = tpl.replace(
+    new RegExp(`(${SEP}+)?\\{([a-zA-Z_]+)\\}(${SEP}+)?`, "g"),
+    (_m, before: string | undefined, key: string, after: string | undefined) => {
+      const k = key.toLowerCase();
+      if (!(k in lower)) return _m;
+      const val = lower[k].trim();
+      if (val) return `${before ?? ""}${val}${after ?? ""}`;
+      if (after) return before ?? "";
+      if (before) return "";
+      return "";
+    },
+  );
+  out = out.replace(/\s+/g, " ").trim();
+  out = out.replace(new RegExp(`^${SEP}+|${SEP}+$`, "g"), "").trim();
+  out = out.replace(new RegExp(`(${SEP})\\s*\\1+`, "g"), "$1");
+  if (!out || /^[\s\-–—,/|·]+$/.test(out)) return "";
+  return out;
+}
 
 const schema = z.object({
   nombre: z.string().min(1, "Nombre requerido"),
@@ -97,6 +123,8 @@ export function EquipoFormDialog({
   const [specs, setSpecs] = useState<Spec[]>([]);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [keywordInput, setKeywordInput] = useState("");
+  const [nombreTpl, setNombreTpl] = useState("");
+  const tplInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const f = fichaQ.data;
@@ -106,6 +134,7 @@ export function EquipoFormDialog({
       setResolucion(f.resolucion ?? "");
       setDescripcion(f.descripcion ?? "");
       setNotas(f.notas ?? "");
+      setNombreTpl(f.nombre_publico_template ?? "");
       try {
         const arr = f.specs_json ? JSON.parse(f.specs_json) : [];
         setSpecs(Array.isArray(arr) ? arr : []);
@@ -116,7 +145,7 @@ export function EquipoFormDialog({
       } catch { setKeywords([]); }
     } else if (!initial) {
       setMontura(""); setFormato(""); setResolucion("");
-      setDescripcion(""); setNotas(""); setSpecs([]); setKeywords([]);
+      setDescripcion(""); setNotas(""); setSpecs([]); setKeywords([]); setNombreTpl("");
     }
   }, [fichaQ.data, initial]);
 
@@ -152,20 +181,27 @@ export function EquipoFormDialog({
   }, [catsQ.data, selectedCats]);
 
   const previewName = useMemo(() => {
-    const parts = [
-      tipoCat,
-      form.watch("marca") ?? "",
-      form.watch("modelo") ?? "",
-      montura, formato, resolucion,
-    ].map((s) => (s ?? "").trim()).filter(Boolean);
-    if (parts.length === 0) return form.watch("nombre") || "—";
+    const marca = (form.watch("marca") ?? "").trim();
+    const modelo = (form.watch("modelo") ?? "").trim();
+    const nombre = (form.watch("nombre") ?? "").trim();
+    const vars: Record<string, string> = {
+      tipo: tipoCat, marca, modelo, nombre, montura, formato, resolucion,
+    };
+    const tpl = nombreTpl.trim();
+    if (tpl) {
+      const rendered = renderTplPreview(tpl, vars);
+      if (rendered) return rendered;
+    }
+    const parts = [tipoCat, marca, modelo, montura, formato, resolucion]
+      .map((s) => s.trim()).filter(Boolean);
+    if (parts.length === 0) return nombre || "—";
     const seen = new Set<string>();
     return parts.filter((p) => {
       const k = p.toLowerCase();
       if (seen.has(k)) return false;
       seen.add(k); return true;
     }).join(" ");
-  }, [tipoCat, form, montura, formato, resolucion]);
+  }, [tipoCat, form, montura, formato, resolucion, nombreTpl]);
 
   const submit = form.handleSubmit(async (values) => {
     const etiquetas = (values.etiquetas_csv ?? "")
@@ -203,6 +239,7 @@ export function EquipoFormDialog({
             formato: formato || null,
             resolucion: resolucion || null,
             keywords_json: keywords.length ? JSON.stringify(keywords) : null,
+            nombre_publico_template: nombreTpl.trim() || null,
           }),
           adminApi.setCategorias(initial.id, [...selectedCats]),
         ]);
@@ -360,6 +397,56 @@ export function EquipoFormDialog({
                 <div className="rounded-md border hairline bg-muted/30 px-3 py-2 text-xs">
                   Estos campos arman el <strong>nombre público</strong> que se ve en el catálogo.
                 </div>
+
+                <Field label="Nombre público (template)">
+                  <Input
+                    ref={tplInputRef}
+                    value={nombreTpl}
+                    onChange={(e) => setNombreTpl(e.target.value)}
+                    placeholder="Vacío = automático. Ej: {marca} {modelo} — {montura}"
+                    className="font-mono text-sm"
+                  />
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {TPL_TOKENS.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => {
+                          const token = `{${t}}`;
+                          const el = tplInputRef.current;
+                          if (!el) {
+                            setNombreTpl((v) => (v ? `${v} ${token}` : token));
+                            return;
+                          }
+                          const start = el.selectionStart ?? nombreTpl.length;
+                          const end = el.selectionEnd ?? nombreTpl.length;
+                          const next = nombreTpl.slice(0, start) + token + nombreTpl.slice(end);
+                          setNombreTpl(next);
+                          requestAnimationFrame(() => {
+                            el.focus();
+                            const pos = start + token.length;
+                            el.setSelectionRange(pos, pos);
+                          });
+                        }}
+                        className="rounded-full border hairline bg-background px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition hover:border-ink hover:text-ink"
+                      >
+                        {`{${t}}`}
+                      </button>
+                    ))}
+                    {nombreTpl && (
+                      <button
+                        type="button"
+                        onClick={() => setNombreTpl("")}
+                        className="ml-auto rounded-full border hairline bg-background px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition hover:border-destructive hover:text-destructive"
+                      >
+                        Limpiar (usar automático)
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Vista previa: <span className="font-medium text-ink">{previewName}</span>
+                  </p>
+                </Field>
 
                 <div className="grid grid-cols-3 gap-3">
                   <Field label="Montura">

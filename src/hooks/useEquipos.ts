@@ -95,11 +95,23 @@ export function buildPublicName(e: BackendEquipo): string {
   const tipo = e.categorias?.[0]?.nombre?.trim() ?? "";
   const marca = (e.marca ?? "").trim();
   const modelo = (e.modelo ?? "").trim();
+  const nombre = (e.nombre ?? "").trim();
   const f = e.ficha;
   const montura = (f?.montura ?? "").trim();
   const formato = (f?.formato ?? "").trim();
   const resolucion = (f?.resolucion ?? "").trim();
 
+  // 1) Si hay template editable, lo renderizamos.
+  const tpl = (f?.nombre_publico_template ?? "").trim();
+  if (tpl) {
+    const vars: Record<string, string> = {
+      tipo, marca, modelo, nombre, montura, formato, resolucion,
+    };
+    const rendered = renderNameTemplate(tpl, vars);
+    if (rendered) return rendered;
+  }
+
+  // 2) Auto-build clásico.
   const parts = [tipo, marca, modelo, montura, formato, resolucion]
     .map((s) => s.replace(/\s+/g, " ").trim())
     .filter(Boolean);
@@ -107,7 +119,6 @@ export function buildPublicName(e: BackendEquipo): string {
   if (parts.length === 0) {
     return e.nombre || "Sin nombre";
   }
-  // Dedupe trivial (si el modelo ya está en el nombre / etc.)
   const seen = new Set<string>();
   const out: string[] = [];
   for (const p of parts) {
@@ -118,6 +129,44 @@ export function buildPublicName(e: BackendEquipo): string {
     }
   }
   return out.join(" ");
+}
+
+/**
+ * Reemplaza tokens {clave} (case-insensitive) por su valor.
+ * Si un token está vacío, se borra junto con el separador inmediato
+ * (espacio, guion, em-dash, coma, slash, pipe) para no dejar "Sony — ".
+ * Devuelve "" si el resultado quedó vacío o solo separadores.
+ */
+function renderNameTemplate(tpl: string, vars: Record<string, string>): string {
+  // Normalizar claves a lowercase
+  const lower: Record<string, string> = {};
+  for (const k of Object.keys(vars)) lower[k.toLowerCase()] = vars[k] ?? "";
+
+  // 1) Reemplazar tokens conocidos vacíos junto con el separador adyacente.
+  //    Patrón: separador (opcional) + {token} O {token} + separador (opcional)
+  const SEP = "[\\s\\-–—,/|·]";
+  let out = tpl.replace(
+    new RegExp(`(${SEP}+)?\\{([a-zA-Z_]+)\\}(${SEP}+)?`, "g"),
+    (_m, before: string | undefined, key: string, after: string | undefined) => {
+      const k = key.toLowerCase();
+      if (!(k in lower)) return _m; // token desconocido → literal
+      const val = lower[k].trim();
+      if (val) return `${before ?? ""}${val}${after ?? ""}`;
+      // Vacío: comemos UN separador (preferimos el de la derecha)
+      if (after) return before ?? "";
+      if (before) return "";
+      return "";
+    },
+  );
+
+  // 2) Limpiar separadores duplicados o sueltos al inicio/final
+  out = out.replace(/\s+/g, " ").trim();
+  out = out.replace(new RegExp(`^${SEP}+|${SEP}+$`, "g"), "").trim();
+  out = out.replace(new RegExp(`(${SEP})\\s*\\1+`, "g"), "$1");
+
+  // Si solo quedaron separadores → vacío
+  if (!out || /^[\s\-–—,/|·]+$/.test(out)) return "";
+  return out;
 }
 
 /* ─── Adaptador backend → tipo frontend ─────────────────────────────── */
