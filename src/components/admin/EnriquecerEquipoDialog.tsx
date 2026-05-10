@@ -103,7 +103,7 @@ export function EnriquecerEquipoDialog({
 
   const setAll = (v: boolean) => {
     setAplicarMarca(v); setAplicarModelo(v); setAplicarFoto(v); setAplicarBh(v);
-    setAplicarDescripcion(v); setAplicarSpecs(v);
+    setAplicarDescripcion(v); setAplicarSpecs(v); setAplicarKeywords(v);
   };
 
   const aplicar = async () => {
@@ -116,13 +116,16 @@ export function EnriquecerEquipoDialog({
     if (aplicarModelo && modelo) { patch.modelo = modelo; }
     if (aplicarBh && bhUrl) { patch.bh_url = bhUrl; }
 
-    // Ficha (descripción + specs) — se persiste aparte
-    const fichaPatch: { descripcion?: string | null; specs_json?: string | null } = {};
+    // Ficha (descripción + specs + keywords) — se persiste aparte
+    const fichaPatch: { descripcion?: string | null; specs_json?: string | null; keywords_json?: string | null } = {};
     if (aplicarDescripcion && result.descripcion) {
       fichaPatch.descripcion = result.descripcion;
     }
     if (aplicarSpecs && result.specs.length > 0) {
       fichaPatch.specs_json = JSON.stringify(result.specs);
+    }
+    if (aplicarKeywords && keywords.length > 0) {
+      fichaPatch.keywords_json = JSON.stringify(keywords);
     }
 
     const willApplyFoto = aplicarFoto && !!fotoUrl;
