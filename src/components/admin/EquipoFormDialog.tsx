@@ -649,7 +649,7 @@ function KitEditor({ equipoId }: { equipoId: number }) {
   );
 }
 
-
+function Field({
   label, error, children,
 }: {
   label: string;
