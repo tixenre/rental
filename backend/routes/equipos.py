@@ -1428,21 +1428,71 @@ def admin_proxy_image(url: str, request: Request):
     if not url.lower().startswith(("http://", "https://")):
         raise HTTPException(400, "URL inválida")
 
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
-        ),
-        "Accept": "image/avif,image/webp,image/png,image/jpeg,image/*,*/*;q=0.8",
+    from urllib.parse import urlparse
+    host = (urlparse(url).hostname or "").lower()
+
+    def _headers(referer: str | None) -> dict:
+        h = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Sec-Fetch-Dest": "image",
+            "Sec-Fetch-Mode": "no-cors",
+            "Sec-Fetch-Site": "cross-site",
+            "Cache-Control": "no-cache",
+        }
+        if referer:
+            h["Referer"] = referer
+        return h
+
+    # Referer "creíble" según el host (B&H, Adorama, Amazon, etc.)
+    referer_map = {
+        "bhphotovideo.com": "https://www.bhphotovideo.com/",
+        "www.bhphotovideo.com": "https://www.bhphotovideo.com/",
+        "adorama.com": "https://www.adorama.com/",
+        "www.adorama.com": "https://www.adorama.com/",
     }
+    primary_referer = next((v for k, v in referer_map.items() if host.endswith(k)), f"https://{host}/")
+
+    last_status = None
+    last_body = b""
+    r = None
     try:
-        with httpx.Client(timeout=20.0, follow_redirects=True) as client:
-            r = client.get(url, headers=headers)
+        with httpx.Client(timeout=20.0, follow_redirects=True, http2=False) as client:
+            # 1º intento: con Referer del propio dominio
+            r = client.get(url, headers=_headers(primary_referer))
+            last_status, last_body = r.status_code, r.content
+            # 2º intento: sin Referer
+            if r.status_code == 403:
+                r2 = client.get(url, headers=_headers(None))
+                if r2.status_code == 200:
+                    r = r2
+                else:
+                    last_status, last_body = r2.status_code, r2.content
+            # 3º intento: Referer = google
+            if r.status_code == 403:
+                r3 = client.get(url, headers=_headers("https://www.google.com/"))
+                if r3.status_code == 200:
+                    r = r3
+                else:
+                    last_status, last_body = r3.status_code, r3.content
     except httpx.HTTPError as e:
         raise HTTPException(502, f"No se pudo descargar la imagen: {e}")
 
-    if r.status_code != 200:
-        raise HTTPException(r.status_code, f"Origen devolvió {r.status_code}")
+    if r is None or r.status_code != 200:
+        snippet = ""
+        try:
+            snippet = last_body[:200].decode("utf-8", errors="ignore")
+        except Exception:
+            pass
+        raise HTTPException(
+            last_status or 502,
+            f"Origen devolvió {last_status} para host {host}. {snippet}".strip(),
+        )
 
     ctype = r.headers.get("content-type", "image/jpeg")
     if not ctype.startswith("image/"):
