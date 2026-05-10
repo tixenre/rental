@@ -1,6 +1,8 @@
 import { Package } from "lucide-react";
 import { equipment, type Equipment } from "@/data/equipment";
 import { EmptyImage } from "./EmptyImage";
+import { KeywordChips } from "./KeywordChips";
+import { pickHighlightSpecs } from "@/lib/equipment/specs";
 
 const DESC_LIMIT = 220;
 
@@ -11,8 +13,10 @@ export function IncludedList({ item }: { item: Equipment }) {
   const hasSpecs = specs.length > 0;
   const description = (item.description ?? "").trim();
   const hasDesc = description.length > 0;
+  const keywords = item.keywords ?? [];
+  const hasKeywords = keywords.length > 0;
 
-  if (!hasIncludes && !hasSpecs && !hasDesc) {
+  if (!hasIncludes && !hasSpecs && !hasDesc && !hasKeywords) {
     return (
       <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         Sin información adicional
@@ -20,9 +24,8 @@ export function IncludedList({ item }: { item: Equipment }) {
     );
   }
 
-  // Selling points: las primeras 4 specs, mostradas como chips compactos.
-  const highlights = specs.slice(0, 4);
-  const moreSpecs = specs.length - highlights.length;
+  const { highlights, rest } = pickHighlightSpecs(item.category, specs, 4);
+  const moreSpecs = rest.length;
 
   const shortDesc =
     description.length > DESC_LIMIT
