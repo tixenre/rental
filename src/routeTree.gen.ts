@@ -9,10 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as EstudioRouteImport } from './routes/estudio'
 import { Route as AdminRouteImport } from './routes/admin'
-import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
@@ -20,19 +18,10 @@ import { Route as AdminEstadisticasRouteImport } from './routes/admin/estadistic
 import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
 import { Route as AdminClientesRouteImport } from './routes/admin/clientes'
 import { Route as AdminCalendarioRouteImport } from './routes/admin/calendario'
-import { Route as AuthCuentaRouteImport } from './routes/_auth/cuenta'
 import { Route as AdminPedidosIndexRouteImport } from './routes/admin/pedidos.index'
-import { Route as AuthMisPedidosIndexRouteImport } from './routes/_auth/mis-pedidos/index'
 import { Route as AdminPedidosNuevoRouteImport } from './routes/admin/pedidos.nuevo'
 import { Route as AdminPedidosIdRouteImport } from './routes/admin/pedidos.$id'
-import { Route as AuthMisPedidosIdRouteImport } from './routes/_auth/mis-pedidos/$id'
-import { Route as ApiAdminEquiposEquipoIdUploadFotoFromUrlRouteImport } from './routes/api/admin/equipos/$equipoId/upload-foto-from-url'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const EstudioRoute = EstudioRouteImport.update({
   id: '/estudio',
   path: '/estudio',
@@ -41,10 +30,6 @@ const EstudioRoute = EstudioRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/_auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -82,20 +67,10 @@ const AdminCalendarioRoute = AdminCalendarioRouteImport.update({
   path: '/calendario',
   getParentRoute: () => AdminRoute,
 } as any)
-const AuthCuentaRoute = AuthCuentaRouteImport.update({
-  id: '/cuenta',
-  path: '/cuenta',
-  getParentRoute: () => AuthRoute,
-} as any)
 const AdminPedidosIndexRoute = AdminPedidosIndexRouteImport.update({
   id: '/pedidos/',
   path: '/pedidos/',
   getParentRoute: () => AdminRoute,
-} as any)
-const AuthMisPedidosIndexRoute = AuthMisPedidosIndexRouteImport.update({
-  id: '/mis-pedidos/',
-  path: '/mis-pedidos/',
-  getParentRoute: () => AuthRoute,
 } as any)
 const AdminPedidosNuevoRoute = AdminPedidosNuevoRouteImport.update({
   id: '/pedidos/nuevo',
@@ -107,75 +82,48 @@ const AdminPedidosIdRoute = AdminPedidosIdRouteImport.update({
   path: '/pedidos/$id',
   getParentRoute: () => AdminRoute,
 } as any)
-const AuthMisPedidosIdRoute = AuthMisPedidosIdRouteImport.update({
-  id: '/mis-pedidos/$id',
-  path: '/mis-pedidos/$id',
-  getParentRoute: () => AuthRoute,
-} as any)
-const ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute =
-  ApiAdminEquiposEquipoIdUploadFotoFromUrlRouteImport.update({
-    id: '/api/admin/equipos/$equipoId/upload-foto-from-url',
-    path: '/api/admin/equipos/$equipoId/upload-foto-from-url',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/estudio': typeof EstudioRoute
-  '/login': typeof LoginRoute
-  '/cuenta': typeof AuthCuentaRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
   '/admin/equipos': typeof AdminEquiposRoute
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/': typeof AdminIndexRoute
-  '/mis-pedidos/$id': typeof AuthMisPedidosIdRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
-  '/mis-pedidos/': typeof AuthMisPedidosIndexRoute
   '/admin/pedidos/': typeof AdminPedidosIndexRoute
-  '/api/admin/equipos/$equipoId/upload-foto-from-url': typeof ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/estudio': typeof EstudioRoute
-  '/login': typeof LoginRoute
-  '/cuenta': typeof AuthCuentaRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
   '/admin/equipos': typeof AdminEquiposRoute
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin': typeof AdminIndexRoute
-  '/mis-pedidos/$id': typeof AuthMisPedidosIdRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
-  '/mis-pedidos': typeof AuthMisPedidosIndexRoute
   '/admin/pedidos': typeof AdminPedidosIndexRoute
-  '/api/admin/equipos/$equipoId/upload-foto-from-url': typeof ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/_auth': typeof AuthRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
   '/estudio': typeof EstudioRoute
-  '/login': typeof LoginRoute
-  '/_auth/cuenta': typeof AuthCuentaRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
   '/admin/equipos': typeof AdminEquiposRoute
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/': typeof AdminIndexRoute
-  '/_auth/mis-pedidos/$id': typeof AuthMisPedidosIdRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
-  '/_auth/mis-pedidos/': typeof AuthMisPedidosIndexRoute
   '/admin/pedidos/': typeof AdminPedidosIndexRoute
-  '/api/admin/equipos/$equipoId/upload-foto-from-url': typeof ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -183,78 +131,52 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/estudio'
-    | '/login'
-    | '/cuenta'
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/equipos'
     | '/admin/estadisticas'
     | '/admin/settings'
     | '/admin/'
-    | '/mis-pedidos/$id'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
-    | '/mis-pedidos/'
     | '/admin/pedidos/'
-    | '/api/admin/equipos/$equipoId/upload-foto-from-url'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/estudio'
-    | '/login'
-    | '/cuenta'
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/equipos'
     | '/admin/estadisticas'
     | '/admin/settings'
     | '/admin'
-    | '/mis-pedidos/$id'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
-    | '/mis-pedidos'
     | '/admin/pedidos'
-    | '/api/admin/equipos/$equipoId/upload-foto-from-url'
   id:
     | '__root__'
     | '/'
-    | '/_auth'
     | '/admin'
     | '/estudio'
-    | '/login'
-    | '/_auth/cuenta'
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/equipos'
     | '/admin/estadisticas'
     | '/admin/settings'
     | '/admin/'
-    | '/_auth/mis-pedidos/$id'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
-    | '/_auth/mis-pedidos/'
     | '/admin/pedidos/'
-    | '/api/admin/equipos/$equipoId/upload-foto-from-url'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AuthRoute: typeof AuthRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
   EstudioRoute: typeof EstudioRoute
-  LoginRoute: typeof LoginRoute
-  ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute: typeof ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/estudio': {
       id: '/estudio'
       path: '/estudio'
@@ -267,13 +189,6 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_auth': {
-      id: '/_auth'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -325,26 +240,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCalendarioRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/_auth/cuenta': {
-      id: '/_auth/cuenta'
-      path: '/cuenta'
-      fullPath: '/cuenta'
-      preLoaderRoute: typeof AuthCuentaRouteImport
-      parentRoute: typeof AuthRoute
-    }
     '/admin/pedidos/': {
       id: '/admin/pedidos/'
       path: '/pedidos'
       fullPath: '/admin/pedidos/'
       preLoaderRoute: typeof AdminPedidosIndexRouteImport
       parentRoute: typeof AdminRoute
-    }
-    '/_auth/mis-pedidos/': {
-      id: '/_auth/mis-pedidos/'
-      path: '/mis-pedidos'
-      fullPath: '/mis-pedidos/'
-      preLoaderRoute: typeof AuthMisPedidosIndexRouteImport
-      parentRoute: typeof AuthRoute
     }
     '/admin/pedidos/nuevo': {
       id: '/admin/pedidos/nuevo'
@@ -360,36 +261,8 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPedidosIdRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/_auth/mis-pedidos/$id': {
-      id: '/_auth/mis-pedidos/$id'
-      path: '/mis-pedidos/$id'
-      fullPath: '/mis-pedidos/$id'
-      preLoaderRoute: typeof AuthMisPedidosIdRouteImport
-      parentRoute: typeof AuthRoute
-    }
-    '/api/admin/equipos/$equipoId/upload-foto-from-url': {
-      id: '/api/admin/equipos/$equipoId/upload-foto-from-url'
-      path: '/api/admin/equipos/$equipoId/upload-foto-from-url'
-      fullPath: '/api/admin/equipos/$equipoId/upload-foto-from-url'
-      preLoaderRoute: typeof ApiAdminEquiposEquipoIdUploadFotoFromUrlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
-
-interface AuthRouteChildren {
-  AuthCuentaRoute: typeof AuthCuentaRoute
-  AuthMisPedidosIdRoute: typeof AuthMisPedidosIdRoute
-  AuthMisPedidosIndexRoute: typeof AuthMisPedidosIndexRoute
-}
-
-const AuthRouteChildren: AuthRouteChildren = {
-  AuthCuentaRoute: AuthCuentaRoute,
-  AuthMisPedidosIdRoute: AuthMisPedidosIdRoute,
-  AuthMisPedidosIndexRoute: AuthMisPedidosIndexRoute,
-}
-
-const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 interface AdminRouteChildren {
   AdminCalendarioRoute: typeof AdminCalendarioRoute
@@ -419,12 +292,8 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AuthRoute: AuthRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
   EstudioRoute: EstudioRoute,
-  LoginRoute: LoginRoute,
-  ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute:
-    ApiAdminEquiposEquipoIdUploadFotoFromUrlRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
