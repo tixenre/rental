@@ -58,6 +58,8 @@ export function EnriquecerEquipoDialog({
   const [aplicarModelo, setAplicarModelo] = useState(true);
   const [aplicarFoto, setAplicarFoto] = useState(true);
   const [aplicarBh, setAplicarBh] = useState(true);
+  const [aplicarDescripcion, setAplicarDescripcion] = useState(true);
+  const [aplicarSpecs, setAplicarSpecs] = useState(true);
 
   useEffect(() => {
     if (!open) {
@@ -85,6 +87,8 @@ export function EnriquecerEquipoDialog({
       setAplicarModelo(!equipo.modelo && !!r.modelo);
       setAplicarFoto(!equipo.foto_url && !!r.foto_url);
       setAplicarBh(!equipo.bh_url);
+      setAplicarDescripcion(!!r.descripcion);
+      setAplicarSpecs(r.specs.length > 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error desconocido");
     } finally {
@@ -94,6 +98,7 @@ export function EnriquecerEquipoDialog({
 
   const setAll = (v: boolean) => {
     setAplicarMarca(v); setAplicarModelo(v); setAplicarFoto(v); setAplicarBh(v);
+    setAplicarDescripcion(v); setAplicarSpecs(v);
   };
 
   const aplicar = async () => {
