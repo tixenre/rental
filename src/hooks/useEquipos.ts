@@ -91,7 +91,7 @@ function resolveCategory(etiquetas: string[], nombre: string, marca: string): Ca
 // formato + resolución (de la ficha técnica). Si no hay ficha ni categorías,
 // cae al combo viejo "nombre + modelo".
 
-function buildPublicName(e: BackendEquipo): string {
+export function buildPublicName(e: BackendEquipo): string {
   const tipo = e.categorias?.[0]?.nombre?.trim() ?? "";
   const marca = (e.marca ?? "").trim();
   const modelo = (e.modelo ?? "").trim();
