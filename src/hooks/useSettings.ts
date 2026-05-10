@@ -51,6 +51,8 @@ export function useRoiPctDefault(): number {
 /** Helper puro: precio jornada en ARS según fórmula
  *    precio_usd × usd_rate × (roi_pct / 100)
  *  Devuelve null si falta algún input.
+ *  El resultado se redondea al múltiplo de 100 más cercano (sin centavos
+ *  ni unidades, que confunden al cliente: $1.184 → $1.200).
  */
 export function calcularPrecioJornada(
   precio_usd: number | null | undefined,
@@ -59,5 +61,6 @@ export function calcularPrecioJornada(
 ): number | null {
   if (!precio_usd || !usd_rate || !roi_pct) return null;
   if (precio_usd <= 0 || usd_rate <= 0 || roi_pct <= 0) return null;
-  return Math.round(precio_usd * usd_rate * (roi_pct / 100));
+  const raw = precio_usd * usd_rate * (roi_pct / 100);
+  return Math.round(raw / 100) * 100;
 }

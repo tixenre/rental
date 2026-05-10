@@ -1,13 +1,16 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
-/** Formatea pesos argentinos: 97500 → "$97.500,00" */
+/** Formatea pesos argentinos: 97500 → "$97.500".
+ *  Sin decimales: los precios se redondean al múltiplo de 100 al
+ *  calcularse (ver `calcularPrecioJornada`), así que mostrar centavos
+ *  no aporta nada y confunde visualmente. */
 export const formatARS = (n: number) =>
   "$" +
   new Intl.NumberFormat("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(n));
 
 /** "6 may 11:00 → 7 may 10:00" o "Elegí tus fechas" */
 export function formatRentalRange(

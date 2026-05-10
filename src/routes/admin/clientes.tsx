@@ -27,7 +27,7 @@ export const Route = createFileRoute("/admin/clientes")({
 });
 
 const fmtArs = (n: number | null | undefined) =>
-  n ? `$${Number(n).toLocaleString("es-AR")}` : "$0";
+  n ? `$${Math.round(Number(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : "$0";
 const fmtFecha = (s: string | null) => (s ? s.slice(0, 10) : "—");
 
 function ClientesPage() {
