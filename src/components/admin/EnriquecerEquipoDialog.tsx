@@ -384,6 +384,12 @@ export function EnriquecerEquipoDialog({
               </div>
             )}
 
+            {!fotoUrl && result.foto_motivo && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <strong>Sin foto válida:</strong> {result.foto_motivo}. Pegá una URL manualmente abajo o dejá el campo vacío.
+              </div>
+            )}
+
             <div className="flex items-center justify-between gap-2 -mb-1">
               <span className="text-xs uppercase tracking-wide text-muted-foreground">Campos</span>
               <div className="flex gap-1">
