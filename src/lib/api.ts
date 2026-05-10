@@ -42,6 +42,19 @@ export type BackendFicha = {
   resolucion: string | null;
   keywords_json: string | null;
   nombre_publico_template?: string | null;
+  // Ficha extendida (enriquecimiento)
+  peso?: string | null;
+  dimensiones?: string | null;
+  alimentacion?: string | null;
+  incluye_json?: string | null;
+  conectividad_json?: string | null;
+  compatible_con_json?: string | null;
+  video_url?: string | null;
+  precio_bh_usd?: number | null;
+  fuente_url?: string | null;
+  fuente_titulo?: string | null;
+  enriquecido_at?: string | null;
+  enriquecido_fuente?: string | null;
 };
 
 export type BackendCategoriaRef = {

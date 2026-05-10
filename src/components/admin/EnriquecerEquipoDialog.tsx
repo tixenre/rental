@@ -25,10 +25,26 @@ export type EnriquecerResult = {
   specs: { label: string; value: string }[];
   keywords: string[];
   foto_url: string | null;
+  // Ficha extendida (cualquiera puede ser null si no se encontró)
+  peso?: string | null;
+  dimensiones?: string | null;
+  montura?: string | null;
+  formato?: string | null;
+  resolucion?: string | null;
+  alimentacion?: string | null;
+  incluye?: string[];
+  conectividad?: string[];
+  compatible_con?: string[];
+  video_url?: string | null;
+  precio_bh_usd?: number | null;
+  categoria_sugerida?: string | null;
+  // Trazabilidad
   fuente_url: string;
   fuente_titulo: string;
   fuente_foto_url?: string | null;
   foto_motivo?: string | null;
+  enriquecido_fuente?: string | null;
+  raw?: Record<string, unknown>;
 };
 
 export function EnriquecerEquipoDialog({
@@ -68,6 +84,8 @@ export function EnriquecerEquipoDialog({
   const [aplicarSpecs, setAplicarSpecs] = useState(true);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [aplicarKeywords, setAplicarKeywords] = useState(true);
+  // Ficha extendida (un solo toggle para todo el bloque)
+  const [aplicarFichaExtendida, setAplicarFichaExtendida] = useState(true);
 
   const [keywordInput, setKeywordInput] = useState("");
   const [photoDiag, setPhotoDiag] = useState<DiagStep[] | null>(null);
@@ -184,6 +202,15 @@ export function EnriquecerEquipoDialog({
       setAplicarSpecs(r.specs.length > 0);
       setKeywords(r.keywords ?? []);
       setAplicarKeywords((r.keywords ?? []).length > 0);
+      const tieneFichaExt = !!(
+        r.peso || r.dimensiones || r.montura || r.formato ||
+        r.resolucion || r.alimentacion || r.video_url ||
+        typeof r.precio_bh_usd === "number" ||
+        (r.incluye?.length ?? 0) > 0 ||
+        (r.conectividad?.length ?? 0) > 0 ||
+        (r.compatible_con?.length ?? 0) > 0
+      );
+      setAplicarFichaExtendida(tieneFichaExt);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error desconocido");
     } finally {
@@ -194,88 +221,93 @@ export function EnriquecerEquipoDialog({
   const setAll = (v: boolean) => {
     setAplicarMarca(v); setAplicarModelo(v); setAplicarFoto(v); setAplicarBh(v);
     setAplicarDescripcion(v); setAplicarSpecs(v); setAplicarKeywords(v);
+    setAplicarFichaExtendida(v);
   };
+
+  const fichaExtendidaTieneDatos = !!result && (
+    !!result.peso || !!result.dimensiones || !!result.montura || !!result.formato ||
+    !!result.resolucion || !!result.alimentacion || !!result.video_url ||
+    typeof result.precio_bh_usd === "number" ||
+    (result.incluye?.length ?? 0) > 0 ||
+    (result.conectividad?.length ?? 0) > 0 ||
+    (result.compatible_con?.length ?? 0) > 0
+  );
 
   const aplicar = async () => {
     if (!result) return;
-    const patch: Record<string, unknown> = {};
     const aplicados: string[] = [];
     const fallidos: string[] = [];
 
-    if (aplicarMarca && marca) { patch.marca = marca; }
-    if (aplicarModelo && modelo) { patch.modelo = modelo; }
-    if (aplicarBh && bhUrl) { patch.bh_url = bhUrl; }
+    // Construimos el body para el endpoint único.
+    // Sólo incluimos lo que el usuario decidió aplicar — los campos no enviados
+    // quedan como están en la DB (no se nullean).
+    const body: Record<string, unknown> = {};
 
-    // Ficha (descripción + specs + keywords) — se persiste aparte
-    const fichaPatch: { descripcion?: string | null; specs_json?: string | null; keywords_json?: string | null } = {};
-    if (aplicarDescripcion && result.descripcion) {
-      fichaPatch.descripcion = result.descripcion;
+    if (aplicarMarca && marca) body.marca = marca;
+    if (aplicarModelo && modelo) body.modelo = modelo;
+    if (aplicarBh && bhUrl) body.bh_url = bhUrl;
+
+    if (aplicarDescripcion && result.descripcion) body.descripcion = result.descripcion;
+    if (aplicarSpecs && result.specs.length > 0) body.specs = result.specs;
+    if (aplicarKeywords && keywords.length > 0) body.keywords = keywords;
+
+    if (aplicarFichaExtendida && fichaExtendidaTieneDatos) {
+      if (result.peso) body.peso = result.peso;
+      if (result.dimensiones) body.dimensiones = result.dimensiones;
+      if (result.montura) body.montura = result.montura;
+      if (result.formato) body.formato = result.formato;
+      if (result.resolucion) body.resolucion = result.resolucion;
+      if (result.alimentacion) body.alimentacion = result.alimentacion;
+      if (result.video_url) body.video_url = result.video_url;
+      if (typeof result.precio_bh_usd === "number") body.precio_bh_usd = result.precio_bh_usd;
+      if ((result.incluye?.length ?? 0) > 0) body.incluye = result.incluye;
+      if ((result.conectividad?.length ?? 0) > 0) body.conectividad = result.conectividad;
+      if ((result.compatible_con?.length ?? 0) > 0) body.compatible_con = result.compatible_con;
     }
-    if (aplicarSpecs && result.specs.length > 0) {
-      fichaPatch.specs_json = JSON.stringify(result.specs);
-    }
-    if (aplicarKeywords && keywords.length > 0) {
-      fichaPatch.keywords_json = JSON.stringify(keywords);
+
+    // Trazabilidad: siempre que se aplique algo, guardamos fuente y raw.
+    if (Object.keys(body).length > 0) {
+      body.fuente_url = result.fuente_url;
+      body.fuente_titulo = result.fuente_titulo;
+      if (result.enriquecido_fuente) body.enriquecido_fuente = result.enriquecido_fuente;
+      if (result.raw) body.raw = result.raw;
     }
 
     const willApplyFoto = aplicarFoto && !!fotoUrl;
 
-    if (
-      Object.keys(patch).length === 0 &&
-      Object.keys(fichaPatch).length === 0 &&
-      !willApplyFoto
-    ) {
+    if (Object.keys(body).length === 0 && !willApplyFoto) {
       toast.info("No hay cambios para aplicar.");
       return;
     }
 
     setSaving(true);
     try {
-      // 1) Foto: si es externa, descargar via proxy y subir al bucket (con diagnóstico)
+      // 1) Foto: si es externa, descargar via proxy y subir al bucket
       if (willApplyFoto) {
         try {
           const finalUrl = await uploadPhotoWithDiag(equipo.id, fotoUrl);
-          patch.foto_url = finalUrl;
+          body.foto_url = finalUrl;
         } catch (e) {
           fallidos.push(`foto (${e instanceof Error ? e.message : "error"})`);
         }
       }
 
-      // 2) Datos básicos del equipo
-      if (Object.keys(patch).length > 0) {
+      // 2) Single-call: graba equipo (marca/modelo/foto/bh_url) + ficha completa
+      if (Object.keys(body).length > 0) {
         try {
-          await adminApi.updateEquipo(equipo.id, patch as Partial<Equipo>);
-          if (patch.marca) aplicados.push(`marca: ${patch.marca}`);
-          if (patch.modelo) aplicados.push(`modelo: ${patch.modelo}`);
-          if (patch.bh_url) aplicados.push("link fuente");
-          if (patch.foto_url) aplicados.push("foto");
+          await adminApi.aplicarEnriquecimiento(equipo.id, body);
+          if (body.marca) aplicados.push(`marca: ${body.marca as string}`);
+          if (body.modelo) aplicados.push(`modelo: ${body.modelo as string}`);
+          if (body.foto_url) aplicados.push("foto");
+          if (body.bh_url) aplicados.push("link fuente");
+          if (body.descripcion) aplicados.push("descripción");
+          if (body.specs) aplicados.push(`${(body.specs as unknown[]).length} specs`);
+          if (body.keywords) aplicados.push(`${(body.keywords as string[]).length} keywords`);
+          if (aplicarFichaExtendida && fichaExtendidaTieneDatos) {
+            aplicados.push("ficha técnica");
+          }
         } catch (e) {
-          fallidos.push(`datos básicos (${e instanceof Error ? e.message : "error"})`);
-        }
-      }
-
-      // 3) Ficha (descripción / specs)
-      if (Object.keys(fichaPatch).length > 0) {
-        try {
-          await adminApi.setFicha(equipo.id, fichaPatch);
-          if (fichaPatch.descripcion) aplicados.push("descripción");
-          if (fichaPatch.specs_json) aplicados.push(`${result.specs.length} specs`);
-          if (fichaPatch.keywords_json) aplicados.push(`${keywords.length} keywords`);
-        } catch (e) {
-          fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
-        }
-      }
-
-      // 4) Verificar que la ficha quedó persistida releyéndola
-      let verificada = true;
-      if (Object.keys(fichaPatch).length > 0) {
-        try {
-          const f = await adminApi.getFicha(equipo.id);
-          const okDesc = !fichaPatch.descripcion || (f.descripcion ?? "").length > 0;
-          const okSpecs = !fichaPatch.specs_json || !!f.specs_json;
-          verificada = okDesc && okSpecs;
-        } catch {
-          verificada = false;
+          fallidos.push(e instanceof Error ? e.message : "error al guardar");
         }
       }
 
@@ -284,10 +316,6 @@ export function EnriquecerEquipoDialog({
       } else if (fallidos.length > 0) {
         toast.warning(`Guardado parcial`, {
           description: `OK: ${aplicados.join(" · ")}. Falló: ${fallidos.join(" · ")}`,
-          duration: 7000,
-        });
-      } else if (!verificada) {
-        toast.warning("Guardado pero la ficha no se ve al releer. Refrescá y revisá.", {
           duration: 7000,
         });
       } else {
@@ -544,6 +572,50 @@ export function EnriquecerEquipoDialog({
               </div>
             </div>
 
+            {/* Ficha técnica extendida (peso, dimensiones, montura, etc.) */}
+            {fichaExtendidaTieneDatos && (
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Ficha técnica extendida
+                  </Label>
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <Checkbox
+                      checked={aplicarFichaExtendida}
+                      onCheckedChange={(v) => setAplicarFichaExtendida(!!v)}
+                    />
+                    Aplicar todo el bloque
+                  </label>
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Datos físicos / técnicos detectados. Se guardan en la ficha y aparecen en el catálogo.
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
+                  {result.peso && <FichaCell label="Peso" value={result.peso} />}
+                  {result.dimensiones && <FichaCell label="Dimensiones" value={result.dimensiones} />}
+                  {result.montura && <FichaCell label="Montura" value={result.montura} />}
+                  {result.formato && <FichaCell label="Formato" value={result.formato} />}
+                  {result.resolucion && <FichaCell label="Resolución" value={result.resolucion} />}
+                  {result.alimentacion && <FichaCell label="Alimentación" value={result.alimentacion} />}
+                  {typeof result.precio_bh_usd === "number" && (
+                    <FichaCell label="Precio B&H (USD)" value={`$${result.precio_bh_usd.toLocaleString("en-US")}`} />
+                  )}
+                  {result.video_url && (
+                    <FichaCell label="Video demo" value={new URL(result.video_url).hostname} />
+                  )}
+                </div>
+                {(result.incluye?.length ?? 0) > 0 && (
+                  <FichaList label="Incluye en la caja" items={result.incluye!} />
+                )}
+                {(result.conectividad?.length ?? 0) > 0 && (
+                  <FichaList label="Conectividad" items={result.conectividad!} />
+                )}
+                {(result.compatible_con?.length ?? 0) > 0 && (
+                  <FichaList label="Compatible con" items={result.compatible_con!} />
+                )}
+              </div>
+            )}
+
             {/* Diagnóstico de foto */}
             {photoDiag && (
               <div className="rounded-md border hairline bg-muted/30 p-3 text-xs">
@@ -637,6 +709,35 @@ function FieldRow({
           Actual: {current}
         </div>
       )}
+    </div>
+  );
+}
+
+function FichaCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border hairline px-2 py-1">
+      <div className="text-muted-foreground">{label}</div>
+      <div className="font-medium truncate">{value}</div>
+    </div>
+  );
+}
+
+function FichaList({ label, items }: { label: string; items: string[] }) {
+  return (
+    <div className="mt-2">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+        {label}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {items.map((item, i) => (
+          <span
+            key={`${label}-${i}`}
+            className="inline-flex items-center rounded-full border hairline bg-muted/40 px-2 py-0.5 text-[11px]"
+          >
+            {item}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

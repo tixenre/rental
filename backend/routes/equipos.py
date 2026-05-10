@@ -66,6 +66,19 @@ class FichaUpdate(BaseModel):
     resolucion:    Optional[str] = None
     keywords_json: Optional[str] = None
     nombre_publico_template: Optional[str] = None
+    # Ficha extendida (enriquecimiento)
+    peso:                Optional[str]   = None
+    dimensiones:         Optional[str]   = None
+    alimentacion:        Optional[str]   = None
+    incluye_json:        Optional[str]   = None
+    conectividad_json:   Optional[str]   = None
+    compatible_con_json: Optional[str]   = None
+    video_url:           Optional[str]   = None
+    precio_bh_usd:       Optional[float] = None
+    fuente_url:          Optional[str]   = None
+    fuente_titulo:       Optional[str]   = None
+    raw_json:            Optional[str]   = None
+    enriquecido_fuente:  Optional[str]   = None
 
 
 class KitItem(BaseModel):
@@ -211,6 +224,7 @@ def get_equipo(id: int):
         if not row:
             raise HTTPException(404, "Equipo no encontrado")
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
+        equipo = attach_ficha(conn, [equipo])[0]
         kit = conn.execute("""
             SELECT kc.componente_id, kc.cantidad, e.nombre, e.marca, e.foto_url
             FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id
@@ -1308,19 +1322,30 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     json_format = {
         "type": "json",
         "prompt": (
-            "Extraé la información del equipo audiovisual (cámara, lente, "
-            "luz, audio) desde la ficha de producto. Specs: máximo 8, label "
-            "corto y value conciso. Descripcion: 1-2 oraciones en español. "
-            "foto_url: URL ABSOLUTA (http/https) a una imagen JPG/PNG/WebP del "
-            "producto principal. NO uses placeholders, sprites, SVGs decorativos, "
-            "tracking pixels, ni rutas relativas. Si no estás 100% seguro de que "
-            "la URL existe y apunta al producto, dejá el campo vacío. "
-            "Keywords: 3-6 palabras clave cortas en español, lowercase, "
-            "que describan la PERSONALIDAD del equipo (ej: 'bicolor', "
-            "'silenciosa', 'v-mount', 'global shutter', 'weather sealed', "
-            "'cri 96', 'cine-ready'). Distintas y específicas — nada genérico "
-            "como 'profesional' o 'calidad'. Si no hay nada distintivo, "
-            "devolvé un array vacío."
+            "Extraé información completa del equipo audiovisual (cámara, lente, "
+            "luz, audio, soporte) desde la ficha de producto. "
+            "Descripcion: 1-2 oraciones en español neutral. "
+            "Specs: máximo 10, label corto y value conciso (ej. 'Sensor': 'Full-frame 24MP'). "
+            "Keywords: 3-6 palabras clave cortas en español lowercase que describan la "
+            "PERSONALIDAD/diferenciales del equipo (ej: 'bicolor', 'silenciosa', "
+            "'v-mount', 'global shutter', 'weather sealed', 'cri 96', 'cine-ready'). "
+            "Distintas y específicas — nada genérico como 'profesional' o 'calidad'. "
+            "Peso: con unidad (ej '640g', '1.2kg'). "
+            "Dimensiones: WxHxD con unidad (ej '129.7 x 77.8 x 84.5 mm'). "
+            "Montura: nombre canónico (ej 'Sony E', 'Canon RF', 'EF', 'MFT', 'PL'). "
+            "Formato: 'Full-frame' | 'APS-C' | 'MFT' | 'Super 35' | etc. para cámaras/lentes. "
+            "Resolucion: para cámaras/monitores (ej '4K 120p', '6K Open Gate', '1080p'). "
+            "Alimentacion: tipo de batería o fuente (ej 'NP-FZ100', 'V-mount', 'AC 220V', '2x AA'). "
+            "Incluye: array de items que vienen en la caja (ej ['Cuerpo','Tapa','Cargador']). "
+            "Conectividad: array de puertos (ej ['USB-C','HDMI Type-A','XLR x2','Mini-jack 3.5mm']). "
+            "Compatible_con: array de etiquetas de compatibilidad (montura, formato, sistemas). "
+            "Precio_usd: precio listado en USD si está visible (sólo número). "
+            "Video_url: URL absoluta a un video YouTube de demo si aparece linkeado. "
+            "Categoria_sugerida: una de ['Cámara','Lente','Iluminación','Audio','Soporte','Monitor','Accesorio']. "
+            "foto_url: URL ABSOLUTA (http/https) a imagen JPG/PNG/WebP del producto. "
+            "NO uses placeholders, sprites, SVGs decorativos, tracking pixels ni rutas relativas. "
+            "Si no estás 100% seguro de que existe, dejá vacío. "
+            "Cualquier campo que no esté en la ficha → dejalo vacío. NO inventes."
         ),
         "schema": {
             "type": "object",
@@ -1341,10 +1366,19 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
                         "required": ["label", "value"],
                     },
                 },
-                "keywords": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
+                "keywords":          {"type": "array", "items": {"type": "string"}},
+                "peso":              {"type": "string"},
+                "dimensiones":       {"type": "string"},
+                "montura":           {"type": "string"},
+                "formato":           {"type": "string"},
+                "resolucion":        {"type": "string"},
+                "alimentacion":      {"type": "string"},
+                "incluye":           {"type": "array", "items": {"type": "string"}},
+                "conectividad":      {"type": "array", "items": {"type": "string"}},
+                "compatible_con":    {"type": "array", "items": {"type": "string"}},
+                "precio_usd":        {"type": "number"},
+                "video_url":         {"type": "string"},
+                "categoria_sugerida": {"type": "string"},
             },
             "required": ["marca", "modelo", "descripcion", "specs"],
         },
@@ -1412,13 +1446,19 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         if needs_alt:
             alt_scrape = _scrape(alt_top["url"], client)
 
-    # ── Merge B&H + alt (B&H pisa) ──────────────────────────────────────────
+    # ── Merge B&H + alt (B&H pisa, alt rellena gaps) ────────────────────────
     primary = bh_scrape or alt_scrape or {}
     secondary = alt_scrape if bh_scrape else None
     extracted = dict(primary.get("extracted") or {})
+    _MERGE_KEYS = (
+        "descripcion", "specs", "keywords", "marca", "modelo", "nombre_normalizado",
+        "peso", "dimensiones", "montura", "formato", "resolucion", "alimentacion",
+        "incluye", "conectividad", "compatible_con", "precio_usd", "video_url",
+        "categoria_sugerida",
+    )
     if secondary:
         sec_ext = secondary.get("extracted") or {}
-        for k in ("descripcion", "specs", "keywords", "marca", "modelo", "nombre_normalizado"):
+        for k in _MERGE_KEYS:
             if not extracted.get(k):
                 extracted[k] = sec_ext.get(k)
 
@@ -1525,6 +1565,52 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         if len(keywords) >= 6:
             break
 
+    # ── Sanitización de listas de strings ──────────────────────────────────
+    def _clean_str_list(raw, max_items: int = 12, max_len: int = 80) -> list[str]:
+        out: list[str] = []
+        seen: set[str] = set()
+        if not isinstance(raw, list):
+            return out
+        for v in raw:
+            if not isinstance(v, str):
+                continue
+            s = v.strip()
+            if not s or len(s) > max_len or s.lower() in seen:
+                continue
+            seen.add(s.lower())
+            out.append(s)
+            if len(out) >= max_items:
+                break
+        return out
+
+    incluye        = _clean_str_list(extracted.get("incluye"),        max_items=15)
+    conectividad   = _clean_str_list(extracted.get("conectividad"),   max_items=10)
+    compatible_con = _clean_str_list(extracted.get("compatible_con"), max_items=8)
+
+    # video_url: validar http(s), nada de javascript: ni rutas relativas
+    video_url = extracted.get("video_url")
+    if isinstance(video_url, str) and not video_url.lower().startswith(("http://", "https://")):
+        video_url = None
+
+    # precio_usd: aceptar número o string numérico, sino None
+    precio_bh_usd = None
+    raw_precio = extracted.get("precio_usd")
+    if isinstance(raw_precio, (int, float)) and raw_precio > 0:
+        precio_bh_usd = float(raw_precio)
+    elif isinstance(raw_precio, str):
+        try:
+            v = float(raw_precio.replace(",", "").replace("$", "").strip())
+            if v > 0:
+                precio_bh_usd = v
+        except ValueError:
+            pass
+
+    fuente_de_enriquecimiento = (
+        "firecrawl-bh" if bh_scrape else
+        "firecrawl-oficial" if alt_scrape else
+        "firecrawl"
+    )
+
     return {
         "marca":  (extracted.get("marca")  or payload.marca  or "").strip() or None,
         "modelo": (extracted.get("modelo") or payload.modelo or "").strip() or None,
@@ -1533,11 +1619,148 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         "specs": (extracted.get("specs") or [])[:12],
         "keywords": keywords,
         "foto_url": foto_url,
-        "fuente_url": canonical_url,
-        "fuente_titulo": canonical_title,
+        # Ficha técnica extendida
+        "peso":           (extracted.get("peso") or "").strip() or None,
+        "dimensiones":    (extracted.get("dimensiones") or "").strip() or None,
+        "montura":        (extracted.get("montura") or "").strip() or None,
+        "formato":        (extracted.get("formato") or "").strip() or None,
+        "resolucion":     (extracted.get("resolucion") or "").strip() or None,
+        "alimentacion":   (extracted.get("alimentacion") or "").strip() or None,
+        "incluye":        incluye,
+        "conectividad":   conectividad,
+        "compatible_con": compatible_con,
+        "video_url":      video_url,
+        "precio_bh_usd":  precio_bh_usd,
+        "categoria_sugerida": (extracted.get("categoria_sugerida") or "").strip() or None,
+        # Trazabilidad
+        "fuente_url":      canonical_url,
+        "fuente_titulo":   canonical_title,
         "fuente_foto_url": fuente_foto_url,
-        "foto_motivo": foto_motivo or None,
+        "foto_motivo":     foto_motivo or None,
+        "enriquecido_fuente": fuente_de_enriquecimiento,
+        # Raw para guardar tal cual (preserva todo lo que la IA devolvió)
+        "raw": extracted,
     }
+
+
+# ── Admin: aplicar resultado de enriquecimiento en una sola llamada ──────────
+#
+# El frontend manda el preview (parcial o completo) + flags "apply_*" para
+# decidir qué piezas grabar. Esto evita N round-trips PATCH equipo + PUT ficha.
+
+class AplicarEnriquecimientoInput(BaseModel):
+    # Núcleo equipo
+    marca:    Optional[str]   = None
+    modelo:   Optional[str]   = None
+    foto_url: Optional[str]   = None
+    bh_url:   Optional[str]   = None
+    # Ficha
+    descripcion:   Optional[str] = None
+    specs:         Optional[list[dict]] = None
+    keywords:      Optional[list[str]]  = None
+    peso:          Optional[str]   = None
+    dimensiones:   Optional[str]   = None
+    montura:       Optional[str]   = None
+    formato:       Optional[str]   = None
+    resolucion:    Optional[str]   = None
+    alimentacion:  Optional[str]   = None
+    incluye:        Optional[list[str]] = None
+    conectividad:   Optional[list[str]] = None
+    compatible_con: Optional[list[str]] = None
+    video_url:     Optional[str]   = None
+    precio_bh_usd: Optional[float] = None
+    fuente_url:    Optional[str]   = None
+    fuente_titulo: Optional[str]   = None
+    raw:           Optional[dict]  = None
+    enriquecido_fuente: Optional[str] = None
+
+
+@router.post("/admin/equipos/{id}/aplicar-enriquecimiento")
+def admin_aplicar_enriquecimiento(id: int, payload: AplicarEnriquecimientoInput, request: Request):
+    """
+    Toma el resultado del endpoint /enriquecer (parcial o completo) y graba
+    en una sola transacción los campos que el cliente decidió aplicar.
+    Cualquier campo NO incluido en el body queda como está (no se nullea).
+    """
+    from admin_guard import require_admin
+    require_admin(request)
+
+    import json as _json
+
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+
+        body = payload.model_dump(exclude_unset=True)
+
+        # ── Equipos (núcleo) ────────────────────────────────────────────
+        eq_fields = {}
+        for k in ("marca", "modelo", "foto_url", "bh_url"):
+            if k in body and body[k] is not None:
+                eq_fields[k] = body[k]
+        if eq_fields:
+            set_clause = ", ".join(f"{k} = ?" for k in eq_fields)
+            set_clause += ", updated_at = CURRENT_TIMESTAMP"
+            conn.execute(
+                f"UPDATE equipos SET {set_clause} WHERE id = ?",
+                list(eq_fields.values()) + [id],
+            )
+
+        # ── Ficha (asegurar fila) ───────────────────────────────────────
+        conn.execute(
+            "INSERT INTO equipo_fichas (equipo_id) VALUES (?) ON CONFLICT(equipo_id) DO NOTHING",
+            (id,),
+        )
+
+        # Mapeo: API → columna DB. Listas/dicts → JSON string.
+        ficha_fields: dict = {}
+        if "descripcion" in body:
+            ficha_fields["descripcion"] = body["descripcion"]
+        if "specs" in body and body["specs"] is not None:
+            ficha_fields["specs_json"] = _json.dumps(body["specs"], ensure_ascii=False)
+        if "keywords" in body and body["keywords"] is not None:
+            ficha_fields["keywords_json"] = _json.dumps(body["keywords"], ensure_ascii=False)
+        if "incluye" in body and body["incluye"] is not None:
+            ficha_fields["incluye_json"] = _json.dumps(body["incluye"], ensure_ascii=False)
+        if "conectividad" in body and body["conectividad"] is not None:
+            ficha_fields["conectividad_json"] = _json.dumps(body["conectividad"], ensure_ascii=False)
+        if "compatible_con" in body and body["compatible_con"] is not None:
+            ficha_fields["compatible_con_json"] = _json.dumps(body["compatible_con"], ensure_ascii=False)
+        for k in ("peso", "dimensiones", "montura", "formato", "resolucion",
+                  "alimentacion", "video_url", "precio_bh_usd",
+                  "fuente_url", "fuente_titulo", "enriquecido_fuente"):
+            if k in body:
+                ficha_fields[k] = body[k]
+        if "raw" in body and body["raw"] is not None:
+            ficha_fields["raw_json"] = _json.dumps(body["raw"], ensure_ascii=False)
+
+        # Si vino algún dato de ficha, marcar enriquecido_at
+        if ficha_fields:
+            ficha_fields["enriquecido_at"] = datetime.datetime.utcnow().isoformat()
+            set_clause = ", ".join(f"{k} = ?" for k in ficha_fields)
+            set_clause += ", updated_at = CURRENT_TIMESTAMP"
+            conn.execute(
+                f"UPDATE equipo_fichas SET {set_clause} WHERE equipo_id = ?",
+                list(ficha_fields.values()) + [id],
+            )
+
+        conn.commit()
+
+        # Devolver equipo + ficha actualizados
+        eq_row = conn.execute("SELECT * FROM equipos WHERE id = ?", (id,)).fetchone()
+        ficha_row = conn.execute("SELECT * FROM equipo_fichas WHERE equipo_id = ?", (id,)).fetchone()
+        return {
+            "equipo": row_to_dict(eq_row),
+            "ficha":  row_to_dict(ficha_row) if ficha_row else None,
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 # ── Admin: proxy de imágenes (para evitar hotlink-block de B&H/Adorama) ──────

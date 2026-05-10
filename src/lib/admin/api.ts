@@ -48,6 +48,19 @@ export type Ficha = {
   resolucion:    string | null;
   keywords_json: string | null;
   nombre_publico_template?: string | null;
+  // Ficha extendida (enriquecimiento)
+  peso?:                string | null;
+  dimensiones?:         string | null;
+  alimentacion?:        string | null;
+  incluye_json?:        string | null;
+  conectividad_json?:   string | null;
+  compatible_con_json?: string | null;
+  video_url?:           string | null;
+  precio_bh_usd?:       number | null;
+  fuente_url?:          string | null;
+  fuente_titulo?:       string | null;
+  enriquecido_at?:      string | null;
+  enriquecido_fuente?:  string | null;
 };
 
 export type CategoriaRef = {
@@ -193,6 +206,17 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }),
+  /** Aplica el resultado de /admin/equipos/enriquecer en un único call.
+   *  Acepta cualquier subset de campos; los no enviados quedan como están. */
+  aplicarEnriquecimiento: (id: number, data: Record<string, unknown>) =>
+    authedJson<{ equipo: Equipo; ficha: Ficha | null }>(
+      `/api/admin/equipos/${id}/aplicar-enriquecimiento`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      },
+    ),
 
   // kit / componentes
   getKit: (id: number) =>

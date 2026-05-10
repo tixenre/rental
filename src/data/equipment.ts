@@ -48,6 +48,18 @@ export type Equipment = {
   fotoUrl?: string | null;
   cantidad?: number;    // stock total
   _backendId?: number;  // ID numérico original, para POST /api/alquileres
+  // Ficha técnica extendida (enriquecida desde Firecrawl + IA)
+  peso?: string | null;
+  dimensiones?: string | null;
+  montura?: string | null;
+  formato?: string | null;
+  resolucion?: string | null;
+  alimentacion?: string | null;
+  incluye?: string[];
+  conectividad?: string[];
+  compatibleCon?: string[];
+  videoUrl?: string | null;
+  precioBhUsd?: number | null;
 };
 
 const e = (

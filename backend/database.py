@@ -317,6 +317,25 @@ def init_db():
     # Si está NULL/vacío, se usa el auto-build del frontend.
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS nombre_publico_template TEXT")
 
+    # ── Ficha extendida (enriquecimiento con IA + scraping) ─────────────
+    # Datos físicos / técnicos estructurados
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS peso TEXT")              # ej: "640g"
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS dimensiones TEXT")       # ej: "129.7 x 77.8 x 84.5 mm"
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS alimentacion TEXT")      # ej: "NP-FZ100", "V-mount", "AC 220V"
+    # Listas estructuradas (TEXT con JSON, igual que specs_json/keywords_json)
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS incluye_json TEXT")          # ["Cuerpo", "Tapa", "Cargador", "Correa"]
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS conectividad_json TEXT")    # ["USB-C", "HDMI Type-A", "XLR x2"]
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS compatible_con_json TEXT")  # ["Sony E-mount", "Full-frame"]
+    # Multimedia y referencias
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS video_url TEXT")             # YouTube demo
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS precio_bh_usd FLOAT")        # precio listado en B&H (referencia)
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS fuente_url TEXT")            # canonical (B&H si hubo)
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS fuente_titulo TEXT")
+    # Trazabilidad del enriquecimiento — guardamos todo el raw para no perder data
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS raw_json TEXT")              # JSON completo de la última extracción
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS enriquecido_at TIMESTAMP")
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS enriquecido_fuente TEXT")    # 'firecrawl-bh' | 'firecrawl-oficial' | 'manual'
+
     # ── Etiquetas (bolsa libre / índice de búsqueda) ─────────────────────
     # Las etiquetas son strings libres: incluyen marca, modelo, palabras del
     # nombre, nombres de categorías asignadas y lo que el admin agregue.
@@ -687,29 +706,30 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     placeholders = ",".join(["%s"] * len(ids))
     cur = conn.cursor()
     cur.execute(f"""
-        SELECT equipo_id, descripcion, notas, specs_json, montura, formato, resolucion, keywords_json, nombre_publico_template
+        SELECT equipo_id, descripcion, notas, specs_json, montura, formato, resolucion,
+               keywords_json, nombre_publico_template,
+               peso, dimensiones, alimentacion,
+               incluye_json, conectividad_json, compatible_con_json,
+               video_url, precio_bh_usd, fuente_url, fuente_titulo,
+               enriquecido_at, enriquecido_fuente
         FROM equipo_fichas
         WHERE equipo_id IN ({placeholders})
     """, ids)
     rows = cur.fetchall()
+    _ficha_keys = (
+        "descripcion", "notas", "specs_json", "montura", "formato", "resolucion",
+        "keywords_json", "nombre_publico_template",
+        "peso", "dimensiones", "alimentacion",
+        "incluye_json", "conectividad_json", "compatible_con_json",
+        "video_url", "precio_bh_usd", "fuente_url", "fuente_titulo",
+        "enriquecido_at", "enriquecido_fuente",
+    )
     f_map: dict[int, dict] = {}
     for r in rows:
-        f_map[r["equipo_id"]] = {
-            "descripcion":   r["descripcion"],
-            "notas":         r["notas"],
-            "specs_json":    r["specs_json"],
-            "montura":       r["montura"],
-            "formato":       r["formato"],
-            "resolucion":    r["resolucion"],
-            "keywords_json": r["keywords_json"],
-            "nombre_publico_template": r["nombre_publico_template"],
-        }
+        f_map[r["equipo_id"]] = {k: r[k] for k in _ficha_keys}
+    _empty = {k: None for k in _ficha_keys}
     for e in equipos:
-        e["ficha"] = f_map.get(e["id"]) or {
-            "descripcion": None, "notas": None, "specs_json": None,
-            "montura": None, "formato": None, "resolucion": None,
-            "keywords_json": None, "nombre_publico_template": None,
-        }
+        e["ficha"] = f_map.get(e["id"]) or dict(_empty)
     cur.close()
     return equipos
 

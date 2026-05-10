@@ -134,6 +134,8 @@ export function EquipmentDetailDialog({
           </div>
         )}
 
+        <QuickFactsRow item={item} />
+
         {item.specs && item.specs.length > 0 && (
           <div className="border-t border-b hairline">
             <button
@@ -167,6 +169,18 @@ export function EquipmentDetailDialog({
             </div>
           </div>
         )}
+
+        {item.incluye && item.incluye.length > 0 && (
+          <FichaPillSection title="Incluye en la caja" items={item.incluye} />
+        )}
+        {item.conectividad && item.conectividad.length > 0 && (
+          <FichaPillSection title="Conectividad" items={item.conectividad} />
+        )}
+        {item.compatibleCon && item.compatibleCon.length > 0 && (
+          <FichaPillSection title="Compatible con" items={item.compatibleCon} />
+        )}
+
+        {item.videoUrl && <YouTubeEmbed url={item.videoUrl} />}
 
         <IncludedList item={item} />
 
@@ -209,5 +223,87 @@ export function EquipmentDetailDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Pills compactas con los datos físicos / técnicos clave (peso, dimensiones, montura, etc). */
+function QuickFactsRow({ item }: { item: Equipment }) {
+  const facts: { label: string; value: string }[] = [];
+  if (item.montura) facts.push({ label: "Montura", value: item.montura });
+  if (item.formato) facts.push({ label: "Formato", value: item.formato });
+  if (item.resolucion) facts.push({ label: "Resolución", value: item.resolucion });
+  if (item.peso) facts.push({ label: "Peso", value: item.peso });
+  if (item.dimensiones) facts.push({ label: "Dimensiones", value: item.dimensiones });
+  if (item.alimentacion) facts.push({ label: "Alimentación", value: item.alimentacion });
+  if (facts.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {facts.map((f) => (
+        <span
+          key={f.label}
+          className="inline-flex items-center gap-1.5 rounded-full border hairline bg-muted/30 px-2.5 py-1 text-[11px]"
+        >
+          <span className="font-mono uppercase tracking-wider text-muted-foreground">
+            {f.label}
+          </span>
+          <span className="font-medium text-ink">{f.value}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function FichaPillSection({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="space-y-2">
+      <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        {title}
+      </h3>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item, i) => (
+          <span
+            key={`${title}-${i}`}
+            className="inline-flex items-center rounded-md border hairline bg-background px-2 py-1 text-[12px] text-ink/90"
+          >
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function YouTubeEmbed({ url }: { url: string }) {
+  const id = (() => {
+    try {
+      const u = new URL(url);
+      if (u.hostname === "youtu.be") return u.pathname.slice(1);
+      if (u.hostname.includes("youtube.com")) {
+        const v = u.searchParams.get("v");
+        if (v) return v;
+        const m = u.pathname.match(/\/(?:embed|shorts)\/([\w-]+)/);
+        if (m) return m[1];
+      }
+    } catch { /* invalid url */ }
+    return null;
+  })();
+  if (!id) return null;
+  return (
+    <div className="space-y-2">
+      <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        Video demo
+      </h3>
+      <div className="relative w-full overflow-hidden rounded-md border hairline" style={{ aspectRatio: "16 / 9" }}>
+        <iframe
+          src={`https://www.youtube.com/embed/${id}`}
+          title="Video demo"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          loading="lazy"
+          className="absolute inset-0 h-full w-full"
+        />
+      </div>
+    </div>
   );
 }

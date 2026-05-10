@@ -207,6 +207,23 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     }
   }
 
+  // Helper para parsear listas JSON guardadas como TEXT
+  const parseStringList = (raw: string | null | undefined): string[] => {
+    if (!raw) return [];
+    try {
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return [];
+      return arr
+        .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+        .map((v) => v.trim());
+    } catch {
+      return [];
+    }
+  };
+  const parsedIncluye        = parseStringList(ficha?.incluye_json);
+  const parsedConectividad   = parseStringList(ficha?.conectividad_json);
+  const parsedCompatibleCon  = parseStringList(ficha?.compatible_con_json);
+
   const kit = Array.isArray(e.kit) ? e.kit as Array<{ componente_id: number; nombre: string; cantidad: number }> : [];
   const includes = kit.map((k) => ({
     id: String(k.componente_id),
@@ -233,6 +250,18 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     isCombo: includes.length > 0,
     includes,
     _backendId: e.id,
+    // Ficha extendida
+    peso:           ficha?.peso          ?? null,
+    dimensiones:    ficha?.dimensiones   ?? null,
+    montura:        ficha?.montura       ?? null,
+    formato:        ficha?.formato       ?? null,
+    resolucion:     ficha?.resolucion    ?? null,
+    alimentacion:   ficha?.alimentacion  ?? null,
+    incluye:        parsedIncluye,
+    conectividad:   parsedConectividad,
+    compatibleCon:  parsedCompatibleCon,
+    videoUrl:       ficha?.video_url     ?? null,
+    precioBhUsd:    ficha?.precio_bh_usd ?? null,
   };
 }
 
