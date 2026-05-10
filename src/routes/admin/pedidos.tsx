@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Trash2, ExternalLink } from "lucide-react";
+import { Search, Trash2, ExternalLink, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
 
 import { adminApi, ESTADO_LABEL, type Pedido, type PedidoEstado } from "@/lib/admin/api";
 import { PedidoDetailSheet, pedidoEstadoVariant } from "@/components/admin/PedidoDetailSheet";
+import { NuevoPedidoWizard } from "@/components/admin/NuevoPedidoWizard";
 
 export const Route = createFileRoute("/admin/pedidos")({
   component: PedidosPage,
