@@ -11,8 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
 import { adminApi, type Equipo } from "@/lib/admin/api";
-import { authedJson, authedPostJson } from "@/lib/authedFetch";
+import { authedJson } from "@/lib/authedFetch";
 import { isBucketUrl } from "@/lib/equipment/photos";
+import { supabase } from "@/integrations/supabase/client";
 
 type DiagStep = { label: string; status: "pending" | "ok" | "fail" | "skip"; detail?: string };
 
@@ -88,13 +89,13 @@ export function EnriquecerEquipoDialog({
   };
   const removeKeyword = (k: string) => setKeywords(keywords.filter((x) => x !== k));
 
-  /** Sube la foto externa al bucket pasando por el backend (service-role).
-   *  Ya no depende de la sesión Supabase del browser. */
+  /** Sube la foto externa al bucket pasando por Lovable Cloud.
+   *  Ya no depende de variables de entorno en Railway. */
   const uploadPhotoWithDiag = async (equipoId: number, externalUrl: string): Promise<string> => {
     const steps: DiagStep[] = [
       { label: "1. Validar URL externa", status: "pending" },
-      { label: "2. Backend descarga la imagen", status: "pending" },
-      { label: "3. Backend sube al bucket (service-role)", status: "pending" },
+      { label: "2. Lovable Cloud descarga la imagen", status: "pending" },
+      { label: "3. Lovable Cloud sube al bucket", status: "pending" },
       { label: "4. Recibir URL pública", status: "pending" },
     ];
     const update = (i: number, patch: Partial<DiagStep>) => {
@@ -117,12 +118,30 @@ export function EnriquecerEquipoDialog({
     update(1, { status: "pending", detail: "esperando backend…" });
 
     try {
-      const res = await authedPostJson<{
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        throw new Error("Iniciá sesión con Google como admin para guardar la foto.");
+      }
+
+      const response = await fetch(`/api/admin/equipos/${equipoId}/upload-foto-from-url`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ url: externalUrl }),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail?.detail ?? `upload-foto-from-url → ${response.status}`);
+      }
+      const res = await response.json() as {
         public_url: string;
         path: string | null;
         size?: number;
         content_type?: string;
-      }>(`/api/admin/equipos/${equipoId}/upload-foto-from-url`, { url: externalUrl });
+      };
 
       update(1, {
         status: "ok",
