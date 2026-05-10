@@ -11,9 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
 import { adminApi, type Equipo } from "@/lib/admin/api";
-import { authedJson } from "@/lib/authedFetch";
+import { authedJson, authedFetch } from "@/lib/authedFetch";
 import { isBucketUrl } from "@/lib/equipment/photos";
-import { supabase } from "@/integrations/supabase/client";
 
 type DiagStep = { label: string; status: "pending" | "ok" | "fail" | "skip"; detail?: string };
 
@@ -107,14 +106,11 @@ export function EnriquecerEquipoDialog({
   };
   const removeKeyword = (k: string) => setKeywords(keywords.filter((x) => x !== k));
 
-  /** Sube la foto externa al bucket pasando por Lovable Cloud.
-   *  Ya no depende de variables de entorno en Railway. */
   const uploadPhotoWithDiag = async (equipoId: number, externalUrl: string): Promise<string> => {
     const steps: DiagStep[] = [
-      { label: "1. Validar URL externa", status: "pending" },
-      { label: "2. Lovable Cloud descarga la imagen", status: "pending" },
-      { label: "3. Lovable Cloud sube al bucket", status: "pending" },
-      { label: "4. Recibir URL pública", status: "pending" },
+      { label: "Validar URL", status: "pending" },
+      { label: "Descargar imagen", status: "pending" },
+      { label: "Subir al almacenamiento", status: "pending" },
     ];
     const update = (i: number, patch: Partial<DiagStep>) => {
       steps[i] = { ...steps[i], ...patch };
@@ -123,7 +119,7 @@ export function EnriquecerEquipoDialog({
     setPhotoDiag([...steps]);
 
     if (isBucketUrl(externalUrl)) {
-      steps.forEach((_, i) => update(i, { status: "skip", detail: "ya es URL del bucket" }));
+      steps.forEach((_, i) => update(i, { status: "skip", detail: "ya guardada" }));
       return externalUrl;
     }
 
@@ -133,48 +129,42 @@ export function EnriquecerEquipoDialog({
       update(0, { status: "fail", detail: "URL inválida" });
       throw new Error("URL inválida");
     }
-    update(1, { status: "pending", detail: "esperando backend…" });
 
+    update(1, { status: "pending" });
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) {
-        throw new Error("Iniciá sesión con Google como admin para guardar la foto.");
-      }
-
-      const response = await fetch(`/api/admin/equipos/${equipoId}/upload-foto-from-url`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const response = await authedFetch(
+        `/api/admin/equipos/${equipoId}/upload-foto-from-url`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: externalUrl }),
         },
-        body: JSON.stringify({ url: externalUrl }),
-      });
+      );
       if (!response.ok) {
         const detail = await response.json().catch(() => ({}));
-        throw new Error(detail?.detail ?? `upload-foto-from-url → ${response.status}`);
+        throw new Error(detail?.detail ?? `upload → ${response.status}`);
       }
       const res = await response.json() as {
         public_url: string;
         path: string | null;
         size?: number;
         content_type?: string;
+        skipped?: boolean;
       };
 
       update(1, {
         status: "ok",
-        detail: res.size
-          ? `${(res.size / 1024).toFixed(1)} KB · ${res.content_type ?? "image/*"}`
-          : "ok",
+        detail: res.size ? `${(res.size / 1024).toFixed(0)} KB` : "ok",
       });
-      update(2, { status: "ok", detail: res.path ?? "(sin cambios)" });
-      update(3, { status: "ok", detail: res.public_url });
+      update(2, {
+        status: res.skipped ? "skip" : "ok",
+        detail: res.skipped ? "ya guardada" : (res.path ?? "ok"),
+      });
       return res.public_url;
     } catch (e) {
       const msg = e instanceof Error ? e.message : "error";
-      if (steps[1].status === "pending") update(1, { status: "fail", detail: msg });
-      else if (steps[2].status === "pending") update(2, { status: "fail", detail: msg });
-      else update(3, { status: "fail", detail: msg });
+      if (steps[1].status !== "ok") update(1, { status: "fail", detail: msg });
+      else update(2, { status: "fail", detail: msg });
       throw e;
     }
   };
@@ -343,8 +333,8 @@ export function EnriquecerEquipoDialog({
             Enriquecer con IA
           </DialogTitle>
           <DialogDescription>
-            Buscamos en B&amp;H / Adorama y la IA extrae specs, foto y descripción.
-            Revisá el resultado antes de aplicar.
+            Buscamos en B&amp;H y sitios oficiales — la IA extrae specs, foto, ficha técnica
+            y datos físicos. Revisá antes de aplicar.
           </DialogDescription>
         </DialogHeader>
 
@@ -616,11 +606,11 @@ export function EnriquecerEquipoDialog({
               </div>
             )}
 
-            {/* Diagnóstico de foto */}
+            {/* Estado de subida de foto */}
             {photoDiag && (
               <div className="rounded-md border hairline bg-muted/30 p-3 text-xs">
                 <div className="flex items-center gap-1.5 mb-2 font-mono uppercase tracking-wide text-muted-foreground">
-                  <Bug className="h-3.5 w-3.5" /> Diagnóstico de foto
+                  <Bug className="h-3.5 w-3.5" /> Subida de foto
                 </div>
                 <ul className="space-y-1">
                   {photoDiag.map((s, i) => (
