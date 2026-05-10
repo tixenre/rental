@@ -295,36 +295,82 @@ def init_db():
         )
     """)
 
+    # ── Etiquetas (bolsa libre / índice de búsqueda) ─────────────────────
+    # Las etiquetas son strings libres: incluyen marca, modelo, palabras del
+    # nombre, nombres de categorías asignadas y lo que el admin agregue.
+    # NO son jerárquicas — la jerarquía vive en la tabla `categorias`.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS etiquetas (
             id     SERIAL PRIMARY KEY,
             nombre TEXT UNIQUE NOT NULL
         )
     """)
-
-    # Prioridad para ordenar categorías (menor = más arriba)
+    # Columna prioridad legacy — se mantiene pero ya no se usa para ordenar
+    # categorías. Queda por compat con datos viejos.
     conn.execute("""
         ALTER TABLE etiquetas
         ADD COLUMN IF NOT EXISTS prioridad INTEGER NOT NULL DEFAULT 100
     """)
-    # Jerarquía: parent_id para soportar 2 niveles (categoría → subcategoría).
-    # NULL = categoría raíz. Los hijos no pueden tener hijos a su vez (validado en API).
+    # parent_id legacy: se va a dropear más abajo, después de migrar a `categorias`.
     conn.execute("""
         ALTER TABLE etiquetas
         ADD COLUMN IF NOT EXISTS parent_id INTEGER
-            REFERENCES etiquetas(id) ON DELETE SET NULL
-    """)
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_etiq_prioridad ON etiquetas(prioridad, nombre)
-    """)
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_etiq_parent ON etiquetas(parent_id, prioridad, nombre)
     """)
 
-    # Seed del árbol de categorías. Idempotente: usa ON CONFLICT (nombre).
-    # Cada raíz se crea/actualiza con su prioridad. Luego sus hijos.
-    # Nota: el seed solo PISA prioridad si la etiqueta todavía está en 100 (default),
-    # así nunca rompe ajustes hechos desde el back-office.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS equipo_etiquetas (
+            equipo_id   INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            etiqueta_id INTEGER NOT NULL REFERENCES etiquetas(id) ON DELETE CASCADE,
+            orden       INTEGER DEFAULT 0,
+            PRIMARY KEY (equipo_id, etiqueta_id)
+        )
+    """)
+    # `origen` distingue etiquetas auto-generadas (a partir de categorías,
+    # marca, modelo, nombre) de las puestas a mano por el admin. Permite
+    # regenerar las auto sin tocar las manuales.
+    conn.execute("""
+        ALTER TABLE equipo_etiquetas
+        ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT 'manual'
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_eq_etiq ON equipo_etiquetas(equipo_id)
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_eq_etiq_origen
+            ON equipo_etiquetas(equipo_id, origen)
+    """)
+
+    # ── Categorías (taxonomía dedicada, árbol de 2 niveles) ──────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS categorias (
+            id        SERIAL PRIMARY KEY,
+            nombre    TEXT UNIQUE NOT NULL,
+            prioridad INTEGER NOT NULL DEFAULT 100,
+            parent_id INTEGER REFERENCES categorias(id) ON DELETE SET NULL
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_cat_prioridad ON categorias(prioridad, nombre)
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_cat_parent ON categorias(parent_id, prioridad, nombre)
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS equipo_categorias (
+            equipo_id    INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            categoria_id INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+            orden        INTEGER DEFAULT 0,
+            PRIMARY KEY (equipo_id, categoria_id)
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_eq_cat ON equipo_categorias(equipo_id)
+    """)
+
+    # Seed del árbol de categorías (en la tabla `categorias`, no en etiquetas).
+    # Idempotente: ON CONFLICT (nombre). Solo pisa prioridad cuando está en
+    # default (100), así no rompe ajustes manuales del back-office.
     SEED_TREE = [
         # (prioridad, nombre_padre, [hijos…])
         (10,  "Cámaras",              ["Video", "Foto", "Acción"]),
@@ -346,49 +392,67 @@ def init_db():
         (110, "Estudio y Producción", ["Set / Backdrops", "Paquetes"]),
     ]
 
+    # Set de todos los nombres del árbol — se usa abajo para migrar etiquetas
+    # legacy (las que actualmente viven en `etiquetas` como nodos del árbol)
+    # hacia `categorias`.
+    SEED_NAMES: set[str] = set()
     for pri, parent_name, children in SEED_TREE:
-        # Upsert padre (sin parent_id).
+        SEED_NAMES.add(parent_name)
+        SEED_NAMES.update(children)
+
+    for pri, parent_name, children in SEED_TREE:
         conn.execute("""
-            INSERT INTO etiquetas (nombre, prioridad, parent_id)
+            INSERT INTO categorias (nombre, prioridad, parent_id)
             VALUES (%s, %s, NULL)
             ON CONFLICT (nombre) DO UPDATE
                 SET prioridad = CASE
-                        WHEN etiquetas.prioridad = 100 THEN EXCLUDED.prioridad
-                        ELSE etiquetas.prioridad
+                        WHEN categorias.prioridad = 100 THEN EXCLUDED.prioridad
+                        ELSE categorias.prioridad
                     END,
                     parent_id = NULL
         """, (parent_name, pri))
-        # Obtener id del padre.
         prow = conn.execute(
-            "SELECT id FROM etiquetas WHERE nombre = %s", (parent_name,)
+            "SELECT id FROM categorias WHERE nombre = %s", (parent_name,)
         ).fetchone()
-        parent_id = prow["id"]
-        # Upsert hijos con prioridad escalonada (10, 20, 30…) y parent_id.
+        parent_cat_id = prow["id"]
         for idx, child_name in enumerate(children, start=1):
             child_pri = idx * 10
             conn.execute("""
-                INSERT INTO etiquetas (nombre, prioridad, parent_id)
+                INSERT INTO categorias (nombre, prioridad, parent_id)
                 VALUES (%s, %s, %s)
                 ON CONFLICT (nombre) DO UPDATE
                     SET parent_id = EXCLUDED.parent_id,
                         prioridad = CASE
-                            WHEN etiquetas.prioridad = 100 THEN EXCLUDED.prioridad
-                            ELSE etiquetas.prioridad
+                            WHEN categorias.prioridad = 100 THEN EXCLUDED.prioridad
+                            ELSE categorias.prioridad
                         END
-            """, (child_name, child_pri, parent_id))
+            """, (child_name, child_pri, parent_cat_id))
 
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS equipo_etiquetas (
-            equipo_id   INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
-            etiqueta_id INTEGER NOT NULL REFERENCES etiquetas(id) ON DELETE CASCADE,
-            orden       INTEGER DEFAULT 0,
-            PRIMARY KEY (equipo_id, etiqueta_id)
-        )
-    """)
+    # ── Migración: mover nodos del árbol que viven en `etiquetas` → `categorias` ──
+    # Esta migración corre una sola vez por el ciclo de vida de cada nombre:
+    # busca etiquetas cuyo nombre coincide con un nodo del árbol, mueve sus
+    # asignaciones desde `equipo_etiquetas` → `equipo_categorias`, y borra
+    # la etiqueta original. Idempotente: si ya está migrada, no encuentra nada.
+    legacy_rows = conn.execute("""
+        SELECT et.id AS etiq_id, et.nombre, c.id AS cat_id
+        FROM etiquetas et
+        JOIN categorias c ON c.nombre = et.nombre
+    """).fetchall()
+    for r in legacy_rows:
+        # Copiar asignaciones: equipo_etiquetas → equipo_categorias.
+        conn.execute("""
+            INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
+            SELECT equipo_id, %s, orden
+            FROM equipo_etiquetas
+            WHERE etiqueta_id = %s
+            ON CONFLICT (equipo_id, categoria_id) DO NOTHING
+        """, (r["cat_id"], r["etiq_id"]))
+        # Borrar la etiqueta vieja (CASCADE elimina equipo_etiquetas).
+        conn.execute("DELETE FROM etiquetas WHERE id = %s", (r["etiq_id"],))
 
-    conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_eq_etiq ON equipo_etiquetas(equipo_id)
-    """)
+    # Nota: NO dropeamos `etiquetas.parent_id` (queda como columna legacy
+    # ignorada). Eso permite que los endpoints admin viejos sigan funcionando
+    # mientras migramos la UI al nuevo CRUD de `categorias`.
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_precio_historial (
@@ -466,6 +530,16 @@ def init_db():
                 (SELECT last_value FROM numero_pedido_seq)
             ), true)
     """)
+
+    # Regenerar etiquetas auto (origen='auto') para todos los equipos.
+    # Idempotente: solo borra y reinserta las auto, no toca las manuales.
+    # Se hace una vez por arranque para mantener la bolsa sincronizada
+    # con marca/modelo/nombre/categorías.
+    try:
+        n = regenerate_auto_tags_all(conn)
+        print(f"   ↳ {n} equipos con etiquetas auto regeneradas")
+    except Exception as ex:
+        print(f"⚠️  No se pudieron regenerar etiquetas auto: {ex}")
 
     conn.commit()
     conn.close()
@@ -555,3 +629,133 @@ def attach_kit(conn, equipos: list[dict]) -> list[dict]:
 
     cur.close()
     return equipos
+
+
+def attach_categorias(conn, equipos: list[dict]) -> list[dict]:
+    """Agrega `categorias` (lista de {id, nombre, parent_id}) a cada equipo."""
+    if not equipos:
+        return equipos
+    ids = [e["id"] for e in equipos]
+    placeholders = ",".join(["%s"] * len(ids))
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT ec.equipo_id, c.id, c.nombre, c.parent_id
+        FROM equipo_categorias ec
+        JOIN categorias c ON c.id = ec.categoria_id
+        WHERE ec.equipo_id IN ({placeholders})
+        ORDER BY ec.equipo_id, ec.orden
+    """, ids)
+    rows = cur.fetchall()
+    cat_map: dict[int, list] = {e["id"]: [] for e in equipos}
+    for r in rows:
+        cat_map[r["equipo_id"]].append({
+            "id": r["id"], "nombre": r["nombre"], "parent_id": r["parent_id"],
+        })
+    for e in equipos:
+        e["categorias"] = cat_map[e["id"]]
+    cur.close()
+    return equipos
+
+
+# ── Auto-tags: regenerar etiquetas derivadas (origen='auto') ────────────────
+#
+# Las etiquetas auto se sintetizan desde marca, modelo, palabras del nombre
+# y nombres de cada categoría asignada (incluyendo padres del árbol).
+# Sirven como índice de búsqueda libre. El admin puede agregar etiquetas
+# manuales encima sin que se pisen.
+
+import re as _re
+
+_WORD_SPLIT = _re.compile(r"[^\wáéíóúñü]+", flags=_re.UNICODE)
+
+
+def _auto_tags_for_equipo(conn, equipo: dict) -> list[str]:
+    """Calcula la lista de strings que deberían ser etiquetas auto."""
+    bag: list[str] = []
+
+    def add(val):
+        if not val:
+            return
+        s = str(val).strip().lower()
+        if not s:
+            return
+        if s not in bag:
+            bag.append(s)
+
+    add(equipo.get("marca"))
+    add(equipo.get("modelo"))
+    # Palabras del nombre (descarta tokens muy cortos / numéricos sueltos).
+    for word in _WORD_SPLIT.split(str(equipo.get("nombre") or "")):
+        w = word.strip().lower()
+        if len(w) >= 3 and not w.isdigit():
+            add(w)
+
+    # Nombres de categorías asignadas + sus padres (árbol completo hacia arriba).
+    cat_rows = conn.execute("""
+        WITH RECURSIVE up AS (
+            SELECT c.id, c.nombre, c.parent_id
+            FROM equipo_categorias ec
+            JOIN categorias c ON c.id = ec.categoria_id
+            WHERE ec.equipo_id = %s
+            UNION
+            SELECT p.id, p.nombre, p.parent_id
+            FROM categorias p
+            JOIN up ON up.parent_id = p.id
+        )
+        SELECT DISTINCT nombre FROM up
+    """, (equipo["id"],)).fetchall()
+    for r in cat_rows:
+        add(r["nombre"])
+
+    return bag
+
+
+def regenerate_auto_tags(conn, equipo_id: int) -> int:
+    """
+    Regenera las etiquetas `origen='auto'` para un equipo.
+    No toca las `origen='manual'`. Devuelve cuántas auto-tags quedaron asignadas.
+    """
+    eq = conn.execute(
+        "SELECT id, nombre, marca, modelo FROM equipos WHERE id = %s", (equipo_id,)
+    ).fetchone()
+    if not eq:
+        return 0
+    equipo = {"id": eq["id"], "nombre": eq["nombre"], "marca": eq["marca"], "modelo": eq["modelo"]}
+
+    # 1) Borrar las auto actuales del equipo.
+    conn.execute(
+        "DELETE FROM equipo_etiquetas WHERE equipo_id = %s AND origen = 'auto'",
+        (equipo_id,),
+    )
+
+    # 2) Calcular nuevas y asegurar que cada nombre exista en `etiquetas`.
+    tags = _auto_tags_for_equipo(conn, equipo)
+    count = 0
+    for orden, name in enumerate(tags):
+        # Upsert de la etiqueta (la tabla tiene UNIQUE(nombre)).
+        conn.execute(
+            "INSERT INTO etiquetas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING",
+            (name,),
+        )
+        row = conn.execute("SELECT id FROM etiquetas WHERE nombre = %s", (name,)).fetchone()
+        if not row:
+            continue
+        # Insertar como auto. Si el admin ya tenía esta etiqueta como manual,
+        # respetamos su origen (DO NOTHING).
+        conn.execute("""
+            INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen)
+            VALUES (%s, %s, %s, 'auto')
+            ON CONFLICT (equipo_id, etiqueta_id) DO NOTHING
+        """, (equipo_id, row["id"], orden))
+        count += 1
+    return count
+
+
+def regenerate_auto_tags_all(conn) -> int:
+    """Regenera auto-tags para todos los equipos. Devuelve cantidad procesada."""
+    rows = conn.execute("SELECT id FROM equipos").fetchall()
+    n = 0
+    for r in rows:
+        regenerate_auto_tags(conn, r["id"])
+        n += 1
+    return n

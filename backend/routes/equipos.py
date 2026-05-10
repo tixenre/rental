@@ -10,7 +10,10 @@ from typing import Optional
 from fastapi import APIRouter, Query, HTTPException, Request
 from pydantic import BaseModel
 
-from database import get_db, row_to_dict, attach_tags, attach_kit
+from database import (
+    get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
+    regenerate_auto_tags,
+)
 from routes.auth import get_session
 
 router = APIRouter()
@@ -66,7 +69,14 @@ class KitItem(BaseModel):
 
 
 class EtiquetasUpdate(BaseModel):
-    etiquetas: list[str]  # lista ordenada de nombres (primera = categoría principal)
+    # Lista ordenada de etiquetas MANUALES. Las auto (marca/modelo/nombre/categorías)
+    # se regeneran solas, no las toques desde acá.
+    etiquetas: list[str]
+
+
+class CategoriasUpdate(BaseModel):
+    # Lista de IDs de categorías hoja (o raíz) asignadas al equipo.
+    categoria_ids: list[int]
 
 
 # ── Disponibilidad en tiempo real ────────────────────────────────────────────
@@ -112,6 +122,7 @@ def list_equipos(
     request:       Request,
     q:             Optional[str]  = Query(None),
     etiqueta:      Optional[str]  = Query(None),
+    categoria:     Optional[str]  = Query(None),
     solo_visibles: Optional[bool] = Query(None),
     page:          int = Query(1, ge=1),
     per_page:      int = Query(200, ge=1, le=500),
@@ -128,39 +139,47 @@ def list_equipos(
         base_sql += " AND (e.nombre LIKE ? OR e.marca LIKE ? OR e.modelo LIKE ?)"
         like = f"%{q}%"
         params += [like, like, like]
-    if etiqueta:
-        # Acepta nombre (legacy) o id numérico. Si es padre, incluye descendientes.
+    if categoria:
+        # Filtro recursivo: si es padre, incluye descendientes (árbol de `categorias`).
+        # Acepta id numérico o nombre.
         try:
-            etiqueta_id_int = int(etiqueta)
+            cat_id_int = int(categoria)
             base_sql += """
               AND e.id IN (
-                SELECT ee.equipo_id FROM equipo_etiquetas ee
-                WHERE ee.etiqueta_id IN (
+                SELECT ec.equipo_id FROM equipo_categorias ec
+                WHERE ec.categoria_id IN (
                     WITH RECURSIVE sub AS (
-                        SELECT id FROM etiquetas WHERE id = ?
+                        SELECT id FROM categorias WHERE id = ?
                         UNION ALL
-                        SELECT et.id FROM etiquetas et
-                        JOIN sub ON et.parent_id = sub.id
+                        SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
                     )
                     SELECT id FROM sub
                 )
               )"""
-            params.append(etiqueta_id_int)
+            params.append(cat_id_int)
         except (TypeError, ValueError):
             base_sql += """
               AND e.id IN (
-                SELECT ee.equipo_id FROM equipo_etiquetas ee
-                WHERE ee.etiqueta_id IN (
+                SELECT ec.equipo_id FROM equipo_categorias ec
+                WHERE ec.categoria_id IN (
                     WITH RECURSIVE sub AS (
-                        SELECT id FROM etiquetas WHERE nombre = ?
+                        SELECT id FROM categorias WHERE nombre = ?
                         UNION ALL
-                        SELECT et.id FROM etiquetas et
-                        JOIN sub ON et.parent_id = sub.id
+                        SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
                     )
                     SELECT id FROM sub
                 )
               )"""
-            params.append(etiqueta)
+            params.append(categoria)
+    if etiqueta:
+        # Filtro plano por nombre de etiqueta (la bolsa ya no es jerárquica).
+        base_sql += """
+          AND e.id IN (
+            SELECT ee.equipo_id FROM equipo_etiquetas ee
+            JOIN etiquetas et ON et.id = ee.etiqueta_id
+            WHERE LOWER(et.nombre) = LOWER(?)
+          )"""
+        params.append(etiqueta)
 
     try:
         total = conn.execute(f"SELECT COUNT(*) {base_sql}", params).fetchone()[0]
@@ -171,6 +190,7 @@ def list_equipos(
         equipos = [row_to_dict(r) for r in rows]
         equipos = attach_tags(conn, equipos)
         equipos = attach_kit(conn, equipos)
+        equipos = attach_categorias(conn, equipos)
         return {"total": total, "page": page, "per_page": per_page, "items": equipos}
     finally:
         conn.close()
@@ -489,61 +509,42 @@ def list_etiquetas():
 @router.get("/categorias")
 def get_categorias(flat: int = Query(0)):
     """
-    Devuelve el árbol de categorías desde la tabla `etiquetas`.
-    - Por defecto: árbol jerárquico [{id, nombre, prioridad, total, children:[…]}].
-    - ?flat=1 → lista plana legacy (nombre, total, prioridad, subtags) para
-      mantener compatibilidad con clientes viejos.
-    `total` cuenta equipos asignados a esa etiqueta o a cualquier descendiente.
+    Devuelve el árbol de categorías desde la tabla `categorias`.
+    `total` cuenta equipos asignados a esa categoría o a cualquier descendiente
+    (vía `equipo_categorias`).
     """
     conn = get_db()
     try:
-        # 1) Todas las etiquetas con su parent_id y prioridad.
-        etiqs = conn.execute("""
+        cats = conn.execute("""
             SELECT id, nombre, prioridad, parent_id
-            FROM etiquetas
+            FROM categorias
             ORDER BY prioridad ASC, LOWER(nombre) ASC
         """).fetchall()
 
-        # 2) Conteo directo por etiqueta_id (orden=0 = principal del equipo).
-        counts_rows = conn.execute("""
-            SELECT etiqueta_id, COUNT(DISTINCT equipo_id) AS n
-            FROM equipo_etiquetas
-            GROUP BY etiqueta_id
-        """).fetchall()
-        direct = {r["etiqueta_id"]: r["n"] for r in counts_rows}
-
-        # 3) Construir árbol y propagar conteos hacia el padre.
         nodes = {
             r["id"]: {
-                "id": r["id"],
-                "nombre": r["nombre"],
-                "prioridad": r["prioridad"],
-                "parent_id": r["parent_id"],
-                "total": direct.get(r["id"], 0),
-                "children": [],
+                "id": r["id"], "nombre": r["nombre"], "prioridad": r["prioridad"],
+                "parent_id": r["parent_id"], "total": 0, "children": [],
             }
-            for r in etiqs
+            for r in cats
         }
         roots = []
-        for r in etiqs:
+        for r in cats:
             n = nodes[r["id"]]
             if r["parent_id"] and r["parent_id"] in nodes:
                 nodes[r["parent_id"]]["children"].append(n)
             else:
                 roots.append(n)
 
-        # Heredar conteo del hijo al padre (sin doble contar — usamos un set).
-        # Para precisión: recalculamos `total` del padre como #equipos distintos en
-        # el subárbol.
-        leaf_to_parent = {nid: n["parent_id"] for nid, n in nodes.items()}
-        # Mapeo equipo→set(etiquetas)
-        eq_rows = conn.execute("SELECT equipo_id, etiqueta_id FROM equipo_etiquetas").fetchall()
+        # Conteo por subárbol: equipos distintos asignados a la categoría o a un descendiente.
+        eq_rows = conn.execute(
+            "SELECT equipo_id, categoria_id FROM equipo_categorias"
+        ).fetchall()
         from collections import defaultdict
-        eq_tags: dict[int, set] = defaultdict(set)
+        eq_cats: dict[int, set] = defaultdict(set)
         for r in eq_rows:
-            eq_tags[r["equipo_id"]].add(r["etiqueta_id"])
+            eq_cats[r["equipo_id"]].add(r["categoria_id"])
 
-        # Para cada nodo, contar equipos cuyo set intersecta el subárbol.
         def descendants(nid: int) -> set:
             out = {nid}
             stack = [nid]
@@ -551,45 +552,32 @@ def get_categorias(flat: int = Query(0)):
                 cur = stack.pop()
                 for n in nodes.values():
                     if n["parent_id"] == cur:
-                        out.add(n["id"])
-                        stack.append(n["id"])
+                        out.add(n["id"]); stack.append(n["id"])
             return out
 
         for nid, n in nodes.items():
             sub = descendants(nid)
-            n["total"] = sum(1 for tags in eq_tags.values() if tags & sub)
+            n["total"] = sum(1 for tags in eq_cats.values() if tags & sub)
 
-        # 4) Ordenar children por prioridad/nombre.
         for n in nodes.values():
             n["children"].sort(key=lambda x: (x["prioridad"], x["nombre"].lower()))
         roots.sort(key=lambda x: (x["prioridad"], x["nombre"].lower()))
 
         if flat:
-            # Compat: devolver solo raíces con subtags como antes.
             return [
                 {
-                    "nombre":    r["nombre"],
-                    "total":     r["total"],
-                    "prioridad": r["prioridad"],
-                    "subtags": [
-                        {"nombre": c["nombre"], "total": c["total"]}
-                        for c in r["children"]
-                    ],
+                    "nombre": r["nombre"], "total": r["total"], "prioridad": r["prioridad"],
+                    "subtags": [{"nombre": c["nombre"], "total": c["total"]} for c in r["children"]],
                 }
                 for r in roots
             ]
 
-        # Limpiar parent_id del payload final (ya está en el árbol).
         def clean(n):
             return {
-                "id": n["id"],
-                "nombre": n["nombre"],
-                "prioridad": n["prioridad"],
-                "total": n["total"],
-                "parent_id": n["parent_id"],
+                "id": n["id"], "nombre": n["nombre"], "prioridad": n["prioridad"],
+                "total": n["total"], "parent_id": n["parent_id"],
                 "children": [clean(c) for c in n["children"]],
             }
-
         return [clean(r) for r in roots]
     finally:
         conn.close()
