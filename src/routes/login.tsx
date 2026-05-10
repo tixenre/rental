@@ -45,16 +45,18 @@ function LoginPage() {
     setError(null);
     try {
       const redirectPath = redirect === "/admin" ? "/admin" : "/mis-pedidos";
+      // Volvemos siempre a /login con el destino en query — la página de login
+      // detecta la sesión y navega al destino. Pasar /admin u otra ruta como
+      // redirect_uri puede caer en 404 según cómo el broker arme la URL final.
+      const callbackUrl = `${window.location.origin}/login?redirect=${encodeURIComponent(redirectPath)}`;
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}${redirectPath}`,
+        redirect_uri: callbackUrl,
       });
       if (result.error) {
         setError("No pudimos iniciar sesión. Probá de nuevo.");
         setBusy(false);
         return;
       }
-      // Si redirected, el browser ya se va a Google
-      // Si no, los tokens se setearon — el efecto de useAuth redirige al destino correcto
     } catch (err) {
       setError("No pudimos iniciar sesión. Probá de nuevo.");
       setBusy(false);
