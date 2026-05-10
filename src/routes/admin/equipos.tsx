@@ -47,6 +47,10 @@ function EquiposPage() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
     qc.invalidateQueries({ queryKey: ["admin", "etiquetas"] });
+    // También refrescamos el catálogo público (useEquipos / useCategorias)
+    // para que la ficha y la foto recién aplicadas aparezcan sin recargar.
+    qc.invalidateQueries({ queryKey: ["equipos"] });
+    qc.invalidateQueries({ queryKey: ["categorias"] });
   };
 
   const saveMut = useMutation({
