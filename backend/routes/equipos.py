@@ -5,6 +5,8 @@ routes/equipos.py — CRUD de equipos, kits, etiquetas, categorías y fichas.
 import calendar as _cal
 import datetime
 import os
+import re
+import unicodedata
 from datetime import date as _date
 from typing import Optional
 
@@ -166,9 +168,21 @@ def list_equipos(
     etiqueta:      Optional[str]  = Query(None),
     categoria:     Optional[str]  = Query(None),
     solo_visibles: Optional[bool] = Query(None),
+    sort:          Optional[str]  = Query(None, description="ranking | nombre | precio_asc | precio_desc | id"),
+    spec:          Optional[list[str]] = Query(None, description="Filtros por specs: spec=key:valor"),
     page:          int = Query(1, ge=1),
     per_page:      int = Query(200, ge=1, le=500),
 ):
+    """Lista equipos con sort y filtros.
+
+    sort por defecto: "ranking" → ORDER BY relevancia_manual ASC,
+    popularidad_score DESC, nombre ASC. Otros valores: nombre,
+    precio_asc, precio_desc, id.
+
+    spec: filtros por specs estructurados. Formato `key:valor`. Múltiples
+    valores se AND-ean. Ej. `?spec=montura:E&spec=video_max:4K` filtra
+    equipos con montura=E Y video_max=4K.
+    """
     conn   = get_db()
     offset = (page - 1) * per_page
     base_sql = "FROM equipos e WHERE 1=1"
@@ -177,6 +191,24 @@ def list_equipos(
     is_admin = bool(get_session(request))
     if solo_visibles or not is_admin:
         base_sql += " AND e.visible_catalogo = 1 AND e.estado != 'fuera_servicio'"
+
+    # ── Filtros por specs estructurados (PR E) ──
+    # Cada `spec=key:valor` agrega un AND EXISTS sobre equipo_specs.
+    if spec:
+        for s in spec:
+            if ":" not in s:
+                continue
+            key, value = s.split(":", 1)
+            key = key.strip().lower()
+            value = value.strip()
+            if not key or not value:
+                continue
+            base_sql += (
+                " AND EXISTS (SELECT 1 FROM equipo_specs es "
+                "WHERE es.equipo_id = e.id AND es.spec_key = ? "
+                "AND LOWER(es.value) = LOWER(?))"
+            )
+            params += [key, value]
     if q:
         # ILIKE = case-insensitive (Postgres). Permite buscar "sony" / "Sony" / "SONY".
         base_sql += " AND (e.nombre ILIKE ? OR e.marca ILIKE ? OR e.modelo ILIKE ?)"
@@ -224,10 +256,22 @@ def list_equipos(
           )"""
         params.append(etiqueta)
 
+    # ── Sort ──
+    # Default: ranking compuesto (relevancia_manual + popularidad_score).
+    # Esto pone los flagship arriba y desempata por uso real.
+    order_clause = {
+        None: "ORDER BY e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC",
+        "ranking": "ORDER BY e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC",
+        "nombre": "ORDER BY COALESCE(e.nombre_publico, e.nombre) ASC",
+        "precio_asc": "ORDER BY e.precio_jornada ASC NULLS LAST, e.nombre ASC",
+        "precio_desc": "ORDER BY e.precio_jornada DESC NULLS LAST, e.nombre ASC",
+        "id": "ORDER BY e.id ASC",
+    }.get(sort, "ORDER BY e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC")
+
     try:
         total = conn.execute(f"SELECT COUNT(*) {base_sql}", params).fetchone()[0]
         rows  = conn.execute(
-            f"SELECT e.* {base_sql} ORDER BY e.nombre LIMIT ? OFFSET ?",
+            f"SELECT e.* {base_sql} {order_clause} LIMIT ? OFFSET ?",
             params + [per_page, offset]
         ).fetchall()
         equipos = [row_to_dict(r) for r in rows]
@@ -2393,6 +2437,26 @@ def _get_r2_client(cfg: dict) -> object:
     return client
 
 
+def _foto_path(equipo_id: int, ext: str) -> str:
+    """Genera path R2: equipos/{id}/{id}_{slug}.{ext}
+    Busca el nombre del equipo en la BD; si falla usa solo el id."""
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT nombre FROM equipos WHERE id = %s", (equipo_id,)).fetchone()
+        conn.close()
+        nombre = row[0] if row else ""
+    except Exception:
+        nombre = ""
+
+    if nombre:
+        slug = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode()
+        slug = re.sub(r"[^a-z0-9]+", "-", slug.lower()).strip("-")[:50]
+    else:
+        slug = ""
+
+    filename = f"{equipo_id}_{slug}.{ext}" if slug else f"{equipo_id}.{ext}"
+    return f"equipos/{equipo_id}/{filename}"
+
 
 def _upload_to_r2(path: str, content: bytes, content_type: str) -> str:
     """Sube `content` al bucket R2 vía S3 API (boto3). Devuelve la URL pública."""
@@ -2492,8 +2556,7 @@ def admin_upload_foto_from_url(
     content, ctype, w, h = _optimize_image(raw_content)
     ext = _ext_from_ctype(ctype)
 
-    import time as _time
-    path = f"equipos/{equipo_id}/equipo-{equipo_id}-{int(_time.time() * 1000)}.{ext}"
+    path = _foto_path(equipo_id, ext)
     public_url = _upload_to_r2(path, content, ctype)
 
     return {
@@ -2534,8 +2597,7 @@ async def admin_upload_foto_file(
     content, ctype, w, h = _optimize_image(raw_content)
     ext = _ext_from_ctype(ctype)
 
-    import time as _time
-    path = f"equipos/{equipo_id}/equipo-{equipo_id}-{int(_time.time() * 1000)}.{ext}"
+    path = _foto_path(equipo_id, ext)
     public_url = _upload_to_r2(path, content, ctype)
 
     return {
