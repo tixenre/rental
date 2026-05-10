@@ -17,7 +17,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { adminApi, type ImportCsvResp, type EtiquetaAdmin, type ClasificarResult } from "@/lib/admin/api";
+import { adminApi, type ImportCsvResp, type CategoriaAdmin, type EtiquetaAdmin, type ClasificarResult } from "@/lib/admin/api";
 
 export const Route = createFileRoute("/admin/settings")({
   component: SettingsPage,
