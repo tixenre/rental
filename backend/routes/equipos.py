@@ -261,6 +261,9 @@ def update_equipo(id: int, data: EquipoUpdate):
         set_clause += ", updated_at = CURRENT_TIMESTAMP"
         conn.execute(f"UPDATE equipos SET {set_clause} WHERE id = ?",
                      list(updates.values()) + [id])
+        # Si cambió algo que alimenta auto-tags, regenerar.
+        if any(k in updates for k in ("nombre", "marca", "modelo")):
+            regenerate_auto_tags(conn, id)
         conn.commit()
         row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
