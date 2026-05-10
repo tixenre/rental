@@ -1,4 +1,6 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { useState } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
   LayoutDashboard,
   Package,
@@ -44,6 +46,23 @@ export function AdminSidebar() {
     select: (router) => router.location.pathname,
   });
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      const { error } = await signOut();
+      if (error) throw error;
+      navigate({ to: "/login", search: { redirect: "/admin" } });
+    } catch (e) {
+      toast.error("No se pudo cerrar sesión", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+      setIsSigningOut(false);
+    }
+  };
 
   const isActive = (url: string, exact?: boolean) =>
     exact ? currentPath === url : currentPath === url || currentPath.startsWith(url + "/");
@@ -142,11 +161,12 @@ export function AdminSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              onClick={() => signOut()}
+              onClick={handleSignOut}
+              disabled={isSigningOut}
               tooltip={collapsed ? "Cerrar sesión" : undefined}
             >
               <LogOut className="h-4 w-4 shrink-0" />
-              {!collapsed && <span>Cerrar sesión</span>}
+              {!collapsed && <span>{isSigningOut ? "Cerrando…" : "Cerrar sesión"}</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
