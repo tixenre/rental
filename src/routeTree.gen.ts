@@ -24,6 +24,7 @@ import { Route as AdminCalendarioRouteImport } from './routes/admin/calendario'
 import { Route as AuthCuentaRouteImport } from './routes/_auth/cuenta'
 import { Route as AuthMisPedidosIndexRouteImport } from './routes/_auth/mis-pedidos/index'
 import { Route as AdminPedidosNuevoRouteImport } from './routes/admin/pedidos.nuevo'
+import { Route as AdminPedidosIdRouteImport } from './routes/admin/pedidos.$id'
 import { Route as AuthMisPedidosIdRouteImport } from './routes/_auth/mis-pedidos/$id'
 
 const LoginRoute = LoginRouteImport.update({
@@ -100,6 +101,11 @@ const AdminPedidosNuevoRoute = AdminPedidosNuevoRouteImport.update({
   path: '/nuevo',
   getParentRoute: () => AdminPedidosRoute,
 } as any)
+const AdminPedidosIdRoute = AdminPedidosIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AdminPedidosRoute,
+} as any)
 const AuthMisPedidosIdRoute = AuthMisPedidosIdRouteImport.update({
   id: '/mis-pedidos/$id',
   path: '/mis-pedidos/$id',
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/': typeof AdminIndexRoute
   '/mis-pedidos/$id': typeof AuthMisPedidosIdRoute
+  '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
   '/mis-pedidos/': typeof AuthMisPedidosIndexRoute
 }
@@ -136,6 +143,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin': typeof AdminIndexRoute
   '/mis-pedidos/$id': typeof AuthMisPedidosIdRoute
+  '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
   '/mis-pedidos': typeof AuthMisPedidosIndexRoute
 }
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/': typeof AdminIndexRoute
   '/_auth/mis-pedidos/$id': typeof AuthMisPedidosIdRoute
+  '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
   '/_auth/mis-pedidos/': typeof AuthMisPedidosIndexRoute
 }
@@ -174,6 +183,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/'
     | '/mis-pedidos/$id'
+    | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/mis-pedidos/'
   fileRoutesByTo: FileRoutesByTo
@@ -190,6 +200,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin'
     | '/mis-pedidos/$id'
+    | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/mis-pedidos'
   id:
@@ -208,6 +219,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/'
     | '/_auth/mis-pedidos/$id'
+    | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/_auth/mis-pedidos/'
   fileRoutesById: FileRoutesById
@@ -327,6 +339,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPedidosNuevoRouteImport
       parentRoute: typeof AdminPedidosRoute
     }
+    '/admin/pedidos/$id': {
+      id: '/admin/pedidos/$id'
+      path: '/$id'
+      fullPath: '/admin/pedidos/$id'
+      preLoaderRoute: typeof AdminPedidosIdRouteImport
+      parentRoute: typeof AdminPedidosRoute
+    }
     '/_auth/mis-pedidos/$id': {
       id: '/_auth/mis-pedidos/$id'
       path: '/mis-pedidos/$id'
@@ -352,10 +371,12 @@ const AuthRouteChildren: AuthRouteChildren = {
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 interface AdminPedidosRouteChildren {
+  AdminPedidosIdRoute: typeof AdminPedidosIdRoute
   AdminPedidosNuevoRoute: typeof AdminPedidosNuevoRoute
 }
 
 const AdminPedidosRouteChildren: AdminPedidosRouteChildren = {
+  AdminPedidosIdRoute: AdminPedidosIdRoute,
   AdminPedidosNuevoRoute: AdminPedidosNuevoRoute,
 }
 
