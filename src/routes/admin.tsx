@@ -9,7 +9,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Back-office — Rambla Rental" },
+      { title: "Backoffice — Rambla Rental" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
