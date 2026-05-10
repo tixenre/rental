@@ -95,6 +95,8 @@ export function EquipoFormDialog({
   const [descripcion, setDescripcion] = useState("");
   const [notas, setNotas] = useState("");
   const [specs, setSpecs] = useState<Spec[]>([]);
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [keywordInput, setKeywordInput] = useState("");
 
   useEffect(() => {
     const f = fichaQ.data;
@@ -108,11 +110,23 @@ export function EquipoFormDialog({
         const arr = f.specs_json ? JSON.parse(f.specs_json) : [];
         setSpecs(Array.isArray(arr) ? arr : []);
       } catch { setSpecs([]); }
+      try {
+        const arr = f.keywords_json ? JSON.parse(f.keywords_json) : [];
+        setKeywords(Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : []);
+      } catch { setKeywords([]); }
     } else if (!initial) {
       setMontura(""); setFormato(""); setResolucion("");
-      setDescripcion(""); setNotas(""); setSpecs([]);
+      setDescripcion(""); setNotas(""); setSpecs([]); setKeywords([]);
     }
   }, [fichaQ.data, initial]);
+
+  const addKeyword = () => {
+    const v = keywordInput.trim().toLowerCase();
+    if (!v) return;
+    if (keywords.includes(v)) { setKeywordInput(""); return; }
+    setKeywords([...keywords, v]);
+    setKeywordInput("");
+  };
 
   // Categorías (multi-select)
   const catsQ = useQuery({
@@ -188,6 +202,7 @@ export function EquipoFormDialog({
             montura: montura || null,
             formato: formato || null,
             resolucion: resolucion || null,
+            keywords_json: keywords.length ? JSON.stringify(keywords) : null,
           }),
           adminApi.setCategorias(initial.id, [...selectedCats]),
         ]);
@@ -400,9 +415,53 @@ export function EquipoFormDialog({
                     )}
                   </div>
                 </div>
+
+                <div>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Palabras clave ({keywords.length})
+                  </Label>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Tags editoriales propios del equipo (ej. <em>bicolor</em>, <em>CRI 96</em>, <em>global shutter</em>).
+                    Aparecen como chips en el catálogo.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {keywords.map((k) => (
+                      <span
+                        key={k}
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-soft px-2 py-0.5 text-[11px] font-mono uppercase tracking-wider text-ink/80"
+                      >
+                        {k}
+                        <button
+                          type="button"
+                          onClick={() => setKeywords(keywords.filter((x) => x !== k))}
+                          className="hover:text-destructive"
+                          aria-label={`Quitar ${k}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                    {keywords.length === 0 && (
+                      <span className="text-[11px] text-muted-foreground italic">Sin keywords.</span>
+                    )}
+                  </div>
+                  <div className="mt-2 flex gap-1.5">
+                    <Input
+                      value={keywordInput}
+                      onChange={(e) => setKeywordInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); addKeyword(); }
+                      }}
+                      placeholder="Agregar palabra clave y Enter…"
+                      className="h-8 text-xs"
+                    />
+                    <Button type="button" size="sm" variant="outline" onClick={addKeyword} className="h-8">
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
               </TabsContent>
 
-              {/* ── Categorías ────────────────────────────────────────── */}
               <TabsContent value="cats" className="space-y-3 mt-4">
                 <div className="rounded-md border hairline bg-muted/30 px-3 py-2 text-xs">
                   La <strong>primera categoría</strong> se usa como tipo en el nombre público.

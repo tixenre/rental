@@ -12,6 +12,7 @@ import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
 import { IncludedList } from "./IncludedList";
+import { KeywordChips } from "./KeywordChips";
 
 export function EquipmentDetailDialog({
   item,
@@ -107,6 +108,10 @@ export function EquipmentDetailDialog({
             <EmptyImage category={item.category} brand={item.brand} />
           )}
         </div>
+
+        {item.keywords && item.keywords.length > 0 && (
+          <KeywordChips keywords={item.keywords} />
+        )}
 
         {desc && (
           <div className="space-y-2">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Sparkles, ExternalLink, Loader2, Check } from "lucide-react";
+import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Bug } from "lucide-react";
 import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -11,8 +11,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
 import { adminApi, type Equipo } from "@/lib/admin/api";
-import { authedJson } from "@/lib/authedFetch";
-import { uploadExternalUrlToBucket, isBucketUrl } from "@/lib/equipment/photos";
+import { authedFetch, authedJson } from "@/lib/authedFetch";
+import { supabase } from "@/integrations/supabase/client";
+import { isBucketUrl } from "@/lib/equipment/photos";
+
+type DiagStep = { label: string; status: "pending" | "ok" | "fail" | "skip"; detail?: string };
 
 export type EnriquecerResult = {
   marca: string | null;
@@ -64,12 +67,80 @@ export function EnriquecerEquipoDialog({
   const [keywords, setKeywords] = useState<string[]>([]);
   const [aplicarKeywords, setAplicarKeywords] = useState(true);
 
+  const [keywordInput, setKeywordInput] = useState("");
+  const [photoDiag, setPhotoDiag] = useState<DiagStep[] | null>(null);
+
   useEffect(() => {
     if (!open) {
       setResult(null);
       setError(null);
+      setPhotoDiag(null);
     }
   }, [open]);
+
+  const addKeyword = () => {
+    const v = keywordInput.trim().toLowerCase();
+    if (!v) return;
+    if (keywords.includes(v)) { setKeywordInput(""); return; }
+    setKeywords([...keywords, v]);
+    setKeywordInput("");
+  };
+  const removeKeyword = (k: string) => setKeywords(keywords.filter((x) => x !== k));
+
+  /** Sube la foto externa al bucket reportando cada paso al panel de diagnóstico. */
+  const uploadPhotoWithDiag = async (equipoId: number, externalUrl: string): Promise<string> => {
+    const steps: DiagStep[] = [
+      { label: "1. Llamar /api/admin/proxy-image", status: "pending" },
+      { label: "2. Recibir blob (tamaño + tipo)", status: "pending" },
+      { label: "3. Subir a Supabase Storage (equipos-fotos)", status: "pending" },
+      { label: "4. Obtener URL pública", status: "pending" },
+    ];
+    const update = (i: number, patch: Partial<DiagStep>) => {
+      steps[i] = { ...steps[i], ...patch };
+      setPhotoDiag([...steps]);
+    };
+    setPhotoDiag([...steps]);
+
+    if (isBucketUrl(externalUrl)) {
+      steps.forEach((_, i) => update(i, { status: "skip", detail: "ya es URL del bucket" }));
+      return externalUrl;
+    }
+
+    const res = await authedFetch(`/api/admin/proxy-image?url=${encodeURIComponent(externalUrl)}`);
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      update(0, { status: "fail", detail: `HTTP ${res.status} ${txt.slice(0, 120)}` });
+      throw new Error(`proxy-image → ${res.status}`);
+    }
+    update(0, { status: "ok", detail: `HTTP ${res.status}` });
+
+    const blob = await res.blob();
+    if (blob.size === 0) {
+      update(1, { status: "fail", detail: "blob vacío (0 bytes)" });
+      throw new Error("blob vacío");
+    }
+    update(1, { status: "ok", detail: `${(blob.size / 1024).toFixed(1)} KB · ${blob.type || "sin content-type"}` });
+
+    const ct = blob.type || "image/jpeg";
+    const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : ct.includes("avif") ? "avif" : "jpg";
+    const path = `equipos/${equipoId}/foto-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("equipos-fotos")
+      .upload(path, blob, { contentType: ct, upsert: false });
+    if (upErr) {
+      update(2, { status: "fail", detail: upErr.message });
+      throw upErr;
+    }
+    update(2, { status: "ok", detail: path });
+
+    const { data } = supabase.storage.from("equipos-fotos").getPublicUrl(path);
+    if (!data?.publicUrl) {
+      update(3, { status: "fail", detail: "no devolvió publicUrl" });
+      throw new Error("sin publicUrl");
+    }
+    update(3, { status: "ok", detail: data.publicUrl });
+    return data.publicUrl;
+  };
 
   const run = async () => {
     setLoading(true);
@@ -141,12 +212,10 @@ export function EnriquecerEquipoDialog({
 
     setSaving(true);
     try {
-      // 1) Foto: si es externa, descargar via proxy y subir al bucket
+      // 1) Foto: si es externa, descargar via proxy y subir al bucket (con diagnóstico)
       if (willApplyFoto) {
         try {
-          const finalUrl = isBucketUrl(fotoUrl)
-            ? fotoUrl
-            : await uploadExternalUrlToBucket(equipo.id, fotoUrl);
+          const finalUrl = await uploadPhotoWithDiag(equipo.id, fotoUrl);
           patch.foto_url = finalUrl;
         } catch (e) {
           fallidos.push(`foto (${e instanceof Error ? e.message : "error"})`);
@@ -380,6 +449,87 @@ export function EnriquecerEquipoDialog({
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Keywords editables */}
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Palabras clave ({keywords.length})
+                </Label>
+                <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                  <Checkbox
+                    checked={aplicarKeywords}
+                    onCheckedChange={(v) => setAplicarKeywords(!!v)}
+                  />
+                  Aplicar
+                </label>
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Tags editoriales (ej. <em>bicolor</em>, <em>global shutter</em>). Aparecen como chips en el catálogo.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {keywords.map((k) => (
+                  <span
+                    key={k}
+                    className="inline-flex items-center gap-1 rounded-full bg-amber-soft px-2 py-0.5 text-[11px] font-mono uppercase tracking-wider text-ink/80"
+                  >
+                    {k}
+                    <button
+                      type="button"
+                      onClick={() => removeKeyword(k)}
+                      className="hover:text-destructive"
+                      aria-label={`Quitar ${k}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                {keywords.length === 0 && (
+                  <span className="text-[11px] text-muted-foreground italic">Sin keywords aún.</span>
+                )}
+              </div>
+              <div className="mt-2 flex gap-1.5">
+                <Input
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); addKeyword(); }
+                  }}
+                  placeholder="Agregar palabra clave…"
+                  className="h-8 text-xs"
+                />
+                <Button type="button" size="sm" variant="outline" onClick={addKeyword} className="h-8">
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Diagnóstico de foto */}
+            {photoDiag && (
+              <div className="rounded-md border hairline bg-muted/30 p-3 text-xs">
+                <div className="flex items-center gap-1.5 mb-2 font-mono uppercase tracking-wide text-muted-foreground">
+                  <Bug className="h-3.5 w-3.5" /> Diagnóstico de foto
+                </div>
+                <ul className="space-y-1">
+                  {photoDiag.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="mt-0.5">
+                        {s.status === "ok" && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+                        {s.status === "fail" && <X className="h-3.5 w-3.5 text-destructive" />}
+                        {s.status === "pending" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                        {s.status === "skip" && <span className="block h-3.5 w-3.5 rounded-full border" />}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className={s.status === "fail" ? "text-destructive font-medium" : ""}>{s.label}</div>
+                        {s.detail && (
+                          <div className="text-[10px] text-muted-foreground break-all">{s.detail}</div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
