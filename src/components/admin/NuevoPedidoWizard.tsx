@@ -234,13 +234,13 @@ export function NuevoPedidoWizard({
                 <Button
                   variant="outline"
                   onClick={() => createMut.mutate("borrador")}
-                  disabled={createMut.isPending || items.length === 0}
+                  disabled={createMut.isPending || items.length === 0 || overstockCount > 0}
                 >
                   Guardar borrador
                 </Button>
                 <Button
                   onClick={() => createMut.mutate("presupuesto")}
-                  disabled={createMut.isPending || items.length === 0}
+                  disabled={createMut.isPending || items.length === 0 || overstockCount > 0}
                 >
                   <Check className="h-4 w-4 mr-1" />
                   {createMut.isPending ? "Creando…" : "Crear presupuesto"}
