@@ -27,6 +27,7 @@ PUBLIC_API = (
     "/api/etiquetas",
     "/api/disponibilidad",
     "/api/public/",
+    "/api/cliente/registro",  # registro-info y registro (sin sesión)
 )
 
 

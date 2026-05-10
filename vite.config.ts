@@ -25,6 +25,10 @@ export default defineConfig({
         target: "http://localhost:8000",
         changeOrigin: true,
       },
+      "/cliente/auth": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
     },
   },
   build: {
