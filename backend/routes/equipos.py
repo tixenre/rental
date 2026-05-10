@@ -275,6 +275,19 @@ def list_equipos(
             params + [per_page, offset]
         ).fetchall()
         equipos = [row_to_dict(r) for r in rows]
+
+        # Attach brand object (id, nombre, logo_url)
+        for equipo in equipos:
+            if equipo.get('brand_id'):
+                brand_row = conn.execute(
+                    "SELECT id, nombre, logo_url FROM marcas WHERE id = ?",
+                    (equipo['brand_id'],)
+                ).fetchone()
+                if brand_row:
+                    equipo['brand'] = row_to_dict(brand_row)
+            else:
+                equipo['brand'] = None
+
         equipos = attach_tags(conn, equipos)
         equipos = attach_kit(conn, equipos)
         equipos = attach_categorias(conn, equipos)
@@ -318,8 +331,15 @@ def create_equipo(data: EquipoCreate):
               data.precio_jornada, data.precio_usd, data.roi_pct,
               data.valor_reposicion, data.foto_url, data.fecha_compra,
               data.serie, data.bh_url, data.dueno, data.visible_catalogo, data.estado))
-        conn.commit()
         new_id = cur.lastrowid
+        # Hook: calcular nombre_publico inicial. No falla el create si esto
+        # rompe (ej. si los servicios no están disponibles).
+        try:
+            from services.nombre_service import actualizar_nombres_de
+            actualizar_nombres_de(conn, new_id, commit=False)
+        except Exception:
+            pass
+        conn.commit()
         row    = conn.execute("SELECT * FROM equipos WHERE id=?", (new_id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         return equipo
@@ -367,6 +387,14 @@ def update_equipo(id: int, data: EquipoUpdate):
         # Si cambió algo que alimenta auto-tags, regenerar.
         if any(k in updates for k in ("nombre", "marca", "modelo")):
             regenerate_auto_tags(conn, id)
+        # Hook: si cambió algo que afecta el nombre público, recalcular.
+        # No falla el update si el recálculo rompe.
+        if any(k in updates for k in ("nombre", "marca", "modelo")):
+            try:
+                from services.nombre_service import actualizar_nombres_de
+                actualizar_nombres_de(conn, id, commit=False)
+            except Exception:
+                pass
         conn.commit()
         row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
@@ -440,6 +468,17 @@ def upsert_ficha(id: int, data: FichaUpdate):
                 f"UPDATE equipo_fichas SET {set_clause} WHERE equipo_id = ?",
                 list(patch.values()) + [id],
             )
+            # Hook: si cambió el template de nombre o specs estructuradas
+            # (montura/formato/resolucion legacy), recalcular nombre_publico.
+            keys_que_afectan_nombre = {
+                "nombre_publico_template", "montura", "formato", "resolucion",
+            }
+            if any(k in patch for k in keys_que_afectan_nombre):
+                try:
+                    from services.nombre_service import actualizar_nombres_de
+                    actualizar_nombres_de(conn, id, commit=False)
+                except Exception:
+                    pass
         conn.commit()
         row = conn.execute(
             "SELECT * FROM equipo_fichas WHERE equipo_id = ?", (id,)
@@ -643,6 +682,13 @@ def set_categorias(id: int, data: CategoriasUpdate):
                 ON CONFLICT (equipo_id, categoria_id) DO UPDATE SET orden = EXCLUDED.orden
             """, (id, cid_int, orden))
         regenerate_auto_tags(conn, id)
+        # Hook: cambió la categoría → cambia el template de specs aplicable
+        # → puede cambiar el nombre público auto-generado.
+        try:
+            from services.nombre_service import actualizar_nombres_de
+            actualizar_nombres_de(conn, id, commit=False)
+        except Exception:
+            pass
         conn.commit()
         row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
@@ -2392,7 +2438,7 @@ def _get_r2_client(cfg: dict) -> object:
 
 
 def _foto_path(equipo_id: int, ext: str) -> str:
-    """Genera path R2: equipos/{id}/{id}-{slug}.{ext}
+    """Genera path R2: equipos/{id}/{id}_{slug}.{ext}
     Busca el nombre del equipo en la BD; si falla usa solo el id."""
     try:
         conn = get_db()

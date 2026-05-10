@@ -14,7 +14,7 @@ export function ListFilters({
   query: string;
   onQuery: (v: string) => void;
   categories: string[];
-  brands: string[];
+  brands: any[];
   selectedCategories: Set<string>;
   onToggleCategory: (c: string) => void;
   selectedBrand: string | null;
@@ -36,8 +36,8 @@ export function ListFilters({
           >
             <option value="">Todas las marcas</option>
             {brandList.map((b) => (
-              <option key={b} value={b}>
-                {b}
+              <option key={b.id} value={String(b.id)}>
+                {b.nombre}
               </option>
             ))}
           </select>

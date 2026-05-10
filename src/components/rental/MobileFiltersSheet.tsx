@@ -6,7 +6,7 @@ type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   categories: string[];
-  brands: string[];
+  brands: any[];
   selectedCategories: Set<string>;
   onToggleCategory: (c: string) => void;
   selectedBrand: string | null;
@@ -58,8 +58,8 @@ export function MobileFiltersSheet({
             >
               <option value="">Todas las marcas</option>
               {brands.map((b) => (
-                <option key={b} value={b}>
-                  {b}
+                <option key={b.id} value={String(b.id)}>
+                  {b.nombre}
                 </option>
               ))}
             </select>

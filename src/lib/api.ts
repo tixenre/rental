@@ -63,10 +63,17 @@ export type BackendCategoriaRef = {
   parent_id: number | null;
 };
 
+export type BackendMarca = {
+  id: number;
+  nombre: string;
+  logo_url?: string | null;
+};
+
 export type BackendEquipo = {
   id: number;
   nombre: string;
-  marca: string;
+  marca?: string;
+  brand?: BackendMarca | null;
   modelo: string | null;
   cantidad: number;
   precio_jornada: number | null;
@@ -111,6 +118,10 @@ export function apiGetDisponibilidad(fechaDesde: string, fechaHasta: string) {
     fecha_desde: fechaDesde,
     fecha_hasta: fechaHasta,
   });
+}
+
+export function apiGetMarcs() {
+  return get<{ items: BackendMarca[] }>("/api/marcas");
 }
 
 // NOTA: la creación de pedidos se movió a `src/lib/orders.ts → createOrder()`

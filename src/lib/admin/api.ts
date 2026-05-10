@@ -161,6 +161,15 @@ export type ClasificarResult = {
   items: ClasificarItem[];
 };
 
+export type MarcaAdmin = {
+  id: number;
+  nombre: string;
+  logo_url?: string | null;
+  visible: boolean;
+  orden: number;
+  total: number;
+};
+
 export const adminApi = {
   dashboard: () => authedJson<DashboardData>("/api/dashboard"),
 
@@ -286,6 +295,19 @@ export const adminApi = {
   },
   adminReorderEtiquetas: (ids: number[]) =>
     authedPostJson<{ ok: true; count: number }>("/api/admin/etiquetas/reorder", { ids }),
+
+  // marcas (admin)
+  adminListMarcas: () =>
+    authedJson<{ items: MarcaAdmin[] }>("/api/admin/marcas"),
+  adminUpdateMarca: (id: number, patch: Partial<MarcaAdmin>) =>
+    authedJson<MarcaAdmin>(`/api/admin/marcas/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  adminReorderMarcas: (reorder: { id: number; orden: number }[]) =>
+    authedPostJson<{ ok: true }>("/api/admin/marcas/reorder", { marcas: reorder }),
+
   adminClasificarDryRun: () =>
     authedPostJson<ClasificarResult>("/api/admin/categorias/clasificar?apply=0", {}),
   adminClasificarApply: () =>

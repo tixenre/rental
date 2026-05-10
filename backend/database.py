@@ -248,6 +248,53 @@ def init_db():
     # al actualizar el USD rate, los manuales se respetan por default.
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS precio_jornada_manual BOOLEAN NOT NULL DEFAULT FALSE")
 
+    # Tabla de marcas (brands)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS marcas (
+            id SERIAL PRIMARY KEY,
+            nombre TEXT NOT NULL UNIQUE,
+            logo_url TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_marcas_nombre ON marcas(nombre)")
+
+    # Migration: agregar columnas visible y orden para admin settings
+    conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT TRUE")
+    conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS orden INTEGER NOT NULL DEFAULT 100")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_marcas_orden ON marcas(orden ASC)")
+
+    # Migration: agregar FK a marcas
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS brand_id INTEGER REFERENCES marcas(id)")
+
+    # Migration: migrar datos de marca (TEXT) a brand_id (FK)
+    try:
+        # Obtener marcas únicas existentes
+        existing_marcas = conn.execute("""
+            SELECT DISTINCT marca FROM equipos WHERE marca IS NOT NULL AND marca != ''
+            ORDER BY marca
+        """).fetchall()
+
+        for (marca,) in existing_marcas:
+            marca = marca.strip()
+            if not marca:
+                continue
+            # Insertar marca si no existe (UPSERT simulado con ON CONFLICT)
+            conn.execute("""
+                INSERT INTO marcas (nombre) VALUES (?)
+                ON CONFLICT (nombre) DO NOTHING
+            """, (marca,))
+
+        # Backfill: actualizar brand_id para todos los equipos
+        conn.execute("""
+            UPDATE equipos SET brand_id = (
+                SELECT id FROM marcas WHERE marcas.nombre = equipos.marca
+            ) WHERE marca IS NOT NULL AND marca != ''
+        """)
+    except Exception as e:
+        print(f"⚠️  Migración de marcas parcial: {e}")
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS clientes (
             id                SERIAL PRIMARY KEY,
@@ -526,6 +573,104 @@ def init_db():
     # Nota: NO dropeamos `etiquetas.parent_id` (queda como columna legacy
     # ignorada). Eso permite que los endpoints admin viejos sigan funcionando
     # mientras migramos la UI al nuevo CRUD de `categorias`.
+
+    # ── Specs estructurados por categoría (rediseño DISEÑO_SPECS.md - PR A) ──
+    #
+    # Hoy `equipo_fichas.specs_json` guarda specs como [{label, value}] sin
+    # validación ni schema. Eso hace imposible filtrar el catálogo por specs
+    # ("cámaras montura E con video 4K") o comparar dos productos lado a lado.
+    #
+    # Modelo nuevo: cada categoría define un TEMPLATE (categoria_spec_templates)
+    # con las keys que sus equipos van a tener (sensor, montura, cri, etc.),
+    # y los valores reales viven en EQUIPO_SPECS (key/value tipados).
+    #
+    # Migración: las tablas se crean acá. El form admin sigue editando el
+    # specs_json viejo hasta que las PRs B/D del rediseño migren la UI.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS categoria_spec_templates (
+            id                  SERIAL PRIMARY KEY,
+            categoria_id        INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+            spec_key            VARCHAR(64) NOT NULL,
+            label               VARCHAR(120) NOT NULL,
+            tipo                VARCHAR(16) NOT NULL,
+            unidad              VARCHAR(32),
+            enum_options        JSONB,
+            prioridad           INTEGER DEFAULT 100,
+            visible_en_card     BOOLEAN DEFAULT FALSE,
+            visible_en_filtros  BOOLEAN DEFAULT FALSE,
+            visible_en_nombre   BOOLEAN DEFAULT FALSE,
+            obligatorio         BOOLEAN DEFAULT FALSE,
+            ayuda               TEXT,
+            UNIQUE (categoria_id, spec_key)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spec_templates_cat "
+        "ON categoria_spec_templates(categoria_id, prioridad)"
+    )
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS equipo_specs (
+            equipo_id   INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            spec_key    VARCHAR(64) NOT NULL,
+            value       TEXT NOT NULL,
+            PRIMARY KEY (equipo_id, spec_key)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_equipo_specs_key "
+        "ON equipo_specs(spec_key, value)"
+    )
+
+    # ── Compatibilidades entre equipos (FX3 + Sigma EF → requiere MC-11) ──
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS equipo_compatibilidad (
+            id            SERIAL PRIMARY KEY,
+            equipo_a_id   INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            equipo_b_id   INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            tipo          VARCHAR(32) NOT NULL,
+            nota          TEXT,
+            adaptador_id  INTEGER REFERENCES equipos(id) ON DELETE SET NULL,
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (equipo_a_id, equipo_b_id, tipo),
+            CHECK (equipo_a_id != equipo_b_id),
+            CHECK (tipo IN ('compatible', 'incompatible', 'requiere_adaptador'))
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_compat_a ON equipo_compatibilidad(equipo_a_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_compat_b ON equipo_compatibilidad(equipo_b_id)"
+    )
+
+    # ── Relevancia + ranking + nombre público calculado ────────────────
+    # `relevancia_manual`: lo que el admin pone a mano (10=flagship, 100=default).
+    # `popularidad_score`: calculado nightly desde historial de pedidos + ingreso.
+    # `cant_pedidos` + `ingreso_total_ars`: snapshots para el cálculo y stats.
+    # `nombre_publico` + `nombre_publico_largo`: cacheados desde el builder
+    # (PR B implementa el builder y los rellena).
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS relevancia_manual INT NOT NULL DEFAULT 100")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS popularidad_score INT NOT NULL DEFAULT 0")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS cant_pedidos INT NOT NULL DEFAULT 0")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS ingreso_total_ars BIGINT NOT NULL DEFAULT 0")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS ranking_actualizado TIMESTAMP")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS nombre_publico TEXT")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS nombre_publico_largo TEXT")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_equipos_ranking "
+        "ON equipos(relevancia_manual ASC, popularidad_score DESC, nombre ASC)"
+    )
+
+    # ── Seed de los 12 templates iniciales (idempotente) ──
+    # Importado dinámicamente para mantener este archivo manejable.
+    try:
+        from seeds.spec_templates import seed_spec_templates
+        n = seed_spec_templates(conn)
+        if n > 0:
+            print(f"   ↳ {n} templates de specs seedeados/actualizados")
+    except Exception as ex:
+        print(f"⚠️  No se pudieron seedear los templates de specs: {ex}")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_precio_historial (
