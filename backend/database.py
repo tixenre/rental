@@ -9,6 +9,16 @@ import psycopg2.extras
 import psycopg2.pool
 from datetime import datetime
 
+try:
+    from dotenv import load_dotenv
+    _BASE = pathlib.Path(__file__).parent
+    for _name in (".env.local", ".env"):
+        _f = _BASE / _name
+        if _f.exists():
+            load_dotenv(_f, override=False)
+except ImportError:
+    pass
+
 # ── Paths ────────────────────────────────────────────────────────────────────
 
 BASE = pathlib.Path(__file__).parent
