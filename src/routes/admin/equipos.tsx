@@ -53,6 +53,12 @@ function EquiposPage() {
     qc.invalidateQueries({ queryKey: ["categorias"] });
   };
 
+  // El form maneja TODO el ciclo de guardado (foto, ficha, ficha extendida,
+  // categorías) y también el toast final + cierre del dialog. Acá sólo
+  // hacemos el create/update + tags y refrescamos las queries — sin toast
+  // ni close (esos los emite el form recién cuando todo el flow terminó,
+  // así evitamos que el dialog se cierre mientras todavía hay requests
+  // en vuelo, y que aparezcan errores parciales después del cierre).
   const saveMut = useMutation({
     mutationFn: async ({ data, etiquetas }: { data: EquipoInput; etiquetas: string[] }) => {
       const eq = editing
@@ -61,13 +67,7 @@ function EquiposPage() {
       await adminApi.setEtiquetas(eq.id, etiquetas);
       return eq;
     },
-    onSuccess: () => {
-      toast.success(editing ? "Equipo actualizado" : "Equipo creado");
-      setOpenForm(false);
-      setEditing(null);
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
+    onSettled: () => invalidate(),
   });
 
   const deleteMut = useMutation({
