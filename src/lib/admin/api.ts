@@ -76,6 +76,9 @@ export type Equipo = {
   modelo: string | null;
   cantidad: number;
   precio_jornada: number | null;
+  /** True si el admin editó el precio a mano (no viene de la fórmula).
+   *  El recálculo masivo en modo "auto" respeta estos precios. */
+  precio_jornada_manual?: boolean;
   precio_usd: number | null;
   roi_pct: number | null;
   valor_reposicion: number | null;
@@ -306,18 +309,34 @@ export const adminApi = {
         body: JSON.stringify({ value: String(value) }),
       },
     ),
-  recalcularPreciosDryRun: (only_missing = false) =>
+  /** Modos: "missing" (sin precio), "auto" (respeta manuales — default),
+   *  "all" (todos), "ids" (solo los listados). */
+  recalcularPrecios: (
+    args: { dry_run: boolean; mode?: "missing" | "auto" | "all" | "ids"; ids?: number[] },
+  ) =>
     authedPostJson<{
-      usd_rate: number; total_evaluados: number; total_cambios: number;
-      cambios: Array<{ id: number; nombre: string; antes: number | null; despues: number; delta: number }>;
+      usd_rate: number; mode: string;
+      total_evaluados: number; total_cambios: number;
+      cambios: Array<{
+        id: number; nombre: string;
+        antes: number | null; despues: number;
+        delta: number; manual: boolean;
+      }>;
       dry_run: boolean;
-    }>("/api/admin/settings/recalcular-precios", { dry_run: true, only_missing }),
-  recalcularPreciosApply: (only_missing = false) =>
-    authedPostJson<{
-      usd_rate: number; total_evaluados: number; total_cambios: number;
-      cambios: Array<{ id: number; nombre: string; antes: number | null; despues: number; delta: number }>;
-      dry_run: boolean;
-    }>("/api/admin/settings/recalcular-precios", { dry_run: false, only_missing }),
+    }>("/api/admin/settings/recalcular-precios", args),
+  /** Lista equipos con precio manual + lo que daría la fórmula con el
+   *  USD rate actual. Útil para revisión equipo-por-equipo. */
+  listarPreciosManuales: () =>
+    authedJson<{
+      usd_rate: number;
+      items: Array<{
+        id: number; nombre: string; marca: string | null; modelo: string | null;
+        foto_url: string | null;
+        precio_actual: number | null; precio_usd: number | null;
+        roi_pct: number | null; precio_calculado: number | null;
+        delta: number | null;
+      }>;
+    }>("/api/admin/equipos/precios-manuales"),
 
   // pedidos / alquileres
   listPedidos: (params: { estado?: string; q?: string; per_page?: number; page?: number } = {}) => {

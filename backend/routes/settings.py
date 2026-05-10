@@ -152,14 +152,33 @@ def recalcular_precios(payload: dict, request: Request):
 
     Útil cuando el admin actualiza el tipo de cambio mensual.
 
-    Payload opcional:
+    Payload:
         - dry_run: bool — si True, no escribe, solo devuelve el preview.
-        - only_missing: bool — si True, solo recalcula equipos sin
-          precio_jornada (no pisa valores manuales).
+        - mode: str — uno de:
+            * "missing"  → sólo equipos sin precio_jornada cargado.
+            * "auto"     → equipos automáticos (precio_jornada_manual=FALSE).
+                            **Default** y el más usado: respeta los precios
+                            que el admin tipeó a mano.
+            * "all"      → todos, incluyendo manuales (los pisa).
+            * "ids"      → sólo los equipo_ids pasados en `ids` (lista).
+        - ids: list[int] — equipos específicos a recalcular (modo "ids").
+        - only_missing: bool — DEPRECATED, equivale a mode="missing".
+
+    Nunca toca equipos sin precio_usd o sin roi_pct (no hay fórmula
+    que aplicar).
     """
     require_admin(request)
     dry_run = bool(payload.get("dry_run"))
-    only_missing = bool(payload.get("only_missing"))
+    # Backwards compat: only_missing=True equivale a mode="missing".
+    if payload.get("only_missing") is True:
+        mode = "missing"
+    else:
+        mode = payload.get("mode") or "auto"
+    if mode not in ("missing", "auto", "all", "ids"):
+        raise HTTPException(400, f"mode inválido: {mode}")
+    ids = payload.get("ids") or []
+    if mode == "ids" and not ids:
+        raise HTTPException(400, "mode=ids requiere lista `ids` no vacía")
 
     conn = get_db()
     try:
@@ -174,17 +193,25 @@ def recalcular_precios(payload: dict, request: Request):
             raise HTTPException(400, f"usd_rate inválido: {row['value']}")
 
         where = "precio_usd IS NOT NULL AND roi_pct IS NOT NULL"
-        if only_missing:
+        params: list = []
+        if mode == "missing":
             where += " AND precio_jornada IS NULL"
+        elif mode == "auto":
+            where += " AND precio_jornada_manual = FALSE"
+        elif mode == "ids":
+            placeholders = ",".join(["?"] * len(ids))
+            where += f" AND id IN ({placeholders})"
+            params.extend(int(i) for i in ids)
+        # mode == "all": sin filtro adicional
         rows = conn.execute(
-            f"SELECT id, nombre, precio_usd, roi_pct, precio_jornada "
-            f"FROM equipos WHERE {where}"
+            f"SELECT id, nombre, precio_usd, roi_pct, precio_jornada, precio_jornada_manual "
+            f"FROM equipos WHERE {where}",
+            tuple(params),
         ).fetchall()
 
         cambios: list[dict] = []
         for r in rows:
-            # Redondeo al múltiplo de 100 más cercano: precios sin centavos
-            # ni unidades sueltas. $1184 → $1200, $14442 → $14400.
+            # Redondeo al múltiplo de 100 más cercano.
             raw = r["precio_usd"] * usd_rate * (r["roi_pct"] / 100)
             nuevo = round(raw / 100) * 100
             anterior = r["precio_jornada"]
@@ -193,16 +220,23 @@ def recalcular_precios(payload: dict, request: Request):
                     "id": r["id"], "nombre": r["nombre"],
                     "antes": anterior, "despues": nuevo,
                     "delta": nuevo - (anterior or 0),
+                    "manual": bool(r["precio_jornada_manual"]),
                 })
                 if not dry_run:
+                    # Al recalcular bulk, marcamos como auto (precio
+                    # vuelve a la fórmula). Si el admin quiere preservarlo
+                    # como manual debe usar mode="auto" que ya skipea.
                     conn.execute(
-                        "UPDATE equipos SET precio_jornada = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        "UPDATE equipos SET precio_jornada = ?, "
+                        "precio_jornada_manual = FALSE, "
+                        "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                         (nuevo, r["id"]),
                     )
         if not dry_run:
             conn.commit()
         return {
             "usd_rate": usd_rate,
+            "mode": mode,
             "total_evaluados": len(rows),
             "total_cambios": len(cambios),
             "cambios": cambios[:50],  # cap por si son muchos
@@ -211,6 +245,52 @@ def recalcular_precios(payload: dict, request: Request):
     except Exception:
         conn.rollback()
         raise
+    finally:
+        conn.close()
+
+
+@router.get("/admin/equipos/precios-manuales")
+def listar_precios_manuales(request: Request):
+    """Devuelve todos los equipos con `precio_jornada_manual = TRUE`,
+    junto con el precio que daría la fórmula con el USD rate actual.
+    Útil para revisar uno por uno qué hacer cuando se actualiza el USD."""
+    require_admin(request)
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT value FROM app_settings WHERE key = ?", ("usd_rate",)
+        ).fetchone()
+        usd_rate = float(row["value"]) if row else 0.0
+
+        rows = conn.execute(
+            """
+            SELECT id, nombre, marca, modelo, foto_url,
+                   precio_jornada, precio_usd, roi_pct
+            FROM equipos
+            WHERE precio_jornada_manual = TRUE
+            ORDER BY LOWER(nombre)
+            """
+        ).fetchall()
+
+        items = []
+        for r in rows:
+            calculado = None
+            if r["precio_usd"] and r["roi_pct"] and usd_rate > 0:
+                raw = r["precio_usd"] * usd_rate * (r["roi_pct"] / 100)
+                calculado = round(raw / 100) * 100
+            items.append({
+                "id": r["id"],
+                "nombre": r["nombre"],
+                "marca": r["marca"],
+                "modelo": r["modelo"],
+                "foto_url": r["foto_url"],
+                "precio_actual": r["precio_jornada"],
+                "precio_usd": r["precio_usd"],
+                "roi_pct": r["roi_pct"],
+                "precio_calculado": calculado,
+                "delta": (calculado - r["precio_jornada"]) if calculado is not None and r["precio_jornada"] is not None else None,
+            })
+        return {"usd_rate": usd_rate, "items": items}
     finally:
         conn.close()
 

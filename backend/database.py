@@ -242,6 +242,11 @@ def init_db():
             updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Migration: flag para distinguir precios manuales (admin tipeó un valor
+    # que no sale de la fórmula) vs automáticos (calculados desde
+    # precio_usd × usd_rate × roi_pct/100). Cuando se hace recálculo masivo
+    # al actualizar el USD rate, los manuales se respetan por default.
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS precio_jornada_manual BOOLEAN NOT NULL DEFAULT FALSE")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS clientes (
