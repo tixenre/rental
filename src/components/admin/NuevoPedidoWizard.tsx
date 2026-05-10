@@ -10,9 +10,12 @@
  * función `Step*` separada para que sea fácil mejorarlo en futuras iteraciones.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Search, Plus, Minus, Check, UserPlus, X } from "lucide-react";
+import {
+  ChevronLeft, ChevronRight, Search, Plus, Minus, Check,
+  UserPlus, X, Package, AlertTriangle, Lock,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -38,6 +41,10 @@ type WizardItem = {
   precio_jornada: number;
   stock_total: number;
   reservado: number;
+  /** Si está, este ítem fue agregado automáticamente como componente del kit padre. */
+  parent_equipo_id?: number | null;
+  /** Multiplicador del kit: cantidad por cada unidad del padre. */
+  kit_qty_per_parent?: number;
 };
 
 const STEPS = [
@@ -56,6 +63,16 @@ function jornadasEntre(d1?: string, d2?: string): number {
   const b = new Date(d2).getTime();
   if (Number.isNaN(a) || Number.isNaN(b) || b <= a) return 1;
   return Math.max(1, Math.ceil((b - a) / 86_400_000));
+}
+
+/** ¿La fecha ISO YYYY-MM-DD es estrictamente anterior a hoy (zona local)? */
+function isPastDate(iso: string): boolean {
+  if (!iso) return false;
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(y, m - 1, d).getTime() < today.getTime();
 }
 
 export function NuevoPedidoWizard({
@@ -104,12 +121,28 @@ export function NuevoPedidoWizard({
   const total    = Math.round(bruto * (1 - (descuentoPct || 0) / 100));
 
   // Validación por paso
+  const overstockCount = items.filter(
+    (it) => it.cantidad > Math.max(0, it.stock_total - it.reservado),
+  ).length;
+
   const canNext = useMemo(() => {
-    if (stepIdx === 0) return !!cliente || !!clienteAdHoc.nombre.trim();
-    if (stepIdx === 1) return !!fechaDesde && !!fechaHasta && new Date(fechaHasta) >= new Date(fechaDesde);
-    if (stepIdx === 2) return items.length > 0 && items.every((it) => it.cantidad > 0);
+    if (stepIdx === 0) {
+      const adHocOk = clienteAdHoc.nombre.trim().length >= 2;
+      return !!cliente || adHocOk;
+    }
+    if (stepIdx === 1) {
+      if (!fechaDesde || !fechaHasta) return false;
+      const a = new Date(fechaDesde).getTime();
+      const b = new Date(fechaHasta).getTime();
+      return !Number.isNaN(a) && !Number.isNaN(b) && b >= a;
+    }
+    if (stepIdx === 2) {
+      return items.length > 0
+        && items.every((it) => it.cantidad > 0)
+        && overstockCount === 0;
+    }
     return true;
-  }, [stepIdx, cliente, clienteAdHoc, fechaDesde, fechaHasta, items]);
+  }, [stepIdx, cliente, clienteAdHoc, fechaDesde, fechaHasta, items, overstockCount]);
 
   const createMut = useMutation({
     mutationFn: (estado: "borrador" | "presupuesto") => {
@@ -201,13 +234,13 @@ export function NuevoPedidoWizard({
                 <Button
                   variant="outline"
                   onClick={() => createMut.mutate("borrador")}
-                  disabled={createMut.isPending || items.length === 0}
+                  disabled={createMut.isPending || items.length === 0 || overstockCount > 0}
                 >
                   Guardar borrador
                 </Button>
                 <Button
                   onClick={() => createMut.mutate("presupuesto")}
-                  disabled={createMut.isPending || items.length === 0}
+                  disabled={createMut.isPending || items.length === 0 || overstockCount > 0}
                 >
                   <Check className="h-4 w-4 mr-1" />
                   {createMut.isPending ? "Creando…" : "Crear presupuesto"}
@@ -263,15 +296,36 @@ function StepCliente({
   setAdHoc: (v: { nombre: string; email: string; telefono: string }) => void;
 }) {
   const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState({ nombre: "", apellido: "", email: "", telefono: "" });
+  const [highlight, setHighlight] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const qc = useQueryClient();
 
+  // Debounce de la búsqueda (250 ms) — evita pegarle al backend en cada tecla.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
   const clientesQ = useQuery({
-    queryKey: ["admin", "clientes", { q }],
-    queryFn: () => adminApi.listClientes({ q: q || undefined, per_page: 100 }),
+    queryKey: ["admin", "clientes", { q: debouncedQ }],
+    queryFn: () => adminApi.listClientes({ q: debouncedQ || undefined, per_page: 50 }),
     enabled: !cliente,
   });
+
+  const results = clientesQ.data?.items ?? [];
+
+  // Reset highlight cuando cambia la lista
+  useEffect(() => { setHighlight(0); }, [results.length]);
+
+  // Auto-scroll del item resaltado
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLLIElement>(`li[data-idx="${highlight}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [highlight]);
 
   const createCliMut = useMutation({
     mutationFn: () => adminApi.createCliente(creating),
@@ -283,6 +337,21 @@ function StepCliente({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!results.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlight((h) => Math.min(results.length - 1, h + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => Math.max(0, h - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const sel = results[highlight];
+      if (sel) setCliente(sel);
+    }
+  };
 
   if (cliente) {
     return (
@@ -302,38 +371,82 @@ function StepCliente({
     );
   }
 
+  const showCombobox = q.trim().length > 0;
+
   return (
     <div className="space-y-4">
       <div className="relative">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          autoFocus value={q} onChange={(e) => setQ(e.target.value)}
+          ref={inputRef}
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={onKeyDown}
           placeholder="Buscar cliente por nombre, apellido, email o CUIT…"
           className="pl-9"
+          role="combobox"
+          aria-expanded={showCombobox}
+          aria-controls="clientes-listbox"
+          aria-activedescendant={results[highlight] ? `cli-opt-${results[highlight].id}` : undefined}
         />
+        {q && (
+          <button
+            type="button"
+            onClick={() => { setQ(""); inputRef.current?.focus(); }}
+            className="absolute right-2 top-2 text-muted-foreground hover:text-ink"
+            aria-label="Limpiar búsqueda"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <ScrollArea className="h-72 rounded-md border hairline">
-        <ul className="divide-y">
-          {(clientesQ.data?.items ?? []).map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                onClick={() => setCliente(c)}
-                className="w-full text-left px-3 py-2 hover:bg-accent/30 transition-colors"
+      {showCombobox && (
+        <ScrollArea className="h-72 rounded-md border hairline">
+          <ul ref={listRef} id="clientes-listbox" role="listbox" className="divide-y">
+            {clientesQ.isLoading && (
+              <li className="text-sm text-muted-foreground p-4 text-center">Buscando…</li>
+            )}
+            {!clientesQ.isLoading && results.length === 0 && (
+              <li className="text-sm text-muted-foreground p-4 text-center">
+                Sin resultados para “{debouncedQ}”.
+              </li>
+            )}
+            {results.map((c, i) => (
+              <li
+                key={c.id}
+                data-idx={i}
+                role="option"
+                id={`cli-opt-${c.id}`}
+                aria-selected={i === highlight}
               >
-                <div className="text-sm text-ink">{c.apellido}, {c.nombre}</div>
-                <div className="text-xs text-muted-foreground">
-                  {[c.email, c.telefono].filter(Boolean).join(" · ") || "—"}
-                </div>
-              </button>
-            </li>
-          ))}
-          {clientesQ.data?.items.length === 0 && (
-            <li className="text-sm text-muted-foreground p-4 text-center">Sin resultados.</li>
-          )}
-        </ul>
-      </ScrollArea>
+                <button
+                  type="button"
+                  onClick={() => setCliente(c)}
+                  onMouseEnter={() => setHighlight(i)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 transition-colors",
+                    i === highlight ? "bg-accent/60" : "hover:bg-accent/30",
+                  )}
+                >
+                  <div className="text-sm text-ink">
+                    {c.apellido ? `${c.apellido}, ${c.nombre}` : c.nombre}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {[c.email, c.telefono, c.cuit].filter(Boolean).join(" · ") || "—"}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </ScrollArea>
+      )}
+      {!showCombobox && (
+        <p className="text-xs text-muted-foreground">
+          Empezá a tipear para buscar. Usá ↑ ↓ y Enter para seleccionar.
+        </p>
+      )}
 
       <div className="rounded-md border hairline p-3 space-y-3">
         <div className="flex items-center justify-between">
@@ -395,15 +508,46 @@ function StepFechas({
   hasta: string; setHasta: (v: string) => void;
   jornadas: number;
 }) {
+  const desdeEnPasado = isPastDate(desde);
+  const ordenInvalido = !!desde && !!hasta && new Date(hasta).getTime() < new Date(desde).getTime();
+  const today = todayISO();
+
   return (
     <div className="space-y-4 max-w-md">
       <div>
         <Label className="text-xs">Desde</Label>
-        <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
+        <Input
+          type="date" value={desde}
+          onChange={(e) => {
+            const v = e.target.value;
+            setDesde(v);
+            // Si la fecha hasta queda antes del nuevo desde, la ajustamos.
+            if (hasta && new Date(hasta).getTime() < new Date(v).getTime()) {
+              setHasta(v);
+            }
+          }}
+          className={cn(desdeEnPasado && "border-amber-500/60")}
+        />
+        {desdeEnPasado && (
+          <p className="text-[11px] text-amber-700 mt-1 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            La fecha de inicio es anterior a hoy ({today}).
+          </p>
+        )}
       </div>
       <div>
         <Label className="text-xs">Hasta</Label>
-        <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+        <Input
+          type="date" value={hasta}
+          min={desde || undefined}
+          onChange={(e) => setHasta(e.target.value)}
+          className={cn(ordenInvalido && "border-destructive")}
+        />
+        {ordenInvalido && (
+          <p className="text-[11px] text-destructive mt-1">
+            La fecha de devolución no puede ser anterior a la de retiro.
+          </p>
+        )}
       </div>
       <div className="rounded-md bg-accent/30 px-4 py-3 text-sm">
         <span className="text-muted-foreground">Duración: </span>
@@ -459,24 +603,81 @@ function StepEquipos({
     };
   };
 
+  /**
+   * Inserta o actualiza un ítem y, si el equipo tiene kit, agrega/sincroniza
+   * cada componente como ítem hijo (parent_equipo_id = id del equipo padre).
+   * La cantidad de los hijos se mantiene = cantidad_padre × cantidad_kit.
+   */
+  const syncKitChildren = (
+    list: WizardItem[],
+    parent: Equipo,
+    parentQty: number,
+  ): WizardItem[] => {
+    const kit = parent.kit ?? [];
+    if (!kit.length) return list;
+
+    let next = [...list];
+    for (const k of kit) {
+      // Evitar bucles: si el componente coincide con el padre, lo salteamos.
+      if (k.componente_id === parent.id) continue;
+
+      // Buscar metadata del componente en el catálogo cargado para tomar
+      // stock real y precio. Si no está, usamos defaults razonables.
+      const eqComp = (equiposQ.data?.items ?? []).find((e) => e.id === k.componente_id);
+      const sComp = eqComp ? stockDe(eqComp) : { stock_total: 0, reservado: 0, disponible: 0 };
+      const targetQty = parentQty * k.cantidad;
+
+      const idx = next.findIndex((i) => i.equipo_id === k.componente_id);
+      if (idx >= 0) {
+        const cur = next[idx];
+        // Sólo lo gestionamos automáticamente si fue agregado por este padre.
+        if (cur.parent_equipo_id === parent.id) {
+          next[idx] = { ...cur, cantidad: targetQty };
+        }
+        // Si ya estaba como ítem manual, no lo tocamos (respetamos elección).
+      } else {
+        next.push({
+          equipo_id: k.componente_id,
+          nombre: eqComp?.nombre ?? k.nombre,
+          marca: eqComp?.marca ?? k.marca ?? null,
+          cantidad: targetQty,
+          precio_jornada: eqComp?.precio_jornada ?? 0,
+          stock_total: sComp.stock_total,
+          reservado: sComp.reservado,
+          parent_equipo_id: parent.id,
+          kit_qty_per_parent: k.cantidad,
+        });
+      }
+    }
+    return next;
+  };
+
   const addOrIncrement = (eq: Equipo) => {
     const idx = items.findIndex((i) => i.equipo_id === eq.id);
     const s = stockDe(eq);
+
+    let next: WizardItem[];
+    let parentQty = 1;
+
     if (idx >= 0) {
       const cur = items[idx];
-      if (cur.cantidad >= s.disponible - 0) {
+      if (cur.parent_equipo_id) {
+        toast.warning("Este ítem es parte de un kit. Subí la cantidad del equipo padre.");
+        return;
+      }
+      if (cur.cantidad >= s.disponible) {
         toast.warning(`Sin más stock de ${eq.nombre} para esas fechas`);
         return;
       }
-      const next = [...items];
-      next[idx] = { ...cur, cantidad: cur.cantidad + 1 };
-      setItems(next);
+      parentQty = cur.cantidad + 1;
+      next = [...items];
+      next[idx] = { ...cur, cantidad: parentQty };
     } else {
       if (s.disponible <= 0) {
         toast.warning(`${eq.nombre} no tiene stock para esas fechas`);
         return;
       }
-      setItems([
+      next = [
         ...items,
         {
           equipo_id: eq.id,
@@ -487,14 +688,40 @@ function StepEquipos({
           stock_total: s.stock_total,
           reservado: s.reservado,
         },
-      ]);
+      ];
+    }
+
+    next = syncKitChildren(next, eq, parentQty);
+    setItems(next);
+
+    if ((eq.kit ?? []).length && idx < 0) {
+      toast.success(`${eq.nombre} agregado con ${eq.kit!.length} componente${eq.kit!.length > 1 ? "s" : ""} de kit`);
     }
   };
 
-  const updateItem = (equipoId: number, patch: Partial<WizardItem>) =>
-    setItems(items.map((it) => (it.equipo_id === equipoId ? { ...it, ...patch } : it)));
-  const removeItem = (equipoId: number) =>
-    setItems(items.filter((it) => it.equipo_id !== equipoId));
+  /**
+   * Cuando cambia la cantidad de un padre con kit, sincronizamos hijos.
+   * Cuando se elimina un padre, también eliminamos los hijos que vinieron de él.
+   */
+  const updateItem = (equipoId: number, patch: Partial<WizardItem>) => {
+    let next = items.map((it) => (it.equipo_id === equipoId ? { ...it, ...patch } : it));
+    if (patch.cantidad != null) {
+      const eqParent = (equiposQ.data?.items ?? []).find((e) => e.id === equipoId);
+      if (eqParent && (eqParent.kit ?? []).length) {
+        next = syncKitChildren(next, eqParent, patch.cantidad);
+      }
+    }
+    setItems(next);
+  };
+
+  const removeItem = (equipoId: number) => {
+    const target = items.find((it) => it.equipo_id === equipoId);
+    if (target?.parent_equipo_id) {
+      toast.warning("Este componente forma parte de un kit. Quitá el equipo padre para removerlo.");
+      return;
+    }
+    setItems(items.filter((it) => it.equipo_id !== equipoId && it.parent_equipo_id !== equipoId));
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(280px,360px)] gap-4 h-full">
@@ -513,10 +740,18 @@ function StepEquipos({
             {lista.map((eq) => {
               const s = stockDe(eq);
               const inCart = items.find((i) => i.equipo_id === eq.id);
+              const kitCount = eq.kit?.length ?? 0;
               return (
                 <li key={eq.id} className="flex items-center justify-between gap-3 p-3">
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm text-ink truncate">{eq.nombre}</div>
+                    <div className="text-sm text-ink truncate flex items-center gap-1.5">
+                      {eq.nombre}
+                      {kitCount > 0 && (
+                        <Badge variant="outline" className="h-4 px-1 text-[9px] gap-0.5">
+                          <Package className="h-2.5 w-2.5" /> kit ×{kitCount}
+                        </Badge>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground truncate">
                       {[eq.marca, eq.modelo].filter(Boolean).join(" / ")}
                       {" · "}
@@ -554,32 +789,52 @@ function StepEquipos({
             {items.map((it) => {
               const max = Math.max(0, it.stock_total - it.reservado);
               const overstock = it.cantidad > max;
+              const isKitChild = !!it.parent_equipo_id;
               return (
-                <li key={it.equipo_id} className="py-2 space-y-1">
+                <li
+                  key={it.equipo_id}
+                  className={cn("py-2 space-y-1", isKitChild && "pl-3 border-l-2 border-accent ml-1")}
+                >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-sm text-ink min-w-0 flex-1 truncate">{it.nombre}</div>
-                    <button
-                      onClick={() => removeItem(it.equipo_id)}
-                      className="text-muted-foreground hover:text-destructive"
-                      aria-label="Quitar"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                    <div className="text-sm text-ink min-w-0 flex-1 truncate flex items-center gap-1.5">
+                      {isKitChild && <Lock className="h-3 w-3 text-muted-foreground shrink-0" />}
+                      <span className="truncate">{it.nombre}</span>
+                      {isKitChild && (
+                        <Badge variant="outline" className="h-4 px-1 text-[9px] shrink-0">
+                          kit
+                        </Badge>
+                      )}
+                    </div>
+                    {!isKitChild && (
+                      <button
+                        onClick={() => removeItem(it.equipo_id)}
+                        className="text-muted-foreground hover:text-destructive"
+                        aria-label="Quitar"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                   <div className="grid grid-cols-[auto_1fr_auto] items-center gap-1">
                     <Button
                       size="icon" variant="ghost" className="h-7 w-7"
+                      disabled={isKitChild}
                       onClick={() => updateItem(it.equipo_id, { cantidad: Math.max(1, it.cantidad - 1) })}
                     ><Minus className="h-3 w-3" /></Button>
                     <Input
                       type="number" min={1} max={max || undefined}
                       value={it.cantidad}
+                      readOnly={isKitChild}
                       onChange={(e) => updateItem(it.equipo_id, { cantidad: parseInt(e.target.value) || 1 })}
-                      className={cn("h-7 text-center", overstock && "border-destructive text-destructive")}
+                      className={cn(
+                        "h-7 text-center",
+                        overstock && "border-destructive text-destructive",
+                        isKitChild && "bg-muted/40 text-muted-foreground",
+                      )}
                     />
                     <Button
                       size="icon" variant="ghost" className="h-7 w-7"
-                      disabled={it.cantidad >= max}
+                      disabled={isKitChild || it.cantidad >= max}
                       onClick={() => updateItem(it.equipo_id, { cantidad: it.cantidad + 1 })}
                     ><Plus className="h-3 w-3" /></Button>
                   </div>
@@ -592,7 +847,8 @@ function StepEquipos({
                     <span className="text-muted-foreground">/día</span>
                   </div>
                   {overstock && (
-                    <div className="text-[11px] text-destructive">
+                    <div className="text-[11px] text-destructive flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
                       Excede stock disponible ({max})
                     </div>
                   )}
@@ -601,6 +857,12 @@ function StepEquipos({
             })}
           </ul>
         </ScrollArea>
+
+        {items.some((it) => it.cantidad > Math.max(0, it.stock_total - it.reservado)) && (
+          <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive">
+            Hay ítems sin stock suficiente. Ajustá cantidades o cambiá fechas para continuar.
+          </div>
+        )}
       </div>
     </div>
   );

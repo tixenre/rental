@@ -57,6 +57,15 @@ export type Equipo = {
   visible_catalogo: number;
   estado: string;
   etiquetas?: string[];
+  kit?: KitComponente[];
+};
+
+export type KitComponente = {
+  componente_id: number;
+  cantidad: number;
+  nombre: string;
+  marca?: string | null;
+  foto_url?: string | null;
 };
 
 export type EquiposListResp = {
@@ -83,7 +92,7 @@ export const adminApi = {
     sp.set("per_page", String(params.per_page ?? 500));
     return authedJson<EquiposListResp>(`/api/equipos?${sp.toString()}`);
   },
-  getEquipo: (id: number) => authedJson<Equipo & { kit: unknown[] }>(`/api/equipos/${id}`),
+  getEquipo: (id: number) => authedJson<Equipo>(`/api/equipos/${id}`),
   createEquipo: (data: EquipoInput) =>
     authedPostJson<Equipo>("/api/equipos", data),
   updateEquipo: (id: number, data: Partial<EquipoInput>) =>
