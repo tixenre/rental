@@ -63,7 +63,7 @@ function Index() {
   const apiCategories = useMemo(() => {
     const cats = Array.from(new Set(allEquipos.map((e) => e.category)));
     const pri: Record<string, number> = {};
-    backendCats.forEach((c) => { pri[c.nombre] = c.prioridad ?? 100; });
+    backendCats.forEach((c: { nombre: string; prioridad?: number }) => { pri[c.nombre] = c.prioridad ?? 100; });
     return cats.sort((a, b) => {
       const pa = pri[a] ?? 999;
       const pb = pri[b] ?? 999;
