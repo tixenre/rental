@@ -35,7 +35,12 @@ export function EnriquecerEquipoDialog({
   onOpenChange: (v: boolean) => void;
   onApplied: () => void;
 }) {
-  const enriquecer = useServerFn(enriquecerEquipoFn);
+  const enriquecer = (input: { nombre: string; marca?: string | null; modelo?: string | null }) =>
+    authedJson<EnriquecerResult>("/api/admin/equipos/enriquecer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<EnriquecerResult | null>(null);
