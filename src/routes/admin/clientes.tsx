@@ -253,7 +253,7 @@ function ClienteHistorialSheet({
                   {pedidos.map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => setOpenPedidoId(p.id)}
+                      onClick={() => navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })}
                       className="w-full text-left rounded-md border hairline p-3 hover:bg-accent/30 transition-colors"
                     >
                       <div className="flex items-center justify-between gap-2">
