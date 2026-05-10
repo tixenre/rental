@@ -64,6 +64,7 @@ function SettingsPage() {
       </header>
 
       <CategoriasSection />
+      <ClasificacionSection />
 
       <section className="rounded-lg border hairline bg-background p-4 space-y-3">
         <h2 className="font-display text-lg text-ink">Imports CSV</h2>
