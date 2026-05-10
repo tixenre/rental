@@ -2,12 +2,17 @@ import { Package } from "lucide-react";
 import { equipment, type Equipment } from "@/data/equipment";
 import { EmptyImage } from "./EmptyImage";
 
+const DESC_LIMIT = 220;
+
 export function IncludedList({ item }: { item: Equipment }) {
   const includes = item.includes ?? [];
   const hasIncludes = includes.length > 0;
-  const hasSpecs = item.specs.length > 0;
+  const specs = item.specs ?? [];
+  const hasSpecs = specs.length > 0;
+  const description = (item.description ?? "").trim();
+  const hasDesc = description.length > 0;
 
-  if (!hasIncludes && !hasSpecs && !item.description) {
+  if (!hasIncludes && !hasSpecs && !hasDesc) {
     return (
       <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         Sin información adicional
@@ -15,10 +20,47 @@ export function IncludedList({ item }: { item: Equipment }) {
     );
   }
 
+  // Selling points: las primeras 4 specs, mostradas como chips compactos.
+  const highlights = specs.slice(0, 4);
+  const moreSpecs = specs.length - highlights.length;
+
+  const shortDesc =
+    description.length > DESC_LIMIT
+      ? description.slice(0, DESC_LIMIT).trimEnd() + "…"
+      : description;
+
   return (
     <div className="space-y-4">
-      {item.description && (
-        <p className="text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+      {hasSpecs && (
+        <div>
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-ink">
+            Lo importante
+          </div>
+          <ul className="flex flex-wrap gap-1.5">
+            {highlights.map((s, i) => (
+              <li
+                key={`${s.label}-${i}`}
+                className="inline-flex items-baseline gap-1.5 rounded-full border hairline bg-background/70 px-2.5 py-1"
+              >
+                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                  {s.label}
+                </span>
+                <span className="text-xs font-medium text-ink">{s.value}</span>
+              </li>
+            ))}
+            {moreSpecs > 0 && (
+              <li className="inline-flex items-center rounded-full border hairline border-dashed px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                +{moreSpecs} más
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {hasDesc && (
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {shortDesc}
+        </p>
       )}
 
       {hasIncludes && (
@@ -66,25 +108,6 @@ export function IncludedList({ item }: { item: Equipment }) {
               );
             })}
           </ul>
-        </div>
-      )}
-
-      {hasSpecs && (
-        <div>
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-ink">
-            Specs
-          </div>
-          <dl className="grid gap-1 text-xs sm:grid-cols-2">
-            {item.specs.map((s) => (
-              <div
-                key={s.label}
-                className="flex justify-between gap-3 rounded border-b hairline py-1"
-              >
-                <dt className="text-muted-foreground">{s.label}</dt>
-                <dd className="text-right text-ink">{s.value}</dd>
-              </div>
-            ))}
-          </dl>
         </div>
       )}
     </div>
