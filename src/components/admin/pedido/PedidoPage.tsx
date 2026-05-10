@@ -453,6 +453,7 @@ function CarritoTab({
           const idx = items.findIndex((i) => i.equipo_id === eq.id);
           if (idx >= 0) {
             updateItem(eq.id, { cantidad: items[idx].cantidad + 1 });
+            toast.success(`+1 ${eq.nombre}`);
           } else {
             setItems([...items, {
               equipo_id: eq.id,
@@ -461,7 +462,9 @@ function CarritoTab({
               nombre: eq.nombre,
               marca: eq.marca,
             }]);
+            toast.success(`Agregado: ${eq.nombre}`);
           }
+          setOpenSearch(false);
         }}
       />
     </div>
