@@ -18,7 +18,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin, type KitComponente } from "@/lib/admin/api";
 import { uploadFileToBucket } from "@/lib/equipment/photos";
-import { EnriquecerEquipoDialog } from "./EnriquecerEquipoDialog";
+import { authedJson } from "@/lib/authedFetch";
+import { EnriquecerEquipoDialog, type EnriquecerResult } from "./EnriquecerEquipoDialog";
+import { Link as LinkIcon } from "lucide-react";
 
 const TPL_TOKENS = ["tipo", "marca", "modelo", "nombre", "montura", "formato", "resolucion"] as const;
 
@@ -78,7 +80,8 @@ export function EquipoFormDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial?: Equipo | null;
-  onSubmit: (data: EquipoInput, etiquetas: string[]) => void | Promise<void>;
+  /** Devuelve el Equipo guardado (para que el form pueda persistir ficha extendida si fue importada). */
+  onSubmit: (data: EquipoInput, etiquetas: string[]) => Promise<Equipo>;
   saving?: boolean;
 }) {
   const isEdit = !!initial;
@@ -126,6 +129,14 @@ export function EquipoFormDialog({
   const [nombreTpl, setNombreTpl] = useState("");
   const tplInputRef = useRef<HTMLInputElement | null>(null);
 
+  // ── Import desde URL (B&H, sitio oficial, etc.) ─────────────────────────
+  const [importUrl, setImportUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  // Ficha extendida importada (se persiste vía aplicarEnriquecimiento al guardar)
+  const [importedFichaExt, setImportedFichaExt] = useState<Partial<EnriquecerResult> | null>(null);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+
   useEffect(() => {
     const f = fichaQ.data;
     if (f) {
@@ -155,6 +166,64 @@ export function EquipoFormDialog({
     if (keywords.includes(v)) { setKeywordInput(""); return; }
     setKeywords([...keywords, v]);
     setKeywordInput("");
+  };
+
+  const importarDesdeUrl = async () => {
+    const u = importUrl.trim();
+    if (!u) return;
+    setImporting(true);
+    setImportError(null);
+    setImportSummary(null);
+    try {
+      const r = await authedJson<EnriquecerResult>("/api/admin/equipos/enriquecer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: u }),
+      });
+      // ── Llenar campos básicos del form (sólo si vinieron datos)
+      const sets = (k: keyof FormValues, v: string | number | null | undefined) => {
+        if (v !== null && v !== undefined && v !== "") {
+          form.setValue(k, v as never, { shouldDirty: true });
+        }
+      };
+      // Si no había nombre, usar el normalizado de la IA
+      if (!form.getValues("nombre")?.trim() && r.nombre_normalizado) {
+        sets("nombre", r.nombre_normalizado);
+      }
+      sets("marca", r.marca ?? "");
+      sets("modelo", r.modelo ?? "");
+      if (r.foto_url) sets("foto_url", r.foto_url);
+      sets("bh_url", r.fuente_url);
+      if (typeof r.precio_bh_usd === "number") sets("precio_usd", r.precio_bh_usd);
+
+      // ── Llenar ficha visible
+      if (r.descripcion) setDescripcion(r.descripcion);
+      if (r.specs?.length) setSpecs(r.specs);
+      if (r.keywords?.length) setKeywords(r.keywords);
+      if (r.montura)    setMontura(r.montura);
+      if (r.formato)    setFormato(r.formato);
+      if (r.resolucion) setResolucion(r.resolucion);
+
+      // ── Guardar ficha extendida para persistir al submit
+      setImportedFichaExt(r);
+
+      // Resumen visible
+      const parts: string[] = [];
+      if (r.specs?.length) parts.push(`${r.specs.length} specs`);
+      if (r.keywords?.length) parts.push(`${r.keywords.length} keywords`);
+      if (r.descripcion) parts.push("descripción");
+      if (r.peso || r.dimensiones || r.alimentacion) parts.push("datos físicos");
+      if (r.incluye?.length) parts.push("contenido caja");
+      if (r.video_url) parts.push("video demo");
+      setImportSummary(parts.length ? parts.join(" · ") : "datos básicos");
+      toast.success("Datos importados", { description: parts.join(" · ") });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error desconocido";
+      setImportError(msg);
+      toast.error(`No se pudo importar: ${msg}`);
+    } finally {
+      setImporting(false);
+    }
   };
 
   // Categorías (multi-select)
@@ -225,26 +294,67 @@ export function EquipoFormDialog({
       valor_reposicion: rest.valor_reposicion ?? null,
       visible_catalogo: visible_catalogo ? 1 : 0,
     };
-    await onSubmit(payload, etiquetas);
+    const saved = await onSubmit(payload, etiquetas);
+    const equipoId = saved?.id ?? initial?.id;
+    if (!equipoId) return;
 
-    // Si estamos editando, también guardar ficha y categorías
+    // Ficha base (visible en la pestaña): se guarda siempre que estemos editando
+    // o cuando creamos y hay datos importados / cargados.
+    const tieneDatosFicha = (
+      isEdit ||
+      !!descripcion || !!notas || specs.length > 0 || keywords.length > 0 ||
+      !!montura || !!formato || !!resolucion || !!nombreTpl.trim() ||
+      !!importedFichaExt
+    );
+
+    if (tieneDatosFicha) {
+      try {
+        await adminApi.setFicha(equipoId, {
+          descripcion: descripcion || null,
+          notas: notas || null,
+          specs_json: specs.length ? JSON.stringify(specs.filter((s) => s.label && s.value)) : null,
+          montura: montura || null,
+          formato: formato || null,
+          resolucion: resolucion || null,
+          keywords_json: keywords.length ? JSON.stringify(keywords) : null,
+          nombre_publico_template: nombreTpl.trim() || null,
+        });
+      } catch (e) {
+        toast.error(`Falló guardar ficha: ${e instanceof Error ? e.message : ""}`);
+      }
+    }
+
+    // Ficha extendida (peso, dimensiones, incluye, etc.) — sólo cuando se importó desde URL
+    if (importedFichaExt) {
+      try {
+        const r = importedFichaExt;
+        const ext: Record<string, unknown> = {};
+        if (r.peso) ext.peso = r.peso;
+        if (r.dimensiones) ext.dimensiones = r.dimensiones;
+        if (r.alimentacion) ext.alimentacion = r.alimentacion;
+        if (r.video_url) ext.video_url = r.video_url;
+        if (typeof r.precio_bh_usd === "number") ext.precio_bh_usd = r.precio_bh_usd;
+        if (r.incluye?.length) ext.incluye = r.incluye;
+        if (r.conectividad?.length) ext.conectividad = r.conectividad;
+        if (r.compatible_con?.length) ext.compatible_con = r.compatible_con;
+        if (r.fuente_url) ext.fuente_url = r.fuente_url;
+        if (r.fuente_titulo) ext.fuente_titulo = r.fuente_titulo;
+        if (r.enriquecido_fuente) ext.enriquecido_fuente = r.enriquecido_fuente;
+        if (r.raw) ext.raw = r.raw;
+        if (Object.keys(ext).length > 0) {
+          await adminApi.aplicarEnriquecimiento(equipoId, ext);
+        }
+      } catch (e) {
+        toast.error(`Falló guardar ficha extendida: ${e instanceof Error ? e.message : ""}`);
+      }
+    }
+
+    // Categorías: sólo cuando estamos editando (en create no hay UI todavía)
     if (isEdit && initial) {
       try {
-        await Promise.all([
-          adminApi.setFicha(initial.id, {
-            descripcion: descripcion || null,
-            notas: notas || null,
-            specs_json: specs.length ? JSON.stringify(specs.filter((s) => s.label && s.value)) : null,
-            montura: montura || null,
-            formato: formato || null,
-            resolucion: resolucion || null,
-            keywords_json: keywords.length ? JSON.stringify(keywords) : null,
-            nombre_publico_template: nombreTpl.trim() || null,
-          }),
-          adminApi.setCategorias(initial.id, [...selectedCats]),
-        ]);
+        await adminApi.setCategorias(initial.id, [...selectedCats]);
       } catch (e) {
-        toast.error(`Datos básicos OK, pero falló ficha/categorías: ${e instanceof Error ? e.message : ""}`);
+        toast.error(`Falló guardar categorías: ${e instanceof Error ? e.message : ""}`);
       }
     }
   });
@@ -289,6 +399,51 @@ export function EquipoFormDialog({
           </DialogHeader>
 
           <form onSubmit={submit} className="space-y-4">
+            {/* ── Importar desde URL ──────────────────────────────────── */}
+            <div className="rounded-md border hairline bg-amber-soft/40 p-3 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-ink/80">
+                <LinkIcon className="h-3.5 w-3.5" />
+                {isEdit ? "Actualizar desde URL" : "Crear desde URL"}
+                <span className="font-normal text-muted-foreground">
+                  · pegá un link de B&amp;H, sitio oficial o Adorama
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={importUrl}
+                  onChange={(e) => setImportUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); importarDesdeUrl(); }
+                  }}
+                  placeholder="https://www.bhphotovideo.com/c/product/..."
+                  className="font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={importarDesdeUrl}
+                  disabled={importing || !importUrl.trim()}
+                  className="shrink-0"
+                >
+                  {importing ? (
+                    <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Importando…</>
+                  ) : (
+                    <><Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber" />Importar</>
+                  )}
+                </Button>
+              </div>
+              {importError && (
+                <div className="text-xs text-destructive">{importError}</div>
+              )}
+              {importSummary && !importError && (
+                <div className="text-xs text-muted-foreground">
+                  ✓ Importado: <span className="text-ink">{importSummary}</span>
+                  {!isEdit && " (se guardará al crear el equipo)"}
+                </div>
+              )}
+            </div>
+
             <Tabs value={tab} onValueChange={setTab}>
               <TabsList className="w-full">
                 <TabsTrigger value="basicos" className="flex-1">Datos básicos</TabsTrigger>

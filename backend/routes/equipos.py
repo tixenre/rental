@@ -1253,9 +1253,10 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
 # ── Admin: enriquecimiento con IA (Firecrawl + Lovable AI) ────────────────────
 
 class EnriquecerInput(BaseModel):
-    nombre: str
+    nombre: Optional[str] = None
     marca:  Optional[str] = None
     modelo: Optional[str] = None
+    url:    Optional[str] = None   # Si está presente, salta la búsqueda y scrapea esa URL directo
 
 
 @router.post("/admin/equipos/enriquecer")
@@ -1274,9 +1275,13 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     if not FIRECRAWL_API_KEY:
         raise HTTPException(500, "FIRECRAWL_API_KEY no configurado en el backend")
 
+    direct_url = (payload.url or "").strip() or None
+    if direct_url and not direct_url.lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "URL inválida (debe empezar con http:// o https://)")
+
     query = " ".join(x for x in [payload.marca, payload.nombre, payload.modelo] if x).strip()
-    if not query:
-        raise HTTPException(400, "Faltan datos para buscar")
+    if not direct_url and not query:
+        raise HTTPException(400, "Falta nombre/marca o url para enriquecer")
 
     headers_fc = {
         "Authorization": f"Bearer {FIRECRAWL_API_KEY}",
@@ -1417,34 +1422,51 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         return {"extracted": extracted, "foto_candidate": cand or None, "meta": meta}
 
     with httpx.Client(timeout=45.0) as client:
-        # Etapa A: B&H (canónico para bh_url)
-        bh_results = _search(f"{query} site:bhphotovideo.com", client)
-        bh_top = _first_valid(bh_results)
+        if direct_url:
+            # Modo URL directa: scrape de esa página, sin búsqueda.
+            # Si la URL es de B&H la tratamos como bh_top, sino como alt_top
+            # (esto sólo afecta dónde queda el canonical_url y el labelling).
+            from urllib.parse import urlparse as _up
+            host = (_up(direct_url).hostname or "").lower()
+            top_entry = {"url": direct_url, "title": direct_url}
+            if "bhphotovideo" in host:
+                bh_top, alt_top = top_entry, None
+                bh_scrape, alt_scrape = _scrape(direct_url, client), None
+            else:
+                bh_top, alt_top = None, top_entry
+                bh_scrape, alt_scrape = None, _scrape(direct_url, client)
 
-        # Etapa B: sitios oficiales del fabricante
-        alt_results = _search(f"{query} ({OFFICIAL_SITES})", client)
-        alt_top = _first_valid(alt_results)
+            if bh_scrape is None and alt_scrape is None:
+                raise HTTPException(422, "No se pudo scrapear la URL")
+        else:
+            # Etapa A: B&H (canónico para bh_url)
+            bh_results = _search(f"{query} site:bhphotovideo.com", client)
+            bh_top = _first_valid(bh_results)
 
-        # Etapa C: Adorama / Amazon (último recurso)
-        if not alt_top:
-            adoram_results = _search(f"{query} site:adorama.com OR site:amazon.com", client)
-            alt_top = _first_valid(adoram_results)
+            # Etapa B: sitios oficiales del fabricante
+            alt_results = _search(f"{query} ({OFFICIAL_SITES})", client)
+            alt_top = _first_valid(alt_results)
 
-        if not bh_top and not alt_top:
-            raise HTTPException(404, "No se encontraron resultados en internet")
+            # Etapa C: Adorama / Amazon (último recurso)
+            if not alt_top:
+                adoram_results = _search(f"{query} site:adorama.com OR site:amazon.com", client)
+                alt_top = _first_valid(adoram_results)
 
-        bh_scrape  = _scrape(bh_top["url"], client) if bh_top else None
-        alt_scrape = None
-        # Sólo scrapeamos alternativa si B&H no aportó datos o foto
-        needs_alt = (
-            alt_top is not None and (
-                bh_scrape is None
-                or not bh_scrape.get("foto_candidate")
-                or not (bh_scrape.get("extracted") or {}).get("descripcion")
+            if not bh_top and not alt_top:
+                raise HTTPException(404, "No se encontraron resultados en internet")
+
+            bh_scrape  = _scrape(bh_top["url"], client) if bh_top else None
+            alt_scrape = None
+            # Sólo scrapeamos alternativa si B&H no aportó datos o foto
+            needs_alt = (
+                alt_top is not None and (
+                    bh_scrape is None
+                    or not bh_scrape.get("foto_candidate")
+                    or not (bh_scrape.get("extracted") or {}).get("descripcion")
+                )
             )
-        )
-        if needs_alt:
-            alt_scrape = _scrape(alt_top["url"], client)
+            if needs_alt:
+                alt_scrape = _scrape(alt_top["url"], client)
 
     # ── Merge B&H + alt (B&H pisa, alt rellena gaps) ────────────────────────
     primary = bh_scrape or alt_scrape or {}
@@ -1614,7 +1636,7 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     return {
         "marca":  (extracted.get("marca")  or payload.marca  or "").strip() or None,
         "modelo": (extracted.get("modelo") or payload.modelo or "").strip() or None,
-        "nombre_normalizado": (extracted.get("nombre_normalizado") or payload.nombre).strip(),
+        "nombre_normalizado": (extracted.get("nombre_normalizado") or payload.nombre or "").strip() or None,
         "descripcion": (extracted.get("descripcion") or "").strip(),
         "specs": (extracted.get("specs") or [])[:12],
         "keywords": keywords,

@@ -228,7 +228,7 @@ function EquiposPage() {
           onOpenChange={(v) => { setOpenForm(v); if (!v) setEditing(null); }}
           initial={editing}
           saving={saveMut.isPending}
-          onSubmit={async (data, etiquetas) => { await saveMut.mutateAsync({ data, etiquetas }); }}
+          onSubmit={(data, etiquetas) => saveMut.mutateAsync({ data, etiquetas })}
         />
       )}
 
