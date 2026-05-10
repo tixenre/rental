@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
 
 import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
 import { EquipoFormDialog } from "@/components/admin/EquipoFormDialog";
+import { EnriquecerEquipoDialog } from "@/components/admin/EnriquecerEquipoDialog";
 
 export const Route = createFileRoute("/admin/equipos")({
   component: EquiposPage,
@@ -32,6 +33,7 @@ function EquiposPage() {
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Equipo | null>(null);
   const [deleting, setDeleting] = useState<Equipo | null>(null);
+  const [enriching, setEnriching] = useState<Equipo | null>(null);
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", { q, etiqueta }],
@@ -191,6 +193,13 @@ function EquiposPage() {
                     </Button>
                     <Button
                       size="icon" variant="ghost"
+                      title="Enriquecer con IA (B&H/Adorama)"
+                      onClick={() => setEnriching(eq)}
+                    >
+                      <Sparkles className="h-4 w-4 text-amber" />
+                    </Button>
+                    <Button
+                      size="icon" variant="ghost"
                       onClick={() => { setEditing(eq); setOpenForm(true); }}
                     >
                       <Pencil className="h-4 w-4" />
@@ -216,6 +225,15 @@ function EquiposPage() {
           initial={editing}
           saving={saveMut.isPending}
           onSubmit={async (data, etiquetas) => { await saveMut.mutateAsync({ data, etiquetas }); }}
+        />
+      )}
+
+      {enriching && (
+        <EnriquecerEquipoDialog
+          equipo={enriching}
+          open={!!enriching}
+          onOpenChange={(v) => { if (!v) setEnriching(null); }}
+          onApplied={invalidate}
         />
       )}
 
