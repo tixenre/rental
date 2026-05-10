@@ -105,19 +105,59 @@ export function EnriquecerEquipoDialog({
     if (!result) return;
     const patch: Record<string, unknown> = {};
     const aplicados: string[] = [];
+
     if (aplicarMarca && marca) { patch.marca = marca; aplicados.push(`marca: ${marca}`); }
     if (aplicarModelo && modelo) { patch.modelo = modelo; aplicados.push(`modelo: ${modelo}`); }
-    if (aplicarFoto && fotoUrl) { patch.foto_url = fotoUrl; aplicados.push("foto"); }
     if (aplicarBh && bhUrl) { patch.bh_url = bhUrl; aplicados.push("link fuente"); }
 
-    if (Object.keys(patch).length === 0) {
+    // Ficha (descripción + specs) — se persiste aparte
+    const fichaPatch: { descripcion?: string | null; specs_json?: string | null } = {};
+    if (aplicarDescripcion && result.descripcion) {
+      fichaPatch.descripcion = result.descripcion;
+      aplicados.push("descripción");
+    }
+    if (aplicarSpecs && result.specs.length > 0) {
+      fichaPatch.specs_json = JSON.stringify(result.specs);
+      aplicados.push(`${result.specs.length} specs`);
+    }
+
+    const willApplyFoto = aplicarFoto && !!fotoUrl;
+
+    if (
+      Object.keys(patch).length === 0 &&
+      Object.keys(fichaPatch).length === 0 &&
+      !willApplyFoto
+    ) {
       toast.info("No hay cambios para aplicar.");
       return;
     }
 
     setSaving(true);
     try {
-      await adminApi.updateEquipo(equipo.id, patch as Partial<Equipo>);
+      // 1) Foto: si es externa, descargar via proxy y subir al bucket
+      if (willApplyFoto) {
+        try {
+          const finalUrl = isBucketUrl(fotoUrl)
+            ? fotoUrl
+            : await uploadExternalUrlToBucket(equipo.id, fotoUrl);
+          patch.foto_url = finalUrl;
+          aplicados.push(isBucketUrl(fotoUrl) ? "foto" : "foto (subida al storage)");
+        } catch (e) {
+          toast.error(`No se pudo guardar la foto: ${e instanceof Error ? e.message : ""}`);
+          // seguimos con el resto
+        }
+      }
+
+      // 2) Datos básicos del equipo
+      if (Object.keys(patch).length > 0) {
+        await adminApi.updateEquipo(equipo.id, patch as Partial<Equipo>);
+      }
+
+      // 3) Ficha (descripción / specs)
+      if (Object.keys(fichaPatch).length > 0) {
+        await adminApi.setFicha(equipo.id, fichaPatch);
+      }
+
       toast.success("Equipo actualizado ✨", {
         description: aplicados.join(" · "),
         duration: 5000,
