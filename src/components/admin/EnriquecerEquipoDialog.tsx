@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Sparkles, ExternalLink, Loader2, Check } from "lucide-react";
+import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Bug } from "lucide-react";
 import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -11,8 +11,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
 import { adminApi, type Equipo } from "@/lib/admin/api";
-import { authedJson } from "@/lib/authedFetch";
-import { uploadExternalUrlToBucket, isBucketUrl } from "@/lib/equipment/photos";
+import { authedFetch, authedJson } from "@/lib/authedFetch";
+import { supabase } from "@/integrations/supabase/client";
+import { isBucketUrl } from "@/lib/equipment/photos";
+
+type DiagStep = { label: string; status: "pending" | "ok" | "fail" | "skip"; detail?: string };
 
 export type EnriquecerResult = {
   marca: string | null;
