@@ -154,14 +154,30 @@ export const adminApi = {
   // categorías + admin
   listCategorias: () => authedJson<Categoria[]>("/api/categorias"),
   adminListEtiquetas: () => authedJson<EtiquetaAdmin[]>("/api/admin/etiquetas"),
-  adminUpdateEtiqueta: (id: number, patch: { nombre?: string; prioridad?: number }) =>
+  adminCreateEtiqueta: (data: { nombre: string; prioridad?: number; parent_id?: number | null }) =>
+    authedPostJson<EtiquetaAdmin>("/api/admin/etiquetas", data),
+  adminUpdateEtiqueta: (
+    id: number,
+    patch: { nombre?: string; prioridad?: number; parent_id?: number | null; set_parent_null?: boolean },
+  ) =>
     authedJson<{ ok: true }>(`/api/admin/etiquetas/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     }),
+  adminDeleteEtiqueta: async (id: number) => {
+    const res = await authedFetch(`/api/admin/etiquetas/${id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+  },
   adminReorderEtiquetas: (ids: number[]) =>
     authedPostJson<{ ok: true; count: number }>("/api/admin/etiquetas/reorder", { ids }),
+  adminClasificarDryRun: () =>
+    authedPostJson<ClasificarResult>("/api/admin/categorias/clasificar?apply=0", {}),
+  adminClasificarApply: () =>
+    authedPostJson<ClasificarResult>("/api/admin/categorias/clasificar?apply=1", {}),
 
   // pedidos / alquileres
   listPedidos: (params: { estado?: string; q?: string; per_page?: number; page?: number } = {}) => {
