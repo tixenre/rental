@@ -23,6 +23,7 @@ from routes.dashboard        import router as dashboard_router
 from routes.auth             import router as auth_router
 from routes.settings         import router as settings_router
 from routes.cliente_portal   import router as cliente_portal_router
+from routes.marcas           import router as marcas_router
 from middleware          import auth_middleware
 
 # ── App ──────────────────────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ app.include_router(clientes_router,       prefix="/api")
 app.include_router(estadisticas_router,   prefix="/api")
 app.include_router(dashboard_router,      prefix="/api")
 app.include_router(settings_router,       prefix="/api")
+app.include_router(marcas_router,         prefix="/api")
 app.include_router(cliente_portal_router)
 
 # ── Health Check ─────────────────────────────────────────────────────────────

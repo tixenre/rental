@@ -231,6 +231,19 @@ def list_equipos(
             params + [per_page, offset]
         ).fetchall()
         equipos = [row_to_dict(r) for r in rows]
+
+        # Attach brand object (id, nombre, logo_url)
+        for equipo in equipos:
+            if equipo.get('brand_id'):
+                brand_row = conn.execute(
+                    "SELECT id, nombre, logo_url FROM marcas WHERE id = ?",
+                    (equipo['brand_id'],)
+                ).fetchone()
+                if brand_row:
+                    equipo['brand'] = row_to_dict(brand_row)
+            else:
+                equipo['brand'] = None
+
         equipos = attach_tags(conn, equipos)
         equipos = attach_kit(conn, equipos)
         equipos = attach_categorias(conn, equipos)
