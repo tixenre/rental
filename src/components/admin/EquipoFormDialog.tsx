@@ -398,6 +398,56 @@ export function EquipoFormDialog({
                   Estos campos arman el <strong>nombre público</strong> que se ve en el catálogo.
                 </div>
 
+                <Field label="Nombre público (template)">
+                  <Input
+                    ref={tplInputRef}
+                    value={nombreTpl}
+                    onChange={(e) => setNombreTpl(e.target.value)}
+                    placeholder="Vacío = automático. Ej: {marca} {modelo} — {montura}"
+                    className="font-mono text-sm"
+                  />
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {TPL_TOKENS.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => {
+                          const token = `{${t}}`;
+                          const el = tplInputRef.current;
+                          if (!el) {
+                            setNombreTpl((v) => (v ? `${v} ${token}` : token));
+                            return;
+                          }
+                          const start = el.selectionStart ?? nombreTpl.length;
+                          const end = el.selectionEnd ?? nombreTpl.length;
+                          const next = nombreTpl.slice(0, start) + token + nombreTpl.slice(end);
+                          setNombreTpl(next);
+                          requestAnimationFrame(() => {
+                            el.focus();
+                            const pos = start + token.length;
+                            el.setSelectionRange(pos, pos);
+                          });
+                        }}
+                        className="rounded-full border hairline bg-background px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition hover:border-ink hover:text-ink"
+                      >
+                        {`{${t}}`}
+                      </button>
+                    ))}
+                    {nombreTpl && (
+                      <button
+                        type="button"
+                        onClick={() => setNombreTpl("")}
+                        className="ml-auto rounded-full border hairline bg-background px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition hover:border-destructive hover:text-destructive"
+                      >
+                        Limpiar (usar automático)
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Vista previa: <span className="font-medium text-ink">{previewName}</span>
+                  </p>
+                </Field>
+
                 <div className="grid grid-cols-3 gap-3">
                   <Field label="Montura">
                     <Input value={montura} onChange={(e) => setMontura(e.target.value)} placeholder="Ej: Montura E" />
