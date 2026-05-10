@@ -407,3 +407,101 @@ def admin_responder_solicitud(id: int, data: SolicitudRespuesta, request: Reques
         return {"ok": True}
     finally:
         conn.close()
+
+
+# ── Documentos PDF (cliente) ──────────────────────────────────────────────────
+
+def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
+    """Carga el pedido validando ownership y rellena items + componentes."""
+    row = conn.execute(
+        "SELECT * FROM alquileres WHERE id = ? AND cliente_id = ?",
+        (pedido_id, cliente_id),
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "Pedido no encontrado")
+    pedido = row_to_dict(row)
+
+    items = conn.execute("""
+        SELECT pi.cantidad, e.id AS equipo_id, e.nombre, e.marca, e.modelo,
+               e.serie, e.valor_reposicion, e.foto_url, pi.precio_jornada, pi.subtotal
+        FROM alquiler_items pi
+        JOIN equipos e ON e.id = pi.equipo_id
+        WHERE pi.pedido_id = ?
+        ORDER BY e.nombre
+    """, (pedido_id,)).fetchall()
+    pedido["items"] = [row_to_dict(i) for i in items]
+
+    for item in pedido["items"]:
+        comp_rows = conn.execute("""
+            SELECT ec.nombre, ec.marca, ec.modelo, ec.serie, ec.valor_reposicion, kc.cantidad
+            FROM kit_componentes kc
+            JOIN equipos ec ON ec.id = kc.componente_id
+            WHERE kc.equipo_id = ?
+        """, (item['equipo_id'],)).fetchall()
+        item['componentes'] = [row_to_dict(c) for c in comp_rows]
+
+    # Datos del cliente para el contrato
+    cli = conn.execute(
+        "SELECT nombre, apellido, email, telefono, direccion, cuit, perfil_impuestos FROM clientes WHERE id = ?",
+        (cliente_id,),
+    ).fetchone()
+    if cli:
+        c = row_to_dict(cli)
+        pedido["cliente_nombre"] = f"{c.get('nombre','')} {c.get('apellido','')}".strip()
+        pedido["cliente_email"] = c.get("email")
+        pedido["cliente_telefono"] = c.get("telefono")
+        pedido["cliente_direccion"] = c.get("direccion")
+        pedido["cliente_cuit"] = c.get("cuit")
+        pedido["cliente_perfil_impuestos"] = c.get("perfil_impuestos")
+
+    return pedido
+
+
+def _pdf_response(pdf_bytes: bytes, filename: str) -> Response:
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
+@router.get("/api/cliente/pedidos/{id}/remito.pdf")
+async def cliente_pedido_remito(id: int, request: Request):
+    session = require_cliente(request)
+    conn = get_db()
+    try:
+        pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
+    finally:
+        conn.close()
+    if not _documentos_disponibles(pedido.get("estado", ""))["remito"]:
+        raise HTTPException(403, "El remito estará disponible cuando confirmemos el pedido.")
+    pdf_bytes = await _render_pdf(_pedido_html(pedido))
+    return _pdf_response(pdf_bytes, _pedido_filename(pedido))
+
+
+@router.get("/api/cliente/pedidos/{id}/contrato.pdf")
+async def cliente_pedido_contrato(id: int, request: Request):
+    session = require_cliente(request)
+    conn = get_db()
+    try:
+        pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
+    finally:
+        conn.close()
+    if not _documentos_disponibles(pedido.get("estado", ""))["contrato"]:
+        raise HTTPException(403, "El contrato estará disponible cuando confirmemos el pedido.")
+    pdf_bytes = await _render_pdf(_contrato_html(pedido))
+    return _pdf_response(pdf_bytes, _pedido_filename(pedido, suffix="contrato"))
+
+
+@router.get("/api/cliente/pedidos/{id}/albaran.pdf")
+async def cliente_pedido_albaran(id: int, request: Request):
+    session = require_cliente(request)
+    conn = get_db()
+    try:
+        pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
+    finally:
+        conn.close()
+    if not _documentos_disponibles(pedido.get("estado", ""))["albaran"]:
+        raise HTTPException(403, "El albarán estará disponible al momento de la entrega.")
+    pdf_bytes = await _render_pdf(_albaran_html(pedido))
+    return _pdf_response(pdf_bytes, _pedido_filename(pedido, suffix="albaran"))
