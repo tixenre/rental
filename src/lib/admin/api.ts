@@ -47,6 +47,7 @@ export type Ficha = {
   formato:       string | null;
   resolucion:    string | null;
   keywords_json: string | null;
+  nombre_publico_template?: string | null;
 };
 
 export type CategoriaRef = {
