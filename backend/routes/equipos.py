@@ -2229,3 +2229,47 @@ async def admin_upload_foto_file(
         "width": w or None,
         "height": h or None,
     }
+
+
+# ── Admin: diagnóstico de R2 (sin exponer secretos) ─────────────────────────
+
+@router.get("/admin/storage/diag")
+def admin_storage_diag(request: Request):
+    """Verifica que R2 esté configurado correctamente. Sólo dice si las vars
+    están presentes y si el upload+read end-to-end funciona. NUNCA devuelve
+    el contenido del secret."""
+    from admin_guard import require_admin
+    require_admin(request)
+
+    import time as _time
+    import httpx
+
+    vars_status = {
+        "R2_ACCOUNT_ID":         bool(os.getenv("R2_ACCOUNT_ID")),
+        "R2_ACCESS_KEY_ID":      bool(os.getenv("R2_ACCESS_KEY_ID")),
+        "R2_SECRET_ACCESS_KEY":  bool(os.getenv("R2_SECRET_ACCESS_KEY")),
+        "R2_BUCKET":             os.getenv("R2_BUCKET") or "equipos-fotos",
+        "R2_PUBLIC_BASE":        os.getenv("R2_PUBLIC_BASE") or None,
+    }
+    missing = [k for k, v in vars_status.items() if v is False]
+    if missing:
+        return {"ok": False, "vars": vars_status, "missing": missing, "tested": False}
+
+    # Smoke test: subir un blob chico y leerlo
+    try:
+        sample = b"R2 smoke test " + str(int(_time.time())).encode()
+        path = f"diag/smoke-{int(_time.time())}.txt"
+        public_url = _upload_to_r2(path, sample, "text/plain")
+        verify = httpx.get(public_url, timeout=10.0)
+        ok = verify.status_code == 200 and verify.content == sample
+        return {
+            "ok":         ok,
+            "vars":       vars_status,
+            "tested":     True,
+            "public_url": public_url,
+            "verify":     verify.status_code,
+        }
+    except HTTPException as e:
+        return {"ok": False, "vars": vars_status, "tested": True, "error": e.detail}
+    except Exception as e:
+        return {"ok": False, "vars": vars_status, "tested": True, "error": str(e)}
