@@ -450,8 +450,9 @@ def init_db():
         # Borrar la etiqueta vieja (CASCADE elimina equipo_etiquetas).
         conn.execute("DELETE FROM etiquetas WHERE id = %s", (r["etiq_id"],))
 
-    # Drop legacy parent_id de etiquetas — ya no se usa (la jerarquía vive en categorias).
-    conn.execute("ALTER TABLE etiquetas DROP COLUMN IF EXISTS parent_id")
+    # Nota: NO dropeamos `etiquetas.parent_id` (queda como columna legacy
+    # ignorada). Eso permite que los endpoints admin viejos sigan funcionando
+    # mientras migramos la UI al nuevo CRUD de `categorias`.
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_precio_historial (
