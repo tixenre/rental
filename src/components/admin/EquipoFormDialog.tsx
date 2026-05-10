@@ -424,6 +424,17 @@ export function EquipoFormDialog({
                   />
                 )}
               </TabsContent>
+
+              {/* ── Kit / sub-equipos ─────────────────────────────────── */}
+              <TabsContent value="kit" className="space-y-3 mt-4">
+                <div className="rounded-md border hairline bg-muted/30 px-3 py-2 text-xs">
+                  Componentes que <strong>vienen incluidos</strong> al alquilar este equipo.
+                  El stock de cada componente se descuenta automáticamente.
+                </div>
+                {isEdit && initial && (
+                  <KitEditor equipoId={initial.id} />
+                )}
+              </TabsContent>
             </Tabs>
 
             <DialogFooter className="gap-2">
