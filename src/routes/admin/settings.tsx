@@ -610,7 +610,7 @@ function EtiquetasSection() {
   );
 }
 
-
+function ClasificacionSection() {
   const qc = useQueryClient();
   const [preview, setPreview] = useState<ClasificarResult | null>(null);
 
