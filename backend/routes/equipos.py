@@ -1315,7 +1315,13 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
                 "Extraé la información del equipo audiovisual (cámara, lente, "
                 "luz, audio) desde la ficha de producto. Specs: máximo 8, label "
                 "corto y value conciso. Descripcion: 1-2 oraciones en español. "
-                "Si la foto_url no es absoluta (http/https), dejala vacía."
+                "Si la foto_url no es absoluta (http/https), dejala vacía. "
+                "Keywords: 3-6 palabras clave cortas en español, lowercase, "
+                "que describan la PERSONALIDAD del equipo (ej: 'bicolor', "
+                "'silenciosa', 'v-mount', 'global shutter', 'weather sealed', "
+                "'cri 96', 'cine-ready'). Distintas y específicas — nada genérico "
+                "como 'profesional' o 'calidad'. Si no hay nada distintivo, "
+                "devolvé un array vacío."
             ),
             "schema": {
                 "type": "object",
@@ -1335,6 +1341,10 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
                             },
                             "required": ["label", "value"],
                         },
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {"type": "string"},
                     },
                 },
                 "required": ["marca", "modelo", "descripcion", "specs"],
@@ -1370,12 +1380,28 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         candidate = og_image
     foto_url = candidate or None
 
+    # Sanitizar keywords: lowercase, trim, dedupe, max 6
+    raw_kws = extracted.get("keywords") or []
+    seen_kw: set[str] = set()
+    keywords: list[str] = []
+    for k in raw_kws:
+        if not isinstance(k, str):
+            continue
+        kk = k.strip().lower()
+        if not kk or kk in seen_kw or len(kk) > 40:
+            continue
+        seen_kw.add(kk)
+        keywords.append(kk)
+        if len(keywords) >= 6:
+            break
+
     return {
         "marca":  (extracted.get("marca")  or payload.marca  or "").strip() or None,
         "modelo": (extracted.get("modelo") or payload.modelo or "").strip() or None,
         "nombre_normalizado": (extracted.get("nombre_normalizado") or payload.nombre).strip(),
         "descripcion": (extracted.get("descripcion") or "").strip(),
         "specs": (extracted.get("specs") or [])[:12],
+        "keywords": keywords,
         "foto_url": foto_url,
         "fuente_url": top_url,
         "fuente_titulo": top_title,
