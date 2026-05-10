@@ -294,6 +294,11 @@ def init_db():
             updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Campos extra para construir el "nombre público" en el catálogo
+    # (Cámara Sony FX3 Montura E Full Frame 4K).
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS montura   TEXT")
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS formato   TEXT")
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS resolucion TEXT")
 
     # ── Etiquetas (bolsa libre / índice de búsqueda) ─────────────────────
     # Las etiquetas son strings libres: incluyen marca, modelo, palabras del
@@ -653,6 +658,38 @@ def attach_categorias(conn, equipos: list[dict]) -> list[dict]:
         })
     for e in equipos:
         e["categorias"] = cat_map[e["id"]]
+    cur.close()
+    return equipos
+
+
+def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
+    """Agrega la ficha técnica (descripcion, montura, formato, resolucion, specs_json)."""
+    if not equipos:
+        return equipos
+    ids = [e["id"] for e in equipos]
+    placeholders = ",".join(["%s"] * len(ids))
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT equipo_id, descripcion, notas, specs_json, montura, formato, resolucion
+        FROM equipo_fichas
+        WHERE equipo_id IN ({placeholders})
+    """, ids)
+    rows = cur.fetchall()
+    f_map: dict[int, dict] = {}
+    for r in rows:
+        f_map[r["equipo_id"]] = {
+            "descripcion": r["descripcion"],
+            "notas":       r["notas"],
+            "specs_json":  r["specs_json"],
+            "montura":     r["montura"],
+            "formato":     r["formato"],
+            "resolucion":  r["resolucion"],
+        }
+    for e in equipos:
+        e["ficha"] = f_map.get(e["id"]) or {
+            "descripcion": None, "notas": None, "specs_json": None,
+            "montura": None, "formato": None, "resolucion": None,
+        }
     cur.close()
     return equipos
 

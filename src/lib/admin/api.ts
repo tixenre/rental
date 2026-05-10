@@ -39,6 +39,21 @@ export type EquipoAfuera = {
 
 // ── Equipos ──────────────────────────────────────────────────────────────
 
+export type Ficha = {
+  descripcion: string | null;
+  notas:       string | null;
+  specs_json:  string | null;
+  montura:     string | null;
+  formato:     string | null;
+  resolucion:  string | null;
+};
+
+export type CategoriaRef = {
+  id: number;
+  nombre: string;
+  parent_id: number | null;
+};
+
 export type Equipo = {
   id: number;
   nombre: string;
@@ -58,6 +73,8 @@ export type Equipo = {
   estado: string;
   etiquetas?: string[];
   kit?: KitComponente[];
+  categorias?: CategoriaRef[];
+  ficha?: Ficha;
 };
 
 export type KitComponente = {
@@ -75,7 +92,7 @@ export type EquiposListResp = {
   items: Equipo[];
 };
 
-export type EquipoInput = Partial<Omit<Equipo, "id" | "etiquetas">> & {
+export type EquipoInput = Partial<Omit<Equipo, "id" | "etiquetas" | "kit" | "categorias" | "ficha">> & {
   nombre: string;
 };
 
@@ -165,6 +182,30 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ categoria_ids }),
     }),
+
+  // ficha técnica
+  getFicha: (id: number) => authedJson<Ficha & { equipo_id?: number }>(`/api/equipos/${id}/ficha`),
+  setFicha: (id: number, data: Partial<Ficha>) =>
+    authedJson<Ficha>(`/api/equipos/${id}/ficha`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+
+  // kit / componentes
+  getKit: (id: number) =>
+    authedJson<KitComponente[]>(`/api/equipos/${id}/kit`),
+  addKitItem: (id: number, componente_id: number, cantidad = 1) =>
+    authedPostJson<KitComponente[]>(`/api/equipos/${id}/kit`, {
+      componente_id, cantidad,
+    }),
+  removeKitItem: async (id: number, componente_id: number) => {
+    const res = await authedFetch(`/api/equipos/${id}/kit/${componente_id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+  },
   listEtiquetas: (incluirAuto = false) =>
     authedJson<Etiqueta[]>(`/api/etiquetas${incluirAuto ? "?incluir_auto=1" : ""}`),
 

@@ -33,6 +33,21 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 /* ─── Tipos del backend ─────────────────────────────────────────────── */
 
+export type BackendFicha = {
+  descripcion: string | null;
+  notas: string | null;
+  specs_json: string | null;
+  montura: string | null;
+  formato: string | null;
+  resolucion: string | null;
+};
+
+export type BackendCategoriaRef = {
+  id: number;
+  nombre: string;
+  parent_id: number | null;
+};
+
 export type BackendEquipo = {
   id: number;
   nombre: string;
@@ -46,6 +61,8 @@ export type BackendEquipo = {
   visible_catalogo: number;
   etiquetas: string[];
   kit: unknown[];
+  categorias?: BackendCategoriaRef[];
+  ficha?: BackendFicha;
 };
 
 export type BackendCategoria = {

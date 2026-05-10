@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from database import (
     get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
-    regenerate_auto_tags,
+    attach_ficha, regenerate_auto_tags,
 )
 from routes.auth import get_session
 
@@ -61,6 +61,9 @@ class FichaUpdate(BaseModel):
     descripcion: Optional[str] = None
     notas:       Optional[str] = None
     specs_json:  Optional[str] = None
+    montura:     Optional[str] = None
+    formato:     Optional[str] = None
+    resolucion:  Optional[str] = None
 
 
 class KitItem(BaseModel):
@@ -191,6 +194,7 @@ def list_equipos(
         equipos = attach_tags(conn, equipos)
         equipos = attach_kit(conn, equipos)
         equipos = attach_categorias(conn, equipos)
+        equipos = attach_ficha(conn, equipos)
         return {"total": total, "page": page, "per_page": per_page, "items": equipos}
     finally:
         conn.close()
@@ -303,7 +307,10 @@ def get_ficha(id: int):
         ).fetchone()
         if row:
             return row_to_dict(row)
-        return {"equipo_id": id, "descripcion": None, "notas": None, "specs_json": None}
+        return {
+            "equipo_id": id, "descripcion": None, "notas": None, "specs_json": None,
+            "montura": None, "formato": None, "resolucion": None,
+        }
     finally:
         conn.close()
 
@@ -315,14 +322,19 @@ def upsert_ficha(id: int, data: FichaUpdate):
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
         conn.execute("""
-            INSERT INTO equipo_fichas (equipo_id, descripcion, notas, specs_json, updated_at)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO equipo_fichas
+                (equipo_id, descripcion, notas, specs_json, montura, formato, resolucion, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(equipo_id) DO UPDATE SET
                 descripcion = excluded.descripcion,
                 notas       = excluded.notas,
                 specs_json  = excluded.specs_json,
+                montura     = excluded.montura,
+                formato     = excluded.formato,
+                resolucion  = excluded.resolucion,
                 updated_at  = CURRENT_TIMESTAMP
-        """, (id, data.descripcion, data.notas, data.specs_json))
+        """, (id, data.descripcion, data.notas, data.specs_json,
+              data.montura, data.formato, data.resolucion))
         conn.commit()
         row = conn.execute(
             "SELECT * FROM equipo_fichas WHERE equipo_id = ?", (id,)
@@ -1361,3 +1373,48 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         "fuente_url": top_url,
         "fuente_titulo": top_title,
     }
+
+
+# ── Admin: proxy de imágenes (para evitar hotlink-block de B&H/Adorama) ──────
+
+@router.get("/admin/proxy-image")
+def admin_proxy_image(url: str, request: Request):
+    """
+    Descarga una imagen desde una URL externa con un User-Agent normal y la
+    devuelve al cliente. Útil porque B&H/Adorama bloquean hotlinking pero el
+    frontend necesita los bytes para subirlos a Supabase Storage.
+    """
+    from supabase_auth import require_admin
+    require_admin(request)
+
+    import httpx
+    from fastapi.responses import Response
+
+    if not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "URL inválida")
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+        ),
+        "Accept": "image/avif,image/webp,image/png,image/jpeg,image/*,*/*;q=0.8",
+    }
+    try:
+        with httpx.Client(timeout=20.0, follow_redirects=True) as client:
+            r = client.get(url, headers=headers)
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"No se pudo descargar la imagen: {e}")
+
+    if r.status_code != 200:
+        raise HTTPException(r.status_code, f"Origen devolvió {r.status_code}")
+
+    ctype = r.headers.get("content-type", "image/jpeg")
+    if not ctype.startswith("image/"):
+        raise HTTPException(415, f"La URL no devolvió una imagen ({ctype})")
+
+    return Response(
+        content=r.content,
+        media_type=ctype,
+        headers={"Cache-Control": "private, max-age=300"},
+    )
