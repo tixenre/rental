@@ -67,12 +67,80 @@ export function EnriquecerEquipoDialog({
   const [keywords, setKeywords] = useState<string[]>([]);
   const [aplicarKeywords, setAplicarKeywords] = useState(true);
 
+  const [keywordInput, setKeywordInput] = useState("");
+  const [photoDiag, setPhotoDiag] = useState<DiagStep[] | null>(null);
+
   useEffect(() => {
     if (!open) {
       setResult(null);
       setError(null);
+      setPhotoDiag(null);
     }
   }, [open]);
+
+  const addKeyword = () => {
+    const v = keywordInput.trim().toLowerCase();
+    if (!v) return;
+    if (keywords.includes(v)) { setKeywordInput(""); return; }
+    setKeywords([...keywords, v]);
+    setKeywordInput("");
+  };
+  const removeKeyword = (k: string) => setKeywords(keywords.filter((x) => x !== k));
+
+  /** Sube la foto externa al bucket reportando cada paso al panel de diagnóstico. */
+  const uploadPhotoWithDiag = async (equipoId: number, externalUrl: string): Promise<string> => {
+    const steps: DiagStep[] = [
+      { label: "1. Llamar /api/admin/proxy-image", status: "pending" },
+      { label: "2. Recibir blob (tamaño + tipo)", status: "pending" },
+      { label: "3. Subir a Supabase Storage (equipos-fotos)", status: "pending" },
+      { label: "4. Obtener URL pública", status: "pending" },
+    ];
+    const update = (i: number, patch: Partial<DiagStep>) => {
+      steps[i] = { ...steps[i], ...patch };
+      setPhotoDiag([...steps]);
+    };
+    setPhotoDiag([...steps]);
+
+    if (isBucketUrl(externalUrl)) {
+      steps.forEach((_, i) => update(i, { status: "skip", detail: "ya es URL del bucket" }));
+      return externalUrl;
+    }
+
+    const res = await authedFetch(`/api/admin/proxy-image?url=${encodeURIComponent(externalUrl)}`);
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      update(0, { status: "fail", detail: `HTTP ${res.status} ${txt.slice(0, 120)}` });
+      throw new Error(`proxy-image → ${res.status}`);
+    }
+    update(0, { status: "ok", detail: `HTTP ${res.status}` });
+
+    const blob = await res.blob();
+    if (blob.size === 0) {
+      update(1, { status: "fail", detail: "blob vacío (0 bytes)" });
+      throw new Error("blob vacío");
+    }
+    update(1, { status: "ok", detail: `${(blob.size / 1024).toFixed(1)} KB · ${blob.type || "sin content-type"}` });
+
+    const ct = blob.type || "image/jpeg";
+    const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : ct.includes("avif") ? "avif" : "jpg";
+    const path = `equipos/${equipoId}/foto-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("equipos-fotos")
+      .upload(path, blob, { contentType: ct, upsert: false });
+    if (upErr) {
+      update(2, { status: "fail", detail: upErr.message });
+      throw upErr;
+    }
+    update(2, { status: "ok", detail: path });
+
+    const { data } = supabase.storage.from("equipos-fotos").getPublicUrl(path);
+    if (!data?.publicUrl) {
+      update(3, { status: "fail", detail: "no devolvió publicUrl" });
+      throw new Error("sin publicUrl");
+    }
+    update(3, { status: "ok", detail: data.publicUrl });
+    return data.publicUrl;
+  };
 
   const run = async () => {
     setLoading(true);
