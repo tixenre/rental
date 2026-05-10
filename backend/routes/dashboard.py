@@ -7,7 +7,7 @@ import datetime
 from fastapi import APIRouter, Depends, Query
 
 from database import get_db, row_to_dict
-from supabase_auth import require_admin
+from admin_guard import require_admin
 
 router = APIRouter()
 
