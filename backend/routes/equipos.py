@@ -2104,24 +2104,110 @@ def admin_proxy_image(url: str, request: Request):
     )
 
 
-# ── Admin: descargar imagen externa y subirla a Supabase Storage ──────────────
+# ── Admin: descargar imagen externa y subirla a Cloudflare R2 ────────────────
 #
-# El frontend NO sube directamente al bucket porque depende de tener una sesión
-# Supabase válida en el browser (que a veces expira o no existe si el admin
-# entró con la cookie clásica). Acá lo hacemos en el backend con el
-# SUPABASE_SERVICE_ROLE_KEY → bypassa RLS y nunca falla por "rol anon".
+# El frontend NO sube directamente al bucket porque eso requeriría exponer
+# credenciales de R2 al browser. Acá lo hacemos en el backend con el secret
+# guardado en env vars.
+#
+# SSRF guard
+# ----------
+# El admin autenticado puede pedir descargar cualquier URL externa. Sin
+# allowlist, esto sería SSRF: un admin malicioso/comprometido podría hacer
+# que el backend descargue http://localhost:5432/, http://169.254.169.254/
+# (metadata cloud), o cualquier IP de la VPC interna de Railway. Filtramos:
+# (1) sólo http(s) en puerto estándar (80/443), (2) host en allowlist de
+# dominios conocidos, (3) la IP resuelta del host no es privada/loopback.
+
+_ALLOWED_PHOTO_HOSTS = frozenset([
+    # Retailers
+    "bhphotovideo.com", "adorama.com", "amazon.com", "amazon.ca",
+    "amazonaws.com",
+    # Wikipedia / commons
+    "wikimedia.org", "wikipedia.org",
+    # Reviews / press
+    "dpreview.com", "fstoppers.com", "petapixel.com", "cinema5d.com",
+    # Manufacturer (cámaras, lentes, audio, video, iluminación, soportes)
+    "sony.com", "sonycreativesoftware.com",
+    "canon.com", "usa.canon.com", "canon-europe.com",
+    "nikon.com", "nikonusa.com",
+    "fujifilm.com", "fujifilm-x.com",
+    "panasonic.com",
+    "blackmagicdesign.com", "red.com", "atomos.com",
+    "tilta.com", "smallrig.com", "manfrotto.com",
+    "saramonic.com", "rode.com", "shure.com", "sennheiser.com",
+    "sigmaphoto.com", "tamron.com", "samyangopticsamericas.com",
+    "leofoto.com", "godox.com", "aputure.com", "nanlite.com",
+    "zhiyun-tech.com", "dji.com", "insta360.com", "gopro.com",
+    # CDNs comunes que sirven assets de los hosts de arriba
+    "cloudfront.net", "akamaized.net", "akamaihd.net",
+    "shopifycdn.com", "wp.com", "googleusercontent.com",
+])
+
+
+def _is_photo_host_allowed(host: str) -> bool:
+    """True si `host` es un dominio del allowlist o subdominio de uno."""
+    host = (host or "").lower().rstrip(".")
+    return any(host == h or host.endswith("." + h) for h in _ALLOWED_PHOTO_HOSTS)
+
+
+def _host_resolves_to_private(host: str) -> bool:
+    """True si el host resuelve a alguna IP privada/loopback/link-local/
+    multicast/reserved. Defense-in-depth: bloquea el caso (improbable pero
+    posible) de un dominio del allowlist apuntando a IPs internas.
+    """
+    import ipaddress as _ip
+    import socket as _socket
+    try:
+        infos = _socket.getaddrinfo(host, None)
+    except (_socket.gaierror, OSError):
+        return True   # No resolver → no descargar
+    for info in infos:
+        addr = info[4][0]
+        try:
+            ip = _ip.ip_address(addr)
+            if (ip.is_private or ip.is_loopback or ip.is_link_local
+                    or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
+def _validate_external_image_url(url: str) -> None:
+    """Anti-SSRF. Eleva HTTPException si la URL no es segura para descargar."""
+    from urllib.parse import urlparse as _urlparse
+    if not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "URL inválida — sólo http/https")
+    parsed = _urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if not host:
+        raise HTTPException(400, "URL inválida — host vacío")
+    port = parsed.port
+    if port and port not in (80, 443):
+        raise HTTPException(400, f"Puerto no permitido: {port}")
+    if not _is_photo_host_allowed(host):
+        raise HTTPException(
+            403,
+            f"Host no permitido para descarga: {host}. Si es un sitio "
+            "legítimo, agregar a _ALLOWED_PHOTO_HOSTS.",
+        )
+    if _host_resolves_to_private(host):
+        raise HTTPException(403, f"Host '{host}' resuelve a IP privada/interna")
+
 
 def _download_image_bytes(url: str) -> tuple[bytes, str]:
     """Descarga una imagen externa con todos los fallbacks del proxy
     (Referer del host, sin Referer, Referer=google, weserv).
     Devuelve (bytes, content_type). Eleva HTTPException si no se pudo.
+
+    NOTA: el caller debe haber pasado `url` por `_validate_external_image_url`
+    antes (SSRF guard). Acá hacemos una validación final por las dudas.
     """
     import httpx
     from urllib.parse import urlparse, quote
 
-    if not url.lower().startswith(("http://", "https://")):
-        raise HTTPException(400, "URL inválida")
-
+    _validate_external_image_url(url)
     host = (urlparse(url).hostname or "").lower()
 
     def _headers(referer: str | None) -> dict:
@@ -2157,7 +2243,7 @@ def _download_image_bytes(url: str) -> tuple[bytes, str]:
     last_body = b""
     r = None
     try:
-        with httpx.Client(timeout=20.0, follow_redirects=True, http2=False) as client:
+        with httpx.Client(timeout=20.0, follow_redirects=True, http2=False, max_redirects=3) as client:
             r = client.get(url, headers=_headers(primary_referer))
             last_status, last_body = r.status_code, r.content
             if r.status_code == 403:
@@ -2377,6 +2463,9 @@ def admin_upload_foto_from_url(
     cfg_pub = (os.getenv("R2_PUBLIC_BASE") or "").rstrip("/")
     if cfg_pub and url.startswith(cfg_pub + "/"):
         return {"public_url": url, "path": None, "skipped": True}
+
+    # SSRF guard: validar host antes de descargar.
+    _validate_external_image_url(url)
 
     raw_content, raw_ctype = _download_image_bytes(url)
     # Optimización: resize a max 1600px + WebP q=85

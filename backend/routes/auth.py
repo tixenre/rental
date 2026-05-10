@@ -24,11 +24,22 @@ if not SECRET_KEY:
 
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-REDIRECT_URI         = os.getenv("REDIRECT_URI", "https://ramblarental.up.railway.app/auth/callback")
+
+# Base URL del backend. En Railway viene del entorno; en dev local usamos
+# localhost:8000 (que el proxy de Vite reescribe). Las env vars REDIRECT_URI
+# / CLIENTE_REDIRECT_URI tienen prioridad — si están seteadas se respetan
+# tal cual (útil para staging u otros entornos custom).
+def _default_oauth_base() -> str:
+    if os.getenv("RAILWAY_ENVIRONMENT"):
+        return "https://ramblarental.up.railway.app"
+    return "http://localhost:8000"
+
+_OAUTH_BASE          = _default_oauth_base()
+REDIRECT_URI         = os.getenv("REDIRECT_URI")         or f"{_OAUTH_BASE}/auth/callback"
+CLIENTE_REDIRECT_URI = os.getenv("CLIENTE_REDIRECT_URI") or f"{_OAUTH_BASE}/cliente/auth/callback"
 POST_LOGIN_URL       = os.getenv("POST_LOGIN_URL", "/admin")
 FRONTEND_BASE        = os.getenv("FRONTEND_BASE_URL", "")   # e.g. http://localhost:3000 en dev
 MAPS_API_KEY         = os.getenv("GOOGLE_MAPS_API_KEY", "")
-CLIENTE_REDIRECT_URI = os.getenv("CLIENTE_REDIRECT_URI", "https://ramblarental.up.railway.app/cliente/auth/callback")
 
 ALLOWED_EMAILS: set[str] = {
     e.strip().lower()

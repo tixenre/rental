@@ -21,9 +21,33 @@ export async function authedJson<T>(path: string, init: AuthedFetchInit = {}): P
     ...init,
     headers: { Accept: "application/json", ...(init.headers ?? {}) },
   });
+  const method = init.method ?? "GET";
   if (!res.ok) {
-    const detail = await res.json().catch(() => ({}));
-    throw new Error(detail?.detail ?? `${init.method ?? "GET"} ${path} → ${res.status}`);
+    // Intentar parsear como JSON (FastAPI devuelve {detail}); si la
+    // respuesta es HTML/text (proxy de Vite, Cloudflare, error genérico
+    // de uvicorn), leerla como text y mostrar un fragmento. Sin esto el
+    // toast queda como "GET /path → 500" sin contexto y el debugging es
+    // a ciegas.
+    const text = await res.text().catch(() => "");
+    let message = "";
+    try {
+      const parsed = JSON.parse(text);
+      message = parsed?.detail ?? parsed?.message ?? "";
+    } catch {
+      // No era JSON. Tomar las primeras líneas, sin tags HTML, y truncar.
+      message = text
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 200);
+    }
+    const prefix = `${method} ${path} → ${res.status}`;
+    throw new Error(message ? `${prefix}: ${message}` : prefix);
+  }
+  // 204 No Content y respuestas sin body: devolver undefined cast a T para
+  // no romper con `Unexpected end of JSON input`.
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return undefined as T;
   }
   return res.json() as Promise<T>;
 }
