@@ -43,6 +43,8 @@ export function EquipmentCard({
       style={width ? { width } : undefined}
       className={cn(
         "group relative flex shrink-0 flex-col overflow-hidden rounded-lg border bg-surface transition-all snap-start",
+        // Card 4:5 estilo IG: foto cuadrada arriba, info en el 20% restante.
+        "aspect-[4/5]",
         selected
           ? "border-amber/60 shadow-[0_0_0_1px_var(--amber)]"
           : sinStock
@@ -54,7 +56,7 @@ export function EquipmentCard({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`Ver detalle de ${item.name}`}
-        className="relative block aspect-[4/3] overflow-hidden text-left"
+        className="relative block aspect-square w-full shrink-0 overflow-hidden text-left"
       >
         {item.fotoUrl ? (
           <img
@@ -89,84 +91,76 @@ export function EquipmentCard({
         )}
       </button>
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <button type="button" onClick={() => setOpen(true)} className="text-left">
-          <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+      {/* Info compacta — ocupa el 20% restante (ratio 4:5 - 4:4 = 4:1) */}
+      <div className="flex min-h-0 flex-1 items-center gap-2 px-2.5 py-1.5">
+        {/* Columna izquierda: brand + name (truncado) */}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex min-w-0 flex-1 flex-col text-left"
+        >
+          <div className="truncate font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
             {item.brand}
           </div>
-          <div className="mt-1 line-clamp-2 font-display text-base leading-tight tracking-tight text-ink hover:underline">
+          <div className="truncate font-display text-sm leading-tight tracking-tight text-ink hover:underline">
             {item.name}
+          </div>
+          <div className="flex items-baseline gap-1.5 leading-none">
+            <span className="font-display text-sm tabular text-ink">
+              {formatARS(item.pricePerDay)}
+            </span>
+            <span className="font-mono text-[8px] uppercase tracking-widest text-muted-foreground">
+              /jornada
+            </span>
+            {disponible !== undefined && (
+              <span
+                className={cn(
+                  "ml-auto font-mono text-[9px] uppercase tracking-widest tabular",
+                  sinStock
+                    ? "text-destructive"
+                    : stockBajo
+                    ? "text-amber-600"
+                    : "text-muted-foreground",
+                )}
+              >
+                {sinStock ? "—" : `${disponible} disp.`}
+              </span>
+            )}
           </div>
         </button>
 
-        {/* Disponibilidad */}
-        {disponible !== undefined && (
-          <div className={cn(
-            "font-mono text-[10px] uppercase tracking-widest",
-            sinStock ? "text-destructive/70" : stockBajo ? "text-amber" : "text-muted-foreground"
-          )}>
-            {sinStock ? "Sin stock" : `${disponible} disponible${disponible !== 1 ? "s" : ""}`}
-          </div>
-        )}
-
-        <div className="mt-auto flex items-end justify-between gap-2">
-          <div>
-            <div className="font-display text-lg tabular text-ink">
-              {formatARS(item.pricePerDay)}
-            </div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              / 1 jornada
-            </div>
-            {disponible !== undefined && (
-              <div
-                className={cn(
-                  "mt-1 font-mono text-[9px] uppercase tracking-widest tabular",
-                  disponible <= 0
-                    ? "text-destructive"
-                    : disponible === 1
-                      ? "text-amber-600"
-                      : "text-muted-foreground",
-                )}
-              >
-                {disponible <= 0
-                  ? "Sin stock"
-                  : `${disponible} disp${disponible === 1 ? "." : "."}`}
-              </div>
-            )}
-          </div>
-
-          {qty === 0 ? (
+        {/* Columna derecha: agregar / cantidad */}
+        {qty === 0 ? (
+          <button
+            onClick={() => !sinStock && add(item.id)}
+            disabled={sinStock}
+            aria-label="Agregar al carrito"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-md border hairline transition hover:border-amber hover:bg-amber hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        ) : (
+          <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-amber/40 bg-amber-soft p-0.5">
             <button
-              onClick={() => !sinStock && add(item.id)}
-              disabled={sinStock}
-              className="flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition hover:border-amber hover:bg-amber hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => remove(item.id)}
+              className="grid h-7 w-7 place-items-center rounded text-amber hover:bg-amber/20"
+              aria-label="Quitar uno"
+            >
+              <Minus className="h-3 w-3" />
+            </button>
+            <span className="w-5 text-center text-sm tabular">{qty}</span>
+            <button
+              onClick={() => {
+                if (!reachedMax) add(item.id);
+              }}
+              disabled={reachedMax}
+              className="grid h-7 w-7 place-items-center rounded text-amber hover:bg-amber/20 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Sumar uno"
             >
               <Plus className="h-3 w-3" />
-              {noStock ? "Sin stock" : "Agregar"}
             </button>
-          ) : (
-            <div className="flex items-center gap-1 rounded-md border border-amber/40 bg-amber-soft p-0.5">
-              <button
-                onClick={() => remove(item.id)}
-                className="grid h-7 w-7 place-items-center rounded text-amber hover:bg-amber/20"
-              >
-                <Minus className="h-3 w-3" />
-              </button>
-              <span className="w-6 text-center text-sm tabular">{qty}</span>
-              <button
-                onClick={() => {
-                  if (disponible === undefined || qty < disponible) {
-                    add(item.id);
-                  }
-                }}
-                disabled={disponible !== undefined && qty >= disponible}
-                className="grid h-7 w-7 place-items-center rounded text-amber hover:bg-amber/20 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Plus className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </motion.article>
   );
