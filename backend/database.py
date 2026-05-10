@@ -260,6 +260,11 @@ def init_db():
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_marcas_nombre ON marcas(nombre)")
 
+    # Migration: agregar columnas visible y orden para admin settings
+    conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT TRUE")
+    conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS orden INTEGER NOT NULL DEFAULT 100")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_marcas_orden ON marcas(orden ASC)")
+
     # Migration: agregar FK a marcas
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS brand_id INTEGER REFERENCES marcas(id)")
 
