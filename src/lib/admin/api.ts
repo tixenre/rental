@@ -178,8 +178,19 @@ export const adminApi = {
     );
   },
 
-  // crear pedido nuevo (wizard)
+  // crear pedido nuevo (wizard / página /nuevo)
   createPedido: (data: PedidoCreateInput) => authedPostJson<Pedido>("/api/alquileres", data),
+
+  // reemplazar items completos del pedido (PUT, requiere ≥1 ítem)
+  updatePedidoItems: (
+    id: number,
+    items: { equipo_id: number; cantidad: number; precio_jornada: number }[],
+  ) =>
+    authedJson<Pedido>(`/api/alquileres/${id}/items`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    }),
 
   // clientes — detalle / edición
   getCliente: (id: number) => authedJson<Cliente>(`/api/clientes/${id}`),
