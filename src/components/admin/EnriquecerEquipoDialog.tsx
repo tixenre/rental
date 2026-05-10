@@ -978,7 +978,11 @@ function FieldRow({
   current?: string | null;
   mono?: boolean;
 }) {
-  const changed = (current ?? "") !== value;
+  // Comparar normalizando: backend a veces devuelve null/undefined, el form
+  // siempre tiene string. Trim también, así "FX3" no se marca como cambiado
+  // si el actual es " FX3 ". Sin esto, casi todos los campos aparecen como
+  // "cambia" aunque el valor sea idéntico — confunde al review.
+  const changed = ((current ?? "") as string).trim() !== (value ?? "").trim();
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">

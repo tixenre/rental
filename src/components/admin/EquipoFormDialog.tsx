@@ -160,6 +160,10 @@ export function EquipoFormDialog({
 
   const buscarFotos = async () => {
     setPhotoSearching(true);
+    // Timeout 30s: si Firecrawl o el scraper backend cuelgan, abortamos
+    // para que el botón no quede en "Buscando…" indefinidamente.
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 30_000);
     try {
       const r = await authedJson<{ foto_candidates: string[] }>(
         "/api/admin/equipos/buscar-fotos",
@@ -172,6 +176,7 @@ export function EquipoFormDialog({
             modelo: form.getValues("modelo") || null,
             exclude: photoCands,
           }),
+          signal: ctrl.signal,
         },
       );
       const news = (r.foto_candidates ?? []).filter((u) => !photoCands.includes(u));
@@ -182,8 +187,13 @@ export function EquipoFormDialog({
         toast.success(`${news.length} fotos encontradas`);
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error buscando fotos");
+      if (e instanceof Error && e.name === "AbortError") {
+        toast.error("La búsqueda tardó demasiado (timeout 30s)");
+      } else {
+        toast.error(e instanceof Error ? e.message : "Error buscando fotos");
+      }
     } finally {
+      clearTimeout(timeoutId);
       setPhotoSearching(false);
     }
   };
@@ -250,6 +260,20 @@ export function EquipoFormDialog({
   const importarDesdeUrl = async () => {
     const u = importUrl.trim();
     if (!u) return;
+    // Validar que sea una URL válida HTTP(S) antes de mandarla al backend.
+    // Sin esto, un string suelto ("asd") se manda igual y vuelve un error
+    // feo del backend después de varios segundos.
+    try {
+      const parsed = new URL(u);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new Error("URL debe empezar con http:// o https://");
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "URL inválida";
+      setImportError(msg);
+      toast.error(`URL inválida: ${msg}`);
+      return;
+    }
     setImporting(true);
     setImportError(null);
     setImportSummary(null);
