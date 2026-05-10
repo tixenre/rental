@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { authedJson } from "@/lib/authedFetch";
 import { isBucketUrl } from "@/lib/equipment/photos";
+import { supabase } from "@/integrations/supabase/client";
 
 type DiagStep = { label: string; status: "pending" | "ok" | "fail" | "skip"; detail?: string };
 
@@ -117,17 +118,30 @@ export function EnriquecerEquipoDialog({
     update(1, { status: "pending", detail: "esperando backend…" });
 
     try {
-      const res = await authedJson<{
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        throw new Error("Iniciá sesión con Google como admin para guardar la foto.");
+      }
+
+      const response = await fetch(`/api/admin/equipos/${equipoId}/upload-foto-from-url`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ url: externalUrl }),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail?.detail ?? `upload-foto-from-url → ${response.status}`);
+      }
+      const res = await response.json() as {
         public_url: string;
         path: string | null;
         size?: number;
         content_type?: string;
-      }>(`/api/admin/equipos/${equipoId}/upload-foto-from-url`, {
-        method: "POST",
-        skipAuth: true,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: externalUrl }),
-      });
+      };
 
       update(1, {
         status: "ok",
