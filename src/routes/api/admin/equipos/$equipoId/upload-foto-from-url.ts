@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type {} from "@tanstack/react-start";
 
 import { ADMIN_EMAILS } from "@/lib/admin-emails";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -14,7 +13,7 @@ type DownloadedImage = {
 export const Route = createFileRoute("/api/admin/equipos/$equipoId/upload-foto-from-url")({
   server: {
     handlers: {
-      POST: async ({ request, params }) => {
+      POST: async ({ request, params }: { request: Request; params: { equipoId: string } }) => {
         const admin = await requireAdmin(request);
         if (!admin.ok) return jsonError(admin.status, admin.detail);
 
@@ -63,7 +62,7 @@ export const Route = createFileRoute("/api/admin/equipos/$equipoId/upload-foto-f
       },
     },
   },
-});
+} as any);
 
 async function requireAdmin(request: Request): Promise<{ ok: true } | { ok: false; status: number; detail: string }> {
   const auth = request.headers.get("authorization") ?? "";
