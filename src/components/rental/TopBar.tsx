@@ -81,11 +81,11 @@ export function TopBar() {
               <CalendarIcon className="h-5 w-5 shrink-0 text-amber" />
               {hasDates ? (
                 <span className="text-base font-semibold tabular-nums">
-                  {format(startDate!, "dd MMM", { locale: es })} {startTime}
+                  {format(startDate!, "EEE dd MMM", { locale: es })} {startTime}
                   <span className="mx-2 text-muted-foreground">→</span>
-                  {format(endDate!, "dd MMM", { locale: es })} {endTime}
+                  {format(endDate!, "EEE dd MMM", { locale: es })} {endTime}
                   <span className="ml-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                    · {jornadas}j
+                    · {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
                   </span>
                 </span>
               ) : (
