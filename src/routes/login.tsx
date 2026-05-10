@@ -7,11 +7,20 @@ import { getAppOrigin, isLovableHost } from "@/lib/app-origin";
 
 import { ArrowLeft } from "lucide-react";
 
+type LoginSearch = {
+  redirect?: string;
+  oauth?: "google";
+};
+
+function validateLoginSearch(search: Record<string, unknown>): LoginSearch {
+  const parsed: LoginSearch = {};
+  if (typeof search.redirect === "string") parsed.redirect = search.redirect;
+  if (search.oauth === "google") parsed.oauth = "google";
+  return parsed;
+}
+
 export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    redirect: typeof search.redirect === "string" ? search.redirect : undefined,
-    oauth: search.oauth === "google" ? "google" : undefined,
-  }),
+  validateSearch: validateLoginSearch,
   head: () => ({
     meta: [
       { title: "Iniciar sesión — Rambla Rental" },
