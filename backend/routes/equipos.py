@@ -65,6 +65,7 @@ class FichaUpdate(BaseModel):
     formato:       Optional[str] = None
     resolucion:    Optional[str] = None
     keywords_json: Optional[str] = None
+    nombre_publico_template: Optional[str] = None
 
 
 class KitItem(BaseModel):
