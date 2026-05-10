@@ -1,34 +1,17 @@
 /**
- * authedFetch — wrapper de fetch que adjunta el JWT de Supabase Auth
- * cuando el usuario está logueado. El backend FastAPI valida ese JWT en
- * su middleware (ver `backend/supabase_auth.py`) y resuelve el cliente
- * por `supabase_uid`.
- *
- * Para endpoints públicos (catálogo, disponibilidad) el header es ignorado;
- * para endpoints privados el backend devuelve 401 si no hay token válido.
+ * authedFetch — wrapper de fetch que envía la cookie `session` del backend.
  */
 
-import { supabase } from "@/integrations/supabase/client";
-
-const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+const API_BASE = (import.meta.env.VITE_API_URL ?? "https://ramblarental.up.railway.app").replace(/\/$/, "");
 
 export type AuthedFetchInit = Omit<RequestInit, "headers"> & {
   headers?: Record<string, string>;
-  /** Si true, NO incluye el Authorization header aunque haya sesión. */
-  skipAuth?: boolean;
 };
 
 export async function authedFetch(path: string, init: AuthedFetchInit = {}): Promise<Response> {
-  const { skipAuth, headers = {}, ...rest } = init;
-
-  if (!skipAuth) {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
-
+  const { headers = {}, ...rest } = init;
   const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
-  return fetch(url, { ...rest, headers });
+  return fetch(url, { ...rest, headers, credentials: "include" });
 }
 
 export async function authedJson<T>(path: string, init: AuthedFetchInit = {}): Promise<T> {

@@ -9,7 +9,6 @@ import {
   CalendarDays,
   BarChart3,
   Settings,
-  ExternalLink,
   LogOut,
 } from "lucide-react";
 
@@ -26,8 +25,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useAuth } from "@/hooks/use-auth";
-import { BACKOFFICE_URL } from "@/lib/admin-emails";
+import { authedFetch } from "@/lib/authedFetch";
 
 const items = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard, exact: true },
@@ -37,15 +35,14 @@ const items = [
   { title: "Calendario", url: "/admin/calendario", icon: CalendarDays },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
   { title: "Settings", url: "/admin/settings", icon: Settings },
-];
+] as const;
 
-export function AdminSidebar() {
+export function AdminSidebar({ email }: { email: string }) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const currentPath = useRouterState({
     select: (router) => router.location.pathname,
   });
-  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -53,9 +50,8 @@ export function AdminSidebar() {
     if (isSigningOut) return;
     setIsSigningOut(true);
     try {
-      const { error } = await signOut();
-      if (error) throw error;
-      navigate({ to: "/login", search: { redirect: "/admin" } });
+      await authedFetch("/auth/logout", { method: "POST" });
+      navigate({ to: "/admin/login" });
     } catch (e) {
       toast.error("No se pudo cerrar sesión", {
         description: e instanceof Error ? e.message : String(e),
@@ -117,44 +113,16 @@ export function AdminSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        <SidebarGroup>
-          {!collapsed && (
-            <SidebarGroupLabel className="font-mono text-[9px] uppercase tracking-[0.25em]">
-              Externo
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  tooltip={collapsed ? "Back-office viejo" : undefined}
-                >
-                  <a
-                    href={BACKOFFICE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2"
-                  >
-                    <ExternalLink className="h-4 w-4 shrink-0" />
-                    {!collapsed && <span>Back-office viejo</span>}
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="border-t hairline">
-        {!collapsed && user?.email && (
+        {!collapsed && email && (
           <div className="px-2 py-1.5 min-w-0">
             <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
               Sesión
             </div>
-            <div className="text-xs text-ink truncate" title={user.email}>
-              {user.email}
+            <div className="text-xs text-ink truncate" title={email}>
+              {email}
             </div>
           </div>
         )}
