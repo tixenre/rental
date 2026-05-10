@@ -1,28 +1,45 @@
-No, no estás pidiendo algo raro. Se guardó pensando en el modal de detalle, pero vos estás mirando la fila expandida del catálogo, donde el componente que dice “Sin información adicional” no está usando la info enriquecida de forma clara; además la foto puede estar fallando por guardado/invalidación/cache.
+Sí, se entiende. No estás pidiendo algo raro: la base ya tiene una tabla de ficha (`equipo_fichas`) y el frontend ya sabe leer `descripcion` + `specs_json`, pero hoy el flujo está incompleto/bugueado.
 
-Plan:
+Lo que encontré:
+- El backend público sí devuelve `ficha`, pero actualmente todos los equipos visibles tienen `descripcion` y `specs_json` vacíos.
+- Las fotos que existen son URLs externas de B&H, no fotos copiadas al storage interno; por eso pueden verse rotas o bloqueadas.
+- El enriquecedor devuelve un preview, pero no hay confirmación robusta de que la ficha/foto realmente quedó persistida y reflejada en la lista.
+- La búsqueda pública no es fuzzy: busca por `includes`, sin normalizar acentos. Por eso `baterias` no encuentra `Batería`; `batería` sí.
 
-1. Hacer visible la ficha enriquecida en la fila pública
-   - En `EquipmentRow`, cuando se despliega una fila, reemplazar el estado “Sin información adicional” por una sección real con:
-     - 3 o 4 specs/selling points destacados primero.
-     - Descripción breve si existe.
-     - “Incluye” debajo si es combo/kit.
-   - Si no hay ficha, recién ahí mostrar “Sin información adicional”.
+Plan de implementación:
 
-2. Unificar la presentación de “selling points”
-   - Ajustar `IncludedList` para que no trate las specs como una tabla técnica larga en ese contexto.
-   - Mostrar specs importantes como chips/pares cortos, aptos para catálogo: `6K`, `Global Shutter`, `Canon RF`, `Full Frame`, etc.
-   - Mantener el acordeón completo de especificaciones en el modal de detalle para quien quiera ver todo.
+1. Hacer el guardado del enriquecimiento confiable
+   - Cambiar el flujo para que al aplicar IA guarde en una sola operación controlada:
+     - datos básicos: marca, modelo, fuente, foto
+     - ficha: descripción, specs, montura/formato/resolución cuando existan
+   - Después de guardar, volver a leer la ficha/equipo y mostrar un toast claro: qué se guardó y si algo falló.
+   - Si la foto falla, no decir “equipo actualizado” como si todo estuviera perfecto; mostrar “info guardada, foto no se pudo copiar”.
 
-3. Corregir refresco después de enriquecer
-   - Al aplicar enriquecimiento, invalidar también el query público `equipos`, no solo el query admin.
-   - Así, si estás en el catálogo o volvés a él, se ve la nueva foto/ficha sin esperar cache ni recargar manualmente.
+2. Persistir fotos de forma usable
+   - Priorizar copiar la foto externa al bucket interno `equipos-fotos`.
+   - Si la URL externa no se puede descargar por bloqueo, conservar el resto de la ficha y mostrar el error específico.
+   - Evitar que queden guardadas URLs externas rotas como imagen principal.
 
-4. Robustecer guardado de fotos
-   - Mantener la subida al bucket interno, pero hacer que si la subida externa falla quede claro con un error útil.
-   - Asegurar que `foto_url` actualizado vuelva en `/api/equipos` y se mapee a `fotoUrl` para cards, filas y ficha pública.
-   - Evitar que una URL externa rota quede como “guardada” si no se pudo copiar al storage.
+3. Mostrar la info enriquecida donde corresponde
+   - En la fila expandida del catálogo: mostrar 3–4 specs/selling points + descripción breve; solo mostrar “Sin información adicional” si realmente no hay ficha.
+   - En la ficha/modal de detalle: mostrar descripción, acordeón de especificaciones completo y foto principal.
+   - En cards/filas: usar la foto guardada si existe, con fallback visual si falla la carga.
 
-5. Verificar el flujo completo
-   - Probar conceptualmente: enriquecer equipo → aplicar → catálogo público → fila expandida muestra specs/descripcion → thumbnail/foto aparece.
-   - Si el backend devuelve ficha/foto pero el frontend no lo refleja, corregir el mapeo; si no lo devuelve, corregir el endpoint.
+4. Crear una ficha de equipo más completa
+   - Reorganizar la ficha pública para que use toda la info disponible:
+     - foto
+     - descripción
+     - specs completas
+     - selling points destacados
+     - fuente/metadata si aplica, sin mostrar datos internos innecesarios
+   - Mantener una presentación compacta en catálogo y más detallada en el modal.
+
+5. Hacer la búsqueda más tolerante
+   - Normalizar acentos en la búsqueda pública del frontend: `baterias` debe encontrar `Batería`.
+   - Incluir en la búsqueda frontend: nombre público, marca, categoría, descripción y specs guardadas.
+   - Opcionalmente mejorar también el backend admin para búsquedas sin acentos si hace falta.
+
+6. Verificación
+   - Revisar `/api/equipos` después de enriquecer para confirmar que devuelve `ficha.descripcion`, `ficha.specs_json` y `foto_url`.
+   - Confirmar que la fila expandida ya no muestra “Sin información adicional” cuando hay specs/descripcion.
+   - Confirmar que buscar `baterias` devuelve las baterías aunque estén guardadas como `Batería`.
