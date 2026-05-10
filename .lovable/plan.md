@@ -1,31 +1,20 @@
-## Plan
+## Plan para corregir la redirección al preview
 
-Voy a dejar el flujo de admin funcionando de punta a punta:
+1. **Eliminar el salto automático al preview**
+   - Quitar del login la lógica que, si el host no es `.lovable.app`, manda al usuario a `id-preview--...lovable.app`.
+   - Usar siempre `window.location.origin` como origen del OAuth, para que Google vuelva exactamente al mismo dominio desde donde empezó el login.
 
-1. **Eliminar la dependencia rígida del preview de Lovable**
-   - Reemplazar el `APP_ORIGIN` fijo que hoy fuerza el callback a `id-preview--...lovable.app`.
-   - Hacer que el login use el origen actual cuando está en un host compatible y sólo use fallback cuando realmente haga falta.
-   - Evitar que el usuario quede “secuestrado” en el preview después de autenticarse.
+2. **Simplificar `app-origin` para evitar futuros rebotes**
+   - Dejar `getAppOrigin()` como helper seguro que prioriza el origen actual del navegador.
+   - Mantener compatibilidad con imports existentes, pero sin fallback activo al preview salvo contexto SSR extremo.
 
-2. **Preservar el destino `/admin` durante Google OAuth**
-   - Mantener el `redirect=/admin` antes, durante y después del rebote de Google.
-   - Reforzar el guardado temporal del destino para que no caiga en `/mis-pedidos` cuando el broker OAuth pierde el query string.
+3. **Preservar `/admin` después del login**
+   - Mantener `postLoginRedirect=/admin` en `sessionStorage` antes de iniciar Google OAuth.
+   - Al volver del login, redirigir a `/admin` si el destino guardado o el query param lo indican; si no, ir a `/mis-pedidos`.
 
-3. **Mejorar la entrada protegida al admin**
-   - Ajustar `/admin` para redirigir siempre a `/login?redirect=/admin` si no hay sesión.
-   - Una vez logueado, validar email admin y mostrar claramente “no autorizado” sólo si la cuenta no corresponde.
-
-4. **Revisar links relacionados**
-   - Verificar el link “Admin” del catálogo y el logout del admin para que vuelvan al flujo correcto.
-   - No tocar el back-office viejo salvo que esté interfiriendo.
+4. **Corregir el error de build `Script not found "build:dev"`**
+   - Agregar el script `build:dev` en `package.json` apuntando al build existente para que el entorno de Lovable pueda compilar.
 
 5. **Verificación**
-   - Probar mentalmente/por herramientas el recorrido: catálogo → Admin → Google → vuelve → `/admin`.
-   - Confirmar que el flujo normal de clientes sigue yendo a `/mis-pedidos`.
-
-## Archivos previstos
-
-- `src/lib/app-origin.ts`
-- `src/routes/login.tsx`
-- `src/routes/admin.tsx` si hace falta endurecer el guard
-- `src/components/admin/AdminSidebar.tsx` sólo si el logout/link externo interfiere
+   - Revisar que ya no exista ningún `window.location.href` hacia el preview hardcodeado en el login.
+   - Confirmar que el flujo esperado queda: `/admin` → `/login?redirect=/admin` → Google → mismo dominio `/login?...` → `/admin`.
