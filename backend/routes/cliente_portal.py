@@ -9,7 +9,6 @@ from typing import Optional
 
 from database import get_db, row_to_dict
 from routes.auth import get_session, signer, COOKIE_SECURE, SESSION_MAX_AGE
-from supabase_auth import upsert_cliente_from_claims
 from itsdangerous import BadSignature, SignatureExpired
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 
@@ -32,20 +31,7 @@ def _documentos_disponibles(estado: str) -> dict:
 # ── Auth helper ───────────────────────────────────────────────────────────────
 
 def require_cliente(request: Request) -> dict:
-    """
-    Devuelve `{cliente_id, email, name, role}` aceptando dos métodos:
-      1. JWT de Supabase Auth (frontend Lovable) — se hace upsert en `clientes`.
-      2. Cookie de sesión clásica (portal cliente con login propio).
-    """
-    claims = getattr(request.state, "supabase_claims", None)
-    if claims:
-        cliente = upsert_cliente_from_claims(claims)
-        return {
-            "cliente_id": cliente["id"],
-            "email": cliente.get("email"),
-            "name": cliente.get("nombre"),
-            "role": "cliente",
-        }
+    """Devuelve la sesión del cliente (cookie). 401 si no hay sesión válida."""
     session = get_session(request)
     if not session or session.get("role") != "cliente":
         raise HTTPException(401, "Sesión de cliente requerida")

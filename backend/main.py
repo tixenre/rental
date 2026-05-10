@@ -3,6 +3,7 @@ Rambla Rental API — FastAPI + PostgreSQL
 Run: uvicorn main:app --reload --port 8000
 """
 
+import os
 import threading
 from pathlib import Path
 
@@ -24,17 +25,25 @@ from routes.settings         import router as settings_router
 from routes.cliente_portal   import router as cliente_portal_router
 from middleware          import auth_middleware
 
-FRONTEND_ORIGIN = "https://id-preview--cd1cc884-084b-435b-8af0-167f25bc78ca.lovable.app"
-
 # ── App ──────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="Rambla Rental API", version="2.0")
+
+# Orígenes permitidos para CORS con credenciales (cookie de sesión).
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.getenv(
+        "FRONTEND_ORIGINS",
+        "https://id-preview--cd1cc884-084b-435b-8af0-167f25bc78ca.lovable.app,"
+        "http://localhost:5173,http://localhost:8000",
+    ).split(",") if o.strip()
+]
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.lovable\.app",
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
@@ -66,16 +75,6 @@ def health():
     """Health check endpoint para Railway."""
     return {"status": "ok"}
 
-@app.get("/~oauth/initiate", include_in_schema=False)
-def oauth_initiate(request: Request):
-    """Railway no sirve el broker OAuth; reenviamos al frontend Lovable."""
-    from urllib.parse import urlencode
-
-    params = dict(request.query_params)
-    if params.get("redirect_uri"):
-        params["redirect_uri"] = params["redirect_uri"].replace("https://ramblarental.up.railway.app", FRONTEND_ORIGIN)
-    return RedirectResponse(f"{FRONTEND_ORIGIN}/~oauth/initiate?{urlencode(params)}", status_code=307)
-
 # ── Páginas ──────────────────────────────────────────────────────────────────
 
 def _serve_frontend(path: str = "index.html"):
@@ -86,7 +85,6 @@ def _serve_frontend(path: str = "index.html"):
     classic_file = FRONT / path
     if classic_file.exists():
         return FileResponse(str(classic_file))
-    # Fallback: serve SPA index (TanStack Router maneja el 404 en cliente)
     spa_index = FRONT_NEW / "index.html"
     if spa_index.exists():
         return FileResponse(str(spa_index))
@@ -97,13 +95,9 @@ def root():
     return _serve_frontend("index.html")
 
 @app.get("/login", include_in_schema=False)
-def login_page(request: Request):
-    """Railway no maneja Google OAuth: reenviamos al frontend Lovable
-    preservando el ?redirect=... para volver a /admin después del login."""
-    from urllib.parse import urlencode
-    qs = urlencode(dict(request.query_params))
-    target = f"{FRONTEND_ORIGIN}/login" + (f"?{qs}" if qs else "")
-    return RedirectResponse(target, status_code=307)
+def login_page():
+    # El login del admin vive en el SPA en /admin/login.
+    return RedirectResponse("/admin/login", status_code=307)
 
 @app.get("/admin", include_in_schema=False)
 def admin():

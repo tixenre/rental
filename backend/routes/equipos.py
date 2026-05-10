@@ -689,7 +689,7 @@ class EtiquetasReorder(BaseModel):
 
 @router.get("/admin/etiquetas")
 def admin_list_etiquetas(request: Request):
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
     conn = get_db()
     try:
@@ -717,7 +717,7 @@ def admin_list_etiquetas(request: Request):
 
 @router.post("/admin/etiquetas", status_code=201)
 def admin_create_etiqueta(data: EtiquetaCreate, request: Request):
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
     nombre = (data.nombre or "").strip()
     if not nombre:
@@ -759,7 +759,7 @@ def admin_create_etiqueta(data: EtiquetaCreate, request: Request):
 
 @router.patch("/admin/etiquetas/{eid}")
 def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
     sets, vals = [], []
     if patch.nombre is not None:
@@ -804,7 +804,7 @@ def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
 
 @router.delete("/admin/etiquetas/{eid}", status_code=204)
 def admin_delete_etiqueta(eid: int, request: Request):
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
     conn = get_db()
     try:
@@ -817,7 +817,7 @@ def admin_delete_etiqueta(eid: int, request: Request):
 
 @router.post("/admin/etiquetas/reorder")
 def admin_reorder_etiquetas(payload: EtiquetasReorder, request: Request):
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
     conn = get_db()
     try:
@@ -942,7 +942,7 @@ class CategoriasReorder(BaseModel):
 
 @router.get("/admin/categorias")
 def admin_list_categorias(request: Request):
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
     conn = get_db()
     try:
@@ -965,7 +965,7 @@ def admin_list_categorias(request: Request):
 
 @router.post("/admin/categorias", status_code=201)
 def admin_create_categoria(data: CategoriaCreate, request: Request):
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
     nombre = (data.nombre or "").strip()
     if not nombre:
@@ -1003,7 +1003,7 @@ def admin_create_categoria(data: CategoriaCreate, request: Request):
 
 @router.patch("/admin/categorias/{cid}")
 def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
     sets, vals = [], []
     if patch.nombre is not None:
@@ -1053,7 +1053,7 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
 
 @router.delete("/admin/categorias/{cid}", status_code=204)
 def admin_delete_categoria(cid: int, request: Request):
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
     conn = get_db()
     try:
@@ -1071,7 +1071,7 @@ def admin_delete_categoria(cid: int, request: Request):
 
 @router.post("/admin/categorias/reorder")
 def admin_reorder_categorias(payload: CategoriasReorder, request: Request):
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
     conn = get_db()
     try:
@@ -1096,7 +1096,7 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
     - apply=1: REEMPLAZA las categorías de cada equipo que matchee al menos 1
       regla; los que no matchean no se tocan. Regenera auto-tags después.
     """
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
 
     conn = get_db()
@@ -1251,7 +1251,7 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     extraer marca/modelo/specs/foto en JSON estructurado. Devuelve un preview;
     el frontend decide qué campos aplicar via PATCH normal.
     """
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
 
     import os, httpx
@@ -1549,7 +1549,7 @@ def admin_proxy_image(url: str, request: Request):
     devuelve al cliente. Útil porque B&H/Adorama bloquean hotlinking pero el
     frontend necesita los bytes para subirlos a Supabase Storage.
     """
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
 
     import httpx
@@ -1822,7 +1822,7 @@ def admin_upload_foto_from_url(
     Esto reemplaza el upload directo desde el browser, que requería sesión
     Supabase activa y fallaba con "rol anon" cuando el JWT expiraba.
     """
-    from supabase_auth import require_admin
+    from admin_guard import require_admin
     require_admin(request)
 
     url = (payload.url or "").strip()
