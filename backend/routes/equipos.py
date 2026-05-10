@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from database import (
     get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
-    regenerate_auto_tags,
+    attach_ficha, regenerate_auto_tags,
 )
 from routes.auth import get_session
 
