@@ -57,6 +57,15 @@ export type Equipo = {
   visible_catalogo: number;
   estado: string;
   etiquetas?: string[];
+  kit?: KitComponente[];
+};
+
+export type KitComponente = {
+  componente_id: number;
+  cantidad: number;
+  nombre: string;
+  marca?: string | null;
+  foto_url?: string | null;
 };
 
 export type EquiposListResp = {
