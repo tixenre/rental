@@ -79,7 +79,7 @@ export type EquipoInput = Partial<Omit<Equipo, "id" | "etiquetas">> & {
   nombre: string;
 };
 
-export type Etiqueta = { id: number; nombre: string; uso_count?: number };
+export type Etiqueta = { nombre: string; total?: number };
 
 export type EtiquetaAdmin = {
   id: number;
@@ -89,6 +89,16 @@ export type EtiquetaAdmin = {
   total: number;
 };
 
+// Categoría: vive en su propia taxonomía (tabla `categorias`).
+export type CategoriaAdmin = {
+  id: number;
+  nombre: string;
+  prioridad: number;
+  parent_id: number | null;
+  total: number;
+};
+
+// Árbol público para filtros del catálogo.
 export type Categoria = {
   id?: number;
   nombre: string;
