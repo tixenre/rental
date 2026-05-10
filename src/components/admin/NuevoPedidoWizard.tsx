@@ -296,15 +296,36 @@ function StepCliente({
   setAdHoc: (v: { nombre: string; email: string; telefono: string }) => void;
 }) {
   const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState({ nombre: "", apellido: "", email: "", telefono: "" });
+  const [highlight, setHighlight] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const qc = useQueryClient();
 
+  // Debounce de la búsqueda (250 ms) — evita pegarle al backend en cada tecla.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
   const clientesQ = useQuery({
-    queryKey: ["admin", "clientes", { q }],
-    queryFn: () => adminApi.listClientes({ q: q || undefined, per_page: 100 }),
+    queryKey: ["admin", "clientes", { q: debouncedQ }],
+    queryFn: () => adminApi.listClientes({ q: debouncedQ || undefined, per_page: 50 }),
     enabled: !cliente,
   });
+
+  const results = clientesQ.data?.items ?? [];
+
+  // Reset highlight cuando cambia la lista
+  useEffect(() => { setHighlight(0); }, [results.length]);
+
+  // Auto-scroll del item resaltado
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLLIElement>(`li[data-idx="${highlight}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [highlight]);
 
   const createCliMut = useMutation({
     mutationFn: () => adminApi.createCliente(creating),
@@ -316,6 +337,21 @@ function StepCliente({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!results.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlight((h) => Math.min(results.length - 1, h + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => Math.max(0, h - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const sel = results[highlight];
+      if (sel) setCliente(sel);
+    }
+  };
 
   if (cliente) {
     return (
@@ -335,38 +371,82 @@ function StepCliente({
     );
   }
 
+  const showCombobox = q.trim().length > 0;
+
   return (
     <div className="space-y-4">
       <div className="relative">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          autoFocus value={q} onChange={(e) => setQ(e.target.value)}
+          ref={inputRef}
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={onKeyDown}
           placeholder="Buscar cliente por nombre, apellido, email o CUIT…"
           className="pl-9"
+          role="combobox"
+          aria-expanded={showCombobox}
+          aria-controls="clientes-listbox"
+          aria-activedescendant={results[highlight] ? `cli-opt-${results[highlight].id}` : undefined}
         />
+        {q && (
+          <button
+            type="button"
+            onClick={() => { setQ(""); inputRef.current?.focus(); }}
+            className="absolute right-2 top-2 text-muted-foreground hover:text-ink"
+            aria-label="Limpiar búsqueda"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <ScrollArea className="h-72 rounded-md border hairline">
-        <ul className="divide-y">
-          {(clientesQ.data?.items ?? []).map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                onClick={() => setCliente(c)}
-                className="w-full text-left px-3 py-2 hover:bg-accent/30 transition-colors"
+      {showCombobox && (
+        <ScrollArea className="h-72 rounded-md border hairline">
+          <ul ref={listRef} id="clientes-listbox" role="listbox" className="divide-y">
+            {clientesQ.isLoading && (
+              <li className="text-sm text-muted-foreground p-4 text-center">Buscando…</li>
+            )}
+            {!clientesQ.isLoading && results.length === 0 && (
+              <li className="text-sm text-muted-foreground p-4 text-center">
+                Sin resultados para “{debouncedQ}”.
+              </li>
+            )}
+            {results.map((c, i) => (
+              <li
+                key={c.id}
+                data-idx={i}
+                role="option"
+                id={`cli-opt-${c.id}`}
+                aria-selected={i === highlight}
               >
-                <div className="text-sm text-ink">{c.apellido}, {c.nombre}</div>
-                <div className="text-xs text-muted-foreground">
-                  {[c.email, c.telefono].filter(Boolean).join(" · ") || "—"}
-                </div>
-              </button>
-            </li>
-          ))}
-          {clientesQ.data?.items.length === 0 && (
-            <li className="text-sm text-muted-foreground p-4 text-center">Sin resultados.</li>
-          )}
-        </ul>
-      </ScrollArea>
+                <button
+                  type="button"
+                  onClick={() => setCliente(c)}
+                  onMouseEnter={() => setHighlight(i)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 transition-colors",
+                    i === highlight ? "bg-accent/60" : "hover:bg-accent/30",
+                  )}
+                >
+                  <div className="text-sm text-ink">
+                    {c.apellido ? `${c.apellido}, ${c.nombre}` : c.nombre}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {[c.email, c.telefono, c.cuit].filter(Boolean).join(" · ") || "—"}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </ScrollArea>
+      )}
+      {!showCombobox && (
+        <p className="text-xs text-muted-foreground">
+          Empezá a tipear para buscar. Usá ↑ ↓ y Enter para seleccionar.
+        </p>
+      )}
 
       <div className="rounded-md border hairline p-3 space-y-3">
         <div className="flex items-center justify-between">
