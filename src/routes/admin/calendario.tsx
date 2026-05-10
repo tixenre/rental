@@ -28,8 +28,8 @@ const ymd = (d: Date) => {
 
 function CalendarioPage() {
   const today = new Date();
+  const navigate = useNavigate();
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [openId, setOpenId] = useState<number | null>(null);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
