@@ -508,15 +508,46 @@ function StepFechas({
   hasta: string; setHasta: (v: string) => void;
   jornadas: number;
 }) {
+  const desdeEnPasado = isPastDate(desde);
+  const ordenInvalido = !!desde && !!hasta && new Date(hasta).getTime() < new Date(desde).getTime();
+  const today = todayISO();
+
   return (
     <div className="space-y-4 max-w-md">
       <div>
         <Label className="text-xs">Desde</Label>
-        <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
+        <Input
+          type="date" value={desde}
+          onChange={(e) => {
+            const v = e.target.value;
+            setDesde(v);
+            // Si la fecha hasta queda antes del nuevo desde, la ajustamos.
+            if (hasta && new Date(hasta).getTime() < new Date(v).getTime()) {
+              setHasta(v);
+            }
+          }}
+          className={cn(desdeEnPasado && "border-amber-500/60")}
+        />
+        {desdeEnPasado && (
+          <p className="text-[11px] text-amber-700 mt-1 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            La fecha de inicio es anterior a hoy ({today}).
+          </p>
+        )}
       </div>
       <div>
         <Label className="text-xs">Hasta</Label>
-        <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+        <Input
+          type="date" value={hasta}
+          min={desde || undefined}
+          onChange={(e) => setHasta(e.target.value)}
+          className={cn(ordenInvalido && "border-destructive")}
+        />
+        {ordenInvalido && (
+          <p className="text-[11px] text-destructive mt-1">
+            La fecha de devolución no puede ser anterior a la de retiro.
+          </p>
+        )}
       </div>
       <div className="rounded-md bg-accent/30 px-4 py-3 text-sm">
         <span className="text-muted-foreground">Duración: </span>
