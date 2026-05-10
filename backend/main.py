@@ -6,7 +6,7 @@ Run: uvicorn main:app --reload --port 8000
 import threading
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -67,15 +67,13 @@ def health():
     return {"status": "ok"}
 
 @app.get("/~oauth/initiate", include_in_schema=False)
-def oauth_initiate(provider: str = "google", redirect_uri: str | None = None, state: str | None = None):
+def oauth_initiate(request: Request):
     """Railway no sirve el broker OAuth; reenviamos al frontend Lovable."""
     from urllib.parse import urlencode
 
-    params = {"provider": provider}
-    if redirect_uri:
-        params["redirect_uri"] = redirect_uri.replace("https://ramblarental.up.railway.app", FRONTEND_ORIGIN)
-    if state:
-        params["state"] = state
+    params = dict(request.query_params)
+    if params.get("redirect_uri"):
+        params["redirect_uri"] = params["redirect_uri"].replace("https://ramblarental.up.railway.app", FRONTEND_ORIGIN)
     return RedirectResponse(f"{FRONTEND_ORIGIN}/~oauth/initiate?{urlencode(params)}", status_code=307)
 
 # ── Páginas ──────────────────────────────────────────────────────────────────
