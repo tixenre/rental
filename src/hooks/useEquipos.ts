@@ -85,16 +85,75 @@ function resolveCategory(etiquetas: string[], nombre: string, marca: string): Ca
   return inferCategory(nombre, marca);
 }
 
+/* ─── Nombre público derivado ──────────────────────────────────────── */
+//
+// Combina tipo (primera categoría asignada) + marca + modelo + montura +
+// formato + resolución (de la ficha técnica). Si no hay ficha ni categorías,
+// cae al combo viejo "nombre + modelo".
+
+function buildPublicName(e: BackendEquipo): string {
+  const tipo = e.categorias?.[0]?.nombre?.trim() ?? "";
+  const marca = (e.marca ?? "").trim();
+  const modelo = (e.modelo ?? "").trim();
+  const f = e.ficha;
+  const montura = (f?.montura ?? "").trim();
+  const formato = (f?.formato ?? "").trim();
+  const resolucion = (f?.resolucion ?? "").trim();
+
+  const parts = [tipo, marca, modelo, montura, formato, resolucion]
+    .map((s) => s.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return e.nombre || "Sin nombre";
+  }
+  // Dedupe trivial (si el modelo ya está en el nombre / etc.)
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of parts) {
+    const key = p.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(p);
+    }
+  }
+  return out.join(" ");
+}
+
 /* ─── Adaptador backend → tipo frontend ─────────────────────────────── */
 
 export function backendToEquipment(e: BackendEquipo): Equipment {
   const nombre = e.nombre ?? "";
   const marca  = e.marca  ?? "";
-  const name   = [nombre, e.modelo].filter(Boolean).join(" ") || "Sin nombre";
+  const publicName = buildPublicName(e);
+  const fallbackName = [nombre, e.modelo].filter(Boolean).join(" ") || "Sin nombre";
+  const name = publicName || fallbackName;
+
+  const ficha = e.ficha;
+  let parsedSpecs: { label: string; value: string }[] = [];
+  if (ficha?.specs_json) {
+    try {
+      const arr = JSON.parse(ficha.specs_json);
+      if (Array.isArray(arr)) {
+        parsedSpecs = arr
+          .filter((s) => s && typeof s === "object" && s.label && s.value)
+          .map((s: { label: string; value: string }) => ({ label: String(s.label), value: String(s.value) }));
+      }
+    } catch {
+      /* ignore malformed specs */
+    }
+  }
+
+  const kit = Array.isArray(e.kit) ? e.kit as Array<{ componente_id: number; nombre: string; cantidad: number }> : [];
+  const includes = kit.map((k) => ({
+    id: String(k.componente_id),
+    name: k.nombre,
+    qty: k.cantidad,
+  }));
 
   return {
     id: String(e.id),
-    slug: `${marca}-${name}`
+    slug: `${marca}-${nombre}`
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") || `equipo-${e.id}`,
@@ -104,11 +163,11 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     pricePerDay: e.precio_jornada ?? 0,
     fotoUrl: e.foto_url ?? null,
     cantidad: e.cantidad ?? 1,
-    description: "",
-    specs: [],
+    description: ficha?.descripcion ?? "",
+    specs: parsedSpecs,
     isNew: false,
-    isCombo: false,
-    includes: [],
+    isCombo: includes.length > 0,
+    includes,
     _backendId: e.id,
   };
 }
