@@ -1480,6 +1480,20 @@ def admin_proxy_image(url: str, request: Request):
                     r = r3
                 else:
                     last_status, last_body = r3.status_code, r3.content
+            # 4º intento: proxy público images.weserv.nl (esquiva hotlink-block)
+            if r.status_code in (403, 401, 429):
+                from urllib.parse import quote
+                # weserv requiere la URL sin esquema
+                stripped = url.split("://", 1)[1] if "://" in url else url
+                weserv_url = f"https://images.weserv.nl/?url={quote(stripped, safe='')}"
+                r4 = client.get(weserv_url, headers={
+                    "User-Agent": "Mozilla/5.0",
+                    "Accept": "image/*,*/*;q=0.8",
+                })
+                if r4.status_code == 200 and r4.headers.get("content-type", "").startswith("image/"):
+                    r = r4
+                else:
+                    last_status, last_body = r4.status_code, r4.content
     except httpx.HTTPError as e:
         raise HTTPException(502, f"No se pudo descargar la imagen: {e}")
 
