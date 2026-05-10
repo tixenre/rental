@@ -34,6 +34,7 @@ export function IncludedList({ item }: { item: Equipment }) {
 
   return (
     <div className="space-y-4">
+      {hasKeywords && <KeywordChips keywords={keywords} />}
       {hasSpecs && (
         <div>
           <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-ink">
