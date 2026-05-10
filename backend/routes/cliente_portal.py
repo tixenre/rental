@@ -3,7 +3,7 @@ routes/cliente_portal.py — Portal de clientes (solo Google OAuth).
 """
 
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from typing import Optional
 
@@ -11,8 +11,22 @@ from database import get_db, row_to_dict
 from routes.auth import get_session, signer, COOKIE_SECURE, SESSION_MAX_AGE
 from supabase_auth import upsert_cliente_from_claims
 from itsdangerous import BadSignature, SignatureExpired
+from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 
 router = APIRouter()
+
+
+# ── Documentos disponibles según estado del pedido ───────────────────────────
+
+def _documentos_disponibles(estado: str) -> dict:
+    """Devuelve qué PDFs puede descargar el cliente según el estado del pedido."""
+    e = (estado or "").lower()
+    confirmado_o_mas = e in ("confirmado", "entregado", "devuelto", "finalizado")
+    return {
+        "remito": confirmado_o_mas,
+        "contrato": confirmado_o_mas,
+        "albaran": e in ("entregado", "devuelto", "finalizado"),
+    }
 
 
 # ── Auth helper ───────────────────────────────────────────────────────────────
