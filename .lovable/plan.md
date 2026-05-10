@@ -1,53 +1,61 @@
-
 ## Objetivo
 
-Que el flujo "Re-buscar → Aplicar al equipo" guarde la foto en Supabase Storage de forma confiable. Hoy falla porque el scraper devuelve URLs de imagen rotas (404) y el proxy no tiene fallbacks suficientes.
+Que el upload de la foto enriquecida no dependa nunca del estado de sesión del browser. El backend descarga la imagen y la sube a Supabase Storage usando `SUPABASE_SERVICE_ROLE_KEY` (bypassa RLS). El frontend recibe la URL pública final y la guarda en `equipos.foto_url`.
 
-**Sí es posible** — no hay nada de fondo que lo impida (Storage funciona, RLS está bien, sesión existe). El problema es 100% que la URL candidata está mal o muerta.
+Esto elimina el error "Sin sesión Supabase (rol anon)" del paso 3 y deja el flujo robusto incluso si el JWT expiró o el admin entró por cookie clásica.
 
 ## Cambios
 
-### 1. Validar la foto candidata en el backend antes de devolverla
+### 1. Nuevo endpoint backend `POST /api/admin/equipos/{id}/upload-foto-from-url`
 
-En `admin_enriquecer_equipo` (`backend/routes/equipos.py`), después de elegir `foto_candidate`:
+En `backend/routes/equipos.py`, junto a `admin_enriquecer_equipo`:
 
-- Hacer un `HEAD` (con fallback a `GET` con `Range: bytes=0-1024` si HEAD falla, lo cual es común) usando los mismos headers del proxy.
-- Aceptar sólo si:
-  - status 200/206
-  - `content-type` empieza con `image/`
-  - `content-length` (cuando viene) > 1KB (descarta píxeles de tracking)
-- Si la candidata principal (B&H) no pasa, **probar la candidata alternativa** (oficial / Adorama).
-- Si ninguna pasa, devolver `foto_url: null` con un campo nuevo `foto_motivo` ("404 en origen", "tipo no es imagen", etc.) para mostrar en el diagnóstico.
+- Body: `{ "url": "<url externa>" }`.
+- Auth: `Depends(require_admin)` (mismo gate que el resto de `/api/admin/*`).
+- Pasos:
+  1. Re-validar la URL con el helper `_validate_image` ya existente (HEAD/GET parcial, content-type `image/*`, > 1KB).
+  2. Descargar el blob completo con los headers del proxy (User-Agent, Referer del host) — reutilizar la lógica del proxy actual incluyendo el fallback a `images.weserv.nl` para 401/403/404/429/5xx.
+  3. Subir a Supabase Storage usando un cliente service-role:
+     - `supabase.storage.from_("equipos-fotos").upload(path=f"equipos/{equipo_id}/foto-{ts}.{ext}", file=blob, file_options={"content-type": ct, "upsert": "false"})`.
+     - Cliente: nuevo helper `get_supabase_admin()` en `backend/supabase_auth.py` que crea un client con `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (ya están en env).
+  4. Devolver `{ "public_url": "<url pública del bucket>", "path": "<path>" }`.
+- Errores con detalle: `{"detail": "<motivo>"}` y código HTTP apropiado (400 URL inválida, 502 origen falló, 500 storage falló).
 
-Esto evita el 404 en el momento de aplicar — la URL que llega al frontend ya está garantizada como descargable.
+### 2. Frontend: usar el nuevo endpoint en `EnriquecerEquipoDialog.tsx`
 
-### 2. Mejorar la elección de la URL de foto
+Reemplazar el bloque actual de "subir a Supabase Storage (equipos-fotos)" por una llamada `authedPostJson` al nuevo endpoint.
 
-- Priorizar `og:image` por sobre el `foto_url` que extrae el LLM (el `og:image` es más confiable en B&H/Adorama; el LLM a veces inventa rutas).
-- Reforzar el prompt JSON: "URL absoluta a una imagen JPG/PNG/WebP del producto principal. NO uses placeholders, sprites, SVGs decorativos, ni tracking pixels. Si no estás seguro, dejá el campo vacío."
+- Paso 3 del diagnóstico ya no usa `supabase.storage.from(...)` desde el browser.
+- Paso 4 ("Obtener URL pública") se fusiona con el paso 3 — el backend devuelve la `public_url` directamente.
+- Mantener el diagnóstico visual (✓/✗) actualizado: paso 3 ahora se llama "Subir vía backend" y muestra el mensaje del backend si falla.
 
-### 3. Extender fallback del proxy `/api/admin/proxy-image`
+### 3. Helper compartido en `src/lib/equipment/photos.ts`
 
-En `backend/routes/equipos.py` lineas 1476-1495:
+Nueva función `uploadExternalUrlViaBackend(equipoId, url)` que envuelve la llamada al endpoint y devuelve `public_url`. La función actual `uploadExternalUrlToBucket` queda como deprecated (no la borramos para no romper otros call-sites; marcamos con comentario).
 
-- Hoy el fallback a `images.weserv.nl` se dispara sólo en 403/401/429.
-- Sumar **404 y 5xx** a la lista — weserv suele tener cacheada la imagen aunque el origen ya la haya borrado, y para 5xx vale la pena reintentar.
-- Si weserv también falla, devolver el detalle completo (host + status + snippet) para diagnóstico.
+### 4. (Opcional, recomendado) Aplicar el mismo patrón a `uploadFileToBucket`
 
-### 4. Frontend: mostrar el motivo cuando no hay foto
+Para uploads desde el formulario manual (cuando el admin sube un archivo desde su disco), también pasar por el backend con un endpoint multipart `POST /api/admin/equipos/{id}/upload-foto`. Así *ningún* upload del back-office depende de la sesión Supabase del browser.
 
-En `EnriquecerEquipoDialog.tsx`:
-
-- Sumar `foto_motivo?: string` al tipo `EnriquecerResult`.
-- Si `result.foto_url` es null y hay `foto_motivo`, mostrar un aviso amarillo "No se encontró foto válida ({foto_motivo}). Podés pegar una URL manual abajo o dejar vacío."
-- El input manual de foto ya existe (campo `URL foto`), sólo hay que asegurarse que sea editable cuando vino vacía.
+Si querés mantener este cambio mínimo, lo dejamos para otra iteración y sólo arreglamos el flujo de enriquecimiento.
 
 ## Lo que NO cambia
 
-- Tabla `storage.objects` y políticas RLS.
-- Flujo de upload en sí (sigue siendo `supabase.storage.from('equipos-fotos').upload(...)`).
-- Búsqueda en cascada B&H → oficial → Adorama (recién implementada).
+- Bucket `equipos-fotos` y sus políticas RLS (siguen igual; el service-role las bypassa por diseño).
+- Flujo de autenticación del admin.
+- Endpoint `/api/admin/proxy-image` (sigue existiendo para previews en el dialog).
+- Tabla `equipos` y el campo `foto_url`.
+
+## Detalles técnicos
+
+- `supabase-py` ya está implícito en el backend (lo necesitamos para el client admin). Si no está en `requirements.txt`, lo agregamos: `supabase==2.x`.
+- El helper `get_supabase_admin()` cachea el cliente a nivel módulo (no se recrea por request).
+- Path en el bucket: `equipos/{equipoId}/foto-{timestamp}.{ext}` — mismo formato que hoy, así no rompe nada en el frontend.
+- Extensión derivada del `content-type` (jpg/png/webp/avif), igual que en `photos.ts`.
 
 ## Garantía
 
-Con estos 3 cambios juntos: si **alguna** de las páginas scrapeadas tiene una imagen accesible (directo, vía proxy con referer, o vía weserv cacheado), la foto se guarda. Si literalmente ninguna fuente devuelve una imagen válida — caso muy raro — al menos vas a saber por qué y podés pegar una URL a mano sin que el flujo se trabe.
+Después de estos cambios:
+- El upload no requiere sesión Supabase en el browser → el error "rol anon" desaparece.
+- Si el origen de la imagen está caído, el backend lo dice con mensaje claro (no falla en silencio).
+- El admin sigue protegido por `require_admin` → nadie sin permisos puede subir fotos arbitrarias.

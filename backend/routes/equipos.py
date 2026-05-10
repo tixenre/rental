@@ -1647,3 +1647,202 @@ def admin_proxy_image(url: str, request: Request):
         media_type=ctype,
         headers={"Cache-Control": "private, max-age=300"},
     )
+
+
+# ── Admin: descargar imagen externa y subirla a Supabase Storage ──────────────
+#
+# El frontend NO sube directamente al bucket porque depende de tener una sesión
+# Supabase válida en el browser (que a veces expira o no existe si el admin
+# entró con la cookie clásica). Acá lo hacemos en el backend con el
+# SUPABASE_SERVICE_ROLE_KEY → bypassa RLS y nunca falla por "rol anon".
+
+def _download_image_bytes(url: str) -> tuple[bytes, str]:
+    """Descarga una imagen externa con todos los fallbacks del proxy
+    (Referer del host, sin Referer, Referer=google, weserv).
+    Devuelve (bytes, content_type). Eleva HTTPException si no se pudo.
+    """
+    import httpx
+    from urllib.parse import urlparse, quote
+
+    if not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "URL inválida")
+
+    host = (urlparse(url).hostname or "").lower()
+
+    def _headers(referer: str | None) -> dict:
+        h = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Sec-Fetch-Dest": "image",
+            "Sec-Fetch-Mode": "no-cors",
+            "Sec-Fetch-Site": "cross-site",
+            "Cache-Control": "no-cache",
+        }
+        if referer:
+            h["Referer"] = referer
+        return h
+
+    referer_map = {
+        "bhphotovideo.com": "https://www.bhphotovideo.com/",
+        "www.bhphotovideo.com": "https://www.bhphotovideo.com/",
+        "adorama.com": "https://www.adorama.com/",
+        "www.adorama.com": "https://www.adorama.com/",
+    }
+    primary_referer = next(
+        (v for k, v in referer_map.items() if host.endswith(k)),
+        f"https://{host}/",
+    )
+
+    last_status = None
+    last_body = b""
+    r = None
+    try:
+        with httpx.Client(timeout=20.0, follow_redirects=True, http2=False) as client:
+            r = client.get(url, headers=_headers(primary_referer))
+            last_status, last_body = r.status_code, r.content
+            if r.status_code == 403:
+                r2 = client.get(url, headers=_headers(None))
+                if r2.status_code == 200:
+                    r = r2
+                else:
+                    last_status, last_body = r2.status_code, r2.content
+            if r.status_code == 403:
+                r3 = client.get(url, headers=_headers("https://www.google.com/"))
+                if r3.status_code == 200:
+                    r = r3
+                else:
+                    last_status, last_body = r3.status_code, r3.content
+            if r.status_code in (401, 403, 404, 429) or r.status_code >= 500:
+                stripped = url.split("://", 1)[1] if "://" in url else url
+                weserv_url = f"https://images.weserv.nl/?url={quote(stripped, safe='')}"
+                r4 = client.get(weserv_url, headers={
+                    "User-Agent": "Mozilla/5.0",
+                    "Accept": "image/*,*/*;q=0.8",
+                })
+                if r4.status_code == 200 and r4.headers.get("content-type", "").startswith("image/"):
+                    r = r4
+                else:
+                    last_status, last_body = r4.status_code, r4.content
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"No se pudo descargar la imagen: {e}")
+
+    if r is None or r.status_code != 200:
+        snippet = ""
+        try:
+            snippet = last_body[:200].decode("utf-8", errors="ignore")
+        except Exception:
+            pass
+        raise HTTPException(
+            502,
+            f"Origen devolvió {last_status} para host {host}. {snippet}".strip(),
+        )
+
+    ctype = r.headers.get("content-type", "image/jpeg")
+    if not ctype.startswith("image/"):
+        raise HTTPException(415, f"La URL no devolvió una imagen ({ctype})")
+
+    if len(r.content) < 1024:
+        raise HTTPException(415, f"Imagen muy chica ({len(r.content)} bytes)")
+
+    return r.content, ctype
+
+
+def _ext_from_ctype(ct: str) -> str:
+    ct = (ct or "").lower()
+    if "png" in ct:  return "png"
+    if "webp" in ct: return "webp"
+    if "avif" in ct: return "avif"
+    if "gif" in ct:  return "gif"
+    return "jpg"
+
+
+def _upload_to_supabase_storage(path: str, content: bytes, content_type: str) -> str:
+    """Sube `content` al bucket equipos-fotos vía REST API usando service role.
+    Devuelve la URL pública. Eleva HTTPException si falla.
+    """
+    import os
+    import httpx
+
+    base = (
+        os.getenv("SUPABASE_URL")
+        or os.getenv("SUPABASE_PROJECT_URL")
+        or "https://ytujjqoffcdsdowfqaex.supabase.co"
+    ).rstrip("/")
+    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not service_key:
+        raise HTTPException(
+            500,
+            "Falta SUPABASE_SERVICE_ROLE_KEY en el backend. "
+            "Configurala como env var en Railway.",
+        )
+
+    bucket = "equipos-fotos"
+    upload_url = f"{base}/storage/v1/object/{bucket}/{path}"
+    headers = {
+        "Authorization": f"Bearer {service_key}",
+        "apikey": service_key,
+        "Content-Type": content_type,
+        "x-upsert": "false",
+        "Cache-Control": "3600",
+    }
+    try:
+        with httpx.Client(timeout=30.0) as c:
+            r = c.post(upload_url, headers=headers, content=content)
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"No se pudo subir a Storage: {e}")
+
+    if r.status_code not in (200, 201):
+        snippet = (r.text or "")[:300]
+        raise HTTPException(
+            r.status_code if r.status_code >= 400 else 502,
+            f"Storage devolvió {r.status_code}: {snippet}",
+        )
+
+    return f"{base}/storage/v1/object/public/{bucket}/{path}"
+
+
+class UploadFotoFromUrlInput(BaseModel):
+    url: str
+
+
+@router.post("/admin/equipos/{equipo_id}/upload-foto-from-url")
+def admin_upload_foto_from_url(
+    equipo_id: int,
+    payload: UploadFotoFromUrlInput,
+    request: Request,
+):
+    """Descarga la imagen de `payload.url` y la sube al bucket `equipos-fotos`
+    vía service-role (bypassa RLS). Devuelve `{public_url, path}`.
+
+    Esto reemplaza el upload directo desde el browser, que requería sesión
+    Supabase activa y fallaba con "rol anon" cuando el JWT expiraba.
+    """
+    from supabase_auth import require_admin
+    require_admin(request)
+
+    url = (payload.url or "").strip()
+    if not url:
+        raise HTTPException(400, "URL vacía")
+
+    # Si ya es una URL del propio bucket, no hacemos nada.
+    if "/storage/v1/object/public/equipos-fotos/" in url:
+        return {"public_url": url, "path": None, "skipped": True}
+
+    content, ctype = _download_image_bytes(url)
+    ext = _ext_from_ctype(ctype)
+
+    import time as _time
+    path = f"equipos/{equipo_id}/foto-{int(_time.time() * 1000)}.{ext}"
+    public_url = _upload_to_supabase_storage(path, content, ctype)
+
+    return {
+        "public_url": public_url,
+        "path": path,
+        "size": len(content),
+        "content_type": ctype,
+    }
