@@ -13,9 +13,10 @@
 
 const ENV_ORIGIN = (import.meta.env.VITE_PUBLIC_APP_ORIGIN as string | undefined)?.replace(/\/$/, "");
 
+// Fallback sólo para casos extremos (SSR sin window y sin env). En el browser
+// preferimos SIEMPRE el origen actual cuando es un host válido para OAuth, así
+// no "secuestramos" al usuario al preview de Lovable.
 const FALLBACK_ORIGIN = "https://id-preview--cd1cc884-084b-435b-8af0-167f25bc78ca.lovable.app";
-
-export const APP_ORIGIN = ENV_ORIGIN || FALLBACK_ORIGIN;
 
 /** True si el host actual soporta el broker OAuth de Lovable. */
 export function isLovableHost(hostname: string): boolean {
@@ -26,3 +27,20 @@ export function isLovableHost(hostname: string): boolean {
     hostname === "127.0.0.1"
   );
 }
+
+/**
+ * Origen a usar para callbacks de OAuth. Prioridad:
+ * 1. VITE_PUBLIC_APP_ORIGIN si está definido.
+ * 2. window.location.origin si el host actual soporta OAuth de Lovable.
+ * 3. FALLBACK_ORIGIN (preview).
+ */
+export function getAppOrigin(): string {
+  if (ENV_ORIGIN) return ENV_ORIGIN;
+  if (typeof window !== "undefined" && isLovableHost(window.location.hostname)) {
+    return window.location.origin;
+  }
+  return FALLBACK_ORIGIN;
+}
+
+/** @deprecated usar getAppOrigin() para respetar el host actual. */
+export const APP_ORIGIN = ENV_ORIGIN || FALLBACK_ORIGIN;
