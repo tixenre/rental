@@ -250,7 +250,10 @@ export function EquipoFormDialog({
                   Ficha técnica
                 </TabsTrigger>
                 <TabsTrigger value="cats" className="flex-1" disabled={!isEdit}>
-                  Categorías y etiquetas
+                  Categorías
+                </TabsTrigger>
+                <TabsTrigger value="kit" className="flex-1" disabled={!isEdit}>
+                  Kit
                 </TabsTrigger>
               </TabsList>
 
