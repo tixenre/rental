@@ -10,7 +10,7 @@ type Props = {
   query: string;
   setQuery: (q: string) => void;
   categories: string[];
-  brands: string[];
+  brands: any[];
   selectedCategories: Set<string>;
   onToggleCategory: (c: string) => void;
   selectedBrand: string | null;

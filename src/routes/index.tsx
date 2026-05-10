@@ -13,11 +13,12 @@ import { EquipmentDetailDialog } from "@/components/rental/EquipmentDetailDialog
 import { CartMiniBar } from "@/components/rental/CartMiniBar";
 import { CarouselRow } from "@/components/rental/CarouselRow";
 import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
+import { BrandCarousel } from "@/components/rental/BrandCarousel";
 import { ListFilters } from "@/components/rental/ListFilters";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { CategoryIllustration } from "@/components/rental/illustrations/CategoryIllustration";
 import { EquipmentDetailProvider } from "@/lib/equipment-detail-context";
-import { useEquipos, useDisponibilidad, useCategorias } from "@/hooks/useEquipos";
+import { useEquipos, useDisponibilidad, useCategorias, useMarcas } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment, type Category } from "@/data/equipment";
 import { cn } from "@/lib/utils";
@@ -55,6 +56,7 @@ function Index() {
   // Datos de la API
   const { data: allEquipos = [], isLoading, isError } = useEquipos();
   const { data: backendCats = [] } = useCategorias();
+  const { data: marcasData } = useMarcas();
   const { startDate, endDate } = useCart();
   const { data: disponibilidad } = useDisponibilidad(startDate, endDate);
 
@@ -71,10 +73,7 @@ function Index() {
       return a.localeCompare(b, "es");
     });
   }, [allEquipos, backendCats]);
-  const apiBrands = useMemo(
-    () => Array.from(new Set(allEquipos.map((e) => e.brand).filter(Boolean))).sort(),
-    [allEquipos],
-  );
+  const marcas = marcasData?.items ?? [];
 
   const setOpenId = (id: string | null) => {
     navigate({
@@ -236,7 +235,7 @@ function Index() {
               query={query}
               setQuery={setQuery}
               categories={apiCategories}
-              brands={apiBrands}
+              brands={marcas}
               selectedCategories={selectedCats}
               onToggleCategory={toggleCat}
               selectedBrand={brand}
@@ -321,6 +320,9 @@ function Index() {
           <GridMode
             allEquipos={allEquipos}
             apiCategories={apiCategories}
+            marcas={marcas}
+            selectedBrand={brand}
+            onBrandSelect={(brandId) => setBrand(brandId !== null ? String(brandId) : null)}
             onJumpToCategory={jumpToCategory}
             selectedCats={selectedCats}
             onClearCats={() => setSelectedCats(new Set())}
@@ -331,7 +333,7 @@ function Index() {
           <ListMode
             allEquipos={allEquipos}
             apiCategories={apiCategories}
-            apiBrands={apiBrands}
+            marcas={marcas}
             query={query}
             setQuery={setQuery}
             selectedCats={selectedCats}
@@ -396,6 +398,9 @@ function GlobalDetailDialog({
 function GridMode({
   allEquipos,
   apiCategories,
+  marcas,
+  selectedBrand,
+  onBrandSelect,
   onJumpToCategory,
   selectedCats,
   onClearCats,
@@ -404,6 +409,9 @@ function GridMode({
 }: {
   allEquipos: Equipment[];
   apiCategories: string[];
+  marcas: any[];
+  selectedBrand?: string | null;
+  onBrandSelect: (brandId: number | null) => void;
   onJumpToCategory: (c: string) => void;
   selectedCats: Set<string>;
   onClearCats: () => void;
@@ -463,6 +471,15 @@ function GridMode({
           allEquipos={allEquipos}
           categories={apiCategories}
           onSelect={onJumpToCategory}
+        />
+      )}
+
+      {!isFiltered && !isSearching && marcas.length > 0 && (
+        <BrandCarousel
+          brands={marcas}
+          allEquipos={allEquipos}
+          selectedBrand={selectedBrand}
+          onBrandSelect={onBrandSelect}
         />
       )}
 
@@ -580,7 +597,7 @@ function GridMode({
 function ListMode({
   allEquipos,
   apiCategories,
-  apiBrands,
+  marcas,
   query,
   setQuery,
   selectedCats,
@@ -593,7 +610,7 @@ function ListMode({
 }: {
   allEquipos: Equipment[];
   apiCategories: string[];
-  apiBrands: string[];
+  marcas: any[];
   query: string;
   setQuery: (v: string) => void;
   selectedCats: Set<string>;
@@ -638,7 +655,7 @@ function ListMode({
         query={query}
         onQuery={setQuery}
         categories={apiCategories}
-        brands={apiBrands}
+        brands={marcas}
         selectedCategories={selectedCats}
         onToggleCategory={toggleCat}
         selectedBrand={brand}

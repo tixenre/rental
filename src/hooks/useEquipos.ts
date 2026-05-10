@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiGetEquipos, apiGetCategorias, apiGetDisponibilidad, type BackendEquipo } from "@/lib/api";
+import { apiGetEquipos, apiGetCategorias, apiGetDisponibilidad, apiGetMarcs, type BackendEquipo, type BackendMarca } from "@/lib/api";
 import { type Equipment, type Category, equipment as MOCK_EQUIPMENT } from "@/data/equipment";
 import { format } from "date-fns";
 
@@ -321,6 +321,15 @@ export function useDisponibilidad(startDate?: Date, endDate?: Date) {
     },
     enabled: !!(desde && hasta),
     staleTime: 2 * 60 * 1000,
+    retry: 1,
+  });
+}
+
+export function useMarcas() {
+  return useQuery<{ items: BackendMarca[] }>({
+    queryKey: ["marcas"],
+    queryFn: apiGetMarcs,
+    staleTime: 10 * 60 * 1000,
     retry: 1,
   });
 }
