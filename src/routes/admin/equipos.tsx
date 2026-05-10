@@ -145,6 +145,7 @@ function EquiposPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-14"></TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead className="hidden md:table-cell">Marca / Modelo</TableHead>
               <TableHead className="text-right">Stock</TableHead>
@@ -157,13 +158,30 @@ function EquiposPage() {
           <TableBody>
             {items.length === 0 && !equiposQ.isLoading && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
                   Sin equipos.
                 </TableCell>
               </TableRow>
             )}
             {items.map((eq) => (
               <TableRow key={eq.id} className={eq.visible_catalogo ? "" : "opacity-60"}>
+                <TableCell>
+                  {eq.foto_url ? (
+                    <img
+                      src={eq.foto_url}
+                      alt=""
+                      loading="lazy"
+                      className="h-10 w-10 rounded object-cover bg-muted/30"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.opacity = "0.2";
+                      }}
+                    />
+                  ) : (
+                    <div className="h-10 w-10 rounded bg-muted/40 grid place-items-center text-[10px] text-muted-foreground">
+                      —
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className="font-medium">{eq.nombre}</TableCell>
                 <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                   {[eq.marca, eq.modelo].filter(Boolean).join(" / ") || "—"}

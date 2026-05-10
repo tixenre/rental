@@ -1348,9 +1348,12 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
             "Precio_usd: precio listado en USD si está visible (sólo número). "
             "Video_url: URL absoluta a un video YouTube de demo si aparece linkeado. "
             "Categoria_sugerida: una de ['Cámara','Lente','Iluminación','Audio','Soporte','Monitor','Accesorio']. "
-            "foto_url: URL ABSOLUTA (http/https) a imagen JPG/PNG/WebP del producto. "
-            "NO uses placeholders, sprites, SVGs decorativos, tracking pixels ni rutas relativas. "
-            "Si no estás 100% seguro de que existe, dejá vacío. "
+            "Foto_urls: array con hasta 5 URLs ABSOLUTAS (http/https) de imágenes del producto, "
+            "ordenadas de MÁS A MENOS relevante para el producto principal. "
+            "Incluí ángulos distintos (frente, lateral, detalle) si están disponibles. "
+            "JPG/PNG/WebP únicamente — NO uses placeholders, sprites, SVGs decorativos, "
+            "tracking pixels, banners de categoría, fotos de productos relacionados, ni rutas relativas. "
+            "Si no estás 100% seguro de que una URL existe y apunta al producto, NO la incluyas. "
             "Cualquier campo que no esté en la ficha → dejalo vacío. NO inventes."
         ),
         "schema": {
@@ -1360,7 +1363,7 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
                 "modelo": {"type": "string"},
                 "nombre_normalizado": {"type": "string"},
                 "descripcion": {"type": "string"},
-                "foto_url": {"type": "string"},
+                "foto_urls": {"type": "array", "items": {"type": "string"}, "maxItems": 5},
                 "specs": {
                     "type": "array",
                     "items": {
@@ -1391,7 +1394,10 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     }
 
     def _scrape(url: str, client: "httpx.Client") -> dict | None:
-        """Devuelve {extracted, foto_candidate, meta} o None si falló."""
+        """Devuelve {extracted, foto_candidates, meta} o None si falló.
+        foto_candidates es una lista ordenada de URLs candidatas (LLM primero,
+        luego og:image, twitter:image, dedupe).
+        """
         try:
             rs = client.post(
                 "https://api.firecrawl.dev/v2/scrape",
@@ -1414,13 +1420,33 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         sd = sj.get("data") or sj
         meta      = sd.get("metadata") or {}
         extracted = sd.get("json") or {}
-        og_image = meta.get("ogImage") or meta.get("og:image") or None
-        # Priorizar og:image (más confiable) sobre lo extraído por LLM
-        llm_img = extracted.get("foto_url")
-        if llm_img and not str(llm_img).lower().startswith(("http://", "https://")):
-            llm_img = None
-        cand = og_image or llm_img
-        return {"extracted": extracted, "foto_candidate": cand or None, "meta": meta}
+
+        # Candidatos: LLM (array) primero (mejor ranking), después meta tags
+        candidates: list[str] = []
+        seen_lower: set[str] = set()
+
+        def _push(u: str | None) -> None:
+            if not u or not isinstance(u, str):
+                return
+            u = u.strip()
+            if not u.lower().startswith(("http://", "https://")):
+                return
+            key = u.lower()
+            if key in seen_lower:
+                return
+            seen_lower.add(key)
+            candidates.append(u)
+
+        # 1. LLM array (foto_urls) — orden de relevancia ya viene de la IA
+        for u in (extracted.get("foto_urls") or []):
+            _push(u)
+        # 2. Backwards-compat: si vino foto_url scalar (esquema viejo)
+        _push(extracted.get("foto_url"))
+        # 3. Meta tags
+        _push(meta.get("ogImage") or meta.get("og:image"))
+        _push(meta.get("twitterImage") or meta.get("twitter:image"))
+
+        return {"extracted": extracted, "foto_candidates": candidates[:6], "meta": meta}
 
     with httpx.Client(timeout=45.0) as client:
         if direct_url:
@@ -1533,41 +1559,47 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         except httpx.HTTPError as e:
             return False, f"error de red: {type(e).__name__}"
 
-    bh_foto = (bh_scrape or {}).get("foto_candidate") if bh_scrape else None
-    alt_foto = (alt_scrape or {}).get("foto_candidate") if alt_scrape else None
+    # Juntar todos los candidatos: B&H primero, después alt (sin dedupe-cross,
+    # se dedupe cuando los unimos)
+    bh_cands  = (bh_scrape or {}).get("foto_candidates") or []
+    alt_cands = (alt_scrape or {}).get("foto_candidates") or []
 
-    foto_url = None
-    fuente_foto_url = None
-    foto_motivo = ""
+    # Si alt no se scrapeó pero existe URL, scrape ahora para sumar candidatos
+    if not alt_scrape and alt_top:
+        try:
+            with httpx.Client(timeout=45.0) as c2:
+                alt_scrape = _scrape(alt_top["url"], c2)
+            alt_cands = (alt_scrape or {}).get("foto_candidates") or []
+        except Exception:
+            pass
 
-    # Probar B&H primero
-    if bh_foto:
-        ok, motivo = _validate_image(bh_foto)
+    all_candidates: list[str] = []
+    seen_lc: set[str] = set()
+    for u in (bh_cands + alt_cands):
+        k = u.lower()
+        if k in seen_lc:
+            continue
+        seen_lc.add(k)
+        all_candidates.append(u)
+
+    # Validar cada candidato (HEAD/GET); guardar los que pasen + motivo de los que no
+    foto_validas: list[str] = []
+    foto_invalidas: list[dict] = []
+    for u in all_candidates[:8]:  # límite hard para no validar 50 imágenes
+        ok, motivo = _validate_image(u)
         if ok:
-            foto_url = bh_foto
-            fuente_foto_url = bh_top["url"] if bh_top else None
+            foto_validas.append(u)
         else:
-            foto_motivo = f"B&H: {motivo}"
+            foto_invalidas.append({"url": u, "motivo": motivo})
 
-    # Si B&H no validó, probar alternativa (incluso si no scrapeada antes)
+    foto_url = foto_validas[0] if foto_validas else None
+    fuente_foto_url = (bh_top or alt_top or {}).get("url") if foto_url else None
+    foto_motivo = ""
     if not foto_url:
-        if not alt_scrape and alt_top:
-            try:
-                with httpx.Client(timeout=45.0) as c2:
-                    alt_scrape = _scrape(alt_top["url"], c2)
-                alt_foto = (alt_scrape or {}).get("foto_candidate") if alt_scrape else None
-            except Exception:
-                pass
-        if alt_foto:
-            ok, motivo = _validate_image(alt_foto)
-            if ok:
-                foto_url = alt_foto
-                fuente_foto_url = alt_top["url"] if alt_top else None
-            else:
-                foto_motivo = (foto_motivo + f" | alt: {motivo}").strip(" |")
-
-    if not foto_url and not foto_motivo:
-        foto_motivo = "no se encontró imagen en ninguna fuente"
+        if foto_invalidas:
+            foto_motivo = " | ".join(f"{(d['motivo'] or 'inválida')}" for d in foto_invalidas[:3])
+        else:
+            foto_motivo = "no se encontró imagen en ninguna fuente"
 
     # bh_url canónico = el de B&H si hubo, sino el alternativo (como referencia)
     canonical_url = (bh_top or alt_top)["url"]
@@ -1642,6 +1674,7 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         "specs": (extracted.get("specs") or [])[:12],
         "keywords": keywords,
         "foto_url": foto_url,
+        "foto_candidates": foto_validas,  # todas las URLs válidas (la primera es la elegida por defecto)
         # Ficha técnica extendida
         "peso":           (extracted.get("peso") or "").strip() or None,
         "dimensiones":    (extracted.get("dimensiones") or "").strip() or None,

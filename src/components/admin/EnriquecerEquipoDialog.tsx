@@ -24,6 +24,8 @@ export type EnriquecerResult = {
   specs: { label: string; value: string }[];
   keywords: string[];
   foto_url: string | null;
+  /** Todas las URLs de foto que pasaron la validación. La primera es la elegida por defecto. */
+  foto_candidates?: string[];
   // Ficha extendida (cualquiera puede ser null si no se encontró)
   peso?: string | null;
   dimensiones?: string | null;
@@ -57,7 +59,7 @@ export function EnriquecerEquipoDialog({
   onOpenChange: (v: boolean) => void;
   onApplied: () => void;
 }) {
-  const enriquecer = (input: { nombre: string; marca?: string | null; modelo?: string | null }) =>
+  const enriquecer = (input: { nombre?: string | null; marca?: string | null; modelo?: string | null; url?: string | null }) =>
     authedJson<EnriquecerResult>("/api/admin/equipos/enriquecer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -396,7 +398,7 @@ export function EnriquecerEquipoDialog({
               )}
             </div>
 
-            {/* Foto preview */}
+            {/* Foto preview + selector de candidatos */}
             {fotoUrl && (
               <div className="rounded-md border hairline overflow-hidden bg-muted/30">
                 <img
@@ -407,6 +409,47 @@ export function EnriquecerEquipoDialog({
                     (e.target as HTMLImageElement).style.opacity = "0.3";
                   }}
                 />
+              </div>
+            )}
+
+            {(result.foto_candidates?.length ?? 0) > 1 && (
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
+                  Otras opciones detectadas — click para elegir
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {result.foto_candidates!.map((u) => {
+                    const selected = u === fotoUrl;
+                    return (
+                      <button
+                        type="button"
+                        key={u}
+                        onClick={() => setFotoUrl(u)}
+                        title={u}
+                        className={
+                          "relative h-16 w-16 overflow-hidden rounded border transition " +
+                          (selected
+                            ? "border-amber ring-2 ring-amber/40"
+                            : "border-muted hover:border-ink/30")
+                        }
+                      >
+                        <img
+                          src={u}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.opacity = "0.2";
+                          }}
+                        />
+                        {selected && (
+                          <span className="absolute right-0.5 top-0.5 rounded-full bg-amber p-0.5">
+                            <Check className="h-2.5 w-2.5 text-ink" />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
