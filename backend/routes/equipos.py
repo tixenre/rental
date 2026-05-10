@@ -1233,14 +1233,11 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     from supabase_auth import require_admin
     require_admin(request)
 
-    import os, json, httpx
+    import os, httpx
 
     FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
-    LOVABLE_API_KEY   = os.getenv("LOVABLE_API_KEY")
     if not FIRECRAWL_API_KEY:
         raise HTTPException(500, "FIRECRAWL_API_KEY no configurado en el backend")
-    if not LOVABLE_API_KEY:
-        raise HTTPException(500, "LOVABLE_API_KEY no configurado en el backend")
 
     query = " ".join(x for x in [payload.marca, payload.nombre, payload.modelo] if x).strip()
     if not query:
