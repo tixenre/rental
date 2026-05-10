@@ -43,6 +43,9 @@ export type Equipment = {
   // Campos de Lovable
   isNew?: boolean;
   isCombo?: boolean;
+  /** True si relevancia_manual ≤ 30 (flagship/premium). Aparece como
+   *  badge "destacado" en el card del catálogo. */
+  destacado?: boolean;
   includes?: IncludedItem[];
   // Campos extra del backend (opcionales para mantener compat con datos locales)
   fotoUrl?: string | null;

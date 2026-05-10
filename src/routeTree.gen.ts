@@ -17,11 +17,13 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ClienteRegistroRouteImport } from './routes/cliente.registro'
 import { Route as ClientePortalRouteImport } from './routes/cliente.portal'
 import { Route as ClienteLoginRouteImport } from './routes/cliente.login'
+import { Route as AdminValidacionRouteImport } from './routes/admin/validacion'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminEstadisticasRouteImport } from './routes/admin/estadisticas'
 import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
 import { Route as AdminClientesRouteImport } from './routes/admin/clientes'
+import { Route as AdminClasificarRouteImport } from './routes/admin/clasificar'
 import { Route as AdminCalendarioRouteImport } from './routes/admin/calendario'
 import { Route as AdminPedidosIndexRouteImport } from './routes/admin/pedidos.index'
 import { Route as AdminPedidosNuevoRouteImport } from './routes/admin/pedidos.nuevo'
@@ -67,6 +69,11 @@ const ClienteLoginRoute = ClienteLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => ClienteRoute,
 } as any)
+const AdminValidacionRoute = AdminValidacionRouteImport.update({
+  id: '/validacion',
+  path: '/validacion',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -90,6 +97,11 @@ const AdminEquiposRoute = AdminEquiposRouteImport.update({
 const AdminClientesRoute = AdminClientesRouteImport.update({
   id: '/clientes',
   path: '/clientes',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminClasificarRoute = AdminClasificarRouteImport.update({
+  id: '/clasificar',
+  path: '/clasificar',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminCalendarioRoute = AdminCalendarioRouteImport.update({
@@ -119,11 +131,13 @@ export interface FileRoutesByFullPath {
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/admin/calendario': typeof AdminCalendarioRoute
+  '/admin/clasificar': typeof AdminClasificarRoute
   '/admin/clientes': typeof AdminClientesRoute
   '/admin/equipos': typeof AdminEquiposRoute
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/validacion': typeof AdminValidacionRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
@@ -137,11 +151,13 @@ export interface FileRoutesByTo {
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/admin/calendario': typeof AdminCalendarioRoute
+  '/admin/clasificar': typeof AdminClasificarRoute
   '/admin/clientes': typeof AdminClientesRoute
   '/admin/equipos': typeof AdminEquiposRoute
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/validacion': typeof AdminValidacionRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
@@ -157,11 +173,13 @@ export interface FileRoutesById {
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/admin/calendario': typeof AdminCalendarioRoute
+  '/admin/clasificar': typeof AdminClasificarRoute
   '/admin/clientes': typeof AdminClientesRoute
   '/admin/equipos': typeof AdminEquiposRoute
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/admin/validacion': typeof AdminValidacionRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
@@ -178,11 +196,13 @@ export interface FileRouteTypes {
     | '/cliente'
     | '/estudio'
     | '/admin/calendario'
+    | '/admin/clasificar'
     | '/admin/clientes'
     | '/admin/equipos'
     | '/admin/estadisticas'
     | '/admin/login'
     | '/admin/settings'
+    | '/admin/validacion'
     | '/cliente/login'
     | '/cliente/portal'
     | '/cliente/registro'
@@ -196,11 +216,13 @@ export interface FileRouteTypes {
     | '/cliente'
     | '/estudio'
     | '/admin/calendario'
+    | '/admin/clasificar'
     | '/admin/clientes'
     | '/admin/equipos'
     | '/admin/estadisticas'
     | '/admin/login'
     | '/admin/settings'
+    | '/admin/validacion'
     | '/cliente/login'
     | '/cliente/portal'
     | '/cliente/registro'
@@ -215,11 +237,13 @@ export interface FileRouteTypes {
     | '/cliente'
     | '/estudio'
     | '/admin/calendario'
+    | '/admin/clasificar'
     | '/admin/clientes'
     | '/admin/equipos'
     | '/admin/estadisticas'
     | '/admin/login'
     | '/admin/settings'
+    | '/admin/validacion'
     | '/cliente/login'
     | '/cliente/portal'
     | '/cliente/registro'
@@ -294,6 +318,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClienteLoginRouteImport
       parentRoute: typeof ClienteRoute
     }
+    '/admin/validacion': {
+      id: '/admin/validacion'
+      path: '/validacion'
+      fullPath: '/admin/validacion'
+      preLoaderRoute: typeof AdminValidacionRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/settings': {
       id: '/admin/settings'
       path: '/settings'
@@ -329,6 +360,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminClientesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/clasificar': {
+      id: '/admin/clasificar'
+      path: '/clasificar'
+      fullPath: '/admin/clasificar'
+      preLoaderRoute: typeof AdminClasificarRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/calendario': {
       id: '/admin/calendario'
       path: '/calendario'
@@ -362,11 +400,13 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminCalendarioRoute: typeof AdminCalendarioRoute
+  AdminClasificarRoute: typeof AdminClasificarRoute
   AdminClientesRoute: typeof AdminClientesRoute
   AdminEquiposRoute: typeof AdminEquiposRoute
   AdminEstadisticasRoute: typeof AdminEstadisticasRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminValidacionRoute: typeof AdminValidacionRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminPedidosIdRoute: typeof AdminPedidosIdRoute
   AdminPedidosNuevoRoute: typeof AdminPedidosNuevoRoute
@@ -375,11 +415,13 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCalendarioRoute: AdminCalendarioRoute,
+  AdminClasificarRoute: AdminClasificarRoute,
   AdminClientesRoute: AdminClientesRoute,
   AdminEquiposRoute: AdminEquiposRoute,
   AdminEstadisticasRoute: AdminEstadisticasRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminSettingsRoute: AdminSettingsRoute,
+  AdminValidacionRoute: AdminValidacionRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminPedidosIdRoute: AdminPedidosIdRoute,
   AdminPedidosNuevoRoute: AdminPedidosNuevoRoute,

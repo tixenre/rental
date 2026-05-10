@@ -15,6 +15,8 @@ export default defineConfig({
     tsconfigPaths(),
   ],
   server: {
+    port: 3000,
+    strictPort: true,
     proxy: {
       // En desarrollo local, proxea /api al backend Python
       "/api": {

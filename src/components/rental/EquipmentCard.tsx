@@ -77,6 +77,12 @@ export function EquipmentCard({
             combo
           </div>
         )}
+        {/* Destacado: convive con isNew/isCombo en otra esquina */}
+        {item.destacado && (
+          <div className="absolute right-2 top-2 rounded-full bg-amber/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-ink shadow-sm">
+            ★ destacado
+          </div>
+        )}
         {selected && (
           <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-amber text-ink">
             <Check className="h-3.5 w-3.5" strokeWidth={3} />
