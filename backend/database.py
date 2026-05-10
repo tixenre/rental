@@ -530,6 +530,16 @@ def init_db():
             ), true)
     """)
 
+    # Regenerar etiquetas auto (origen='auto') para todos los equipos.
+    # Idempotente: solo borra y reinserta las auto, no toca las manuales.
+    # Se hace una vez por arranque para mantener la bolsa sincronizada
+    # con marca/modelo/nombre/categorías.
+    try:
+        n = regenerate_auto_tags_all(conn)
+        print(f"   ↳ {n} equipos con etiquetas auto regeneradas")
+    except Exception as ex:
+        print(f"⚠️  No se pudieron regenerar etiquetas auto: {ex}")
+
     conn.commit()
     conn.close()
     print("✅ Base de datos PostgreSQL inicializada")
