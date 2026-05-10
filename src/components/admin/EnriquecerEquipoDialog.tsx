@@ -124,11 +124,20 @@ export function EnriquecerEquipoDialog({
     const ct = blob.type || "image/jpeg";
     const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : ct.includes("avif") ? "avif" : "jpg";
     const path = `equipos/${equipoId}/foto-${Date.now()}.${ext}`;
+
+    // Verificar sesión Supabase antes de subir (RLS necesita rol authenticated)
+    const { data: sess } = await supabase.auth.getSession();
+    if (!sess?.session?.user?.id) {
+      update(2, { status: "fail", detail: "Sin sesión Supabase (rol anon). Cerrá sesión y volvé a entrar." });
+      throw new Error("Sin sesión Supabase");
+    }
+
     const { error: upErr } = await supabase.storage
       .from("equipos-fotos")
       .upload(path, blob, { contentType: ct, upsert: false });
     if (upErr) {
-      update(2, { status: "fail", detail: upErr.message });
+      const userEmail = sess.session.user.email ?? "(sin email)";
+      update(2, { status: "fail", detail: `${upErr.message} · user=${userEmail}` });
       throw upErr;
     }
     update(2, { status: "ok", detail: path });
