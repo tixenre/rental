@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
+import { APP_ORIGIN, isLovableHost } from "@/lib/app-origin";
 import { ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
@@ -45,10 +46,16 @@ function LoginPage() {
     setError(null);
     try {
       const redirectPath = redirect === "/admin" ? "/admin" : "/mis-pedidos";
-      // Volvemos siempre a /login con el destino en query — la página de login
-      // detecta la sesión y navega al destino. Pasar /admin u otra ruta como
-      // redirect_uri puede caer en 404 según cómo el broker arme la URL final.
-      const callbackUrl = `${window.location.origin}/login?redirect=${encodeURIComponent(redirectPath)}`;
+
+      // El broker OAuth de Lovable (/~oauth/initiate) sólo existe en hosts
+      // Lovable. Si estamos en otro origen (p. ej. ramblarental.up.railway.app),
+      // redirigimos al login del frontend Lovable antes de iniciar OAuth.
+      if (!isLovableHost(window.location.hostname)) {
+        window.location.href = `${APP_ORIGIN}/login?redirect=${encodeURIComponent(redirectPath)}`;
+        return;
+      }
+
+      const callbackUrl = `${APP_ORIGIN}/login?redirect=${encodeURIComponent(redirectPath)}`;
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: callbackUrl,
       });
