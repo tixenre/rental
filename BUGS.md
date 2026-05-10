@@ -19,13 +19,13 @@
 
 ## ALTO — bug real, afecta UX
 
-- [ ] **`uploadExternalUrlToBucket("nuevo", url)` en CREATE mode** — `EquipoFormDialog.tsx:179` y `:335`. En modo crear, se pasa el string `"nuevo"` al endpoint que espera `int`, devuelve 422. Está silenciado por try/catch pero es ruido. **Fix**: si `!initial?.id`, no intentar subir; subir después de crear el equipo (cuando ya tenemos el ID real).
+- [x] **`uploadExternalUrlToBucket("nuevo", url)` en CREATE mode** — **FIX aplicado**: refactor del flow completo de `submit()` en `EquipoFormDialog.tsx`. El equipo se crea/actualiza primero (con la URL externa o `null` si hay archivo pendiente), después se sube a R2 con el `id` real seguido de un PATCH del equipo. Para archivos locales en CREATE mode se introdujo el state `pendingFile` + `pendingFilePreview` (blob URL) que se sube post-create. Mismo fix replicado en `elegirFoto` y `handleUpload`.
 
 - [ ] **`CLIENTE_REDIRECT_URI` hardcodeado a producción** — `backend/routes/auth.py:28-31`. En dev local, el OAuth del cliente redirige a Railway. **Fix**: leer de env var con fallback local.
 
-- [ ] **`form.handleSubmit` sin try/catch global** — `EquipoFormDialog.tsx:325-424`. Si `onSubmit` rechaza, no hay toast genérico y la promesa queda colgada. **Fix**: wrap el bloque principal en try/catch con `toast.error`.
+- [x] **`form.handleSubmit` sin try/catch global** — **FIX aplicado**: el nuevo `submit()` envuelve el flow en try/catch. Si el create/update falla, `toast.error` y el dialog queda abierto para reintentar sin perder el form. Errores parciales (foto/ficha/categorías) se acumulan en el array `fallidos` y se reportan en un único `toast.warning` al final con detalle.
 
-- [ ] **`aplicarEnriquecimiento` race con `onSuccess`** — `routes/admin/equipos.tsx:64-69` cierra el dialog cuando termina `mutateAsync`, pero el `submit` del form todavía está corriendo `setFicha` + `aplicarEnriquecimiento` en background. Si esos fallan, el toast aparece después del cierre y el usuario no entiende. **Fix**: mover el cierre del dialog adentro de `submit` (después de todos los awaits) en vez de en `onSuccess`.
+- [x] **`aplicarEnriquecimiento` race con `onSuccess`** — **FIX aplicado**: en `routes/admin/equipos.tsx`, `saveMut` cambió de `onSuccess` (con close + toast) a `onSettled` (sólo invalida queries). El form maneja el cierre y los toasts al **final** del flow completo, después de foto + ficha + ficha extendida + categorías. El dialog ya no se cierra con requests en vuelo.
 
 - [ ] **`importarDesdeUrl` sin validación de URL** — `EquipoFormDialog.tsx:221`. Acepta cualquier string. **Fix**: validar `new URL(u)` antes del fetch.
 

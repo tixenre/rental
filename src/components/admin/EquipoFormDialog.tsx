@@ -142,6 +142,22 @@ export function EquipoFormDialog({
   const [photoCands, setPhotoCands] = useState<string[]>([]);
   const [pickingPhotoUrl, setPickingPhotoUrl] = useState<string | null>(null);
 
+  // ── Foto pendiente (para CREATE mode, no se puede subir sin id) ────────
+  // Cuando el usuario elige un archivo local en el form de "Nuevo equipo",
+  // todavía no existe el equipo en la DB, así que no podemos subirlo a R2
+  // (R2 path requiere el id). Guardamos el File en memoria + un blob URL
+  // para preview, y lo subimos después del create con el id real.
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingFilePreview, setPendingFilePreview] = useState<string>("");
+
+  // Liberar el objectURL al desmontar / al cambiar el preview, para no
+  // perder memoria.
+  useEffect(() => {
+    return () => {
+      if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+    };
+  }, [pendingFilePreview]);
+
   const buscarFotos = async () => {
     setPhotoSearching(true);
     try {
@@ -172,12 +188,25 @@ export function EquipoFormDialog({
     }
   };
 
-  /** Click en un candidato: subir a R2 y dejar el R2-url en el form. */
+  /** Click en un candidato. En EDIT sube a R2 al toque (queda hosteado y
+   *  el form ve la URL final). En CREATE solo dejamos la URL externa en el
+   *  form: el submit() la subirá a R2 después de crear el equipo. */
   const elegirFoto = async (externalUrl: string) => {
+    if (!initial?.id) {
+      // CREATE mode: setear la URL externa en el form, el submit se ocupa.
+      // También limpiamos cualquier archivo pendiente para no pisar.
+      if (pendingFile) {
+        setPendingFile(null);
+        if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+        setPendingFilePreview("");
+      }
+      form.setValue("foto_url", externalUrl, { shouldDirty: true });
+      toast.info("Foto elegida (se subirá al crear el equipo)");
+      return;
+    }
     setPickingPhotoUrl(externalUrl);
     try {
-      const eqId = initial?.id ?? "nuevo";
-      const r2url = await uploadExternalUrlToBucket(eqId, externalUrl);
+      const r2url = await uploadExternalUrlToBucket(initial.id, externalUrl);
       form.setValue("foto_url", r2url, { shouldDirty: true });
       toast.success("Foto seleccionada y subida");
     } catch (e) {
@@ -328,18 +357,20 @@ export function EquipoFormDialog({
     const { etiquetas_csv: _omit, visible_catalogo, ...rest } = values;
     void _omit;
 
-    // Si la foto es externa (no R2), subirla primero para no depender de B&H/Adorama.
-    let fotoUrlFinal = rest.foto_url || null;
-    if (fotoUrlFinal && !isHostedUrl(fotoUrlFinal)) {
-      try {
-        const eqId = initial?.id ?? "nuevo";
-        fotoUrlFinal = await uploadExternalUrlToBucket(eqId, fotoUrlFinal);
-        form.setValue("foto_url", fotoUrlFinal, { shouldDirty: false });
-      } catch (e) {
-        toast.error(`No se pudo guardar la foto en storage: ${e instanceof Error ? e.message : ""}`);
-        // Continuamos con la URL externa como fallback — al menos no perdemos los demás cambios.
-      }
-    }
+    // Detectamos si la foto del form va a requerir un upload post-create.
+    // Tres casos posibles:
+    //   1. pendingFile      → archivo local elegido en CREATE mode
+    //   2. URL externa      → URL del campo que NO está hosteada en R2
+    //   3. URL R2 ya hosteada (o vacía) → no hay que subir nada
+    const fotoUrlForm = rest.foto_url || null;
+    const fotoExternaPendiente =
+      !pendingFile && fotoUrlForm && !isHostedUrl(fotoUrlForm) ? fotoUrlForm : null;
+
+    // Para el INSERT/UPDATE inicial:
+    //   - Si hay pendingFile → mandamos null y completamos después.
+    //   - Si hay URL externa → la mandamos provisional (después la pisamos con la R2).
+    //   - Si ya es R2 → la mandamos directamente.
+    const fotoUrlInicial = pendingFile ? null : fotoUrlForm;
 
     const payload: EquipoInput = {
       nombre: rest.nombre,
@@ -350,7 +381,7 @@ export function EquipoFormDialog({
       serie: rest.serie || null,
       dueno: rest.dueno || null,
       bh_url: rest.bh_url || null,
-      foto_url: fotoUrlFinal,
+      foto_url: fotoUrlInicial,
       fecha_compra: rest.fecha_compra || null,
       precio_jornada: rest.precio_jornada ?? null,
       precio_usd: rest.precio_usd ?? null,
@@ -358,78 +389,144 @@ export function EquipoFormDialog({
       valor_reposicion: rest.valor_reposicion ?? null,
       visible_catalogo: visible_catalogo ? 1 : 0,
     };
-    const saved = await onSubmit(payload, etiquetas);
-    const equipoId = saved?.id ?? initial?.id;
-    if (!equipoId) return;
 
-    // Ficha base (visible en la pestaña): se guarda siempre que estemos editando
-    // o cuando creamos y hay datos importados / cargados.
-    const tieneDatosFicha = (
-      isEdit ||
-      !!descripcion || !!notas || specs.length > 0 || keywords.length > 0 ||
-      !!montura || !!formato || !!resolucion || !!nombreTpl.trim() ||
-      !!importedFichaExt
-    );
+    // Acumulamos errores parciales para reportar en un solo toast al final.
+    const fallidos: string[] = [];
+    let equipoId: number | undefined;
 
-    if (tieneDatosFicha) {
-      try {
-        await adminApi.setFicha(equipoId, {
-          descripcion: descripcion || null,
-          notas: notas || null,
-          specs_json: specs.length ? JSON.stringify(specs.filter((s) => s.label && s.value)) : null,
-          montura: montura || null,
-          formato: formato || null,
-          resolucion: resolucion || null,
-          keywords_json: keywords.length ? JSON.stringify(keywords) : null,
-          nombre_publico_template: nombreTpl.trim() || null,
-        });
-      } catch (e) {
-        toast.error(`Falló guardar ficha: ${e instanceof Error ? e.message : ""}`);
+    try {
+      // 1) Crear o actualizar el equipo. Si esto falla, abortamos: sin equipo
+      //    no tiene sentido seguir con foto/ficha/categorías.
+      const saved = await onSubmit(payload, etiquetas);
+      equipoId = saved?.id ?? initial?.id;
+      if (!equipoId) {
+        toast.error("No se pudo guardar el equipo");
+        return;
       }
-    }
 
-    // Ficha extendida (peso, dimensiones, incluye, etc.) — sólo cuando se importó desde URL
-    if (importedFichaExt) {
-      try {
-        const r = importedFichaExt;
-        const ext: Record<string, unknown> = {};
-        if (r.peso) ext.peso = r.peso;
-        if (r.dimensiones) ext.dimensiones = r.dimensiones;
-        if (r.alimentacion) ext.alimentacion = r.alimentacion;
-        if (r.video_url) ext.video_url = r.video_url;
-        if (typeof r.precio_bh_usd === "number") ext.precio_bh_usd = r.precio_bh_usd;
-        if (r.incluye?.length) ext.incluye = r.incluye;
-        if (r.conectividad?.length) ext.conectividad = r.conectividad;
-        if (r.compatible_con?.length) ext.compatible_con = r.compatible_con;
-        if (r.fuente_url) ext.fuente_url = r.fuente_url;
-        if (r.fuente_titulo) ext.fuente_titulo = r.fuente_titulo;
-        if (r.enriquecido_fuente) ext.enriquecido_fuente = r.enriquecido_fuente;
-        if (r.raw) ext.raw = r.raw;
-        if (Object.keys(ext).length > 0) {
-          await adminApi.aplicarEnriquecimiento(equipoId, ext);
+      // 2) Subir foto pendiente (archivo local) o externa, con el id real.
+      //    Si falla, el equipo queda con la URL provisional (o null) y se avisa.
+      if (pendingFile) {
+        try {
+          const r2url = await uploadFileToBucket(equipoId, pendingFile);
+          await adminApi.updateEquipo(equipoId, { foto_url: r2url });
+          form.setValue("foto_url", r2url, { shouldDirty: false });
+          // Limpiamos el archivo pendiente y su preview.
+          setPendingFile(null);
+          if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+          setPendingFilePreview("");
+        } catch (e) {
+          fallidos.push(`foto (${e instanceof Error ? e.message : "error"})`);
         }
-      } catch (e) {
-        toast.error(`Falló guardar ficha extendida: ${e instanceof Error ? e.message : ""}`);
+      } else if (fotoExternaPendiente) {
+        try {
+          const r2url = await uploadExternalUrlToBucket(equipoId, fotoExternaPendiente);
+          await adminApi.updateEquipo(equipoId, { foto_url: r2url });
+          form.setValue("foto_url", r2url, { shouldDirty: false });
+        } catch (e) {
+          // Foto queda como URL externa — no es ideal pero el equipo está OK.
+          fallidos.push(`foto a R2 (${e instanceof Error ? e.message : "error"})`);
+        }
       }
+
+      // 3) Ficha base (visible). Se guarda siempre que estemos editando o
+      //    cuando creamos y hay datos importados / cargados.
+      const tieneDatosFicha = (
+        isEdit ||
+        !!descripcion || !!notas || specs.length > 0 || keywords.length > 0 ||
+        !!montura || !!formato || !!resolucion || !!nombreTpl.trim() ||
+        !!importedFichaExt
+      );
+      if (tieneDatosFicha) {
+        try {
+          await adminApi.setFicha(equipoId, {
+            descripcion: descripcion || null,
+            notas: notas || null,
+            specs_json: specs.length ? JSON.stringify(specs.filter((s) => s.label && s.value)) : null,
+            montura: montura || null,
+            formato: formato || null,
+            resolucion: resolucion || null,
+            keywords_json: keywords.length ? JSON.stringify(keywords) : null,
+            nombre_publico_template: nombreTpl.trim() || null,
+          });
+        } catch (e) {
+          fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
+        }
+      }
+
+      // 4) Ficha extendida (peso, dimensiones, incluye, etc.) — cuando se
+      //    importó desde URL.
+      if (importedFichaExt) {
+        try {
+          const r = importedFichaExt;
+          const ext: Record<string, unknown> = {};
+          if (r.peso) ext.peso = r.peso;
+          if (r.dimensiones) ext.dimensiones = r.dimensiones;
+          if (r.alimentacion) ext.alimentacion = r.alimentacion;
+          if (r.video_url) ext.video_url = r.video_url;
+          if (typeof r.precio_bh_usd === "number") ext.precio_bh_usd = r.precio_bh_usd;
+          if (r.incluye?.length) ext.incluye = r.incluye;
+          if (r.conectividad?.length) ext.conectividad = r.conectividad;
+          if (r.compatible_con?.length) ext.compatible_con = r.compatible_con;
+          if (r.fuente_url) ext.fuente_url = r.fuente_url;
+          if (r.fuente_titulo) ext.fuente_titulo = r.fuente_titulo;
+          if (r.enriquecido_fuente) ext.enriquecido_fuente = r.enriquecido_fuente;
+          if (r.raw) ext.raw = r.raw;
+          if (Object.keys(ext).length > 0) {
+            await adminApi.aplicarEnriquecimiento(equipoId, ext);
+          }
+        } catch (e) {
+          fallidos.push(`ficha extendida (${e instanceof Error ? e.message : "error"})`);
+        }
+      }
+
+      // 5) Categorías: sólo cuando estamos editando (en create no hay UI).
+      if (isEdit && initial) {
+        try {
+          await adminApi.setCategorias(initial.id, [...selectedCats]);
+        } catch (e) {
+          fallidos.push(`categorías (${e instanceof Error ? e.message : "error"})`);
+        }
+      }
+    } catch (e) {
+      // Falla en el create/update del equipo (1). El dialog queda abierto
+      // para que el usuario reintente sin perder el form.
+      toast.error(e instanceof Error ? e.message : "Error al guardar el equipo");
+      return;
     }
 
-    // Categorías: sólo cuando estamos editando (en create no hay UI todavía)
-    if (isEdit && initial) {
-      try {
-        await adminApi.setCategorias(initial.id, [...selectedCats]);
-      } catch (e) {
-        toast.error(`Falló guardar categorías: ${e instanceof Error ? e.message : ""}`);
-      }
+    // 6) Notificación final al usuario y cierre del dialog.
+    if (fallidos.length > 0) {
+      toast.warning(isEdit ? "Equipo actualizado con avisos" : "Equipo creado con avisos", {
+        description: `Falló: ${fallidos.join(" · ")}`,
+        duration: 7000,
+      });
+    } else {
+      toast.success(isEdit ? "Equipo actualizado" : "Equipo creado");
     }
+    onOpenChange(false);
   });
 
-  // Upload de foto al bucket equipos-fotos (atado al equipo)
+  // Upload de foto al bucket equipos-fotos.
+  // EDIT mode: sube directo al toque, queda en R2 con el id del equipo.
+  // CREATE mode: guarda el File en memoria + preview local. El submit() lo
+  //   sube cuando el equipo ya existe (no podemos subir a R2 sin id).
   const handleUpload = async (file: File) => {
     if (!file) return;
+    if (!initial?.id) {
+      // CREATE mode: pendingFile + blob URL para preview.
+      setPendingFile(file);
+      if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+      setPendingFilePreview(URL.createObjectURL(file));
+      // Limpiamos cualquier URL externa que hubiera en el form: el upload
+      // del File pendiente tiene precedencia sobre cualquier URL.
+      form.setValue("foto_url", "", { shouldDirty: true });
+      toast.info("Foto lista — se va a subir cuando crees el equipo");
+      return;
+    }
     setUploading(true);
     try {
-      const eqId = initial?.id ?? "nuevo";
-      const publicUrl = await uploadFileToBucket(eqId, file);
+      const publicUrl = await uploadFileToBucket(initial.id, file);
       form.setValue("foto_url", publicUrl, { shouldDirty: true });
       toast.success("Foto subida");
     } catch (e) {
@@ -635,13 +732,20 @@ export function EquipoFormDialog({
                       </div>
                     )}
 
-                    {form.watch("foto_url") && (
-                      <img
-                        src={form.watch("foto_url") ?? ""}
-                        alt="Preview"
-                        className="rounded-md border hairline max-h-40 object-contain bg-muted/30"
-                        onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
-                      />
+                    {(pendingFilePreview || form.watch("foto_url")) && (
+                      <div className="space-y-1">
+                        <img
+                          src={pendingFilePreview || form.watch("foto_url") || ""}
+                          alt="Preview"
+                          className="rounded-md border hairline max-h-40 object-contain bg-muted/30"
+                          onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+                        />
+                        {pendingFile && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Archivo local "{pendingFile.name}" — se va a subir a storage al crear el equipo.
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 </Field>
