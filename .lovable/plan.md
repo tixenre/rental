@@ -1,100 +1,75 @@
-## Objetivo
 
-Categorías jerárquicas (2 niveles) con:
-- Un equipo puede tener N categorías hoja.
-- Filtrar por padre incluye automáticamente todos los hijos.
-- Ejemplo: Sony a7 V → `Foto` + `Video`. Aparece en ambas y dentro de `Cámaras`.
+Ahora sí me queda claro. Tres cosas separadas, con **etiquetas como bolsa global de búsqueda** que incluye todo lo demás más palabras libres.
 
-## Fase 1 — Backend: estructura del árbol
+## Modelo
 
-**Migración `etiquetas`:**
-- `parent_id INTEGER NULL REFERENCES etiquetas(id) ON DELETE SET NULL`
-- Índice `(parent_id, prioridad, nombre)`
-- Constraint: `parent_id != id` y el padre no puede tener a su vez `parent_id` (forzar 2 niveles).
+| Concepto | Dónde vive | Estructura | Ejemplos |
+|---|---|---|---|
+| **Categorías** | Tabla `categorias` propia | Árbol 2 niveles (parent_id), multi-asignación a equipos | Cámara → Foto, Lente → Montura E |
+| **Marca** | Columna `equipos.marca` | Texto plano | Sony, Canon, Aputure |
+| **Modelo** | Columna `equipos.modelo` | Texto plano | a7 V, FX3, 300X Bi-color |
+| **Etiquetas** | Tabla `etiquetas` + join | Lista plana, libre | a7v, sony, foto, cámara, 4k60, fullframe, f/2.8, 5600k |
 
-**Seed del árbol** (idempotente por nombre):
+### Cómo se relacionan
 
-```text
-Cámaras (10)              → Video, Foto, Acción
-Lentes (20)               → Zoom E, Zoom EF, Fijos EF, Especiales, Vintage
-Adaptadores y Filtros (25)→ Adaptadores, Filtros 82mm
-Iluminación (30)          → LED daylight/bicolor, LED RGB, Tungsteno, Fluorescente, On-camera, Práctica/efecto
-Modificadores (40)        → Softbox, Difusión, Reflectores, Banderas
-Soportes (50)             → Trípodes video, Trípodes foto, C-Stands, Estabilización, Slider/Dolly, Car mount
-Grip (60)                 → Brazos, Clamps, Wall plates/pins, Pinzas, Líneas seguridad, Sopapa, Lastre
-Sonido (70)               → Inalámbricos, Shotgun/Boom, On-camera, Estudio/Podcast, Intercom
-Monitores y Video (80)    → Monitores, Grabadores, Transmisión, Follow Focus/Matebox
-Energía (90)              → V-Mount, NP/LP-E6, Distribución
-Media y Datos (100)       → SD, CFexpress, Lectores
-Estudio y Producción (110)→ Set/Backdrops, Paquetes
-```
+Las **etiquetas** son una bolsa de strings de búsqueda. Para cada equipo se compone de:
+1. **Auto** (no editable, se regenera): nombre de cada categoría asignada (incluyendo padres del árbol), `marca`, `modelo`, palabras del nombre.
+2. **Manuales** (editables): lo que el admin agregue libre — "4K60", "f/2.8", "5600K", "V-Mount", "Vintage", "Cine", lo que sea.
 
-**Endpoints (`backend/routes/equipos.py`):**
-- `GET /api/categorias` → árbol `[{id, nombre, prioridad, children:[...]}]`. `?flat=1` para retrocompat.
-- `GET /api/equipos?categoria=<id>` → CTE recursiva: matchea si el equipo está asignado a esa etiqueta o a cualquier descendiente.
-- `GET /api/admin/etiquetas` → incluye `parent_id`.
-- `POST /api/admin/etiquetas` y `PATCH /api/admin/etiquetas/{id}` → aceptan `parent_id` (validar 2 niveles + no-ciclo).
-- `PUT /api/admin/equipos/{id}/etiquetas` → reemplaza la lista completa de etiquetas hoja del equipo.
+Esto convierte a `etiquetas` en el índice universal para el buscador y filtros rápidos, mientras que **las categorías siguen siendo la navegación oficial del catálogo**.
 
-## Fase 2 — Clasificación con revisión previa
+## Cambios DB
 
-**Script `backend/scripts/seed_categorias.py`:**
-1. Crea/actualiza el árbol de etiquetas.
-2. Recorre los 142 equipos y aplica reglas de nombre/marca/modelo → set de etiquetas hoja propuesto.
-3. Genera `/mnt/documents/clasificacion_propuesta.csv` con columnas: `id, nombre, marca, etiquetas_propuestas, notas`.
-4. **No escribe asignaciones todavía.** Vos revisás el CSV.
-5. Segundo paso (`--apply` o un endpoint admin) que toma el CSV revisado y ejecuta las asignaciones.
+1. **Nueva tabla `categorias`** (taxonomía dedicada)
+   - `id`, `nombre`, `prioridad`, `parent_id` (FK self, 2 niveles), `slug`.
+   - Seed con el árbol que ya armamos.
+2. **Nueva join `equipo_categorias`** (`equipo_id`, `categoria_id`, `orden`).
+3. **`etiquetas` se simplifica de vuelta**
+   - Drop `parent_id` (ya no es jerárquica).
+   - Agrega columna `origen TEXT NOT NULL DEFAULT 'manual'` con valores `'auto'` (derivada) o `'manual'` (puesta a mano). Permite regenerar las auto sin pisar las manuales.
+   - El join `equipo_etiquetas` se queda igual.
+4. **Migración**
+   - Mover los nodos del árbol que están hoy en `etiquetas` → `categorias` (con su parent y prioridad).
+   - Mover sus asignaciones de `equipo_etiquetas` → `equipo_categorias`.
+   - Borrar esos nodos de `etiquetas`.
+   - Por cada equipo, generar etiquetas `auto` desde `marca`, `modelo`, nombres de sus categorías (hoja + padre).
+   - Lo que quede en `etiquetas` (si algo era spec libre) se marca `origen='manual'`.
 
-Casos especiales pre-cargados:
-- Sony a7 V, ZV-E1 → `Foto` + `Video`.
-- FX3, RED, C200 → `Video`.
-- GoPro, Insta360 → `Acción`.
+## Backend
 
-## Fase 3 — Frontend: tipos y hooks
+- **Trigger / función `regenerar_etiquetas_auto(equipo_id)`** que se llama cuando cambian categorías, marca o modelo. Borra las etiquetas `origen='auto'` del equipo y las regenera. No toca las `manual`.
+- `GET /api/categorias` → árbol desde `categorias`.
+- `GET /api/equipos?categoria=<id>` → CTE recursivo sobre `categorias`/`equipo_categorias`.
+- `GET /api/etiquetas` → todas, con `total` (count). Búsqueda global hace `LIKE` contra etiquetas.
+- `PUT /api/admin/equipos/{id}/categorias` → setea categorías hoja → dispara regenerar.
+- `PUT /api/admin/equipos/{id}/etiquetas` → setea solo las `manual` (las `auto` quedan intactas).
+- CRUD admin `/admin/categorias/*` (árbol) y `/admin/etiquetas/*` (libres).
+- Autoclasificación → escribe en `equipo_categorias`, regenera auto-tags en consecuencia.
 
-**`src/lib/api.ts` y `src/lib/admin/api.ts`:**
-- `Categoria` gana `parent_id?: number | null` y `children?: Categoria[]`.
-- Helpers: `flattenCategorias(tree)`, `descendantIds(tree, id)`, `getParent(byId, cat)`.
+## Frontend
 
-**`src/hooks/useEquipos.ts`:**
-- `useCategorias()` devuelve `{ tree, flat, byId }`.
+- Tipos: `Categoria` (con `parent_id`, `children`) y `Etiqueta` (plano, con `origen`).
+- Hooks separados `useCategorias()` y `useEtiquetas()`.
+- **`/admin/settings`** dos secciones:
+  - **Categorías**: árbol editable (lo que ya hicimos, apuntando al endpoint nuevo).
+  - **Etiquetas**: lista plana de las `manual` distintas (rename/merge/delete). Las `auto` se muestran en gris read-only con su origen.
+  - **Clasificación auto**: aclara que aplica a categorías y regenera etiquetas.
+- **`/admin/equipos`** detalle: tres campos:
+  - **Categorías** (multi-select del árbol).
+  - **Marca / Modelo** (inputs ya existentes).
+  - **Etiquetas manuales** (free-text con autocompletar). Debajo, chip-list read-only de las `auto` para que el admin vea qué se generó.
+- **Catálogo público**:
+  - Filtros por **categoría** (ya existe, sin cambio visual).
+  - Buscador global usa el campo `etiquetas` para matchear (cubre marca/modelo/categoría/keywords sin lógica especial).
+  - Chips de specs en card/detail muestran solo las `manual` interesantes.
 
-## Fase 4 — UI catálogo público (recomendación)
+## Orden de ejecución
 
-**Recomiendo: chips expandibles con drawer en mobile.**
+1. Migración SQL: crear `categorias` + `equipo_categorias`, copiar árbol, agregar `origen` a `etiquetas`, dropear `parent_id`, generar etiquetas auto iniciales.
+2. Backend: función de regeneración + nuevos endpoints + filtros.
+3. Tipos y hooks frontend.
+4. Admin settings: separar categorías y etiquetas en dos secciones.
+5. Editor de equipo con los tres campos.
+6. Buscador global del catálogo apoyado en etiquetas.
 
-Razón: en 402px un dropdown jerárquico se siente desconectado del contenido y obliga a 2 taps para volver a ver opciones. Los chips expandibles muestran el contexto completo sin abrir/cerrar menús, y ya tenés el lenguaje visual de chips en el catálogo.
-
-**Implementación:**
-- Fila horizontal scrollable de chips de **nivel padre** (Cámaras, Lentes, Iluminación…).
-- Tap en padre → activa filtro padre **y** revela una segunda fila debajo con sus hijos (Foto, Video, Acción).
-- Tap en hijo → filtro más fino. Tap de nuevo en el padre → vuelve al filtro padre. "Todos" limpia.
-- Indicador visual: padre activo en sólido, hijo activo con ring, padres inactivos con borde.
-- En desktop la segunda fila aparece inline; en mobile colapsada en un chip "▾ subcategorías" si supera el ancho.
-
-## Fase 5 — Sheet de pedidos
-
-`EquipoSearchSheet` en `PedidoPage.tsx`:
-- Agrupa por **categoría hoja**, con encabezado de padre arriba (sticky de 2 niveles).
-- Equipos con varias hojas aparecen en cada grupo correspondiente (con stock compartido — la disponibilidad sigue siendo por equipo).
-
-## Fase 6 — Admin
-
-**`/admin/settings` — Sección Categorías (árbol):**
-- Vista indentada con expand/collapse por padre.
-- Acciones por nodo: agregar hijo, renombrar, mover (cambiar `parent_id`), reordenar (▲▼ + input prioridad), borrar.
-- Botón "Guardar orden" hace bulk reorder por nivel.
-
-**`/admin/equipos` — Editor de etiquetas por equipo:**
-- En la fila/detalle de cada equipo, multi-select de etiquetas **hoja** (los padres se infieren).
-- Mostrar chips de las etiquetas asignadas con el padre como prefijo (ej: `Cámaras · Foto`).
-- Guardar llama a `PUT /api/admin/equipos/{id}/etiquetas`.
-
-## Orden de entrega sugerido
-
-1. Migración + seed del árbol (sin asignar equipos aún).
-2. Endpoints actualizados (`categorias` árbol, `equipos` con filtro recursivo).
-3. Tipos/hook frontend + catálogo con chips expandibles.
-4. Script de clasificación → CSV de revisión → vos confirmás → aplicar.
-5. Editor de etiquetas en `/admin/equipos` y editor de árbol en `/admin/settings`.
-6. Sheet de pedidos con agrupado de 2 niveles.
+¿Avanzo así?
