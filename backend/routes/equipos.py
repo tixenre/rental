@@ -10,7 +10,10 @@ from typing import Optional
 from fastapi import APIRouter, Query, HTTPException, Request
 from pydantic import BaseModel
 
-from database import get_db, row_to_dict, attach_tags, attach_kit
+from database import (
+    get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
+    regenerate_auto_tags,
+)
 from routes.auth import get_session
 
 router = APIRouter()
@@ -66,7 +69,14 @@ class KitItem(BaseModel):
 
 
 class EtiquetasUpdate(BaseModel):
-    etiquetas: list[str]  # lista ordenada de nombres (primera = categoría principal)
+    # Lista ordenada de etiquetas MANUALES. Las auto (marca/modelo/nombre/categorías)
+    # se regeneran solas, no las toques desde acá.
+    etiquetas: list[str]
+
+
+class CategoriasUpdate(BaseModel):
+    # Lista de IDs de categorías hoja (o raíz) asignadas al equipo.
+    categoria_ids: list[int]
 
 
 # ── Disponibilidad en tiempo real ────────────────────────────────────────────
