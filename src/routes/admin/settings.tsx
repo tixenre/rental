@@ -70,6 +70,7 @@ function SettingsPage() {
       </header>
 
       <CategoriasSection />
+      <EtiquetasSection />
       <ClasificacionSection />
 
       <section className="rounded-lg border hairline bg-background p-4 space-y-3">
