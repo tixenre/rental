@@ -212,12 +212,10 @@ export function EnriquecerEquipoDialog({
 
     setSaving(true);
     try {
-      // 1) Foto: si es externa, descargar via proxy y subir al bucket
+      // 1) Foto: si es externa, descargar via proxy y subir al bucket (con diagnóstico)
       if (willApplyFoto) {
         try {
-          const finalUrl = isBucketUrl(fotoUrl)
-            ? fotoUrl
-            : await uploadExternalUrlToBucket(equipo.id, fotoUrl);
+          const finalUrl = await uploadPhotoWithDiag(equipo.id, fotoUrl);
           patch.foto_url = finalUrl;
         } catch (e) {
           fallidos.push(`foto (${e instanceof Error ? e.message : "error"})`);
