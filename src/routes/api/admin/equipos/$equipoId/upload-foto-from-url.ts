@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type {} from "@tanstack/react-start";
 
 import { ADMIN_EMAILS } from "@/lib/admin-emails";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
