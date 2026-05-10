@@ -228,9 +228,9 @@ function Index() {
         </section>
 
         {/* Toggle Modo + búsqueda sticky */}
-        <div className="sticky top-14 sm:top-[60px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
-          <div className="flex flex-col gap-1.5 px-3 py-2 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:py-3 lg:px-12">
-            {/* Mobile: pill fechas + lupa + filtros */}
+        <div className="sticky top-14 sm:top-[68px] z-30 border-b hairline bg-background/95 backdrop-blur-xl">
+          {/* Mobile */}
+          <div className="sm:hidden">
             <MobileStickyBar
               query={query}
               setQuery={setQuery}
@@ -247,56 +247,62 @@ function Index() {
               }}
               resultCount={filtered.length}
             />
+          </div>
 
-            {/* Desktop: search input */}
-            <div className="relative hidden sm:block flex-1 min-w-0 sm:max-w-xl">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar equipo, marca…"
-                className="w-full rounded-full border hairline bg-surface py-2 pl-9 pr-9 text-sm placeholder:text-muted-foreground focus:border-amber focus:outline-none"
-              />
-              {query && (
-                <button
-                  onClick={() => setQuery("")}
-                  aria-label="Limpiar búsqueda"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-foreground/10 hover:text-ink"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
+          {/* Desktop: grid 3 cols alineado con el TopBar */}
+          <div className="hidden sm:grid sm:grid-cols-[auto_1fr_auto] sm:gap-4 sm:items-center sm:px-6 sm:py-2.5">
+
+            {/* Col izquierda: toggle Explorar/Lista (bajo el logo) */}
+            <div className="flex items-center gap-1 rounded-full border hairline p-0.5 shrink-0">
+              <button
+                onClick={() => setMode("grid")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
+                  mode === "grid" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
+                )}
+              >
+                <LayoutGrid className="h-3 w-3" />
+                <span>Explorar</span>
+              </button>
+              <button
+                onClick={() => setMode("list")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
+                  mode === "list" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
+                )}
+              >
+                <List className="h-3 w-3" />
+                <span>Lista</span>
+              </button>
             </div>
 
-            {/* Desktop only: toggle Grid/Lista + contador */}
-            <div className="hidden sm:flex items-center justify-between gap-3 sm:ml-auto">
-              <div className="flex items-center gap-1 rounded-full border hairline p-0.5">
-                <button
-                  onClick={() => setMode("grid")}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
-                    mode === "grid" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
-                  )}
-                >
-                  <LayoutGrid className="h-3 w-3" />
-                  <span>Explorar</span>
-                </button>
-                <button
-                  onClick={() => setMode("list")}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
-                    mode === "list" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
-                  )}
-                >
-                  <List className="h-3 w-3" />
-                  <span>Lista</span>
-                </button>
+            {/* Col central: buscador (bajo el pill) */}
+            <div className="px-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar equipo, marca…"
+                  className="w-full rounded-full border-2 hairline bg-muted/50 py-2 pl-9 pr-9 text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none focus:bg-background transition"
+                />
+                {query && (
+                  <button
+                    onClick={() => setQuery("")}
+                    aria-label="Limpiar búsqueda"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-foreground/10 hover:text-ink"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
-                {query.trim() || mode === "list"
-                  ? `${filtered.length} resultados`
-                  : `${allEquipos.length} equipos`}
-              </div>
+            </div>
+
+            {/* Col derecha: contador (bajo carrito/ingresar) */}
+            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular shrink-0">
+              {query.trim() || mode === "list"
+                ? `${filtered.length} resultados`
+                : `${allEquipos.length} equipos`}
             </div>
           </div>
         </div>
