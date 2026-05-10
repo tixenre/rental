@@ -17,7 +17,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { adminApi, type ImportCsvResp, type EtiquetaAdmin, type ClasificarResult } from "@/lib/admin/api";
+import { adminApi, type ImportCsvResp, type CategoriaAdmin, type EtiquetaAdmin, type ClasificarResult } from "@/lib/admin/api";
 
 export const Route = createFileRoute("/admin/settings")({
   component: SettingsPage,
@@ -70,6 +70,7 @@ function SettingsPage() {
       </header>
 
       <CategoriasSection />
+      <EtiquetasSection />
       <ClasificacionSection />
 
       <section className="rounded-lg border hairline bg-background p-4 space-y-3">
@@ -227,8 +228,8 @@ function ImportCard({
 function CategoriasSection() {
   const qc = useQueryClient();
   const listQ = useQuery({
-    queryKey: ["admin", "etiquetas"],
-    queryFn: () => adminApi.adminListEtiquetas(),
+    queryKey: ["admin", "categorias"],
+    queryFn: () => adminApi.adminListCategorias(),
   });
 
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
@@ -237,26 +238,27 @@ function CategoriasSection() {
   const [newRoot, setNewRoot] = useState("");
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["admin", "etiquetas"] });
+    qc.invalidateQueries({ queryKey: ["admin", "categorias"] });
     qc.invalidateQueries({ queryKey: ["categorias"] });
+    qc.invalidateQueries({ queryKey: ["equipos"] });
   };
 
   const updateMut = useMutation({
     mutationFn: ({ id, ...patch }: { id: number; nombre?: string; prioridad?: number; parent_id?: number | null; set_parent_null?: boolean }) =>
-      adminApi.adminUpdateEtiqueta(id, patch),
+      adminApi.adminUpdateCategoria(id, patch),
     onSuccess: invalidate,
     onError: (e: Error) => toast.error(e.message),
   });
 
   const createMut = useMutation({
     mutationFn: (data: { nombre: string; prioridad?: number; parent_id?: number | null }) =>
-      adminApi.adminCreateEtiqueta(data),
+      adminApi.adminCreateCategoria(data),
     onSuccess: () => { invalidate(); toast.success("Categoría creada"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: number) => adminApi.adminDeleteEtiqueta(id),
+    mutationFn: (id: number) => adminApi.adminDeleteCategoria(id),
     onSuccess: () => { invalidate(); toast.success("Categoría eliminada"); },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -406,15 +408,17 @@ function CategoriasSection() {
   );
 }
 
+type RowItem = { id: number; nombre: string; prioridad: number; parent_id: number | null; total: number };
+
 function CategoryRow({
   et, isRoot, isOpen, hasChildren, parents, onToggle, onPriority,
   onRename, onChangeParent, onDelete, onAddChild,
 }: {
-  et: EtiquetaAdmin;
+  et: RowItem;
   isRoot?: boolean;
   isOpen?: boolean;
   hasChildren?: boolean;
-  parents?: EtiquetaAdmin[];
+  parents?: RowItem[];
   onToggle?: () => void;
   onPriority: (v: number) => void;
   onRename: (n: string) => void;
@@ -483,6 +487,126 @@ function CategoryRow({
         <Trash2 className="h-4 w-4" />
       </Button>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Etiquetas (bolsa libre, plana — keywords manuales)
+// ─────────────────────────────────────────────────────────────────────────
+
+function EtiquetasSection() {
+  const qc = useQueryClient();
+  const listQ = useQuery({
+    queryKey: ["admin", "etiquetas"],
+    queryFn: () => adminApi.adminListEtiquetas(),
+  });
+  const [nueva, setNueva] = useState("");
+  const [filter, setFilter] = useState("");
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["admin", "etiquetas"] });
+    qc.invalidateQueries({ queryKey: ["etiquetas"] });
+  };
+
+  const createMut = useMutation({
+    mutationFn: (nombre: string) => adminApi.adminCreateEtiqueta({ nombre }),
+    onSuccess: () => { invalidate(); setNueva(""); toast.success("Etiqueta creada"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const renameMut = useMutation({
+    mutationFn: ({ id, nombre }: { id: number; nombre: string }) =>
+      adminApi.adminUpdateEtiqueta(id, { nombre }),
+    onSuccess: invalidate,
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => adminApi.adminDeleteEtiqueta(id),
+    onSuccess: () => { invalidate(); toast.success("Etiqueta eliminada"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Mostramos solo etiquetas manuales (las que tienen al menos 1 uso o las que
+  // el admin creó a mano y todavía no asignó). Como el endpoint admin devuelve
+  // TODO (incluyendo auto-tags derivadas), filtramos visualmente: las auto
+  // típicamente son lowercase y sin prioridad customizada (= 100). El criterio
+  // exacto es difuso; mostramos todas y dejamos que el admin filtre por texto.
+  const items = useMemo(() => {
+    const all = listQ.data ?? [];
+    const f = filter.trim().toLowerCase();
+    const list = f ? all.filter((e) => e.nombre.toLowerCase().includes(f)) : all;
+    return list.sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre));
+  }, [listQ.data, filter]);
+
+  return (
+    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+      <div>
+        <h2 className="font-display text-lg text-ink">Etiquetas libres</h2>
+        <p className="text-sm text-muted-foreground">
+          Bolsa de keywords para búsqueda. Marca, modelo, nombre y categorías
+          se agregan automáticamente — usá esto para palabras adicionales (ej:
+          "f/2.8", "4k60", "fullframe", "bicolor").
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          placeholder="Nueva etiqueta…"
+          value={nueva}
+          onChange={(e) => setNueva(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && nueva.trim()) createMut.mutate(nueva.trim());
+          }}
+          className="h-8 max-w-xs"
+        />
+        <Button size="sm" disabled={!nueva.trim() || createMut.isPending}
+          onClick={() => createMut.mutate(nueva.trim())}>
+          <Plus className="h-4 w-4 mr-1" /> Agregar
+        </Button>
+        <div className="flex-1" />
+        <Input
+          placeholder="Filtrar…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="h-8 max-w-xs"
+        />
+      </div>
+
+      {listQ.isLoading && (
+        <div className="py-6 text-sm text-muted-foreground flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
+        </div>
+      )}
+      {listQ.error && (
+        <div className="text-sm text-destructive">Error: {(listQ.error as Error).message}</div>
+      )}
+
+      {items.length > 0 && (
+        <ul className="divide-y hairline border hairline rounded-md max-h-96 overflow-auto">
+          {items.map((et) => (
+            <li key={et.id} className="flex items-center gap-2 px-3 py-1.5">
+              <Input
+                defaultValue={et.nombre}
+                key={`${et.id}-${et.nombre}`}
+                className="h-8 flex-1"
+                onBlur={(e) => {
+                  const v = e.target.value.trim();
+                  if (v && v !== et.nombre) renameMut.mutate({ id: et.id, nombre: v });
+                }}
+              />
+              <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
+                {et.total}
+              </span>
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive"
+                onClick={() => {
+                  if (confirm(`Eliminar etiqueta "${et.nombre}"?`)) deleteMut.mutate(et.id);
+                }} title="Eliminar">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

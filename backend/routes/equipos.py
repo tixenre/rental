@@ -261,6 +261,9 @@ def update_equipo(id: int, data: EquipoUpdate):
         set_clause += ", updated_at = CURRENT_TIMESTAMP"
         conn.execute(f"UPDATE equipos SET {set_clause} WHERE id = ?",
                      list(updates.values()) + [id])
+        # Si cambió algo que alimenta auto-tags, regenerar.
+        if any(k in updates for k in ("nombre", "marca", "modelo")):
+            regenerate_auto_tags(conn, id)
         conn.commit()
         row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
@@ -459,25 +462,35 @@ def get_precio_historial(id: int):
 
 @router.put("/equipos/{id}/etiquetas", status_code=200)
 def set_etiquetas(id: int, data: EtiquetasUpdate):
+    """Reemplaza SOLO las etiquetas manuales del equipo. Las auto se preservan."""
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
-        conn.execute("DELETE FROM equipo_etiquetas WHERE equipo_id = ?", (id,))
+        # Borrar solo manuales; las auto siguen vivas.
+        conn.execute(
+            "DELETE FROM equipo_etiquetas WHERE equipo_id = %s AND origen = 'manual'",
+            (id,),
+        )
         for orden, nombre in enumerate(data.etiquetas):
-            nombre = nombre.strip()
+            nombre = (nombre or "").strip()
             if not nombre:
                 continue
-            row = conn.execute("SELECT id FROM etiquetas WHERE nombre = ?", (nombre,)).fetchone()
-            if row:
-                etiqueta_id = row["id"]
-            else:
-                cur = conn.execute("INSERT INTO etiquetas (nombre) VALUES (?)", (nombre,))
-                etiqueta_id = cur.lastrowid
             conn.execute(
-                "INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden) VALUES (?,?,?) ON CONFLICT (equipo_id, etiqueta_id) DO UPDATE SET orden=EXCLUDED.orden",
-                (id, etiqueta_id, orden),
+                "INSERT INTO etiquetas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING",
+                (nombre,),
             )
+            row = conn.execute(
+                "SELECT id FROM etiquetas WHERE nombre = %s", (nombre,)
+            ).fetchone()
+            if not row:
+                continue
+            conn.execute("""
+                INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen)
+                VALUES (%s, %s, %s, 'manual')
+                ON CONFLICT (equipo_id, etiqueta_id)
+                DO UPDATE SET orden = EXCLUDED.orden, origen = 'manual'
+            """, (id, row["id"], orden))
         conn.commit()
         row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
@@ -489,18 +502,69 @@ def set_etiquetas(id: int, data: EtiquetasUpdate):
         conn.close()
 
 
+# ── Categorías por equipo ────────────────────────────────────────────────────
+
+@router.put("/equipos/{id}/categorias", status_code=200)
+def set_categorias(id: int, data: CategoriasUpdate):
+    """
+    Reemplaza la lista de categorías asignadas al equipo y regenera auto-tags
+    (porque los nombres de categoría alimentan la bolsa de etiquetas auto).
+    """
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+        conn.execute("DELETE FROM equipo_categorias WHERE equipo_id = %s", (id,))
+        for orden, cid in enumerate(data.categoria_ids):
+            try:
+                cid_int = int(cid)
+            except (TypeError, ValueError):
+                continue
+            conn.execute("""
+                INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (equipo_id, categoria_id) DO UPDATE SET orden = EXCLUDED.orden
+            """, (id, cid_int, orden))
+        regenerate_auto_tags(conn, id)
+        conn.commit()
+        row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
+        equipo = attach_tags(conn, [row_to_dict(row)])[0]
+        equipo = attach_categorias(conn, [equipo])[0]
+        return equipo
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 # ── Etiquetas / Categorías ───────────────────────────────────────────────────
 
 @router.get("/etiquetas")
-def list_etiquetas():
+def list_etiquetas(incluir_auto: int = Query(0)):
+    """
+    Lista etiquetas. Por defecto devuelve solo las que tienen al menos un uso
+    MANUAL (las auto inflan demasiado). `incluir_auto=1` devuelve todo.
+    """
     conn = get_db()
     try:
-        rows = conn.execute("""
-            SELECT et.nombre, COUNT(ee.equipo_id) as total
-            FROM etiquetas et
-            LEFT JOIN equipo_etiquetas ee ON ee.etiqueta_id = et.id
-            GROUP BY et.id ORDER BY et.nombre
-        """).fetchall()
+        if incluir_auto:
+            rows = conn.execute("""
+                SELECT et.nombre, COUNT(ee.equipo_id) AS total
+                FROM etiquetas et
+                LEFT JOIN equipo_etiquetas ee ON ee.etiqueta_id = et.id
+                GROUP BY et.id, et.nombre
+                ORDER BY LOWER(et.nombre)
+            """).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT et.nombre, COUNT(ee.equipo_id) AS total
+                FROM etiquetas et
+                JOIN equipo_etiquetas ee ON ee.etiqueta_id = et.id
+                WHERE ee.origen = 'manual'
+                GROUP BY et.id, et.nombre
+                ORDER BY LOWER(et.nombre)
+            """).fetchall()
         return [{"nombre": r["nombre"], "total": r["total"]} for r in rows]
     finally:
         conn.close()
@@ -836,21 +900,180 @@ def _propose_tags(nombre: str, marca: str, modelo: str) -> list[str]:
     return out
 
 
+# ── Admin: CRUD de categorías (árbol propio) ─────────────────────────────────
+
+class CategoriaCreate(BaseModel):
+    nombre:    str
+    prioridad: Optional[int] = 100
+    parent_id: Optional[int] = None
+
+
+class CategoriaPatch(BaseModel):
+    nombre:    Optional[str] = None
+    prioridad: Optional[int] = None
+    parent_id: Optional[int] = None
+    set_parent_null: Optional[bool] = False
+
+
+class CategoriasReorder(BaseModel):
+    ids: list[int]
+
+
+@router.get("/admin/categorias")
+def admin_list_categorias(request: Request):
+    from supabase_auth import require_admin
+    require_admin(request)
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT c.id, c.nombre, c.prioridad, c.parent_id,
+                   COUNT(ec.equipo_id) AS total
+            FROM categorias c
+            LEFT JOIN equipo_categorias ec ON ec.categoria_id = c.id
+            GROUP BY c.id, c.nombre, c.prioridad, c.parent_id
+            ORDER BY c.prioridad ASC, LOWER(c.nombre) ASC
+        """).fetchall()
+        return [
+            {"id": r["id"], "nombre": r["nombre"], "prioridad": r["prioridad"],
+             "parent_id": r["parent_id"], "total": r["total"]}
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
+@router.post("/admin/categorias", status_code=201)
+def admin_create_categoria(data: CategoriaCreate, request: Request):
+    from supabase_auth import require_admin
+    require_admin(request)
+    nombre = (data.nombre or "").strip()
+    if not nombre:
+        raise HTTPException(400, "Nombre vacío")
+    conn = get_db()
+    try:
+        if data.parent_id is not None:
+            prow = conn.execute(
+                "SELECT id, parent_id FROM categorias WHERE id = %s", (data.parent_id,)
+            ).fetchone()
+            if not prow:
+                raise HTTPException(400, "parent_id no existe")
+            if prow["parent_id"] is not None:
+                raise HTTPException(400, "Solo se permiten 2 niveles")
+        cur = conn.execute("""
+            INSERT INTO categorias (nombre, prioridad, parent_id)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (nombre) DO UPDATE
+                SET prioridad = EXCLUDED.prioridad,
+                    parent_id = EXCLUDED.parent_id
+            RETURNING id, nombre, prioridad, parent_id
+        """, (nombre, data.prioridad or 100, data.parent_id))
+        row = cur.fetchone()
+        conn.commit()
+        return {"id": row["id"], "nombre": row["nombre"],
+                "prioridad": row["prioridad"], "parent_id": row["parent_id"], "total": 0}
+    except HTTPException:
+        conn.rollback(); raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(400, str(e))
+    finally:
+        conn.close()
+
+
+@router.patch("/admin/categorias/{cid}")
+def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
+    from supabase_auth import require_admin
+    require_admin(request)
+    sets, vals = [], []
+    if patch.nombre is not None:
+        sets.append("nombre = %s"); vals.append(patch.nombre.strip())
+    if patch.prioridad is not None:
+        sets.append("prioridad = %s"); vals.append(int(patch.prioridad))
+    if patch.set_parent_null:
+        sets.append("parent_id = NULL")
+    elif patch.parent_id is not None:
+        if patch.parent_id == cid:
+            raise HTTPException(400, "Una categoría no puede ser su propio padre")
+        conn0 = get_db()
+        try:
+            prow = conn0.execute(
+                "SELECT id, parent_id FROM categorias WHERE id = %s", (patch.parent_id,)
+            ).fetchone()
+            if not prow:
+                raise HTTPException(400, "parent_id no existe")
+            if prow["parent_id"] is not None:
+                raise HTTPException(400, "Solo se permiten 2 niveles")
+            chrow = conn0.execute(
+                "SELECT 1 FROM categorias WHERE parent_id = %s LIMIT 1", (cid,)
+            ).fetchone()
+            if chrow:
+                raise HTTPException(400, "Esta categoría tiene hijos")
+        finally:
+            conn0.close()
+        sets.append("parent_id = %s"); vals.append(int(patch.parent_id))
+    if not sets:
+        raise HTTPException(400, "Sin cambios")
+    conn = get_db()
+    try:
+        vals.append(cid)
+        conn.execute(f"UPDATE categorias SET {', '.join(sets)} WHERE id = %s", tuple(vals))
+        # Si renombró, regenerar auto-tags de los equipos afectados.
+        if patch.nombre is not None:
+            eq_rows = conn.execute(
+                "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = %s", (cid,)
+            ).fetchall()
+            for r in eq_rows:
+                regenerate_auto_tags(conn, r["equipo_id"])
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@router.delete("/admin/categorias/{cid}", status_code=204)
+def admin_delete_categoria(cid: int, request: Request):
+    from supabase_auth import require_admin
+    require_admin(request)
+    conn = get_db()
+    try:
+        eq_rows = conn.execute(
+            "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = %s", (cid,)
+        ).fetchall()
+        affected = [r["equipo_id"] for r in eq_rows]
+        conn.execute("DELETE FROM categorias WHERE id = %s", (cid,))
+        for eid in affected:
+            regenerate_auto_tags(conn, eid)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+@router.post("/admin/categorias/reorder")
+def admin_reorder_categorias(payload: CategoriasReorder, request: Request):
+    from supabase_auth import require_admin
+    require_admin(request)
+    conn = get_db()
+    try:
+        for idx, cid in enumerate(payload.ids):
+            conn.execute(
+                "UPDATE categorias SET prioridad = %s WHERE id = %s",
+                ((idx + 1) * 10, cid),
+            )
+        conn.commit()
+        return {"ok": True, "count": len(payload.ids)}
+    finally:
+        conn.close()
+
+
+# ── Admin: clasificación automática (escribe en equipo_categorias) ───────────
+
 @router.post("/admin/categorias/clasificar")
 def admin_clasificar(request: Request, apply: int = Query(0)):
     """
-    Calcula etiquetas hoja propuestas para todos los equipos visibles.
-    - apply=0 (default): dry-run, solo devuelve la propuesta.
-    - apply=1: aplica las asignaciones (REEMPLAZA las etiquetas existentes
-      de cada equipo que tenga al menos 1 match; los que no matchean nada
-      no se tocan).
-
-    Respuesta:
-      {
-        "total": 142, "matched": 130, "unmatched": 12,
-        "items": [{id, nombre, marca, propuestas: [...], actuales: [...]}],
-        "applied": 0 | <int>,
-      }
+    Calcula categorías hoja propuestas para todos los equipos.
+    - apply=0: dry-run.
+    - apply=1: REEMPLAZA las categorías de cada equipo que matchee al menos 1
+      regla; los que no matchean no se tocan. Regenera auto-tags después.
     """
     from supabase_auth import require_admin
     require_admin(request)
@@ -863,20 +1086,20 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
             ORDER BY e.nombre
         """).fetchall()
 
-        # Cargar etiquetas existentes por equipo.
+        # Categorías actuales por equipo (para mostrar el diff).
         rows = conn.execute("""
-            SELECT ee.equipo_id, et.nombre
-            FROM equipo_etiquetas ee
-            JOIN etiquetas et ON et.id = ee.etiqueta_id
+            SELECT ec.equipo_id, c.nombre
+            FROM equipo_categorias ec
+            JOIN categorias c ON c.id = ec.categoria_id
         """).fetchall()
         from collections import defaultdict
         actuales: dict[int, list[str]] = defaultdict(list)
         for r in rows:
             actuales[r["equipo_id"]].append(r["nombre"])
 
-        # Mapa nombre→id de hojas válidas.
+        # Mapa nombre→id de categorías hoja válidas.
         leaf_rows = conn.execute(
-            "SELECT id, nombre FROM etiquetas WHERE parent_id IS NOT NULL"
+            "SELECT id, nombre FROM categorias WHERE parent_id IS NOT NULL"
         ).fetchall()
         leaf_id = {r["nombre"]: r["id"] for r in leaf_rows}
 
@@ -885,22 +1108,21 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
         applied = 0
         for eq in equipos:
             propuestas = _propose_tags(eq["nombre"], eq["marca"] or "", eq["modelo"] or "")
-            # Filtrar a las que existen como hoja en DB.
             propuestas = [p for p in propuestas if p in leaf_id]
             if propuestas:
                 matched += 1
                 if apply:
-                    # REEMPLAZA: borra las actuales y vuelve a insertar las propuestas.
                     conn.execute(
-                        "DELETE FROM equipo_etiquetas WHERE equipo_id = %s", (eq["id"],)
+                        "DELETE FROM equipo_categorias WHERE equipo_id = %s", (eq["id"],)
                     )
                     for orden, name in enumerate(propuestas):
                         conn.execute("""
-                            INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden)
+                            INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
                             VALUES (%s, %s, %s)
-                            ON CONFLICT (equipo_id, etiqueta_id)
+                            ON CONFLICT (equipo_id, categoria_id)
                             DO UPDATE SET orden = EXCLUDED.orden
                         """, (eq["id"], leaf_id[name], orden))
+                    regenerate_auto_tags(conn, eq["id"])
                     applied += 1
             items.append({
                 "id":        eq["id"],
