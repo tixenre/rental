@@ -1,34 +1,68 @@
-Diagnóstico breve:
-- Probé el botón “Continuar con Google” en el frontend actual y sí llega a `accounts.google.com` cuando se ejecuta desde el host Lovable correcto.
-- El problema que te queda es que el flujo está mezclando dominios: Railway (`ramblarental.up.railway.app`) sirve backend/SPA viejo, pero Google OAuth administrado funciona desde el frontend Lovable. El código actual intenta saltar entre esos dominios y eso genera la sensación de “me manda al preview” o corta el flujo.
 
-Plan de corrección:
-1. Dejar un único origen canónico para el login
-   - Definir explícitamente cuál es el frontend real para autenticación.
-   - El login de Google siempre debe iniciar desde ese origen, no desde Railway.
-   - Si alguien entra a `/login` en Railway, redirigir a `/login?redirect=/admin` del frontend canónico antes de iniciar OAuth.
+## Objetivo
 
-2. Simplificar `src/routes/login.tsx`
-   - Quitar lógica frágil de auto-reintento con `oauth=google` si está causando confusión.
-   - Mantener el botón manual “Continuar con Google”.
-   - Al clickear, llamar a `lovable.auth.signInWithOAuth("google", { redirect_uri: <frontend>/login?redirect=/admin })`.
-   - Guardar `postLoginRedirect=/admin` antes de iniciar el flujo.
+Eliminar todo el sistema de login basado en Google / Lovable / Supabase Auth. El admin entra con email + contraseña validados por el backend FastAPI (ya hay `/auth/login-local` y tabla `usuarios`). El portal de clientes (`/cliente*` del backend FastAPI) no se toca.
 
-3. Ajustar el backend Railway
-   - Cambiar `/login` en Railway para que no intente manejar autenticación Lovable localmente.
-   - Redirigir `/login` y `/~oauth/initiate` hacia el frontend canónico con el `redirect=/admin` preservado.
-   - Mantener las APIs de Railway funcionando igual para catálogo/admin; solo corregir rutas de login/OAuth.
+---
 
-4. Preservar entrada a `/admin`
-   - Después del callback OAuth, si el usuario está autenticado, enviarlo a `/admin`.
-   - Si el email no está en `ADMIN_EMAILS`, mostrar la pantalla de “Acceso no autorizado” como ahora.
+## Frontend (Lovable)
 
-5. Verificación
-   - Probar `/login?redirect=/admin` en el frontend: click en Google debe abrir `accounts.google.com`.
-   - Probar URL Railway `/login?redirect=/admin`: debe saltar al frontend canónico, no quedarse en Railway ni abrir 404.
-   - Confirmar que no queda ninguna ruta que construya `/~oauth/initiate` sobre `ramblarental.up.railway.app`.
+### Borrar
+- `src/routes/login.tsx` — pantalla de login con Google.
+- `src/routes/_auth.tsx` y `src/routes/_auth/` (cuenta, mis-pedidos) — dependen de Supabase Auth y son del flujo cliente Lovable que ya no usaremos (los clientes siguen usando el portal del backend FastAPI).
+- `src/hooks/use-auth.ts` — hook Supabase.
+- `src/lib/app-origin.ts` — helpers para OAuth broker.
+- `src/routes/api/admin/equipos/$equipoId/upload-foto-from-url.ts` — endpoint que valida admin vía Supabase JWT (la funcionalidad de subida ya existe en el backend FastAPI).
 
-Detalle técnico:
-- No voy a tocar `src/integrations/lovable/index.ts` porque es autogenerado.
-- No voy a borrar autenticación; el problema es de origen/callback, no de permisos ni de Google en sí.
-- La solución evita que Railway sea host de OAuth y lo deja como backend/API.
+### Crear
+- `src/routes/admin.login.tsx` — formulario email + password. POST a `${VITE_API_URL}/auth/login-local` con `credentials: "include"`. En éxito redirige a `/admin`.
+
+### Modificar
+- `src/lib/authedFetch.ts` — quitar Supabase; siempre `credentials: "include"` para mandar la cookie `session` del backend.
+- `src/routes/admin.tsx` — en vez de `useAuth` Supabase, hace `GET /auth/me` (con cookie) en `beforeLoad`/efecto. Si 401 → redirige a `/admin/login`. Borrar `isAdminEmail` (la validación queda en el backend con `require_admin`).
+- `src/components/admin/AdminSidebar.tsx` — el botón "Cerrar sesión" llama `GET /auth/logout` (limpia cookie) y redirige a `/admin/login`. Quitar el bloque "Back-office viejo" / `BACKOFFICE_URL`.
+- `src/lib/admin-emails.ts` — borrar (o dejar vacío); ya no se usa en el frontend.
+- Quitar referencias residuales en `src/routes/admin/index.tsx` (mensaje "tu email esté en ADMIN_EMAILS").
+
+### Dejar igual
+- `src/integrations/supabase/*` — los seguimos usando para `createOrder` y datos. No tocamos `client.ts` (autogenerado).
+- `src/integrations/lovable/index.ts` — autogenerado; no se importa más desde el código de la app.
+
+---
+
+## Backend (FastAPI)
+
+### Borrar
+- `backend/supabase_auth.py` completo.
+- En `backend/routes/auth.py`: rutas `GET /auth/login` y `GET /auth/callback` (Google OAuth) y todo el bloque de `httpx`/`CLIENT_ID`/`GOOGLE_*`. Dejar `login-local`, `register`, `logout`, `me`, `config`, `maps-key` y `get_session`/`require_session`.
+- En `backend/main.py`: la ruta `GET /~oauth/initiate` y la constante `FRONTEND_ORIGIN`. La ruta `GET /login` deja de redirigir al frontend Lovable y simplemente sirve el SPA (`/admin/login` lo maneja TanStack Router).
+
+### Modificar
+- `backend/middleware.py`:
+  - Quitar import y uso de `get_supabase_claims`.
+  - Quitar `/~oauth/` de `PUBLIC_PREFIXES`.
+  - Mantener cookie de sesión clásica como único mecanismo.
+- Nuevo `backend/admin_guard.py` (o reusar `routes/auth.py`):
+  - `require_admin(request)` chequea cookie de sesión y que `email` ∈ `ADMIN_EMAILS` (env var, default `tinchosantini@gmail.com`).
+  - Lanza 401 si no hay sesión, 403 si email no autorizado.
+- Reemplazar todos los `from supabase_auth import require_admin` en `routes/equipos.py`, `routes/dashboard.py`, `routes/settings.py` por el nuevo módulo. Mismo nombre de función → cambio mínimo.
+- `backend/routes/cliente_portal.py` — si importa `get_supabase_cliente`, reemplazarlo por la auth basada en cookie/registro de cliente que ya existe (no se elimina la funcionalidad cliente).
+
+---
+
+## Detalle técnico
+
+- Cookie `session` ya está implementada (`itsdangerous` + `set_cookie` con `httponly`, `samesite="lax"`, `secure` en prod). Sirve igual entre orígenes con `credentials: "include"` siempre que el backend mande `Access-Control-Allow-Credentials: true` y el origin específico (no `*`). Hay que ajustar CORS en `main.py`:
+  - `allow_origins=[FRONTEND_ORIGIN_LIST]` (lista explícita: preview Lovable + dominio publicado), no `"*"`.
+  - `allow_credentials=True` ya está.
+- En el frontend, `VITE_API_URL` ya apunta a `https://ramblarental.up.railway.app`.
+- Onboarding: el backend ya tiene `/auth/config` con `setup_needed`. La pantalla `/admin/login` muestra el form de registro la primera vez (campo extra "nombre"); después solo el form de login.
+- Memoria del proyecto a actualizar: la línea sobre `ADMIN_EMAILS` frontend y `require_admin` con JWT debe reescribirse para reflejar "cookie session local + ADMIN_EMAILS env var".
+
+## Verificación
+
+1. `bun run build:dev` debe pasar (no quedan imports rotos a `useAuth`/`app-origin`/`supabase_auth`).
+2. `/admin` sin sesión → redirige a `/admin/login`.
+3. `/admin/login` con credenciales válidas → setea cookie y entra a `/admin`.
+4. `GET /api/dashboard` desde el admin con cookie → 200; sin cookie → 401.
+5. Catálogo público (`/`) y portal `/cliente*` siguen funcionando.
