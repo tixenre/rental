@@ -300,6 +300,8 @@ def cliente_pedido_detalle(id: int, request: Request):
         """, (id,)).fetchall()
         d["solicitudes"] = [row_to_dict(s) for s in solicitudes]
 
+        d["documentos_disponibles"] = _documentos_disponibles(d.get("estado", ""))
+
         return d
     finally:
         conn.close()
