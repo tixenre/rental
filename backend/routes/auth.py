@@ -28,6 +28,7 @@ REDIRECT_URI         = os.getenv("REDIRECT_URI", "https://ramblarental.up.railwa
 POST_LOGIN_URL       = os.getenv("POST_LOGIN_URL", "/admin")
 FRONTEND_BASE        = os.getenv("FRONTEND_BASE_URL", "")   # e.g. http://localhost:3000 en dev
 MAPS_API_KEY         = os.getenv("GOOGLE_MAPS_API_KEY", "")
+CLIENTE_REDIRECT_URI = os.getenv("CLIENTE_REDIRECT_URI", "https://ramblarental.up.railway.app/cliente/auth/callback")
 
 ALLOWED_EMAILS: set[str] = {
     e.strip().lower()
@@ -241,3 +242,111 @@ def auth_dev_login():
 @router.get("/api/public/maps-key")
 def public_maps_key():
     return {"key": MAPS_API_KEY or None}
+
+
+# ── OAuth para clientes ───────────────────────────────────────────────────────
+
+@router.get("/cliente/auth/google")
+def cliente_auth_google(request: Request):
+    """Inicia el flujo OAuth de Google para clientes."""
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(503, "Google OAuth no configurado en el servidor.")
+    client = OAuth2Client(
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        redirect_uri=CLIENTE_REDIRECT_URI,
+        scope="openid email profile",
+    )
+    uri, state = client.create_authorization_url(
+        GOOGLE_AUTH_URL,
+        access_type="online",
+        prompt="select_account",
+    )
+    res = RedirectResponse(uri, status_code=302)
+    res.set_cookie("oauth_state_cliente", state, httponly=True, samesite="lax",
+                   secure=COOKIE_SECURE, max_age=600)
+    return res
+
+
+@router.get("/cliente/auth/callback")
+def cliente_auth_callback(request: Request):
+    """Google redirige acá. Si el cliente existe → sesión. Si no → registro."""
+    from database import get_db
+
+    ip = request.client.host if request.client else "unknown"
+    _check_rate(ip)
+
+    error = request.query_params.get("error")
+    if error:
+        return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error={error}", status_code=303)
+
+    code  = request.query_params.get("code")
+    state = request.query_params.get("state")
+
+    if not code:
+        return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=no_code", status_code=303)
+
+    saved_state = request.cookies.get("oauth_state_cliente")
+    if not saved_state or saved_state != state:
+        _record_fail(ip)
+        return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=state_mismatch", status_code=303)
+
+    client = OAuth2Client(
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        redirect_uri=CLIENTE_REDIRECT_URI,
+        scope="openid email profile",
+    )
+    try:
+        client.fetch_token(GOOGLE_TOKEN_URL, code=code)
+    except Exception as e:
+        print(f"[cliente_auth] token_error: {e}")
+        _record_fail(ip)
+        return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=token_error", status_code=303)
+
+    try:
+        resp = client.get(GOOGLE_USERINFO)
+        resp.raise_for_status()
+        userinfo = resp.json()
+    except Exception as e:
+        print(f"[cliente_auth] userinfo_error: {e}")
+        _record_fail(ip)
+        return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=userinfo_error", status_code=303)
+
+    email = userinfo.get("email", "").lower()
+    name  = userinfo.get("name", email)
+
+    if not email:
+        _record_fail(ip)
+        return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=no_email", status_code=303)
+
+    # ¿El cliente ya existe en la BD?
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT id FROM clientes WHERE LOWER(email) = LOWER(?)", (email,)
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if row:
+        # Cliente conocido → crear sesión directamente
+        session_data = {"email": email, "name": name, "role": "cliente", "cliente_id": row["id"]}
+        token = signer.dumps(session_data)
+        safe_url = f"{FRONTEND_BASE}/cliente/portal".replace('"', "%22")
+        res = HTMLResponse(
+            f'<!DOCTYPE html><html><head>'
+            f'<script>window.location.replace("{safe_url}")</script>'
+            f'</head><body>Redirigiendo...</body></html>'
+        )
+        res.set_cookie("session", token, httponly=True, samesite="lax",
+                       secure=COOKIE_SECURE, max_age=SESSION_MAX_AGE)
+        res.delete_cookie("oauth_state_cliente")
+        return res
+    else:
+        # Cliente nuevo → token de registro (válido 30 min)
+        reg_token = signer.dumps({"tipo": "registro", "email": email, "name": name})
+        redirect_url = f"{FRONTEND_BASE}/cliente/registro?t={reg_token}"
+        res = RedirectResponse(redirect_url, status_code=303)
+        res.delete_cookie("oauth_state_cliente")
+        return res

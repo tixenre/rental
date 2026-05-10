@@ -10,9 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as EstudioRouteImport } from './routes/estudio'
+import { Route as ClienteRouteImport } from './routes/cliente'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as ClienteRegistroRouteImport } from './routes/cliente.registro'
+import { Route as ClientePortalRouteImport } from './routes/cliente.portal'
+import { Route as ClienteLoginRouteImport } from './routes/cliente.login'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminEstadisticasRouteImport } from './routes/admin/estadisticas'
@@ -26,6 +30,11 @@ import { Route as AdminPedidosIdRouteImport } from './routes/admin/pedidos.$id'
 const EstudioRoute = EstudioRouteImport.update({
   id: '/estudio',
   path: '/estudio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClienteRoute = ClienteRouteImport.update({
+  id: '/cliente',
+  path: '/cliente',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -42,6 +51,21 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
+} as any)
+const ClienteRegistroRoute = ClienteRegistroRouteImport.update({
+  id: '/registro',
+  path: '/registro',
+  getParentRoute: () => ClienteRoute,
+} as any)
+const ClientePortalRoute = ClientePortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
+  getParentRoute: () => ClienteRoute,
+} as any)
+const ClienteLoginRoute = ClienteLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => ClienteRoute,
 } as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
@@ -92,6 +116,7 @@ const AdminPedidosIdRoute = AdminPedidosIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
@@ -99,6 +124,9 @@ export interface FileRoutesByFullPath {
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/cliente/login': typeof ClienteLoginRoute
+  '/cliente/portal': typeof ClientePortalRoute
+  '/cliente/registro': typeof ClienteRegistroRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
@@ -106,6 +134,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
@@ -113,6 +142,9 @@ export interface FileRoutesByTo {
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/cliente/login': typeof ClienteLoginRoute
+  '/cliente/portal': typeof ClientePortalRoute
+  '/cliente/registro': typeof ClienteRegistroRoute
   '/admin': typeof AdminIndexRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
@@ -122,6 +154,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
@@ -129,6 +162,9 @@ export interface FileRoutesById {
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
+  '/cliente/login': typeof ClienteLoginRoute
+  '/cliente/portal': typeof ClientePortalRoute
+  '/cliente/registro': typeof ClienteRegistroRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
@@ -139,6 +175,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/cliente'
     | '/estudio'
     | '/admin/calendario'
     | '/admin/clientes'
@@ -146,6 +183,9 @@ export interface FileRouteTypes {
     | '/admin/estadisticas'
     | '/admin/login'
     | '/admin/settings'
+    | '/cliente/login'
+    | '/cliente/portal'
+    | '/cliente/registro'
     | '/admin/'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
@@ -153,6 +193,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/cliente'
     | '/estudio'
     | '/admin/calendario'
     | '/admin/clientes'
@@ -160,6 +201,9 @@ export interface FileRouteTypes {
     | '/admin/estadisticas'
     | '/admin/login'
     | '/admin/settings'
+    | '/cliente/login'
+    | '/cliente/portal'
+    | '/cliente/registro'
     | '/admin'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
@@ -168,6 +212,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/cliente'
     | '/estudio'
     | '/admin/calendario'
     | '/admin/clientes'
@@ -175,6 +220,9 @@ export interface FileRouteTypes {
     | '/admin/estadisticas'
     | '/admin/login'
     | '/admin/settings'
+    | '/cliente/login'
+    | '/cliente/portal'
+    | '/cliente/registro'
     | '/admin/'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
@@ -184,6 +232,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
+  ClienteRoute: typeof ClienteRouteWithChildren
   EstudioRoute: typeof EstudioRoute
 }
 
@@ -194,6 +243,13 @@ declare module '@tanstack/react-router' {
       path: '/estudio'
       fullPath: '/estudio'
       preLoaderRoute: typeof EstudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cliente': {
+      id: '/cliente'
+      path: '/cliente'
+      fullPath: '/cliente'
+      preLoaderRoute: typeof ClienteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -216,6 +272,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/cliente/registro': {
+      id: '/cliente/registro'
+      path: '/registro'
+      fullPath: '/cliente/registro'
+      preLoaderRoute: typeof ClienteRegistroRouteImport
+      parentRoute: typeof ClienteRoute
+    }
+    '/cliente/portal': {
+      id: '/cliente/portal'
+      path: '/portal'
+      fullPath: '/cliente/portal'
+      preLoaderRoute: typeof ClientePortalRouteImport
+      parentRoute: typeof ClienteRoute
+    }
+    '/cliente/login': {
+      id: '/cliente/login'
+      path: '/login'
+      fullPath: '/cliente/login'
+      preLoaderRoute: typeof ClienteLoginRouteImport
+      parentRoute: typeof ClienteRoute
     }
     '/admin/settings': {
       id: '/admin/settings'
@@ -311,9 +388,25 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface ClienteRouteChildren {
+  ClienteLoginRoute: typeof ClienteLoginRoute
+  ClientePortalRoute: typeof ClientePortalRoute
+  ClienteRegistroRoute: typeof ClienteRegistroRoute
+}
+
+const ClienteRouteChildren: ClienteRouteChildren = {
+  ClienteLoginRoute: ClienteLoginRoute,
+  ClientePortalRoute: ClientePortalRoute,
+  ClienteRegistroRoute: ClienteRegistroRoute,
+}
+
+const ClienteRouteWithChildren =
+  ClienteRoute._addFileChildren(ClienteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
+  ClienteRoute: ClienteRouteWithChildren,
   EstudioRoute: EstudioRoute,
 }
 export const routeTree = rootRouteImport
