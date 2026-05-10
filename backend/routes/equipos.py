@@ -466,7 +466,7 @@ def get_categorias():
     conn = get_db()
     try:
         rows = conn.execute("""
-            SELECT ee.equipo_id, et.nombre, ee.orden
+            SELECT ee.equipo_id, et.nombre, et.prioridad, ee.orden
             FROM equipo_etiquetas ee
             JOIN etiquetas et ON et.id = ee.etiqueta_id
             ORDER BY ee.equipo_id, ee.orden
@@ -475,30 +475,111 @@ def get_categorias():
         from collections import defaultdict
         tree:        dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         main_counts: dict[str, int]            = defaultdict(int)
+        main_pri:    dict[str, int]            = {}
         item_main:   dict[int, str]            = {}
 
         for r in rows:
             if r["orden"] == 0:
                 item_main[r["equipo_id"]] = r["nombre"]
                 main_counts[r["nombre"]] += 1
+                main_pri[r["nombre"]] = r["prioridad"]
 
         for r in rows:
             if r["orden"] > 0 and r["equipo_id"] in item_main:
                 tree[item_main[r["equipo_id"]]][r["nombre"]] += 1
 
+        ordered = sorted(
+            main_counts.keys(),
+            key=lambda n: (main_pri.get(n, 100), n.lower()),
+        )
+
         return [
             {
-                "nombre": main,
-                "total":  main_counts[main],
+                "nombre":    main,
+                "total":     main_counts[main],
+                "prioridad": main_pri.get(main, 100),
                 "subtags": [
                     {"nombre": sub, "total": cnt}
                     for sub, cnt in sorted(tree[main].items(), key=lambda x: -x[1])
                 ],
             }
-            for main in sorted(main_counts.keys())
+            for main in ordered
         ]
     finally:
         conn.close()
+
+
+# ── Admin: gestión de etiquetas / categorías ─────────────────────────────────
+
+class EtiquetaPatch(BaseModel):
+    nombre:    Optional[str] = None
+    prioridad: Optional[int] = None
+
+
+class EtiquetasReorder(BaseModel):
+    ids: list[int]
+
+
+@router.get("/admin/etiquetas")
+def admin_list_etiquetas(request: Request):
+    from supabase_auth import require_admin
+    require_admin(request)
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT et.id, et.nombre, et.prioridad,
+                   COUNT(ee.equipo_id) FILTER (WHERE ee.orden = 0) AS total
+            FROM etiquetas et
+            LEFT JOIN equipo_etiquetas ee ON ee.etiqueta_id = et.id
+            GROUP BY et.id, et.nombre, et.prioridad
+            ORDER BY et.prioridad ASC, LOWER(et.nombre) ASC
+        """).fetchall()
+        return [
+            {"id": r["id"], "nombre": r["nombre"],
+             "prioridad": r["prioridad"], "total": r["total"]}
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
+@router.patch("/admin/etiquetas/{eid}")
+def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
+    from supabase_auth import require_admin
+    require_admin(request)
+    sets, vals = [], []
+    if patch.nombre is not None:
+        sets.append("nombre = %s"); vals.append(patch.nombre.strip())
+    if patch.prioridad is not None:
+        sets.append("prioridad = %s"); vals.append(int(patch.prioridad))
+    if not sets:
+        raise HTTPException(400, "Sin cambios")
+    conn = get_db()
+    try:
+        vals.append(eid)
+        conn.execute(f"UPDATE etiquetas SET {', '.join(sets)} WHERE id = %s", tuple(vals))
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@router.post("/admin/etiquetas/reorder")
+def admin_reorder_etiquetas(payload: EtiquetasReorder, request: Request):
+    from supabase_auth import require_admin
+    require_admin(request)
+    conn = get_db()
+    try:
+        for idx, eid in enumerate(payload.ids):
+            conn.execute(
+                "UPDATE etiquetas SET prioridad = %s WHERE id = %s",
+                ((idx + 1) * 10, eid),
+            )
+        conn.commit()
+        return {"ok": True, "count": len(payload.ids)}
+    finally:
+        conn.close()
+
 
 
 @router.get("/equipos/{id}/calendario")
