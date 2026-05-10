@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Bug } from "lucide-react";
+import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Bug, Image as ImageIcon, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -93,6 +93,8 @@ export function EnriquecerEquipoDialog({
   // Candidatos extra obtenidos por la búsqueda dedicada de fotos
   const [extraCands, setExtraCands] = useState<string[]>([]);
   const [searchingPhotos, setSearchingPhotos] = useState(false);
+  // Modo: "info" = enriquecimiento completo (B&H + IA). "photos" = solo buscar fotos.
+  const [mode, setMode] = useState<"info" | "photos" | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -100,8 +102,65 @@ export function EnriquecerEquipoDialog({
       setError(null);
       setPhotoDiag(null);
       setExtraCands([]);
+      setMode(null);
+      setFotoUrl("");
     }
   }, [open]);
+
+  /** Modo "solo fotos": no llama a /enriquecer, solo a /buscar-fotos. */
+  const buscarSoloFotos = async () => {
+    setMode("photos");
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await authedJson<{ foto_candidates: string[] }>(
+        "/api/admin/equipos/buscar-fotos",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: equipo.nombre,
+            marca: equipo.marca,
+            modelo: equipo.modelo,
+          }),
+        },
+      );
+      const cands = r.foto_candidates ?? [];
+      setExtraCands(cands);
+      if (cands.length === 0) {
+        toast.info("No se encontraron fotos.");
+      } else {
+        // Pre-seleccionar la primera
+        setFotoUrl(cands[0]);
+        setAplicarFoto(true);
+        toast.success(`${cands.length} fotos encontradas`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error buscando fotos");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** Aplicar solo la foto seleccionada (modo "photos"). */
+  const aplicarSoloFoto = async () => {
+    if (!fotoUrl) {
+      toast.info("Elegí una foto primero.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const finalUrl = await uploadPhotoWithDiag(equipo.id, fotoUrl);
+      await adminApi.updateEquipo(equipo.id, { foto_url: finalUrl });
+      toast.success("Foto aplicada al equipo ✨");
+      onApplied();
+      onOpenChange(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al aplicar foto");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const buscarMasFotos = async () => {
     setSearchingPhotos(true);
@@ -211,6 +270,7 @@ export function EnriquecerEquipoDialog({
   };
 
   const run = async () => {
+    setMode("info");
     setLoading(true);
     setError(null);
     setResult(null);
@@ -386,20 +446,145 @@ export function EnriquecerEquipoDialog({
           </div>
         </div>
 
-        {!result && !loading && !error && (
-          <div className="py-6 text-center">
-            <Button onClick={run} size="lg">
-              <Sparkles className="h-4 w-4 mr-2" />
-              Buscar en internet
-            </Button>
+        {!result && !loading && !error && mode !== "photos" && (
+          <div className="py-4 space-y-3">
+            <p className="text-xs text-muted-foreground text-center">
+              ¿Qué querés buscar?
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={buscarSoloFotos}
+                className="rounded-md border hairline p-4 text-left transition hover:border-amber hover:bg-amber-soft/40"
+              >
+                <ImageIcon className="h-5 w-5 mb-2 text-amber" />
+                <div className="font-medium text-sm">Solo fotos</div>
+                <div className="text-[11px] text-muted-foreground mt-1">
+                  Wikipedia, sitios oficiales y reviews. Rápido (~5s).
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={run}
+                className="rounded-md border hairline p-4 text-left transition hover:border-amber hover:bg-amber-soft/40"
+              >
+                <FileText className="h-5 w-5 mb-2 text-amber" />
+                <div className="font-medium text-sm">Info técnica</div>
+                <div className="text-[11px] text-muted-foreground mt-1">
+                  B&amp;H + IA: specs, peso, montura, precio. ~15s.
+                </div>
+              </button>
+            </div>
           </div>
         )}
 
         {loading && (
           <div className="py-12 text-center text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin mx-auto mb-3" />
-            Buscando en B&amp;H, scrapeando y extrayendo specs…
-            <div className="text-xs mt-1">Suele tardar 10-20 segundos.</div>
+            {mode === "photos"
+              ? "Buscando fotos en internet…"
+              : "Buscando en B&H, scrapeando y extrayendo specs…"}
+            <div className="text-xs mt-1">
+              {mode === "photos" ? "Suele tardar 5-10 segundos." : "Suele tardar 10-20 segundos."}
+            </div>
+          </div>
+        )}
+
+        {/* Modo "solo fotos": grid de candidatos + botón aplicar */}
+        {mode === "photos" && !loading && !error && (
+          <div className="space-y-3">
+            {extraCands.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                Sin resultados. Probá con la búsqueda completa o cargá una URL manual.
+                <div className="mt-3">
+                  <Button variant="outline" size="sm" onClick={buscarSoloFotos}>
+                    Reintentar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {fotoUrl && (
+                  <div className="rounded-md border hairline overflow-hidden bg-muted/30">
+                    <img
+                      src={fotoUrl}
+                      alt="Preview"
+                      className="w-full max-h-64 object-contain"
+                      onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+                    />
+                  </div>
+                )}
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {extraCands.length} fotos — click para elegir
+                    </span>
+                    <Button
+                      type="button" size="sm" variant="ghost" className="h-7 text-xs"
+                      onClick={buscarMasFotos} disabled={searchingPhotos}
+                    >
+                      {searchingPhotos ? (
+                        <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Buscando…</>
+                      ) : (
+                        <><Sparkles className="h-3 w-3 mr-1 text-amber" />Buscar más</>
+                      )}
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {extraCands.map((u) => {
+                      const selected = u === fotoUrl;
+                      return (
+                        <button
+                          type="button" key={u} onClick={() => setFotoUrl(u)} title={u}
+                          className={
+                            "relative h-16 w-16 overflow-hidden rounded border transition " +
+                            (selected
+                              ? "border-amber ring-2 ring-amber/40"
+                              : "border-muted hover:border-ink/30")
+                          }
+                        >
+                          <img
+                            src={u} alt=""
+                            className="h-full w-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.2"; }}
+                          />
+                          {selected && (
+                            <span className="absolute right-0.5 top-0.5 rounded-full bg-amber p-0.5">
+                              <Check className="h-2.5 w-2.5 text-ink" />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {photoDiag && (
+                  <div className="rounded-md border hairline bg-muted/30 p-3 text-xs">
+                    <div className="flex items-center gap-1.5 mb-2 font-mono uppercase tracking-wide text-muted-foreground">
+                      <Bug className="h-3.5 w-3.5" /> Subida de foto
+                    </div>
+                    <ul className="space-y-1">
+                      {photoDiag.map((s, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="mt-0.5">
+                            {s.status === "ok" && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+                            {s.status === "fail" && <X className="h-3.5 w-3.5 text-destructive" />}
+                            {s.status === "pending" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                            {s.status === "skip" && <span className="block h-3.5 w-3.5 rounded-full border" />}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className={s.status === "fail" ? "text-destructive font-medium" : ""}>{s.label}</div>
+                            {s.detail && (
+                              <div className="text-[10px] text-muted-foreground break-all">{s.detail}</div>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -747,6 +932,15 @@ export function EnriquecerEquipoDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
+          {mode === "photos" && extraCands.length > 0 && !loading && (
+            <Button onClick={aplicarSoloFoto} disabled={saving || !fotoUrl}>
+              {saving ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</>
+              ) : (
+                <><Check className="h-4 w-4 mr-2" /> Aplicar foto</>
+              )}
+            </Button>
+          )}
           {result && (
             <>
               <Button variant="outline" onClick={run} disabled={loading || saving}>

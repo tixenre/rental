@@ -1,6 +1,7 @@
 import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { QueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   return (
@@ -22,6 +23,11 @@ function NotFoundComponent() {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  component: () => <Outlet />,
+  component: () => (
+    <>
+      <Outlet />
+      <Toaster richColors position="top-right" />
+    </>
+  ),
   notFoundComponent: NotFoundComponent,
 });
