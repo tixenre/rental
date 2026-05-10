@@ -10,9 +10,12 @@
  * función `Step*` separada para que sea fácil mejorarlo en futuras iteraciones.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Search, Plus, Minus, Check, UserPlus, X } from "lucide-react";
+import {
+  ChevronLeft, ChevronRight, Search, Plus, Minus, Check,
+  UserPlus, X, Package, AlertTriangle, Lock,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -38,6 +41,10 @@ type WizardItem = {
   precio_jornada: number;
   stock_total: number;
   reservado: number;
+  /** Si está, este ítem fue agregado automáticamente como componente del kit padre. */
+  parent_equipo_id?: number | null;
+  /** Multiplicador del kit: cantidad por cada unidad del padre. */
+  kit_qty_per_parent?: number;
 };
 
 const STEPS = [
@@ -56,6 +63,16 @@ function jornadasEntre(d1?: string, d2?: string): number {
   const b = new Date(d2).getTime();
   if (Number.isNaN(a) || Number.isNaN(b) || b <= a) return 1;
   return Math.max(1, Math.ceil((b - a) / 86_400_000));
+}
+
+/** ¿La fecha ISO YYYY-MM-DD es estrictamente anterior a hoy (zona local)? */
+function isPastDate(iso: string): boolean {
+  if (!iso) return false;
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(y, m - 1, d).getTime() < today.getTime();
 }
 
 export function NuevoPedidoWizard({
