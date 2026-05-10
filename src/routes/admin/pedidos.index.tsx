@@ -21,7 +21,7 @@ import {
 import { adminApi, ESTADO_LABEL, type Pedido, type PedidoEstado } from "@/lib/admin/api";
 import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 
-export const Route = createFileRoute("/admin/pedidos")({
+export const Route = createFileRoute("/admin/pedidos/")({
   component: PedidosPage,
 });
 
