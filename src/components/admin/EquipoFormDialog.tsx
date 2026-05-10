@@ -391,25 +391,66 @@ export function EquipoFormDialog({
                     </Button>
                   </div>
                   <div className="space-y-1.5">
-                    {specs.map((s, i) => (
-                      <div key={i} className="flex gap-2">
-                        <Input
-                          placeholder="Etiqueta (ej: Sensor)"
-                          value={s.label}
-                          onChange={(e) => setSpecs(specs.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
-                          className="flex-[2]"
-                        />
-                        <Input
-                          placeholder="Valor (ej: Full-frame 12MP)"
-                          value={s.value}
-                          onChange={(e) => setSpecs(specs.map((x, j) => j === i ? { ...x, value: e.target.value } : x))}
-                          className="flex-[3]"
-                        />
-                        <Button type="button" size="icon" variant="ghost" onClick={() => setSpecs(specs.filter((_, j) => j !== i))}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                    {specs.map((s, i) => {
+                      const move = (dir: -1 | 1) => {
+                        const j = i + dir;
+                        if (j < 0 || j >= specs.length) return;
+                        const next = [...specs];
+                        [next[i], next[j]] = [next[j], next[i]];
+                        setSpecs(next);
+                      };
+                      return (
+                        <div
+                          key={i}
+                          className="flex gap-2 items-start group"
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", String(i));
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const from = Number(e.dataTransfer.getData("text/plain"));
+                            if (Number.isNaN(from) || from === i) return;
+                            const next = [...specs];
+                            const [moved] = next.splice(from, 1);
+                            next.splice(i, 0, moved);
+                            setSpecs(next);
+                          }}
+                        >
+                          <div className="flex flex-col items-center pt-1.5 text-muted-foreground">
+                            <GripVertical className="h-4 w-4 cursor-grab opacity-40 group-hover:opacity-100" />
+                          </div>
+                          <Input
+                            placeholder="Etiqueta (ej: Sensor)"
+                            value={s.label}
+                            onChange={(e) => setSpecs(specs.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
+                            className="flex-[2]"
+                          />
+                          <Input
+                            placeholder="Valor (ej: Full-frame 12MP)"
+                            value={s.value}
+                            onChange={(e) => setSpecs(specs.map((x, j) => j === i ? { ...x, value: e.target.value } : x))}
+                            className="flex-[3]"
+                          />
+                          <div className="flex flex-col">
+                            <Button type="button" size="icon" variant="ghost" className="h-5 w-7" disabled={i === 0} onClick={() => move(-1)} aria-label="Subir">
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button type="button" size="icon" variant="ghost" className="h-5 w-7" disabled={i === specs.length - 1} onClick={() => move(1)} aria-label="Bajar">
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                          <Button type="button" size="icon" variant="ghost" onClick={() => setSpecs(specs.filter((_, j) => j !== i))}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
                     {specs.length === 0 && (
                       <p className="text-xs text-muted-foreground italic">Sin specs.</p>
                     )}
