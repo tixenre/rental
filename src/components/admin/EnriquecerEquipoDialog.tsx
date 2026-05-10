@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { Sparkles, ExternalLink, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,7 +11,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
 import { adminApi, type Equipo } from "@/lib/admin/api";
-import { enriquecerEquipoFn, type EnriquecerResult } from "@/lib/admin/enrich.functions";
+import { authedJson } from "@/lib/authedFetch";
+
+export type EnriquecerResult = {
+  marca: string | null;
+  modelo: string | null;
+  nombre_normalizado: string;
+  descripcion: string;
+  specs: { label: string; value: string }[];
+  foto_url: string | null;
+  fuente_url: string;
+  fuente_titulo: string;
+};
 
 export function EnriquecerEquipoDialog({
   equipo,
@@ -25,7 +35,12 @@ export function EnriquecerEquipoDialog({
   onOpenChange: (v: boolean) => void;
   onApplied: () => void;
 }) {
-  const enriquecer = useServerFn(enriquecerEquipoFn);
+  const enriquecer = (input: { nombre: string; marca?: string | null; modelo?: string | null }) =>
+    authedJson<EnriquecerResult>("/api/admin/equipos/enriquecer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<EnriquecerResult | null>(null);
@@ -56,11 +71,9 @@ export function EnriquecerEquipoDialog({
     setResult(null);
     try {
       const r = await enriquecer({
-        data: {
-          nombre: equipo.nombre,
-          marca: equipo.marca,
-          modelo: equipo.modelo,
-        },
+        nombre: equipo.nombre,
+        marca: equipo.marca,
+        modelo: equipo.modelo,
       });
       setResult(r);
       setMarca(r.marca ?? "");
