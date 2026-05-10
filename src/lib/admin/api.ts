@@ -159,10 +159,42 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ etiquetas }),
     }),
-  listEtiquetas: () => authedJson<Etiqueta[]>("/api/etiquetas"),
+  setCategorias: (id: number, categoria_ids: number[]) =>
+    authedJson<{ ok: true }>(`/api/equipos/${id}/categorias`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ categoria_ids }),
+    }),
+  listEtiquetas: (incluirAuto = false) =>
+    authedJson<Etiqueta[]>(`/api/etiquetas${incluirAuto ? "?incluir_auto=1" : ""}`),
 
-  // categorías + admin
+  // categorías (público — árbol con totales)
   listCategorias: () => authedJson<Categoria[]>("/api/categorias"),
+
+  // categorías (admin)
+  adminListCategorias: () => authedJson<CategoriaAdmin[]>("/api/admin/categorias"),
+  adminCreateCategoria: (data: { nombre: string; prioridad?: number; parent_id?: number | null }) =>
+    authedPostJson<CategoriaAdmin>("/api/admin/categorias", data),
+  adminUpdateCategoria: (
+    id: number,
+    patch: { nombre?: string; prioridad?: number; parent_id?: number | null; set_parent_null?: boolean },
+  ) =>
+    authedJson<{ ok: true }>(`/api/admin/categorias/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  adminDeleteCategoria: async (id: number) => {
+    const res = await authedFetch(`/api/admin/categorias/${id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+  },
+  adminReorderCategorias: (ids: number[]) =>
+    authedPostJson<{ ok: true; count: number }>("/api/admin/categorias/reorder", { ids }),
+
+  // etiquetas (admin) — bolsa libre
   adminListEtiquetas: () => authedJson<EtiquetaAdmin[]>("/api/admin/etiquetas"),
   adminCreateEtiqueta: (data: { nombre: string; prioridad?: number; parent_id?: number | null }) =>
     authedPostJson<EtiquetaAdmin>("/api/admin/etiquetas", data),
