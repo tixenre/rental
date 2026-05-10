@@ -212,3 +212,136 @@ function ImportCard({
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Categorías: prioridad / orden
+// ─────────────────────────────────────────────────────────────────────────
+
+function CategoriasSection() {
+  const qc = useQueryClient();
+  const listQ = useQuery({
+    queryKey: ["admin", "etiquetas"],
+    queryFn: () => adminApi.adminListEtiquetas(),
+  });
+
+  // Buffer local para reordenar antes de guardar
+  const [order, setOrder] = useState<EtiquetaAdmin[] | null>(null);
+  useEffect(() => {
+    if (listQ.data) setOrder(listQ.data);
+  }, [listQ.data]);
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, prioridad }: { id: number; prioridad: number }) =>
+      adminApi.adminUpdateEtiqueta(id, { prioridad }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "etiquetas"] });
+      qc.invalidateQueries({ queryKey: ["categorias"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const reorderMut = useMutation({
+    mutationFn: (ids: number[]) => adminApi.adminReorderEtiquetas(ids),
+    onSuccess: () => {
+      toast.success("Orden guardado");
+      qc.invalidateQueries({ queryKey: ["admin", "etiquetas"] });
+      qc.invalidateQueries({ queryKey: ["categorias"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const move = (idx: number, dir: -1 | 1) => {
+    if (!order) return;
+    const j = idx + dir;
+    if (j < 0 || j >= order.length) return;
+    const next = [...order];
+    [next[idx], next[j]] = [next[j], next[idx]];
+    setOrder(next);
+  };
+
+  const dirty =
+    !!order && !!listQ.data &&
+    order.some((e, i) => listQ.data![i]?.id !== e.id);
+
+  return (
+    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h2 className="font-display text-lg text-ink">Categorías</h2>
+          <p className="text-sm text-muted-foreground">
+            Orden con el que aparecen en el catálogo público y en el selector de equipos.
+            Menor número = más arriba.
+          </p>
+        </div>
+        {dirty && (
+          <Button
+            size="sm"
+            disabled={reorderMut.isPending}
+            onClick={() => order && reorderMut.mutate(order.map((e) => e.id))}
+          >
+            {reorderMut.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+            Guardar orden
+          </Button>
+        )}
+      </div>
+
+      {listQ.isLoading && (
+        <div className="py-6 text-sm text-muted-foreground flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
+        </div>
+      )}
+      {listQ.error && (
+        <div className="text-sm text-destructive">Error: {(listQ.error as Error).message}</div>
+      )}
+
+      {order && (
+        <ul className="divide-y hairline border hairline rounded-md">
+          {order.map((et, idx) => (
+            <li key={et.id} className="flex items-center gap-2 px-3 py-2">
+              <span className="font-mono text-[11px] text-muted-foreground w-6 text-right tabular-nums">
+                {idx + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-ink truncate">{et.nombre}</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {et.total} equipo{et.total !== 1 ? "s" : ""}
+                </div>
+              </div>
+              <Input
+                type="number"
+                defaultValue={et.prioridad}
+                key={`${et.id}-${et.prioridad}`}
+                className="h-8 w-20 text-right tabular-nums"
+                onBlur={(e) => {
+                  const v = parseInt(e.target.value);
+                  if (!Number.isNaN(v) && v !== et.prioridad) {
+                    updateMut.mutate({ id: et.id, prioridad: v });
+                  }
+                }}
+              />
+              <div className="flex">
+                <Button
+                  size="icon" variant="ghost" className="h-8 w-8"
+                  disabled={idx === 0}
+                  onClick={() => move(idx, -1)}
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon" variant="ghost" className="h-8 w-8"
+                  disabled={idx === order.length - 1}
+                  onClick={() => move(idx, 1)}
+                >
+                  <ArrowDown className="h-4 w-4" />
+                </Button>
+              </div>
+            </li>
+          ))}
+          {order.length === 0 && (
+            <li className="p-4 text-sm text-muted-foreground text-center">Sin categorías cargadas.</li>
+          )}
+        </ul>
+      )}
+    </section>
+  );
+}
