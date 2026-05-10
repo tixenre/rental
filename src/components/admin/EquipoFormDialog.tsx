@@ -42,7 +42,7 @@ export function EquipoFormDialog({
 }) {
   const isEdit = !!initial;
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       nombre: initial?.nombre ?? "",
       marca: initial?.marca ?? "",
@@ -61,23 +61,23 @@ export function EquipoFormDialog({
   const submit = form.handleSubmit(async (values) => {
     const etiquetas = (values.etiquetas_csv ?? "")
       .split(",")
-      .map((s) => s.trim())
+      .map((s: string) => s.trim())
       .filter(Boolean);
     const { etiquetas_csv: _omit, visible_catalogo, ...rest } = values;
     void _omit;
-    await onSubmit(
-      {
-        ...rest,
-        marca: rest.marca || null,
-        modelo: rest.modelo || null,
-        serie: rest.serie || null,
-        dueno: rest.dueno || null,
-        precio_jornada: rest.precio_jornada ?? null,
-        precio_usd: rest.precio_usd ?? null,
-        visible_catalogo: visible_catalogo ? 1 : 0,
-      },
-      etiquetas,
-    );
+    const payload: EquipoInput = {
+      nombre: rest.nombre,
+      cantidad: rest.cantidad,
+      estado: rest.estado,
+      marca: rest.marca || null,
+      modelo: rest.modelo || null,
+      serie: rest.serie || null,
+      dueno: rest.dueno || null,
+      precio_jornada: rest.precio_jornada ?? null,
+      precio_usd: rest.precio_usd ?? null,
+      visible_catalogo: visible_catalogo ? 1 : 0,
+    };
+    await onSubmit(payload, etiquetas);
   });
 
   return (
