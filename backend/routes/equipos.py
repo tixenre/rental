@@ -61,6 +61,9 @@ class FichaUpdate(BaseModel):
     descripcion: Optional[str] = None
     notas:       Optional[str] = None
     specs_json:  Optional[str] = None
+    montura:     Optional[str] = None
+    formato:     Optional[str] = None
+    resolucion:  Optional[str] = None
 
 
 class KitItem(BaseModel):
