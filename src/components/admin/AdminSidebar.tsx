@@ -27,7 +27,8 @@ import {
 } from "@/components/ui/sidebar";
 import { authedFetch } from "@/lib/authedFetch";
 
-const items = [
+type NavItem = { title: string; url: string; icon: typeof LayoutDashboard; exact?: boolean };
+const items: NavItem[] = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard, exact: true },
   { title: "Equipos", url: "/admin/equipos", icon: Package },
   { title: "Pedidos", url: "/admin/pedidos", icon: ClipboardList },
@@ -35,7 +36,7 @@ const items = [
   { title: "Calendario", url: "/admin/calendario", icon: CalendarDays },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
   { title: "Settings", url: "/admin/settings", icon: Settings },
-] as const;
+];
 
 export function AdminSidebar({ email }: { email: string }) {
   const { state } = useSidebar();

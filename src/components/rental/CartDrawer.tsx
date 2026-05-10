@@ -114,7 +114,7 @@ export function CartDrawer({
   async function handleSubmit() {
     if (!startDate || !endDate) return;
     if (list.length === 0) return;
-    if (!user) return;
+    
 
     setSubmitting(true);
     setSubmitError(null);
@@ -381,46 +381,33 @@ export function CartDrawer({
                     </span>
                   </div>
 
-                  {!user ? (
-                    <Link
-                      to="/login"
-                      search={{ redirect: undefined }}
-                      onClick={() => setDrawerOpen(false)}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                  {!showNotas && list.length > 0 && (
+                    <button
+                      onClick={() => setShowNotas(true)}
+                      className="w-full text-xs text-muted-foreground hover:text-ink focus:outline-none focus-visible:underline"
                     >
-                      <LogIn className="h-4 w-4" /> Iniciar sesión para enviar
-                    </Link>
-                  ) : (
-                    <>
-                      {!showNotas && list.length > 0 && (
-                        <button
-                          onClick={() => setShowNotas(true)}
-                          className="w-full text-xs text-muted-foreground hover:text-ink focus:outline-none focus-visible:underline"
-                        >
-                          Agregar una nota
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        disabled={
-                          submitting ||
-                          list.length === 0 ||
-                          !startDate ||
-                          !endDate
-                        }
-                        onClick={handleSubmit}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
-                      >
-                        {submitting ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" /> Enviando…
-                          </>
-                        ) : (
-                          "Confirmar solicitud"
-                        )}
-                      </button>
-                    </>
+                      Agregar una nota
+                    </button>
                   )}
+                  <button
+                    type="button"
+                    disabled={
+                      submitting ||
+                      list.length === 0 ||
+                      !startDate ||
+                      !endDate
+                    }
+                    onClick={handleSubmit}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Enviando…
+                      </>
+                    ) : (
+                      "Confirmar solicitud"
+                    )}
+                  </button>
 
                   {(!startDate || !endDate) ? (
                     <p className="text-center text-xs text-muted-foreground">
