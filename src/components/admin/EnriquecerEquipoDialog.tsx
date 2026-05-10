@@ -295,18 +295,36 @@ export function EnriquecerEquipoDialog({
 
             {result.descripcion && (
               <div>
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Descripción (informativa, no se guarda aún)
-                </Label>
-                <Textarea value={result.descripcion} readOnly rows={2} className="mt-1 text-sm" />
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Descripción
+                  </Label>
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <Checkbox
+                      checked={aplicarDescripcion}
+                      onCheckedChange={(v) => setAplicarDescripcion(!!v)}
+                    />
+                    Aplicar
+                  </label>
+                </div>
+                <Textarea value={result.descripcion} readOnly rows={3} className="mt-1 text-sm" />
               </div>
             )}
 
             {result.specs.length > 0 && (
               <div>
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Specs encontradas (informativas)
-                </Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Specs ({result.specs.length})
+                  </Label>
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <Checkbox
+                      checked={aplicarSpecs}
+                      onCheckedChange={(v) => setAplicarSpecs(!!v)}
+                    />
+                    Aplicar
+                  </label>
+                </div>
                 <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
                   {result.specs.map((s, i) => (
                     <div key={i} className="rounded border hairline px-2 py-1">
@@ -315,10 +333,6 @@ export function EnriquecerEquipoDialog({
                     </div>
                   ))}
                 </div>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  Tip: la base de equipos todavía no tiene campos para specs/descripción.
-                  Si las querés guardar, copialas como etiquetas o pedíme agregar las columnas.
-                </p>
               </div>
             )}
           </div>
