@@ -4,6 +4,7 @@ routes/equipos.py — CRUD de equipos, kits, etiquetas, categorías y fichas.
 
 import calendar as _cal
 import datetime
+import os
 from datetime import date as _date
 from typing import Optional
 
@@ -2006,6 +2007,96 @@ def _ext_from_ctype(ct: str) -> str:
     return "jpg"
 
 
+def _optimize_image(content: bytes) -> tuple[bytes, str, int, int]:
+    """Optimiza la imagen: auto-orient + resize a max 1600px ancho + WebP q=85.
+    Devuelve (bytes_optimizados, content_type, width, height).
+    Si algo falla, devuelve el contenido original como fallback.
+    """
+    try:
+        from PIL import Image, ImageOps
+        from io import BytesIO
+    except ImportError:
+        return content, "image/jpeg", 0, 0
+
+    try:
+        img = Image.open(BytesIO(content))
+        img = ImageOps.exif_transpose(img)  # auto-orient
+
+        # Convertir a RGB para WebP (los PNGs con transparencia se conservan en RGBA→WebP soporta)
+        if img.mode not in ("RGB", "RGBA"):
+            img = img.convert("RGBA" if "A" in img.mode else "RGB")
+
+        # Resize si excede 1600px de ancho
+        MAX_WIDTH = 1600
+        if img.width > MAX_WIDTH:
+            ratio = MAX_WIDTH / img.width
+            new_size = (MAX_WIDTH, int(img.height * ratio))
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+
+        out = BytesIO()
+        img.save(out, format="WEBP", quality=85, method=6)
+        return out.getvalue(), "image/webp", img.width, img.height
+    except Exception as e:
+        print(f"[optimize_image] fallback (no se pudo optimizar): {e}")
+        return content, "image/jpeg", 0, 0
+
+
+def _r2_config() -> dict:
+    """Lee la configuración de Cloudflare R2 desde env. Eleva 500 si falta algo."""
+    import os
+    cfg = {
+        "account_id":      os.getenv("R2_ACCOUNT_ID") or "",
+        "access_key_id":   os.getenv("R2_ACCESS_KEY_ID") or "",
+        "secret_key":      os.getenv("R2_SECRET_ACCESS_KEY") or "",
+        "bucket":          os.getenv("R2_BUCKET") or "equipos-fotos",
+        "public_base":     (os.getenv("R2_PUBLIC_BASE") or "").rstrip("/"),
+    }
+    missing = [k for k in ("account_id", "access_key_id", "secret_key") if not cfg[k]]
+    if missing:
+        raise HTTPException(
+            500,
+            f"R2 no configurado: faltan env vars {', '.join('R2_'+m.upper() for m in missing)}. "
+            "Configurá en Railway: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, "
+            "R2_BUCKET, R2_PUBLIC_BASE.",
+        )
+    if not cfg["public_base"]:
+        # Default al endpoint público de R2 (sin custom domain) — válido si activaste public bucket
+        cfg["public_base"] = f"https://pub-{cfg['account_id']}.r2.dev"
+    return cfg
+
+
+def _upload_to_r2(path: str, content: bytes, content_type: str) -> str:
+    """Sube `content` al bucket R2 vía S3 API (boto3). Devuelve la URL pública."""
+    try:
+        import boto3
+        from botocore.config import Config as BotoConfig
+    except ImportError:
+        raise HTTPException(500, "boto3 no instalado en el backend")
+
+    cfg = _r2_config()
+    client = boto3.client(
+        "s3",
+        endpoint_url=f"https://{cfg['account_id']}.r2.cloudflarestorage.com",
+        aws_access_key_id=cfg["access_key_id"],
+        aws_secret_access_key=cfg["secret_key"],
+        region_name="auto",
+        config=BotoConfig(signature_version="s3v4"),
+    )
+
+    try:
+        client.put_object(
+            Bucket=cfg["bucket"],
+            Key=path,
+            Body=content,
+            ContentType=content_type,
+            CacheControl="public, max-age=31536000, immutable",
+        )
+    except Exception as e:
+        raise HTTPException(502, f"R2 upload falló: {e}")
+
+    return f"{cfg['public_base']}/{path}"
+
+
 def _upload_to_supabase_storage(path: str, content: bytes, content_type: str) -> str:
     """Sube `content` al bucket equipos-fotos vía REST API usando service role.
     Devuelve la URL pública. Eleva HTTPException si falla.
@@ -2061,11 +2152,10 @@ def admin_upload_foto_from_url(
     payload: UploadFotoFromUrlInput,
     request: Request,
 ):
-    """Descarga la imagen de `payload.url` y la sube al bucket `equipos-fotos`
-    vía service-role (bypassa RLS). Devuelve `{public_url, path}`.
+    """Descarga imagen externa, la optimiza (resize + WebP) y la sube a Cloudflare R2.
+    Devuelve {public_url, path, size, content_type}.
 
-    Esto reemplaza el upload directo desde el browser, que requería sesión
-    Supabase activa y fallaba con "rol anon" cuando el JWT expiraba.
+    Reemplaza el upload directo desde el browser y el storage de Supabase.
     """
     from admin_guard import require_admin
     require_admin(request)
@@ -2074,20 +2164,68 @@ def admin_upload_foto_from_url(
     if not url:
         raise HTTPException(400, "URL vacía")
 
-    # Si ya es una URL del propio bucket, no hacemos nada.
-    if "/storage/v1/object/public/equipos-fotos/" in url:
+    # Si ya es una URL del propio bucket R2 (público), no rehospedamos
+    cfg_pub = (os.getenv("R2_PUBLIC_BASE") or "").rstrip("/")
+    if cfg_pub and url.startswith(cfg_pub + "/"):
         return {"public_url": url, "path": None, "skipped": True}
 
-    content, ctype = _download_image_bytes(url)
+    raw_content, raw_ctype = _download_image_bytes(url)
+    # Optimización: resize a max 1600px + WebP q=85
+    content, ctype, w, h = _optimize_image(raw_content)
     ext = _ext_from_ctype(ctype)
 
     import time as _time
     path = f"equipos/{equipo_id}/foto-{int(_time.time() * 1000)}.{ext}"
-    public_url = _upload_to_supabase_storage(path, content, ctype)
+    public_url = _upload_to_r2(path, content, ctype)
 
     return {
         "public_url": public_url,
         "path": path,
         "size": len(content),
+        "size_original": len(raw_content),
         "content_type": ctype,
+        "width": w or None,
+        "height": h or None,
+    }
+
+
+# ── Admin: subir bytes de un archivo (multipart) directo a R2 ─────────────
+
+@router.post("/admin/equipos/{equipo_id}/upload-foto")
+async def admin_upload_foto_file(
+    equipo_id: int,
+    request: Request,
+):
+    """Sube un archivo (multipart/form-data, campo `file`) a R2 después de
+    optimizarlo. Devuelve {public_url, path, ...}.
+    """
+    from admin_guard import require_admin
+    require_admin(request)
+
+    form = await request.form()
+    file = form.get("file")
+    if file is None or not hasattr(file, "read"):
+        raise HTTPException(400, "Falta el campo 'file' en el form-data")
+
+    raw_content = await file.read()
+    if not raw_content:
+        raise HTTPException(400, "Archivo vacío")
+    if len(raw_content) > 20 * 1024 * 1024:
+        raise HTTPException(413, "Archivo muy grande (máx 20MB)")
+
+    content, ctype, w, h = _optimize_image(raw_content)
+    ext = _ext_from_ctype(ctype)
+
+    import time as _time
+    path = f"equipos/{equipo_id}/foto-{int(_time.time() * 1000)}.{ext}"
+    public_url = _upload_to_r2(path, content, ctype)
+
+    return {
+        "public_url": public_url,
+        "path": path,
+        "size": len(content),
+        "size_original": len(raw_content),
+        "content_type": ctype,
+        "width": w or None,
+        "height": h or None,
     }

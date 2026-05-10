@@ -1,69 +1,81 @@
 /**
  * Helpers para fotos de equipo.
  *
- * Las fotos viven en el bucket `equipos-fotos` bajo `equipos/{equipoId}/foto-{ts}.{ext}`,
- * de modo que la imagen quede atada al equipo y no a una URL externa
- * (B&H/Adorama bloquean hotlinking).
+ * Las fotos se almacenan en Cloudflare R2 vía endpoints admin del backend:
+ *   - POST /api/admin/equipos/{id}/upload-foto         (multipart/form-data)
+ *   - POST /api/admin/equipos/{id}/upload-foto-from-url (JSON {url})
+ *
+ * El backend optimiza con Pillow (resize a 1600px max + WebP q=85) y
+ * sube a R2 con Cache-Control inmutable. Devuelve la public_url del CDN.
  */
 
-import { supabase } from "@/integrations/supabase/client";
 import { authedFetch } from "@/lib/authedFetch";
 
-const BUCKET = "equipos-fotos";
+type UploadResponse = {
+  public_url: string;
+  path: string | null;
+  size?: number;
+  size_original?: number;
+  content_type?: string;
+  width?: number | null;
+  height?: number | null;
+  skipped?: boolean;
+};
 
-export function isBucketUrl(url: string | null | undefined): boolean {
+/** ¿La URL ya está hospedada en nuestro storage? Detecta R2 (pub-*.r2.dev) o
+ *  custom domain (cualquier dominio que sirva /equipos/{id}/foto-*).
+ *  Heurística simple: si contiene `/equipos/` y termina en una extensión de imagen.
+ */
+export function isHostedUrl(url: string | null | undefined): boolean {
   if (!url) return false;
-  return url.includes(`/storage/v1/object/public/${BUCKET}/`);
+  return /\/equipos\/\d+\/foto-\d+\.(webp|jpg|jpeg|png|avif|gif)/i.test(url);
 }
 
-function extFromContentType(ct: string | null): string {
-  if (!ct) return "jpg";
-  if (ct.includes("png")) return "png";
-  if (ct.includes("webp")) return "webp";
-  if (ct.includes("avif")) return "avif";
-  if (ct.includes("gif")) return "gif";
-  return "jpg";
-}
+/** Backwards compat: alias del antiguo isBucketUrl. */
+export const isBucketUrl = isHostedUrl;
 
-async function uploadBlob(equipoId: number | string, blob: Blob, ext: string): Promise<string> {
-  const path = `equipos/${equipoId}/foto-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, blob, { contentType: blob.type || `image/${ext}`, upsert: false });
-  if (error) throw error;
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
-}
-
+/** Sube un File del browser al backend. Devuelve la URL pública. */
 export async function uploadFileToBucket(
   equipoId: number | string,
   file: File,
 ): Promise<string> {
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-  return uploadBlob(equipoId, file, ext);
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const res = await authedFetch(`/api/admin/equipos/${equipoId}/upload-foto`, {
+    method: "POST",
+    body: fd,
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail?.detail ?? `upload-foto → ${res.status}`);
+  }
+  const data = (await res.json()) as UploadResponse;
+  return data.public_url;
 }
 
-/**
- * Descarga una URL externa vía el proxy admin del backend (evita CORS/hotlinking)
- * y la sube al bucket. Devuelve la URL pública del bucket.
- *
- * Si la URL ya pertenece al bucket, la devuelve sin tocarla.
+/** Descarga una URL externa vía backend, optimiza y la sube a R2.
+ *  Si la URL ya pertenece a nuestro storage, la devuelve sin tocarla.
  */
 export async function uploadExternalUrlToBucket(
   equipoId: number | string,
   externalUrl: string,
 ): Promise<string> {
   if (!externalUrl) throw new Error("URL vacía");
-  if (isBucketUrl(externalUrl)) return externalUrl;
+  if (isHostedUrl(externalUrl)) return externalUrl;
 
   const res = await authedFetch(
-    `/api/admin/proxy-image?url=${encodeURIComponent(externalUrl)}`,
+    `/api/admin/equipos/${equipoId}/upload-foto-from-url`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: externalUrl }),
+    },
   );
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
-    throw new Error(detail?.detail ?? `proxy-image → ${res.status}`);
+    throw new Error(detail?.detail ?? `upload-foto-from-url → ${res.status}`);
   }
-  const blob = await res.blob();
-  const ext = extFromContentType(blob.type);
-  return uploadBlob(equipoId, blob, ext);
+  const data = (await res.json()) as UploadResponse;
+  return data.public_url;
 }
