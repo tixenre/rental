@@ -48,7 +48,7 @@ function AdminDashboard() {
           </div>
           <div>{(error as Error)?.message ?? "No se pudo cargar el dashboard"}</div>
           <div className="mt-2 text-xs opacity-80">
-            Verificá que el backend esté corriendo y tu email esté en ADMIN_EMAILS.
+            Verificá que el backend esté corriendo.
           </div>
         </div>
       )}
