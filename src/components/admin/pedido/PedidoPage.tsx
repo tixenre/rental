@@ -513,14 +513,29 @@ function EquipoSearchSheet({
       arr.push(eq);
       map.set(cat, arr);
     }
-    const pri: Record<string, number> = {};
-    (categoriasQ.data ?? []).forEach((c) => { pri[c.nombre] = c.prioridad; });
+    // Construir peso por nombre: parentPri * 1000 + nodePri.
+    // Funciona con la respuesta nueva (árbol con children) y la legacy (subtags).
+    const weight: Record<string, number> = {};
+    const tree = categoriasQ.data ?? [];
+    for (const root of tree) {
+      const rp = root.prioridad ?? 999;
+      weight[root.nombre] = rp * 1000;
+      const children = root.children ?? [];
+      for (const c of children) {
+        const cp = (c as { prioridad?: number }).prioridad ?? 100;
+        weight[c.nombre] = rp * 1000 + cp;
+      }
+      // legacy subtags (sin prioridad propia → orden alfabético dentro del padre)
+      (root.subtags ?? []).forEach((s, i) => {
+        if (weight[s.nombre] == null) weight[s.nombre] = rp * 1000 + (i + 1) * 10;
+      });
+    }
     return Array.from(map.entries()).sort(([a], [b]) => {
       if (a === SIN) return 1;
       if (b === SIN) return -1;
-      const pa = pri[a] ?? 999;
-      const pb = pri[b] ?? 999;
-      if (pa !== pb) return pa - pb;
+      const wa = weight[a] ?? 999_000;
+      const wb = weight[b] ?? 999_000;
+      if (wa !== wb) return wa - wb;
       return a.localeCompare(b, "es");
     });
   }, [lista, categoriasQ.data]);

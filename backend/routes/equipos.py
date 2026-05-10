@@ -129,13 +129,38 @@ def list_equipos(
         like = f"%{q}%"
         params += [like, like, like]
     if etiqueta:
-        base_sql += """
-          AND e.id IN (
-            SELECT ee.equipo_id FROM equipo_etiquetas ee
-            JOIN etiquetas et ON et.id = ee.etiqueta_id
-            WHERE et.nombre = ?
-          )"""
-        params.append(etiqueta)
+        # Acepta nombre (legacy) o id numérico. Si es padre, incluye descendientes.
+        try:
+            etiqueta_id_int = int(etiqueta)
+            base_sql += """
+              AND e.id IN (
+                SELECT ee.equipo_id FROM equipo_etiquetas ee
+                WHERE ee.etiqueta_id IN (
+                    WITH RECURSIVE sub AS (
+                        SELECT id FROM etiquetas WHERE id = ?
+                        UNION ALL
+                        SELECT et.id FROM etiquetas et
+                        JOIN sub ON et.parent_id = sub.id
+                    )
+                    SELECT id FROM sub
+                )
+              )"""
+            params.append(etiqueta_id_int)
+        except (TypeError, ValueError):
+            base_sql += """
+              AND e.id IN (
+                SELECT ee.equipo_id FROM equipo_etiquetas ee
+                WHERE ee.etiqueta_id IN (
+                    WITH RECURSIVE sub AS (
+                        SELECT id FROM etiquetas WHERE nombre = ?
+                        UNION ALL
+                        SELECT et.id FROM etiquetas et
+                        JOIN sub ON et.parent_id = sub.id
+                    )
+                    SELECT id FROM sub
+                )
+              )"""
+            params.append(etiqueta)
 
     try:
         total = conn.execute(f"SELECT COUNT(*) {base_sql}", params).fetchone()[0]
@@ -462,58 +487,127 @@ def list_etiquetas():
 
 
 @router.get("/categorias")
-def get_categorias():
+def get_categorias(flat: int = Query(0)):
+    """
+    Devuelve el árbol de categorías desde la tabla `etiquetas`.
+    - Por defecto: árbol jerárquico [{id, nombre, prioridad, total, children:[…]}].
+    - ?flat=1 → lista plana legacy (nombre, total, prioridad, subtags) para
+      mantener compatibilidad con clientes viejos.
+    `total` cuenta equipos asignados a esa etiqueta o a cualquier descendiente.
+    """
     conn = get_db()
     try:
-        rows = conn.execute("""
-            SELECT ee.equipo_id, et.nombre, et.prioridad, ee.orden
-            FROM equipo_etiquetas ee
-            JOIN etiquetas et ON et.id = ee.etiqueta_id
-            ORDER BY ee.equipo_id, ee.orden
+        # 1) Todas las etiquetas con su parent_id y prioridad.
+        etiqs = conn.execute("""
+            SELECT id, nombre, prioridad, parent_id
+            FROM etiquetas
+            ORDER BY prioridad ASC, LOWER(nombre) ASC
         """).fetchall()
 
-        from collections import defaultdict
-        tree:        dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-        main_counts: dict[str, int]            = defaultdict(int)
-        main_pri:    dict[str, int]            = {}
-        item_main:   dict[int, str]            = {}
+        # 2) Conteo directo por etiqueta_id (orden=0 = principal del equipo).
+        counts_rows = conn.execute("""
+            SELECT etiqueta_id, COUNT(DISTINCT equipo_id) AS n
+            FROM equipo_etiquetas
+            GROUP BY etiqueta_id
+        """).fetchall()
+        direct = {r["etiqueta_id"]: r["n"] for r in counts_rows}
 
-        for r in rows:
-            if r["orden"] == 0:
-                item_main[r["equipo_id"]] = r["nombre"]
-                main_counts[r["nombre"]] += 1
-                main_pri[r["nombre"]] = r["prioridad"]
-
-        for r in rows:
-            if r["orden"] > 0 and r["equipo_id"] in item_main:
-                tree[item_main[r["equipo_id"]]][r["nombre"]] += 1
-
-        ordered = sorted(
-            main_counts.keys(),
-            key=lambda n: (main_pri.get(n, 100), n.lower()),
-        )
-
-        return [
-            {
-                "nombre":    main,
-                "total":     main_counts[main],
-                "prioridad": main_pri.get(main, 100),
-                "subtags": [
-                    {"nombre": sub, "total": cnt}
-                    for sub, cnt in sorted(tree[main].items(), key=lambda x: -x[1])
-                ],
+        # 3) Construir árbol y propagar conteos hacia el padre.
+        nodes = {
+            r["id"]: {
+                "id": r["id"],
+                "nombre": r["nombre"],
+                "prioridad": r["prioridad"],
+                "parent_id": r["parent_id"],
+                "total": direct.get(r["id"], 0),
+                "children": [],
             }
-            for main in ordered
-        ]
+            for r in etiqs
+        }
+        roots = []
+        for r in etiqs:
+            n = nodes[r["id"]]
+            if r["parent_id"] and r["parent_id"] in nodes:
+                nodes[r["parent_id"]]["children"].append(n)
+            else:
+                roots.append(n)
+
+        # Heredar conteo del hijo al padre (sin doble contar — usamos un set).
+        # Para precisión: recalculamos `total` del padre como #equipos distintos en
+        # el subárbol.
+        leaf_to_parent = {nid: n["parent_id"] for nid, n in nodes.items()}
+        # Mapeo equipo→set(etiquetas)
+        eq_rows = conn.execute("SELECT equipo_id, etiqueta_id FROM equipo_etiquetas").fetchall()
+        from collections import defaultdict
+        eq_tags: dict[int, set] = defaultdict(set)
+        for r in eq_rows:
+            eq_tags[r["equipo_id"]].add(r["etiqueta_id"])
+
+        # Para cada nodo, contar equipos cuyo set intersecta el subárbol.
+        def descendants(nid: int) -> set:
+            out = {nid}
+            stack = [nid]
+            while stack:
+                cur = stack.pop()
+                for n in nodes.values():
+                    if n["parent_id"] == cur:
+                        out.add(n["id"])
+                        stack.append(n["id"])
+            return out
+
+        for nid, n in nodes.items():
+            sub = descendants(nid)
+            n["total"] = sum(1 for tags in eq_tags.values() if tags & sub)
+
+        # 4) Ordenar children por prioridad/nombre.
+        for n in nodes.values():
+            n["children"].sort(key=lambda x: (x["prioridad"], x["nombre"].lower()))
+        roots.sort(key=lambda x: (x["prioridad"], x["nombre"].lower()))
+
+        if flat:
+            # Compat: devolver solo raíces con subtags como antes.
+            return [
+                {
+                    "nombre":    r["nombre"],
+                    "total":     r["total"],
+                    "prioridad": r["prioridad"],
+                    "subtags": [
+                        {"nombre": c["nombre"], "total": c["total"]}
+                        for c in r["children"]
+                    ],
+                }
+                for r in roots
+            ]
+
+        # Limpiar parent_id del payload final (ya está en el árbol).
+        def clean(n):
+            return {
+                "id": n["id"],
+                "nombre": n["nombre"],
+                "prioridad": n["prioridad"],
+                "total": n["total"],
+                "parent_id": n["parent_id"],
+                "children": [clean(c) for c in n["children"]],
+            }
+
+        return [clean(r) for r in roots]
     finally:
         conn.close()
 
 
 # ── Admin: gestión de etiquetas / categorías ─────────────────────────────────
 
+class EtiquetaCreate(BaseModel):
+    nombre:    str
+    prioridad: Optional[int] = 100
+    parent_id: Optional[int] = None
+
+
 class EtiquetaPatch(BaseModel):
     nombre:    Optional[str] = None
     prioridad: Optional[int] = None
+    parent_id: Optional[int] = None  # explícito None para "limpiar" no soportado vía PATCH; usar -1 para nullear
+    set_parent_null: Optional[bool] = False
 
 
 class EtiquetasReorder(BaseModel):
@@ -527,18 +621,65 @@ def admin_list_etiquetas(request: Request):
     conn = get_db()
     try:
         rows = conn.execute("""
-            SELECT et.id, et.nombre, et.prioridad,
-                   COUNT(ee.equipo_id) FILTER (WHERE ee.orden = 0) AS total
+            SELECT et.id, et.nombre, et.prioridad, et.parent_id,
+                   COUNT(ee.equipo_id) AS total
             FROM etiquetas et
             LEFT JOIN equipo_etiquetas ee ON ee.etiqueta_id = et.id
-            GROUP BY et.id, et.nombre, et.prioridad
+            GROUP BY et.id, et.nombre, et.prioridad, et.parent_id
             ORDER BY et.prioridad ASC, LOWER(et.nombre) ASC
         """).fetchall()
         return [
-            {"id": r["id"], "nombre": r["nombre"],
-             "prioridad": r["prioridad"], "total": r["total"]}
+            {
+                "id":        r["id"],
+                "nombre":    r["nombre"],
+                "prioridad": r["prioridad"],
+                "parent_id": r["parent_id"],
+                "total":     r["total"],
+            }
             for r in rows
         ]
+    finally:
+        conn.close()
+
+
+@router.post("/admin/etiquetas", status_code=201)
+def admin_create_etiqueta(data: EtiquetaCreate, request: Request):
+    from supabase_auth import require_admin
+    require_admin(request)
+    nombre = (data.nombre or "").strip()
+    if not nombre:
+        raise HTTPException(400, "Nombre vacío")
+    conn = get_db()
+    try:
+        # Validar parent: debe existir y ser raíz (forzar 2 niveles).
+        if data.parent_id is not None:
+            prow = conn.execute(
+                "SELECT id, parent_id FROM etiquetas WHERE id = %s", (data.parent_id,)
+            ).fetchone()
+            if not prow:
+                raise HTTPException(400, "parent_id no existe")
+            if prow["parent_id"] is not None:
+                raise HTTPException(400, "Solo se permiten 2 niveles (el padre ya es subcategoría)")
+        cur = conn.execute("""
+            INSERT INTO etiquetas (nombre, prioridad, parent_id)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (nombre) DO UPDATE
+                SET prioridad = EXCLUDED.prioridad,
+                    parent_id = EXCLUDED.parent_id
+            RETURNING id, nombre, prioridad, parent_id
+        """, (nombre, data.prioridad or 100, data.parent_id))
+        row = cur.fetchone()
+        conn.commit()
+        return {
+            "id": row["id"], "nombre": row["nombre"],
+            "prioridad": row["prioridad"], "parent_id": row["parent_id"],
+            "total": 0,
+        }
+    except HTTPException:
+        conn.rollback(); raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(400, str(e))
     finally:
         conn.close()
 
@@ -552,6 +693,30 @@ def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
         sets.append("nombre = %s"); vals.append(patch.nombre.strip())
     if patch.prioridad is not None:
         sets.append("prioridad = %s"); vals.append(int(patch.prioridad))
+    if patch.set_parent_null:
+        sets.append("parent_id = NULL")
+    elif patch.parent_id is not None:
+        if patch.parent_id == eid:
+            raise HTTPException(400, "Una etiqueta no puede ser su propio padre")
+        # Validar que el padre exista y sea raíz.
+        conn0 = get_db()
+        try:
+            prow = conn0.execute(
+                "SELECT id, parent_id FROM etiquetas WHERE id = %s", (patch.parent_id,)
+            ).fetchone()
+            if not prow:
+                raise HTTPException(400, "parent_id no existe")
+            if prow["parent_id"] is not None:
+                raise HTTPException(400, "Solo se permiten 2 niveles")
+            # Verificar que esta etiqueta no tenga hijos (sino bajaríamos un nivel raíz).
+            chrow = conn0.execute(
+                "SELECT 1 FROM etiquetas WHERE parent_id = %s LIMIT 1", (eid,)
+            ).fetchone()
+            if chrow:
+                raise HTTPException(400, "Esta etiqueta tiene hijos; no puede convertirse en hija")
+        finally:
+            conn0.close()
+        sets.append("parent_id = %s"); vals.append(int(patch.parent_id))
     if not sets:
         raise HTTPException(400, "Sin cambios")
     conn = get_db()
@@ -560,6 +725,19 @@ def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
         conn.execute(f"UPDATE etiquetas SET {', '.join(sets)} WHERE id = %s", tuple(vals))
         conn.commit()
         return {"ok": True}
+    finally:
+        conn.close()
+
+
+@router.delete("/admin/etiquetas/{eid}", status_code=204)
+def admin_delete_etiqueta(eid: int, request: Request):
+    from supabase_auth import require_admin
+    require_admin(request)
+    conn = get_db()
+    try:
+        # ON DELETE CASCADE en equipo_etiquetas + SET NULL en parent_id de hijos.
+        conn.execute("DELETE FROM etiquetas WHERE id = %s", (eid,))
+        conn.commit()
     finally:
         conn.close()
 
@@ -577,6 +755,186 @@ def admin_reorder_etiquetas(payload: EtiquetasReorder, request: Request):
             )
         conn.commit()
         return {"ok": True, "count": len(payload.ids)}
+    finally:
+        conn.close()
+
+
+# ── Admin: clasificación automática de equipos ───────────────────────────────
+
+# Reglas leaf → keywords. Orden importa: más específico primero.
+# Cada equipo recibe TODAS las hojas que matcheen (multi-asignación).
+# Se aplica sobre nombre + marca + modelo (lowercase).
+_RULES_LEAF = [
+    # ── CÁMARAS (multi: foto+video para mirrorless híbridas) ────────────
+    ("Foto",           ["a7 v", "zv-e1"]),  # mirrorless híbridas → también foto
+    ("Video",          ["a7 v", "zv-e1", "fx3", "komodo", "c200"]),
+    ("Acción",         ["gopro", "insta360"]),
+    # ── LENTES ─────────────────────────────────────────────────────────
+    ("Vintage",        ["vintage", "carl zeiss jena"]),
+    ("Especiales",     ["laowa", "probe macro"]),
+    ("Zoom E-mount",   ["sony gm", "montura e"]),
+    ("Zoom EF",        ["sigma art 18-35", "sigma art 24-70", "tokina 11-16", "canon 70-200"]),
+    ("Fijos EF",       ["sigma art 35mm", "sigma art 50mm"]),
+    # ── ADAPTADORES Y FILTROS ──────────────────────────────────────────
+    ("Adaptadores de montura", ["adaptador "]),
+    ("Filtros 82mm",   ["filtro "]),
+    # ── ILUMINACIÓN ────────────────────────────────────────────────────
+    ("LED RGB",        ["rgb", "tl60", "m1 mini", "amaran 300c", "accent b7c"]),
+    ("LED daylight/bicolor", ["led", "amaran", "nanlite", "godox vl", "spotlight"]),
+    ("Tungsteno",      ["tungsteno", "fresnel arri", "mole richardson", "lowel par", "open face", "focus light"]),
+    ("Fluorescente",   ["kino flo", "caselight", "pampa tubo", "fluorescente"]),
+    ("On-camera / Flash", ["flash godox", "luz on-camera", "yongnuo yn300", "dracast bicolor"]),
+    ("Práctica / efecto", ["globo china", "máquina de humo", "smokegenie"]),
+    # ── MODIFICADORES ──────────────────────────────────────────────────
+    ("Softbox",        ["softbox", "light dome", "ad-s60"]),
+    ("Difusión / Frame", ["frame difusión", "fresnel attachment"]),
+    ("Reflectores",    ["reflector"]),
+    ("Banderas",       ["bandera"]),
+    # ── SOPORTES ───────────────────────────────────────────────────────
+    ("Trípodes video", ["manfrotto 502", "manfrotto 504", "manfrotto 529", "trípode fluido", "trípode galera"]),
+    ("Trípodes foto",  ["xpro 4s", "trípode foto", "manfrotto elements"]),
+    ("C-Stands",       ["c-stand"]),
+    ("Estabilización", ["gimbal", "ronin", "steadicam", "glidecam", "tilta gravity"]),
+    ("Slider / Dolly / Riel", ["slider", "dolly", "riel "]),
+    ("Car Mount",      ["car mount", "tilta hydra"]),
+    # ── GRIP ───────────────────────────────────────────────────────────
+    ("Brazos",         ["brazo ", "boom arm", "magic arm", "superflex", "brazo mágico"]),
+    ("Clamps",         ["clamp", "superclamp", "avenger c1510", "avenger c4462", "avenger e390"]),
+    ("Wall plates / pins", ["wall plate", "baby pin", "junior pin"]),
+    ("Pinzas",         ["pinza"]),
+    ("Líneas de seguridad", ["línea de seguridad", "linea de seguridad"]),
+    ("Sopapa",         ["sopapa"]),
+    ("Lastre",         ["bolsa de arena", "saco de arena"]),
+    # ── SONIDO ─────────────────────────────────────────────────────────
+    ("Inalámbricos / Lavalier", ["dji mic", "wireless go", "lavalier"]),
+    ("Shotgun / Boom", ["shotgun", "ntg2", "mke 600", "caña boom", "zeppelin"]),
+    ("On-camera (sonido)", ["videomic", "mke 400"]),
+    ("Estudio / Podcast", ["procaster", "rodecaster"]),
+    ("Intercom",       ["intercom", "solidcom", "hollyland"]),
+    # ── MONITORES Y VIDEO ──────────────────────────────────────────────
+    ("Monitores",      ["monitor de campo", "smallhd", "lilliput", "viltrox 6", "monitor on-camera"]),
+    ("Grabadores",     ["video assist", "grabador"]),
+    ("Transmisión inalámbrica", ["sdr transmission", "transmisor inalámbrico"]),
+    ("Follow Focus / Matebox", ["follow focus", "nucleus", "matebox", "matte box"]),
+    # ── ENERGÍA ────────────────────────────────────────────────────────
+    ("V-Mount",        ["v-mount", "vmount"]),
+    ("NP / LP-E6",     ["np-f", "np-fz", "lp-e6", "np serie-l"]),
+    ("Distribución eléctrica", ["zapatilla", "alargue eléctrico"]),
+    # ── MEDIA Y DATOS ──────────────────────────────────────────────────
+    ("Tarjetas SD",    ["tarjeta sd"]),
+    ("Tarjetas CFexpress", ["cfexpress"]),
+    ("Lectores",       ["lector"]),
+    # ── ESTUDIO Y PRODUCCIÓN ───────────────────────────────────────────
+    ("Set / Backdrops", ["backdrop", "mesa de producción"]),
+    ("Paquetes",       ["rambla estudio", "estudio equipos promo"]),
+]
+
+
+def _propose_tags(nombre: str, marca: str, modelo: str) -> list[str]:
+    """Devuelve la lista de etiquetas hoja propuestas para un equipo."""
+    text = f"{nombre} {marca or ''} {modelo or ''}".lower()
+    matches = []
+    for leaf, kws in _RULES_LEAF:
+        for kw in kws:
+            if kw in text:
+                matches.append(leaf)
+                break
+    # Dedupe preservando orden
+    seen = set()
+    out = []
+    for m in matches:
+        if m not in seen:
+            out.append(m); seen.add(m)
+    return out
+
+
+@router.post("/admin/categorias/clasificar")
+def admin_clasificar(request: Request, apply: int = Query(0)):
+    """
+    Calcula etiquetas hoja propuestas para todos los equipos visibles.
+    - apply=0 (default): dry-run, solo devuelve la propuesta.
+    - apply=1: aplica las asignaciones (REEMPLAZA las etiquetas existentes
+      de cada equipo que tenga al menos 1 match; los que no matchean nada
+      no se tocan).
+
+    Respuesta:
+      {
+        "total": 142, "matched": 130, "unmatched": 12,
+        "items": [{id, nombre, marca, propuestas: [...], actuales: [...]}],
+        "applied": 0 | <int>,
+      }
+    """
+    from supabase_auth import require_admin
+    require_admin(request)
+
+    conn = get_db()
+    try:
+        equipos = conn.execute("""
+            SELECT e.id, e.nombre, e.marca, e.modelo
+            FROM equipos e
+            ORDER BY e.nombre
+        """).fetchall()
+
+        # Cargar etiquetas existentes por equipo.
+        rows = conn.execute("""
+            SELECT ee.equipo_id, et.nombre
+            FROM equipo_etiquetas ee
+            JOIN etiquetas et ON et.id = ee.etiqueta_id
+        """).fetchall()
+        from collections import defaultdict
+        actuales: dict[int, list[str]] = defaultdict(list)
+        for r in rows:
+            actuales[r["equipo_id"]].append(r["nombre"])
+
+        # Mapa nombre→id de hojas válidas.
+        leaf_rows = conn.execute(
+            "SELECT id, nombre FROM etiquetas WHERE parent_id IS NOT NULL"
+        ).fetchall()
+        leaf_id = {r["nombre"]: r["id"] for r in leaf_rows}
+
+        items = []
+        matched = 0
+        applied = 0
+        for eq in equipos:
+            propuestas = _propose_tags(eq["nombre"], eq["marca"] or "", eq["modelo"] or "")
+            # Filtrar a las que existen como hoja en DB.
+            propuestas = [p for p in propuestas if p in leaf_id]
+            if propuestas:
+                matched += 1
+                if apply:
+                    # REEMPLAZA: borra las actuales y vuelve a insertar las propuestas.
+                    conn.execute(
+                        "DELETE FROM equipo_etiquetas WHERE equipo_id = %s", (eq["id"],)
+                    )
+                    for orden, name in enumerate(propuestas):
+                        conn.execute("""
+                            INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (equipo_id, etiqueta_id)
+                            DO UPDATE SET orden = EXCLUDED.orden
+                        """, (eq["id"], leaf_id[name], orden))
+                    applied += 1
+            items.append({
+                "id":        eq["id"],
+                "nombre":    eq["nombre"],
+                "marca":     eq["marca"],
+                "propuestas": propuestas,
+                "actuales":  actuales.get(eq["id"], []),
+            })
+
+        if apply:
+            conn.commit()
+
+        return {
+            "total":     len(equipos),
+            "matched":   matched,
+            "unmatched": len(equipos) - matched,
+            "applied":   applied,
+            "items":     items,
+        }
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 

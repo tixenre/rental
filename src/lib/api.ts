@@ -53,6 +53,9 @@ export type BackendCategoria = {
   nombre: string;
   total: number;
   prioridad?: number;
+  parent_id?: number | null;
+  children?: BackendCategoria[];
+  // Compat con respuesta legacy ?flat=1
   subtags?: { nombre: string; total: number }[];
 };
 

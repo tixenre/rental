@@ -1,103 +1,100 @@
 ## Objetivo
 
-Mostrar los equipos agrupados por categoría dentro del sheet "Agregar equipo" del editor de pedidos, ordenando las categorías por una **prioridad** definida en el backend (reutilizable también en el catálogo público y en cualquier listado futuro).
+Categorías jerárquicas (2 niveles) con:
+- Un equipo puede tener N categorías hoja.
+- Filtrar por padre incluye automáticamente todos los hijos.
+- Ejemplo: Sony a7 V → `Foto` + `Video`. Aparece en ambas y dentro de `Cámaras`.
 
-## Modelo de datos (FastAPI / Postgres)
+## Fase 1 — Backend: estructura del árbol
 
-La tabla `etiquetas` ya existe `(id, nombre)`. Le agregamos:
+**Migración `etiquetas`:**
+- `parent_id INTEGER NULL REFERENCES etiquetas(id) ON DELETE SET NULL`
+- Índice `(parent_id, prioridad, nombre)`
+- Constraint: `parent_id != id` y el padre no puede tener a su vez `parent_id` (forzar 2 niveles).
+
+**Seed del árbol** (idempotente por nombre):
 
 ```text
-prioridad INTEGER NOT NULL DEFAULT 100
+Cámaras (10)              → Video, Foto, Acción
+Lentes (20)               → Zoom E, Zoom EF, Fijos EF, Especiales, Vintage
+Adaptadores y Filtros (25)→ Adaptadores, Filtros 82mm
+Iluminación (30)          → LED daylight/bicolor, LED RGB, Tungsteno, Fluorescente, On-camera, Práctica/efecto
+Modificadores (40)        → Softbox, Difusión, Reflectores, Banderas
+Soportes (50)             → Trípodes video, Trípodes foto, C-Stands, Estabilización, Slider/Dolly, Car mount
+Grip (60)                 → Brazos, Clamps, Wall plates/pins, Pinzas, Líneas seguridad, Sopapa, Lastre
+Sonido (70)               → Inalámbricos, Shotgun/Boom, On-camera, Estudio/Podcast, Intercom
+Monitores y Video (80)    → Monitores, Grabadores, Transmisión, Follow Focus/Matebox
+Energía (90)              → V-Mount, NP/LP-E6, Distribución
+Media y Datos (100)       → SD, CFexpress, Lectores
+Estudio y Producción (110)→ Set/Backdrops, Paquetes
 ```
 
-- Menor número = más arriba.
-- Default 100 para que las nuevas categorías queden al final hasta que alguien les fije prioridad.
-- Se aplica **a todas las etiquetas**, no solo a las "categoría principal" (orden=0). En la práctica el orden lo usa quien agrupe por categoría principal; otros usos (filtros por subtag) podrán reutilizarlo.
+**Endpoints (`backend/routes/equipos.py`):**
+- `GET /api/categorias` → árbol `[{id, nombre, prioridad, children:[...]}]`. `?flat=1` para retrocompat.
+- `GET /api/equipos?categoria=<id>` → CTE recursiva: matchea si el equipo está asignado a esa etiqueta o a cualquier descendiente.
+- `GET /api/admin/etiquetas` → incluye `parent_id`.
+- `POST /api/admin/etiquetas` y `PATCH /api/admin/etiquetas/{id}` → aceptan `parent_id` (validar 2 niveles + no-ciclo).
+- `PUT /api/admin/equipos/{id}/etiquetas` → reemplaza la lista completa de etiquetas hoja del equipo.
 
-### Seed inicial (orden pedido por el usuario)
+## Fase 2 — Clasificación con revisión previa
 
-| Prioridad | Categoría |
-|----:|---|
-| 10 | Cámaras |
-| 20 | Lentes |
-| 30 | Luces |
-| 40 | Modificadores |
-| 50 | Soportes / Trípode |
-| 60 | Grips / Griperia |
-| 70 | Sonido |
-| 80 | Monitores |
-| 90 | Baterías |
-| 100 | (resto) |
+**Script `backend/scripts/seed_categorias.py`:**
+1. Crea/actualiza el árbol de etiquetas.
+2. Recorre los 142 equipos y aplica reglas de nombre/marca/modelo → set de etiquetas hoja propuesto.
+3. Genera `/mnt/documents/clasificacion_propuesta.csv` con columnas: `id, nombre, marca, etiquetas_propuestas, notas`.
+4. **No escribe asignaciones todavía.** Vos revisás el CSV.
+5. Segundo paso (`--apply` o un endpoint admin) que toma el CSV revisado y ejecuta las asignaciones.
 
-Los nombres exactos se mapean contra los que ya existen en `etiquetas`. Lo que no matchee queda en 100 y se puede ajustar luego desde la UI.
+Casos especiales pre-cargados:
+- Sony a7 V, ZV-E1 → `Foto` + `Video`.
+- FX3, RED, C200 → `Video`.
+- GoPro, Insta360 → `Acción`.
 
-## Backend (`backend/`)
+## Fase 3 — Frontend: tipos y hooks
 
-1. **Migración** (en `database.py` initialización idempotente):
-   - `ALTER TABLE etiquetas ADD COLUMN IF NOT EXISTS prioridad INTEGER NOT NULL DEFAULT 100`
-   - `CREATE INDEX IF NOT EXISTS idx_etiq_prioridad ON etiquetas(prioridad, nombre)`
+**`src/lib/api.ts` y `src/lib/admin/api.ts`:**
+- `Categoria` gana `parent_id?: number | null` y `children?: Categoria[]`.
+- Helpers: `flattenCategorias(tree)`, `descendantIds(tree, id)`, `getParent(byId, cat)`.
 
-2. **Seed** (one-shot al arrancar, solo para etiquetas con `prioridad = 100` y nombre conocido) — así no pisa cambios manuales del usuario.
+**`src/hooks/useEquipos.ts`:**
+- `useCategorias()` devuelve `{ tree, flat, byId }`.
 
-3. **`GET /api/categorias`**: incluir `prioridad` en cada item y ordenar `ORDER BY et.prioridad ASC, et.nombre ASC` en lugar de alfabético.
+## Fase 4 — UI catálogo público (recomendación)
 
-4. **`GET /api/equipos`**: incluir `prioridad` en cada etiqueta devuelta (hoy devuelve solo el nombre).
+**Recomiendo: chips expandibles con drawer en mobile.**
 
-5. **Nuevos endpoints admin** (protegidos con `require_admin`):
-   - `GET  /api/admin/etiquetas` → lista `[{ id, nombre, prioridad, total }]` ordenada por prioridad.
-   - `PATCH /api/admin/etiquetas/{id}` → body `{ prioridad?: int, nombre?: string }`.
-   - (Opcional ahora, recomendado) `POST /api/admin/etiquetas/reorder` → body `{ ids: number[] }` que setea prioridad = 10, 20, 30… según el orden recibido (más práctico para drag-and-drop).
+Razón: en 402px un dropdown jerárquico se siente desconectado del contenido y obliga a 2 taps para volver a ver opciones. Los chips expandibles muestran el contexto completo sin abrir/cerrar menús, y ya tenés el lenguaje visual de chips en el catálogo.
 
-## Frontend
+**Implementación:**
+- Fila horizontal scrollable de chips de **nivel padre** (Cámaras, Lentes, Iluminación…).
+- Tap en padre → activa filtro padre **y** revela una segunda fila debajo con sus hijos (Foto, Video, Acción).
+- Tap en hijo → filtro más fino. Tap de nuevo en el padre → vuelve al filtro padre. "Todos" limpia.
+- Indicador visual: padre activo en sólido, hijo activo con ring, padres inactivos con borde.
+- En desktop la segunda fila aparece inline; en mobile colapsada en un chip "▾ subcategorías" si supera el ancho.
 
-### `src/lib/admin/api.ts`
-- Tipo `Etiqueta = { id; nombre; prioridad; total? }`.
-- `adminApi.listEtiquetas()`, `adminApi.updateEtiqueta(id, patch)`, `adminApi.reorderEtiquetas(ids)`.
-- Extender `Categoria` (respuesta de `/api/categorias`) con `prioridad`.
+## Fase 5 — Sheet de pedidos
 
-### `/admin/settings` — nueva sección "Categorías"
-Pantalla simple, encima de "Importar CSV":
+`EquipoSearchSheet` en `PedidoPage.tsx`:
+- Agrupa por **categoría hoja**, con encabezado de padre arriba (sticky de 2 niveles).
+- Equipos con varias hojas aparecen en cada grupo correspondiente (con stock compartido — la disponibilidad sigue siendo por equipo).
 
-- Lista vertical de categorías con: nombre, contador de equipos, input numérico de prioridad y handle de drag (`@dnd-kit/sortable`, ya disponible vía shadcn pattern; si no, usamos botones ▲▼ para no agregar dependencia).
-- "Guardar orden" → `reorderEtiquetas([ids])` → toast + invalidar `["categorias"]` y `["admin","etiquetas"]`.
-- Edición inline de prioridad numérica con `onBlur` → `updateEtiqueta`.
+## Fase 6 — Admin
 
-Decisión de diseño: arrancamos con **botones ▲▼ + input numérico** (sin nueva dependencia). Si después se siente lento, sumamos drag-and-drop.
+**`/admin/settings` — Sección Categorías (árbol):**
+- Vista indentada con expand/collapse por padre.
+- Acciones por nodo: agregar hijo, renombrar, mover (cambiar `parent_id`), reordenar (▲▼ + input prioridad), borrar.
+- Botón "Guardar orden" hace bulk reorder por nivel.
 
-### Sheet de pedidos (`EquipoSearchSheet` en `PedidoPage.tsx`)
-- Pedir `useQuery(["categorias"])` para obtener orden y prioridad.
-- Helper `categoriaPrincipal(eq)` = `eq.etiquetas?.[0] ?? "Sin categoría"`.
-- Construir `Map<categoria, Equipo[]>` y ordenar las claves por la prioridad que viene del API (las que no aparezcan en `/api/categorias` van al final).
-- Renderizar la lista como secciones con header sticky:
+**`/admin/equipos` — Editor de etiquetas por equipo:**
+- En la fila/detalle de cada equipo, multi-select de etiquetas **hoja** (los padres se infieren).
+- Mostrar chips de las etiquetas asignadas con el padre como prefijo (ej: `Cámaras · Foto`).
+- Guardar llama a `PUT /api/admin/equipos/{id}/etiquetas`.
 
-  ```text
-  Cámaras                              3
-  ─────────────────
-  · Sony FX3                  + 
-  · Komodo                    + 
-  Lentes                               5
-  ─────────────────
-  ...
-  ```
-- Si hay `q` (búsqueda), seguimos filtrando equipos antes de agrupar; categorías sin matches se ocultan.
-- "Sin categoría" siempre al final.
+## Orden de entrega sugerido
 
-### Catálogo público (`src/routes/index.tsx`)
-- Hoy `apiCategories` se calcula con `Array.from(new Set(...)).sort()` (alfabético).
-- Cambio: pedir `useCategorias()` (ya existe en `src/hooks/useEquipos.ts`) y usar el orden devuelto por el backend (que ya estará ordenado por prioridad). Las categorías derivadas que no estén en la respuesta del backend van al final, alfabéticas.
-- No se toca el agrupado/render existente, solo el array `apiCategories`.
-
-## Orden de ejecución
-
-1. Migración + seed + endpoints en `backend/` (1 commit).
-2. Tipos y métodos en `src/lib/admin/api.ts`.
-3. UI de categorías en `/admin/settings`.
-4. Agrupado en `EquipoSearchSheet`.
-5. Reordenar `apiCategories` en el catálogo público.
-6. QA: crear pedido, abrir sheet, ver agrupado; cambiar prioridad en settings y verificar que se reordena en el sheet y en el home.
-
-## Notas
-
-- No se toca Supabase (los pedidos siguen yendo al FastAPI).
-- `resolveCategory` (heurística por keywords en `useEquipos.ts`) se mantiene como fallback para equipos sin etiquetas; el orden lo dicta `/api/categorias`.
-- El campo `prioridad` queda disponible para futuros usos: orden de subtags, sidebar de filtros, reportes, etc.
+1. Migración + seed del árbol (sin asignar equipos aún).
+2. Endpoints actualizados (`categorias` árbol, `equipos` con filtro recursivo).
+3. Tipos/hook frontend + catálogo con chips expandibles.
+4. Script de clasificación → CSV de revisión → vos confirmás → aplicar.
+5. Editor de etiquetas en `/admin/equipos` y editor de árbol en `/admin/settings`.
+6. Sheet de pedidos con agrupado de 2 niveles.

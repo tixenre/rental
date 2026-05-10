@@ -307,29 +307,75 @@ def init_db():
         ALTER TABLE etiquetas
         ADD COLUMN IF NOT EXISTS prioridad INTEGER NOT NULL DEFAULT 100
     """)
+    # Jerarquía: parent_id para soportar 2 niveles (categoría → subcategoría).
+    # NULL = categoría raíz. Los hijos no pueden tener hijos a su vez (validado en API).
+    conn.execute("""
+        ALTER TABLE etiquetas
+        ADD COLUMN IF NOT EXISTS parent_id INTEGER
+            REFERENCES etiquetas(id) ON DELETE SET NULL
+    """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_etiq_prioridad ON etiquetas(prioridad, nombre)
     """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_etiq_parent ON etiquetas(parent_id, prioridad, nombre)
+    """)
 
-    # Seed: solo aplica a etiquetas todavía con prioridad por defecto.
-    # Así nunca pisa cambios manuales hechos desde el back-office.
-    seed_pri = [
-        (10,  ["Cámaras", "Camaras", "Camara", "Cámara"]),
-        (20,  ["Lentes", "Lente"]),
-        (30,  ["Luces", "Luz", "Iluminación"]),
-        (40,  ["Modificadores", "Modificador"]),
-        (50,  ["Soportes", "Soporte", "Trípode", "Tripode", "Tripodes", "Trípodes"]),
-        (60,  ["Grips", "Griperia", "Gripería", "Grip"]),
-        (70,  ["Sonido", "Audio", "Micrófonos", "Microfonos"]),
-        (80,  ["Monitores", "Monitor"]),
-        (90,  ["Baterías", "Baterias", "Batería"]),
+    # Seed del árbol de categorías. Idempotente: usa ON CONFLICT (nombre).
+    # Cada raíz se crea/actualiza con su prioridad. Luego sus hijos.
+    # Nota: el seed solo PISA prioridad si la etiqueta todavía está en 100 (default),
+    # así nunca rompe ajustes hechos desde el back-office.
+    SEED_TREE = [
+        # (prioridad, nombre_padre, [hijos…])
+        (10,  "Cámaras",              ["Video", "Foto", "Acción"]),
+        (20,  "Lentes",               ["Zoom E-mount", "Zoom EF", "Fijos EF", "Especiales", "Vintage"]),
+        (25,  "Adaptadores y Filtros",["Adaptadores de montura", "Filtros 82mm"]),
+        (30,  "Iluminación",          ["LED daylight/bicolor", "LED RGB", "Tungsteno",
+                                       "Fluorescente", "On-camera / Flash", "Práctica / efecto"]),
+        (40,  "Modificadores",        ["Softbox", "Difusión / Frame", "Reflectores", "Banderas"]),
+        (50,  "Soportes",             ["Trípodes video", "Trípodes foto", "C-Stands",
+                                       "Estabilización", "Slider / Dolly / Riel", "Car Mount"]),
+        (60,  "Grip",                 ["Brazos", "Clamps", "Wall plates / pins",
+                                       "Pinzas", "Líneas de seguridad", "Sopapa", "Lastre"]),
+        (70,  "Sonido",               ["Inalámbricos / Lavalier", "Shotgun / Boom",
+                                       "On-camera (sonido)", "Estudio / Podcast", "Intercom"]),
+        (80,  "Monitores y Video",    ["Monitores", "Grabadores",
+                                       "Transmisión inalámbrica", "Follow Focus / Matebox"]),
+        (90,  "Energía",              ["V-Mount", "NP / LP-E6", "Distribución eléctrica"]),
+        (100, "Media y Datos",        ["Tarjetas SD", "Tarjetas CFexpress", "Lectores"]),
+        (110, "Estudio y Producción", ["Set / Backdrops", "Paquetes"]),
     ]
-    for pri, names in seed_pri:
-        conn.execute(
-            f"UPDATE etiquetas SET prioridad = %s "
-            f"WHERE prioridad = 100 AND nombre IN ({','.join(['%s'] * len(names))})",
-            (pri, *names),
-        )
+
+    for pri, parent_name, children in SEED_TREE:
+        # Upsert padre (sin parent_id).
+        conn.execute("""
+            INSERT INTO etiquetas (nombre, prioridad, parent_id)
+            VALUES (%s, %s, NULL)
+            ON CONFLICT (nombre) DO UPDATE
+                SET prioridad = CASE
+                        WHEN etiquetas.prioridad = 100 THEN EXCLUDED.prioridad
+                        ELSE etiquetas.prioridad
+                    END,
+                    parent_id = NULL
+        """, (parent_name, pri))
+        # Obtener id del padre.
+        prow = conn.execute(
+            "SELECT id FROM etiquetas WHERE nombre = %s", (parent_name,)
+        ).fetchone()
+        parent_id = prow["id"]
+        # Upsert hijos con prioridad escalonada (10, 20, 30…) y parent_id.
+        for idx, child_name in enumerate(children, start=1):
+            child_pri = idx * 10
+            conn.execute("""
+                INSERT INTO etiquetas (nombre, prioridad, parent_id)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (nombre) DO UPDATE
+                    SET parent_id = EXCLUDED.parent_id,
+                        prioridad = CASE
+                            WHEN etiquetas.prioridad = 100 THEN EXCLUDED.prioridad
+                            ELSE etiquetas.prioridad
+                        END
+            """, (child_name, child_pri, parent_id))
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_etiquetas (
