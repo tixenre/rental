@@ -27,7 +27,7 @@ import {
 import { adminApi, type CategoriaAdmin } from "@/lib/admin/api";
 
 
-export const Route = createFileRoute("/admin/clasificar")({
+export const Route = createFileRoute("/admin/equipos/clasificar")({
   component: ClasificarPage,
 });
 

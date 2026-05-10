@@ -56,15 +56,18 @@ export function SpecTemplatesSection() {
     queryFn: () => adminApi.adminListCategorias(),
   });
 
-  // Flatten para selector — incluye raíces e hijas
+  // Construir lista plana con path (raíz › hija) desde la lista flat del backend
   const catsFlat = useMemo(() => {
-    const flat: { id: number; nombre: string; path: string }[] = [];
-    const tree = catsQ.data ?? [];
-    for (const root of tree) {
-      flat.push({ id: root.id, nombre: root.nombre, path: root.nombre });
-      const hijos = root.children ?? [];
+    const all = catsQ.data ?? [];
+    const flat: { id: number; nombre: string; path: string; prioridad: number }[] = [];
+    const roots = all.filter((c) => c.parent_id == null)
+      .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
+    for (const root of roots) {
+      flat.push({ id: root.id, nombre: root.nombre, path: root.nombre, prioridad: root.prioridad });
+      const hijos = all.filter((c) => c.parent_id === root.id)
+        .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
       for (const h of hijos) {
-        flat.push({ id: h.id, nombre: h.nombre, path: `${root.nombre} › ${h.nombre}` });
+        flat.push({ id: h.id, nombre: h.nombre, path: `${root.nombre} › ${h.nombre}`, prioridad: h.prioridad });
       }
     }
     return flat;

@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { adminApi } from "@/lib/admin/api";
 
 
-export const Route = createFileRoute("/admin/validacion")({
+export const Route = createFileRoute("/admin/equipos/validacion")({
   component: ValidacionPage,
 });
 
