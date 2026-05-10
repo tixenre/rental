@@ -1536,6 +1536,7 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         "fuente_url": canonical_url,
         "fuente_titulo": canonical_title,
         "fuente_foto_url": fuente_foto_url,
+        "foto_motivo": foto_motivo or None,
     }
 
 
