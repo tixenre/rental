@@ -1,74 +1,58 @@
-# Plan: editor de equipo completo + nombre público
+## Contexto
 
-## 1. Sacar badge de "Kit" en la tabla admin
-En `src/routes/admin/equipos.tsx` no agregar la columna/badge "Kit (n)" que estaba propuesto en el plan anterior. La info de kit solo se ve dentro del editor.
+Tres bugs concretos + una visión más grande ("gestor de equipos").
 
-## 2. Nombre público derivado (no se guarda en DB)
+1. **Búsqueda del kit no encuentra "sony"**: el backend usa `LIKE` (case-sensitive en Postgres). "Sony" matchea, "sony" no.
+2. **Foto enriquecida no se guarda ni se ve en la web**: el dialog de IA guarda la URL externa de B&H/Adorama. Esos hosts bloquean hotlinking → la `<img>` queda rota. Además queda atada al sitio externo, no al equipo.
+3. **Specs/descripción no se guardan**: el dialog de IA las muestra como "informativas" y no escribe en `equipo_fichas`, aunque las columnas ya existen (`descripcion`, `notas`, `specs_json`).
 
-**Decisión:** no agregar una columna nueva a la tabla `equipos`. El "nombre interno" (`nombre`) sigue siendo simple y editable ("FX3 Cuerpo"), y el "nombre público" se **arma automáticamente** combinando campos que ya existen + un par de campos nuevos en `equipo_fichas` (que ya está pensada para info técnica).
+Y la idea de fondo: que el equipo sea **una sola entidad consistente** — datos básicos + ficha + foto propia + componentes — y que tanto el back-office como la web consuman el mismo modelo.
 
-**Fórmula del nombre público** (en orden, separadas por espacio, omitiendo lo vacío):
+## Plan
 
-```
-[tipo] [marca] [modelo] [montura] [formato] [resolución]
-```
+### 1. Fix búsqueda fuzzy (case-insensitive)
 
-Ejemplo FX3 → `Cámara Sony FX3 Montura E Full Frame 4K`
+`backend/routes/equipos.py` → `LIKE` por `ILIKE` en el filtro `q` de `GET /equipos`. Una línea, sin migración. Resuelve la búsqueda del editor de kit y cualquier otra búsqueda.
 
-De dónde sale cada parte:
-- **tipo** → primera categoría asignada (`Cámara`, `Lente`, `Luz`, …). Si no hay, se omite.
-- **marca / modelo** → ya existen en `equipos`.
-- **montura / formato / resolución** → tres campos nuevos opcionales en `equipo_fichas`:
-  - `montura TEXT` (ej: "Montura E", "RF", "EF")
-  - `formato TEXT` (ej: "Full Frame", "Super 35", "APS-C")
-  - `resolucion TEXT` (ej: "4K", "6K", "8K")
-- Nada más se inventa: si la ficha está vacía, el nombre público = `Sony FX3` y listo.
+### 2. Fotos: pasar siempre por storage propio
 
-El cálculo se hace en el **frontend** en `useEquipos` (helper `buildPublicName(equipo)`), así no toca el backend más allá de exponer los 3 campos nuevos. La web reemplaza `name` por el nombre público; el back-office sigue mostrando el `nombre` interno.
+Hoy la foto enriquecida se guarda como URL externa (B&H bloquea hotlinking → no se ve en la web).
 
-## 3. Editor de equipo lo más completo posible
+- En `EnriquecerEquipoDialog`, al "Aplicar al equipo": si `foto_url` no es del bucket `equipos-fotos`, descargarla con el proxy `/api/admin/proxy-image` (ya existe), subirla a `equipos-fotos/equipos/{id}/foto-{ts}.{ext}` y guardar la URL pública del bucket.
+- Mismo helper reutilizable (`uploadExternalPhotoToBucket`) lo puede usar también el botón "Subir" del editor cuando se pega una URL externa.
+- Resultado: foto vive en el equipo, no en una función específica, y se ve en la web.
 
-Refactor de `EquipoFormDialog` a 3 tabs (`Tabs` de shadcn):
+### 3. Persistir ficha (descripción + specs) desde IA
 
-### Tab "Datos básicos"
-Ya existentes: nombre interno, marca, modelo, cantidad, precio/día (ARS), valor (USD), serie, dueño, estado, visible en catálogo.
-Agregar lo que ya está en el modelo del backend pero falta en el form:
-- `roi_pct` (retorno %)
-- `valor_reposicion` (USD para seguro)
-- `fecha_compra` (date picker)
-- `bh_url` (link de fuente B&H/Adorama)
-- `foto_url` + botón "Subir foto" (a `equipos-fotos/equipos/{id}/foto-{ts}.{ext}`) + preview
-- Botón ✨ "Enriquecer con IA" arriba a la derecha (ya existe el dialog, lo abrimos desde acá también)
+En `EnriquecerEquipoDialog`:
+- Nuevos toggles "Aplicar descripción" y "Aplicar specs (N)" debajo de los actuales.
+- Al aplicar, además del `updateEquipo`, hacer `adminApi.setFicha(id, { descripcion, specs_json: JSON.stringify(specs) })` con `Promise.all`.
+- Toast de éxito ya lista los campos aplicados (incluye ahora "descripción" y "N specs").
+- Quitar la nota "todavía no tiene campos para specs".
 
-### Tab "Ficha técnica" (PUT `/equipos/{id}/ficha`)
-- `montura` (input)
-- `formato` (input)
-- `resolucion` (input)
-- `descripcion` (textarea, va al detalle público)
-- `notas` (textarea, internas)
-- Editor de `specs_json`: tabla `[label, value]` con botones "+ Agregar fila" / "✕"
-- **Preview del nombre público** en vivo arriba del tab (texto chico gris): "Se verá en la web como: *Cámara Sony FX3 Montura E Full Frame 4K*"
+### 4. "Gestor de equipos" — consolidación ligera
 
-### Tab "Categorías y kit"
-- **Categorías**: multi-select con árbol (`/categorias` ya existe). PUT `/equipos/{id}/categorias`.
-- **Etiquetas manuales**: input CSV (las auto se regeneran solas). PUT `/equipos/{id}/etiquetas`.
-- **Componentes del kit**: buscador de equipos + lista con cantidad y botón ✕. POST/DELETE `/equipos/{id}/kit`. Aclaración: "Lo que agregues acá se descuenta del stock cuando se alquila este equipo (ej: FX3 → 2× Batería NP-FZ100)".
+Sin re-arquitectura grande, dejar el modelo unificado:
 
-## 4. Cambios técnicos
+- `src/lib/equipment/` (nuevo módulo):
+  - `types.ts` — re-exporta `BackendEquipo`, `Equipment`, `Ficha`, `Categoria`.
+  - `mapping.ts` — mueve `buildPublicName` + `backendToEquipment` desde `useEquipos.ts`.
+  - `photos.ts` — `uploadExternalPhotoToBucket(file|url, equipoId)` reutilizable.
+- `useEquipos.ts` queda como hook delgado que importa de ahí.
+- Web (cards/rows/detalle) sigue consumiendo `Equipment` igual; sin breaking changes.
 
-**Backend:**
-- Migración SQLite/Postgres: `ALTER TABLE equipo_fichas ADD COLUMN montura TEXT, ADD COLUMN formato TEXT, ADD COLUMN resolucion TEXT` (idempotente).
-- `FichaUpdate` y endpoints `GET/PUT /equipos/{id}/ficha`: incluir los 3 campos.
-- `GET /equipos`: incluir `ficha` (ya hace falta para la web también).
+Beneficio: cuando agregues fichas técnicas más ricas (pesos, conectores, accesorios sugeridos), un solo lugar para extender el modelo y la web lo refleja.
 
-**Frontend:**
-- `src/lib/admin/api.ts`: tipos `Ficha` con los 3 campos nuevos + `getKit/addKitItem/removeKitItem` + `setCategorias`.
-- `src/components/admin/EquipoFormDialog.tsx`: refactor a Tabs (todo lo de arriba).
-- `src/hooks/useEquipos.ts`: helper `buildPublicName({tipo, marca, modelo, ficha})` y mapearlo a `Equipment.name` para la web. El nombre interno queda accesible como `Equipment.internalName` por si hace falta.
-- `src/routes/admin/equipos.tsx`: **NO** agregar badge "Kit". La columna sigue mostrando el `nombre` interno tal cual.
+## Detalles técnicos
 
-## 5. Aclaraciones / decisiones
+- Backend: cambio puntual en `routes/equipos.py` (filtro `q`). Sin migración.
+- Frontend:
+  - `EnriquecerEquipoDialog.tsx`: 2 checkboxes nuevos, llamada a `setFicha`, bajada de foto al storage previo a `updateEquipo`.
+  - `useEquipos.ts`: extraer helpers (refactor mecánico, sin cambios de comportamiento).
+  - Nuevo `src/lib/equipment/photos.ts` con la helper de subida (usa `supabase.storage.from('equipos-fotos')` y el proxy `/api/admin/proxy-image` para URLs externas).
+- DB: nada nuevo, todo existe.
 
-- El nombre público es **siempre derivado**, no se puede editar a mano. Si querés cambiarlo, cambiás los campos (montura/formato/resolución/categoría). Esto evita tener dos nombres desincronizados.
-- Si en algún caso esto no alcanza (ej: querés algo súper custom como "Kit Cinema FX3 Pro"), podemos agregar después un campo opcional `nombre_publico_override` en `equipo_fichas`. Por ahora arrancamos sin eso.
-- Las mejoras del dialog "Enriquecer con IA" (toast detallado + botones "Aplicar todos / Ninguno" + foto guardada en `equipos/{id}/...` en bucket público) siguen incluidas como quedaron acordadas.
+## Fuera de alcance (avisar)
+
+- Rediseño de la card de equipo en la web para mostrar ficha técnica/specs — lo hacemos después, cuando arranques con las "fichas de cada equipo".
+- Re-clasificación masiva de fotos viejas que ya están guardadas como URL externa (lo dejamos para una migración aparte si querés).

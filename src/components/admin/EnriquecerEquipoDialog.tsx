@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { authedJson } from "@/lib/authedFetch";
+import { uploadExternalUrlToBucket, isBucketUrl } from "@/lib/equipment/photos";
 
 export type EnriquecerResult = {
   marca: string | null;
@@ -57,6 +58,8 @@ export function EnriquecerEquipoDialog({
   const [aplicarModelo, setAplicarModelo] = useState(true);
   const [aplicarFoto, setAplicarFoto] = useState(true);
   const [aplicarBh, setAplicarBh] = useState(true);
+  const [aplicarDescripcion, setAplicarDescripcion] = useState(true);
+  const [aplicarSpecs, setAplicarSpecs] = useState(true);
 
   useEffect(() => {
     if (!open) {
@@ -84,6 +87,8 @@ export function EnriquecerEquipoDialog({
       setAplicarModelo(!equipo.modelo && !!r.modelo);
       setAplicarFoto(!equipo.foto_url && !!r.foto_url);
       setAplicarBh(!equipo.bh_url);
+      setAplicarDescripcion(!!r.descripcion);
+      setAplicarSpecs(r.specs.length > 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error desconocido");
     } finally {
@@ -93,25 +98,66 @@ export function EnriquecerEquipoDialog({
 
   const setAll = (v: boolean) => {
     setAplicarMarca(v); setAplicarModelo(v); setAplicarFoto(v); setAplicarBh(v);
+    setAplicarDescripcion(v); setAplicarSpecs(v);
   };
 
   const aplicar = async () => {
     if (!result) return;
     const patch: Record<string, unknown> = {};
     const aplicados: string[] = [];
+
     if (aplicarMarca && marca) { patch.marca = marca; aplicados.push(`marca: ${marca}`); }
     if (aplicarModelo && modelo) { patch.modelo = modelo; aplicados.push(`modelo: ${modelo}`); }
-    if (aplicarFoto && fotoUrl) { patch.foto_url = fotoUrl; aplicados.push("foto"); }
     if (aplicarBh && bhUrl) { patch.bh_url = bhUrl; aplicados.push("link fuente"); }
 
-    if (Object.keys(patch).length === 0) {
+    // Ficha (descripción + specs) — se persiste aparte
+    const fichaPatch: { descripcion?: string | null; specs_json?: string | null } = {};
+    if (aplicarDescripcion && result.descripcion) {
+      fichaPatch.descripcion = result.descripcion;
+      aplicados.push("descripción");
+    }
+    if (aplicarSpecs && result.specs.length > 0) {
+      fichaPatch.specs_json = JSON.stringify(result.specs);
+      aplicados.push(`${result.specs.length} specs`);
+    }
+
+    const willApplyFoto = aplicarFoto && !!fotoUrl;
+
+    if (
+      Object.keys(patch).length === 0 &&
+      Object.keys(fichaPatch).length === 0 &&
+      !willApplyFoto
+    ) {
       toast.info("No hay cambios para aplicar.");
       return;
     }
 
     setSaving(true);
     try {
-      await adminApi.updateEquipo(equipo.id, patch as Partial<Equipo>);
+      // 1) Foto: si es externa, descargar via proxy y subir al bucket
+      if (willApplyFoto) {
+        try {
+          const finalUrl = isBucketUrl(fotoUrl)
+            ? fotoUrl
+            : await uploadExternalUrlToBucket(equipo.id, fotoUrl);
+          patch.foto_url = finalUrl;
+          aplicados.push(isBucketUrl(fotoUrl) ? "foto" : "foto (subida al storage)");
+        } catch (e) {
+          toast.error(`No se pudo guardar la foto: ${e instanceof Error ? e.message : ""}`);
+          // seguimos con el resto
+        }
+      }
+
+      // 2) Datos básicos del equipo
+      if (Object.keys(patch).length > 0) {
+        await adminApi.updateEquipo(equipo.id, patch as Partial<Equipo>);
+      }
+
+      // 3) Ficha (descripción / specs)
+      if (Object.keys(fichaPatch).length > 0) {
+        await adminApi.setFicha(equipo.id, fichaPatch);
+      }
+
       toast.success("Equipo actualizado ✨", {
         description: aplicados.join(" · "),
         duration: 5000,
@@ -249,18 +295,36 @@ export function EnriquecerEquipoDialog({
 
             {result.descripcion && (
               <div>
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Descripción (informativa, no se guarda aún)
-                </Label>
-                <Textarea value={result.descripcion} readOnly rows={2} className="mt-1 text-sm" />
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Descripción
+                  </Label>
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <Checkbox
+                      checked={aplicarDescripcion}
+                      onCheckedChange={(v) => setAplicarDescripcion(!!v)}
+                    />
+                    Aplicar
+                  </label>
+                </div>
+                <Textarea value={result.descripcion} readOnly rows={3} className="mt-1 text-sm" />
               </div>
             )}
 
             {result.specs.length > 0 && (
               <div>
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Specs encontradas (informativas)
-                </Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Specs ({result.specs.length})
+                  </Label>
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <Checkbox
+                      checked={aplicarSpecs}
+                      onCheckedChange={(v) => setAplicarSpecs(!!v)}
+                    />
+                    Aplicar
+                  </label>
+                </div>
                 <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
                   {result.specs.map((s, i) => (
                     <div key={i} className="rounded border hairline px-2 py-1">
@@ -269,10 +333,6 @@ export function EnriquecerEquipoDialog({
                     </div>
                   ))}
                 </div>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  Tip: la base de equipos todavía no tiene campos para specs/descripción.
-                  Si las querés guardar, copialas como etiquetas o pedíme agregar las columnas.
-                </p>
               </div>
             )}
           </div>

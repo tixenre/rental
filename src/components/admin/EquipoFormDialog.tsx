@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin, type KitComponente } from "@/lib/admin/api";
-import { supabase } from "@/integrations/supabase/client";
+import { uploadFileToBucket } from "@/lib/equipment/photos";
 import { EnriquecerEquipoDialog } from "./EnriquecerEquipoDialog";
 
 const schema = z.object({
@@ -197,20 +197,14 @@ export function EquipoFormDialog({
     }
   });
 
-  // Upload de foto a Supabase Storage
+  // Upload de foto al bucket equipos-fotos (atado al equipo)
   const handleUpload = async (file: File) => {
     if (!file) return;
     setUploading(true);
     try {
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
       const eqId = initial?.id ?? "nuevo";
-      const path = `equipos/${eqId}/foto-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage
-        .from("equipos-fotos")
-        .upload(path, file, { contentType: file.type, upsert: false });
-      if (error) throw error;
-      const { data } = supabase.storage.from("equipos-fotos").getPublicUrl(path);
-      form.setValue("foto_url", data.publicUrl, { shouldDirty: true });
+      const publicUrl = await uploadFileToBucket(eqId, file);
+      form.setValue("foto_url", publicUrl, { shouldDirty: true });
       toast.success("Foto subida");
     } catch (e) {
       toast.error(`Error al subir: ${e instanceof Error ? e.message : ""}`);
