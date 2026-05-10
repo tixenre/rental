@@ -121,8 +121,8 @@ function EquiposPage() {
           <SelectContent>
             <SelectItem value="__all">Todas las etiquetas</SelectItem>
             {etiquetasOpts.map((e) => (
-              <SelectItem key={e.id} value={e.nombre}>
-                {e.nombre} {e.uso_count ? `(${e.uso_count})` : ""}
+              <SelectItem key={e.nombre} value={e.nombre}>
+                {e.nombre} {e.total ? `(${e.total})` : ""}
               </SelectItem>
             ))}
           </SelectContent>
