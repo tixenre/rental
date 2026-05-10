@@ -17,10 +17,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin, type KitComponente } from "@/lib/admin/api";
-import { uploadFileToBucket } from "@/lib/equipment/photos";
+import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
 import { authedJson } from "@/lib/authedFetch";
 import { EnriquecerEquipoDialog, type EnriquecerResult } from "./EnriquecerEquipoDialog";
-import { Link as LinkIcon } from "lucide-react";
+import { Link as LinkIcon, Image as ImageIcon, Check as CheckIcon } from "lucide-react";
 
 const TPL_TOKENS = ["tipo", "marca", "modelo", "nombre", "montura", "formato", "resolucion"] as const;
 
@@ -136,6 +136,56 @@ export function EquipoFormDialog({
   // Ficha extendida importada (se persiste vía aplicarEnriquecimiento al guardar)
   const [importedFichaExt, setImportedFichaExt] = useState<Partial<EnriquecerResult> | null>(null);
   const [importSummary, setImportSummary] = useState<string | null>(null);
+
+  // ── Búsqueda dedicada de fotos ─────────────────────────────────────────
+  const [photoSearching, setPhotoSearching] = useState(false);
+  const [photoCands, setPhotoCands] = useState<string[]>([]);
+  const [pickingPhotoUrl, setPickingPhotoUrl] = useState<string | null>(null);
+
+  const buscarFotos = async () => {
+    setPhotoSearching(true);
+    try {
+      const r = await authedJson<{ foto_candidates: string[] }>(
+        "/api/admin/equipos/buscar-fotos",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: form.getValues("nombre"),
+            marca:  form.getValues("marca") || null,
+            modelo: form.getValues("modelo") || null,
+            exclude: photoCands,
+          }),
+        },
+      );
+      const news = (r.foto_candidates ?? []).filter((u) => !photoCands.includes(u));
+      setPhotoCands((prev) => [...prev, ...news]);
+      if (news.length === 0) {
+        toast.info("No se encontraron más fotos.");
+      } else {
+        toast.success(`${news.length} fotos encontradas`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error buscando fotos");
+    } finally {
+      setPhotoSearching(false);
+    }
+  };
+
+  /** Click en un candidato: subir a R2 y dejar el R2-url en el form. */
+  const elegirFoto = async (externalUrl: string) => {
+    setPickingPhotoUrl(externalUrl);
+    try {
+      const eqId = initial?.id ?? "nuevo";
+      const r2url = await uploadExternalUrlToBucket(eqId, externalUrl);
+      form.setValue("foto_url", r2url, { shouldDirty: true });
+      toast.success("Foto seleccionada y subida");
+    } catch (e) {
+      toast.error(`No se pudo subir: ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setPickingPhotoUrl(null);
+    }
+  };
 
   useEffect(() => {
     const f = fichaQ.data;
@@ -277,6 +327,20 @@ export function EquipoFormDialog({
       .split(",").map((s: string) => s.trim()).filter(Boolean);
     const { etiquetas_csv: _omit, visible_catalogo, ...rest } = values;
     void _omit;
+
+    // Si la foto es externa (no R2), subirla primero para no depender de B&H/Adorama.
+    let fotoUrlFinal = rest.foto_url || null;
+    if (fotoUrlFinal && !isHostedUrl(fotoUrlFinal)) {
+      try {
+        const eqId = initial?.id ?? "nuevo";
+        fotoUrlFinal = await uploadExternalUrlToBucket(eqId, fotoUrlFinal);
+        form.setValue("foto_url", fotoUrlFinal, { shouldDirty: false });
+      } catch (e) {
+        toast.error(`No se pudo guardar la foto en storage: ${e instanceof Error ? e.message : ""}`);
+        // Continuamos con la URL externa como fallback — al menos no perdemos los demás cambios.
+      }
+    }
+
     const payload: EquipoInput = {
       nombre: rest.nombre,
       cantidad: rest.cantidad,
@@ -286,7 +350,7 @@ export function EquipoFormDialog({
       serie: rest.serie || null,
       dueno: rest.dueno || null,
       bh_url: rest.bh_url || null,
-      foto_url: rest.foto_url || null,
+      foto_url: fotoUrlFinal,
       fecha_compra: rest.fecha_compra || null,
       precio_jornada: rest.precio_jornada ?? null,
       precio_usd: rest.precio_usd ?? null,
@@ -494,6 +558,19 @@ export function EquipoFormDialog({
                   <div className="space-y-2">
                     <div className="flex gap-2">
                       <Input {...form.register("foto_url")} className="font-mono text-xs flex-1" placeholder="https://… o subí una" />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={photoSearching || (!form.watch("nombre") && !form.watch("marca"))}
+                        onClick={buscarFotos}
+                      >
+                        {photoSearching ? (
+                          <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Buscando…</>
+                        ) : (
+                          <><ImageIcon className="h-4 w-4 mr-1" />Buscar fotos</>
+                        )}
+                      </Button>
                       <label className="inline-flex">
                         <input
                           type="file" accept="image/*" className="hidden"
@@ -508,6 +585,56 @@ export function EquipoFormDialog({
                         </Button>
                       </label>
                     </div>
+
+                    {/* Candidatos de buscar-fotos */}
+                    {photoCands.length > 0 && (
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                          {photoCands.length} candidatas — click para usar
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {photoCands.map((u) => {
+                            const selected = form.watch("foto_url") === u;
+                            const loading = pickingPhotoUrl === u;
+                            return (
+                              <button
+                                type="button"
+                                key={u}
+                                onClick={() => elegirFoto(u)}
+                                disabled={loading}
+                                title={u}
+                                className={
+                                  "relative h-14 w-14 overflow-hidden rounded border transition " +
+                                  (selected
+                                    ? "border-amber ring-2 ring-amber/40"
+                                    : "border-muted hover:border-ink/30")
+                                }
+                              >
+                                <img
+                                  src={u}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.opacity = "0.2";
+                                  }}
+                                />
+                                {loading && (
+                                  <div className="absolute inset-0 grid place-items-center bg-background/80">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  </div>
+                                )}
+                                {selected && !loading && (
+                                  <span className="absolute right-0.5 top-0.5 rounded-full bg-amber p-0.5">
+                                    <CheckIcon className="h-2.5 w-2.5 text-ink" />
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {form.watch("foto_url") && (
                       <img
                         src={form.watch("foto_url") ?? ""}

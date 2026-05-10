@@ -1699,6 +1699,182 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     }
 
 
+# ── Admin: búsqueda dedicada de fotos (separada del enriquecimiento) ─────────
+#
+# El enriquecedor general usa B&H/Adorama (mejor para specs) pero esos sitios
+# bloquean hotlinking de fotos. Este endpoint busca específicamente en sitios
+# con imágenes confiables (Wikipedia, manufacturer, sitios de review).
+
+class BuscarFotosInput(BaseModel):
+    nombre: Optional[str]      = None
+    marca:  Optional[str]      = None
+    modelo: Optional[str]      = None
+    url:    Optional[str]      = None
+    exclude: Optional[list[str]] = None  # URLs ya conocidas (para "buscar más")
+
+
+@router.post("/admin/equipos/buscar-fotos")
+def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
+    """Busca fotos del equipo en fuentes optimizadas para imágenes (Wikipedia,
+    manufacturer oficial, review sites). Devuelve lista validada de candidatos."""
+    from admin_guard import require_admin
+    require_admin(request)
+
+    import httpx
+    import re
+
+    FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+    if not FIRECRAWL_API_KEY:
+        raise HTTPException(500, "FIRECRAWL_API_KEY no configurado")
+
+    direct_url = (payload.url or "").strip() or None
+    if direct_url and not direct_url.lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "URL inválida")
+
+    query = " ".join(x for x in [payload.marca, payload.nombre, payload.modelo] if x).strip()
+    if not direct_url and not query:
+        raise HTTPException(400, "Falta nombre/marca o url")
+
+    exclude_lc: set[str] = {(u or "").strip().lower() for u in (payload.exclude or [])}
+
+    headers = {
+        "Authorization": f"Bearer {FIRECRAWL_API_KEY}",
+        "Content-Type":  "application/json",
+    }
+
+    # Queries específicos para fotos. Wikipedia primero (sin hotlink-block,
+    # imágenes limpias), después review sites, después manufacturer.
+    PHOTO_QUERIES = [
+        f"{query} (site:en.wikipedia.org OR site:commons.wikimedia.org OR site:es.wikipedia.org)",
+        f"{query} review (site:dpreview.com OR site:photographyblog.com OR site:cinema5d.com OR "
+        f"site:newsshooter.com OR site:fstoppers.com OR site:petapixel.com)",
+        f"{query} (site:canon.com OR site:usa.canon.com OR site:sony.com OR site:nikon.com OR "
+        f"site:fujifilm.com OR site:panasonic.com OR site:blackmagicdesign.com OR site:aputure.com OR "
+        f"site:godox.com OR site:rode.com OR site:sennheiser.com OR site:dji.com OR site:atomos.com OR "
+        f"site:tilta.com OR site:smallrig.com)",
+    ]
+
+    def _fc_search(q: str, client) -> list[str]:
+        try:
+            r = client.post(
+                "https://api.firecrawl.dev/v2/search",
+                headers=headers,
+                json={"query": q, "limit": 3},
+            )
+        except httpx.HTTPError:
+            return []
+        if r.status_code != 200:
+            return []
+        data = r.json().get("data")
+        rows = data if isinstance(data, list) else (data.get("web") if isinstance(data, dict) else None) or []
+        urls = []
+        for row in rows:
+            u = (row.get("url") or "").strip() if isinstance(row, dict) else ""
+            if u.lower().startswith(("http://", "https://")) and not u.lower().endswith(".pdf"):
+                urls.append(u)
+        return urls
+
+    def _extract_images_from_page(url: str, client) -> list[str]:
+        """Scrapea una página y extrae URLs de imagen (meta + markdown img tags)."""
+        try:
+            r = client.post(
+                "https://api.firecrawl.dev/v2/scrape",
+                headers=headers,
+                json={"url": url, "formats": ["markdown"], "onlyMainContent": False},
+            )
+        except httpx.HTTPError:
+            return []
+        if r.status_code != 200:
+            return []
+        sd = r.json().get("data") or {}
+        meta = sd.get("metadata") or {}
+        markdown = sd.get("markdown") or ""
+
+        cands: list[str] = []
+        seen: set[str] = set()
+
+        def push(u: str | None) -> None:
+            if not u or not isinstance(u, str):
+                return
+            u = u.strip()
+            if not u.lower().startswith(("http://", "https://")):
+                return
+            # Filtrar tracking pixels y svgs decorativos
+            if u.lower().endswith(".svg"):
+                return
+            k = u.lower()
+            if k in seen or k in exclude_lc:
+                return
+            seen.add(k)
+            cands.append(u)
+
+        push(meta.get("ogImage") or meta.get("og:image"))
+        push(meta.get("twitterImage") or meta.get("twitter:image"))
+        # ![alt](url) en markdown
+        for m in re.finditer(r"!\[[^\]]*\]\(([^)\s]+)", markdown):
+            push(m.group(1))
+        # <img src="..."> en HTML embebido
+        for m in re.finditer(r'<img[^>]+src=["\']?([^"\'>\s]+)', markdown):
+            push(m.group(1))
+
+        return cands[:10]
+
+    # Validación rápida: HEAD/GET parcial, descarta lo que no sea imagen real
+    def _is_valid_image(url: str, client) -> bool:
+        try:
+            from urllib.parse import urlparse as _up
+            host = (_up(url).hostname or "").lower()
+            hdrs = {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "image/avif,image/webp,image/*,*/*;q=0.8",
+                "Referer": f"https://{host}/" if host else "",
+            }
+            try:
+                rh = client.head(url, headers=hdrs, follow_redirects=True, timeout=8.0)
+                if rh.status_code == 200:
+                    ct = rh.headers.get("content-type", "")
+                    cl = int(rh.headers.get("content-length", "0") or "0")
+                    if ct.startswith("image/") and (cl == 0 or cl > 1024):
+                        return True
+            except httpx.HTTPError:
+                pass
+            # Fallback con Range
+            hdrs["Range"] = "bytes=0-2048"
+            rg = client.get(url, headers=hdrs, follow_redirects=True, timeout=8.0)
+            if rg.status_code in (200, 206):
+                ct = rg.headers.get("content-type", "")
+                if ct.startswith("image/"):
+                    return True
+        except httpx.HTTPError:
+            pass
+        return False
+
+    all_cands: list[str] = []
+    seen_lc: set[str] = set()
+
+    with httpx.Client(timeout=45.0) as client:
+        if direct_url:
+            for u in _extract_images_from_page(direct_url, client):
+                if u.lower() not in seen_lc:
+                    seen_lc.add(u.lower())
+                    all_cands.append(u)
+        else:
+            for q in PHOTO_QUERIES:
+                if len(all_cands) >= 18:
+                    break
+                for top in _fc_search(q, client)[:2]:
+                    for u in _extract_images_from_page(top, client):
+                        if u.lower() not in seen_lc:
+                            seen_lc.add(u.lower())
+                            all_cands.append(u)
+
+        # Validar (paralelo no necesario para 18 imgs)
+        with httpx.Client(timeout=10.0) as vc:
+            validated = [u for u in all_cands[:18] if _is_valid_image(u, vc)][:10]
+
+    return {"foto_candidates": validated, "total_inspeccionadas": len(all_cands)}
+
+
 # ── Admin: aplicar resultado de enriquecimiento en una sola llamada ──────────
 #
 # El frontend manda el preview (parcial o completo) + flags "apply_*" para

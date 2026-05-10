@@ -90,14 +90,53 @@ export function EnriquecerEquipoDialog({
 
   const [keywordInput, setKeywordInput] = useState("");
   const [photoDiag, setPhotoDiag] = useState<DiagStep[] | null>(null);
+  // Candidatos extra obtenidos por la búsqueda dedicada de fotos
+  const [extraCands, setExtraCands] = useState<string[]>([]);
+  const [searchingPhotos, setSearchingPhotos] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setResult(null);
       setError(null);
       setPhotoDiag(null);
+      setExtraCands([]);
     }
   }, [open]);
+
+  const buscarMasFotos = async () => {
+    setSearchingPhotos(true);
+    try {
+      const known = [
+        ...(result?.foto_candidates ?? []),
+        ...(fotoUrl ? [fotoUrl] : []),
+        ...extraCands,
+      ];
+      const r = await authedJson<{ foto_candidates: string[] }>(
+        "/api/admin/equipos/buscar-fotos",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: equipo.nombre,
+            marca:  equipo.marca,
+            modelo: equipo.modelo,
+            exclude: known,
+          }),
+        },
+      );
+      const news = (r.foto_candidates ?? []).filter((u) => !known.includes(u));
+      setExtraCands((prev) => [...prev, ...news]);
+      if (news.length === 0) {
+        toast.info("No se encontraron fotos nuevas.");
+      } else {
+        toast.success(`${news.length} fotos nuevas encontradas`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error buscando fotos");
+    } finally {
+      setSearchingPhotos(false);
+    }
+  };
 
   const addKeyword = () => {
     const v = keywordInput.trim().toLowerCase();
@@ -412,46 +451,72 @@ export function EnriquecerEquipoDialog({
               </div>
             )}
 
-            {(result.foto_candidates?.length ?? 0) > 1 && (
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
-                  Otras opciones detectadas — click para elegir
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {result.foto_candidates!.map((u) => {
-                    const selected = u === fotoUrl;
-                    return (
-                      <button
-                        type="button"
-                        key={u}
-                        onClick={() => setFotoUrl(u)}
-                        title={u}
-                        className={
-                          "relative h-16 w-16 overflow-hidden rounded border transition " +
-                          (selected
-                            ? "border-amber ring-2 ring-amber/40"
-                            : "border-muted hover:border-ink/30")
-                        }
-                      >
-                        <img
-                          src={u}
-                          alt=""
-                          className="h-full w-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.opacity = "0.2";
-                          }}
-                        />
-                        {selected && (
-                          <span className="absolute right-0.5 top-0.5 rounded-full bg-amber p-0.5">
-                            <Check className="h-2.5 w-2.5 text-ink" />
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+            {/* Selector de fotos: candidatos del enriquecedor + extras de buscar-fotos */}
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Otras opciones — click para elegir
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={buscarMasFotos}
+                  disabled={searchingPhotos}
+                >
+                  {searchingPhotos ? (
+                    <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Buscando…</>
+                  ) : (
+                    <><Sparkles className="h-3 w-3 mr-1 text-amber" />Buscar más fotos</>
+                  )}
+                </Button>
               </div>
-            )}
+              <div className="flex flex-wrap gap-1.5">
+                {[...(result.foto_candidates ?? []), ...extraCands].map((u, idx) => {
+                  const isExtra = idx >= (result.foto_candidates?.length ?? 0);
+                  const selected = u === fotoUrl;
+                  return (
+                    <button
+                      type="button"
+                      key={u}
+                      onClick={() => setFotoUrl(u)}
+                      title={u}
+                      className={
+                        "relative h-16 w-16 overflow-hidden rounded border transition " +
+                        (selected
+                          ? "border-amber ring-2 ring-amber/40"
+                          : "border-muted hover:border-ink/30")
+                      }
+                    >
+                      <img
+                        src={u}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.opacity = "0.2";
+                        }}
+                      />
+                      {selected && (
+                        <span className="absolute right-0.5 top-0.5 rounded-full bg-amber p-0.5">
+                          <Check className="h-2.5 w-2.5 text-ink" />
+                        </span>
+                      )}
+                      {isExtra && !selected && (
+                        <span className="absolute left-0.5 top-0.5 rounded-full bg-ink/70 px-1 py-px text-[8px] font-mono text-amber">
+                          EXTRA
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+                {(result.foto_candidates?.length ?? 0) === 0 && extraCands.length === 0 && (
+                  <span className="text-[11px] text-muted-foreground italic py-2">
+                    Sin candidatos. Click "Buscar más fotos" para intentar otros sitios.
+                  </span>
+                )}
+              </div>
+            </div>
 
             {!fotoUrl && result.foto_motivo && (
               <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
