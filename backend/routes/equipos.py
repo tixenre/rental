@@ -1611,7 +1611,7 @@ def admin_proxy_image(url: str, request: Request):
                 else:
                     last_status, last_body = r3.status_code, r3.content
             # 4º intento: proxy público images.weserv.nl (esquiva hotlink-block)
-            if r.status_code in (403, 401, 429):
+            if r.status_code in (401, 403, 404, 429) or r.status_code >= 500:
                 from urllib.parse import quote
                 # weserv requiere la URL sin esquema
                 stripped = url.split("://", 1)[1] if "://" in url else url
