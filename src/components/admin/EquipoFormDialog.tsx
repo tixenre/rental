@@ -20,6 +20,32 @@ import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin, type KitC
 import { uploadFileToBucket } from "@/lib/equipment/photos";
 import { EnriquecerEquipoDialog } from "./EnriquecerEquipoDialog";
 
+const TPL_TOKENS = ["tipo", "marca", "modelo", "nombre", "montura", "formato", "resolucion"] as const;
+
+/** Render preview del template (mismas reglas que useEquipos.renderNameTemplate). */
+function renderTplPreview(tpl: string, vars: Record<string, string>): string {
+  const lower: Record<string, string> = {};
+  for (const k of Object.keys(vars)) lower[k.toLowerCase()] = vars[k] ?? "";
+  const SEP = "[\\s\\-–—,/|·]";
+  let out = tpl.replace(
+    new RegExp(`(${SEP}+)?\\{([a-zA-Z_]+)\\}(${SEP}+)?`, "g"),
+    (_m, before: string | undefined, key: string, after: string | undefined) => {
+      const k = key.toLowerCase();
+      if (!(k in lower)) return _m;
+      const val = lower[k].trim();
+      if (val) return `${before ?? ""}${val}${after ?? ""}`;
+      if (after) return before ?? "";
+      if (before) return "";
+      return "";
+    },
+  );
+  out = out.replace(/\s+/g, " ").trim();
+  out = out.replace(new RegExp(`^${SEP}+|${SEP}+$`, "g"), "").trim();
+  out = out.replace(new RegExp(`(${SEP})\\s*\\1+`, "g"), "$1");
+  if (!out || /^[\s\-–—,/|·]+$/.test(out)) return "";
+  return out;
+}
+
 const schema = z.object({
   nombre: z.string().min(1, "Nombre requerido"),
   marca: z.string().optional().nullable(),
