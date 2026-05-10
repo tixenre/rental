@@ -451,6 +451,87 @@ export function EnriquecerEquipoDialog({
                 </div>
               </div>
             )}
+
+            {/* Keywords editables */}
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Palabras clave ({keywords.length})
+                </Label>
+                <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                  <Checkbox
+                    checked={aplicarKeywords}
+                    onCheckedChange={(v) => setAplicarKeywords(!!v)}
+                  />
+                  Aplicar
+                </label>
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Tags editoriales (ej. <em>bicolor</em>, <em>global shutter</em>). Aparecen como chips en el catálogo.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {keywords.map((k) => (
+                  <span
+                    key={k}
+                    className="inline-flex items-center gap-1 rounded-full bg-amber-soft px-2 py-0.5 text-[11px] font-mono uppercase tracking-wider text-ink/80"
+                  >
+                    {k}
+                    <button
+                      type="button"
+                      onClick={() => removeKeyword(k)}
+                      className="hover:text-destructive"
+                      aria-label={`Quitar ${k}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                {keywords.length === 0 && (
+                  <span className="text-[11px] text-muted-foreground italic">Sin keywords aún.</span>
+                )}
+              </div>
+              <div className="mt-2 flex gap-1.5">
+                <Input
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); addKeyword(); }
+                  }}
+                  placeholder="Agregar palabra clave…"
+                  className="h-8 text-xs"
+                />
+                <Button type="button" size="sm" variant="outline" onClick={addKeyword} className="h-8">
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Diagnóstico de foto */}
+            {photoDiag && (
+              <div className="rounded-md border hairline bg-muted/30 p-3 text-xs">
+                <div className="flex items-center gap-1.5 mb-2 font-mono uppercase tracking-wide text-muted-foreground">
+                  <Bug className="h-3.5 w-3.5" /> Diagnóstico de foto
+                </div>
+                <ul className="space-y-1">
+                  {photoDiag.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="mt-0.5">
+                        {s.status === "ok" && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+                        {s.status === "fail" && <X className="h-3.5 w-3.5 text-destructive" />}
+                        {s.status === "pending" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                        {s.status === "skip" && <span className="block h-3.5 w-3.5 rounded-full border" />}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className={s.status === "fail" ? "text-destructive font-medium" : ""}>{s.label}</div>
+                        {s.detail && (
+                          <div className="text-[10px] text-muted-foreground break-all">{s.detail}</div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
