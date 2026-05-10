@@ -121,12 +121,28 @@ export function NuevoPedidoWizard({
   const total    = Math.round(bruto * (1 - (descuentoPct || 0) / 100));
 
   // Validación por paso
+  const overstockCount = items.filter(
+    (it) => it.cantidad > Math.max(0, it.stock_total - it.reservado),
+  ).length;
+
   const canNext = useMemo(() => {
-    if (stepIdx === 0) return !!cliente || !!clienteAdHoc.nombre.trim();
-    if (stepIdx === 1) return !!fechaDesde && !!fechaHasta && new Date(fechaHasta) >= new Date(fechaDesde);
-    if (stepIdx === 2) return items.length > 0 && items.every((it) => it.cantidad > 0);
+    if (stepIdx === 0) {
+      const adHocOk = clienteAdHoc.nombre.trim().length >= 2;
+      return !!cliente || adHocOk;
+    }
+    if (stepIdx === 1) {
+      if (!fechaDesde || !fechaHasta) return false;
+      const a = new Date(fechaDesde).getTime();
+      const b = new Date(fechaHasta).getTime();
+      return !Number.isNaN(a) && !Number.isNaN(b) && b >= a;
+    }
+    if (stepIdx === 2) {
+      return items.length > 0
+        && items.every((it) => it.cantidad > 0)
+        && overstockCount === 0;
+    }
     return true;
-  }, [stepIdx, cliente, clienteAdHoc, fechaDesde, fechaHasta, items]);
+  }, [stepIdx, cliente, clienteAdHoc, fechaDesde, fechaHasta, items, overstockCount]);
 
   const createMut = useMutation({
     mutationFn: (estado: "borrador" | "presupuesto") => {
