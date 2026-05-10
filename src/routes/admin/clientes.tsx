@@ -20,7 +20,7 @@ import {
 
 import { adminApi, ESTADO_LABEL, type Cliente } from "@/lib/admin/api";
 import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
-import { pedidoEstadoVariant, PedidoDetailSheet } from "@/components/admin/PedidoDetailSheet";
+import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 
 export const Route = createFileRoute("/admin/clientes")({
   component: ClientesPage,
