@@ -20,6 +20,24 @@ from routes.auth import get_session
 router = APIRouter()
 
 
+# ── Constantes de fotos / scraping ───────────────────────────────────────────
+# Antes estaban hardcodeadas como números mágicos en 3 lugares con valores
+# distintos (6, 8, 10, 18). Centralizadas acá con nombres explícitos.
+
+# Cuántos candidatos guarda cada scrape individual (B&H o sitio oficial).
+# Más alto que esto = más data redundante; el merge ya deduplica entre fuentes.
+MAX_PHOTO_CANDIDATES_PER_SCRAPE = 6
+
+# Cuántos candidatos validamos vía HTTP en /enriquecer (B&H + alt mergeados).
+# Validar es lento (HEAD por imagen) → mantener bajo.
+MAX_PHOTO_CANDIDATES_TO_VALIDATE = 8
+
+# /buscar-fotos: cuántos validamos y cuántos devolvemos. Este flow inspecciona
+# más fuentes (Wikipedia, reviews, manufacturer) por eso el límite es mayor.
+MAX_PHOTO_CANDIDATES_BUSCAR_VALIDATE = 18
+MAX_PHOTO_CANDIDATES_BUSCAR_RETURN   = 10
+
+
 # ── Modelos ──────────────────────────────────────────────────────────────────
 
 class EquipoCreate(BaseModel):
@@ -1446,7 +1464,12 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         _push(meta.get("ogImage") or meta.get("og:image"))
         _push(meta.get("twitterImage") or meta.get("twitter:image"))
 
-        return {"extracted": extracted, "foto_candidates": candidates[:6], "meta": meta}
+        return {
+            "extracted": extracted,
+            "foto_candidates": candidates[:MAX_PHOTO_CANDIDATES_PER_SCRAPE],
+            "meta": meta,
+            "source_url": url,   # URL original scrapeada (para trazabilidad)
+        }
 
     with httpx.Client(timeout=45.0) as client:
         if direct_url:
@@ -1511,7 +1534,10 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
             if not extracted.get(k):
                 extracted[k] = sec_ext.get(k)
 
-    if not extracted:
+    # `not {}` es True, pero `not {"a": None}` es False — necesitamos también
+    # rechazar dicts donde todos los valores son falsy/vacíos (caso real:
+    # Firecrawl devuelve el schema con todas las keys pero todas en None).
+    if not extracted or not any(extracted.values()):
         raise HTTPException(422, "No se pudo extraer información estructurada")
 
     # ── Validación de foto: HEAD/GET parcial antes de devolver ──────────────
@@ -1585,7 +1611,7 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     # Validar cada candidato (HEAD/GET); guardar los que pasen + motivo de los que no
     foto_validas: list[str] = []
     foto_invalidas: list[dict] = []
-    for u in all_candidates[:8]:  # límite hard para no validar 50 imágenes
+    for u in all_candidates[:MAX_PHOTO_CANDIDATES_TO_VALIDATE]:
         ok, motivo = _validate_image(u)
         if ok:
             foto_validas.append(u)
@@ -1660,10 +1686,28 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         except ValueError:
             pass
 
+    # Trazabilidad: distinguir de qué tipo de fuente vino la data ayuda a
+    # debuggear "¿por qué este equipo tiene esta info rara?". Antes era
+    # genérico ("firecrawl" para todo lo no-B&H), ahora distinguimos
+    # bh / adorama / amazon / manufacturer / generic.
+    def _fuente_for(scrape: dict | None) -> str | None:
+        if not scrape:
+            return None
+        from urllib.parse import urlparse as _up
+        url = scrape.get("source_url") or (scrape.get("meta") or {}).get("sourceURL") or ""
+        host = (_up(url).hostname or "").lower()
+        if "bhphotovideo.com" in host:
+            return "firecrawl-bh"
+        if "adorama.com" in host:
+            return "firecrawl-adorama"
+        if "amazon." in host:
+            return "firecrawl-amazon"
+        if host:
+            return "firecrawl-manufacturer"
+        return "firecrawl"
+
     fuente_de_enriquecimiento = (
-        "firecrawl-bh" if bh_scrape else
-        "firecrawl-oficial" if alt_scrape else
-        "firecrawl"
+        _fuente_for(bh_scrape) or _fuente_for(alt_scrape) or "firecrawl"
     )
 
     return {
@@ -1870,7 +1914,10 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
 
         # Validar (paralelo no necesario para 18 imgs)
         with httpx.Client(timeout=10.0) as vc:
-            validated = [u for u in all_cands[:18] if _is_valid_image(u, vc)][:10]
+            validated = [
+                u for u in all_cands[:MAX_PHOTO_CANDIDATES_BUSCAR_VALIDATE]
+                if _is_valid_image(u, vc)
+            ][:MAX_PHOTO_CANDIDATES_BUSCAR_RETURN]
 
     return {"foto_candidates": validated, "total_inspeccionadas": len(all_cands)}
 
@@ -1993,115 +2040,6 @@ def admin_aplicar_enriquecimiento(id: int, payload: AplicarEnriquecimientoInput,
         raise
     finally:
         conn.close()
-
-
-# ── Admin: proxy de imágenes (para evitar hotlink-block de B&H/Adorama) ──────
-
-@router.get("/admin/proxy-image")
-def admin_proxy_image(url: str, request: Request):
-    """
-    Descarga una imagen desde una URL externa con un User-Agent normal y la
-    devuelve al cliente. Útil porque B&H/Adorama bloquean hotlinking pero el
-    frontend necesita los bytes para subirlos a Supabase Storage.
-    """
-    from admin_guard import require_admin
-    require_admin(request)
-
-    import httpx
-    from fastapi.responses import Response
-
-    if not url.lower().startswith(("http://", "https://")):
-        raise HTTPException(400, "URL inválida")
-
-    from urllib.parse import urlparse
-    host = (urlparse(url).hostname or "").lower()
-
-    def _headers(referer: str | None) -> dict:
-        h = {
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            ),
-            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Sec-Fetch-Dest": "image",
-            "Sec-Fetch-Mode": "no-cors",
-            "Sec-Fetch-Site": "cross-site",
-            "Cache-Control": "no-cache",
-        }
-        if referer:
-            h["Referer"] = referer
-        return h
-
-    # Referer "creíble" según el host (B&H, Adorama, Amazon, etc.)
-    referer_map = {
-        "bhphotovideo.com": "https://www.bhphotovideo.com/",
-        "www.bhphotovideo.com": "https://www.bhphotovideo.com/",
-        "adorama.com": "https://www.adorama.com/",
-        "www.adorama.com": "https://www.adorama.com/",
-    }
-    primary_referer = next((v for k, v in referer_map.items() if host.endswith(k)), f"https://{host}/")
-
-    last_status = None
-    last_body = b""
-    r = None
-    try:
-        with httpx.Client(timeout=20.0, follow_redirects=True, http2=False) as client:
-            # 1º intento: con Referer del propio dominio
-            r = client.get(url, headers=_headers(primary_referer))
-            last_status, last_body = r.status_code, r.content
-            # 2º intento: sin Referer
-            if r.status_code == 403:
-                r2 = client.get(url, headers=_headers(None))
-                if r2.status_code == 200:
-                    r = r2
-                else:
-                    last_status, last_body = r2.status_code, r2.content
-            # 3º intento: Referer = google
-            if r.status_code == 403:
-                r3 = client.get(url, headers=_headers("https://www.google.com/"))
-                if r3.status_code == 200:
-                    r = r3
-                else:
-                    last_status, last_body = r3.status_code, r3.content
-            # 4º intento: proxy público images.weserv.nl (esquiva hotlink-block)
-            if r.status_code in (401, 403, 404, 429) or r.status_code >= 500:
-                from urllib.parse import quote
-                # weserv requiere la URL sin esquema
-                stripped = url.split("://", 1)[1] if "://" in url else url
-                weserv_url = f"https://images.weserv.nl/?url={quote(stripped, safe='')}"
-                r4 = client.get(weserv_url, headers={
-                    "User-Agent": "Mozilla/5.0",
-                    "Accept": "image/*,*/*;q=0.8",
-                })
-                if r4.status_code == 200 and r4.headers.get("content-type", "").startswith("image/"):
-                    r = r4
-                else:
-                    last_status, last_body = r4.status_code, r4.content
-    except httpx.HTTPError as e:
-        raise HTTPException(502, f"No se pudo descargar la imagen: {e}")
-
-    if r is None or r.status_code != 200:
-        snippet = ""
-        try:
-            snippet = last_body[:200].decode("utf-8", errors="ignore")
-        except Exception:
-            pass
-        raise HTTPException(
-            last_status or 502,
-            f"Origen devolvió {last_status} para host {host}. {snippet}".strip(),
-        )
-
-    ctype = r.headers.get("content-type", "image/jpeg")
-    if not ctype.startswith("image/"):
-        raise HTTPException(415, f"La URL no devolvió una imagen ({ctype})")
-
-    return Response(
-        content=r.content,
-        media_type=ctype,
-        headers={"Cache-Control": "private, max-age=300"},
-    )
 
 
 # ── Admin: descargar imagen externa y subirla a Cloudflare R2 ────────────────
@@ -2360,15 +2298,24 @@ def _r2_config() -> dict:
     return cfg
 
 
-def _upload_to_r2(path: str, content: bytes, content_type: str) -> str:
-    """Sube `content` al bucket R2 vía S3 API (boto3). Devuelve la URL pública."""
+# Cliente boto3 singleton: crearlo cuesta ~50ms (parse config, init session,
+# resolver endpoint) y antes lo creabamos en cada upload. Con singleton, el
+# costo es one-time. Cacheamos la tupla (config, client) y la invalidamos
+# si cambia la config (ej. rotación de credenciales en runtime).
+_r2_client_cache: tuple[tuple, object] | None = None
+
+
+def _get_r2_client(cfg: dict) -> object:
+    """Devuelve un cliente boto3 reutilizable para el bucket R2."""
+    global _r2_client_cache
+    cfg_key = (cfg["account_id"], cfg["access_key_id"], cfg["secret_key"])
+    if _r2_client_cache is not None and _r2_client_cache[0] == cfg_key:
+        return _r2_client_cache[1]
     try:
         import boto3
         from botocore.config import Config as BotoConfig
     except ImportError:
         raise HTTPException(500, "boto3 no instalado en el backend")
-
-    cfg = _r2_config()
     client = boto3.client(
         "s3",
         endpoint_url=f"https://{cfg['account_id']}.r2.cloudflarestorage.com",
@@ -2377,7 +2324,14 @@ def _upload_to_r2(path: str, content: bytes, content_type: str) -> str:
         region_name="auto",
         config=BotoConfig(signature_version="s3v4"),
     )
+    _r2_client_cache = (cfg_key, client)
+    return client
 
+
+def _upload_to_r2(path: str, content: bytes, content_type: str) -> str:
+    """Sube `content` al bucket R2 vía S3 API (boto3). Devuelve la URL pública."""
+    cfg = _r2_config()
+    client = _get_r2_client(cfg)
     try:
         client.put_object(
             Bucket=cfg["bucket"],
