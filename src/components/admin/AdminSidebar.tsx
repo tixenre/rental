@@ -55,7 +55,7 @@ export function AdminSidebar() {
     try {
       const { error } = await signOut();
       if (error) throw error;
-      navigate({ to: "/login" });
+      navigate({ to: "/login", search: { redirect: "/admin" } });
     } catch (e) {
       toast.error("No se pudo cerrar sesión", {
         description: e instanceof Error ? e.message : String(e),
