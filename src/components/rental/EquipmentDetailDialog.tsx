@@ -90,8 +90,44 @@ export function EquipmentDetailDialog({
         </DialogHeader>
 
         <div className="relative aspect-[16/9] overflow-hidden rounded-lg">
-          <EmptyImage category={item.category} brand={item.brand} />
+          {item.fotoUrl ? (
+            <img
+              src={item.fotoUrl}
+              alt={item.name}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <EmptyImage category={item.category} brand={item.brand} />
+          )}
         </div>
+
+        {item.description && (
+          <div className="space-y-2">
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              Descripción
+            </h3>
+            <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">
+              {item.description}
+            </p>
+          </div>
+        )}
+
+        {item.specs && item.specs.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              Especificaciones
+            </h3>
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
+              {item.specs.map((s, i) => (
+                <div key={i} className="flex justify-between gap-3 border-b hairline py-1.5 text-sm">
+                  <dt className="text-muted-foreground">{s.label}</dt>
+                  <dd className="text-right font-medium text-ink tabular">{s.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
 
         <IncludedList item={item} />
 
