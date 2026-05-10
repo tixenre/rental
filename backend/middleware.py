@@ -6,7 +6,7 @@ from fastapi import Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from routes.auth import get_session
 
-PUBLIC_EXACT = {"/", "/login", "/cliente"}
+PUBLIC_EXACT = {"/", "/login", "/cliente", "/health"}
 
 PUBLIC_PREFIXES = (
     "/auth/google",
