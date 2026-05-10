@@ -299,6 +299,10 @@ def init_db():
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS montura   TEXT")
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS formato   TEXT")
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS resolucion TEXT")
+    # Keywords/palabras clave libres por equipo (array JSON de strings).
+    # Distintas de las etiquetas de búsqueda: estas son selling-points editoriales
+    # ("bicolor", "silenciosa", "V-mount", "global shutter") visibles en la ficha.
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS keywords_json TEXT")
 
     # ── Etiquetas (bolsa libre / índice de búsqueda) ─────────────────────
     # Las etiquetas son strings libres: incluyen marca, modelo, palabras del
