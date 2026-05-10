@@ -198,6 +198,18 @@ export function EnriquecerEquipoDialog({
               </div>
             )}
 
+            <div className="flex items-center justify-between gap-2 -mb-1">
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">Campos</span>
+              <div className="flex gap-1">
+                <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAll(true)}>
+                  Aplicar todos
+                </Button>
+                <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAll(false)}>
+                  Ninguno
+                </Button>
+              </div>
+            </div>
+
             <div className="space-y-3">
               <FieldRow
                 label="Marca"
