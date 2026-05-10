@@ -92,6 +92,8 @@ export function EnriquecerEquipoDialog({
       setAplicarBh(!equipo.bh_url);
       setAplicarDescripcion(!!r.descripcion);
       setAplicarSpecs(r.specs.length > 0);
+      setKeywords(r.keywords ?? []);
+      setAplicarKeywords((r.keywords ?? []).length > 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error desconocido");
     } finally {
