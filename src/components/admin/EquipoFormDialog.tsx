@@ -202,6 +202,7 @@ export function EquipoFormDialog({
             montura: montura || null,
             formato: formato || null,
             resolucion: resolucion || null,
+            keywords_json: keywords.length ? JSON.stringify(keywords) : null,
           }),
           adminApi.setCategorias(initial.id, [...selectedCats]),
         ]);
