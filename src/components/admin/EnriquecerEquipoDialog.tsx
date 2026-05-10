@@ -346,15 +346,28 @@ export function EnriquecerEquipoDialog({
 
         {result && (
           <div className="space-y-4">
-            <a
-              href={result.fuente_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-muted-foreground hover:text-ink inline-flex items-center gap-1"
-            >
-              <ExternalLink className="h-3 w-3" />
-              Fuente: {new URL(result.fuente_url).hostname}
-            </a>
+            <div className="flex flex-col gap-1">
+              <a
+                href={result.fuente_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-muted-foreground hover:text-ink inline-flex items-center gap-1"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Datos: {new URL(result.fuente_url).hostname}
+              </a>
+              {result.fuente_foto_url && result.fuente_foto_url !== result.fuente_url && (
+                <a
+                  href={result.fuente_foto_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground hover:text-ink inline-flex items-center gap-1"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Foto: {new URL(result.fuente_foto_url).hostname}
+                </a>
+              )}
+            </div>
 
             {/* Foto preview */}
             {fotoUrl && (
