@@ -1373,3 +1373,48 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         "fuente_url": top_url,
         "fuente_titulo": top_title,
     }
+
+
+# ── Admin: proxy de imágenes (para evitar hotlink-block de B&H/Adorama) ──────
+
+@router.get("/admin/proxy-image")
+def admin_proxy_image(url: str, request: Request):
+    """
+    Descarga una imagen desde una URL externa con un User-Agent normal y la
+    devuelve al cliente. Útil porque B&H/Adorama bloquean hotlinking pero el
+    frontend necesita los bytes para subirlos a Supabase Storage.
+    """
+    from supabase_auth import require_admin
+    require_admin(request)
+
+    import httpx
+    from fastapi.responses import Response
+
+    if not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "URL inválida")
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+        ),
+        "Accept": "image/avif,image/webp,image/png,image/jpeg,image/*,*/*;q=0.8",
+    }
+    try:
+        with httpx.Client(timeout=20.0, follow_redirects=True) as client:
+            r = client.get(url, headers=headers)
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"No se pudo descargar la imagen: {e}")
+
+    if r.status_code != 200:
+        raise HTTPException(r.status_code, f"Origen devolvió {r.status_code}")
+
+    ctype = r.headers.get("content-type", "image/jpeg")
+    if not ctype.startswith("image/"):
+        raise HTTPException(415, f"La URL no devolvió una imagen ({ctype})")
+
+    return Response(
+        content=r.content,
+        media_type=ctype,
+        headers={"Cache-Control": "private, max-age=300"},
+    )
