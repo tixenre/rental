@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Trash2, ExternalLink, Plus } from "lucide-react";
@@ -19,8 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, ESTADO_LABEL, type Pedido, type PedidoEstado } from "@/lib/admin/api";
-import { PedidoDetailSheet, pedidoEstadoVariant } from "@/components/admin/PedidoDetailSheet";
-import { NuevoPedidoWizard } from "@/components/admin/NuevoPedidoWizard";
+import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 
 export const Route = createFileRoute("/admin/pedidos")({
   component: PedidosPage,
@@ -37,11 +36,10 @@ const fmtFecha = (s: string | null) => (s ? s.slice(0, 10) : "—");
 
 function PedidosPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [estado, setEstado] = useState<string>("");
-  const [openId, setOpenId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<Pedido | null>(null);
-  const [openWizard, setOpenWizard] = useState(false);
 
   const pedidosQ = useQuery({
     queryKey: ["admin", "pedidos", { q, estado }],
@@ -62,6 +60,9 @@ function PedidosPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const openPedido = (id: number) =>
+    navigate({ to: "/admin/pedidos/$id", params: { id: String(id) } });
+
   const items = pedidosQ.data?.items ?? [];
   const total = pedidosQ.data?.total ?? 0;
 
@@ -77,7 +78,7 @@ function PedidosPage() {
             {pedidosQ.isLoading ? "Cargando…" : `${total} pedidos`}
           </p>
         </div>
-        <Button onClick={() => setOpenWizard(true)}>
+        <Button onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}>
           <Plus className="h-4 w-4 mr-1" /> Nuevo pedido
         </Button>
       </header>
@@ -136,7 +137,7 @@ function PedidosPage() {
                 <TableRow
                   key={p.id}
                   className="cursor-pointer hover:bg-accent/30"
-                  onClick={() => setOpenId(p.id)}
+                  onClick={() => openPedido(p.id)}
                 >
                   <TableCell className="font-mono text-xs">
                     {p.numero_pedido ?? "—"}
@@ -163,7 +164,7 @@ function PedidosPage() {
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="inline-flex gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => setOpenId(p.id)}>
+                      <Button size="icon" variant="ghost" onClick={() => openPedido(p.id)}>
                         <ExternalLink className="h-4 w-4" />
                       </Button>
                       <Button size="icon" variant="ghost" onClick={() => setDeleting(p)}>
@@ -177,18 +178,6 @@ function PedidosPage() {
           </TableBody>
         </Table>
       </div>
-
-      <PedidoDetailSheet
-        pedidoId={openId}
-        open={!!openId}
-        onOpenChange={(v) => { if (!v) setOpenId(null); }}
-      />
-
-      <NuevoPedidoWizard
-        open={openWizard}
-        onOpenChange={setOpenWizard}
-        onCreated={(id) => setOpenId(id)}
-      />
 
       <AlertDialog open={!!deleting} onOpenChange={(v) => { if (!v) setDeleting(null); }}>
         <AlertDialogContent>
