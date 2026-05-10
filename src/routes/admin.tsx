@@ -49,7 +49,7 @@ function AdminLayout() {
       </div>
     );
   }
-  if (!session) return null;
+  if (!session) return <Outlet />;
 
   return (
     <SidebarProvider>

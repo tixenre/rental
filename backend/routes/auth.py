@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from authlib.integrations.httpx_client import OAuth2Client
 from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 router = APIRouter()
@@ -25,6 +25,8 @@ if not SECRET_KEY:
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 REDIRECT_URI         = os.getenv("REDIRECT_URI", "https://ramblarental.up.railway.app/auth/callback")
+POST_LOGIN_URL       = os.getenv("POST_LOGIN_URL", "/admin")
+FRONTEND_BASE        = os.getenv("FRONTEND_BASE_URL", "")   # e.g. http://localhost:3000 en dev
 MAPS_API_KEY         = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
 ALLOWED_EMAILS: set[str] = {
@@ -86,7 +88,14 @@ def require_session(request: Request) -> dict:
 def _make_session_response(email: str, name: str, redirect: str | None = None):
     token = signer.dumps({"email": email, "name": name})
     if redirect:
-        res = RedirectResponse(redirect, status_code=303)
+        # Use 200 + JS redirect so the browser processes Set-Cookie before navigating.
+        # A 303 redirect through the Vite proxy drops Set-Cookie headers.
+        safe_url = redirect.replace('"', "%22")
+        res = HTMLResponse(
+            f'<!DOCTYPE html><html><head>'
+            f'<script>window.location.replace("{safe_url}")</script>'
+            f'</head><body>Redirigiendo...</body></html>'
+        )
     else:
         res = JSONResponse({"ok": True, "email": email, "name": name})
     res.set_cookie(
@@ -121,7 +130,7 @@ def auth_me(request: Request):
 
 @router.get("/auth/logout")
 def auth_logout():
-    res = RedirectResponse("/admin/login", status_code=303)
+    res = RedirectResponse(f"{FRONTEND_BASE}/admin/login", status_code=303)
     res.delete_cookie("session")
     return res
 
@@ -157,50 +166,52 @@ def auth_callback(request: Request):
 
     error = request.query_params.get("error")
     if error:
-        return RedirectResponse(f"/admin/login?error={error}", status_code=303)
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error={error}", status_code=303)
 
     code  = request.query_params.get("code")
     state = request.query_params.get("state")
 
     if not code:
-        return RedirectResponse("/admin/login?error=no_code", status_code=303)
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=no_code", status_code=303)
 
     # Verificar state anti-CSRF
     saved_state = request.cookies.get("oauth_state")
     if not saved_state or saved_state != state:
         _record_fail(ip)
-        return RedirectResponse("/admin/login?error=state_mismatch", status_code=303)
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=state_mismatch", status_code=303)
 
     # Intercambiar código por token
     client = _oauth_client()
     try:
         token = client.fetch_token(GOOGLE_TOKEN_URL, code=code)
-    except Exception:
+    except Exception as e:
+        print(f"[auth] token_error: {e}")
         _record_fail(ip)
-        return RedirectResponse("/admin/login?error=token_error", status_code=303)
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=token_error", status_code=303)
 
-    # Obtener datos del usuario
+    # Obtener datos del usuario — authlib ya tiene el token guardado tras fetch_token()
     try:
-        resp = client.get(GOOGLE_USERINFO, token=token)
+        resp = client.get(GOOGLE_USERINFO)
         resp.raise_for_status()
         userinfo = resp.json()
-    except Exception:
+    except Exception as e:
+        print(f"[auth] userinfo_error: {e}")
         _record_fail(ip)
-        return RedirectResponse("/admin/login?error=userinfo_error", status_code=303)
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=userinfo_error", status_code=303)
 
     email = userinfo.get("email", "").lower()
     name  = userinfo.get("name", email)
 
     if not email:
         _record_fail(ip)
-        return RedirectResponse("/admin/login?error=no_email", status_code=303)
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=no_email", status_code=303)
 
     # Verificar email autorizado
     if ALLOWED_EMAILS and email not in ALLOWED_EMAILS:
         _record_fail(ip)
-        return RedirectResponse("/admin/login?error=not_allowed", status_code=303)
+        return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=not_allowed", status_code=303)
 
-    res = _make_session_response(email, name, redirect="/admin")
+    res = _make_session_response(email, name, redirect=POST_LOGIN_URL)
     # Limpiar cookie de state
     res.delete_cookie("oauth_state")
     return res
