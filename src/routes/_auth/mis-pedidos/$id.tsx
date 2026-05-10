@@ -131,6 +131,8 @@ function OrderDetailPage() {
           </div>
         </div>
 
+        <DocumentosCard orderId={id} disponibles={documentosDisponibles} />
+
         {/* Cambios / cancelación */}
         {status !== "cancelado" && status !== "devuelto" && (
           <div className="rounded-xl border hairline bg-surface p-4 space-y-3">
