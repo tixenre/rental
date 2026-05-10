@@ -17,7 +17,7 @@ import { ListFilters } from "@/components/rental/ListFilters";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { CategoryIllustration } from "@/components/rental/illustrations/CategoryIllustration";
 import { EquipmentDetailProvider } from "@/lib/equipment-detail-context";
-import { useEquipos, useDisponibilidad } from "@/hooks/useEquipos";
+import { useEquipos, useDisponibilidad, useCategorias } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment, type Category } from "@/data/equipment";
 import { cn } from "@/lib/utils";
