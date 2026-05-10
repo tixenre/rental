@@ -445,7 +445,7 @@ def row_to_dict(row) -> dict:
 # ── Helpers de equipos ─────────────────────────────────────────────────────
 
 def attach_tags(conn, equipos: list[dict]) -> list[dict]:
-    """Agrega etiquetas a la lista de equipos."""
+    """Agrega etiquetas a la lista de equipos (ordenadas por `orden`)."""
     if not equipos:
         return equipos
 
@@ -454,7 +454,7 @@ def attach_tags(conn, equipos: list[dict]) -> list[dict]:
 
     cur = conn.cursor()
     cur.execute(f"""
-        SELECT ee.equipo_id, et.nombre
+        SELECT ee.equipo_id, et.nombre, et.prioridad
         FROM equipo_etiquetas ee
         JOIN etiquetas et ON et.id = ee.etiqueta_id
         WHERE ee.equipo_id IN ({placeholders})
