@@ -97,9 +97,13 @@ def root():
     return _serve_frontend("index.html")
 
 @app.get("/login", include_in_schema=False)
-def login_page():
-    # En el nuevo SPA, /login es una ruta de TanStack Router
-    return _serve_frontend("index.html")
+def login_page(request: Request):
+    """Railway no maneja Google OAuth: reenviamos al frontend Lovable
+    preservando el ?redirect=... para volver a /admin después del login."""
+    from urllib.parse import urlencode
+    qs = urlencode(dict(request.query_params))
+    target = f"{FRONTEND_ORIGIN}/login" + (f"?{qs}" if qs else "")
+    return RedirectResponse(target, status_code=307)
 
 @app.get("/admin", include_in_schema=False)
 def admin():

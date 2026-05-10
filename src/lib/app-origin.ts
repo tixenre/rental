@@ -1,22 +1,18 @@
 /**
- * Origen canónico del frontend Lovable.
+ * Origen canónico del frontend Lovable para autenticación.
  *
- * El flujo de Google OAuth administrado por Lovable sólo funciona desde
- * dominios de Lovable (preview *.lovable.app / *.lovableproject.com o el
- * dominio publicado). Si la app se sirve desde otro host (por ejemplo el
- * backend FastAPI en Railway), el endpoint `/~oauth/initiate` no existe y
- * tira 404. Antes de iniciar OAuth, redirigimos al usuario a este origen.
+ * Google OAuth administrado por Lovable sólo funciona desde dominios Lovable
+ * (preview *.lovable.app / *.lovableproject.com o el dominio publicado).
+ * Railway (backend FastAPI) NO sirve `/~oauth/initiate`, por eso el login
+ * siempre debe iniciar desde este origen.
  *
- * Cuando publiques la app y/o conectes un dominio propio, actualizá esta
- * constante (o agregá VITE_PUBLIC_APP_ORIGIN en .env).
+ * Cuando publiques o conectes un dominio propio, actualizá `CANONICAL_ORIGIN`
+ * o seteá VITE_PUBLIC_APP_ORIGIN.
  */
 
 const ENV_ORIGIN = (import.meta.env.VITE_PUBLIC_APP_ORIGIN as string | undefined)?.replace(/\/$/, "");
 
-// Fallback sólo para casos extremos (SSR sin window y sin env). En el browser
-// preferimos SIEMPRE el origen actual cuando es un host válido para OAuth, así
-// no "secuestramos" al usuario al preview de Lovable.
-const FALLBACK_ORIGIN = "https://id-preview--cd1cc884-084b-435b-8af0-167f25bc78ca.lovable.app";
+const CANONICAL_ORIGIN = "https://id-preview--cd1cc884-084b-435b-8af0-167f25bc78ca.lovable.app";
 
 /** True si el host actual soporta el broker OAuth de Lovable. */
 export function isLovableHost(hostname: string): boolean {
@@ -29,18 +25,17 @@ export function isLovableHost(hostname: string): boolean {
 }
 
 /**
- * Origen a usar para callbacks de OAuth. Prioridad:
- * 1. VITE_PUBLIC_APP_ORIGIN si está definido.
- * 2. window.location.origin si el host actual soporta OAuth de Lovable.
- * 3. FALLBACK_ORIGIN (preview).
+ * Origen a usar para el flujo OAuth. Si ya estamos en un host Lovable válido
+ * usamos el origen actual (preview / publicado / custom domain). Si no, caemos
+ * al canónico para evitar que Railway intente manejar `/~oauth/initiate`.
  */
 export function getAppOrigin(): string {
   if (ENV_ORIGIN) return ENV_ORIGIN;
   if (typeof window !== "undefined" && isLovableHost(window.location.hostname)) {
     return window.location.origin;
   }
-  return FALLBACK_ORIGIN;
+  return CANONICAL_ORIGIN;
 }
 
 /** @deprecated usar getAppOrigin() para respetar el host actual. */
-export const APP_ORIGIN = ENV_ORIGIN || FALLBACK_ORIGIN;
+export const APP_ORIGIN = ENV_ORIGIN || CANONICAL_ORIGIN;
