@@ -68,6 +68,13 @@ def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
 
 
 # ── Cursor wrapper para compatibilidad con sqlite3 ───────────────────────────
+# El proyecto migró de SQLite a PostgreSQL. Para no reescribir cientos de
+# queries, este wrapper traduce los placeholders `?` (sqlite3) a `%s` (psycopg2)
+# y emula `lastrowid` con `SELECT lastval()`. Convención del codebase: usar `?`
+# en TODAS las queries para que la traducción sea consistente.
+# Si en el futuro se quiere migrar a `%s` nativo, hay que hacerlo archivo por
+# archivo con tests, no con un sed global (hay `?` en regex y URLs que no se
+# deben tocar — ver `routes/equipos.py:1817`, `:2073`, `routes/auth.py`).
 
 class PGCursor:
     """Wrapper que permite acceder a resultados por índice O por nombre."""

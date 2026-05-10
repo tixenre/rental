@@ -169,6 +169,24 @@ def migrate():
                 ))
             print(f"  ✓ {len(backup['usuarios'])} usuarios")
 
+        # 7. Sincronizar secuencias con MAX(id) — crítico cuando se inserta con id
+        # explícito, porque Postgres NO avanza el contador de la secuencia automáticamente.
+        # Sin esto, el próximo INSERT sin id explícito choca con un id ya existente.
+        print("→ Sincronizando secuencias…")
+        for table in ("equipos", "clientes", "alquileres", "etiquetas",
+                      "categorias", "usuarios"):
+            try:
+                cur.execute(f"SELECT MAX(id) FROM {table}")
+                max_id = cur.fetchone()[0]
+                if max_id:
+                    cur.execute("SELECT pg_get_serial_sequence(%s, 'id')", (table,))
+                    seq_name = cur.fetchone()[0]
+                    if seq_name:
+                        cur.execute("SELECT setval(%s, %s)", (seq_name, max_id))
+                        print(f"  ✓ {table}: secuencia → {max_id}")
+            except Exception as e:
+                print(f"  ⚠ {table}: {e}")
+
         conn.commit()
         print("\n✅ Migración completada exitosamente!")
         print(f"   Equipos: {len(backup.get('equipos', []))}")
