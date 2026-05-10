@@ -171,6 +171,114 @@ export const adminApi = {
 
   // crear pedido nuevo (wizard)
   createPedido: (data: PedidoCreateInput) => authedPostJson<Pedido>("/api/alquileres", data),
+
+  // clientes — detalle / edición
+  getCliente: (id: number) => authedJson<Cliente>(`/api/clientes/${id}`),
+  getClientePedidos: (id: number) =>
+    authedJson<ClientePedidoRow[]>(`/api/clientes/${id}/pedidos`),
+  updateCliente: (id: number, data: Partial<ClienteInput>) =>
+    authedJson<Cliente>(`/api/clientes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+  deleteCliente: async (id: number) => {
+    const res = await authedFetch(`/api/clientes/${id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+  },
+
+  // calendario
+  getCalendario: (desde: string, hasta: string) => {
+    const sp = new URLSearchParams({ desde, hasta });
+    return authedJson<CalendarioPedido[]>(`/api/calendario?${sp.toString()}`);
+  },
+
+  // estadísticas
+  getEstadisticas: () => authedJson<EstadisticasData>("/api/estadisticas"),
+
+  // settings — imports CSV
+  importCsv: async (
+    kind: "equipos" | "clientes" | "alquileres",
+    file: File,
+  ): Promise<ImportCsvResp> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await authedFetch(`/api/settings/import-${kind}`, {
+      method: "POST",
+      body: fd,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.detail ?? `Import ${kind} → ${res.status}`);
+    return json as ImportCsvResp;
+  },
+  fixApellidos: () =>
+    authedPostJson<{ ok: true; fixed?: number; message?: string }>(
+      "/api/settings/fix-apellidos",
+      {},
+    ),
+  resetClientesDesdeBackup: () =>
+    authedPostJson<{ ok: true; message?: string }>(
+      "/api/settings/reset-clientes-desde-backup",
+      {},
+    ),
+};
+
+export type ClientePedidoRow = {
+  id: number;
+  numero_pedido: number | null;
+  estado: PedidoEstado;
+  fecha_desde: string | null;
+  fecha_hasta: string | null;
+  monto_total: number;
+  monto_pagado: number;
+  descuento_pct: number | null;
+  equipos: string | null;
+};
+
+export type CalendarioPedido = {
+  id: number;
+  numero_pedido: number | null;
+  cliente_nombre: string | null;
+  estado: PedidoEstado;
+  fecha_desde: string;
+  fecha_hasta: string;
+  monto_total: number;
+  equipos: string | null;
+};
+
+export type EstadisticasData = {
+  totales: {
+    total_pedidos: number;
+    total_clientes: number;
+    total_ars: number;
+    desde: string | null;
+    hasta: string | null;
+  };
+  por_mes: { mes: string; pedidos: number; total_ars: number }[];
+  crecimiento: { mes: string; total_ars: number; crecimiento_pct: number }[];
+  top_equipos: { equipo: string; total_ars: number; veces: number }[];
+  top_clientes: { cliente: string; total_ars: number; pedidos: number }[];
+  clientes_recurrentes: { cliente: string; veces_alquiladas: number; total_ars: number }[];
+  mejor_peor_mes: {
+    mejor_mes: string | null; mejor_total: number | null;
+    peor_mes: string | null; peor_total: number | null;
+  };
+  por_dueno: { dueno: string; total_ars: number; items: number }[];
+};
+
+export type ImportCsvResp = {
+  ok?: boolean;
+  success_count?: number;
+  inserted?: number;
+  updated?: number;
+  skipped?: number;
+  errors?: string[];
+  error_details?: string[];
+  message?: string;
+  [k: string]: unknown;
 };
 
 export type Cliente = {
