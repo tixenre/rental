@@ -1,23 +1,21 @@
 ## Objetivo
 
-Que el upload de la foto enriquecida no dependa nunca del estado de sesión del browser. El backend descarga la imagen y la sube a Supabase Storage usando `SUPABASE_SERVICE_ROLE_KEY` (bypassa RLS). El frontend recibe la URL pública final y la guarda en `equipos.foto_url`.
+Que el upload de la foto enriquecida no dependa nunca de configurar `SUPABASE_SERVICE_ROLE_KEY` en Railway. La app usa una ruta interna de Lovable Cloud, donde la credencial segura ya existe, descarga la imagen, la sube al bucket y devuelve la URL pública final para guardar en `equipos.foto_url`.
 
 Esto elimina el error "Sin sesión Supabase (rol anon)" del paso 3 y deja el flujo robusto incluso si el JWT expiró o el admin entró por cookie clásica.
 
 ## Cambios
 
-### 1. Nuevo endpoint backend `POST /api/admin/equipos/{id}/upload-foto-from-url`
+### 1. Nuevo endpoint interno `POST /api/admin/equipos/{id}/upload-foto-from-url`
 
-En `backend/routes/equipos.py`, junto a `admin_enriquecer_equipo`:
+En `src/routes/api/admin/equipos/$equipoId/upload-foto-from-url.ts`:
 
 - Body: `{ "url": "<url externa>" }`.
-- Auth: `Depends(require_admin)` (mismo gate que el resto de `/api/admin/*`).
+- Auth: JWT de Lovable Cloud + email permitido en `ADMIN_EMAILS`.
 - Pasos:
   1. Re-validar la URL con el helper `_validate_image` ya existente (HEAD/GET parcial, content-type `image/*`, > 1KB).
   2. Descargar el blob completo con los headers del proxy (User-Agent, Referer del host) — reutilizar la lógica del proxy actual incluyendo el fallback a `images.weserv.nl` para 401/403/404/429/5xx.
-  3. Subir a Supabase Storage usando un cliente service-role:
-     - `supabase.storage.from_("equipos-fotos").upload(path=f"equipos/{equipo_id}/foto-{ts}.{ext}", file=blob, file_options={"content-type": ct, "upsert": "false"})`.
-     - Cliente: nuevo helper `get_supabase_admin()` en `backend/supabase_auth.py` que crea un client con `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (ya están en env).
+  3. Subir a Storage usando el cliente server-side de Lovable Cloud (`supabaseAdmin`).
   4. Devolver `{ "public_url": "<url pública del bucket>", "path": "<path>" }`.
 - Errores con detalle: `{"detail": "<motivo>"}` y código HTTP apropiado (400 URL inválida, 502 origen falló, 500 storage falló).
 
@@ -41,15 +39,14 @@ Si querés mantener este cambio mínimo, lo dejamos para otra iteración y sólo
 
 ## Lo que NO cambia
 
-- Bucket `equipos-fotos` y sus políticas RLS (siguen igual; el service-role las bypassa por diseño).
+- Bucket `equipos-fotos` y sus políticas RLS.
 - Flujo de autenticación del admin.
 - Endpoint `/api/admin/proxy-image` (sigue existiendo para previews en el dialog).
 - Tabla `equipos` y el campo `foto_url`.
 
 ## Detalles técnicos
 
-- `supabase-py` ya está implícito en el backend (lo necesitamos para el client admin). Si no está en `requirements.txt`, lo agregamos: `supabase==2.x`.
-- El helper `get_supabase_admin()` cachea el cliente a nivel módulo (no se recrea por request).
+- No hace falta copiar ninguna key ni agregar variables en Railway para este flujo.
 - Path en el bucket: `equipos/{equipoId}/foto-{timestamp}.{ext}` — mismo formato que hoy, así no rompe nada en el frontend.
 - Extensión derivada del `content-type` (jpg/png/webp/avif), igual que en `photos.ts`.
 
