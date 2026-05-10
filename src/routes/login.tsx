@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
-import { APP_ORIGIN, isLovableHost } from "@/lib/app-origin";
+import { getAppOrigin, isLovableHost } from "@/lib/app-origin";
 import { ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
@@ -57,13 +57,16 @@ function LoginPage() {
 
       // El broker OAuth de Lovable (/~oauth/initiate) sólo existe en hosts
       // Lovable. Si estamos en otro origen (p. ej. ramblarental.up.railway.app),
-      // redirigimos al login del frontend Lovable antes de iniciar OAuth.
+      // redirigimos al frontend Lovable antes de iniciar OAuth.
       if (!isLovableHost(window.location.hostname)) {
-        window.location.href = `${APP_ORIGIN}/login?redirect=${encodeURIComponent(redirectPath)}`;
+        const target = `${getAppOrigin()}/login?redirect=${encodeURIComponent(redirectPath)}`;
+        window.location.href = target;
         return;
       }
 
-      const callbackUrl = `${APP_ORIGIN}/login?redirect=${encodeURIComponent(redirectPath)}`;
+      // En host Lovable: usar el origen actual para que el callback vuelva
+      // exactamente acá (preview O dominio publicado), sin saltar entre hosts.
+      const callbackUrl = `${window.location.origin}/login?redirect=${encodeURIComponent(redirectPath)}`;
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: callbackUrl,
       });
