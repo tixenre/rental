@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin, type KitComponente } from "@/lib/admin/api";
 import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
 import { authedJson } from "@/lib/authedFetch";
+import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
 import { EnriquecerEquipoDialog, type EnriquecerResult } from "./EnriquecerEquipoDialog";
 import { Link as LinkIcon, Image as ImageIcon, Check as CheckIcon } from "lucide-react";
 
@@ -89,6 +90,15 @@ export function EquipoFormDialog({
   const [uploading, setUploading] = useState(false);
   const [tab, setTab] = useState("basicos");
 
+  // Settings globales: tipo de cambio + ROI default. Se usan para
+  // calcular precio_jornada de forma reactiva.
+  const { rate: usdRate, isLoading: usdLoading } = useUsdRate();
+  const roiDefault = useRoiPctDefault();
+
+  // Si el usuario edita precio_jornada manualmente, no queremos seguir
+  // sobreescribiéndolo con el cálculo automático. Track de "manual override".
+  const [precioJornadaManual, setPrecioJornadaManual] = useState(false);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as never,
     defaultValues: {
@@ -98,7 +108,8 @@ export function EquipoFormDialog({
       cantidad: initial?.cantidad ?? 1,
       precio_jornada: initial?.precio_jornada ?? undefined,
       precio_usd: initial?.precio_usd ?? undefined,
-      roi_pct: initial?.roi_pct ?? undefined,
+      // Default ROI desde settings (3% por convención de Rambla).
+      roi_pct: initial?.roi_pct ?? (initial ? undefined : roiDefault),
       valor_reposicion: initial?.valor_reposicion ?? undefined,
       fecha_compra: initial?.fecha_compra ?? "",
       serie: initial?.serie ?? "",
@@ -110,6 +121,23 @@ export function EquipoFormDialog({
       etiquetas_csv: initial?.etiquetas?.join(", ") ?? "",
     },
   });
+
+  // Recalcular precio_jornada cuando cambia precio_usd, roi_pct o usd_rate.
+  // Sólo si el usuario NO lo overrideó manualmente. Esto le permite editar
+  // un precio fijo (ej. equipos especiales) sin que se le pise.
+  const watchedUsd = form.watch("precio_usd");
+  const watchedRoi = form.watch("roi_pct");
+  useEffect(() => {
+    if (precioJornadaManual) return;
+    const calculado = calcularPrecioJornada(
+      watchedUsd ? Number(watchedUsd) : null,
+      usdRate,
+      watchedRoi ? Number(watchedRoi) : null,
+    );
+    if (calculado !== null) {
+      form.setValue("precio_jornada", calculado, { shouldDirty: true });
+    }
+  }, [watchedUsd, watchedRoi, usdRate, precioJornadaManual, form]);
 
   // Ficha técnica (sólo en edición)
   const fichaQ = useQuery({
@@ -656,13 +684,48 @@ export function EquipoFormDialog({
 
                 <div className="grid grid-cols-3 gap-3">
                   <Field label="Stock"><Input type="number" min={0} {...form.register("cantidad")} /></Field>
-                  <Field label="Precio/día (ARS)"><Input type="number" min={0} {...form.register("precio_jornada")} /></Field>
                   <Field label="Valor (USD)"><Input type="number" min={0} step="0.01" {...form.register("precio_usd")} /></Field>
+                  <Field label="ROI %"><Input type="number" min={0} step="0.01" {...form.register("roi_pct")} /></Field>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
-                  <Field label="ROI %"><Input type="number" min={0} step="0.01" {...form.register("roi_pct")} /></Field>
-                  <Field label="Valor reposición (USD)"><Input type="number" min={0} step="0.01" {...form.register("valor_reposicion")} /></Field>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Precio/día (ARS)
+                      </Label>
+                      {precioJornadaManual ? (
+                        <button
+                          type="button"
+                          onClick={() => setPrecioJornadaManual(false)}
+                          className="text-[10px] text-amber hover:underline"
+                          title="Volver al cálculo automático"
+                        >
+                          ↺ auto
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">auto</span>
+                      )}
+                    </div>
+                    <Input
+                      type="number" min={0}
+                      {...form.register("precio_jornada", {
+                        // Si el usuario tipea, lo marcamos como manual para
+                        // que el efecto reactivo deje de pisarlo.
+                        onChange: () => {
+                          if (!precioJornadaManual) setPrecioJornadaManual(true);
+                        },
+                      })}
+                    />
+                    {!precioJornadaManual && form.watch("precio_usd") && form.watch("roi_pct") && (
+                      <p className="text-[10px] text-muted-foreground font-mono">
+                        = {Number(form.watch("precio_usd")).toFixed(2)} × {usdLoading ? "…" : usdRate} × {Number(form.watch("roi_pct"))}%
+                      </p>
+                    )}
+                  </div>
+                  <Field label="Valor reposición (USD)">
+                    <Input type="number" min={0} step="0.01" {...form.register("valor_reposicion")} />
+                  </Field>
                   <Field label="Fecha de compra"><Input type="date" {...form.register("fecha_compra")} /></Field>
                 </div>
 

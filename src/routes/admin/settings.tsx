@@ -69,6 +69,8 @@ function SettingsPage() {
         </p>
       </header>
 
+      <CambioYPreciosSection />
+
       <CategoriasSection />
       <EtiquetasSection />
       <ClasificacionSection />
@@ -709,5 +711,178 @@ function ClasificacionSection() {
         </div>
       )}
     </section>
+  );
+}
+
+
+// ── Cambio (USD/ARS) y recálculo masivo de precios ─────────────────────────
+
+function CambioYPreciosSection() {
+  const qc = useQueryClient();
+  const [valor, setValor] = useState("");
+  const [confirmRecalc, setConfirmRecalc] = useState<{
+    only_missing: boolean;
+    preview: { total_cambios: number; total_evaluados: number };
+  } | null>(null);
+
+  const settingQ = useQuery({
+    queryKey: ["settings", "usd_rate"],
+    queryFn: () => adminApi.getSetting("usd_rate"),
+    staleTime: 60_000,
+  });
+
+  // Cargar el valor actual cuando llega de la red.
+  useEffect(() => {
+    if (settingQ.data && !valor) setValor(settingQ.data.value);
+  }, [settingQ.data, valor]);
+
+  const updateMut = useMutation({
+    mutationFn: (v: string) => adminApi.updateSetting("usd_rate", v),
+    onSuccess: () => {
+      toast.success("Tipo de cambio actualizado");
+      qc.invalidateQueries({ queryKey: ["settings"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const dryRunMut = useMutation({
+    mutationFn: (only_missing: boolean) =>
+      adminApi.recalcularPreciosDryRun(only_missing).then((r) => ({ ...r, only_missing })),
+    onSuccess: (r) => {
+      if (r.total_cambios === 0) {
+        toast.info("Nada para recalcular — todos los precios ya están en sincro.");
+        return;
+      }
+      setConfirmRecalc({
+        only_missing: r.only_missing,
+        preview: { total_cambios: r.total_cambios, total_evaluados: r.total_evaluados },
+      });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const applyMut = useMutation({
+    mutationFn: (only_missing: boolean) => adminApi.recalcularPreciosApply(only_missing),
+    onSuccess: (r) => {
+      toast.success(`${r.total_cambios} precios actualizados`);
+      qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
+      qc.invalidateQueries({ queryKey: ["equipos"] });
+      setConfirmRecalc(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const dirty = valor.trim() !== (settingQ.data?.value ?? "");
+  const fmtFecha = (s: string | null) => {
+    if (!s) return "—";
+    try {
+      return new Date(s).toLocaleString("es-AR", {
+        dateStyle: "medium", timeStyle: "short",
+      });
+    } catch {
+      return s;
+    }
+  };
+
+  return (
+    <>
+      <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+        <header>
+          <h2 className="font-display text-lg text-ink">Tipo de cambio &amp; precios</h2>
+          <p className="text-sm text-muted-foreground">
+            Cotización del dólar usada para calcular el precio de jornada en pesos.
+            Actualizalo a fin de mes y después aplicá el recálculo masivo.
+          </p>
+        </header>
+
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3 border-t hairline pt-3">
+          <div className="flex-1">
+            <label className="text-xs uppercase tracking-wide text-muted-foreground">
+              ARS por 1 USD
+            </label>
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              placeholder="1200"
+              className="mt-1"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Última actualización: {fmtFecha(settingQ.data?.updated_at ?? null)}
+              {settingQ.data?.updated_by && ` · ${settingQ.data.updated_by}`}
+            </p>
+          </div>
+          <Button
+            onClick={() => updateMut.mutate(valor)}
+            disabled={!dirty || updateMut.isPending || !valor.trim()}
+          >
+            {updateMut.isPending ? "Guardando…" : "Guardar"}
+          </Button>
+        </div>
+
+        <div className="border-t hairline pt-3 space-y-2">
+          <div>
+            <div className="text-ink font-medium">Recalcular precios de equipos</div>
+            <p className="text-xs text-muted-foreground">
+              Aplica la fórmula{" "}
+              <code className="font-mono text-[11px] bg-muted/50 px-1 py-0.5 rounded">
+                precio_jornada = precio_usd × usd_rate × (roi_pct / 100)
+              </code>{" "}
+              a los equipos con USD y ROI definidos.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline" size="sm"
+              onClick={() => dryRunMut.mutate(false)}
+              disabled={dryRunMut.isPending}
+            >
+              {dryRunMut.isPending ? (
+                <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Calculando…</>
+              ) : (
+                "Recalcular todos"
+              )}
+            </Button>
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => dryRunMut.mutate(true)}
+              disabled={dryRunMut.isPending}
+              title="No pisa precios manuales — solo equipos sin precio_jornada"
+            >
+              Sólo equipos sin precio
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <AlertDialog open={!!confirmRecalc} onOpenChange={(v) => { if (!v) setConfirmRecalc(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              ¿Aplicar recálculo a {confirmRecalc?.preview.total_cambios} equipos?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              De {confirmRecalc?.preview.total_evaluados} equipos evaluados,
+              {" "}{confirmRecalc?.preview.total_cambios} cambiarían su precio en pesos.
+              {confirmRecalc?.only_missing
+                ? " Sólo se actualizarán los que no tienen precio cargado."
+                : " Se sobrescriben todos los precios existentes."}
+              {" "}Esta acción no se puede deshacer automáticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmRecalc && applyMut.mutate(confirmRecalc.only_missing)}
+              disabled={applyMut.isPending}
+            >
+              {applyMut.isPending ? "Aplicando…" : "Sí, aplicar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
