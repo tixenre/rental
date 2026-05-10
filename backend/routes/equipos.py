@@ -541,15 +541,30 @@ def set_categorias(id: int, data: CategoriasUpdate):
 # ── Etiquetas / Categorías ───────────────────────────────────────────────────
 
 @router.get("/etiquetas")
-def list_etiquetas():
+def list_etiquetas(incluir_auto: int = Query(0)):
+    """
+    Lista etiquetas. Por defecto devuelve solo las que tienen al menos un uso
+    MANUAL (las auto inflan demasiado). `incluir_auto=1` devuelve todo.
+    """
     conn = get_db()
     try:
-        rows = conn.execute("""
-            SELECT et.nombre, COUNT(ee.equipo_id) as total
-            FROM etiquetas et
-            LEFT JOIN equipo_etiquetas ee ON ee.etiqueta_id = et.id
-            GROUP BY et.id ORDER BY et.nombre
-        """).fetchall()
+        if incluir_auto:
+            rows = conn.execute("""
+                SELECT et.nombre, COUNT(ee.equipo_id) AS total
+                FROM etiquetas et
+                LEFT JOIN equipo_etiquetas ee ON ee.etiqueta_id = et.id
+                GROUP BY et.id, et.nombre
+                ORDER BY LOWER(et.nombre)
+            """).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT et.nombre, COUNT(ee.equipo_id) AS total
+                FROM etiquetas et
+                JOIN equipo_etiquetas ee ON ee.etiqueta_id = et.id
+                WHERE ee.origen = 'manual'
+                GROUP BY et.id, et.nombre
+                ORDER BY LOWER(et.nombre)
+            """).fetchall()
         return [{"nombre": r["nombre"], "total": r["total"]} for r in rows]
     finally:
         conn.close()
