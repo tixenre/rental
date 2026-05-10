@@ -194,6 +194,7 @@ def list_equipos(
         equipos = attach_tags(conn, equipos)
         equipos = attach_kit(conn, equipos)
         equipos = attach_categorias(conn, equipos)
+        equipos = attach_ficha(conn, equipos)
         return {"total": total, "page": page, "per_page": per_page, "items": equipos}
     finally:
         conn.close()
