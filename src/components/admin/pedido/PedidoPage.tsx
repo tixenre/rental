@@ -543,7 +543,7 @@ function EquipoSearchSheet({
 // Tab: Info
 // ─────────────────────────────────────────────────────────────────────────
 
-import type { DraftDatos } from "./usePedidoDraft";
+
 
 function InfoTab({
   datos, setDatos,
