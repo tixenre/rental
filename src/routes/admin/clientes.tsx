@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Plus, Search, Pencil, Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,7 +20,7 @@ import {
 
 import { adminApi, ESTADO_LABEL, type Cliente } from "@/lib/admin/api";
 import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
-import { pedidoEstadoVariant, PedidoDetailSheet } from "@/components/admin/PedidoDetailSheet";
+import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 
 export const Route = createFileRoute("/admin/clientes")({
   component: ClientesPage,
@@ -196,7 +196,7 @@ function ClienteHistorialSheet({
   onOpenChange: (v: boolean) => void;
   onEdit: (c: Cliente) => void;
 }) {
-  const [openPedidoId, setOpenPedidoId] = useState<number | null>(null);
+  const navigate = useNavigate();
   const pedidosQ = useQuery({
     queryKey: ["admin", "cliente-pedidos", cliente?.id],
     queryFn: () => adminApi.getClientePedidos(cliente!.id),
@@ -253,7 +253,7 @@ function ClienteHistorialSheet({
                   {pedidos.map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => setOpenPedidoId(p.id)}
+                      onClick={() => navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })}
                       className="w-full text-left rounded-md border hairline p-3 hover:bg-accent/30 transition-colors"
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -286,12 +286,6 @@ function ClienteHistorialSheet({
           )}
         </SheetContent>
       </Sheet>
-
-      <PedidoDetailSheet
-        pedidoId={openPedidoId}
-        open={!!openPedidoId}
-        onOpenChange={(v) => { if (!v) setOpenPedidoId(null); }}
-      />
     </>
   );
 }

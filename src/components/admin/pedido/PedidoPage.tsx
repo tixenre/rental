@@ -44,7 +44,7 @@ import {
   adminApi, ESTADO_LABEL, pedidoPdfUrl,
   type PedidoEstado, type Equipo, type Cliente,
 } from "@/lib/admin/api";
-import { pedidoEstadoVariant } from "@/components/admin/PedidoDetailSheet";
+import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 import {
   usePedidoDraft, jornadasEntre,
   type DraftItem, type DraftDatos, type SaveStatus,

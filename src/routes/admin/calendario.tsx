@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 import { adminApi, ESTADO_LABEL, type CalendarioPedido } from "@/lib/admin/api";
-import { pedidoEstadoVariant, PedidoDetailSheet } from "@/components/admin/PedidoDetailSheet";
+import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 
 export const Route = createFileRoute("/admin/calendario")({
   component: CalendarioPage,
@@ -28,8 +28,8 @@ const ymd = (d: Date) => {
 
 function CalendarioPage() {
   const today = new Date();
+  const navigate = useNavigate();
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [openId, setOpenId] = useState<number | null>(null);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -132,7 +132,7 @@ function CalendarioPage() {
                   {pedidos.slice(0, 3).map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => setOpenId(p.id)}
+                      onClick={() => navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })}
                       className="block w-full text-left rounded-sm bg-accent/40 hover:bg-accent/70 px-1 py-0.5 text-[10px] leading-tight"
                       title={`#${p.numero_pedido ?? p.id} · ${p.cliente_nombre ?? ""} · ${p.equipos ?? ""}`}
                     >
@@ -160,11 +160,6 @@ function CalendarioPage() {
         ))}
       </div>
 
-      <PedidoDetailSheet
-        pedidoId={openId}
-        open={!!openId}
-        onOpenChange={(v) => { if (!v) setOpenId(null); }}
-      />
     </div>
   );
 }
