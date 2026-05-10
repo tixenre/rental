@@ -130,6 +130,18 @@ export const adminApi = {
     }),
   listEtiquetas: () => authedJson<Etiqueta[]>("/api/etiquetas"),
 
+  // categorías + admin
+  listCategorias: () => authedJson<Categoria[]>("/api/categorias"),
+  adminListEtiquetas: () => authedJson<EtiquetaAdmin[]>("/api/admin/etiquetas"),
+  adminUpdateEtiqueta: (id: number, patch: { nombre?: string; prioridad?: number }) =>
+    authedJson<{ ok: true }>(`/api/admin/etiquetas/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  adminReorderEtiquetas: (ids: number[]) =>
+    authedPostJson<{ ok: true; count: number }>("/api/admin/etiquetas/reorder", { ids }),
+
   // pedidos / alquileres
   listPedidos: (params: { estado?: string; q?: string; per_page?: number; page?: number } = {}) => {
     const sp = new URLSearchParams();
