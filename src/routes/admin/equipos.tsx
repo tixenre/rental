@@ -197,10 +197,8 @@ function EquiposPage() {
                   {[eq.marca, eq.modelo].filter(Boolean).join(" / ") || "—"}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{eq.cantidad}</TableCell>
-                <TableCell className="text-right tabular-nums hidden sm:table-cell">
-                  {eq.precio_jornada
-                    ? `$${Math.round(eq.precio_jornada).toLocaleString("es-AR", { maximumFractionDigits: 0 })}`
-                    : "—"}
+                <TableCell className="text-right hidden sm:table-cell w-32">
+                  <PrecioJornadaInline equipo={eq} onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })} />
                 </TableCell>
                 <TableCell className="text-right hidden sm:table-cell w-24">
                   <RoiInline equipo={eq} onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })} />
@@ -381,5 +379,104 @@ function RoiInline({
       disabled={saveMut.isPending}
       className="h-7 w-16 ml-auto text-right text-xs tabular-nums px-2 py-0"
     />
+  );
+}
+
+
+/**
+ * Editor inline del precio de jornada en pesos. Espejo de RoiInline:
+ *  - Editás precio → calcula nuevo ROI = precio / (precio_usd × usd_rate) × 100
+ *  - PATCHea ambos campos atómicamente
+ *  - Optimistic UI con rollback si falla
+ *
+ * No fuerza redondeo a múltiplos de 100 al tipear (es input MANUAL — el
+ * admin manda). El redondeo a 100 solo aplica al cálculo automático
+ * desde ROI o al recálculo masivo desde Settings.
+ *
+ * Si el equipo no tiene `precio_usd`, el ROI no se puede calcular: se
+ * guarda solo el precio.
+ */
+function PrecioJornadaInline({
+  equipo,
+  onSaved,
+}: {
+  equipo: Equipo;
+  onSaved: () => void;
+}) {
+  const { rate: usdRate } = useUsdRate();
+  const [value, setValue] = useState<string>(
+    equipo.precio_jornada != null ? String(equipo.precio_jornada) : "",
+  );
+  const initialRef = useRef(equipo.precio_jornada);
+
+  useEffect(() => {
+    setValue(equipo.precio_jornada != null ? String(equipo.precio_jornada) : "");
+    initialRef.current = equipo.precio_jornada;
+  }, [equipo.id, equipo.precio_jornada]);
+
+  const saveMut = useMutation({
+    mutationFn: async (newPrecio: number | null) => {
+      const patch: Partial<EquipoInput> = { precio_jornada: newPrecio };
+      // Si tenemos USD y el nuevo precio no es null, derivamos el ROI
+      // implícito y lo persistimos también para que la fórmula quede
+      // coherente. Si el equipo no tiene USD, no podemos calcular ROI.
+      if (newPrecio !== null && equipo.precio_usd && usdRate > 0) {
+        const newRoi = (newPrecio / (equipo.precio_usd * usdRate)) * 100;
+        // Redondear a 2 decimales para evitar 3.0399999999...
+        patch.roi_pct = Math.round(newRoi * 100) / 100;
+      }
+      return adminApi.updateEquipo(equipo.id, patch);
+    },
+    onSuccess: () => {
+      onSaved();
+    },
+    onError: (e: Error) => {
+      toast.error(`No se pudo actualizar precio: ${e.message}`);
+      setValue(initialRef.current != null ? String(initialRef.current) : "");
+    },
+  });
+
+  const commit = () => {
+    const trimmed = value.trim();
+    if (trimmed === "") {
+      // Vacío → null (saca el precio). Permitido pero no toca ROI.
+      if (initialRef.current != null) saveMut.mutate(null);
+      return;
+    }
+    const num = Number(trimmed);
+    if (!Number.isFinite(num) || num < 0) {
+      toast.error("Precio debe ser un número >= 0");
+      setValue(initialRef.current != null ? String(initialRef.current) : "");
+      return;
+    }
+    if (num === initialRef.current) return;
+    saveMut.mutate(num);
+  };
+
+  return (
+    <div className="relative ml-auto w-28">
+      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">
+        $
+      </span>
+      <Input
+        type="number"
+        min={0}
+        step="100"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            (e.target as HTMLInputElement).blur();
+          } else if (e.key === "Escape") {
+            setValue(initialRef.current != null ? String(initialRef.current) : "");
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        placeholder="—"
+        disabled={saveMut.isPending}
+        className="h-7 text-right text-xs tabular-nums pl-5 pr-2 py-0"
+      />
+    </div>
   );
 }
