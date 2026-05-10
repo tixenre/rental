@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Upload, Plus, Trash2, Sparkles } from "lucide-react";
+import { Loader2, Upload, Plus, Trash2, Sparkles, ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
