@@ -1,6 +1,7 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
+import { useQuery } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/cliente/login")({
   head: () => ({
@@ -25,6 +26,14 @@ function ClienteLoginPage() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
+  const { data: logoSetting } = useQuery({
+    queryKey: ["settings", "logo_url"],
+    queryFn: () =>
+      fetch("/api/settings/logo_url").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    staleTime: 5 * 60 * 1000,
+  });
+  const logoUrl: string | null = logoSetting?.value ?? null;
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const errCode = params.get("error");
@@ -36,7 +45,25 @@ function ClienteLoginPage() {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-background grid place-items-center px-4 py-12">
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header con branding */}
+      <header className="border-b hairline px-6 py-4 flex items-center">
+        <Link to="/" className="flex items-center gap-2">
+          {logoUrl ? (
+            <img src={logoUrl} alt="Rambla Rental" className="h-9 w-auto object-contain" />
+          ) : (
+            <>
+              <span className="wordmark text-2xl text-amber leading-none">rambla</span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
+                Rental
+              </span>
+            </>
+          )}
+        </Link>
+      </header>
+
+      {/* Card de login */}
+      <div className="flex-1 grid place-items-center px-4 py-12">
       <div className="w-full max-w-sm rounded-2xl border hairline bg-surface p-8 shadow-sm space-y-6">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
@@ -61,6 +88,7 @@ function ClienteLoginPage() {
           <GoogleIcon />
           Entrar con Google
         </button>
+      </div>
       </div>
     </div>
   );

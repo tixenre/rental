@@ -7,6 +7,20 @@ import { Calendar as CalendarIcon, ShoppingBag, User } from "lucide-react";
 import { RentalDateModal } from "./RentalDateModal";
 import { useQuery } from "@tanstack/react-query";
 
+function LogoContent({ logoUrl }: { logoUrl: string | null }) {
+  if (logoUrl) {
+    return <img src={logoUrl} alt="Rambla Rental" className="h-10 sm:h-11 w-auto object-contain" />;
+  }
+  return (
+    <>
+      <span className="wordmark text-2xl sm:text-3xl text-amber leading-none">rambla</span>
+      <span className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
+        Rental
+      </span>
+    </>
+  );
+}
+
 export function TopBar() {
   const {
     startDate,
@@ -34,27 +48,30 @@ export function TopBar() {
     <>
       <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
       <header className="sticky top-0 z-40 border-b hairline bg-background/95 backdrop-blur-md md:bg-background/85 md:backdrop-blur-xl">
-        <div className="flex items-center justify-between gap-2 px-4 py-3 md:grid md:grid-cols-[auto_1fr_auto] md:gap-4 md:px-6">
+        <div className="px-4 py-3 md:px-6 md:grid md:grid-cols-[auto_1fr_auto] md:gap-4 md:items-center">
 
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 shrink-0">
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt="Rambla Rental"
-                className="h-10 sm:h-11 w-auto object-contain"
-              />
-            ) : (
-              <>
-                <span className="wordmark text-2xl sm:text-3xl text-amber leading-none">rambla</span>
-                <span className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
-                  Rental
-                </span>
-              </>
-            )}
+          {/* Mobile: logo centrado con ícono de usuario a la derecha */}
+          <div className="flex items-center md:hidden">
+            {/* Espaciador izquierdo igual al ancho del ícono derecho */}
+            <div className="w-8" />
+            <Link to="/" className="flex-1 flex justify-center">
+              <LogoContent logoUrl={logoUrl} />
+            </Link>
+            <Link
+              to="/cliente"
+              className="flex items-center justify-center w-8 h-8 rounded-full border hairline hover:border-foreground/40"
+              aria-label="Ingresar"
+            >
+              <User className="h-4 w-4" />
+            </Link>
+          </div>
+
+          {/* Desktop: logo izquierda */}
+          <Link to="/" className="hidden md:flex items-center gap-2 shrink-0">
+            <LogoContent logoUrl={logoUrl} />
           </Link>
 
-          {/* Pill de fechas — centrado en desktop, oculto en mobile */}
+          {/* Pill de fechas — solo desktop */}
           <div className="hidden md:flex px-4">
             <button
               onClick={() => setDateModalOpen(true)}
@@ -77,28 +94,23 @@ export function TopBar() {
             </button>
           </div>
 
-          {/* Acciones */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Acciones desktop */}
+          <div className="hidden md:flex items-center gap-2 shrink-0">
             <button
               onClick={() => setDrawerOpen(true, "bottom")}
-              className="relative flex items-center gap-2 rounded-full bg-foreground px-3 py-1.5 text-xs sm:text-sm md:px-4 md:py-2 font-medium text-background transition hover:bg-amber hover:text-ink"
+              className="flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-amber hover:text-ink"
               aria-label={`Carrito (${count})`}
             >
               <ShoppingBag className="h-4 w-4" />
-              <span className="tabular hidden md:inline">{count}</span>
-              <span className="hidden md:inline">{count === 1 ? "ítem" : "ítems"}</span>
-              {count > 0 && (
-                <span className="md:hidden absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-amber px-1 font-mono text-[10px] font-semibold leading-none text-ink">
-                  {count}
-                </span>
-              )}
+              <span className="tabular-nums">{count}</span>
+              <span>{count === 1 ? "ítem" : "ítems"}</span>
             </button>
             <Link
               to="/cliente"
-              className="flex items-center gap-1.5 rounded-full border hairline px-2 py-1.5 text-xs md:px-3 md:py-2 md:text-sm hover:border-foreground/40"
+              className="flex items-center gap-1.5 rounded-full border hairline px-3 py-2 text-sm hover:border-foreground/40"
             >
-              <User className="h-3.5 w-3.5 md:h-4 md:w-4" />
-              <span className="hidden md:inline">Ingresar</span>
+              <User className="h-4 w-4" />
+              <span>Ingresar</span>
             </Link>
           </div>
 
