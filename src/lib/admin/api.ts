@@ -81,6 +81,20 @@ export type EquipoInput = Partial<Omit<Equipo, "id" | "etiquetas">> & {
 
 export type Etiqueta = { id: number; nombre: string; uso_count?: number };
 
+export type EtiquetaAdmin = {
+  id: number;
+  nombre: string;
+  prioridad: number;
+  total: number;
+};
+
+export type Categoria = {
+  nombre: string;
+  total: number;
+  prioridad: number;
+  subtags: { nombre: string; total: number }[];
+};
+
 export const adminApi = {
   dashboard: () => authedJson<DashboardData>("/api/dashboard"),
 
