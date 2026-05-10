@@ -1,64 +1,45 @@
 ## Diagnóstico
 
-Revisé los 3 archivos relevantes (`src/routes/admin.tsx`, `src/components/admin/AdminSidebar.tsx`, `src/hooks/use-auth.ts`) y la lógica de auth está bien: `ADMIN_AUTH_BYPASS` ya no existe, el `useEffect` redirige a `/login` si no hay user, y `signOut` está bien cableado al botón.
+El 404 viene de esta URL:
 
-El problema más probable del "botón de cerrar sesión no anda" es **silencioso**:
-
-1. **`onClick={() => signOut()}` es fire-and-forget.** No hace `await`, no maneja errores, no fuerza navegación. Si `supabase.auth.signOut()` tarda, falla por red, o el listener `onAuthStateChange` no dispara a tiempo, el usuario no ve nada — parece que el botón "no hace nada".
-2. **No hay feedback visual** mientras se cierra la sesión.
-3. **No se navega explícitamente** — se confía 100% en que el `useEffect` del layout reaccione al cambio de `user`. Si por algún motivo el listener no actualiza state (sesión cacheada en otra pestaña, error de Supabase), el usuario queda atrapado adentro.
-
-Sobre "no sé si anda el log in": probablemente sí ande, pero como entraste con la sesión vieja (de cuando estaba el bypass) y nunca pudiste salir, no llegaste a probarlo limpio.
-
-## Cambios
-
-### 1. `src/components/admin/AdminSidebar.tsx`
-Reescribir el handler del botón de logout:
-- Hacer `await signOut()` con manejo de error (toast con `sonner`).
-- Navegar explícitamente a `/login` después del signOut, sin depender solo del `useEffect`.
-- Deshabilitar el botón mientras está en curso (estado `isSigningOut`) para evitar doble click.
-
-```tsx
-const navigate = useNavigate();
-const [isSigningOut, setIsSigningOut] = useState(false);
-
-const handleSignOut = async () => {
-  if (isSigningOut) return;
-  setIsSigningOut(true);
-  try {
-    const { error } = await signOut();
-    if (error) throw error;
-    navigate({ to: "/login" });
-  } catch (e) {
-    toast.error("No se pudo cerrar sesión", { description: String(e) });
-    setIsSigningOut(false);
-  }
-};
+```text
+https://ramblarental.up.railway.app/~oauth/initiate?provider=google&redirect_uri=...
 ```
 
-### 2. `src/hooks/use-auth.ts`
-Cambiar `signOut` para que devuelva el resultado completo de Supabase (`{ error }`) en vez de un Promise vacío, así el caller puede detectar errores.
+Ese endpoint `~oauth/initiate` no existe en Railway. Es parte del flujo administrado por Lovable Cloud y debe ejecutarse desde el dominio del frontend de Lovable, no desde el backend FastAPI/Railway.
+
+En el código actual, `src/routes/login.tsx` usa:
 
 ```ts
-return {
-  session,
-  user,
-  loading,
-  signOut: () => supabase.auth.signOut(),  // ya devuelve { error }
-};
+window.location.origin
 ```
-(De hecho el tipo ya es ese; solo hay que tipar bien el caller — sin cambios reales en use-auth.)
 
-### 3. Verificación con browser tools
-Después del fix:
-1. `navigate_to_sandbox` → `/admin`.
-2. Click en "Cerrar sesión".
-3. Confirmar que redirige a `/login` y que `localStorage` ya no tiene sesión Supabase.
-4. Volver a hacer login con Google → confirmar que vuelve a `/admin`.
-5. Si sigue sin funcionar, mirar `console_logs` y `network_requests` para ver el error real de Supabase (puede ser CORS, refresh token inválido, etc.).
+Si el usuario abre `/login` desde `ramblarental.up.railway.app`, el login intenta iniciar OAuth en Railway y termina en 404.
 
-## Lo que NO hay que tocar
+## Plan de implementación
 
-- `src/routes/admin.tsx` — la lógica de redirect está bien.
-- `src/routes/login.tsx` — ya funciona con Google OAuth gestionado por Lovable Cloud.
-- `src/lib/admin-emails.ts` — `tinchosantini@gmail.com` ya está en la lista.
+1. **Reescribir el inicio de Google en `src/routes/login.tsx`**
+   - Mantener la UI actual del login.
+   - Cambiar el `redirect_uri` para que use el origen correcto del frontend Lovable cuando corresponda.
+   - Evitar que el flujo administrado de Google intente correr en `ramblarental.up.railway.app`.
+
+2. **Agregar fallback claro si el login se abre desde Railway**
+   - Si el origen actual es Railway, redirigir al login del frontend Lovable con el mismo `redirect=/admin`.
+   - Así el botón Google nunca dispara `https://ramblarental.up.railway.app/~oauth/initiate`.
+
+3. **Mantener la redirección post-login existente**
+   - Después de Google, volver a `/login?redirect=/admin`.
+   - `useAuth` detecta la sesión y manda al usuario a `/admin`.
+
+4. **Revisar el botón “Back-office viejo”**
+   - Hoy apunta a `https://ramblarental.up.railway.app/login`.
+   - No lo mezclaría con el nuevo login de Lovable, salvo que queramos que ese enlace sea explícitamente “login viejo”.
+
+5. **Verificación**
+   - Confirmar que al hacer click en Google ya no aparece `ramblarental.up.railway.app/~oauth/initiate`.
+   - Confirmar que el flujo inicia desde el dominio Lovable y vuelve a `/admin`.
+   - Confirmar que cerrar sesión sigue llevando a `/login?redirect=/admin`.
+
+## Nota importante
+
+Esto no requiere tocar credenciales de Google ni reconfigurar Railway. El problema es de origen/dominio: se está abriendo el flujo administrado de Lovable Cloud desde el backend Railway.
