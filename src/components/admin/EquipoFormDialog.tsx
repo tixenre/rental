@@ -108,6 +108,7 @@ export function EquipoFormDialog({
       setResolucion(f.resolucion ?? "");
       setDescripcion(f.descripcion ?? "");
       setNotas(f.notas ?? "");
+      setNombreTpl(f.nombre_publico_template ?? "");
       try {
         const arr = f.specs_json ? JSON.parse(f.specs_json) : [];
         setSpecs(Array.isArray(arr) ? arr : []);
@@ -118,7 +119,7 @@ export function EquipoFormDialog({
       } catch { setKeywords([]); }
     } else if (!initial) {
       setMontura(""); setFormato(""); setResolucion("");
-      setDescripcion(""); setNotas(""); setSpecs([]); setKeywords([]);
+      setDescripcion(""); setNotas(""); setSpecs([]); setKeywords([]); setNombreTpl("");
     }
   }, [fichaQ.data, initial]);
 
