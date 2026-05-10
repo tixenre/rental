@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
-import { PdfViewerModal } from "@/components/PdfViewerModal";
 
 export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mi cuenta — Rambla Rental" }] }),
@@ -16,6 +15,7 @@ type Perfil = {
 type Item = {
   nombre: string;
   marca: string;
+  modelo?: string | null;
   cantidad: number;
   precio_jornada: number;
   subtotal: number;
@@ -23,11 +23,15 @@ type Item = {
   nombre_publico?: string | null;
   nombre_publico_largo?: string | null;
 };
+type Pago = { monto: number; concepto?: string | null; fecha: string };
 type Pedido = {
   id: number; numero_pedido: string; estado: string;
   fecha_desde?: string; fecha_hasta?: string;
   monto_total?: number; monto_pagado?: number;
+  descuento_pct?: number | null;
+  notas?: string | null;
   items: Item[];
+  pagos?: Pago[];
   documentos_disponibles: { remito: boolean; contrato: boolean; albaran: boolean };
 };
 
@@ -133,13 +137,26 @@ export default function ClientePortal() {
   );
 }
 
-type PdfDoc = { url: string; filename: string; titulo: string };
+function jornadasEntre(desde?: string, hasta?: string): number {
+  if (!desde || !hasta) return 1;
+  const d1 = new Date(desde + "T12:00:00").getTime();
+  const d2 = new Date(hasta + "T12:00:00").getTime();
+  if (Number.isNaN(d1) || Number.isNaN(d2) || d2 < d1) return 1;
+  return Math.max(1, Math.ceil((d2 - d1) / 86_400_000) + 1);
+}
 
 function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: boolean; onToggle: () => void }) {
   const { documentos_disponibles: docs } = pedido;
   const estadoClass = ESTADO_COLOR[pedido.estado] ?? "bg-muted text-muted-foreground";
-  const [pdfDoc, setPdfDoc] = useState<PdfDoc | null>(null);
   const numero = pedido.numero_pedido ?? pedido.id;
+  const jornadas = jornadasEntre(pedido.fecha_desde, pedido.fecha_hasta);
+
+  const subtotalItems = pedido.items.reduce((acc, it) => acc + it.subtotal, 0);
+  const descuentoPct = pedido.descuento_pct ?? 0;
+  const descuentoMonto = Math.round(subtotalItems * (descuentoPct / 100));
+  const total = pedido.monto_total ?? (subtotalItems - descuentoMonto);
+  const pagado = pedido.monto_pagado ?? 0;
+  const balance = Math.max(0, total - pagado);
 
   return (
     <div className="rounded-xl border hairline bg-surface overflow-hidden">
@@ -172,98 +189,149 @@ function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: 
         </div>
       </button>
 
-      {/* Detalle expandido */}
+      {/* Detalle expandido — vista read-only del pedido */}
       {expanded && (
-        <div className="border-t hairline px-4 py-4 space-y-4">
-          {/* Fechas en móvil */}
-          <p className="text-xs text-muted-foreground sm:hidden">
-            {fmtDate(pedido.fecha_desde)} – {fmtDate(pedido.fecha_hasta)}
-          </p>
+        <div className="border-t hairline px-4 py-4 space-y-5">
 
-          {/* Items */}
-          <div className="space-y-2">
-            {pedido.items.map((item, i) => {
-              const display = item.nombre_publico || item.nombre;
-              return (
-                <div key={i} className="flex items-center gap-3 text-sm">
-                  {item.foto_url && (
-                    <img src={item.foto_url} alt={display}
-                      className="h-8 w-8 rounded object-cover shrink-0 bg-muted" />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <span className="text-ink truncate block">{display}</span>
-                    <span className="text-xs text-muted-foreground">{item.marca} · ×{item.cantidad}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground shrink-0">{fmt(item.subtotal)}</span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Resumen financiero */}
-          {pedido.monto_total != null && (
-            <div className="border-t hairline pt-3 space-y-1 text-xs">
-              <div className="flex justify-between text-muted-foreground">
-                <span>Total</span>
-                <span className="font-medium text-ink">{fmt(pedido.monto_total)}</span>
-              </div>
-              {pedido.monto_pagado != null && pedido.monto_pagado > 0 && (
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Pagado</span>
-                  <span className="text-green-700">{fmt(pedido.monto_pagado)}</span>
-                </div>
-              )}
+          {/* Bloque: período de alquiler */}
+          <section className="grid grid-cols-3 gap-2 text-xs">
+            <div className="rounded-md border hairline bg-background px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Desde</div>
+              <div className="text-ink mt-0.5">{fmtDate(pedido.fecha_desde)}</div>
             </div>
+            <div className="rounded-md border hairline bg-background px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Hasta</div>
+              <div className="text-ink mt-0.5">{fmtDate(pedido.fecha_hasta)}</div>
+            </div>
+            <div className="rounded-md border hairline bg-background px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Jornadas</div>
+              <div className="text-ink mt-0.5 tabular-nums">{jornadas}</div>
+            </div>
+          </section>
+
+          {/* Bloque: items detallados */}
+          <section>
+            <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
+              Equipos ({pedido.items.length})
+            </h3>
+            <ul className="space-y-2">
+              {pedido.items.map((item, i) => {
+                const display = item.nombre_publico || item.nombre;
+                const cap = `${item.marca ?? ""}${item.modelo ? ` · ${item.modelo}` : ""}`.trim();
+                return (
+                  <li key={i} className="flex items-start gap-3 text-sm">
+                    {item.foto_url ? (
+                      <img src={item.foto_url} alt={display}
+                        className="h-10 w-10 rounded object-cover shrink-0 bg-muted" />
+                    ) : (
+                      <div className="h-10 w-10 rounded bg-muted shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-ink truncate">{display}</div>
+                      {cap && <div className="text-xs text-muted-foreground truncate">{cap}</div>}
+                      <div className="text-[11px] text-muted-foreground tabular-nums mt-0.5">
+                        {item.cantidad} × {fmt(item.precio_jornada)} × {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
+                      </div>
+                    </div>
+                    <div className="text-sm text-ink tabular-nums shrink-0">{fmt(item.subtotal)}</div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+
+          {/* Bloque: desglose económico */}
+          <section className="border-t hairline pt-3 space-y-1 text-xs">
+            <div className="flex justify-between text-muted-foreground">
+              <span>Subtotal equipos</span>
+              <span className="tabular-nums">{fmt(subtotalItems)}</span>
+            </div>
+            {descuentoPct > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>Descuento ({descuentoPct}%)</span>
+                <span className="tabular-nums text-amber-700">−{fmt(descuentoMonto)}</span>
+              </div>
+            )}
+            <div className="flex justify-between pt-1 border-t hairline">
+              <span className="text-ink font-medium">Total</span>
+              <span className="text-ink font-medium tabular-nums">{fmt(total)}</span>
+            </div>
+            {pagado > 0 && (
+              <>
+                <div className="flex justify-between text-green-700">
+                  <span>Pagado</span>
+                  <span className="tabular-nums">{fmt(pagado)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-ink">Balance pendiente</span>
+                  <span className={`tabular-nums font-medium ${balance > 0 ? "text-ink" : "text-green-700"}`}>
+                    {fmt(balance)}
+                  </span>
+                </div>
+              </>
+            )}
+          </section>
+
+          {/* Bloque: pagos detallados */}
+          {pedido.pagos && pedido.pagos.length > 0 && (
+            <section>
+              <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Pagos</h3>
+              <ul className="space-y-1 text-xs">
+                {pedido.pagos.map((pg, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2 text-muted-foreground">
+                    <span className="truncate">
+                      {fmtDate(pg.fecha)}{pg.concepto ? ` · ${pg.concepto}` : ""}
+                    </span>
+                    <span className="tabular-nums text-green-700 shrink-0">{fmt(pg.monto)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
 
-          {/* Documentos */}
+          {/* Bloque: notas */}
+          {pedido.notas && (
+            <section>
+              <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Notas</h3>
+              <p className="text-xs text-muted-foreground whitespace-pre-wrap">{pedido.notas}</p>
+            </section>
+          )}
+
+          {/* Bloque: descargar documentos (PDF on-demand) */}
           {(docs.remito || docs.contrato || docs.albaran) && (
-            <div className="border-t hairline pt-3 flex flex-wrap gap-2">
-              {docs.remito && (
-                <button
-                  onClick={() => setPdfDoc({
-                    url: `/api/cliente/pedidos/${pedido.id}/remito.pdf`,
-                    filename: `remito-${numero}.pdf`,
-                    titulo: "Remito",
-                  })}
-                  className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition">
-                  <PdfIcon /> Remito
-                </button>
-              )}
-              {docs.contrato && (
-                <button
-                  onClick={() => setPdfDoc({
-                    url: `/api/cliente/pedidos/${pedido.id}/contrato.pdf`,
-                    filename: `contrato-${numero}.pdf`,
-                    titulo: "Contrato",
-                  })}
-                  className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition">
-                  <PdfIcon /> Contrato
-                </button>
-              )}
-              {docs.albaran && (
-                <button
-                  onClick={() => setPdfDoc({
-                    url: `/api/cliente/pedidos/${pedido.id}/albaran.pdf`,
-                    filename: `albaran-${numero}.pdf`,
-                    titulo: "Albarán",
-                  })}
-                  className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition">
-                  <PdfIcon /> Albarán
-                </button>
-              )}
-            </div>
+            <section className="border-t hairline pt-3">
+              <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
+                Descargar documentos
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {docs.remito && (
+                  <a
+                    href={`/api/cliente/pedidos/${pedido.id}/remito.pdf`}
+                    download={`remito-${numero}.pdf`}
+                    className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition">
+                    <PdfIcon /> Remito
+                  </a>
+                )}
+                {docs.contrato && (
+                  <a
+                    href={`/api/cliente/pedidos/${pedido.id}/contrato.pdf`}
+                    download={`contrato-${numero}.pdf`}
+                    className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition">
+                    <PdfIcon /> Contrato
+                  </a>
+                )}
+                {docs.albaran && (
+                  <a
+                    href={`/api/cliente/pedidos/${pedido.id}/albaran.pdf`}
+                    download={`albaran-${numero}.pdf`}
+                    className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition">
+                    <PdfIcon /> Albarán
+                  </a>
+                )}
+              </div>
+            </section>
           )}
         </div>
-      )}
-
-      {pdfDoc && (
-        <PdfViewerModal
-          url={pdfDoc.url}
-          filename={pdfDoc.filename}
-          titulo={`${pdfDoc.titulo} · #${numero}`}
-          onClose={() => setPdfDoc(null)}
-        />
       )}
     </div>
   );

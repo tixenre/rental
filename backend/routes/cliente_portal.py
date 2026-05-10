@@ -225,13 +225,21 @@ def cliente_pedidos(request: Request):
             d = row_to_dict(p)
             items = conn.execute("""
                 SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                       e.nombre, e.marca, e.foto_url,
+                       e.nombre, e.marca, e.modelo, e.foto_url,
                        e.nombre_publico, e.nombre_publico_largo
                 FROM alquiler_items ai
                 JOIN equipos e ON e.id = ai.equipo_id
                 WHERE ai.pedido_id = ?
             """, (p["id"],)).fetchall()
             d["items"] = [row_to_dict(i) for i in items]
+
+            pagos = conn.execute("""
+                SELECT monto, concepto, fecha
+                FROM alquiler_pagos
+                WHERE pedido_id = ?
+                ORDER BY fecha
+            """, (p["id"],)).fetchall()
+            d["pagos"] = [row_to_dict(pg) for pg in pagos]
 
             # Solicitudes de modificación pendientes
             solic = conn.execute("""

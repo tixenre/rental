@@ -720,7 +720,7 @@ async def pedido_pdf(id: int):
     return Response(
         content    = pdf_bytes,
         media_type = "application/pdf",
-        headers    = {"Content-Disposition": f'inline; filename="{filename}"'},
+        headers    = {"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -761,7 +761,7 @@ async def pedido_albaran(id: int):
     return Response(
         content    = pdf_bytes,
         media_type = "application/pdf",
-        headers    = {"Content-Disposition": f'inline; filename="{filename}"'},
+        headers    = {"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -791,5 +791,5 @@ async def pedido_contrato(id: int):
     return Response(
         content    = pdf_bytes,
         media_type = "application/pdf",
-        headers    = {"Content-Disposition": f'inline; filename="{filename}"'},
+        headers    = {"Content-Disposition": f'attachment; filename="{filename}"'},
     )
