@@ -12,6 +12,7 @@ import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
 import { IncludedList } from "./IncludedList";
+import { KeywordChips } from "./KeywordChips";
 
 export function EquipmentDetailDialog({
   item,
