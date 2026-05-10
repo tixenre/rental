@@ -239,6 +239,7 @@ export function EquipoFormDialog({
             formato: formato || null,
             resolucion: resolucion || null,
             keywords_json: keywords.length ? JSON.stringify(keywords) : null,
+            nombre_publico_template: nombreTpl.trim() || null,
           }),
           adminApi.setCategorias(initial.id, [...selectedCats]),
         ]);
