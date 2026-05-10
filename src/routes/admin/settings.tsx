@@ -66,6 +66,7 @@ function SettingsPage() {
       <CategoriasSection />
 
       <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+        <h2 className="font-display text-lg text-ink">Imports CSV</h2>
         <p className="text-sm text-muted-foreground">
           Subí archivos CSV exportados desde el sistema viejo o planillas. UTF-8, con headers en la primera fila.
         </p>
