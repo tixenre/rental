@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useUsdRate, calcularPrecioJornada } from "@/hooks/useSettings";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -150,7 +151,7 @@ function EquiposPage() {
               <TableHead className="hidden md:table-cell">Marca / Modelo</TableHead>
               <TableHead className="text-right">Stock</TableHead>
               <TableHead className="text-right hidden sm:table-cell">Precio/día</TableHead>
-              <TableHead className="hidden lg:table-cell">Etiquetas</TableHead>
+              <TableHead className="text-right hidden sm:table-cell w-24">ROI %</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -159,7 +160,16 @@ function EquiposPage() {
             {items.length === 0 && !equiposQ.isLoading && (
               <TableRow>
                 <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
-                  Sin equipos.
+                  Sin equipos.{" "}
+                  {(q || etiqueta) && (
+                    <button
+                      type="button"
+                      onClick={() => { setQ(""); setEtiqueta(""); }}
+                      className="underline hover:text-ink"
+                    >
+                      Limpiar filtros
+                    </button>
+                  )}
                 </TableCell>
               </TableRow>
             )}
@@ -188,14 +198,12 @@ function EquiposPage() {
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{eq.cantidad}</TableCell>
                 <TableCell className="text-right tabular-nums hidden sm:table-cell">
-                  {eq.precio_jornada ? `$${eq.precio_jornada.toLocaleString("es-AR")}` : "—"}
+                  {eq.precio_jornada
+                    ? `$${Math.round(eq.precio_jornada).toLocaleString("es-AR", { maximumFractionDigits: 0 })}`
+                    : "—"}
                 </TableCell>
-                <TableCell className="hidden lg:table-cell">
-                  <div className="flex flex-wrap gap-1">
-                    {(eq.etiquetas ?? []).slice(0, 3).map((t) => (
-                      <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>
-                    ))}
-                  </div>
+                <TableCell className="text-right hidden sm:table-cell w-24">
+                  <RoiInline equipo={eq} onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })} />
                 </TableCell>
                 <TableCell>
                   <Badge variant={eq.estado === "operativo" ? "default" : "outline"}>
@@ -280,5 +288,98 @@ function EquiposPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+
+/**
+ * Editor inline del ROI %. Al cambiar:
+ *  - Calcula el nuevo precio_jornada con el USD rate actual.
+ *  - PATCHea ambos campos al backend.
+ *  - Optimistic UI: actualiza el state local al toque, revierte si falla.
+ *
+ * No commitea hasta blur o Enter (evita una request por cada keystroke).
+ */
+function RoiInline({
+  equipo,
+  onSaved,
+}: {
+  equipo: Equipo;
+  onSaved: () => void;
+}) {
+  const { rate: usdRate } = useUsdRate();
+  const [value, setValue] = useState<string>(
+    equipo.roi_pct != null ? String(equipo.roi_pct) : "",
+  );
+  const initialRef = useRef(equipo.roi_pct);
+
+  // Si el equipo cambia (ej. recarga), sincronizar el input.
+  useEffect(() => {
+    setValue(equipo.roi_pct != null ? String(equipo.roi_pct) : "");
+    initialRef.current = equipo.roi_pct;
+  }, [equipo.id, equipo.roi_pct]);
+
+  const saveMut = useMutation({
+    mutationFn: async (newRoi: number) => {
+      // Actualiza ROI; si tenemos USD, también recalcula precio_jornada
+      // y lo manda en el mismo PATCH para que ambos cambien atómicamente.
+      const patch: Partial<EquipoInput> = { roi_pct: newRoi };
+      if (equipo.precio_usd) {
+        const nuevoPrecio = calcularPrecioJornada(equipo.precio_usd, usdRate, newRoi);
+        if (nuevoPrecio !== null) patch.precio_jornada = nuevoPrecio;
+      }
+      return adminApi.updateEquipo(equipo.id, patch);
+    },
+    onSuccess: () => {
+      onSaved();
+    },
+    onError: (e: Error) => {
+      toast.error(`No se pudo actualizar ROI: ${e.message}`);
+      // Revertir al valor original.
+      setValue(initialRef.current != null ? String(initialRef.current) : "");
+    },
+  });
+
+  const commit = () => {
+    const trimmed = value.trim();
+    if (trimmed === "") {
+      // Vacío → null (saca el ROI). Lo permitimos pero no recalcula precio.
+      if (initialRef.current != null) {
+        adminApi.updateEquipo(equipo.id, { roi_pct: null }).then(onSaved).catch((e) => {
+          toast.error(`No se pudo limpiar ROI: ${e instanceof Error ? e.message : ""}`);
+        });
+      }
+      return;
+    }
+    const num = Number(trimmed);
+    if (!Number.isFinite(num) || num < 0) {
+      toast.error("ROI debe ser un número >= 0");
+      setValue(initialRef.current != null ? String(initialRef.current) : "");
+      return;
+    }
+    if (num === initialRef.current) return;   // sin cambio, evitar request
+    saveMut.mutate(num);
+  };
+
+  return (
+    <Input
+      type="number"
+      min={0}
+      step="0.1"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          (e.target as HTMLInputElement).blur();
+        } else if (e.key === "Escape") {
+          setValue(initialRef.current != null ? String(initialRef.current) : "");
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      placeholder="—"
+      disabled={saveMut.isPending}
+      className="h-7 w-16 ml-auto text-right text-xs tabular-nums px-2 py-0"
+    />
   );
 }

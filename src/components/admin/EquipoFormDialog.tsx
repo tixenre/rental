@@ -719,7 +719,10 @@ export function EquipoFormDialog({
                     />
                     {!precioJornadaManual && form.watch("precio_usd") && form.watch("roi_pct") && (
                       <p className="text-[10px] text-muted-foreground font-mono">
-                        = {Number(form.watch("precio_usd")).toFixed(2)} × {usdLoading ? "…" : usdRate} × {Number(form.watch("roi_pct"))}%
+                        {Number(form.watch("precio_usd")).toFixed(2)} × {usdLoading ? "…" : usdRate} × {Number(form.watch("roi_pct"))}%
+                        {form.watch("precio_jornada") != null && (
+                          <span className="text-ink"> = ${Number(form.watch("precio_jornada")).toLocaleString("es-AR", { maximumFractionDigits: 0 })}</span>
+                        )}
                       </p>
                     )}
                   </div>

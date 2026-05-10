@@ -183,7 +183,10 @@ def recalcular_precios(payload: dict, request: Request):
 
         cambios: list[dict] = []
         for r in rows:
-            nuevo = round(r["precio_usd"] * usd_rate * (r["roi_pct"] / 100))
+            # Redondeo al múltiplo de 100 más cercano: precios sin centavos
+            # ni unidades sueltas. $1184 → $1200, $14442 → $14400.
+            raw = r["precio_usd"] * usd_rate * (r["roi_pct"] / 100)
+            nuevo = round(raw / 100) * 100
             anterior = r["precio_jornada"]
             if anterior != nuevo:
                 cambios.append({

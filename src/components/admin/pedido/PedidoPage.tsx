@@ -51,7 +51,7 @@ import {
 } from "./usePedidoDraft";
 
 const fmtArs = (n: number | null | undefined) =>
-  n ? `$${Number(n).toLocaleString("es-AR")}` : "$0";
+  n ? `$${Math.round(Number(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : "$0";
 
 export function PedidoPage({ pedidoId }: { pedidoId: number }) {
   const router = useRouter();
