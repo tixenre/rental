@@ -122,6 +122,7 @@ def list_equipos(
     request:       Request,
     q:             Optional[str]  = Query(None),
     etiqueta:      Optional[str]  = Query(None),
+    categoria:     Optional[str]  = Query(None),
     solo_visibles: Optional[bool] = Query(None),
     page:          int = Query(1, ge=1),
     per_page:      int = Query(200, ge=1, le=500),
@@ -138,39 +139,47 @@ def list_equipos(
         base_sql += " AND (e.nombre LIKE ? OR e.marca LIKE ? OR e.modelo LIKE ?)"
         like = f"%{q}%"
         params += [like, like, like]
-    if etiqueta:
-        # Acepta nombre (legacy) o id numérico. Si es padre, incluye descendientes.
+    if categoria:
+        # Filtro recursivo: si es padre, incluye descendientes (árbol de `categorias`).
+        # Acepta id numérico o nombre.
         try:
-            etiqueta_id_int = int(etiqueta)
+            cat_id_int = int(categoria)
             base_sql += """
               AND e.id IN (
-                SELECT ee.equipo_id FROM equipo_etiquetas ee
-                WHERE ee.etiqueta_id IN (
+                SELECT ec.equipo_id FROM equipo_categorias ec
+                WHERE ec.categoria_id IN (
                     WITH RECURSIVE sub AS (
-                        SELECT id FROM etiquetas WHERE id = ?
+                        SELECT id FROM categorias WHERE id = ?
                         UNION ALL
-                        SELECT et.id FROM etiquetas et
-                        JOIN sub ON et.parent_id = sub.id
+                        SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
                     )
                     SELECT id FROM sub
                 )
               )"""
-            params.append(etiqueta_id_int)
+            params.append(cat_id_int)
         except (TypeError, ValueError):
             base_sql += """
               AND e.id IN (
-                SELECT ee.equipo_id FROM equipo_etiquetas ee
-                WHERE ee.etiqueta_id IN (
+                SELECT ec.equipo_id FROM equipo_categorias ec
+                WHERE ec.categoria_id IN (
                     WITH RECURSIVE sub AS (
-                        SELECT id FROM etiquetas WHERE nombre = ?
+                        SELECT id FROM categorias WHERE nombre = ?
                         UNION ALL
-                        SELECT et.id FROM etiquetas et
-                        JOIN sub ON et.parent_id = sub.id
+                        SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
                     )
                     SELECT id FROM sub
                 )
               )"""
-            params.append(etiqueta)
+            params.append(categoria)
+    if etiqueta:
+        # Filtro plano por nombre de etiqueta (la bolsa ya no es jerárquica).
+        base_sql += """
+          AND e.id IN (
+            SELECT ee.equipo_id FROM equipo_etiquetas ee
+            JOIN etiquetas et ON et.id = ee.etiqueta_id
+            WHERE LOWER(et.nombre) = LOWER(?)
+          )"""
+        params.append(etiqueta)
 
     try:
         total = conn.execute(f"SELECT COUNT(*) {base_sql}", params).fetchone()[0]
@@ -181,6 +190,7 @@ def list_equipos(
         equipos = [row_to_dict(r) for r in rows]
         equipos = attach_tags(conn, equipos)
         equipos = attach_kit(conn, equipos)
+        equipos = attach_categorias(conn, equipos)
         return {"total": total, "page": page, "per_page": per_page, "items": equipos}
     finally:
         conn.close()
