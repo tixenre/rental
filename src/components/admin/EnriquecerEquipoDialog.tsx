@@ -172,6 +172,7 @@ export function EnriquecerEquipoDialog({
           await adminApi.setFicha(equipo.id, fichaPatch);
           if (fichaPatch.descripcion) aplicados.push("descripción");
           if (fichaPatch.specs_json) aplicados.push(`${result.specs.length} specs`);
+          if (fichaPatch.keywords_json) aplicados.push(`${keywords.length} keywords`);
         } catch (e) {
           fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
         }
