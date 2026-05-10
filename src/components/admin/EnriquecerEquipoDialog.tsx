@@ -91,13 +91,18 @@ export function EnriquecerEquipoDialog({
     }
   };
 
+  const setAll = (v: boolean) => {
+    setAplicarMarca(v); setAplicarModelo(v); setAplicarFoto(v); setAplicarBh(v);
+  };
+
   const aplicar = async () => {
     if (!result) return;
     const patch: Record<string, unknown> = {};
-    if (aplicarMarca && marca) patch.marca = marca;
-    if (aplicarModelo && modelo) patch.modelo = modelo;
-    if (aplicarFoto && fotoUrl) patch.foto_url = fotoUrl;
-    if (aplicarBh && bhUrl) patch.bh_url = bhUrl;
+    const aplicados: string[] = [];
+    if (aplicarMarca && marca) { patch.marca = marca; aplicados.push(`marca: ${marca}`); }
+    if (aplicarModelo && modelo) { patch.modelo = modelo; aplicados.push(`modelo: ${modelo}`); }
+    if (aplicarFoto && fotoUrl) { patch.foto_url = fotoUrl; aplicados.push("foto"); }
+    if (aplicarBh && bhUrl) { patch.bh_url = bhUrl; aplicados.push("link fuente"); }
 
     if (Object.keys(patch).length === 0) {
       toast.info("No hay cambios para aplicar.");
@@ -107,7 +112,10 @@ export function EnriquecerEquipoDialog({
     setSaving(true);
     try {
       await adminApi.updateEquipo(equipo.id, patch as Partial<Equipo>);
-      toast.success("Equipo enriquecido ✨");
+      toast.success("Equipo actualizado ✨", {
+        description: aplicados.join(" · "),
+        duration: 5000,
+      });
       onApplied();
       onOpenChange(false);
     } catch (e) {
