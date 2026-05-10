@@ -1,7 +1,8 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Send, X } from "lucide-react";
+import { ArrowLeft, Send, X, FileText, Download, ExternalLink, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import {
   getOrder,
   cancelOrder,
@@ -9,7 +10,12 @@ import {
   isEditable,
   STATUS_LABEL,
   STATUS_TONE,
+  DOCUMENTO_LABEL,
+  DOCUMENTO_HINT,
+  openOrderDocument,
+  downloadOrderDocument,
   type OrderStatus,
+  type DocumentoTipo,
 } from "@/lib/orders";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -49,7 +55,7 @@ function OrderDetailPage() {
     return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Cargando…</div>;
   }
 
-  const { order, items, changeRequests } = data;
+  const { order, items, changeRequests, documentosDisponibles } = data;
   const status = order.status as OrderStatus;
   const editable = isEditable(status);
 
@@ -125,6 +131,8 @@ function OrderDetailPage() {
           </div>
         </div>
 
+        <DocumentosCard orderId={id} disponibles={documentosDisponibles} />
+
         {/* Cambios / cancelación */}
         {status !== "cancelado" && status !== "devuelto" && (
           <div className="rounded-xl border hairline bg-surface p-4 space-y-3">
@@ -197,5 +205,109 @@ function OrderDetailPage() {
         )}
       </div>
     </div>
+  );
+}
+
+/* ── Documentos ─────────────────────────────────────────────────────────── */
+
+type DocsProps = {
+  orderId: string;
+  disponibles: { remito: boolean; contrato: boolean; albaran: boolean };
+};
+
+function DocumentosCard({ orderId, disponibles }: DocsProps) {
+  const tipos: DocumentoTipo[] = ["remito", "contrato", "albaran"];
+  const hayAlguno = tipos.some((t) => disponibles[t]);
+
+  return (
+    <div className="rounded-xl border hairline bg-surface">
+      <div className="border-b hairline px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        Documentos
+      </div>
+      <ul className="divide-y hairline">
+        {tipos.map((tipo) => (
+          <DocumentoRow
+            key={tipo}
+            orderId={orderId}
+            tipo={tipo}
+            disponible={disponibles[tipo]}
+          />
+        ))}
+      </ul>
+      {!hayAlguno && (
+        <div className="border-t hairline px-4 py-2 text-[11px] text-muted-foreground">
+          Los documentos se habilitan a medida que el pedido avanza.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DocumentoRow({
+  orderId,
+  tipo,
+  disponible,
+}: {
+  orderId: string;
+  tipo: DocumentoTipo;
+  disponible: boolean;
+}) {
+  const [busy, setBusy] = useState<"open" | "download" | null>(null);
+
+  const run = async (action: "open" | "download") => {
+    if (!disponible || busy) return;
+    setBusy(action);
+    try {
+      if (action === "open") await openOrderDocument(orderId, tipo);
+      else await downloadOrderDocument(orderId, tipo);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "No se pudo descargar el archivo.";
+      toast.error(msg);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <li className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <FileText
+          className={
+            "h-4 w-4 shrink-0 " +
+            (disponible ? "text-ink" : "text-muted-foreground/50")
+          }
+        />
+        <div className="min-w-0">
+          <div className={"text-sm " + (disponible ? "text-ink" : "text-muted-foreground")}>
+            {DOCUMENTO_LABEL[tipo]}
+          </div>
+          {!disponible && (
+            <div className="text-[11px] text-muted-foreground">
+              {DOCUMENTO_HINT[tipo]}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => run("open")}
+          disabled={!disponible || busy !== null}
+          title={disponible ? "Ver" : DOCUMENTO_HINT[tipo]}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          {busy === "open" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => run("download")}
+          disabled={!disponible || busy !== null}
+          title={disponible ? "Descargar" : DOCUMENTO_HINT[tipo]}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          {busy === "download" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+    </li>
   );
 }
