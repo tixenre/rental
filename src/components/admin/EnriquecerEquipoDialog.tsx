@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { Sparkles, ExternalLink, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,7 +11,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
 import { adminApi, type Equipo } from "@/lib/admin/api";
-import { enriquecerEquipoFn, type EnriquecerResult } from "@/lib/admin/enrich.functions";
+import { authedJson } from "@/lib/authedFetch";
+
+export type EnriquecerResult = {
+  marca: string | null;
+  modelo: string | null;
+  nombre_normalizado: string;
+  descripcion: string;
+  specs: { label: string; value: string }[];
+  foto_url: string | null;
+  fuente_url: string;
+  fuente_titulo: string;
+};
 
 export function EnriquecerEquipoDialog({
   equipo,
