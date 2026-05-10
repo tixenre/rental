@@ -1233,14 +1233,11 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     from supabase_auth import require_admin
     require_admin(request)
 
-    import os, json, httpx
+    import os, httpx
 
     FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
-    LOVABLE_API_KEY   = os.getenv("LOVABLE_API_KEY")
     if not FIRECRAWL_API_KEY:
         raise HTTPException(500, "FIRECRAWL_API_KEY no configurado en el backend")
-    if not LOVABLE_API_KEY:
-        raise HTTPException(500, "LOVABLE_API_KEY no configurado en el backend")
 
     query = " ".join(x for x in [payload.marca, payload.nombre, payload.modelo] if x).strip()
     if not query:
@@ -1292,96 +1289,61 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         if not top_url:
             raise HTTPException(404, "El primer resultado no tiene URL")
 
-        # 2. Scrape
+        # 2. Scrape + extracción JSON estructurada (Firecrawl LLM interno)
+        json_format = {
+            "type": "json",
+            "prompt": (
+                "Extraé la información del equipo audiovisual (cámara, lente, "
+                "luz, audio) desde la ficha de producto. Specs: máximo 8, label "
+                "corto y value conciso. Descripcion: 1-2 oraciones en español. "
+                "Si la foto_url no es absoluta (http/https), dejala vacía."
+            ),
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "marca":  {"type": "string"},
+                    "modelo": {"type": "string"},
+                    "nombre_normalizado": {"type": "string"},
+                    "descripcion": {"type": "string"},
+                    "foto_url": {"type": "string"},
+                    "specs": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "label": {"type": "string"},
+                                "value": {"type": "string"},
+                            },
+                            "required": ["label", "value"],
+                        },
+                    },
+                },
+                "required": ["marca", "modelo", "descripcion", "specs"],
+            },
+        }
+
         rs = client.post(
             "https://api.firecrawl.dev/v2/scrape",
             headers=headers_fc,
-            json={"url": top_url, "formats": ["markdown"], "onlyMainContent": True},
+            json={
+                "url": top_url,
+                "formats": ["markdown", json_format],
+                "onlyMainContent": True,
+            },
         )
+        if rs.status_code == 402:
+            raise HTTPException(402, "Sin créditos de Firecrawl. Recargá tu plan.")
+        if rs.status_code == 429:
+            raise HTTPException(429, "Rate-limit de Firecrawl. Probá en un minuto.")
         if rs.status_code != 200:
             raise HTTPException(502, f"Firecrawl scrape {rs.status_code}: {rs.text[:200]}")
         sj = rs.json()
         sd = sj.get("data") or sj
-        markdown = (sd.get("markdown") or "")
-        meta     = sd.get("metadata") or {}
+        meta      = sd.get("metadata") or {}
+        extracted = sd.get("json") or {}
 
-        if len(markdown) < 100:
-            raise HTTPException(422, "La página no devolvió contenido útil")
-
-        # 3. Lovable AI — extracción estructurada via tool calling
-        ai_payload = {
-            "model": "google/gemini-2.5-flash",
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "Extraés información de equipos audiovisuales (cámaras, lentes, "
-                        "luces, audio) desde páginas de e-commerce. Usá SIEMPRE la "
-                        "herramienta extract_equipo. Specs: máximo 8, label corto, "
-                        "value conciso. Descripcion: 1-2 oraciones en español. "
-                        "Si la foto_url no es absoluta, dejala vacía."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"URL: {top_url}\nBúsqueda: {query}\n\nContenido:\n{markdown[:12000]}",
-                },
-            ],
-            "tools": [{
-                "type": "function",
-                "function": {
-                    "name": "extract_equipo",
-                    "description": "Extrae datos del equipo",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "marca":  {"type": "string"},
-                            "modelo": {"type": "string"},
-                            "nombre_normalizado": {"type": "string"},
-                            "descripcion": {"type": "string"},
-                            "specs": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "label": {"type": "string"},
-                                        "value": {"type": "string"},
-                                    },
-                                    "required": ["label", "value"],
-                                    "additionalProperties": False,
-                                },
-                            },
-                            "foto_url": {"type": "string"},
-                        },
-                        "required": ["marca", "modelo", "descripcion", "specs"],
-                        "additionalProperties": False,
-                    },
-                },
-            }],
-            "tool_choice": {"type": "function", "function": {"name": "extract_equipo"}},
-        }
-
-        ra = client.post(
-            "https://ai.gateway.lovable.dev/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {LOVABLE_API_KEY}",
-                "Content-Type":  "application/json",
-            },
-            json=ai_payload,
-        )
-        if ra.status_code == 429:
-            raise HTTPException(429, "Rate-limit de Lovable AI. Probá en un minuto.")
-        if ra.status_code == 402:
-            raise HTTPException(402, "Sin créditos de Lovable AI. Recargá en Settings → Workspace → Usage.")
-        if ra.status_code != 200:
-            raise HTTPException(502, f"Lovable AI {ra.status_code}: {ra.text[:200]}")
-
-        aj = ra.json()
-        try:
-            args_str = aj["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
-            extracted = json.loads(args_str)
-        except (KeyError, IndexError, json.JSONDecodeError):
-            raise HTTPException(502, "La IA no devolvió extracción estructurada válida")
+        if not extracted:
+            raise HTTPException(422, "Firecrawl no devolvió extracción estructurada")
 
     og_image = meta.get("ogImage") or meta.get("og:image") or None
     candidate = extracted.get("foto_url") or og_image
