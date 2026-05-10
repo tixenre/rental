@@ -40,12 +40,13 @@ export type EquipoAfuera = {
 // ── Equipos ──────────────────────────────────────────────────────────────
 
 export type Ficha = {
-  descripcion: string | null;
-  notas:       string | null;
-  specs_json:  string | null;
-  montura:     string | null;
-  formato:     string | null;
-  resolucion:  string | null;
+  descripcion:   string | null;
+  notas:         string | null;
+  specs_json:    string | null;
+  montura:       string | null;
+  formato:       string | null;
+  resolucion:    string | null;
+  keywords_json: string | null;
 };
 
 export type CategoriaRef = {
