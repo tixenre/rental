@@ -1,17 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Upload, Wrench, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  ArrowDown, ArrowUp, Upload, Wrench, AlertTriangle, Loader2,
+  Plus, Trash2, ChevronRight, ChevronDown, Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { adminApi, type ImportCsvResp, type EtiquetaAdmin } from "@/lib/admin/api";
+import { adminApi, type ImportCsvResp, type EtiquetaAdmin, type ClasificarResult } from "@/lib/admin/api";
 
 export const Route = createFileRoute("/admin/settings")({
   component: SettingsPage,
