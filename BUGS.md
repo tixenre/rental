@@ -21,7 +21,7 @@
 
 - [x] **`uploadExternalUrlToBucket("nuevo", url)` en CREATE mode** — **FIX aplicado**: refactor del flow completo de `submit()` en `EquipoFormDialog.tsx`. El equipo se crea/actualiza primero (con la URL externa o `null` si hay archivo pendiente), después se sube a R2 con el `id` real seguido de un PATCH del equipo. Para archivos locales en CREATE mode se introdujo el state `pendingFile` + `pendingFilePreview` (blob URL) que se sube post-create. Mismo fix replicado en `elegirFoto` y `handleUpload`.
 
-- [ ] **`CLIENTE_REDIRECT_URI` hardcodeado a producción** — `backend/routes/auth.py:28-31`. En dev local, el OAuth del cliente redirige a Railway. **Fix**: leer de env var con fallback local.
+- [x] **`CLIENTE_REDIRECT_URI` hardcodeado a producción** — **FIX aplicado**: en `auth.py` se introdujo `_default_oauth_base()` que detecta el entorno via `RAILWAY_ENVIRONMENT`. En Railway usa el dominio prod, en local usa `http://localhost:8000`. La env var (cuando está seteada) tiene prioridad. Aplica tanto a `REDIRECT_URI` (admin) como a `CLIENTE_REDIRECT_URI` (portal cliente).
 
 - [x] **`form.handleSubmit` sin try/catch global** — **FIX aplicado**: el nuevo `submit()` envuelve el flow en try/catch. Si el create/update falla, `toast.error` y el dialog queda abierto para reintentar sin perder el form. Errores parciales (foto/ficha/categorías) se acumulan en el array `fallidos` y se reportan en un único `toast.warning` al final con detalle.
 
@@ -33,7 +33,7 @@
 
 ## MEDIO — bugs latentes, edge cases
 
-- [ ] **`authedJson` mensaje de error pobre** — `src/lib/authedFetch.ts:24-28`. Cuando la respuesta no es JSON, el mensaje queda como `"GET /path → 500"` sin contexto. **Fix**: leer body como text si JSON falla.
+- [x] **`authedJson` mensaje de error pobre** — **FIX aplicado**: ahora lee el body como text una sola vez, intenta `JSON.parse` para extraer `.detail` o `.message`, y si falla limpia tags HTML y devuelve los primeros 200 chars del texto. Bonus: maneja correctamente `204 No Content` y respuestas con body vacío (antes rompía con `Unexpected end of JSON input`). Aplica a TODA la app porque `authedJson` se usa en cada call al backend.
 
 - [ ] **`buscarFotos` sin timeout** — `EquipoFormDialog.tsx:145`. Si el fetch tarda más de lo esperado, `photoSearching` puede quedar en `true`. **Fix**: `AbortController` con timeout de 30s.
 
@@ -45,7 +45,7 @@
 
 - [ ] **Diff "cambia" en `FieldRow`** — `EnriquecerEquipoDialog.tsx:787`. Compara `current ?? ""` con `value` pero los strings vacíos pueden venir como `null` desde el backend, mostrando "cambia" cuando no cambió nada.
 
-- [ ] **`/admin/equipos/{id}/upload-foto-from-url` sin validación de host** — backend descarga arbitrariamente cualquier URL que le pasen. **Fix**: allowlist (bhphotovideo, adorama, manufacturer domains, wikimedia, dpreview, fstoppers, etc.).
+- [x] **`/admin/equipos/{id}/upload-foto-from-url` sin validación de host (SSRF)** — **FIX aplicado** (era SEGURIDAD, no MEDIO): introducido `_validate_external_image_url()` con (1) allowlist de ~40 hosts conocidos (retailers, Wikipedia, reviews, manufacturer domains, CDNs); (2) `_host_resolves_to_private()` que rechaza hosts que resuelvan a IPs privadas/loopback/link-local/multicast/reserved (defense-in-depth contra dominios del allowlist apuntando a internas); (3) sólo http(s) en puertos 80/443; (4) `max_redirects=3` en `httpx.Client` para limitar blast radius. Llamado al inicio del endpoint y dentro de `_download_image_bytes`. Smoke tests pasan: localhost, 169.254 metadata, hosts random → 403/400; B&H/Adorama → OK.
 
 - [ ] **`saveMut.isPending` no resetea si el dialog se cierra a mitad** — TanStack mutation puede quedar `pending` si la promesa no se resuelve. **Fix**: `onSettled` cleanup.
 
