@@ -95,6 +95,8 @@ export function EquipoFormDialog({
   const [descripcion, setDescripcion] = useState("");
   const [notas, setNotas] = useState("");
   const [specs, setSpecs] = useState<Spec[]>([]);
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [keywordInput, setKeywordInput] = useState("");
 
   useEffect(() => {
     const f = fichaQ.data;
@@ -108,11 +110,23 @@ export function EquipoFormDialog({
         const arr = f.specs_json ? JSON.parse(f.specs_json) : [];
         setSpecs(Array.isArray(arr) ? arr : []);
       } catch { setSpecs([]); }
+      try {
+        const arr = f.keywords_json ? JSON.parse(f.keywords_json) : [];
+        setKeywords(Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : []);
+      } catch { setKeywords([]); }
     } else if (!initial) {
       setMontura(""); setFormato(""); setResolucion("");
-      setDescripcion(""); setNotas(""); setSpecs([]);
+      setDescripcion(""); setNotas(""); setSpecs([]); setKeywords([]);
     }
   }, [fichaQ.data, initial]);
+
+  const addKeyword = () => {
+    const v = keywordInput.trim().toLowerCase();
+    if (!v) return;
+    if (keywords.includes(v)) { setKeywordInput(""); return; }
+    setKeywords([...keywords, v]);
+    setKeywordInput("");
+  };
 
   // Categorías (multi-select)
   const catsQ = useQuery({
