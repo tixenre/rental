@@ -38,7 +38,8 @@ def _maybe_finalizar(conn, pedido_id: int):
 
 def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
     rows = conn.execute("""
-        SELECT pi.*, e.nombre, e.marca, e.foto_url, e.cantidad AS stock_total
+        SELECT pi.*, e.nombre, e.marca, e.foto_url, e.cantidad AS stock_total,
+               e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
         JOIN equipos e ON e.id = pi.equipo_id
         WHERE pi.pedido_id = ?
@@ -48,7 +49,8 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
     # Agregar componentes (kits) a cada item
     for item in items:
         comp_rows = conn.execute("""
-            SELECT kc.*, ec.nombre, ec.marca, ec.foto_url, ec.cantidad AS stock_total
+            SELECT kc.*, ec.nombre, ec.marca, ec.foto_url, ec.cantidad AS stock_total,
+                   ec.nombre_publico, ec.nombre_publico_largo
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id
             WHERE kc.equipo_id = ?
@@ -80,7 +82,8 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
 
     ph = ",".join(["?"] * len(pedido_ids))
     rows = conn.execute(f"""
-        SELECT pi.*, e.nombre, e.marca, e.foto_url, e.cantidad AS stock_total
+        SELECT pi.*, e.nombre, e.marca, e.foto_url, e.cantidad AS stock_total,
+               e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
         JOIN equipos e ON e.id = pi.equipo_id
         WHERE pi.pedido_id IN ({ph})
@@ -93,7 +96,8 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
     if equipo_ids:
         cph = ",".join(["?"] * len(equipo_ids))
         comp_rows = conn.execute(f"""
-            SELECT kc.*, ec.nombre, ec.marca, ec.foto_url, ec.cantidad AS stock_total
+            SELECT kc.*, ec.nombre, ec.marca, ec.foto_url, ec.cantidad AS stock_total,
+                   ec.nombre_publico, ec.nombre_publico_largo
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id
             WHERE kc.equipo_id IN ({cph})
@@ -729,7 +733,8 @@ async def pedido_albaran(id: int):
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
         items  = conn.execute("""
-            SELECT pi.cantidad, e.nombre, e.marca, e.modelo, e.serie, e.valor_reposicion, e.foto_url, pi.equipo_id
+            SELECT pi.cantidad, e.nombre, e.marca, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
+                   e.nombre_publico, e.nombre_publico_largo, pi.equipo_id
             FROM alquiler_items pi
             JOIN equipos e ON e.id = pi.equipo_id
             WHERE pi.pedido_id = ?
@@ -740,7 +745,8 @@ async def pedido_albaran(id: int):
         # Agregar componentes a cada item
         for item in pedido["items"]:
             comp_rows = conn.execute("""
-                SELECT ec.nombre, ec.marca, ec.modelo, ec.serie, ec.valor_reposicion, kc.cantidad
+                SELECT ec.nombre, ec.marca, ec.modelo, ec.serie, ec.valor_reposicion,
+                       ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
                 FROM kit_componentes kc
                 JOIN equipos ec ON ec.id = kc.componente_id
                 WHERE kc.equipo_id = ?
@@ -769,7 +775,8 @@ async def pedido_contrato(id: int):
         # Agregar componentes a cada item
         for item in pedido["items"]:
             comp_rows = conn.execute("""
-                SELECT ec.nombre, ec.marca, ec.modelo, ec.serie, ec.valor_reposicion, kc.cantidad
+                SELECT ec.nombre, ec.marca, ec.modelo, ec.serie, ec.valor_reposicion,
+                       ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
                 FROM kit_componentes kc
                 JOIN equipos ec ON ec.id = kc.componente_id
                 WHERE kc.equipo_id = ?

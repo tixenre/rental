@@ -32,6 +32,43 @@ def _es_month(s: str) -> str:
         s = s.replace(en, es)
     return s
 
+
+def _nombre_para_pdf(item: dict, *, formal: bool = False) -> str:
+    """Helper único para elegir qué nombre mostrar en un PDF.
+
+    El rediseño del sistema de specs (DISEÑO_SPECS.md) introdujo dos
+    variantes calculadas por el backend:
+      - `nombre_publico` (corto, ej. "Cámara Sony FX3 Montura E"): catálogo.
+      - `nombre_publico_largo` (extendido, ej. "Cámara Sony FX3 · Cuerpo ·
+        Montura E · Full-frame · 4K 120fps"): documentos formales.
+
+    Para presupuesto usamos el corto; para albarán/contrato/seguro
+    usamos el largo (más descriptivo, mejor para el cliente y el seguro).
+
+    Fallback en cascada cuando el equipo todavía no tiene los nombres
+    calculados (equipos legacy o sin categoría):
+      formal=True : largo → corto → "marca nombre" → nombre interno
+      formal=False: corto → "marca nombre" → nombre interno
+    """
+    publico = (item.get("nombre_publico") or "").strip()
+    largo = (item.get("nombre_publico_largo") or "").strip()
+    nombre = (item.get("nombre") or "").strip()
+    marca = (item.get("marca") or "").strip()
+
+    if formal:
+        if largo:
+            return largo
+        if publico:
+            return publico
+    else:
+        if publico:
+            return publico
+
+    # Fallback: marca + nombre interno (lo que hacía pdf.py antes).
+    if marca and marca.lower() not in nombre.lower():
+        return f"{marca} {nombre}".strip() or "—"
+    return nombre or "—"
+
 def _fmt_date_short(s) -> str:
     """Formatea fecha como DD/MM/YYYY. Retorna '—' si inválida o vacía."""
     if not s:
@@ -176,7 +213,8 @@ def _pedido_html(pedido: dict) -> str:
     rows = ""
     for it in items:
         subtotal = (it.get("precio_jornada") or 0) * it.get("cantidad",1) * jornadas
-        it_nombre = html.escape(it.get("nombre") or "—")
+        # Presupuesto = nombre corto. Fallback al interno si no hay público aún.
+        it_nombre = html.escape(_nombre_para_pdf(it, formal=False))
         foto_html = ""
         if it.get("foto_url"):
             foto_html = f'<img src="{html.escape(it.get("foto_url"))}" class="item-img" alt="foto">'
@@ -196,7 +234,7 @@ def _pedido_html(pedido: dict) -> str:
         for comp in componentes:
             cant_comp = comp.get("cantidad",1) * it.get("cantidad",1)
             comp_subtotal = (comp.get("precio_jornada") or 0) * cant_comp * jornadas
-            comp_nombre = html.escape(comp.get("nombre") or "—")
+            comp_nombre = html.escape(_nombre_para_pdf(comp, formal=False))
             comp_foto_html = ""
             if comp.get("foto_url"):
                 comp_foto_html = f'<img src="{html.escape(comp.get("foto_url"))}" class="item-img" alt="foto">'
@@ -499,18 +537,25 @@ def _albaran_html(pedido: dict) -> str:
     n = 1
     for it in items:
         cant   = it.get("cantidad", 1)
-        nombre = html.escape(it.get("nombre") or "—")
-        marca  = html.escape(it.get("marca") or "")
-        modelo = html.escape(it.get("modelo") or "")
+        # Albarán = nombre largo (más descriptivo: incluye specs claves).
+        # Si no hay nombre público todavía (equipo sin categoría), fallback
+        # al combo viejo de marca + nombre + modelo.
+        nombre_publico_largo = (it.get("nombre_publico_largo") or "").strip()
+        if nombre_publico_largo:
+            descripcion = html.escape(nombre_publico_largo)
+        else:
+            nombre_raw = it.get("nombre") or "—"
+            marca  = it.get("marca") or ""
+            modelo = it.get("modelo") or ""
+            descripcion = nombre_raw
+            if marca and marca.lower() not in nombre_raw.lower():
+                descripcion = f"{marca} {nombre_raw}"
+            if modelo:
+                descripcion += f" — {modelo}"
+            descripcion = html.escape(descripcion)
         serie  = html.escape(it.get("serie") or "—")
         valor  = parse_valor(it.get("valor_reposicion"))
         valor_total += valor * cant
-
-        descripcion = nombre
-        if marca and marca not in nombre:
-            descripcion = f"{marca} {nombre}"
-        if modelo:
-            descripcion += f" — {modelo}"
 
         foto_html = ""
         if it.get("foto_url"):
@@ -532,18 +577,23 @@ def _albaran_html(pedido: dict) -> str:
         componentes = it.get("componentes", [])
         for comp in componentes:
             comp_cant = comp.get("cantidad", 1) * cant
-            comp_nombre = html.escape(comp.get("nombre") or "—")
-            comp_marca = html.escape(comp.get("marca") or "")
-            comp_modelo = html.escape(comp.get("modelo") or "")
+            # Componente: usar nombre largo si existe, sino el viejo combo.
+            comp_publico_largo = (comp.get("nombre_publico_largo") or "").strip()
+            if comp_publico_largo:
+                comp_descripcion = html.escape(comp_publico_largo)
+            else:
+                comp_nombre_raw = comp.get("nombre") or "—"
+                comp_marca = comp.get("marca") or ""
+                comp_modelo = comp.get("modelo") or ""
+                comp_descripcion = comp_nombre_raw
+                if comp_marca and comp_marca.lower() not in comp_nombre_raw.lower():
+                    comp_descripcion = f"{comp_marca} {comp_nombre_raw}"
+                if comp_modelo:
+                    comp_descripcion += f" — {comp_modelo}"
+                comp_descripcion = html.escape(comp_descripcion)
             comp_serie = html.escape(comp.get("serie") or "—")
             comp_valor = parse_valor(comp.get("valor_reposicion"))
             valor_total += comp_valor * comp_cant
-
-            comp_descripcion = comp_nombre
-            if comp_marca and comp_marca not in comp_nombre:
-                comp_descripcion = f"{comp_marca} {comp_nombre}"
-            if comp_modelo:
-                comp_descripcion += f" — {comp_modelo}"
 
             comp_foto_html = ""
             if comp.get("foto_url"):
@@ -747,19 +797,24 @@ def _contrato_html(pedido: dict) -> str:
     # Tabla de equipos (mezcla de presupuesto + albarán + contrato)
     rows = ""
     for i, it in enumerate(items, 1):
-        nombre = html.escape(it.get("nombre") or "—")
-        marca = html.escape(it.get("marca") or "")
-        modelo = html.escape(it.get("modelo") or "")
         cant = it.get("cantidad", 1)
+        # Contrato = nombre largo (descripción formal, para seguro/garantía).
+        nombre_largo = (it.get("nombre_publico_largo") or "").strip()
+        if nombre_largo:
+            descripcion = html.escape(nombre_largo)
+        else:
+            nombre_raw = it.get("nombre") or "—"
+            marca = it.get("marca") or ""
+            modelo = it.get("modelo") or ""
+            descripcion = nombre_raw
+            if marca and marca.lower() not in nombre_raw.lower():
+                descripcion = f"{marca} {nombre_raw}"
+            if modelo:
+                descripcion += f" — {modelo}"
+            descripcion = html.escape(descripcion)
         serie = html.escape(it.get("serie") or "—")
         valor_repo = parse_valor(it.get("valor_reposicion"))
         precio_jornada = it.get("precio_jornada") or 0
-
-        descripcion = nombre
-        if marca and marca not in nombre:
-            descripcion = f"{marca} {nombre}"
-        if modelo:
-            descripcion += f" — {modelo}"
 
         rows += f'''<tr>
           <td class="center">{i}</td>
@@ -775,18 +830,22 @@ def _contrato_html(pedido: dict) -> str:
         componentes = it.get("componentes", [])
         for comp in componentes:
             comp_cant = comp.get("cantidad", 1) * cant
-            comp_nombre = html.escape(comp.get("nombre") or "—")
-            comp_marca = html.escape(comp.get("marca") or "")
-            comp_modelo = html.escape(comp.get("modelo") or "")
+            comp_largo = (comp.get("nombre_publico_largo") or "").strip()
+            if comp_largo:
+                comp_descripcion = html.escape(comp_largo)
+            else:
+                comp_nombre_raw = comp.get("nombre") or "—"
+                comp_marca = comp.get("marca") or ""
+                comp_modelo = comp.get("modelo") or ""
+                comp_descripcion = comp_nombre_raw
+                if comp_marca and comp_marca.lower() not in comp_nombre_raw.lower():
+                    comp_descripcion = f"{comp_marca} {comp_nombre_raw}"
+                if comp_modelo:
+                    comp_descripcion += f" — {comp_modelo}"
+                comp_descripcion = html.escape(comp_descripcion)
             comp_serie = html.escape(comp.get("serie") or "—")
             comp_valor = parse_valor(comp.get("valor_reposicion"))
             comp_precio = comp.get("precio_jornada") or 0
-
-            comp_descripcion = comp_nombre
-            if comp_marca and comp_marca not in comp_nombre:
-                comp_descripcion = f"{comp_marca} {comp_nombre}"
-            if comp_modelo:
-                comp_descripcion += f" — {comp_modelo}"
 
             rows += f'''<tr style="opacity:0.85">
               <td class="center">—</td>

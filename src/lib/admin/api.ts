@@ -93,6 +93,14 @@ export type Equipo = {
   kit?: KitComponente[];
   categorias?: CategoriaRef[];
   ficha?: Ficha;
+  /** Nombre público corto (catálogo / cards). Lo arma el backend a partir de specs. */
+  nombre_publico?: string | null;
+  /** Nombre público extendido (PDFs formales: albarán, contrato). */
+  nombre_publico_largo?: string | null;
+  /** Relevancia manual (1=más destacado, 100=neutro). */
+  relevancia_manual?: number;
+  /** Score de popularidad (0..100, normalizado por categoría). */
+  popularidad_score?: number;
 };
 
 export type KitComponente = {
@@ -717,6 +725,8 @@ export type PedidoItem = {
   subtotal: number;
   nombre: string;
   marca: string | null;
+  nombre_publico?: string | null;
+  nombre_publico_largo?: string | null;
 };
 
 export type PedidoPago = {
