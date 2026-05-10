@@ -17,6 +17,7 @@ PUBLIC_EXACT = {"/", "/login", "/cliente"}
 # Prefijos que NO requieren autenticación
 PUBLIC_PREFIXES = (
     "/auth/",
+    "/~oauth/",  # OAuth administrado por el frontend Lovable
     "/static/",
     "/assets/",   # bundles JS/CSS del frontend Vite
     "/equipo/",    # fichas públicas

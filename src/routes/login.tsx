@@ -1,15 +1,25 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useCallback, useEffect, useState } from "react";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
+import { getAppOrigin, isLovableHost } from "@/lib/app-origin";
 
 import { ArrowLeft } from "lucide-react";
 
+type LoginSearch = {
+  redirect?: string;
+  oauth?: "google";
+};
+
+function validateLoginSearch(search: Record<string, unknown>): LoginSearch {
+  const parsed: LoginSearch = {};
+  if (typeof search.redirect === "string") parsed.redirect = search.redirect;
+  if (search.oauth === "google") parsed.oauth = "google";
+  return parsed;
+}
+
 export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    redirect: typeof search.redirect === "string" ? search.redirect : undefined,
-  }),
+  validateSearch: validateLoginSearch,
   head: () => ({
     meta: [
       { title: "Iniciar sesión — Rambla Rental" },
@@ -33,9 +43,18 @@ function GoogleIcon({ className }: { className?: string }) {
 function LoginPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const { redirect } = Route.useSearch();
+  const { redirect, oauth } = Route.useSearch();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoStarted, setAutoStarted] = useState(false);
+  const redirectPath = redirect === "/admin" ? "/admin" : "/mis-pedidos";
+
+  const buildLoginUrl = useCallback((origin: string, startOAuth = false) => {
+    const url = new URL("/login", origin);
+    url.searchParams.set("redirect", redirectPath);
+    if (startOAuth) url.searchParams.set("oauth", "google");
+    return url.toString();
+  }, [redirectPath]);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -45,19 +64,24 @@ function LoginPage() {
     navigate({ to: target === "/admin" ? "/admin" : "/mis-pedidos" });
   }, [user, loading, navigate, redirect]);
 
-  const handleGoogle = async () => {
+  const handleGoogle = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
-      const redirectPath = redirect === "/admin" ? "/admin" : "/mis-pedidos";
-
       // Persistimos el destino: el broker OAuth pierde el query string al
       // rebotar, así que sin esto siempre caeríamos en /mis-pedidos.
       sessionStorage.setItem("postLoginRedirect", redirectPath);
 
-      // Usar SIEMPRE el origen actual para que el callback vuelva exactamente
-      // al mismo dominio donde el usuario empezó (preview, publicado o custom).
-      const callbackUrl = `${window.location.origin}/login?redirect=${encodeURIComponent(redirectPath)}`;
+      const appOrigin = getAppOrigin();
+
+      // El broker OAuth vive en dominios Lovable. Si alguien entra al login
+      // desde Railway, moverlo primero al frontend para evitar el 404 en /~oauth.
+      if (!isLovableHost(window.location.hostname)) {
+        window.location.replace(buildLoginUrl(appOrigin, true));
+        return;
+      }
+
+      const callbackUrl = buildLoginUrl(appOrigin);
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: callbackUrl,
       });
@@ -70,7 +94,13 @@ function LoginPage() {
       setError("No pudimos iniciar sesión. Probá de nuevo.");
       setBusy(false);
     }
-  };
+  }, [buildLoginUrl, redirectPath]);
+
+  useEffect(() => {
+    if (loading || user || busy || autoStarted || oauth !== "google") return;
+    setAutoStarted(true);
+    void handleGoogle();
+  }, [autoStarted, busy, handleGoogle, loading, oauth, user]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

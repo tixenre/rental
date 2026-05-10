@@ -6,11 +6,11 @@ Run: uvicorn main:app --reload --port 8000
 import threading
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from database import init_db, FRONT, FRONT_NEW
@@ -23,6 +23,8 @@ from routes.auth             import router as auth_router
 from routes.settings         import router as settings_router
 from routes.cliente_portal   import router as cliente_portal_router
 from middleware          import auth_middleware
+
+FRONTEND_ORIGIN = "https://id-preview--cd1cc884-084b-435b-8af0-167f25bc78ca.lovable.app"
 
 # ── App ──────────────────────────────────────────────────────────────────────
 
@@ -63,6 +65,16 @@ app.include_router(cliente_portal_router)
 def health():
     """Health check endpoint para Railway."""
     return {"status": "ok"}
+
+@app.get("/~oauth/initiate", include_in_schema=False)
+def oauth_initiate(request: Request):
+    """Railway no sirve el broker OAuth; reenviamos al frontend Lovable."""
+    from urllib.parse import urlencode
+
+    params = dict(request.query_params)
+    if params.get("redirect_uri"):
+        params["redirect_uri"] = params["redirect_uri"].replace("https://ramblarental.up.railway.app", FRONTEND_ORIGIN)
+    return RedirectResponse(f"{FRONTEND_ORIGIN}/~oauth/initiate?{urlencode(params)}", status_code=307)
 
 # ── Páginas ──────────────────────────────────────────────────────────────────
 
