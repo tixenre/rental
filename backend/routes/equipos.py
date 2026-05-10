@@ -1311,7 +1311,10 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
             "Extraé la información del equipo audiovisual (cámara, lente, "
             "luz, audio) desde la ficha de producto. Specs: máximo 8, label "
             "corto y value conciso. Descripcion: 1-2 oraciones en español. "
-            "Si la foto_url no es absoluta (http/https), dejala vacía. "
+            "foto_url: URL ABSOLUTA (http/https) a una imagen JPG/PNG/WebP del "
+            "producto principal. NO uses placeholders, sprites, SVGs decorativos, "
+            "tracking pixels, ni rutas relativas. Si no estás 100% seguro de que "
+            "la URL existe y apunta al producto, dejá el campo vacío. "
             "Keywords: 3-6 palabras clave cortas en español, lowercase, "
             "que describan la PERSONALIDAD del equipo (ej: 'bicolor', "
             "'silenciosa', 'v-mount', 'global shutter', 'weather sealed', "
@@ -1372,9 +1375,11 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         meta      = sd.get("metadata") or {}
         extracted = sd.get("json") or {}
         og_image = meta.get("ogImage") or meta.get("og:image") or None
-        cand = extracted.get("foto_url") or og_image
-        if cand and not str(cand).lower().startswith(("http://", "https://")):
-            cand = og_image
+        # Priorizar og:image (más confiable) sobre lo extraído por LLM
+        llm_img = extracted.get("foto_url")
+        if llm_img and not str(llm_img).lower().startswith(("http://", "https://")):
+            llm_img = None
+        cand = og_image or llm_img
         return {"extracted": extracted, "foto_candidate": cand or None, "meta": meta}
 
     with httpx.Client(timeout=45.0) as client:
@@ -1420,12 +1425,86 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     if not extracted:
         raise HTTPException(422, "No se pudo extraer información estructurada")
 
-    # Foto: B&H primero, sino alternativa
-    foto_url = (bh_scrape or {}).get("foto_candidate") if bh_scrape else None
-    fuente_foto_url = bh_top["url"] if (foto_url and bh_top) else None
-    if not foto_url and alt_scrape:
-        foto_url = alt_scrape.get("foto_candidate")
-        fuente_foto_url = alt_top["url"] if foto_url else None
+    # ── Validación de foto: HEAD/GET parcial antes de devolver ──────────────
+    def _validate_image(url: str | None) -> tuple[bool, str]:
+        """Devuelve (ok, motivo). motivo es '' si ok=True."""
+        if not url:
+            return False, "sin candidata"
+        if not url.lower().startswith(("http://", "https://")):
+            return False, "URL no absoluta"
+        from urllib.parse import urlparse as _up
+        host = (_up(url).hostname or "").lower()
+        ref = f"https://{host}/" if host else None
+        hdrs = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/*,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        if ref:
+            hdrs["Referer"] = ref
+        try:
+            with httpx.Client(timeout=10.0, follow_redirects=True) as c:
+                # HEAD primero
+                try:
+                    rh = c.head(url, headers=hdrs)
+                    if rh.status_code == 200:
+                        ct = rh.headers.get("content-type", "")
+                        cl = int(rh.headers.get("content-length", "0") or "0")
+                        if ct.startswith("image/") and (cl == 0 or cl > 1024):
+                            return True, ""
+                        if not ct.startswith("image/"):
+                            return False, f"content-type {ct or 'desconocido'}"
+                        if cl and cl <= 1024:
+                            return False, "imagen muy chica (<1KB)"
+                except httpx.HTTPError:
+                    pass
+                # GET con Range como fallback (HEAD a veces no está soportado)
+                hdrs["Range"] = "bytes=0-2048"
+                rg = c.get(url, headers=hdrs)
+                if rg.status_code in (200, 206):
+                    ct = rg.headers.get("content-type", "")
+                    if ct.startswith("image/"):
+                        return True, ""
+                    return False, f"content-type {ct or 'desconocido'}"
+                return False, f"HTTP {rg.status_code} en origen"
+        except httpx.HTTPError as e:
+            return False, f"error de red: {type(e).__name__}"
+
+    bh_foto = (bh_scrape or {}).get("foto_candidate") if bh_scrape else None
+    alt_foto = (alt_scrape or {}).get("foto_candidate") if alt_scrape else None
+
+    foto_url = None
+    fuente_foto_url = None
+    foto_motivo = ""
+
+    # Probar B&H primero
+    if bh_foto:
+        ok, motivo = _validate_image(bh_foto)
+        if ok:
+            foto_url = bh_foto
+            fuente_foto_url = bh_top["url"] if bh_top else None
+        else:
+            foto_motivo = f"B&H: {motivo}"
+
+    # Si B&H no validó, probar alternativa (incluso si no scrapeada antes)
+    if not foto_url:
+        if not alt_scrape and alt_top:
+            try:
+                with httpx.Client(timeout=45.0) as c2:
+                    alt_scrape = _scrape(alt_top["url"], c2)
+                alt_foto = (alt_scrape or {}).get("foto_candidate") if alt_scrape else None
+            except Exception:
+                pass
+        if alt_foto:
+            ok, motivo = _validate_image(alt_foto)
+            if ok:
+                foto_url = alt_foto
+                fuente_foto_url = alt_top["url"] if alt_top else None
+            else:
+                foto_motivo = (foto_motivo + f" | alt: {motivo}").strip(" |")
+
+    if not foto_url and not foto_motivo:
+        foto_motivo = "no se encontró imagen en ninguna fuente"
 
     # bh_url canónico = el de B&H si hubo, sino el alternativo (como referencia)
     canonical_url = (bh_top or alt_top)["url"]
@@ -1457,6 +1536,7 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         "fuente_url": canonical_url,
         "fuente_titulo": canonical_title,
         "fuente_foto_url": fuente_foto_url,
+        "foto_motivo": foto_motivo or None,
     }
 
 
@@ -1531,7 +1611,7 @@ def admin_proxy_image(url: str, request: Request):
                 else:
                     last_status, last_body = r3.status_code, r3.content
             # 4º intento: proxy público images.weserv.nl (esquiva hotlink-block)
-            if r.status_code in (403, 401, 429):
+            if r.status_code in (401, 403, 404, 429) or r.status_code >= 500:
                 from urllib.parse import quote
                 # weserv requiere la URL sin esquema
                 stripped = url.split("://", 1)[1] if "://" in url else url
