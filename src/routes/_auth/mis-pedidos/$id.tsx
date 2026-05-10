@@ -1,7 +1,8 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Send, X } from "lucide-react";
+import { ArrowLeft, Send, X, FileText, Download, ExternalLink, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import {
   getOrder,
   cancelOrder,
@@ -9,7 +10,12 @@ import {
   isEditable,
   STATUS_LABEL,
   STATUS_TONE,
+  DOCUMENTO_LABEL,
+  DOCUMENTO_HINT,
+  openOrderDocument,
+  downloadOrderDocument,
   type OrderStatus,
+  type DocumentoTipo,
 } from "@/lib/orders";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
