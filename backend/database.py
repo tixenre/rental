@@ -294,6 +294,11 @@ def init_db():
             updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Campos extra para construir el "nombre público" en el catálogo
+    # (Cámara Sony FX3 Montura E Full Frame 4K).
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS montura   TEXT")
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS formato   TEXT")
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS resolucion TEXT")
 
     # ── Etiquetas (bolsa libre / índice de búsqueda) ─────────────────────
     # Las etiquetas son strings libres: incluyen marca, modelo, palabras del
