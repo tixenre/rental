@@ -97,6 +97,8 @@ export function EquipoFormDialog({
   const [specs, setSpecs] = useState<Spec[]>([]);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [keywordInput, setKeywordInput] = useState("");
+  const [nombreTpl, setNombreTpl] = useState("");
+  const tplInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const f = fichaQ.data;
