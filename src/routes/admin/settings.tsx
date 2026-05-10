@@ -408,15 +408,17 @@ function CategoriasSection() {
   );
 }
 
+type RowItem = { id: number; nombre: string; prioridad: number; parent_id: number | null; total: number };
+
 function CategoryRow({
   et, isRoot, isOpen, hasChildren, parents, onToggle, onPriority,
   onRename, onChangeParent, onDelete, onAddChild,
 }: {
-  et: EtiquetaAdmin;
+  et: RowItem;
   isRoot?: boolean;
   isOpen?: boolean;
   hasChildren?: boolean;
-  parents?: EtiquetaAdmin[];
+  parents?: RowItem[];
   onToggle?: () => void;
   onPriority: (v: number) => void;
   onRename: (n: string) => void;
