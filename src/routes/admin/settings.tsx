@@ -228,8 +228,8 @@ function ImportCard({
 function CategoriasSection() {
   const qc = useQueryClient();
   const listQ = useQuery({
-    queryKey: ["admin", "etiquetas"],
-    queryFn: () => adminApi.adminListEtiquetas(),
+    queryKey: ["admin", "categorias"],
+    queryFn: () => adminApi.adminListCategorias(),
   });
 
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
@@ -238,26 +238,27 @@ function CategoriasSection() {
   const [newRoot, setNewRoot] = useState("");
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["admin", "etiquetas"] });
+    qc.invalidateQueries({ queryKey: ["admin", "categorias"] });
     qc.invalidateQueries({ queryKey: ["categorias"] });
+    qc.invalidateQueries({ queryKey: ["equipos"] });
   };
 
   const updateMut = useMutation({
     mutationFn: ({ id, ...patch }: { id: number; nombre?: string; prioridad?: number; parent_id?: number | null; set_parent_null?: boolean }) =>
-      adminApi.adminUpdateEtiqueta(id, patch),
+      adminApi.adminUpdateCategoria(id, patch),
     onSuccess: invalidate,
     onError: (e: Error) => toast.error(e.message),
   });
 
   const createMut = useMutation({
     mutationFn: (data: { nombre: string; prioridad?: number; parent_id?: number | null }) =>
-      adminApi.adminCreateEtiqueta(data),
+      adminApi.adminCreateCategoria(data),
     onSuccess: () => { invalidate(); toast.success("Categoría creada"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: number) => adminApi.adminDeleteEtiqueta(id),
+    mutationFn: (id: number) => adminApi.adminDeleteCategoria(id),
     onSuccess: () => { invalidate(); toast.success("Categoría eliminada"); },
     onError: (e: Error) => toast.error(e.message),
   });
