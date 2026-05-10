@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, ShoppingBag, User } from "lucide-react";
 import { RentalDateModal } from "./RentalDateModal";
+import { useQuery } from "@tanstack/react-query";
 
 export function TopBar() {
   const {
@@ -21,6 +22,14 @@ export function TopBar() {
   const hasDates = !!(startDate && endDate);
   const jornadas = days();
 
+  const { data: logoSetting } = useQuery({
+    queryKey: ["settings", "logo_url"],
+    queryFn: () =>
+      fetch("/api/settings/logo_url").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    staleTime: 5 * 60 * 1000,
+  });
+  const logoUrl: string | null = logoSetting?.value ?? null;
+
   return (
     <>
       <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
@@ -29,17 +38,27 @@ export function TopBar() {
 
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 shrink-0">
-            <span className="wordmark text-2xl sm:text-3xl text-amber leading-none">rambla</span>
-            <span className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
-              Rental
-            </span>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Rambla Rental"
+                className="h-8 sm:h-9 w-auto object-contain"
+              />
+            ) : (
+              <>
+                <span className="wordmark text-2xl sm:text-3xl text-amber leading-none">rambla</span>
+                <span className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
+                  Rental
+                </span>
+              </>
+            )}
           </Link>
 
           {/* Pill de fechas — centrado en desktop, oculto en mobile */}
-          <div className="hidden md:flex justify-center">
+          <div className="hidden md:flex px-4">
             <button
               onClick={() => setDateModalOpen(true)}
-              className="flex items-center gap-3 rounded-full border-2 border-amber/50 bg-amber/10 px-6 py-3 transition hover:border-amber hover:bg-amber/20 shadow-sm"
+              className="w-full flex items-center justify-center gap-3 rounded-full border-2 border-amber/50 bg-amber/10 px-6 py-3 transition hover:border-amber hover:bg-amber/20 shadow-sm"
               aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
             >
               <CalendarIcon className="h-5 w-5 shrink-0 text-amber" />
