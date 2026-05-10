@@ -40,21 +40,21 @@ export function TopBar() {
 
             <button
               onClick={() => setDateModalOpen(true)}
-              className="hidden md:flex items-center gap-2 rounded-full border border-amber/40 bg-amber/5 px-3 py-2 text-left transition hover:border-amber ml-4"
+              className="hidden md:flex items-center gap-2.5 rounded-full border border-amber/60 bg-amber/10 px-4 py-2.5 text-left transition hover:border-amber hover:bg-amber/20 ml-4 shadow-sm"
               aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
             >
-              <CalendarIcon className="h-4 w-4 shrink-0" />
+              <CalendarIcon className="h-4 w-4 shrink-0 text-amber" />
               {hasDates ? (
-                <span className="text-[13px] font-medium tabular-nums">
+                <span className="text-sm font-semibold tabular-nums">
                   {format(startDate!, "dd MMM", { locale: es })} {startTime}
-                  <span className="mx-1 text-muted-foreground">→</span>
+                  <span className="mx-1.5 text-muted-foreground">→</span>
                   {format(endDate!, "dd MMM", { locale: es })} {endTime}
-                  <span className="ml-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                     · {jornadas}j
                   </span>
                 </span>
               ) : (
-                <span className="text-[13px] font-medium text-muted-foreground">Elegir fechas</span>
+                <span className="text-sm font-semibold">Elegir fechas</span>
               )}
             </button>
 
@@ -74,13 +74,14 @@ export function TopBar() {
                   </span>
                 )}
               </button>
-              <button
+              <Link
+                to="/cliente"
                 className="flex items-center gap-1.5 rounded-full border hairline px-2 py-1.5 text-xs md:px-3 md:py-2 md:text-sm hover:border-foreground/40"
-                aria-label={user}
+                aria-label="Iniciar sesión"
               >
                 <User className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span className="hidden md:inline">{user}</span>
-              </button>
+                <span className="hidden md:inline">Ingresar</span>
+              </Link>
             </div>
           </div>
 
