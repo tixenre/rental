@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Minus, Sparkles, Share2, Check } from "lucide-react";
+import { Plus, Minus, Sparkles, Share2, Check, ChevronDown } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,12 @@ export function EquipmentDetailDialog({
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
   const [copied, setCopied] = useState(false);
+  const [specsOpen, setSpecsOpen] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
+  const DESC_LIMIT = 240;
+  const desc = item.description ?? "";
+  const isLongDesc = desc.length > DESC_LIMIT;
+  const shownDesc = !isLongDesc || descExpanded ? desc : desc.slice(0, DESC_LIMIT).trimEnd() + "…";
 
   const sinStock = disponible !== undefined && disponible <= 0;
   const canAddMore = disponible === undefined || qty < disponible;
@@ -102,30 +108,58 @@ export function EquipmentDetailDialog({
           )}
         </div>
 
-        {item.description && (
+        {desc && (
           <div className="space-y-2">
             <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
               Descripción
             </h3>
             <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">
-              {item.description}
+              {shownDesc}
             </p>
+            {isLongDesc && (
+              <button
+                type="button"
+                onClick={() => setDescExpanded((v) => !v)}
+                className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground underline-offset-4 transition hover:text-ink hover:underline"
+                aria-expanded={descExpanded}
+              >
+                {descExpanded ? "Ver menos" : "Ver más"}
+              </button>
+            )}
           </div>
         )}
 
         {item.specs && item.specs.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-              Especificaciones
-            </h3>
-            <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
-              {item.specs.map((s, i) => (
-                <div key={i} className="flex justify-between gap-3 border-b hairline py-1.5 text-sm">
-                  <dt className="text-muted-foreground">{s.label}</dt>
-                  <dd className="text-right font-medium text-ink tabular">{s.value}</dd>
-                </div>
-              ))}
-            </dl>
+          <div className="border-t border-b hairline">
+            <button
+              type="button"
+              onClick={() => setSpecsOpen((v) => !v)}
+              aria-expanded={specsOpen}
+              aria-controls="specs-panel"
+              className="flex w-full items-center justify-between gap-3 py-3 text-left transition hover:text-ink"
+            >
+              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                Especificaciones
+                <span className="ml-2 text-ink/60">({item.specs.length})</span>
+              </span>
+              <ChevronDown
+                className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${specsOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+            <div
+              id="specs-panel"
+              hidden={!specsOpen}
+              className="pb-3"
+            >
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
+                {item.specs.map((s, i) => (
+                  <div key={i} className="flex justify-between gap-3 border-b hairline py-1.5 text-sm">
+                    <dt className="text-muted-foreground">{s.label}</dt>
+                    <dd className="text-right font-medium text-ink tabular">{s.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           </div>
         )}
 
