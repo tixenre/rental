@@ -9,7 +9,11 @@ from routes.auth import get_session
 PUBLIC_EXACT = {"/", "/login", "/cliente"}
 
 PUBLIC_PREFIXES = (
-    "/auth/",
+    "/auth/google",
+    "/auth/callback",
+    "/auth/logout",
+    "/auth/me",
+    "/auth/config",
     "/static/",
     "/assets/",
     "/equipo/",

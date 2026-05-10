@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { authedFetch, authedPostJson } from "@/lib/authedFetch";
+import { authedFetch } from "@/lib/authedFetch";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({
@@ -12,107 +12,49 @@ export const Route = createFileRoute("/admin/login")({
   component: AdminLoginPage,
 });
 
+const ERROR_MESSAGES: Record<string, string> = {
+  not_allowed: "Tu cuenta de Google no está autorizada para acceder al admin.",
+  state_mismatch: "Error de seguridad en el flujo de login. Intentá de nuevo.",
+  token_error: "No se pudo completar la autenticación con Google. Intentá de nuevo.",
+  userinfo_error: "No se pudo obtener tu información de Google. Intentá de nuevo.",
+  no_email: "Google no devolvió un email. Verificá los permisos de tu cuenta.",
+  no_code: "Google no devolvió el código de autorización. Intentá de nuevo.",
+};
+
 function AdminLoginPage() {
   const navigate = useNavigate();
-  const [setupNeeded, setSetupNeeded] = useState(false);
-  const [nombre, setNombre] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    authedFetch("/auth/config")
-      .then((r) => r.json())
-      .then((d) => setSetupNeeded(Boolean(d?.setup_needed)))
-      .catch(() => undefined);
+    // Leer error de query param si Google redirigió con error
+    const params = new URLSearchParams(window.location.search);
+    const errCode = params.get("error");
+    if (errCode) {
+      setError(ERROR_MESSAGES[errCode] ?? `Error: ${errCode}`);
+    }
 
-    // Si ya hay sesión, ir directo al admin.
+    // Si ya hay sesión activa, ir directo al admin
     authedFetch("/auth/me").then((r) => {
       if (r.ok) navigate({ to: "/admin" });
     });
   }, [navigate]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      if (setupNeeded) {
-        await authedPostJson("/auth/register", { nombre, email, password });
-      } else {
-        await authedPostJson("/auth/login-local", { email, password });
-      }
-      navigate({ to: "/admin" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo iniciar sesión");
-      setBusy(false);
-    }
+  function handleGoogleLogin() {
+    window.location.href = "/auth/google";
   }
 
   return (
     <div className="min-h-screen bg-background grid place-items-center px-4 py-12">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-2xl border hairline bg-surface p-8 shadow-sm space-y-4"
-      >
+      <div className="w-full max-w-sm rounded-2xl border hairline bg-surface p-8 shadow-sm space-y-6">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
             Back-office
           </div>
-          <h1 className="mt-1 font-display text-2xl text-ink">
-            {setupNeeded ? "Crear cuenta admin" : "Acceso admin"}
-          </h1>
+          <h1 className="mt-1 font-display text-2xl text-ink">Acceso admin</h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            {setupNeeded
-              ? "No hay usuarios todavía. Creá el primero."
-              : "Ingresá con tu email y contraseña."}
+            Ingresá con tu cuenta de Google autorizada.
           </p>
         </div>
-
-        {setupNeeded && (
-          <label className="block">
-            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              Nombre
-            </div>
-            <input
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              required
-              className="mt-1 w-full rounded-md border hairline bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber"
-            />
-          </label>
-        )}
-
-        <label className="block">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            Email
-          </div>
-          <input
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="mt-1 w-full rounded-md border hairline bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber"
-          />
-        </label>
-
-        <label className="block">
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            Contraseña
-          </div>
-          <input
-            type="password"
-            autoComplete={setupNeeded ? "new-password" : "current-password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={setupNeeded ? 8 : undefined}
-            className="mt-1 w-full rounded-md border hairline bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber"
-          />
-        </label>
 
         {error && (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
@@ -121,13 +63,24 @@ function AdminLoginPage() {
         )}
 
         <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded-md bg-amber py-2.5 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:opacity-50"
+          onClick={handleGoogleLogin}
+          className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-background py-2.5 text-sm font-medium text-ink transition hover:bg-surface active:scale-[0.98]"
         >
-          {busy ? "..." : setupNeeded ? "Crear y entrar" : "Ingresar"}
+          <GoogleIcon />
+          Entrar con Google
         </button>
-      </form>
+      </div>
     </div>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.7 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13 17.8 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.1z" />
+      <path fill="#FBBC05" d="M10.5 28.7A14.6 14.6 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.7 10.7l7.8-6z" />
+      <path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.6-5.9c-2 1.4-4.6 2.2-7.6 2.2-6.2 0-11.5-4.2-13.4-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z" />
+    </svg>
   );
 }
