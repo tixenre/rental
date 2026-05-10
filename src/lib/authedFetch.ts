@@ -2,7 +2,9 @@
  * authedFetch — wrapper de fetch que envía la cookie `session` del backend.
  */
 
-const API_BASE = (import.meta.env.VITE_API_URL ?? "https://ramblarental.up.railway.app").replace(/\/$/, "");
+// En dev el proxy de Vite reenvía /api y /auth a localhost:8000, así que
+// usamos ruta relativa (API_BASE vacío). En prod VITE_API_URL apunta al dominio.
+const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
 export type AuthedFetchInit = Omit<RequestInit, "headers"> & {
   headers?: Record<string, string>;
