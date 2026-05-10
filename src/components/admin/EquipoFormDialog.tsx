@@ -506,7 +506,150 @@ function CategoriasPicker({
   );
 }
 
-function Field({
+function KitEditor({ equipoId }: { equipoId: number }) {
+  const [items, setItems] = useState<KitComponente[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<Equipo[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [busy, setBusy] = useState<number | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const k = await adminApi.getKit(equipoId);
+      setItems(k);
+    } catch (e) {
+      toast.error(`Kit: ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [equipoId]);
+
+  useEffect(() => {
+    if (!search.trim() || search.trim().length < 2) { setResults([]); return; }
+    const t = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const r = await adminApi.listEquipos({ q: search.trim(), per_page: 15 });
+        setResults(r.items.filter((e) => e.id !== equipoId));
+      } finally { setSearching(false); }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [search, equipoId]);
+
+  const add = async (componente_id: number) => {
+    setBusy(componente_id);
+    try {
+      await adminApi.addKitItem(equipoId, componente_id, 1);
+      await load();
+      setSearch("");
+      setResults([]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally { setBusy(null); }
+  };
+
+  const updateQty = async (componente_id: number, cantidad: number) => {
+    if (cantidad < 1) return;
+    setBusy(componente_id);
+    try {
+      await adminApi.addKitItem(equipoId, componente_id, cantidad);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally { setBusy(null); }
+  };
+
+  const remove = async (componente_id: number) => {
+    setBusy(componente_id);
+    try {
+      await adminApi.removeKitItem(equipoId, componente_id);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally { setBusy(null); }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          Componentes ({items.length})
+        </Label>
+        {loading ? (
+          <p className="text-xs text-muted-foreground mt-2">Cargando…</p>
+        ) : items.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic mt-2">Sin componentes.</p>
+        ) : (
+          <div className="space-y-1.5 mt-2">
+            {items.map((it) => (
+              <div key={it.componente_id} className="flex items-center gap-2 rounded-md border hairline px-2 py-1.5">
+                {it.foto_url && (
+                  <img src={it.foto_url} alt="" className="h-8 w-8 object-contain rounded bg-muted/30" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm truncate">{it.nombre}</div>
+                  {it.marca && <div className="text-[11px] text-muted-foreground">{it.marca}</div>}
+                </div>
+                <Input
+                  type="number" min={1}
+                  value={it.cantidad}
+                  className="w-16 h-8 text-center"
+                  onChange={(e) => updateQty(it.componente_id, Math.max(1, parseInt(e.target.value || "1", 10)))}
+                  disabled={busy === it.componente_id}
+                />
+                <Button type="button" size="icon" variant="ghost"
+                  onClick={() => remove(it.componente_id)}
+                  disabled={busy === it.componente_id}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Agregar componente</Label>
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nombre, marca o modelo…"
+          className="mt-1"
+        />
+        {searching && <p className="text-xs text-muted-foreground mt-1">Buscando…</p>}
+        {results.length > 0 && (
+          <div className="mt-2 max-h-56 overflow-y-auto rounded-md border hairline divide-y">
+            {results.map((r) => (
+              <button key={r.id} type="button"
+                className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-accent text-left disabled:opacity-50"
+                onClick={() => add(r.id)}
+                disabled={busy === r.id || items.some((i) => i.componente_id === r.id)}>
+                {r.foto_url && (
+                  <img src={r.foto_url} alt="" className="h-7 w-7 object-contain rounded bg-muted/30" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm truncate">{r.nombre}</div>
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {[r.marca, r.modelo].filter(Boolean).join(" / ")} · stock {r.cantidad}
+                  </div>
+                </div>
+                {items.some((i) => i.componente_id === r.id)
+                  ? <Badge variant="secondary" className="text-[10px]">en kit</Badge>
+                  : <Plus className="h-4 w-4 text-muted-foreground" />}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
   label, error, children,
 }: {
   label: string;
