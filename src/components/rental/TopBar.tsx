@@ -58,7 +58,7 @@ export function TopBar() {
           <div className="hidden md:flex px-4">
             <button
               onClick={() => setDateModalOpen(true)}
-              className="w-full flex items-center justify-center gap-3 rounded-full border-2 border-amber/50 bg-amber/10 px-6 py-3 transition hover:border-amber hover:bg-amber/20 shadow-sm"
+              className="w-full flex items-center justify-center gap-3 rounded-full border-2 border-amber/50 bg-amber/10 px-6 py-2 transition hover:border-amber hover:bg-amber/20 shadow-sm"
               aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
             >
               <CalendarIcon className="h-5 w-5 shrink-0 text-amber" />
