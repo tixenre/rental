@@ -11,8 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
 import { adminApi, type Equipo } from "@/lib/admin/api";
-import { authedFetch, authedJson } from "@/lib/authedFetch";
-import { supabase } from "@/integrations/supabase/client";
+import { authedJson, authedPostJson } from "@/lib/authedFetch";
 import { isBucketUrl } from "@/lib/equipment/photos";
 
 type DiagStep = { label: string; status: "pending" | "ok" | "fail" | "skip"; detail?: string };
@@ -89,13 +88,14 @@ export function EnriquecerEquipoDialog({
   };
   const removeKeyword = (k: string) => setKeywords(keywords.filter((x) => x !== k));
 
-  /** Sube la foto externa al bucket reportando cada paso al panel de diagnóstico. */
+  /** Sube la foto externa al bucket pasando por el backend (service-role).
+   *  Ya no depende de la sesión Supabase del browser. */
   const uploadPhotoWithDiag = async (equipoId: number, externalUrl: string): Promise<string> => {
     const steps: DiagStep[] = [
-      { label: "1. Llamar /api/admin/proxy-image", status: "pending" },
-      { label: "2. Recibir blob (tamaño + tipo)", status: "pending" },
-      { label: "3. Subir a Supabase Storage (equipos-fotos)", status: "pending" },
-      { label: "4. Obtener URL pública", status: "pending" },
+      { label: "1. Validar URL externa", status: "pending" },
+      { label: "2. Backend descarga la imagen", status: "pending" },
+      { label: "3. Backend sube al bucket (service-role)", status: "pending" },
+      { label: "4. Recibir URL pública", status: "pending" },
     ];
     const update = (i: number, patch: Partial<DiagStep>) => {
       steps[i] = { ...steps[i], ...patch };
@@ -108,49 +108,38 @@ export function EnriquecerEquipoDialog({
       return externalUrl;
     }
 
-    const res = await authedFetch(`/api/admin/proxy-image?url=${encodeURIComponent(externalUrl)}`);
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      update(0, { status: "fail", detail: `HTTP ${res.status} ${txt.slice(0, 120)}` });
-      throw new Error(`proxy-image → ${res.status}`);
+    try {
+      update(0, { status: "ok", detail: new URL(externalUrl).hostname });
+    } catch {
+      update(0, { status: "fail", detail: "URL inválida" });
+      throw new Error("URL inválida");
     }
-    update(0, { status: "ok", detail: `HTTP ${res.status}` });
+    update(1, { status: "pending", detail: "esperando backend…" });
 
-    const blob = await res.blob();
-    if (blob.size === 0) {
-      update(1, { status: "fail", detail: "blob vacío (0 bytes)" });
-      throw new Error("blob vacío");
+    try {
+      const res = await authedPostJson<{
+        public_url: string;
+        path: string | null;
+        size?: number;
+        content_type?: string;
+      }>(`/api/admin/equipos/${equipoId}/upload-foto-from-url`, { url: externalUrl });
+
+      update(1, {
+        status: "ok",
+        detail: res.size
+          ? `${(res.size / 1024).toFixed(1)} KB · ${res.content_type ?? "image/*"}`
+          : "ok",
+      });
+      update(2, { status: "ok", detail: res.path ?? "(sin cambios)" });
+      update(3, { status: "ok", detail: res.public_url });
+      return res.public_url;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "error";
+      if (steps[1].status === "pending") update(1, { status: "fail", detail: msg });
+      else if (steps[2].status === "pending") update(2, { status: "fail", detail: msg });
+      else update(3, { status: "fail", detail: msg });
+      throw e;
     }
-    update(1, { status: "ok", detail: `${(blob.size / 1024).toFixed(1)} KB · ${blob.type || "sin content-type"}` });
-
-    const ct = blob.type || "image/jpeg";
-    const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : ct.includes("avif") ? "avif" : "jpg";
-    const path = `equipos/${equipoId}/foto-${Date.now()}.${ext}`;
-
-    // Verificar sesión Supabase antes de subir (RLS necesita rol authenticated)
-    const { data: sess } = await supabase.auth.getSession();
-    if (!sess?.session?.user?.id) {
-      update(2, { status: "fail", detail: "Sin sesión Supabase (rol anon). Cerrá sesión y volvé a entrar." });
-      throw new Error("Sin sesión Supabase");
-    }
-
-    const { error: upErr } = await supabase.storage
-      .from("equipos-fotos")
-      .upload(path, blob, { contentType: ct, upsert: false });
-    if (upErr) {
-      const userEmail = sess.session.user.email ?? "(sin email)";
-      update(2, { status: "fail", detail: `${upErr.message} · user=${userEmail}` });
-      throw upErr;
-    }
-    update(2, { status: "ok", detail: path });
-
-    const { data } = supabase.storage.from("equipos-fotos").getPublicUrl(path);
-    if (!data?.publicUrl) {
-      update(3, { status: "fail", detail: "no devolvió publicUrl" });
-      throw new Error("sin publicUrl");
-    }
-    update(3, { status: "ok", detail: data.publicUrl });
-    return data.publicUrl;
   };
 
   const run = async () => {
