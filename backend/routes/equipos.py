@@ -459,28 +459,74 @@ def get_precio_historial(id: int):
 
 @router.put("/equipos/{id}/etiquetas", status_code=200)
 def set_etiquetas(id: int, data: EtiquetasUpdate):
+    """Reemplaza SOLO las etiquetas manuales del equipo. Las auto se preservan."""
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
-        conn.execute("DELETE FROM equipo_etiquetas WHERE equipo_id = ?", (id,))
+        # Borrar solo manuales; las auto siguen vivas.
+        conn.execute(
+            "DELETE FROM equipo_etiquetas WHERE equipo_id = %s AND origen = 'manual'",
+            (id,),
+        )
         for orden, nombre in enumerate(data.etiquetas):
-            nombre = nombre.strip()
+            nombre = (nombre or "").strip()
             if not nombre:
                 continue
-            row = conn.execute("SELECT id FROM etiquetas WHERE nombre = ?", (nombre,)).fetchone()
-            if row:
-                etiqueta_id = row["id"]
-            else:
-                cur = conn.execute("INSERT INTO etiquetas (nombre) VALUES (?)", (nombre,))
-                etiqueta_id = cur.lastrowid
             conn.execute(
-                "INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden) VALUES (?,?,?) ON CONFLICT (equipo_id, etiqueta_id) DO UPDATE SET orden=EXCLUDED.orden",
-                (id, etiqueta_id, orden),
+                "INSERT INTO etiquetas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING",
+                (nombre,),
             )
+            row = conn.execute(
+                "SELECT id FROM etiquetas WHERE nombre = %s", (nombre,)
+            ).fetchone()
+            if not row:
+                continue
+            conn.execute("""
+                INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen)
+                VALUES (%s, %s, %s, 'manual')
+                ON CONFLICT (equipo_id, etiqueta_id)
+                DO UPDATE SET orden = EXCLUDED.orden, origen = 'manual'
+            """, (id, row["id"], orden))
         conn.commit()
         row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
+        return equipo
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# ── Categorías por equipo ────────────────────────────────────────────────────
+
+@router.put("/equipos/{id}/categorias", status_code=200)
+def set_categorias(id: int, data: CategoriasUpdate):
+    """
+    Reemplaza la lista de categorías asignadas al equipo y regenera auto-tags
+    (porque los nombres de categoría alimentan la bolsa de etiquetas auto).
+    """
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+        conn.execute("DELETE FROM equipo_categorias WHERE equipo_id = %s", (id,))
+        for orden, cid in enumerate(data.categoria_ids):
+            try:
+                cid_int = int(cid)
+            except (TypeError, ValueError):
+                continue
+            conn.execute("""
+                INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (equipo_id, categoria_id) DO UPDATE SET orden = EXCLUDED.orden
+            """, (id, cid_int, orden))
+        regenerate_auto_tags(conn, id)
+        conn.commit()
+        row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
+        equipo = attach_tags(conn, [row_to_dict(row)])[0]
+        equipo = attach_categorias(conn, [equipo])[0]
         return equipo
     except Exception:
         conn.rollback()
