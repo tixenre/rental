@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { adminApi, type Equipo, type EquipoInput, type Ficha, type CategoriaAdmin } from "@/lib/admin/api";
+import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin, type KitComponente } from "@/lib/admin/api";
 import { supabase } from "@/integrations/supabase/client";
 import { EnriquecerEquipoDialog } from "./EnriquecerEquipoDialog";
 
