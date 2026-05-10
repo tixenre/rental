@@ -1,6 +1,5 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { authedFetch } from "@/lib/authedFetch";
 import { useQuery } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/cliente/login")({
@@ -23,7 +22,6 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 function ClienteLoginPage() {
-  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
   const { data: logoSetting } = useQuery({
@@ -38,11 +36,7 @@ function ClienteLoginPage() {
     const params = new URLSearchParams(window.location.search);
     const errCode = params.get("error");
     if (errCode) setError(ERROR_MESSAGES[errCode] ?? `Error: ${errCode}`);
-
-    authedFetch("/api/cliente/me").then((r) => {
-      if (r.ok) navigate({ to: "/cliente/portal" });
-    });
-  }, [navigate]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
