@@ -18,11 +18,11 @@ export default defineConfig({
     proxy: {
       // En desarrollo local, proxea /api al backend Python
       "/api": {
-        target: "http://localhost:5000",
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
       "/auth": {
-        target: "http://localhost:5000",
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
     },
