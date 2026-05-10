@@ -255,6 +255,8 @@ def cliente_pedidos(request: Request):
             """, (p["id"],)).fetchall()
             d["solicitudes"] = [row_to_dict(s) for s in solic]
 
+            d["documentos_disponibles"] = _documentos_disponibles(d.get("estado", ""))
+
             result.append(d)
         return result
     finally:
