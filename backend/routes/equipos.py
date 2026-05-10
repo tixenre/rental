@@ -129,13 +129,38 @@ def list_equipos(
         like = f"%{q}%"
         params += [like, like, like]
     if etiqueta:
-        base_sql += """
-          AND e.id IN (
-            SELECT ee.equipo_id FROM equipo_etiquetas ee
-            JOIN etiquetas et ON et.id = ee.etiqueta_id
-            WHERE et.nombre = ?
-          )"""
-        params.append(etiqueta)
+        # Acepta nombre (legacy) o id numérico. Si es padre, incluye descendientes.
+        try:
+            etiqueta_id_int = int(etiqueta)
+            base_sql += """
+              AND e.id IN (
+                SELECT ee.equipo_id FROM equipo_etiquetas ee
+                WHERE ee.etiqueta_id IN (
+                    WITH RECURSIVE sub AS (
+                        SELECT id FROM etiquetas WHERE id = ?
+                        UNION ALL
+                        SELECT et.id FROM etiquetas et
+                        JOIN sub ON et.parent_id = sub.id
+                    )
+                    SELECT id FROM sub
+                )
+              )"""
+            params.append(etiqueta_id_int)
+        except (TypeError, ValueError):
+            base_sql += """
+              AND e.id IN (
+                SELECT ee.equipo_id FROM equipo_etiquetas ee
+                WHERE ee.etiqueta_id IN (
+                    WITH RECURSIVE sub AS (
+                        SELECT id FROM etiquetas WHERE nombre = ?
+                        UNION ALL
+                        SELECT et.id FROM etiquetas et
+                        JOIN sub ON et.parent_id = sub.id
+                    )
+                    SELECT id FROM sub
+                )
+              )"""
+            params.append(etiqueta)
 
     try:
         total = conn.execute(f"SELECT COUNT(*) {base_sql}", params).fetchone()[0]
