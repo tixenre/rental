@@ -155,20 +155,27 @@ export function EquipoFormDialog({
   }, [catsQ.data, selectedCats]);
 
   const previewName = useMemo(() => {
-    const parts = [
-      tipoCat,
-      form.watch("marca") ?? "",
-      form.watch("modelo") ?? "",
-      montura, formato, resolucion,
-    ].map((s) => (s ?? "").trim()).filter(Boolean);
-    if (parts.length === 0) return form.watch("nombre") || "—";
+    const marca = (form.watch("marca") ?? "").trim();
+    const modelo = (form.watch("modelo") ?? "").trim();
+    const nombre = (form.watch("nombre") ?? "").trim();
+    const vars: Record<string, string> = {
+      tipo: tipoCat, marca, modelo, nombre, montura, formato, resolucion,
+    };
+    const tpl = nombreTpl.trim();
+    if (tpl) {
+      const rendered = renderTplPreview(tpl, vars);
+      if (rendered) return rendered;
+    }
+    const parts = [tipoCat, marca, modelo, montura, formato, resolucion]
+      .map((s) => s.trim()).filter(Boolean);
+    if (parts.length === 0) return nombre || "—";
     const seen = new Set<string>();
     return parts.filter((p) => {
       const k = p.toLowerCase();
       if (seen.has(k)) return false;
       seen.add(k); return true;
     }).join(" ");
-  }, [tipoCat, form, montura, formato, resolucion]);
+  }, [tipoCat, form, montura, formato, resolucion, nombreTpl]);
 
   const submit = form.handleSubmit(async (values) => {
     const etiquetas = (values.etiquetas_csv ?? "")
