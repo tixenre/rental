@@ -1411,6 +1411,64 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     if not direct_url and not query:
         raise HTTPException(400, "Falta nombre/marca o url para enriquecer")
 
+    # ── Specs guiados por template ─────────────────────────────────────────
+    # Cargamos los specs definidos en `categoria_spec_templates` y los inyectamos
+    # al prompt para que la IA use labels canónicos consistentes con nuestro modelo.
+    # (Schema sigue siendo `specs: [{label,value}]` para mantener compat con el
+    # migrador y los flujos viejos — solo guiamos al LLM con los labels esperados.)
+    def _build_specs_guide() -> str:
+        try:
+            conn = get_db()
+            try:
+                rows = conn.execute("""
+                    SELECT c.nombre AS categoria, t.label, t.tipo, t.unidad, t.enum_options, t.prioridad
+                    FROM categoria_spec_templates t
+                    JOIN categorias c ON c.id = t.categoria_id
+                    ORDER BY c.prioridad NULLS LAST, c.nombre, t.prioridad NULLS LAST, t.label
+                """).fetchall()
+            finally:
+                conn.close()
+        except Exception:
+            return ""
+
+        if not rows:
+            return ""
+
+        # Agrupamos por categoría
+        from collections import defaultdict
+        by_cat: dict[str, list[str]] = defaultdict(list)
+        for r in rows:
+            r = row_to_dict(r) if not isinstance(r, dict) else r
+            label = r.get("label") or ""
+            tipo = r.get("tipo") or ""
+            unidad = r.get("unidad") or ""
+            enum_options = r.get("enum_options")
+            hint = label
+            if tipo == "enum" and enum_options:
+                import json as _json
+                try:
+                    opts = enum_options if isinstance(enum_options, list) else _json.loads(enum_options)
+                    if opts:
+                        hint = f"{label} (uno de: {', '.join(map(str, opts[:8]))})"
+                except Exception:
+                    pass
+            elif tipo == "number" and unidad:
+                hint = f"{label} (numérico en {unidad})"
+            elif tipo == "bool":
+                hint = f"{label} (sí/no)"
+            by_cat[r["categoria"]].append(hint)
+
+        lines = ["LABELS CANÓNICOS DE SPECS POR CATEGORÍA — usá estos labels exactos cuando aplique:"]
+        for cat, specs in by_cat.items():
+            lines.append(f"  • {cat}: {' / '.join(specs)}.")
+        lines.append(
+            "Si el equipo no encaja en ninguna categoría, usá los labels más naturales. "
+            "Para enums, devolvé exactamente uno de los valores listados (case-sensitive)."
+        )
+        return "\n".join(lines)
+
+    specs_guide = _build_specs_guide()
+
     headers_fc = {
         "Authorization": f"Bearer {FIRECRAWL_API_KEY}",
         "Content-Type":  "application/json",
@@ -1482,6 +1540,7 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
             "tracking pixels, banners de categoría, fotos de productos relacionados, ni rutas relativas. "
             "Si no estás 100% seguro de que una URL existe y apunta al producto, NO la incluyas. "
             "Cualquier campo que no esté en la ficha → dejalo vacío. NO inventes."
+            + ("\n\n" + specs_guide if specs_guide else "")
         ),
         "schema": {
             "type": "object",

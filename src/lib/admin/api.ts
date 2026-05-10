@@ -178,6 +178,40 @@ export type MarcaAdmin = {
   total: number;
 };
 
+// ── Templates de specs por categoría (CRUD admin) ────────────────────────
+
+export type SpecTipo = "string" | "number" | "enum" | "bool";
+
+export type SpecTemplate = {
+  id: number;
+  categoria_id: number;
+  spec_key: string;
+  label: string;
+  tipo: SpecTipo;
+  unidad: string | null;
+  enum_options: string[] | null;
+  prioridad: number;
+  visible_en_card: boolean;
+  visible_en_filtros: boolean;
+  visible_en_nombre: boolean;
+  obligatorio: boolean;
+  ayuda: string | null;
+};
+
+export type SpecTemplateInput = {
+  spec_key: string;
+  label: string;
+  tipo: SpecTipo;
+  unidad?: string | null;
+  enum_options?: string[] | null;
+  prioridad?: number;
+  visible_en_card?: boolean;
+  visible_en_filtros?: boolean;
+  visible_en_nombre?: boolean;
+  obligatorio?: boolean;
+  ayuda?: string | null;
+};
+
 export const adminApi = {
   dashboard: () => authedJson<DashboardData>("/api/dashboard"),
 
@@ -411,6 +445,26 @@ export const adminApi = {
         body: JSON.stringify({ specs }),
       },
     ),
+
+  // ── CRUD templates de specs por categoría ──────────────────────────
+  listSpecTemplates: (categoriaId: number) =>
+    authedJson<{ items: SpecTemplate[] }>(`/api/admin/categorias/${categoriaId}/spec-templates`),
+  createSpecTemplate: (categoriaId: number, input: SpecTemplateInput) =>
+    authedJson<SpecTemplate>(`/api/admin/categorias/${categoriaId}/spec-templates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  updateSpecTemplate: (templateId: number, input: Partial<SpecTemplateInput>) =>
+    authedJson<{ ok: true; id: number }>(`/api/admin/spec-templates/${templateId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteSpecTemplate: async (templateId: number) => {
+    const res = await authedFetch(`/api/admin/spec-templates/${templateId}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+  },
 
   // ── Compatibilidades ───────────────────────────────────────────────
   listarCompatibilidades: (id: number) =>

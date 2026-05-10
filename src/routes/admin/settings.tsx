@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, type ImportCsvResp, type CategoriaAdmin, type EtiquetaAdmin, type ClasificarResult, type MarcaAdmin } from "@/lib/admin/api";
+import { SpecTemplatesSection } from "@/components/admin/specs/SpecTemplatesSection";
 
 export const Route = createFileRoute("/admin/settings")({
   component: SettingsPage,
@@ -81,6 +82,7 @@ function SettingsPage() {
       <CambioYPreciosSection />
 
       <CategoriasSection />
+      <SpecTemplatesSection />
       <MarcasSection />
       <EtiquetasSection />
       <ClasificacionSection />
