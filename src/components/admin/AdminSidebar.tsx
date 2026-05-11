@@ -3,6 +3,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   LayoutDashboard,
+  Sun,
   Package,
   ClipboardList,
   Users,
@@ -49,6 +50,7 @@ type NavItem = {
 
 const items: NavItem[] = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard, exact: true },
+  { title: "Hoy",       url: "/admin/hoy",      icon: Sun },
   {
     title: "Equipos",
     url: "/admin/equipos",
