@@ -120,7 +120,7 @@ function PerfilPage() {
                 type="text"
                 value={form.nombre ?? ""}
                 onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm text-ink"
+                className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
                 required
               />
             </Field>
@@ -129,7 +129,7 @@ function PerfilPage() {
                 type="text"
                 value={form.apellido ?? ""}
                 onChange={(e) => setForm({ ...form, apellido: e.target.value })}
-                className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm text-ink"
+                className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
               />
             </Field>
           </div>

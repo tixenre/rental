@@ -409,28 +409,28 @@ function CarritoTab({
                 </div>
                 <div className="mt-2 flex items-center gap-1">
                   <Button
-                    size="icon" variant="outline" className="h-7 w-7"
+                    size="icon" variant="outline" className="h-9 w-9 sm:h-7 sm:w-7"
                     onClick={() => updateItem(it.equipo_id, { cantidad: Math.max(1, it.cantidad - 1) })}
                   ><Minus className="h-3 w-3" /></Button>
                   <Input
                     type="number" min={1}
                     value={it.cantidad}
                     onChange={(e) => updateItem(it.equipo_id, { cantidad: parseInt(e.target.value) || 1 })}
-                    className={cn("h-7 w-14 text-center", overstock && "border-destructive text-destructive")}
+                    className={cn("h-9 sm:h-7 w-14 text-center", overstock && "border-destructive text-destructive")}
                   />
                   <Button
-                    size="icon" variant="outline" className="h-7 w-7"
+                    size="icon" variant="outline" className="h-9 w-9 sm:h-7 sm:w-7"
                     onClick={() => updateItem(it.equipo_id, { cantidad: it.cantidad + 1 })}
                   ><Plus className="h-3 w-3" /></Button>
                   <Input
                     type="number" min={0}
                     value={it.precio_jornada}
                     onChange={(e) => updateItem(it.equipo_id, { precio_jornada: parseInt(e.target.value) || 0 })}
-                    className="h-7 ml-2 text-xs flex-1 max-w-[100px]"
+                    className="h-9 sm:h-7 ml-2 sm:text-xs flex-1 max-w-[100px]"
                   />
                   <span className="text-xs text-muted-foreground">/día</span>
                   <Button
-                    size="icon" variant="ghost" className="h-7 w-7 ml-auto text-muted-foreground hover:text-destructive"
+                    size="icon" variant="ghost" className="h-9 w-9 sm:h-7 sm:w-7 ml-auto text-muted-foreground hover:text-destructive"
                     onClick={() => removeItem(it.equipo_id)}
                   ><X className="h-4 w-4" /></Button>
                 </div>
@@ -577,7 +577,11 @@ function EquipoSearchSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[80vh] flex flex-col">
+      <SheetContent
+        side="bottom"
+        className="h-[85vh] flex flex-col"
+        style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+      >
         <SheetHeader>
           <SheetTitle className="font-display">Agregar equipo</SheetTitle>
         </SheetHeader>
@@ -612,7 +616,13 @@ function EquipoSearchSheet({
                           {eq.precio_jornada ? ` · ${fmtArs(eq.precio_jornada)}/día` : ""}
                         </div>
                       </div>
-                      <Button size="sm" disabled={disponible <= 0} onClick={() => onAdd(eq)}>
+                      <Button
+                        size="icon"
+                        className="h-10 w-10 shrink-0 sm:h-9 sm:w-9"
+                        disabled={disponible <= 0}
+                        onClick={() => onAdd(eq)}
+                        aria-label="Agregar"
+                      >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </li>
