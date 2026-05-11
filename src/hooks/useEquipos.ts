@@ -229,11 +229,12 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
   const parsedConectividad   = parseStringList(ficha?.conectividad_json);
   const parsedCompatibleCon  = parseStringList(ficha?.compatible_con_json);
 
-  const kit = Array.isArray(e.kit) ? e.kit as Array<{ componente_id: number; nombre: string; cantidad: number }> : [];
+  const kit = Array.isArray(e.kit) ? e.kit as Array<{ componente_id: number; nombre: string; cantidad: number; foto_url?: string | null }> : [];
   const includes = kit.map((k) => ({
     id: String(k.componente_id),
     name: k.nombre,
     qty: k.cantidad,
+    fotoUrl: k.foto_url ?? null,
   }));
 
   return {

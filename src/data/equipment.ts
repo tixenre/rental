@@ -27,6 +27,7 @@ export type IncludedItem = {
   name: string;
   qty?: number;
   note?: string;
+  fotoUrl?: string | null;
 };
 
 export type Equipment = {

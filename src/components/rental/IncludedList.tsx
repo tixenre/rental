@@ -83,11 +83,19 @@ export function IncludedList({ item }: { item: Equipment }) {
                   key={`${inc.id ?? inc.name}-${i}`}
                   className="flex items-center gap-2.5 rounded-md border hairline bg-background/60 p-2"
                 >
-                  <div className="relative aspect-square w-10 shrink-0 overflow-hidden rounded">
-                    {ref ? (
+                  <div className="relative aspect-square w-10 shrink-0 overflow-hidden rounded bg-muted/40">
+                    {inc.fotoUrl ? (
+                      <img
+                        src={inc.fotoUrl}
+                        alt={inc.name}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0"; }}
+                      />
+                    ) : ref ? (
                       <EmptyImage category={ref.category} brand={ref.brand} />
                     ) : (
-                      <div className="grid h-full w-full place-items-center bg-muted">
+                      <div className="grid h-full w-full place-items-center">
                         <Package className="h-4 w-4 text-muted-foreground" />
                       </div>
                     )}
