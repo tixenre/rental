@@ -67,6 +67,17 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Diagnóstico: atrapa errores JS antes de que React monte -->
+    <script>
+      (function() {
+        function show(msg) {
+          var el = document.getElementById('root');
+          if (el) el.innerHTML = '<div style="font-family:monospace;padding:24px;color:#b00;max-width:640px;margin:auto"><h2 style="margin:0 0 12px">Error al cargar la app</h2><pre style="white-space:pre-wrap;background:#fee;padding:12px;border-radius:6px;font-size:12px">' + msg + '</pre><button onclick="location.reload()" style="margin-top:12px;padding:8px 16px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer">Recargar</button></div>';
+        }
+        window.addEventListener('error', function(e) { show((e.error ? e.error.stack : e.message) || 'Unknown error'); });
+        window.addEventListener('unhandledrejection', function(e) { show(e.reason && e.reason.stack ? e.reason.stack : String(e.reason)); });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
