@@ -80,7 +80,12 @@ export function useEnriquecedor({
       authedJson<{ foto_candidates: string[] }>("/api/admin/equipos/buscar-fotos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre: equipo.nombre, marca: equipo.marca, modelo: equipo.modelo }),
+        body: JSON.stringify({
+          nombre: equipo.nombre,
+          marca: equipo.marca,
+          modelo: equipo.modelo,
+          url: customUrl.trim() || null,
+        }),
       });
 
     const fetchSpecs = () =>
