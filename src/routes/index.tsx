@@ -591,7 +591,7 @@ function ListMode({
                 ref={sentinelRef}
                 className="flex items-center justify-center py-6 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground"
               >
-                Cargando más equipos…
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />Cargando más equipos…
               </div>
             )}
             {!hasMore && filtered.length > PAGE_SIZE && (

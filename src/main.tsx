@@ -18,7 +18,7 @@ const queryClient = new QueryClient({
       staleTime: 30_000,
       // Mantener en caché 5 minutos después de que se quede sin observadores.
       // Mejora navegación back/forward.
-      gcTime: 5 * 60_000,
+      gcTime: 30 * 60_000,
     },
   },
 });

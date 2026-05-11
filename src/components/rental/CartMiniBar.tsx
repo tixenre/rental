@@ -21,7 +21,7 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-amber/60 bg-background/98 shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.15)] backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 lg:px-12">
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:px-12">
         <div className="flex items-center gap-2.5">
           <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-foreground text-background">
             <ShoppingBag className="h-4 w-4" />

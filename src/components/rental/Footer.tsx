@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Instagram, MessageCircle, MapPin, Phone, Mail, Clock } from "lucide-react";
 
 import { CONTACT, whatsappUrl } from "@/data/contact";
-import logoWordmark from "@/assets/rambla-wordmark.png";
+import logoWordmark from "@/assets/rambla-wordmark.webp";
 
 /**
  * Footer público — usado en home, catálogo, estudio, FAQ, portal cliente.

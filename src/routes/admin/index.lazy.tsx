@@ -232,7 +232,7 @@ function EquiposAfueraCard({ items }: { items: { nombre: string; marca: string |
           No hay equipos en alquiler activo.
         </div>
       ) : (
-        <ul className="divide-y hairline max-h-80 overflow-auto">
+        <ul className="divide-y hairline max-h-48 md:max-h-80 overflow-auto">
           {items.slice(0, 12).map((it, i) => (
             <li key={i} className="px-4 py-2.5 text-sm">
               <div className="flex items-center gap-2">
