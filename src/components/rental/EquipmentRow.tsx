@@ -49,17 +49,19 @@ export function EquipmentRow({
   const price = priceBreakdown(item.pricePerDay, jornadas, 1);
   const showPeriodTotal = hasDateRange && jornadas > 1;
 
-  // Specs clave para mostrar en la mini-ficha: peso, montura, formato,
-  // resolución (lo que aplique). Máx 3 para no romper layout.
-  const quickFacts = [
-    item.montura && { label: "Montura", value: item.montura },
-    item.formato && { label: "Formato", value: item.formato },
-    item.resolucion && { label: "Resolución", value: item.resolucion },
-    item.peso && { label: "Peso", value: item.peso },
-    item.alimentacion && { label: "Alimentación", value: item.alimentacion },
-  ]
-    .filter((x): x is { label: string; value: string } => !!x)
-    .slice(0, 3);
+  // Specs clave para mostrar en la mini-ficha. Usa las specs_destacados del
+  // template si las hay; de lo contrario cae al conjunto fijo legacy.
+  const quickFacts = (
+    item.specsDestacados && item.specsDestacados.length > 0
+      ? item.specsDestacados
+      : [
+          item.montura && { label: "Montura", value: item.montura },
+          item.formato && { label: "Formato", value: item.formato },
+          item.resolucion && { label: "Resolución", value: item.resolucion },
+          item.peso && { label: "Peso", value: item.peso },
+          item.alimentacion && { label: "Alimentación", value: item.alimentacion },
+        ].filter((x): x is { label: string; value: string } => !!x)
+  ).slice(0, 3);
 
   return (
     <div

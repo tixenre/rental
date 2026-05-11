@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from database import (
     get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
-    attach_ficha, regenerate_auto_tags,
+    attach_ficha, attach_specs_destacados, regenerate_auto_tags,
 )
 from routes.auth import get_session
 from admin_guard import require_admin
@@ -301,6 +301,7 @@ def list_equipos(
         equipos = attach_kit(conn, equipos)
         equipos = attach_categorias(conn, equipos)
         equipos = attach_ficha(conn, equipos)
+        equipos = attach_specs_destacados(conn, equipos)
         return {"total": total, "page": page, "per_page": per_page, "items": equipos}
     finally:
         conn.close()

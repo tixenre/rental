@@ -251,6 +251,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     cantidad: e.cantidad ?? 1,
     description: ficha?.descripcion ?? "",
     specs: parsedSpecs,
+    specsDestacados: e.specs_destacados ?? [],
     keywords: parsedKeywords,
     isNew: false,
     relevanciaManual: e.relevancia_manual ?? 100,
