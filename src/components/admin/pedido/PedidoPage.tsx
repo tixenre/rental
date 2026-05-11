@@ -27,7 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { BottomSheet } from "@/components/mobile";
+import { BottomSheet, ActionMenu } from "@/components/mobile";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
   DropdownMenuSeparator,
@@ -66,6 +66,7 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
 
   const [tab, setTab] = useState<"carrito" | "info" | "pagos" | "docs">("carrito");
   const [askDelete, setAskDelete] = useState(false);
+  const [openActionMenu, setOpenActionMenu] = useState(false);
 
   const deleteMut = useMutation({
     mutationFn: () => adminApi.deletePedido(pedidoId),
@@ -156,9 +157,12 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
             variant="icon"
             className="md:hidden"
           />
+          {/* Desktop: dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost"><MoreHorizontal className="h-5 w-5" /></Button>
+              <Button size="icon" variant="ghost" className="hidden sm:inline-flex">
+                <MoreHorizontal className="h-5 w-5" />
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
@@ -176,6 +180,10 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {/* Mobile: bottom drawer */}
+          <Button size="icon" variant="ghost" className="sm:hidden" onClick={() => setOpenActionMenu(true)}>
+            <MoreHorizontal className="h-5 w-5" />
+          </Button>
         </div>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
@@ -231,6 +239,25 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
           pending={draft.estadoMut.isPending}
         />
       </footer>
+
+      <ActionMenu
+        open={openActionMenu}
+        onOpenChange={setOpenActionMenu}
+        title={numero}
+        actions={[
+          ...(pedido.estado !== "cancelado" ? [{
+            label: "Cancelar pedido",
+            icon: <X className="h-4 w-4" />,
+            onClick: () => draft.estadoMut.mutate("cancelado"),
+          }] : []),
+          {
+            label: "Eliminar pedido",
+            icon: <Trash2 className="h-4 w-4" />,
+            variant: "destructive" as const,
+            onClick: () => setAskDelete(true),
+          },
+        ]}
+      />
 
       <AlertDialog open={askDelete} onOpenChange={setAskDelete}>
         <AlertDialogContent>
