@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 140,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Páginas de Privacidad y Términos",
+    body: "Se publicaron dos páginas legales: /privacidad (cómo recolectamos, usamos y protegemos los datos personales, cumpliendo Ley 25.326 de Argentina) y /terminos (proceso de reserva, precios, depósito, daños, cancelación, jurisdicción Mar del Plata). Links agregados al footer. Los textos son un borrador inicial — antes de hacer el sitio 100% público conviene que un abogado los revise.",
+    labels: ["público", "legal"],
+  },
+  {
     number: 139,
     date: "2026-05-11",
     type: "fix",
