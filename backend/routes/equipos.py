@@ -2058,21 +2058,21 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
         "Content-Type":  "application/json",
     }
 
-    # Queries específicos para fotos. Wikipedia primero (sin hotlink-block,
-    # imágenes limpias), después review sites, después manufacturer.
+    # Queries específicos para fotos. B&H primero (fotos hero de alta
+    # resolución, match exacto marca+modelo), después manufacturer, Wikipedia
+    # y review sites como fallback.
     PHOTO_QUERIES = [
-        # 1. Wikipedia: imágenes limpias, alta resolución, sin paywall
-        f"{query} (site:en.wikipedia.org OR site:commons.wikimedia.org OR site:es.wikipedia.org)",
-        # 2. Retailers: páginas de producto suelen tener fotos hero grandes
-        f"{query} (site:bhphotovideo.com OR site:adorama.com OR site:keh.com)",
-        # 3. Manufacturer oficial: fotos de producto canon
+        # 1. B&H Photo: fotos hero grandes, catálogo preciso, sin hotlink-block
+        f"{query} site:bhphotovideo.com",
+        # 2. Adorama / KEH: misma categoría de retailers
+        f"{query} (site:adorama.com OR site:keh.com)",
+        # 3. Manufacturer oficial
         f"{query} (site:canon.com OR site:usa.canon.com OR site:sony.com OR site:nikon.com OR "
         f"site:fujifilm.com OR site:panasonic.com OR site:blackmagicdesign.com OR site:aputure.com OR "
         f"site:godox.com OR site:rode.com OR site:sennheiser.com OR site:dji.com OR site:atomos.com OR "
         f"site:tilta.com OR site:smallrig.com OR site:saramonic.com OR site:zoom-na.com)",
-        # 4. Review sites: producto en uso, suele tener fotos cuidadas
-        f"{query} review (site:dpreview.com OR site:photographyblog.com OR site:cinema5d.com OR "
-        f"site:newsshooter.com OR site:fstoppers.com OR site:petapixel.com OR site:cinematography.com)",
+        # 4. Wikipedia: fallback con imágenes limpias y sin paywall
+        f"{query} (site:en.wikipedia.org OR site:commons.wikimedia.org OR site:es.wikipedia.org)",
     ]
 
     def _fc_search(q: str, client) -> list[str]:
@@ -2143,11 +2143,11 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
             m = _re.search(r"[-_/](\d{2,4})x(\d{2,4})", lo)
             if m:
                 w, h = int(m.group(1)), int(m.group(2))
-                if w < 400 or h < 400:
+                if w < 800 or h < 800:
                     return
             # width=NN o w=NN <= 300 en query string
             m = _re.search(r"[?&](?:width|w|size)=(\d+)", lo)
-            if m and int(m.group(1)) < 400:
+            if m and int(m.group(1)) < 800:
                 return
             k = lo
             if k in seen or k in exclude_lc:

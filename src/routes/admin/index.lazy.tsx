@@ -38,7 +38,7 @@ function AdminDashboard() {
       {isLoading && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-28 rounded-xl border hairline bg-surface animate-pulse" />
+            <div key={i} className="min-h-[5.5rem] rounded-xl border hairline bg-surface animate-pulse" />
           ))}
         </div>
       )}

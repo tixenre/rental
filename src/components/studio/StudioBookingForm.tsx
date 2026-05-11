@@ -141,7 +141,7 @@ export function StudioBookingForm() {
               <button
                 type="button"
                 onClick={() => setHours((h) => Math.max(STUDIO.minHours, h - 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-md border hairline text-muted-foreground hover:border-ink hover:text-ink disabled:opacity-40"
+                className="flex h-10 w-10 items-center justify-center rounded-md border hairline text-muted-foreground hover:border-ink hover:text-ink disabled:opacity-40"
                 disabled={hours <= STUDIO.minHours}
                 aria-label="Restar hora"
               >
@@ -153,7 +153,7 @@ export function StudioBookingForm() {
               <button
                 type="button"
                 onClick={() => setHours((h) => Math.min(12, h + 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-md border hairline text-muted-foreground hover:border-ink hover:text-ink"
+                className="flex h-10 w-10 items-center justify-center rounded-md border hairline text-muted-foreground hover:border-ink hover:text-ink"
                 aria-label="Sumar hora"
               >
                 <Plus className="h-4 w-4" />
