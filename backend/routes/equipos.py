@@ -789,10 +789,13 @@ def get_categorias(flat: int = Query(0)):
     """
     conn = get_db()
     try:
+        # #131: agregamos popularidad_score como tiebreaker después de
+        # prioridad (manual override del admin). Si todas tienen la misma
+        # prioridad (default 100), gana la popularidad real.
         cats = conn.execute("""
-            SELECT id, nombre, prioridad, parent_id
+            SELECT id, nombre, prioridad, parent_id, popularidad_score
             FROM categorias
-            ORDER BY prioridad ASC, LOWER(nombre) ASC
+            ORDER BY prioridad ASC, popularidad_score DESC, LOWER(nombre) ASC
         """).fetchall()
 
         nodes = {

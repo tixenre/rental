@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 134,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Ranking automático extendido a marcas y categorías",
+    body: "Antes el sistema solo rankeaba equipos. Ahora también marcas y categorías se ordenan automáticamente por uso real (cantidad de pedidos + ingresos generados en los últimos 6 meses). Cuando corrés 'Recalcular ranking' en /admin/settings, las marcas más alquiladas suben en el carrusel y las categorías más activas suben en el mosaico. El orden manual (campo 'orden' o 'prioridad') sigue siendo override — el admin puede forzar marcas específicas arriba bajándole el número.",
+    labels: ["admin", "catálogo"],
+  },
+  {
     number: 132,
     date: "2026-05-11",
     type: "fix",
