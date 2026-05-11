@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, ESTADO_LABEL, type Pedido, type PedidoEstado } from "@/lib/admin/api";
+import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 
 export const Route = createLazyFileRoute("/admin/pedidos/")({
   component: PedidosPage,
@@ -177,7 +178,8 @@ function PedidosPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="inline-flex gap-1">
+                    <div className="inline-flex gap-1 items-center">
+                      <WhatsAppButton pedido={p} phone={p.cliente_telefono} variant="icon" />
                       <Button size="icon" variant="ghost" onClick={() => openPedido(p.id)}>
                         <ExternalLink className="h-4 w-4" />
                       </Button>
