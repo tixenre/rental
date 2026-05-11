@@ -241,7 +241,7 @@ function EquiposPage() {
                     </Button>
                     <Button
                       size="icon" variant="ghost"
-                      title="Enriquecer con IA (B&H/Adorama)"
+                      title="Auto-completar info (B&H/Adorama)"
                       onClick={() => setEnriching(eq)}
                     >
                       <Sparkles className="h-4 w-4 text-amber" />

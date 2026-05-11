@@ -611,7 +611,7 @@ export function EquipoFormDialog({
               {isEdit && initial && (
                 <Button type="button" variant="outline" size="sm" onClick={() => setEnriching(true)}>
                   <Sparkles className="h-4 w-4 mr-1.5 text-amber" />
-                  Enriquecer con IA
+                  Auto-completar info
                 </Button>
               )}
             </div>

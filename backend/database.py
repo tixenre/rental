@@ -379,15 +379,9 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_pedido_items_equipo ON alquiler_items(equipo_id)
     """)
 
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id            SERIAL PRIMARY KEY,
-            email         TEXT UNIQUE NOT NULL,
-            nombre        TEXT NOT NULL,
-            password_hash TEXT NOT NULL,
-            creado_en     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+    # NOTA: tabla `usuarios` (auth email+password legacy) removida en #76.
+    # Auth ahora es 100% Google OAuth + Supabase. La migración Alembic
+    # `322b...drop_tabla_usuarios_legacy_76` hace el DROP en prod.
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_fichas (

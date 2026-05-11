@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 139,
+    date: "2026-05-11",
+    type: "fix",
+    title: "Batch de cierres rápidos: rate limit, cleanup BD, rename 'Enriquecer'",
+    body: "Tres mejoras chicas que cierran issues abiertos: (1) protección básica contra abuso/bots (rate limit 200 req/min por IP, sin Redis ni costos); (2) limpieza de tabla 'usuarios' legacy del auth viejo (ya no se usaba); (3) 'Enriquecer con IA' renombrado a 'Auto-completar info' en el form del equipo (menos jerga, más claro).",
+    labels: ["admin", "infra"],
+  },
+  {
     number: 138,
     date: "2026-05-11",
     type: "docs",
