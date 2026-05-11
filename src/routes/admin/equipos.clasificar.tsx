@@ -10,7 +10,7 @@
  *   3. "Aprobar todos los de alta confianza" preselecciona los >=0.85.
  *   4. "Aplicar (N)" manda las selecciones al backend.
  *
- * Diseño: DISEÑO_SPECS.md sección 2.3 (asignación masiva).
+ * Diseño: docs/DISEÑO_SPECS.md sección 2.3 (asignación masiva).
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";

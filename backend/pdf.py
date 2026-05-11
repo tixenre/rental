@@ -36,7 +36,7 @@ def _es_month(s: str) -> str:
 def _nombre_para_pdf(item: dict, *, formal: bool = False) -> str:
     """Helper único para elegir qué nombre mostrar en un PDF.
 
-    El rediseño del sistema de specs (DISEÑO_SPECS.md) introdujo dos
+    El rediseño del sistema de specs (docs/DISEÑO_SPECS.md) introdujo dos
     variantes calculadas por el backend:
       - `nombre_publico` (corto, ej. "Cámara Sony FX3 Montura E"): catálogo.
       - `nombre_publico_largo` (extendido, ej. "Cámara Sony FX3 · Cuerpo ·

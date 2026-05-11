@@ -7,7 +7,7 @@ Cubre:
   - Endpoint para regenerar nombres públicos masivamente (con dry-run).
   - Endpoint para recalcular el ranking de popularidad (con dry-run).
 
-Diseño completo: DISEÑO_SPECS.md sección 3, 4, 5.
+Diseño completo: docs/DISEÑO_SPECS.md sección 3, 4, 5.
 """
 
 import json

@@ -574,7 +574,7 @@ def init_db():
     # ignorada). Eso permite que los endpoints admin viejos sigan funcionando
     # mientras migramos la UI al nuevo CRUD de `categorias`.
 
-    # ── Specs estructurados por categoría (rediseño DISEÑO_SPECS.md - PR A) ──
+    # ── Specs estructurados por categoría (rediseño docs/DISEÑO_SPECS.md - PR A) ──
     #
     # Hoy `equipo_fichas.specs_json` guarda specs como [{label, value}] sin
     # validación ni schema. Eso hace imposible filtrar el catálogo por specs
