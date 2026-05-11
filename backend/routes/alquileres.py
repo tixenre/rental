@@ -300,6 +300,13 @@ def create_pedido(data: PedidoCreate):
         if data.fecha_desde and data.fecha_hasta:
             d0 = datetime.datetime.fromisoformat(data.fecha_desde)
             d1 = datetime.datetime.fromisoformat(data.fecha_hasta)
+            hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+            if d0 >= d1:
+                raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
+            if d0 < hoy:
+                raise HTTPException(400, "fecha_desde no puede ser en el pasado")
+
             jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
         else:
             jornadas = 1
@@ -505,11 +512,24 @@ def update_pedido(id: int, data: PedidoEstado, request: Request):
             errores = []
             if not p_row["fecha_desde"] or not p_row["fecha_hasta"]:
                 errores.append("El pedido no tiene fechas de inicio y fin.")
+            else:
+                try:
+                    d0 = datetime.datetime.fromisoformat(p_row["fecha_desde"])
+                    d1 = datetime.datetime.fromisoformat(p_row["fecha_hasta"])
+                    hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+                    if d0 >= d1:
+                        errores.append("fecha_hasta debe ser posterior a fecha_desde")
+                    if d0 < hoy:
+                        errores.append("fecha_desde no puede ser en el pasado")
+                except ValueError:
+                    errores.append("Las fechas tienen formato inválido")
+
             if not conn.execute(
                 "SELECT 1 FROM alquiler_items WHERE pedido_id=?", (id,)
             ).fetchone():
                 errores.append("El pedido no tiene equipos cargados.")
-            if p_row["fecha_desde"] and p_row["fecha_hasta"]:
+            if p_row["fecha_desde"] and p_row["fecha_hasta"] and not errores:
                 sin_stock = _check_stock(conn, id, p_row["fecha_desde"], p_row["fecha_hasta"])
                 for s in sin_stock:
                     errores.append(f"Sin stock suficiente: {s}")
@@ -662,6 +682,20 @@ def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
                 # Solo usar descuento del cliente si no vino uno manual en el payload
                 if "descuento_pct" not in payload:
                     payload["descuento_pct"] = c["descuento"] or 0.0
+
+        # Validar fechas si se están actualizando
+        if "fecha_desde" in payload or "fecha_hasta" in payload:
+            nueva_desde = payload.get("fecha_desde") or p["fecha_desde"]
+            nueva_hasta = payload.get("fecha_hasta") or p["fecha_hasta"]
+            if nueva_desde and nueva_hasta:
+                d0 = datetime.datetime.fromisoformat(nueva_desde)
+                d1 = datetime.datetime.fromisoformat(nueva_hasta)
+                hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+                if d0 >= d1:
+                    raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
+                if d0 < hoy:
+                    raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 
         if payload:
             cols = ", ".join(f"{k}=?" for k in payload)
