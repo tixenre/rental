@@ -319,6 +319,9 @@ def init_db():
     # Migration: link clientes to Supabase Auth users (Phase 1 of unified backend)
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS supabase_uid UUID UNIQUE")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clientes_supabase_uid ON clientes(supabase_uid)")
+    # Functional index sobre LOWER(email): el UNIQUE no se usa porque las
+    # queries hacen WHERE LOWER(email) = LOWER(?) (auth.py, cliente_portal.py).
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_clientes_email_lower ON clientes(LOWER(email))")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (
@@ -347,6 +350,10 @@ def init_db():
     """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_pedidos_fechas ON alquileres(fecha_desde, fecha_hasta)
+    """)
+    # Portal del cliente trae sus pedidos con WHERE cliente_id = ? en cada carga.
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_pedidos_cliente ON alquileres(cliente_id)
     """)
 
     conn.execute("""
@@ -462,6 +469,11 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_eq_etiq_origen
             ON equipo_etiquetas(equipo_id, origen)
     """)
+    # Mismo razonamiento que idx_eq_cat_categoria: el PK no sirve para
+    # WHERE etiqueta_id = ? (queries reversas de "qué equipos tienen tag X").
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_eq_etiq_etiqueta ON equipo_etiquetas(etiqueta_id)
+    """)
 
     # ── Categorías (taxonomía dedicada, árbol de 2 niveles) ──────────────
     conn.execute("""
@@ -489,6 +501,11 @@ def init_db():
     """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_eq_cat ON equipo_categorias(equipo_id)
+    """)
+    # El PK (equipo_id, categoria_id) sirve para queries por equipo_id, pero no
+    # para WHERE categoria_id = ? que se hace en equipos.py:1203,1219,234,248.
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_eq_cat_categoria ON equipo_categorias(categoria_id)
     """)
 
     # Seed del árbol de categorías (en la tabla `categorias`, no en etiquetas).
@@ -740,6 +757,9 @@ def init_db():
     """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_solicitudes_estado ON solicitudes_modificacion(estado)
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_solicitudes_cliente ON solicitudes_modificacion(cliente_id)
     """)
 
     # Configuración global de la app (tipo de cambio, defaults, etc.).
