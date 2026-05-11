@@ -81,6 +81,51 @@ Si el agente o vos detectan ideas de features (no bugs), separarlas en otro arch
 
 ---
 
+## Fase 1.5 — Mobile pass (10-15 min)
+
+**Cuándo corre**: después de la auditoría general (Fase 1) y antes de fixear (Fase 2). También corre como **gate obligatorio** en cualquier PR que toque rutas de cliente o `/admin/pedidos|dashboard`.
+
+**Objetivo**: verificar que lo que se renderiza en mobile se ve y funciona bien. El audit es visual — no alcanza con revisar clases `hidden sm:*` en el código; hay componentes que se renderizan pero no "se ven" (ej. carruseles sin flechas ni indicación de scroll).
+
+### Viewports estándar
+
+- **iPhone SE**: 375×667
+- **iPhone 14 Pro**: 393×852
+
+Usar Chrome DevTools → toggle device toolbar (Cmd+Shift+M) y elegir el viewport.
+
+### Checklist rápido
+
+| | Checkpoint |
+|---|---|
+| ☐ | Sin scroll horizontal (el ancho del viewport no se excede) |
+| ☐ | Tap targets ≥ 40px (botones, links, CTA principales) |
+| ☐ | Inputs ≥ 16px para no disparar zoom en iOS |
+| ☐ | Imágenes con `loading="lazy"` |
+| ☐ | Modales y drawers caben en `100dvh` |
+| ☐ | Carrito siempre accesible (sticky bar o header) |
+
+Ver detalle completo en `docs/MOBILE_AUDIT.md`.
+
+### Gate de merge
+
+Si el PR toca alguna de estas rutas, el mobile pass es **obligatorio antes de mergear**:
+
+- Rutas cliente: `/`, `/equipo/*`, `/cliente/*`, `/estudio`, `/preguntas-frecuentes`
+- Admin prioritario: `/admin/pedidos`, `/admin/dashboard`
+
+Para ver el backlog de issues mobile pendientes:
+
+```bash
+gh issue list --state open --label "mobile"
+```
+
+### Superficie mobile
+
+No todo se renderiza en mobile. Antes de auditar, revisar `docs/MOBILE_AUDIT.md` sección "Superficie mobile" para saber qué esperar en viewport chico. Componentes marcados ❌ (no renderiza) están fuera del scope mobile.
+
+---
+
 ## Fase 2 — Fixear con verificación (30-90 min)
 
 **Una tanda = 4-6 fixes relacionados, NUNCA 20 cambios sueltos en un commit.**

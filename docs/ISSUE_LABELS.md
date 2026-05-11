@@ -47,8 +47,12 @@ Independiente de prioridad — algo urgente puede ser chico o grande.
 
 - Aplicar **además** del tipo (`bug`/`design`/`feature`) y de la `priority:*` normal. La label no reemplaza ninguna de las otras.
 - Si una issue afecta mobile **y** desktop pero el problema es más grave en mobile (ej. layout roto solo en viewport chico), aplicarla igual.
-- Sólo lo que es **exclusivo desktop** (admin back-office, dashboards densos) **no** lleva esta label.
-- El código no se separa: el mismo componente usa responsive utilities (Tailwind `sm:`, `md:`). La label es para **triage**, no para dividir el código.
+- **Alcance**:
+  - ✅ Rutas cliente: `/`, `/equipo/*`, `/cliente/*`, `/estudio`, `/preguntas-frecuentes`
+  - ✅ Admin prioritario: `/admin/pedidos`, `/admin/dashboard` — el dueño los usa desde el celu
+  - ❌ Resto del admin (`/admin/equipos`, `/admin/clientes`, etc.) — desktop-first por ahora
+- El código no se separa: el mismo componente usa responsive utilities (Tailwind `sm:`, `md:`). La label es solo para **triage**.
+- Antes de crear una issue `mobile` de un componente, verificar en la sección "Superficie mobile" de `docs/MOBILE_AUDIT.md` que el componente realmente se renderiza en mobile. Un componente dentro de `hidden sm:block` no necesita issue mobile.
 
 ## Cómo elegir issue para trabajar
 

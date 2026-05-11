@@ -6,7 +6,7 @@
 
 ## QUICK WINS — alto impacto, bajo esfuerzo (un par de horas)
 
-- [ ] **Skeleton loaders en el catálogo público** — hoy mientras carga `useEquipos` no hay nada. Un grid de cards grises con `animate-pulse` mejora la percepción de velocidad.
+- [ ] **Skeleton loaders en el catálogo público** `[mobile]` — hoy mientras carga `useEquipos` no hay nada. Un grid de cards grises con `animate-pulse` mejora la percepción de velocidad, especialmente en conexiones lentas (mobile).
 
 - [ ] **Persistir filtros en la URL del admin** — `q` y `etiqueta` en `routes/admin/equipos.tsx` viven solo en estado React. Si recargás, se pierden. Mover a search params (TanStack Router lo soporta nativo).
 
@@ -38,7 +38,7 @@
 
 - [ ] **Disponibilidad real en backend** — hoy el `disponible` que muestra el card se calcula en el frontend a partir de los pedidos. Mover el cálculo al backend (`GET /api/equipos?desde=X&hasta=Y` devuelve `disponible` por equipo) — más fiable y permite cachear.
 
-- [ ] **Carrito persistente** — `cart-store.ts` usa Zustand sin persistencia. Si el cliente refresca, pierde todo. Agregar `persist` middleware a localStorage.
+- [ ] **Carrito persistente** `[mobile]` — `cart-store.ts` usa Zustand sin persistencia. Si el cliente refresca (o vuelve al browser en el celu), pierde todo. Agregar `persist` middleware a localStorage.
 
 ---
 
@@ -62,19 +62,19 @@
 
 ## POLISH — detalles que hacen sentir profesional
 
-- [ ] **Loading states consistentes** — usar el mismo `<Skeleton />` en todas las páginas en vez de "Cargando…" con texto.
+- [ ] **Loading states consistentes** `[mobile]` — usar el mismo `<Skeleton />` en todas las páginas en vez de "Cargando…" con texto. En mobile los spinners de texto son particularmente feos.
 
 - [ ] **Empty states con dibujito + CTA** — hoy "Sin equipos" es un texto gris. Una ilustración + "Crear el primero" suma mucho.
 
 - [ ] **Dark mode** — el design system ya parece pensado para esto (`bg-ink`, `bg-background`, etc.). Falta el toggle.
 
-- [ ] **Microinteracciones en el carrito** — cuando agregás un equipo desde el card, animar el "+1" volando hacia el ícono del carrito (Framer Motion).
+- [ ] **Microinteracciones en el carrito** `[mobile]` — cuando agregás un equipo desde el card, animar el "+1" volando hacia el ícono del carrito (Framer Motion). El feedback táctil es especialmente importante en mobile.
 
 - [ ] **Compartir equipo (link directo)** — botón "compartir" en el card del catálogo que copia un URL con anchor a ese equipo.
 
 - [ ] **Mejor manejo de imágenes rotas** — hoy con `onError` se baja la opacidad. Reemplazar con un placeholder real (categoría + nombre) cuando falla.
 
-- [ ] **Sticky header en el catálogo** — el filtro y carrito siempre visibles cuando scrolleás.
+- [ ] **Sticky header en el catálogo** `[mobile]` — el filtro y carrito siempre visibles cuando scrolleás. El `MobileStickyBar` ya es sticky; esto aplica a asegurar que se mantenga visible en todos los casos.
 
 ---
 
