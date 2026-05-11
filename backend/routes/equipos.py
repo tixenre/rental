@@ -2096,8 +2096,11 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
                 urls.append(u)
         return urls
 
-    def _extract_images_from_page(url: str, client) -> list[str]:
-        """Scrapea una página y extrae URLs de imagen (meta + markdown img tags)."""
+    def _extract_images_from_page(url: str, client, trust_url: bool = False) -> list[str]:
+        """Scrapea una página y extrae URLs de imagen (meta + markdown img tags).
+        Si trust_url=True (cuando el usuario pega el link explícitamente), no
+        descarta candidatos por dimensiones pequeñas en la URL — solo filtra
+        patrones obvios de basura (thumbs, iconos, logos)."""
         try:
             r = client.post(
                 "https://api.firecrawl.dev/v2/scrape",
@@ -2139,17 +2142,18 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
             )
             if any(p in lo for p in LOW_QUALITY_PATTERNS):
                 return
-            # Dimensiones pequeñas en URL: -100x100, _50x50, 200x150
-            import re as _re
-            m = _re.search(r"[-_/](\d{2,4})x(\d{2,4})", lo)
-            if m:
-                w, h = int(m.group(1)), int(m.group(2))
-                if w < 800 or h < 800:
+            if not trust_url:
+                # Dimensiones pequeñas en URL: -100x100, _50x50, 200x150
+                import re as _re
+                m = _re.search(r"[-_/](\d{2,4})x(\d{2,4})", lo)
+                if m:
+                    w, h = int(m.group(1)), int(m.group(2))
+                    if w < 800 or h < 800:
+                        return
+                # width=NN o w=NN <= 300 en query string
+                m = _re.search(r"[?&](?:width|w|size)=(\d+)", lo)
+                if m and int(m.group(1)) < 800:
                     return
-            # width=NN o w=NN <= 300 en query string
-            m = _re.search(r"[?&](?:width|w|size)=(\d+)", lo)
-            if m and int(m.group(1)) < 800:
-                return
             k = lo
             if k in seen or k in exclude_lc:
                 return
@@ -2213,7 +2217,12 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
 
     with httpx.Client(timeout=45.0) as client:
         if direct_url:
-            for u in _extract_images_from_page(direct_url, client):
+            # 1) Si la URL apunta directamente a una imagen, usarla tal cual.
+            if direct_url.lower().rsplit(".", 1)[-1] in ("jpg", "jpeg", "png", "webp", "avif", "gif"):
+                all_cands.append(direct_url)
+                seen_lc.add(direct_url.lower())
+            # 2) Scrapear la página con filtros relajados (trust_url=True)
+            for u in _extract_images_from_page(direct_url, client, trust_url=True):
                 if u.lower() not in seen_lc:
                     seen_lc.add(u.lower())
                     all_cands.append(u)
