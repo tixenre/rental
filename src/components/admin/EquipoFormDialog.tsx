@@ -3,7 +3,16 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Upload, Plus, Trash2, Sparkles, ChevronUp, ChevronDown, GripVertical } from "lucide-react";
+import { Loader2, Upload, Plus, Trash2, Sparkles, ChevronUp, ChevronDown, GripVertical, Search } from "lucide-react";
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -1163,6 +1172,70 @@ function CategoriasPicker({
   );
 }
 
+// ── SortableKitItem ──────────────────────────────────────────────────────────
+
+function SortableKitItem({
+  item, busy, onUpdateQty, onRemove,
+}: {
+  item: KitComponente;
+  busy: number | null;
+  onUpdateQty: (id: number, qty: number) => void;
+  onRemove: (id: number) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.componente_id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 rounded-md border hairline px-2 py-1.5 bg-background"
+    >
+      {/* drag handle */}
+      <button
+        type="button"
+        className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground touch-none"
+        {...attributes}
+        {...listeners}
+        tabIndex={-1}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+
+      {item.foto_url
+        ? <img src={item.foto_url} alt="" className="h-8 w-8 object-contain rounded bg-muted/30 shrink-0" />
+        : <div className="h-8 w-8 rounded bg-muted/30 shrink-0" />
+      }
+
+      <div className="flex-1 min-w-0">
+        <div className="text-sm truncate">{item.nombre}</div>
+        {item.marca && <div className="text-[11px] text-muted-foreground">{item.marca}</div>}
+      </div>
+
+      <Input
+        type="number" min={1}
+        value={item.cantidad}
+        className="w-16 h-8 text-center"
+        onChange={(e) => onUpdateQty(item.componente_id, Math.max(1, parseInt(e.target.value || "1", 10)))}
+        disabled={busy === item.componente_id}
+      />
+      <Button type="button" size="icon" variant="ghost"
+        onClick={() => onRemove(item.componente_id)}
+        disabled={busy === item.componente_id}>
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+// ── KitEditor ────────────────────────────────────────────────────────────────
+
 function KitEditor({ equipoId }: { equipoId: number }) {
   const [items, setItems] = useState<KitComponente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1170,6 +1243,11 @@ function KitEditor({ equipoId }: { equipoId: number }) {
   const [results, setResults] = useState<Equipo[]>([]);
   const [searching, setSearching] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const load = async () => {
     setLoading(true);
@@ -1230,64 +1308,53 @@ function KitEditor({ equipoId }: { equipoId: number }) {
     } finally { setBusy(null); }
   };
 
-  return (
-    <div className="space-y-3">
-      <div>
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-          Componentes ({items.length})
-        </Label>
-        {loading ? (
-          <p className="text-xs text-muted-foreground mt-2">Cargando…</p>
-        ) : items.length === 0 ? (
-          <p className="text-xs text-muted-foreground italic mt-2">Sin componentes.</p>
-        ) : (
-          <div className="space-y-1.5 mt-2">
-            {items.map((it) => (
-              <div key={it.componente_id} className="flex items-center gap-2 rounded-md border hairline px-2 py-1.5">
-                {it.foto_url && (
-                  <img src={it.foto_url} alt="" className="h-8 w-8 object-contain rounded bg-muted/30" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm truncate">{it.nombre}</div>
-                  {it.marca && <div className="text-[11px] text-muted-foreground">{it.marca}</div>}
-                </div>
-                <Input
-                  type="number" min={1}
-                  value={it.cantidad}
-                  className="w-16 h-8 text-center"
-                  onChange={(e) => updateQty(it.componente_id, Math.max(1, parseInt(e.target.value || "1", 10)))}
-                  disabled={busy === it.componente_id}
-                />
-                <Button type="button" size="icon" variant="ghost"
-                  onClick={() => remove(it.componente_id)}
-                  disabled={busy === it.componente_id}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
+    const oldIndex = items.findIndex((i) => i.componente_id === active.id);
+    const newIndex = items.findIndex((i) => i.componente_id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(items, oldIndex, newIndex);
+    setItems(reordered); // optimistic update
+    try {
+      await adminApi.reorderKit(equipoId, reordered.map((i) => i.componente_id));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al reordenar");
+      await load(); // revert
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* ── Buscador (arriba) ── */}
       <div>
         <Label className="text-xs uppercase tracking-wide text-muted-foreground">Agregar componente</Label>
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por nombre, marca o modelo…"
-          className="mt-1"
-        />
-        {searching && <p className="text-xs text-muted-foreground mt-1">Buscando…</p>}
+        <div className="relative mt-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, marca o modelo…"
+            className="pl-8"
+          />
+          {searching && (
+            <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          )}
+        </div>
+
         {results.length > 0 && (
-          <div className="mt-2 max-h-56 overflow-y-auto rounded-md border hairline divide-y">
+          <div className="mt-1.5 max-h-56 overflow-y-auto rounded-md border hairline divide-y shadow-sm">
             {results.map((r) => (
               <button key={r.id} type="button"
                 className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-accent text-left disabled:opacity-50"
                 onClick={() => add(r.id)}
                 disabled={busy === r.id || items.some((i) => i.componente_id === r.id)}>
-                {r.foto_url && (
-                  <img src={r.foto_url} alt="" className="h-7 w-7 object-contain rounded bg-muted/30" />
-                )}
+                {r.foto_url
+                  ? <img src={r.foto_url} alt="" className="h-7 w-7 object-contain rounded bg-muted/30 shrink-0" />
+                  : <div className="h-7 w-7 rounded bg-muted/30 shrink-0" />
+                }
                 <div className="flex-1 min-w-0">
                   <div className="text-sm truncate">{r.nombre}</div>
                   <div className="text-[11px] text-muted-foreground truncate">
@@ -1296,10 +1363,49 @@ function KitEditor({ equipoId }: { equipoId: number }) {
                 </div>
                 {items.some((i) => i.componente_id === r.id)
                   ? <Badge variant="secondary" className="text-[10px]">en kit</Badge>
-                  : <Plus className="h-4 w-4 text-muted-foreground" />}
+                  : <Plus className="h-4 w-4 text-muted-foreground shrink-0" />}
               </button>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* ── Lista de componentes con drag-and-drop ── */}
+      <div>
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          Componentes ({items.length})
+          {items.length > 1 && (
+            <span className="ml-1.5 normal-case font-normal text-muted-foreground/60">· arrastrá para reordenar</span>
+          )}
+        </Label>
+
+        {loading ? (
+          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando…
+          </div>
+        ) : items.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic mt-2">
+            Sin componentes. Usá el buscador de arriba para agregar.
+          </p>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext
+              items={items.map((i) => i.componente_id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-1.5 mt-2">
+                {items.map((it) => (
+                  <SortableKitItem
+                    key={it.componente_id}
+                    item={it}
+                    busy={busy}
+                    onUpdateQty={updateQty}
+                    onRemove={remove}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
     </div>
