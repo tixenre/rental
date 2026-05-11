@@ -38,10 +38,3 @@ export function getAvailability(
   if (bucket < 35) return { available: true, stock: 1 };
   return { available: true, stock: 2 + (seed % 3) };
 }
-
-/** Cantidad de jornadas facturables (mínimo 1). */
-export function billableDays(start?: Date, end?: Date): number {
-  if (!start || !end) return 1;
-  const ms = end.getTime() - start.getTime();
-  return Math.max(1, Math.ceil(ms / 86400000) + 1);
-}

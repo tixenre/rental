@@ -195,6 +195,7 @@ function Index() {
           {/* Mobile */}
           <div className="sm:hidden">
             <MobileStickyBar
+              allEquipos={allEquipos}
               query={query}
               setQuery={setQuery}
               categories={apiCategories}
@@ -403,12 +404,14 @@ function GridMode({
       )}
 
       {!isFiltered && !isSearching && marcas.length > 0 && (
-        <BrandCarousel
-          brands={marcas}
-          allEquipos={allEquipos}
-          selectedBrand={selectedBrand}
-          onBrandSelect={onBrandSelect}
-        />
+        <div className="hidden sm:block">
+          <BrandCarousel
+            brands={marcas}
+            allEquipos={allEquipos}
+            selectedBrand={selectedBrand}
+            onBrandSelect={onBrandSelect}
+          />
+        </div>
       )}
 
 

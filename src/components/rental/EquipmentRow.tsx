@@ -233,9 +233,12 @@ export function EquipmentRow({
             <div className="border-t hairline px-3 py-3 sm:px-4 sm:py-4 space-y-3">
               {/* Quick facts fundamentales (montura, formato, resolución...).
                * TODO #116: hacer configurables desde admin por categoría —
-               * hoy son los primeros 3 con valor entre un set fijo. */}
+               * hoy son los primeros 3 con valor entre un set fijo.
+               * Ocultos en mobile (#144) — se solapan visualmente con los
+               * specs highlights de IncludedList y la info está en la ficha
+               * completa via QuickFactsRow. */}
               {quickFacts.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
+                <div className="hidden flex-wrap gap-1.5 sm:flex">
                   {quickFacts.map((f) => (
                     <span
                       key={f.label}

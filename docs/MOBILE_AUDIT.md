@@ -3,6 +3,51 @@
 > Crítico para launch porque la mayoría del tráfico de un rental viene de móvil
 > (clientes consultando desde sets, productoras, etc.). Sin mobile, no hay launch.
 
+## Superficie mobile
+
+No todo se renderiza en mobile. El criterio de triage:
+
+- ✅ **Renderiza y funciona bien** → no tocar salvo regresión.
+- ⚠️ **Renderiza pero con problemas** → fix o decisión de ocultar.
+- ❌ **No renderiza** → fuera del scope mobile (no crear issues).
+
+| Componente / Sección | Estado mobile | Notas |
+|---|---|---|
+| MobileStickyBar | ✅ solo mobile | Fechas + búsqueda + filtros |
+| TopBar mobile | ✅ logo centrado + icono usuario | |
+| EquipmentRow (list) | ✅ thumb cuadrado, precio inline | |
+| EquipmentCard (grid) | ✅ 2 cols mobile | Responsive utils a revisar (#5) |
+| RentalDateModal | ✅ `h-[100dvh]` | |
+| CartDrawer | ✅ full-width | |
+| CategoryMosaic | ✅ renderiza | |
+| Footer | ✅ mobile compacto | |
+| BrandCarousel | ❌ oculto (`hidden sm:block`) | Ocultado mayo 2026 — no queda bien sin flechas |
+| CarouselRow arrows | ❌ `hidden sm:flex` | El contenido del carrusel puede ser visible |
+| ListFilters (panel) | ❌ `hidden md:block` | En mobile usa MobileFiltersSheet |
+| TopBar pill de fechas | ❌ `hidden md:flex` | En mobile está en MobileStickyBar |
+| TopBar acciones desktop | ❌ `hidden md:flex` | |
+| Footer desktop | ❌ `hidden md:block` | |
+| Precio columna desktop | ❌ `hidden sm:block` | En mobile está inline |
+
+---
+
+## Label `mobile`
+
+Todos los issues relacionados con la experiencia mobile llevan la label
+`mobile` en GitHub. Alcance:
+
+- ✅ Incluye: rutas y componentes del cliente (`/`, `/equipo/*`, `/cliente/*`, `/estudio`)
+- ✅ Incluye: `/admin/pedidos`, `/admin/dashboard` (el dueño los usa desde el celu)
+- ❌ Excluye: el resto del admin por ahora
+
+Ver convención completa en `docs/ISSUE_LABELS.md`.
+
+```bash
+gh issue list --state open --label "mobile"
+```
+
+---
+
 ## Cómo correr la auditoría
 
 ### Manual (rápido, sin setup)
@@ -61,15 +106,22 @@ Para cada página, verificar **todos** estos puntos antes de marcar como OK:
 | Ficha de equipo | `/equipo/{id}` | 🟢 OK | Layout mobile-first con precio sticky bottom (PR #111). |
 | El Estudio | `/estudio` | 🟡 Verificar | FAQ accordion + booking form en mobile. |
 | Preguntas frecuentes | `/preguntas-frecuentes` | 🟢 OK | Layout simple, accordions. |
-| Login cliente | `/cliente/login` | 🟢 OK | Formulario centrado, inputs full-width. |
-| Registro cliente | `/cliente/registro` | 🟢 OK | Idem. |
+| Login cliente | `/cliente/login` | 🟡 Verificar | Funciona por defecto pero sin responsive utils explícitas. |
+| Registro cliente | `/cliente/registro` | 🟡 Verificar | Idem. |
+
+### Admin (prioritario mobile)
+
+| Página | URL | Status | Notas |
+|---|---|---|---|
+| Pedidos | `/admin/pedidos` | 🔴 Pendiente | Lista y detalle de pedidos desde celu |
+| Dashboard | `/admin/dashboard` | 🔴 Pendiente | KPIs desde celu |
 
 ### Portal cliente
 
 | Página | URL | Status | Notas |
 |---|---|---|---|
 | Lista de pedidos | `/cliente/portal` | 🟢 OK | Acordeón expandible por pedido. |
-| Perfil | `/cliente/perfil` | 🟢 OK | Form simple. |
+| Perfil | `/cliente/perfil` | 🟡 Verificar | Sin responsive utils explícitas. |
 
 ### Componentes críticos
 
@@ -129,9 +181,11 @@ Fixea **todos** los inputs del proyecto sin tocar componentes. Desktop (`md+`) s
 
 ## Re-auditar cuando
 
-- Se agregue una página nueva.
+- **En cada PR** que toque rutas cliente o `/admin/pedidos|dashboard` (gate de merge — ver PROTOCOLO.md Fase 1.5).
+- Se agregue una página nueva → agregarla a la tabla de páginas y auditarla.
 - Se cambie el diseño de TopBar, Cart, DateModal o Footer (componentes globales).
 - Se actualice Tailwind o shadcn (puede romper sizing).
 - Antes de cada deploy a producción si hubo cambios de UI.
+- Como rutina general: cada 2-4 semanas.
 
 Mantener este doc actualizado con cada fix.
