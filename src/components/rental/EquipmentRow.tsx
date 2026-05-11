@@ -3,6 +3,7 @@ import { Plus, Minus, Sparkles, ChevronDown } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
+import { priceBreakdown } from "@/lib/pricing";
 import { EmptyImage } from "./EmptyImage";
 import { IncludedList } from "./IncludedList";
 import { useEquipmentDetail } from "@/lib/equipment-detail-context";
@@ -18,6 +19,8 @@ export function EquipmentRow({
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
   const remove = useCart((s) => s.remove);
+  const jornadas = useCart((s) => s.days());
+  const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
   const selected = qty > 0;
   const { openId, setOpenId } = useEquipmentDetail();
   const expanded = openId === item.id;
@@ -27,6 +30,11 @@ export function EquipmentRow({
 
   const sinStock = noStock;
   const stockBajo = !noStock && cap > 0 && cap <= 2;
+
+  // TODO #73: cuando se implementen descuentos por jornada / cliente,
+  // este breakdown ya devolverá total con descuentos aplicados.
+  const price = priceBreakdown(item.pricePerDay, jornadas, 1);
+  const showPeriodTotal = hasDateRange && jornadas > 1;
 
   return (
     <div
@@ -96,8 +104,13 @@ export function EquipmentRow({
                 {formatARS(item.pricePerDay)}
               </span>
               <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-                /día
+                /jornada
               </span>
+              {showPeriodTotal && (
+                <span className="ml-1 font-display text-xs tabular text-amber">
+                  · {formatARS(price.total)} total
+                </span>
+              )}
             </div>
           </div>
         </button>
@@ -108,8 +121,16 @@ export function EquipmentRow({
             {formatARS(item.pricePerDay)}
           </div>
           <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-            / 1 jornada
+            / jornada
           </div>
+          {showPeriodTotal && (
+            <div className="mt-1 font-display text-sm tabular text-amber">
+              {formatARS(price.total)}
+              <span className="ml-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                · {price.jornadas} j
+              </span>
+            </div>
+          )}
           {disponible !== undefined && (
             <div
               className={cn(
