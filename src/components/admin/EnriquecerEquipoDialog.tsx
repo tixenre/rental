@@ -435,7 +435,7 @@ export function EnriquecerEquipoDialog({
         <DialogHeader>
           <DialogTitle className="font-display text-2xl flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-amber" />
-            Enriquecer con IA
+            Auto-completar info
           </DialogTitle>
           <DialogDescription>
             Buscamos en B&amp;H y sitios oficiales — la IA extrae specs, foto, ficha técnica

@@ -22,5 +22,10 @@ playwright>=1.40.0
 alembic>=1.13.0
 SQLAlchemy>=2.0.0
 
+# Rate limiting (#58). In-memory por default — sirve bien con 1 instancia
+# de Railway. Si Railway escala a multi-instancia o se agrega Redis,
+# cambiar storage_uri en main.py a "redis://...".
+slowapi>=0.1.9
+
 # Tests (no se instalan en prod; el CI corre `pip install -r requirements-dev.txt`).
 # Mantener acá los runtime deps; los test deps van en requirements-dev.txt.
