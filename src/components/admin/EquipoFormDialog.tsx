@@ -743,7 +743,27 @@ export function EquipoFormDialog({
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="N° Serie"><Input {...form.register("serie")} /></Field>
+                  <Field label="N° Serie">
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        {...form.register("serie")}
+                        placeholder="N° de serie"
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          form.setValue("serie", "N/A", { shouldDirty: true })
+                        }
+                        className="shrink-0 text-xs h-9"
+                        title="Marcar como no aplica (ej. reflectores, cables sin serie)"
+                      >
+                        N/A
+                      </Button>
+                    </div>
+                  </Field>
                   <Field label="Dueño">
                     {(() => {
                       const value = form.watch("dueno") ?? "Rambla";

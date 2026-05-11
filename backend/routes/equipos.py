@@ -876,6 +876,36 @@ class EtiquetasReorder(BaseModel):
     ids: list[int]
 
 
+@router.get("/admin/equipos/sin-serie")
+def admin_equipos_sin_serie(request: Request):
+    """Lista equipos sin número de serie cargado.
+
+    Útil para que el admin priorice completar el inventario (issue #91).
+    Ordena por valor de reposición DESC — primero los equipos más caros
+    (importantes para identificar en caso de pérdida/daño).
+
+    Considera \"sin serie\" cualquier valor NULL, vacío o solo espacios.
+    NOTA: 'N/A' es un valor válido — significa \"no aplica\" (reflectores,
+    cables sin serie, etc.). El admin lo seteó explícitamente, no falta.
+    """
+    require_admin(request)
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT id, nombre, marca, modelo, foto_url,
+                   valor_reposicion, dueno, cantidad
+            FROM equipos
+            WHERE serie IS NULL OR TRIM(serie) = ''
+            ORDER BY COALESCE(valor_reposicion, 0) DESC, id ASC
+        """).fetchall()
+        return {
+            "total": len(rows),
+            "equipos": [row_to_dict(r) for r in rows],
+        }
+    finally:
+        conn.close()
+
+
 @router.get("/admin/etiquetas")
 def admin_list_etiquetas(request: Request):
     require_admin(request)

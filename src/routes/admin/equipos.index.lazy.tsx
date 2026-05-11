@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,12 @@ function EquiposPage() {
   const etiquetasQ = useQuery({
     queryKey: ["admin", "etiquetas"],
     queryFn: () => adminApi.listEtiquetas(),
+  });
+  // Banner de calidad de inventario: equipos sin serie. Issue #91.
+  const sinSerieQ = useQuery({
+    queryKey: ["admin", "equipos-sin-serie"],
+    queryFn: () => adminApi.getEquiposSinSerie(),
+    staleTime: 60_000,
   });
 
   const invalidate = () => {
@@ -139,6 +145,20 @@ function EquiposPage() {
       {equiposQ.error && (
         <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           Error: {(equiposQ.error as Error).message}
+        </div>
+      )}
+
+      {/* Banner: equipos sin serie cargada (calidad inventario, issue #91) */}
+      {sinSerieQ.data && sinSerieQ.data.total > 0 && (
+        <div className="flex items-start gap-2.5 rounded-md border hairline border-amber/40 bg-amber-soft/30 px-3 py-2 text-sm">
+          <AlertCircle className="h-4 w-4 mt-0.5 text-amber shrink-0" />
+          <div className="flex-1">
+            <span className="font-medium text-ink">
+              {sinSerieQ.data.total} equipo
+              {sinSerieQ.data.total === 1 ? "" : "s"} sin número de serie
+            </span>
+            <span className="text-muted-foreground"> · cargá la serie desde el form de cada equipo (botón <span className="font-mono">N/A</span> si no aplica).</span>
+          </div>
         </div>
       )}
 
