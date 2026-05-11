@@ -379,9 +379,17 @@ function GlobalDetailDialog({
 }) {
   const { eq } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
+  const savedScrollY = useRef(0);
 
   const item = eq ? allEquipos.find((e: Equipment) => e.id === eq) : undefined;
   const open = !!item && mode === "grid";
+
+  // Guardar posición de scroll cuando se abre el modal
+  useEffect(() => {
+    if (open) {
+      savedScrollY.current = window.scrollY;
+    }
+  }, [open]);
 
   if (!item) return null;
   return (
@@ -391,9 +399,15 @@ function GlobalDetailDialog({
       disponible={getDisponible(item)}
       onOpenChange={(v) => {
         if (!v) {
+          const scrollY = savedScrollY.current;
           navigate({
             search: (prev: { eq?: string }) => ({ ...prev, eq: undefined }),
             replace: true,
+            resetScroll: false,
+          });
+          // Restaurar posición de scroll luego de que el router re-renderice
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: scrollY, behavior: "instant" as ScrollBehavior });
           });
         }
       }}
