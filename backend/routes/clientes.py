@@ -4,10 +4,11 @@ routes/clientes.py — CRUD de clientes e importación desde histórico.
 
 from typing import Optional
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Request
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict
+from admin_guard import require_admin
 
 router = APIRouter()
 
@@ -45,10 +46,12 @@ class ClienteUpdate(BaseModel):
 
 @router.get("/clientes")
 def list_clientes(
+    request:  Request,
     q:        Optional[str] = Query(None),
     page:     int = Query(1, ge=1),
     per_page: int = Query(100, ge=1, le=500),
 ):
+    require_admin(request)
     conn   = get_db()
     offset = (page - 1) * per_page
     where  = "WHERE 1=1"
@@ -69,7 +72,8 @@ def list_clientes(
 
 
 @router.get("/clientes/{id}")
-def get_cliente(id: int):
+def get_cliente(id: int, request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         row  = conn.execute("SELECT * FROM clientes WHERE id=?", (id,)).fetchone()
@@ -81,7 +85,8 @@ def get_cliente(id: int):
 
 
 @router.get("/clientes/{id}/pedidos")
-def get_cliente_pedidos(id: int):
+def get_cliente_pedidos(id: int, request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM clientes WHERE id=?", (id,)).fetchone():
@@ -104,7 +109,8 @@ def get_cliente_pedidos(id: int):
 
 
 @router.post("/clientes", status_code=201)
-def create_cliente(data: ClienteCreate):
+def create_cliente(data: ClienteCreate, request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         cur  = conn.execute("""
@@ -124,7 +130,8 @@ def create_cliente(data: ClienteCreate):
 
 
 @router.patch("/clientes/{id}")
-def update_cliente(id: int, data: ClienteUpdate):
+def update_cliente(id: int, data: ClienteUpdate, request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM clientes WHERE id=?", (id,)).fetchone():
@@ -145,7 +152,8 @@ def update_cliente(id: int, data: ClienteUpdate):
 
 
 @router.delete("/clientes/{id}", status_code=204)
-def delete_cliente(id: int):
+def delete_cliente(id: int, request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM clientes WHERE id=?", (id,)).fetchone():

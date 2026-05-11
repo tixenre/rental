@@ -3,15 +3,17 @@ routes/estadisticas.py — Análisis y estadísticas de alquileres.
 Lee directo de pedidos + alquiler_items + equipos. Sin tablas intermedias.
 """
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from typing import Optional
 from database import get_db, row_to_dict
+from admin_guard import require_admin
 
 router = APIRouter()
 
 
 @router.get("/estadisticas")
-def get_estadisticas():
+def get_estadisticas(request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         # ── Totales generales (solo pedidos confirmados/finalizados) ──────────────
@@ -180,11 +182,13 @@ def get_estadisticas():
 
 @router.get("/estadisticas/pedidos")
 def list_pedidos_stats(
+    request:  Request,
     q:        Optional[str] = Query(None),
     dueno:    Optional[str] = Query(None),
     page:     int = Query(1, ge=1),
     per_page: int = Query(80, ge=1, le=500),
 ):
+    require_admin(request)
     """Lista de pedidos confirmados con sus items para la tabla de detalle."""
     conn   = get_db()
     offset = (page - 1) * per_page

@@ -6,12 +6,13 @@ import datetime
 from math import ceil
 from typing import Optional
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
+from admin_guard import require_admin
 
 router = APIRouter()
 
@@ -267,7 +268,17 @@ def get_disponibilidad(
 # ── Rutas de pedidos ─────────────────────────────────────────────────────────
 
 @router.post("/alquileres", status_code=201)
+def create_pedido_endpoint(data: PedidoCreate, request: Request):
+    """Endpoint admin para crear pedido. La lógica está en `create_pedido`,
+    así el portal cliente (cliente_portal.py) la reutiliza sin pasar por admin guard."""
+    require_admin(request)
+    return create_pedido(data)
+
+
 def create_pedido(data: PedidoCreate):
+    """Lógica interna de creación de pedido. Llamada por el endpoint admin
+    (`create_pedido_endpoint`) y también por `cliente_portal.cliente_crear_pedido`
+    que tiene su propio `require_cliente`."""
     if not data.items and data.estado != "borrador":
         raise HTTPException(400, "El pedido debe tener al menos un ítem")
 
@@ -345,6 +356,7 @@ SORT_COLS = {
 
 @router.get("/alquileres")
 def list_pedidos(
+    request: Request,
     estado:   Optional[str] = Query(None),
     fuente:   Optional[str] = Query(None),
     q:        Optional[str] = Query(None),
@@ -353,6 +365,7 @@ def list_pedidos(
     sort_by:  Optional[str] = Query(None),
     sort_dir: Optional[str] = Query("desc"),
 ):
+    require_admin(request)
     conn   = get_db()
     offset = (page - 1) * per_page
     params: list = []
@@ -395,7 +408,8 @@ def list_pedidos(
 
 
 @router.get("/alquileres/{id}")
-def get_pedido(id: int):
+def get_pedido(id: int, request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         pedido = _get_alquiler_detail(conn, id)
@@ -405,7 +419,8 @@ def get_pedido(id: int):
 
 
 @router.delete("/alquileres/{id}", status_code=204)
-def delete_pedido(id: int):
+def delete_pedido(id: int, request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
@@ -457,7 +472,8 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
 
 
 @router.patch("/alquileres/{id}")
-def update_pedido(id: int, data: PedidoEstado):
+def update_pedido(id: int, data: PedidoEstado, request: Request):
+    require_admin(request)
     if data.estado not in ESTADOS_VALIDOS:
         raise HTTPException(400, f"Estado inválido. Usar: {', '.join(sorted(ESTADOS_VALIDOS))}")
 
@@ -508,7 +524,8 @@ def update_pedido(id: int, data: PedidoEstado):
 
 
 @router.patch("/alquileres/{id}/pago")
-def registrar_pago(id: int, data: PagoParcial):
+def registrar_pago(id: int, data: PagoParcial, request: Request):
+    require_admin(request)
     """Endpoint legacy: setea monto_pagado directamente (sin registro en tabla pagos)."""
     conn = get_db()
     try:
@@ -531,7 +548,8 @@ def registrar_pago(id: int, data: PagoParcial):
 # ── Registro de pagos ────────────────────────────────────────────────────────
 
 @router.get("/alquileres/{id}/pagos")
-def list_pagos(id: int):
+def list_pagos(id: int, request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
@@ -543,14 +561,18 @@ def list_pagos(id: int):
 
 
 @router.post("/alquileres/{id}/pagos", status_code=201)
-def agregar_pago(id: int, data: PagoCreate):
+def agregar_pago(id: int, data: PagoCreate, request: Request):
     """Agrega una entrada de pago y recalcula monto_pagado."""
+    require_admin(request)
     if data.monto <= 0:
         raise HTTPException(400, "El monto debe ser mayor a 0")
     conn = get_db()
     try:
-        if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
+        p = conn.execute("SELECT estado FROM alquileres WHERE id=?", (id,)).fetchone()
+        if not p:
             raise HTTPException(404, "Pedido no encontrado")
+        if p["estado"] in ("cancelado",):
+            raise HTTPException(400, "No se pueden agregar pagos a un pedido cancelado")
 
         fecha = data.fecha or datetime.date.today().isoformat()
         conn.execute("""
@@ -572,7 +594,8 @@ def agregar_pago(id: int, data: PagoCreate):
 
 
 @router.delete("/alquileres/{id}/pagos/{pago_id}", status_code=200)
-def eliminar_pago(id: int, pago_id: int):
+def eliminar_pago(id: int, pago_id: int, request: Request):
+    require_admin(request)
     """Elimina una entrada de pago y recalcula monto_pagado."""
     conn = get_db()
     try:
@@ -602,7 +625,8 @@ def eliminar_pago(id: int, pago_id: int):
 
 
 @router.patch("/alquileres/{id}/datos")
-def update_pedido_datos(id: int, data: PedidoDatos):
+def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         p = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
@@ -657,7 +681,8 @@ def update_pedido_datos(id: int, data: PedidoDatos):
 
 
 @router.put("/alquileres/{id}/items")
-def update_alquiler_items(id: int, data: PedidoItemUpdate):
+def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         p = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
@@ -703,8 +728,9 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate):
 # ── PDFs ─────────────────────────────────────────────────────────────────────
 
 @router.get("/alquileres/{id}/pdf")
-async def pedido_pdf(id: int, format: str = "pdf"):
+async def pedido_pdf(id: int, request: Request, format: str = "pdf"):
     """`format=html` devuelve el preview HTML sin pasar por el renderer."""
+    require_admin(request)
     conn = get_db()
     try:
         row  = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
@@ -729,8 +755,9 @@ async def pedido_pdf(id: int, format: str = "pdf"):
 
 
 @router.get("/alquileres/{id}/albaran")
-async def pedido_albaran(id: int, format: str = "pdf"):
+async def pedido_albaran(id: int, request: Request, format: str = "pdf"):
     """`format=html` devuelve el preview HTML sin pasar por el renderer."""
+    require_admin(request)
     conn = get_db()
     try:
         row  = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
@@ -774,8 +801,9 @@ async def pedido_albaran(id: int, format: str = "pdf"):
 
 
 @router.get("/alquileres/{id}/contrato")
-async def pedido_contrato(id: int, format: str = "pdf"):
+async def pedido_contrato(id: int, request: Request, format: str = "pdf"):
     """Genera el PDF del contrato de alquiler."""
+    require_admin(request)
     conn    = get_db()
     try:
         pedido  = _get_alquiler_detail(conn, id)
