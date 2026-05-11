@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 113,
+    date: "2026-05-11",
+    type: "feat",
+    title: "URLs de equipos con nombre legible — /equipo/sony-fx3-cuerpo-47",
+    body: "Antes los links eran /equipo/47 — números crípticos sin información. Ahora son /equipo/sony-fx3-cuerpo-47, con la marca y el nombre del equipo. Google posiciona mejor URLs con keywords, y compartir un link es más confiable (al ver la URL ya se sabe qué hay). Los links viejos /equipo/47 siguen funcionando y redirigen automáticamente al nuevo formato.",
+    labels: ["seo", "público"],
+  },
+  {
     number: 112,
     date: "2026-05-11",
     type: "fix",
