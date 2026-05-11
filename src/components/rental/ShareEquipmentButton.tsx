@@ -24,7 +24,7 @@ export function ShareEquipmentButton({ id, name }: { id: string; name: string })
     <button
       type="button"
       onClick={handleShare}
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border hairline px-3 py-2.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition hover:border-amber hover:text-ink active:border-amber active:text-amber"
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border hairline px-3 py-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition hover:border-amber hover:text-ink active:border-amber active:text-amber"
       aria-label="Compartir enlace"
     >
       {copied ? (
