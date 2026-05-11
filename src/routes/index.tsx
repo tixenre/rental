@@ -195,6 +195,7 @@ function Index() {
           {/* Mobile */}
           <div className="sm:hidden">
             <MobileStickyBar
+              allEquipos={allEquipos}
               query={query}
               setQuery={setQuery}
               categories={apiCategories}
