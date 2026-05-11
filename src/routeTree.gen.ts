@@ -13,6 +13,7 @@ import { Route as EstudioRouteImport } from './routes/estudio'
 import { Route as ClienteRouteImport } from './routes/cliente'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ClienteIndexRouteImport } from './routes/cliente.index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ClienteRegistroRouteImport } from './routes/cliente.registro'
 import { Route as ClientePortalRouteImport } from './routes/cliente.portal'
@@ -53,6 +54,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ClienteIndexRoute = ClienteIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ClienteRoute,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
@@ -170,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/admin/': typeof AdminIndexRoute
+  '/cliente/': typeof ClienteIndexRoute
   '/admin/equipos/categorias': typeof AdminEquiposCategoriasRoute
   '/admin/equipos/clasificar': typeof AdminEquiposClasificarRoute
   '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
@@ -183,7 +190,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
@@ -194,6 +200,7 @@ export interface FileRoutesByTo {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/admin': typeof AdminIndexRoute
+  '/cliente': typeof ClienteIndexRoute
   '/admin/equipos/categorias': typeof AdminEquiposCategoriasRoute
   '/admin/equipos/clasificar': typeof AdminEquiposClasificarRoute
   '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
@@ -221,6 +228,7 @@ export interface FileRoutesById {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/admin/': typeof AdminIndexRoute
+  '/cliente/': typeof ClienteIndexRoute
   '/admin/equipos/categorias': typeof AdminEquiposCategoriasRoute
   '/admin/equipos/clasificar': typeof AdminEquiposClasificarRoute
   '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
@@ -249,6 +257,7 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/admin/'
+    | '/cliente/'
     | '/admin/equipos/categorias'
     | '/admin/equipos/clasificar'
     | '/admin/equipos/etiquetas'
@@ -262,7 +271,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/cliente'
     | '/estudio'
     | '/admin/calendario'
     | '/admin/clientes'
@@ -273,6 +281,7 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/admin'
+    | '/cliente'
     | '/admin/equipos/categorias'
     | '/admin/equipos/clasificar'
     | '/admin/equipos/etiquetas'
@@ -299,6 +308,7 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/admin/'
+    | '/cliente/'
     | '/admin/equipos/categorias'
     | '/admin/equipos/clasificar'
     | '/admin/equipos/etiquetas'
@@ -347,6 +357,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/cliente/': {
+      id: '/cliente/'
+      path: '/'
+      fullPath: '/cliente/'
+      preLoaderRoute: typeof ClienteIndexRouteImport
+      parentRoute: typeof ClienteRoute
     }
     '/admin/': {
       id: '/admin/'
@@ -547,12 +564,14 @@ interface ClienteRouteChildren {
   ClienteLoginRoute: typeof ClienteLoginRoute
   ClientePortalRoute: typeof ClientePortalRoute
   ClienteRegistroRoute: typeof ClienteRegistroRoute
+  ClienteIndexRoute: typeof ClienteIndexRoute
 }
 
 const ClienteRouteChildren: ClienteRouteChildren = {
   ClienteLoginRoute: ClienteLoginRoute,
   ClientePortalRoute: ClientePortalRoute,
   ClienteRegistroRoute: ClienteRegistroRoute,
+  ClienteIndexRoute: ClienteIndexRoute,
 }
 
 const ClienteRouteWithChildren =

@@ -87,3 +87,21 @@ descrito en `PROTOCOLO.md`:
 1. Spawn Explore agent con prompt de auditoría.
 2. Volcar hallazgos a `BUGS.md` (reset del archivo a las nuevas categorías).
 3. Atacar en tandas siguiendo prioridad CRÍTICO → ALTO → MEDIO → BAJO.
+
+---
+
+## Bugs reportados por el usuario — mayo 2026
+
+Fijados en PR #26 (`feat/sistema-specs-bulletproof`).
+
+| Bug | Estado |
+|-----|--------|
+| PNG con fondo negro | ✅ Resuelto — `object-contain` + `bg-white` en Card/Row/Dialog |
+| Cambios en categorías no se guardan | ✅ Resuelto — `CategoriasSection` reescrita; backend ya tenía CRUD correcto |
+| Link en "Enriquecer con IA" no funciona | ✅ Resuelto — input UI + parámetro `url` en payload → backend lo usaba pero faltaba el campo |
+| Opciones de búsqueda confusas ("Info técnica" buscaba fotos también) | ✅ Resuelto — renombrado a "Specs + foto" |
+| Botón "Ingresar" no lleva a ningún lado | ✅ Resuelto — creado `cliente.index.tsx` con redirect; TanStack Router necesitaba un index route |
+| Modal de producto vuelve al top al cerrarlo | ✅ Resuelto — `savedScrollY` ref + `resetScroll: false` en navigate + `requestAnimationFrame` restore |
+| Imágenes de distintos tamaños | 🟡 Mejorado — `object-contain` + aspect-ratio fijo; normalización completa pendiente (remove.bg) |
+| Búsqueda "Solo fotos" calidad baja | 🔵 Pendiente (low priority) |
+| Calendario en dashboard | 🔵 Sugerencia pendiente |

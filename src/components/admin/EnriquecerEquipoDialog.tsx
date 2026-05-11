@@ -489,12 +489,12 @@ export function EnriquecerEquipoDialog({
               >
                 <FileText className="h-5 w-5 mb-2 text-amber" />
                 <div className="font-medium text-sm">
-                  {customUrl.trim() ? "Buscar desde este link" : "Info técnica"}
+                  {customUrl.trim() ? "Buscar desde este link" : "Specs + foto"}
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-1">
                   {customUrl.trim()
                     ? `Scrapea ${(() => { try { return new URL(customUrl.trim()).hostname; } catch { return "el link"; } })()} con IA.`
-                    : "B&H + IA: specs, peso, montura, precio. ~15s."
+                    : "B&H + IA: specs, peso, montura, foto, precio. ~15s."
                   }
                 </div>
               </button>
