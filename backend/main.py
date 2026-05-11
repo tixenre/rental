@@ -198,5 +198,43 @@ def init_db_bg():
     except Exception as e:
         logger.error("Falló alembic upgrade: %s. La app sigue arrancando — revisar manualmente.", e, exc_info=True)
 
+    # Auto-run del ranking si nunca corrió (popularidad_score=0 en todos
+    # los equipos). Después de eso, queda en manos del admin desde
+    # /admin/settings. Issue #131.
+    try:
+        _maybe_run_initial_ranking()
+    except Exception as e:
+        logger.error("Falló cálculo inicial de ranking: %s. La app sigue. Recalcular manual desde /admin/settings.", e, exc_info=True)
+
+
+def _maybe_run_initial_ranking() -> None:
+    """Corre el cálculo de ranking SI ningún equipo tiene
+    ranking_actualizado seteado (nunca se corrió). Después de la primera
+    vez, queda en manos del admin re-correrlo desde /admin/settings.
+    """
+    from database import get_db
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM equipos WHERE ranking_actualizado IS NOT NULL"
+        ).fetchone()
+        ya_corrio = int(row["n"] or 0) > 0
+        if ya_corrio:
+            logger.info("Ranking ya tiene datos previos — se saltea el cálculo inicial.")
+            return
+
+        logger.info("Corriendo cálculo inicial de ranking (primera vez)...")
+        from services.ranking_service import recalcular_ranking_todos
+        result = recalcular_ranking_todos(conn, dry_run=False)
+        logger.info(
+            "Ranking inicial OK: %d equipos · %d categorías · %d marcas actualizados",
+            len(result.get("cambios", [])),
+            len(result.get("cambios_categorias", [])),
+            len(result.get("cambios_marcas", [])),
+        )
+    finally:
+        conn.close()
+
+
 db_init_thread = threading.Thread(target=init_db_bg, daemon=True)
 db_init_thread.start()
