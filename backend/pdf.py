@@ -533,6 +533,25 @@ def _albaran_html(pedido: dict) -> str:
 
     items = pedido.get("items", [])
     valor_total = 0
+
+    def _valor_celda(valor_unit: int, cantidad: int) -> str:
+        """Renderiza la celda 'Valor reposición':
+        - Si cantidad == 1: solo el valor (más limpio).
+        - Si cantidad > 1: 'valor x cant = subtotal' explícito (issue #92,
+          para que el cliente vea claro que es POR UNIDAD).
+        """
+        subtotal = valor_unit * cantidad
+        if cantidad <= 1:
+            return f'<div class="right">{fmt_ars(valor_unit)}</div>'
+        return (
+            f'<div class="right">'
+            f'<div style="font-size:9pt;color:#666">'
+            f'{fmt_ars(valor_unit)} × {cantidad} und'
+            f'</div>'
+            f'<div style="font-weight:600">{fmt_ars(subtotal)}</div>'
+            f'</div>'
+        )
+
     rows = ""
     n = 1
     for it in items:
@@ -569,7 +588,7 @@ def _albaran_html(pedido: dict) -> str:
           <td>{descripcion}</td>
           <td class="center">{cant}</td>
           <td class="mono">{serie}</td>
-          <td class="right">{fmt_ars(valor)}</td>
+          <td>{_valor_celda(valor, cant)}</td>
         </tr>"""
         n += 1
 
@@ -608,7 +627,7 @@ def _albaran_html(pedido: dict) -> str:
           <td style="padding-left:24px">└─ {comp_descripcion}</td>
           <td class="center">{comp_cant}</td>
           <td class="mono">{comp_serie}</td>
-          <td class="right">{fmt_ars(comp_valor)}</td>
+          <td>{_valor_celda(comp_valor, comp_cant)}</td>
         </tr>"""
             n += 1
 
@@ -754,7 +773,7 @@ def _albaran_html(pedido: dict) -> str:
       <th>Equipo</th>
       <th class="center" style="width:60px">Cant.</th>
       <th style="width:140px">Nº Serie</th>
-      <th class="right" style="width:130px">Valor reposición</th>
+      <th class="right" style="width:150px">Valor reposición<br/><span style="font-size:7.5pt;opacity:0.8;font-weight:500">(por unidad)</span></th>
     </tr>
   </thead>
   <tbody>{rows}</tbody>
@@ -767,6 +786,9 @@ def _albaran_html(pedido: dict) -> str:
     </div>
     <div class="totales-row final">
       <span>Valor total de reposición</span><span>{fmt_ars(valor_total)}</span>
+    </div>
+    <div style="font-size:8.5pt;color:#666;margin-top:6px;padding-top:6px;border-top:1px dashed #ccc;text-align:right">
+      Suma de cantidad × valor unitario,<br/>incluyendo componentes de kits.
     </div>
   </div>
 </div>

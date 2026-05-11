@@ -15,6 +15,9 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # Configurar logging ANTES de importar cualquier módulo del proyecto
 # (algunos crean loggers a nivel de módulo).
@@ -41,6 +44,20 @@ logger = logging.getLogger(__name__)
 # ── App ──────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="Rambla Rental API", version="2.0")
+
+# ── Rate limiting (#58) ──────────────────────────────────────────────────────
+# In-memory: sirve para 1 instancia de Railway. Si se escala a multi-instancia
+# o se agrega Redis, cambiar storage_uri a "redis://..." (slowapi lo soporta).
+#
+# Defaults: 200 requests/minuto por IP. Endpoints sensibles (auth, cotización)
+# tienen rate más estricto via @limiter.limit("...") en cada handler.
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200/minute"],
+    headers_enabled=True,  # devuelve X-RateLimit-* en cada response
+)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 async def request_id_middleware(request: Request, call_next):
@@ -197,6 +214,44 @@ def init_db_bg():
         logger.info("Migraciones Alembic al día")
     except Exception as e:
         logger.error("Falló alembic upgrade: %s. La app sigue arrancando — revisar manualmente.", e, exc_info=True)
+
+    # Auto-run del ranking si nunca corrió (popularidad_score=0 en todos
+    # los equipos). Después de eso, queda en manos del admin desde
+    # /admin/settings. Issue #131.
+    try:
+        _maybe_run_initial_ranking()
+    except Exception as e:
+        logger.error("Falló cálculo inicial de ranking: %s. La app sigue. Recalcular manual desde /admin/settings.", e, exc_info=True)
+
+
+def _maybe_run_initial_ranking() -> None:
+    """Corre el cálculo de ranking SI ningún equipo tiene
+    ranking_actualizado seteado (nunca se corrió). Después de la primera
+    vez, queda en manos del admin re-correrlo desde /admin/settings.
+    """
+    from database import get_db
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM equipos WHERE ranking_actualizado IS NOT NULL"
+        ).fetchone()
+        ya_corrio = int(row["n"] or 0) > 0
+        if ya_corrio:
+            logger.info("Ranking ya tiene datos previos — se saltea el cálculo inicial.")
+            return
+
+        logger.info("Corriendo cálculo inicial de ranking (primera vez)...")
+        from services.ranking_service import recalcular_ranking_todos
+        result = recalcular_ranking_todos(conn, dry_run=False)
+        logger.info(
+            "Ranking inicial OK: %d equipos · %d categorías · %d marcas actualizados",
+            len(result.get("cambios", [])),
+            len(result.get("cambios_categorias", [])),
+            len(result.get("cambios_marcas", [])),
+        )
+    finally:
+        conn.close()
+
 
 db_init_thread = threading.Thread(target=init_db_bg, daemon=True)
 db_init_thread.start()

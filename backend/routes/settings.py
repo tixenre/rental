@@ -785,9 +785,47 @@ async def reset_clientes_desde_backup(request: Request = None):
 
 # ── Upload logo a R2 ──────────────────────────────────────────────────────────
 
+def _optimize_logo(raw_content: bytes) -> tuple[bytes, str, str]:
+    """Optimiza una imagen para usar como logo del top bar.
+
+    Distinto de `_optimize_image` (que es para fotos de equipos):
+    - NO recorta al ras (trim_and_square).
+    - NO hace cuadrado.
+    - Mantiene aspect ratio original (wordmark horizontal queda horizontal).
+    - Resize si el ancho excede 600px (preserva proporciones).
+    - Guarda como PNG para preservar transparencia.
+
+    Retorna (bytes, content_type, ext).
+    """
+    from io import BytesIO
+    from PIL import Image
+
+    img = Image.open(BytesIO(raw_content))
+    # Convertir a RGBA para preservar transparencia.
+    if img.mode != "RGBA":
+        img = img.convert("RGBA")
+
+    MAX_WIDTH = 600
+    if img.width > MAX_WIDTH:
+        new_height = int(img.height * (MAX_WIDTH / img.width))
+        img = img.resize((MAX_WIDTH, new_height), Image.Resampling.LANCZOS)
+
+    out = BytesIO()
+    img.save(out, format="PNG", optimize=True)
+    return out.getvalue(), "image/png", "png"
+
+
 @router.post("/admin/settings/upload-logo")
 async def upload_logo(request: Request):
-    """Sube una imagen como logo a R2 y guarda la URL en app_settings."""
+    """Sube una imagen como logo a R2 y guarda la URL en app_settings.
+
+    Path fijo: 'branding/logo.png'. R2 sobreescribe — cada upload reemplaza
+    la versión anterior (no acumula basura). La URL guardada incluye un
+    query string `?v=<timestamp>` como cache buster para invalidar el cache
+    del navegador / CDN sin esperar TTL.
+
+    Issue #127.
+    """
     session = require_admin(request)
     actor = (session.get("email") or session.get("user_id") or "admin")[:255]
 
@@ -802,16 +840,24 @@ async def upload_logo(request: Request):
     if len(raw_content) > 5 * 1024 * 1024:
         raise HTTPException(413, "Archivo muy grande (máx 5MB)")
 
-    # Reutilizar helpers de equipos.py
-    from routes.equipos import _optimize_image, _ext_from_ctype, _upload_to_r2
-    content, ctype, _, _ = _optimize_image(raw_content)
-    ext = _ext_from_ctype(ctype)
+    # Optimizar manteniendo aspect ratio (wordmarks horizontales no se
+    # vuelven cuadrados — eso engrosaba el top bar mobile, issue #127).
+    try:
+        content, ctype, ext = _optimize_logo(raw_content)
+    except Exception as e:
+        raise HTTPException(400, f"No se pudo procesar la imagen: {e}")
 
-    import time as _time
-    path = f"branding/logo-{int(_time.time() * 1000)}.{ext}"
+    # Path FIJO — R2 sobreescribe.
+    path = f"branding/logo.{ext}"
+
+    from routes.equipos import _upload_to_r2
     public_url = _upload_to_r2(path, content, ctype)
 
-    # Guardar en app_settings
+    # Cache buster: cada upload genera un ?v=<timestamp> distinto. El
+    # navegador descarga la versión nueva sin esperar TTL del CDN.
+    import time as _time
+    versioned_url = f"{public_url}?v={int(_time.time())}"
+
     conn = get_db()
     try:
         conn.execute("""
@@ -821,8 +867,8 @@ async def upload_logo(request: Request):
             SET value = EXCLUDED.value,
                 updated_at = CURRENT_TIMESTAMP,
                 updated_by = EXCLUDED.updated_by
-        """, (public_url, actor))
+        """, (versioned_url, actor))
         conn.commit()
-        return {"ok": True, "url": public_url}
+        return {"ok": True, "url": versioned_url}
     finally:
         conn.close()

@@ -65,12 +65,21 @@ function Index() {
   // Las que no aparecen en /api/categorias quedan al final, alfabéticas.
   const apiCategories = useMemo(() => {
     const cats = Array.from(new Set(allEquipos.map((e) => e.category)));
-    const pri: Record<string, number> = {};
-    backendCats.forEach((c: { nombre: string; prioridad?: number }) => { pri[c.nombre] = c.prioridad ?? 100; });
+    // Sort por: prioridad ASC (manual del admin), después popularidad
+    // DESC (automática del ranking #131), después alfabético.
+    // Mismo criterio que el backend ORDER BY en /api/categorias.
+    const meta: Record<string, { prioridad: number; popularidad: number }> = {};
+    backendCats.forEach((c: { nombre: string; prioridad?: number; popularidad_score?: number }) => {
+      meta[c.nombre] = {
+        prioridad: c.prioridad ?? 100,
+        popularidad: c.popularidad_score ?? 0,
+      };
+    });
     return cats.sort((a, b) => {
-      const pa = pri[a] ?? 999;
-      const pb = pri[b] ?? 999;
-      if (pa !== pb) return pa - pb;
+      const ma = meta[a] ?? { prioridad: 999, popularidad: 0 };
+      const mb = meta[b] ?? { prioridad: 999, popularidad: 0 };
+      if (ma.prioridad !== mb.prioridad) return ma.prioridad - mb.prioridad;
+      if (ma.popularidad !== mb.popularidad) return mb.popularidad - ma.popularidad;
       return a.localeCompare(b, "es");
     });
   }, [allEquipos, backendCats]);
@@ -282,7 +291,7 @@ function Index() {
             apiCategories={apiCategories}
             marcas={marcas}
             selectedBrand={brand}
-            onBrandSelect={(brandId) => setBrand(brandId !== null ? String(brandId) : null)}
+            onBrandSelect={(brandName) => setBrand(brandName)}
             onJumpToCategory={jumpToCategory}
             selectedCats={selectedCats}
             onClearCats={() => setSelectedCats(new Set())}
@@ -331,7 +340,7 @@ function GridMode({
   apiCategories: string[];
   marcas: any[];
   selectedBrand?: string | null;
-  onBrandSelect: (brandId: number | null) => void;
+  onBrandSelect: (brandName: string | null) => void;
   onJumpToCategory: (c: string) => void;
   selectedCats: Set<string>;
   onClearCats: () => void;
@@ -404,9 +413,10 @@ function GridMode({
 
 
       {visibleCategories.map((c) => {
-        const items = allEquipos
-          .filter((e) => e.category === c && matches(e))
-          .sort((a, b) => (a.relevanciaManual ?? 100) - (b.relevanciaManual ?? 100));
+        // NO re-sortear acá. allEquipos viene del backend ordenado por
+        // relevancia_manual ASC, popularidad_score DESC, nombre ASC.
+        // El filter preserva el orden, así que respeta el ranking automático.
+        const items = allEquipos.filter((e) => e.category === c && matches(e));
         if (items.length === 0) return null;
 
         if (isFiltered) {

@@ -516,8 +516,39 @@ def _pdf_response(pdf_bytes: bytes, filename: str) -> Response:
     )
 
 
+def _doc_response(
+    html_str: str,
+    pdf_filename: str,
+    format: str,
+):
+    """Devuelve HTML inline (preview) o PDF (download) según `format`.
+
+    Issue #106: el cliente puede previsualizar el documento antes de
+    descargar el PDF. HTML es más liviano y mejor UX mobile.
+    """
+    if format == "html":
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html_str)
+    return None  # caller sigue con PDF
+
+
+async def _doc_response_or_pdf(html_str: str, pdf_filename: str, format: str):
+    preview = _doc_response(html_str, pdf_filename, format)
+    if preview is not None:
+        return preview
+    pdf_bytes = await _render_pdf(html_str)
+    from fastapi.responses import Response
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{pdf_filename}"'},
+    )
+
+
 @router.get("/api/cliente/pedidos/{id}/remito.pdf")
-async def cliente_pedido_remito(id: int, request: Request):
+@router.get("/api/cliente/pedidos/{id}/remito")
+async def cliente_pedido_remito(id: int, request: Request, format: str = "pdf"):
+    """Remito del pedido. format=pdf (default, download) o html (preview)."""
     session = require_cliente(request)
     conn = get_db()
     try:
@@ -526,12 +557,15 @@ async def cliente_pedido_remito(id: int, request: Request):
         conn.close()
     if not _documentos_disponibles(pedido.get("estado", ""))["remito"]:
         raise HTTPException(403, "El remito estará disponible cuando confirmemos el pedido.")
-    pdf_bytes = await _render_pdf(_pedido_html(pedido))
-    return _pdf_response(pdf_bytes, _pedido_filename(pedido))
+    return await _doc_response_or_pdf(
+        _pedido_html(pedido), _pedido_filename(pedido), format
+    )
 
 
 @router.get("/api/cliente/pedidos/{id}/contrato.pdf")
-async def cliente_pedido_contrato(id: int, request: Request):
+@router.get("/api/cliente/pedidos/{id}/contrato")
+async def cliente_pedido_contrato(id: int, request: Request, format: str = "pdf"):
+    """Contrato del pedido. format=pdf (default) o html (preview)."""
     session = require_cliente(request)
     conn = get_db()
     try:
@@ -540,12 +574,15 @@ async def cliente_pedido_contrato(id: int, request: Request):
         conn.close()
     if not _documentos_disponibles(pedido.get("estado", ""))["contrato"]:
         raise HTTPException(403, "El contrato estará disponible cuando confirmemos el pedido.")
-    pdf_bytes = await _render_pdf(_contrato_html(pedido))
-    return _pdf_response(pdf_bytes, _pedido_filename(pedido, suffix="contrato"))
+    return await _doc_response_or_pdf(
+        _contrato_html(pedido), _pedido_filename(pedido, suffix="contrato"), format
+    )
 
 
 @router.get("/api/cliente/pedidos/{id}/albaran.pdf")
-async def cliente_pedido_albaran(id: int, request: Request):
+@router.get("/api/cliente/pedidos/{id}/albaran")
+async def cliente_pedido_albaran(id: int, request: Request, format: str = "pdf"):
+    """Albarán del pedido. format=pdf (default) o html (preview)."""
     session = require_cliente(request)
     conn = get_db()
     try:
@@ -554,5 +591,6 @@ async def cliente_pedido_albaran(id: int, request: Request):
         conn.close()
     if not _documentos_disponibles(pedido.get("estado", ""))["albaran"]:
         raise HTTPException(403, "El albarán estará disponible al momento de la entrega.")
-    pdf_bytes = await _render_pdf(_albaran_html(pedido))
-    return _pdf_response(pdf_bytes, _pedido_filename(pedido, suffix="albaran"))
+    return await _doc_response_or_pdf(
+        _albaran_html(pedido), _pedido_filename(pedido, suffix="albaran"), format
+    )

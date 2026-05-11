@@ -332,36 +332,36 @@ function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: 
             </section>
           )}
 
-          {/* Bloque: descargar documentos (PDF on-demand) */}
+          {/* Bloque: documentos (preview HTML + descarga PDF). Issue #106. */}
           {(docs.remito || docs.contrato || docs.albaran) && (
             <section className="border-t hairline pt-3">
               <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
-                Descargar documentos
+                Documentos
               </h3>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-1.5">
                 {docs.remito && (
-                  <a
-                    href={`/api/cliente/pedidos/${pedido.id}/remito.pdf`}
-                    download={`remito-${numero}.pdf`}
-                    className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition">
-                    <PdfIcon /> Remito
-                  </a>
+                  <DocActions
+                    pedidoId={pedido.id}
+                    numero={numero}
+                    tipo="remito"
+                    label="Remito"
+                  />
                 )}
                 {docs.contrato && (
-                  <a
-                    href={`/api/cliente/pedidos/${pedido.id}/contrato.pdf`}
-                    download={`contrato-${numero}.pdf`}
-                    className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition">
-                    <PdfIcon /> Contrato
-                  </a>
+                  <DocActions
+                    pedidoId={pedido.id}
+                    numero={numero}
+                    tipo="contrato"
+                    label="Contrato"
+                  />
                 )}
                 {docs.albaran && (
-                  <a
-                    href={`/api/cliente/pedidos/${pedido.id}/albaran.pdf`}
-                    download={`albaran-${numero}.pdf`}
-                    className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition">
-                    <PdfIcon /> Albarán
-                  </a>
+                  <DocActions
+                    pedidoId={pedido.id}
+                    numero={numero}
+                    tipo="albaran"
+                    label="Albarán"
+                  />
                 )}
               </div>
             </section>
@@ -377,5 +377,123 @@ function PdfIcon() {
     <svg className="h-3.5 w-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
     </svg>
+  );
+}
+
+/**
+ * Acciones por documento: Ver (preview HTML en modal) + Descargar (PDF).
+ * Issue #106.
+ */
+function DocActions({
+  pedidoId,
+  numero,
+  tipo,
+  label,
+}: {
+  pedidoId: number;
+  numero: string;
+  tipo: "remito" | "contrato" | "albaran";
+  label: string;
+}) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  return (
+    <>
+      <div className="flex items-stretch gap-1.5">
+        <button
+          type="button"
+          onClick={() => setPreviewOpen(true)}
+          className="flex-1 inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition justify-start"
+        >
+          <PdfIcon /> Ver {label}
+        </button>
+        <a
+          href={`/api/cliente/pedidos/${pedidoId}/${tipo}.pdf`}
+          download={`${tipo}-${numero}.pdf`}
+          className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-ink transition"
+          title={`Descargar ${label} en PDF`}
+        >
+          ⬇ PDF
+        </a>
+      </div>
+
+      {previewOpen && (
+        <DocPreviewModal
+          title={label}
+          url={`/api/cliente/pedidos/${pedidoId}/${tipo}?format=html`}
+          downloadUrl={`/api/cliente/pedidos/${pedidoId}/${tipo}.pdf`}
+          downloadFilename={`${tipo}-${numero}.pdf`}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * Modal con iframe que muestra el HTML del documento. Botón de descargar
+ * PDF en el header. ESC o click afuera cierra.
+ */
+function DocPreviewModal({
+  title,
+  url,
+  downloadUrl,
+  downloadFilename,
+  onClose,
+}: {
+  title: string;
+  url: string;
+  downloadUrl: string;
+  downloadFilename: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/60 flex items-stretch sm:items-center justify-center sm:p-6"
+      onClick={onClose}
+    >
+      <div
+        className="bg-background w-full sm:max-w-4xl sm:max-h-[90vh] h-full sm:h-auto flex flex-col sm:rounded-lg overflow-hidden shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between gap-2 border-b hairline px-4 py-3 shrink-0">
+          <h2 className="font-display text-base text-ink">{title}</h2>
+          <div className="flex items-center gap-2">
+            <a
+              href={downloadUrl}
+              download={downloadFilename}
+              className="inline-flex items-center gap-1.5 rounded-md bg-ink text-amber px-3 py-1.5 text-xs font-medium hover:brightness-110 transition"
+            >
+              ⬇ Descargar PDF
+            </a>
+            <button
+              type="button"
+              onClick={onClose}
+              className="grid h-9 w-9 place-items-center rounded-md hover:bg-muted transition"
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
+          </div>
+        </header>
+        <iframe
+          src={url}
+          title={title}
+          className="flex-1 w-full bg-white border-0"
+        />
+      </div>
+    </div>
   );
 }

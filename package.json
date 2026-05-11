@@ -6,7 +6,8 @@
     "dev": "vite dev --port 3000",
     "build": "vite build",
     "build:dev": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "changelog:draft": "./scripts/changelog-draft.sh"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

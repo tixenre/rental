@@ -1,5 +1,6 @@
 """
-services/ranking_service.py — Cálculo de popularidad de equipos.
+services/ranking_service.py — Cálculo de popularidad de equipos, marcas
+y categorías.
 
 Combina lo manual (`relevancia_manual` que el admin define) con lo
 automático (`popularidad_score` calculado desde el historial de pedidos
@@ -15,6 +16,11 @@ Convención de relevancia_manual (más bajo = más prominente):
     60  → workhorse (BMPCC 6K, A7 III)
     100 → default
     200 → secundarios (cables, baterías, plates)
+
+#131: extendido a marcas y categorías. La función
+`recalcular_ranking_todos` ahora actualiza también `marcas.popularidad_score`
+y `categorias.popularidad_score` con los mismos criterios (cant_pedidos
++ ingreso, normalizado contra el max de su universo).
 """
 
 from datetime import datetime
@@ -198,6 +204,10 @@ def recalcular_ranking_todos(
         else:
             sin_cambios += 1
 
+    # ─── Categorías y marcas (#131) ─────────────────────────────────────
+    cambios_categorias = _recalcular_ranking_categorias(conn, dry_run=dry_run, ventana_dias=ventana_dias)
+    cambios_marcas = _recalcular_ranking_marcas(conn, dry_run=dry_run, ventana_dias=ventana_dias)
+
     if not dry_run:
         conn.commit()
 
@@ -206,9 +216,176 @@ def recalcular_ranking_todos(
         "ventana_dias": ventana_dias,
         "cambios": cambios,
         "sin_cambios": sin_cambios,
+        "cambios_categorias": cambios_categorias,
+        "cambios_marcas": cambios_marcas,
         "max_por_categoria": {
             c: max_por_cat[c] for c in sorted(max_por_cat.keys())
         },
         "universo": universo,
         "dry_run": dry_run,
     }
+
+
+def _recalcular_ranking_categorias(
+    conn,
+    *,
+    dry_run: bool,
+    ventana_dias: int,
+) -> list[dict]:
+    """Recalcula popularidad_score, cant_pedidos, ingreso_total_ars de
+    cada categoría sumando los stats de todos sus equipos. Issue #131.
+
+    Score normalizado contra el max de todas las categorías (un universo
+    porque hay pocas categorías y la comparación tiene sentido entre todas).
+    """
+    estados_validos = ("confirmado", "retirado", "devuelto", "finalizado")
+    placeholders = ",".join(["?"] * len(estados_validos))
+
+    # Para cada categoría: sumar pedidos e ingresos de equipos en sus
+    # categoria_id (incluye sub-categorías si las hay).
+    rows = conn.execute(
+        f"""
+        SELECT
+            c.id,
+            c.nombre,
+            c.popularidad_score AS score_actual,
+            c.cant_pedidos AS pedidos_actual,
+            c.ingreso_total_ars AS ingreso_actual,
+            COUNT(DISTINCT a.id) AS cant_pedidos,
+            COALESCE(SUM(
+                ai.cantidad * COALESCE(ai.precio_jornada, 0) *
+                GREATEST(
+                    1,
+                    NULLIF(a.fecha_hasta, '')::date - NULLIF(a.fecha_desde, '')::date
+                )
+            ), 0) AS ingreso_total_ars
+        FROM categorias c
+        LEFT JOIN equipo_categorias ec ON ec.categoria_id = c.id
+        LEFT JOIN alquiler_items ai ON ai.equipo_id = ec.equipo_id
+        LEFT JOIN alquileres a ON a.id = ai.pedido_id
+            AND a.estado IN ({placeholders})
+            AND a.fecha_desde ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
+            AND a.fecha_hasta ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
+            AND NULLIF(a.fecha_desde, '')::date >= CURRENT_DATE - (? || ' days')::interval
+        GROUP BY c.id, c.nombre, c.popularidad_score, c.cant_pedidos, c.ingreso_total_ars
+        """,
+        (*estados_validos, str(ventana_dias)),
+    ).fetchall()
+
+    max_pedidos = max((r["cant_pedidos"] or 0 for r in rows), default=0)
+    max_ingreso = max((r["ingreso_total_ars"] or 0 for r in rows), default=0)
+
+    cambios = []
+    for r in rows:
+        pedidos = int(r["cant_pedidos"] or 0)
+        ingreso = int(r["ingreso_total_ars"] or 0)
+        score_p = (pedidos / max_pedidos * 50) if max_pedidos > 0 else 0
+        score_i = (ingreso / max_ingreso * 50) if max_ingreso > 0 else 0
+        nuevo_score = round(score_p + score_i)
+
+        if (
+            r["score_actual"] != nuevo_score
+            or r["pedidos_actual"] != pedidos
+            or r["ingreso_actual"] != ingreso
+        ):
+            cambios.append({
+                "id": r["id"],
+                "nombre": r["nombre"],
+                "antes": {"score": r["score_actual"], "pedidos": r["pedidos_actual"], "ingreso": r["ingreso_actual"]},
+                "despues": {"score": nuevo_score, "pedidos": pedidos, "ingreso": ingreso},
+            })
+            if not dry_run:
+                conn.execute(
+                    """
+                    UPDATE categorias
+                    SET popularidad_score = ?,
+                        cant_pedidos = ?,
+                        ingreso_total_ars = ?,
+                        ranking_actualizado = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (nuevo_score, pedidos, ingreso, r["id"]),
+                )
+    return cambios
+
+
+def _recalcular_ranking_marcas(
+    conn,
+    *,
+    dry_run: bool,
+    ventana_dias: int,
+) -> list[dict]:
+    """Recalcula popularidad_score, cant_pedidos, ingreso_total_ars de
+    cada marca sumando los stats de todos sus equipos. Issue #131.
+
+    Las marcas se relacionan via `equipos.marca` (TEXT, nombre case-sensitive)
+    o `equipos.brand_id` (FK más reciente). Usamos brand_id si está, sino
+    fallback al campo TEXT.
+    """
+    estados_validos = ("confirmado", "retirado", "devuelto", "finalizado")
+    placeholders = ",".join(["?"] * len(estados_validos))
+
+    rows = conn.execute(
+        f"""
+        SELECT
+            m.id,
+            m.nombre,
+            m.popularidad_score AS score_actual,
+            m.cant_pedidos AS pedidos_actual,
+            m.ingreso_total_ars AS ingreso_actual,
+            COUNT(DISTINCT a.id) AS cant_pedidos,
+            COALESCE(SUM(
+                ai.cantidad * COALESCE(ai.precio_jornada, 0) *
+                GREATEST(
+                    1,
+                    NULLIF(a.fecha_hasta, '')::date - NULLIF(a.fecha_desde, '')::date
+                )
+            ), 0) AS ingreso_total_ars
+        FROM marcas m
+        LEFT JOIN equipos e ON e.brand_id = m.id OR LOWER(e.marca) = LOWER(m.nombre)
+        LEFT JOIN alquiler_items ai ON ai.equipo_id = e.id
+        LEFT JOIN alquileres a ON a.id = ai.pedido_id
+            AND a.estado IN ({placeholders})
+            AND a.fecha_desde ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
+            AND a.fecha_hasta ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
+            AND NULLIF(a.fecha_desde, '')::date >= CURRENT_DATE - (? || ' days')::interval
+        GROUP BY m.id, m.nombre, m.popularidad_score, m.cant_pedidos, m.ingreso_total_ars
+        """,
+        (*estados_validos, str(ventana_dias)),
+    ).fetchall()
+
+    max_pedidos = max((r["cant_pedidos"] or 0 for r in rows), default=0)
+    max_ingreso = max((r["ingreso_total_ars"] or 0 for r in rows), default=0)
+
+    cambios = []
+    for r in rows:
+        pedidos = int(r["cant_pedidos"] or 0)
+        ingreso = int(r["ingreso_total_ars"] or 0)
+        score_p = (pedidos / max_pedidos * 50) if max_pedidos > 0 else 0
+        score_i = (ingreso / max_ingreso * 50) if max_ingreso > 0 else 0
+        nuevo_score = round(score_p + score_i)
+
+        if (
+            r["score_actual"] != nuevo_score
+            or r["pedidos_actual"] != pedidos
+            or r["ingreso_actual"] != ingreso
+        ):
+            cambios.append({
+                "id": r["id"],
+                "nombre": r["nombre"],
+                "antes": {"score": r["score_actual"], "pedidos": r["pedidos_actual"], "ingreso": r["ingreso_actual"]},
+                "despues": {"score": nuevo_score, "pedidos": pedidos, "ingreso": ingreso},
+            })
+            if not dry_run:
+                conn.execute(
+                    """
+                    UPDATE marcas
+                    SET popularidad_score = ?,
+                        cant_pedidos = ?,
+                        ingreso_total_ars = ?,
+                        ranking_actualizado = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (nuevo_score, pedidos, ingreso, r["id"]),
+                )
+    return cambios

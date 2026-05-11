@@ -225,6 +225,21 @@ export const adminApi = {
     return authedJson<EquiposListResp>(`/api/equipos?${sp.toString()}`);
   },
   getEquipo: (id: number) => authedJson<Equipo>(`/api/equipos/${id}`),
+  /** Equipos sin número de serie cargado (NULL o vacío). Issue #91. */
+  getEquiposSinSerie: () =>
+    authedJson<{
+      total: number;
+      equipos: Array<{
+        id: number;
+        nombre: string;
+        marca: string | null;
+        modelo: string | null;
+        foto_url: string | null;
+        valor_reposicion: number | null;
+        dueno: string | null;
+        cantidad: number;
+      }>;
+    }>("/api/admin/equipos/sin-serie"),
   createEquipo: (data: EquipoInput) =>
     authedPostJson<Equipo>("/api/equipos", data),
   updateEquipo: (id: number, data: Partial<EquipoInput>) =>

@@ -42,14 +42,20 @@ class MarcaMergeRequest(BaseModel):
 
 @router.get("/marcas")
 def list_marcas():
-    """Lista marcas visibles ordenadas por orden, luego por nombre."""
+    """Lista marcas visibles ordenadas por orden manual, después por
+    popularidad automática (#131), después alfabético.
+
+    El `orden` manual (default 100) sigue siendo override — el admin
+    puede forzar marcas específicas arriba bajándole el número. Si
+    todas tienen orden=100, gana la popularidad real (cant_pedidos +
+    ingreso, calculado por el ranking service)."""
     conn = get_db()
     try:
         rows = conn.execute("""
-            SELECT id, nombre, logo_url, created_at, updated_at
+            SELECT id, nombre, logo_url, popularidad_score, created_at, updated_at
             FROM marcas
             WHERE visible = TRUE
-            ORDER BY orden ASC, nombre ASC
+            ORDER BY orden ASC, popularidad_score DESC, nombre ASC
         """).fetchall()
         marcas = [row_to_dict(r) for r in rows]
         return {"items": marcas}

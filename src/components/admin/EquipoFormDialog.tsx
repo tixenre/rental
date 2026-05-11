@@ -24,6 +24,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DUENOS, isCanonicalDueno } from "@/lib/admin/duenos";
+import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
 
 import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin, type KitComponente } from "@/lib/admin/api";
 import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
@@ -609,7 +611,7 @@ export function EquipoFormDialog({
               {isEdit && initial && (
                 <Button type="button" variant="outline" size="sm" onClick={() => setEnriching(true)}>
                   <Sparkles className="h-4 w-4 mr-1.5 text-amber" />
-                  Enriquecer con IA
+                  Auto-completar info
                 </Button>
               )}
             </div>
@@ -738,12 +740,57 @@ export function EquipoFormDialog({
                   <Field label="Valor reposición (USD)">
                     <Input type="number" min={0} step="0.01" {...form.register("valor_reposicion")} />
                   </Field>
-                  <Field label="Fecha de compra"><Input type="date" {...form.register("fecha_compra")} /></Field>
+                  <Field label="Fecha de compra">
+                    <MonthYearPicker
+                      value={form.watch("fecha_compra")}
+                      onChange={(v) => form.setValue("fecha_compra", v, { shouldDirty: true })}
+                    />
+                  </Field>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="N° Serie"><Input {...form.register("serie")} /></Field>
-                  <Field label="Dueño"><Input {...form.register("dueno")} /></Field>
+                  <Field label="N° Serie">
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        {...form.register("serie")}
+                        placeholder="N° de serie"
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          form.setValue("serie", "N/A", { shouldDirty: true })
+                        }
+                        className="shrink-0 text-xs h-9"
+                        title="Marcar como no aplica (ej. reflectores, cables sin serie)"
+                      >
+                        N/A
+                      </Button>
+                    </div>
+                  </Field>
+                  <Field label="Dueño">
+                    {(() => {
+                      const value = form.watch("dueno") ?? "Rambla";
+                      const isLegacy = value && !isCanonicalDueno(value);
+                      return (
+                        <Select
+                          value={isLegacy ? "" : value}
+                          onValueChange={(v) => form.setValue("dueno", v, { shouldDirty: true })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={isLegacy ? `(legacy: ${value})` : "Elegir"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DUENOS.map((d) => (
+                              <SelectItem key={d} value={d}>{d}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    })()}
+                  </Field>
                 </div>
 
                 <Field label="Link de fuente (B&H, Adorama…)">

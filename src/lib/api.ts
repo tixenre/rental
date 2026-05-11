@@ -67,6 +67,8 @@ export type BackendMarca = {
   id: number;
   nombre: string;
   logo_url?: string | null;
+  /** Score automático calculado por el ranking service (#131). */
+  popularidad_score?: number;
 };
 
 export type BackendEquipo = {
@@ -93,6 +95,8 @@ export type BackendCategoria = {
   nombre: string;
   total: number;
   prioridad?: number;
+  /** Score automático calculado por el ranking service (#131). */
+  popularidad_score?: number;
   parent_id?: number | null;
   children?: BackendCategoria[];
   // Compat con respuesta legacy ?flat=1
