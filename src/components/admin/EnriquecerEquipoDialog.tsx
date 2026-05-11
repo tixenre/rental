@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Bug, Image as ImageIcon, FileText } from "lucide-react";
+import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Bug, Image as ImageIcon, FileText, Link as LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -95,6 +95,8 @@ export function EnriquecerEquipoDialog({
   const [searchingPhotos, setSearchingPhotos] = useState(false);
   // Modo: "info" = enriquecimiento completo (B&H + IA). "photos" = solo buscar fotos.
   const [mode, setMode] = useState<"info" | "photos" | null>(null);
+  // URL manual opcional que guía la búsqueda (ej. página de B&H, sitio oficial)
+  const [customUrl, setCustomUrl] = useState("");
 
   useEffect(() => {
     if (!open) {
@@ -104,6 +106,7 @@ export function EnriquecerEquipoDialog({
       setExtraCands([]);
       setMode(null);
       setFotoUrl("");
+      setCustomUrl("");
     }
   }, [open]);
 
@@ -279,6 +282,7 @@ export function EnriquecerEquipoDialog({
         nombre: equipo.nombre,
         marca: equipo.marca,
         modelo: equipo.modelo,
+        url: customUrl.trim() || null,
       });
       setResult(r);
       setMarca(r.marca ?? "");
@@ -447,10 +451,25 @@ export function EnriquecerEquipoDialog({
         </div>
 
         {!result && !loading && !error && mode !== "photos" && (
-          <div className="py-4 space-y-3">
-            <p className="text-xs text-muted-foreground text-center">
-              ¿Qué querés buscar?
-            </p>
+          <div className="py-4 space-y-4">
+            {/* Input de URL opcional */}
+            <div className="space-y-1.5">
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                <LinkIcon className="h-3.5 w-3.5" />
+                Link del producto (opcional)
+              </label>
+              <Input
+                value={customUrl}
+                onChange={(e) => setCustomUrl(e.target.value)}
+                placeholder="https://www.bhphotovideo.com/… o sitio oficial"
+                className="font-mono text-xs h-9"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Si pegás un link, la IA va directo ahí en vez de buscar.
+              </p>
+            </div>
+
+            <p className="text-xs text-muted-foreground text-center">¿Qué querés buscar?</p>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -469,9 +488,14 @@ export function EnriquecerEquipoDialog({
                 className="rounded-md border hairline p-4 text-left transition hover:border-amber hover:bg-amber-soft/40"
               >
                 <FileText className="h-5 w-5 mb-2 text-amber" />
-                <div className="font-medium text-sm">Info técnica</div>
+                <div className="font-medium text-sm">
+                  {customUrl.trim() ? "Buscar desde este link" : "Info técnica"}
+                </div>
                 <div className="text-[11px] text-muted-foreground mt-1">
-                  B&amp;H + IA: specs, peso, montura, precio. ~15s.
+                  {customUrl.trim()
+                    ? `Scrapea ${(() => { try { return new URL(customUrl.trim()).hostname; } catch { return "el link"; } })()} con IA.`
+                    : "B&H + IA: specs, peso, montura, precio. ~15s."
+                  }
                 </div>
               </button>
             </div>
