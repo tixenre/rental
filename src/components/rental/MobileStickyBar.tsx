@@ -67,7 +67,7 @@ export function MobileStickyBar({
                   if (e.key === "Escape") closeSearch();
                 }}
                 placeholder="Buscar equipo, marca…"
-                className="w-full rounded-full border border-amber/40 bg-amber/5 py-2.5 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:border-amber focus:outline-none"
+                className="h-10 w-full rounded-full border border-amber/40 bg-amber/5 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:border-amber focus:outline-none"
               />
             </div>
             <button
@@ -82,7 +82,7 @@ export function MobileStickyBar({
           <>
             <button
               onClick={() => setDateModalOpen(true)}
-              className="flex flex-1 min-w-0 items-center gap-2 rounded-full border border-amber/40 bg-amber/5 px-3 py-2 text-left transition hover:border-amber"
+              className="flex h-10 flex-1 min-w-0 items-center gap-2 rounded-full border border-amber/40 bg-amber/5 px-3 text-left transition hover:border-amber"
               aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
             >
               <CalendarIcon className="h-4 w-4 shrink-0" />
