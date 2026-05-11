@@ -73,6 +73,11 @@ export function SpecTemplatesSection() {
     return flat;
   }, [catsQ.data]);
 
+  const resumenQ = useQuery({
+    queryKey: ["admin", "spec-templates-resumen"],
+    queryFn: () => adminApi.specTemplatesResumen(),
+  });
+
   const templatesQ = useQuery({
     queryKey: ["admin", "spec-templates", catId],
     queryFn: () => adminApi.listSpecTemplates(catId!),
@@ -126,10 +131,36 @@ export function SpecTemplatesSection() {
         )}
       </div>
 
-      {/* Lista de templates */}
+      {/* Grid de categorías raíz como acceso rápido cuando no hay ninguna seleccionada */}
       {catId == null && (
-        <div className="rounded-md border hairline border-dashed p-6 text-center text-sm text-muted-foreground">
-          Elegí una categoría para ver y editar sus specs.
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Hacé click en una categoría para ver y editar sus specs:
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {catsFlat
+              .filter((c) => {
+                const all = catsQ.data ?? [];
+                const cat = all.find((x) => x.id === c.id);
+                return cat?.parent_id == null;
+              })
+              .map((c) => {
+                const count = resumenQ.data?.[c.id] ?? 0;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCatId(c.id)}
+                    className="rounded-md border hairline p-3 text-left text-sm transition hover:border-amber hover:bg-amber-soft/30 active:bg-amber-soft/50"
+                  >
+                    <div className="font-medium text-ink leading-snug">{c.nombre}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      {count > 0 ? `${count} specs` : "sin specs aún"}
+                    </div>
+                  </button>
+                );
+              })}
+          </div>
         </div>
       )}
 

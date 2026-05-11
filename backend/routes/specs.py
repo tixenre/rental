@@ -103,6 +103,24 @@ class AprobarNombreInput(BaseModel):
 
 # ── CRUD: Spec templates por categoría ─────────────────────────────────
 
+@router.get("/admin/spec-templates/resumen")
+def resumen_templates(request: Request):
+    """Devuelve conteo de specs por categoría para el overview del editor."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """
+            SELECT categoria_id, COUNT(*) as total
+            FROM categoria_spec_templates
+            GROUP BY categoria_id
+            """
+        ).fetchall()
+        return {r["categoria_id"]: r["total"] for r in rows}
+    finally:
+        conn.close()
+
+
 @router.get("/admin/categorias/{categoria_id}/spec-templates")
 def listar_templates(categoria_id: int, request: Request):
     _require_admin(request)

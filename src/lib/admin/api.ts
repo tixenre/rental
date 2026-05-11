@@ -447,6 +447,8 @@ export const adminApi = {
     ),
 
   // ── CRUD templates de specs por categoría ──────────────────────────
+  specTemplatesResumen: () =>
+    authedJson<Record<number, number>>("/api/admin/spec-templates/resumen"),
   listSpecTemplates: (categoriaId: number) =>
     authedJson<{ items: SpecTemplate[] }>(`/api/admin/categorias/${categoriaId}/spec-templates`),
   createSpecTemplate: (categoriaId: number, input: SpecTemplateInput) =>
