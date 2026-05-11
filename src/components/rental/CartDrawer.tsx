@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Trash2, Plus, Minus, Loader2, AlertCircle } from "lucide-react";
+import { X, Trash2, Plus, Minus, Loader2, AlertCircle, Calendar as CalendarIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
@@ -11,6 +11,7 @@ import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { RentalDateModal } from "./RentalDateModal";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -47,6 +48,7 @@ export function CartDrawer({
   const [needsLogin, setNeedsLogin] = useState(false);
   const [notas, setNotas] = useState("");
   const [showNotas, setShowNotas] = useState(false);
+  const [dateModalOpen, setDateModalOpen] = useState(false);
 
   // Refs para focus trap + restauración de foco
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -245,31 +247,28 @@ export function CartDrawer({
               </button>
             </div>
 
-            {/* Fechas */}
+            {/* Fechas — píldora clickeable que abre el RentalDateModal */}
             <div className="border-b hairline px-5 py-4 sm:px-6">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    Desde
-                  </div>
-                  <div className="tabular">
-                    {startDate ? format(startDate, "dd MMM yyyy", { locale: es }) : "—"}
-                    <span className="text-muted-foreground"> · {startTime}</span>
-                  </div>
-                </div>
-                <div>
-                  <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    Hasta
-                  </div>
-                  <div className="tabular">
-                    {endDate ? format(endDate, "dd MMM yyyy", { locale: es }) : "—"}
-                    <span className="text-muted-foreground"> · {endTime}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 font-mono text-[11px] uppercase tracking-widest text-ink">
-                {d} {d === 1 ? "jornada" : "jornadas"}
-              </div>
+              <button
+                type="button"
+                onClick={() => setDateModalOpen(true)}
+                aria-label={startDate ? "Editar fechas y horarios" : "Elegir fechas"}
+                className="w-full flex items-center justify-center gap-3 rounded-full border-2 border-amber/50 bg-amber/10 px-5 py-2.5 transition hover:border-amber hover:bg-amber/20 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+              >
+                <CalendarIcon className="h-4 w-4 shrink-0 text-amber" />
+                {startDate && endDate ? (
+                  <span className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-sm font-semibold tabular-nums">
+                    <span>{format(startDate, "EEE dd MMM", { locale: es })} {startTime}</span>
+                    <span className="text-muted-foreground">→</span>
+                    <span>{format(endDate, "EEE dd MMM", { locale: es })} {endTime}</span>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      · {d} {d === 1 ? "jornada" : "jornadas"}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-sm font-semibold">Elegir fechas</span>
+                )}
+              </button>
             </div>
 
             {/* Contenido */}
@@ -490,6 +489,9 @@ export function CartDrawer({
               </>
             )}
           </motion.aside>
+
+          {/* Modal de fechas — montado fuera del drawer para que se vea encima */}
+          <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
         </>
       )}
     </AnimatePresence>

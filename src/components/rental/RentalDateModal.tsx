@@ -1,7 +1,7 @@
 import { type DateRange } from "react-day-picker";
 import { es } from "date-fns/locale";
 import { addDays, format, startOfDay } from "date-fns";
-import { X } from "lucide-react";
+import { X, ArrowRight, Calendar as CalendarIcon, Clock, Eraser } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -68,7 +68,8 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-3xl p-0 gap-0 overflow-hidden bg-background flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90dvh] sm:rounded-lg rounded-none"
+        hideClose
+        className="max-w-3xl p-0 gap-0 overflow-hidden bg-background flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90dvh] sm:rounded-2xl rounded-none border-0 sm:border shadow-2xl"
       >
         <VisuallyHidden>
           <DialogTitle>Tu Rental — Seleccionar fechas</DialogTitle>
@@ -77,66 +78,65 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
           </DialogDescription>
         </VisuallyHidden>
 
-        {/* Header sticky */}
+        {/* Header */}
         <div
-          className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b hairline shrink-0"
-          style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
+          className="flex items-center justify-between px-5 sm:px-6 py-4 border-b hairline shrink-0 bg-surface/30"
+          style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
         >
-          <h2 className="wordmark text-lg sm:text-xl text-foreground">Tu Rental</h2>
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              Fechas del alquiler
+            </div>
+            <h2 className="font-display text-xl sm:text-2xl text-ink leading-tight">
+              Elegí tus fechas
+            </h2>
+          </div>
           <button
             onClick={() => onOpenChange(false)}
-            className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted transition"
+            className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
             aria-label="Cerrar"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Resumen Retiro / Devolución */}
-        <div className="px-4 sm:px-6 pt-4 pb-2 grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 sm:items-center shrink-0">
-          <div className="flex flex-col">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
-              Retiro
-            </span>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm sm:text-base font-semibold tabular-nums text-sky-600 border-b-2 border-sky-500 pb-0.5 px-1 bg-sky-50/60">
-                {range?.from ? format(range.from, "dd-MM-yyyy") : "--/--/----"}
-              </span>
-              <TimeStepSelect
-                value={startTime}
-                onChange={setStartTime}
-                aria-label="Hora de retiro"
-                className="text-sm sm:text-base font-semibold text-rose-600 border-b-2 border-rose-500 pb-0.5 px-1"
-              />
+        {/* Resumen Retiro / Devolución — diseño limpio */}
+        <div className="px-5 sm:px-6 pt-5 pb-4 shrink-0">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-2 sm:items-stretch">
+            <DateField
+              label="Retiro"
+              date={range?.from}
+              time={startTime}
+              onTimeChange={setStartTime}
+              timeAriaLabel="Hora de retiro"
+            />
+
+            <div className="hidden sm:flex items-center justify-center text-muted-foreground/40 px-1">
+              <ArrowRight className="h-4 w-4" />
             </div>
+            <div className="sm:hidden flex items-center justify-center py-1">
+              <div className="h-px flex-1 bg-border" />
+              <ArrowRight className="h-3 w-3 mx-3 text-muted-foreground/50 rotate-90" />
+              <div className="h-px flex-1 bg-border" />
+            </div>
+
+            <DateField
+              label="Devolución"
+              date={range?.to}
+              time={endTime}
+              onTimeChange={setEndTime}
+              timeAriaLabel="Hora de devolución"
+            />
           </div>
 
-          <div className="hidden sm:block text-muted-foreground text-2xl text-center">→</div>
-
-          <div className="flex flex-col">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
-              Devolución
-            </span>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm sm:text-base font-semibold tabular-nums text-rose-600 border-b-2 border-rose-500 pb-0.5 px-1">
-                {range?.to ? format(range.to, "dd-MM-yyyy") : "--/--/----"}
-              </span>
-              <TimeStepSelect
-                value={endTime}
-                onChange={setEndTime}
-                aria-label="Hora de devolución"
-                className="text-sm sm:text-base font-semibold text-rose-600 border-b-2 border-rose-500 pb-0.5 px-1"
-              />
-            </div>
-          </div>
+          <p className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            Horarios cada 30 min — sujeto a confirmación
+          </p>
         </div>
 
-        <p className="px-4 sm:px-6 pb-2 text-[11px] text-muted-foreground shrink-0">
-          Horarios cada 30 min · sujeto a confirmación.
-        </p>
-
         {/* Calendario — área scrolleable */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex justify-center px-2 sm:px-4 pb-2">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex justify-center px-2 sm:px-4 pb-2 border-t hairline">
           <Calendar
             mode="range"
             selected={range}
@@ -149,37 +149,82 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
               busy: "bg-amber/30 text-ink rounded-full",
             }}
             showOutsideDays={false}
-            className="p-2 sm:p-3 pointer-events-auto"
+            className="p-2 sm:p-4 pointer-events-auto"
           />
         </div>
 
-        {/* Footer sticky con CTA siempre visible */}
+        {/* Footer */}
         <div
-          className="border-t hairline bg-surface px-4 sm:px-6 pt-3 pb-3 shrink-0 flex flex-col gap-2"
+          className="border-t hairline bg-surface/50 px-5 sm:px-6 pt-3 pb-3 shrink-0 flex items-center justify-between gap-3"
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         >
+          <button
+            onClick={clear}
+            disabled={!hasRange && !startDate}
+            className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition px-2 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Eraser className="h-3.5 w-3.5" />
+            Limpiar
+          </button>
+
           {hasRange && (
-            <div className="text-center font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              {jornadas} {jornadas === 1 ? "jornada" : "jornadas"} · retiro {startTime} · devolución {endTime}
+            <div className="hidden sm:flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              <CalendarIcon className="h-3 w-3" />
+              {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
             </div>
           )}
-          <div className="flex items-center justify-between gap-3">
-            <button
-              onClick={clear}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition px-1 py-2"
-            >
-              <X className="h-3.5 w-3.5" />
-              Limpiar
-            </button>
-            <button
-              onClick={apply}
-              className="flex-1 sm:flex-none rounded-full bg-amber px-6 py-3 sm:py-2.5 text-sm font-semibold text-ink hover:opacity-90 transition shadow-sm"
-            >
-              Aplicar
-            </button>
-          </div>
+
+          <button
+            onClick={apply}
+            className="rounded-full bg-amber px-6 py-2.5 sm:py-2 text-sm font-semibold text-ink hover:brightness-110 transition shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+          >
+            Aplicar
+          </button>
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Campo de fecha + hora con styling consistente y sin gritar visualmente. */
+function DateField({
+  label,
+  date,
+  time,
+  onTimeChange,
+  timeAriaLabel,
+}: {
+  label: string;
+  date?: Date;
+  time: string;
+  onTimeChange: (t: string) => void;
+  timeAriaLabel: string;
+}) {
+  const hasDate = !!date;
+  return (
+    <div
+      className={`rounded-xl border hairline bg-surface/40 px-3.5 py-3 transition ${
+        hasDate ? "border-ink/15" : ""
+      }`}
+    >
+      <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-1.5">
+        {label}
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span
+          className={`tabular-nums text-base font-display leading-none ${
+            hasDate ? "text-ink" : "text-muted-foreground/50"
+          }`}
+        >
+          {date ? format(date, "dd MMM yyyy", { locale: es }) : "--/--/----"}
+        </span>
+        <TimeStepSelect
+          value={time}
+          onChange={onTimeChange}
+          aria-label={timeAriaLabel}
+          className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
+        />
+      </div>
+    </div>
   );
 }
