@@ -197,6 +197,7 @@ export type SpecTemplate = {
   visible_en_nombre: boolean;
   obligatorio: boolean;
   ayuda: string | null;
+  destacado: boolean;
 };
 
 export type SpecTemplateInput = {
@@ -211,6 +212,7 @@ export type SpecTemplateInput = {
   visible_en_nombre?: boolean;
   obligatorio?: boolean;
   ayuda?: string | null;
+  destacado?: boolean;
 };
 
 export const adminApi = {

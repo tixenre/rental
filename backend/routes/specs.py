@@ -54,6 +54,7 @@ class SpecTemplateInput(BaseModel):
     visible_en_nombre: bool = False
     obligatorio: bool = False
     ayuda: Optional[str] = None
+    destacado: bool = False
 
 
 class SpecTemplateUpdate(BaseModel):
@@ -67,6 +68,7 @@ class SpecTemplateUpdate(BaseModel):
     visible_en_nombre: Optional[bool] = None
     obligatorio: Optional[bool] = None
     ayuda: Optional[str] = None
+    destacado: Optional[bool] = None
 
 
 class EquipoSpecsInput(BaseModel):
@@ -130,7 +132,8 @@ def listar_templates(categoria_id: int, request: Request):
             """
             SELECT id, categoria_id, spec_key, label, tipo, unidad,
                    enum_options, prioridad, visible_en_card,
-                   visible_en_filtros, visible_en_nombre, obligatorio, ayuda
+                   visible_en_filtros, visible_en_nombre, obligatorio, ayuda,
+                   COALESCE(destacado, FALSE) AS destacado
             FROM categoria_spec_templates
             WHERE categoria_id = ?
             ORDER BY prioridad, label
@@ -159,8 +162,8 @@ def crear_template(categoria_id: int, payload: SpecTemplateInput, request: Reque
                 INSERT INTO categoria_spec_templates
                   (categoria_id, spec_key, label, tipo, unidad, enum_options,
                    prioridad, visible_en_card, visible_en_filtros,
-                   visible_en_nombre, obligatorio, ayuda)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   visible_en_nombre, obligatorio, ayuda, destacado)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """,
                 (
@@ -176,6 +179,7 @@ def crear_template(categoria_id: int, payload: SpecTemplateInput, request: Reque
                     payload.visible_en_nombre,
                     payload.obligatorio,
                     payload.ayuda,
+                    payload.destacado,
                 ),
             )
             new_id = cur.fetchone()[0]

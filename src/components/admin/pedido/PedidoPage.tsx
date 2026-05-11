@@ -1,23 +1,18 @@
 /**
- * PedidoPage — pantalla unificada de pedido (crear y editar).
+ * PedidoPage — detalle de pedido.
  *
- * Layout estilo Booqable:
- *   ┌ Header sticky: ← Volver, número, estado, indicador "Guardado"  ┐
- *   ├ Tabs: 🛒 Carrito · ⓘ Info · 💳 Pagos · 📄 Docs                 │
- *   ├ Tab content (scroll)                                            │
- *   └ Footer sticky: acción primaria contextual (Confirmar, etc.)    ┘
- *
- * Autoguardado vía usePedidoDraft.
+ * Desktop (≥ lg): 3 columnas — [Cliente + Items + Totales] | [Recogida] | [Sidebar]
+ * Mobile: columna única con las mismas secciones apiladas.
  */
 
 import { useState, useMemo } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ChevronLeft, ShoppingCart, Info, CreditCard, FileText,
-  Plus, Minus, Search, X, Trash2, AlertTriangle, Check,
-  FileSignature, Truck, MoreHorizontal, Loader2, CloudOff, CloudCheck,
-  Eye, Download,
+  ChevronLeft, ChevronDown, ChevronRight,
+  Plus, Minus, Search, X, Trash2, AlertTriangle,
+  Check, FileText, FileSignature, Truck, MoreHorizontal,
+  Loader2, CloudOff, CloudCheck, Eye, Download, ShoppingCart,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,11 +21,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { BottomSheet, ActionMenu } from "@/components/mobile";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-  DropdownMenuSeparator,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -49,8 +43,93 @@ import {
   type DraftItem, type DraftDatos, type SaveStatus,
 } from "./usePedidoDraft";
 
+// ── Formatters ────────────────────────────────────────────────────────────
+
 const fmtArs = (n: number | null | undefined) =>
   n ? `$${Math.round(Number(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : "$0";
+
+const fmtFecha = (s: string) => {
+  if (!s) return "—";
+  const [y, m, d] = s.slice(0, 10).split("-");
+  return `${d}-${m}-${y}`;
+};
+
+// ── Avatar ────────────────────────────────────────────────────────────────
+
+const AVATAR_COLORS = [
+  "bg-blue-500", "bg-violet-500", "bg-emerald-500", "bg-amber-600",
+  "bg-rose-500", "bg-cyan-600", "bg-orange-500", "bg-teal-600",
+];
+
+function avatarBg(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
+function nameInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+function ClienteAvatar({ name }: { name: string }) {
+  return (
+    <div className={cn(
+      "h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0",
+      avatarBg(name),
+    )}>
+      {nameInitials(name)}
+    </div>
+  );
+}
+
+// ── Sidebar collapsible section ────────────────────────────────────────────
+
+function SidebarSection({
+  title, badge, defaultOpen = true, children,
+}: {
+  title: string;
+  badge?: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-b hairline last:border-b-0">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-ink hover:bg-muted/30 transition"
+      >
+        <span>
+          {title}
+          {badge != null && badge > 0 && (
+            <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-muted text-muted-foreground text-[10px] h-4 min-w-4 px-1">
+              {badge}
+            </span>
+          )}
+        </span>
+        <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", !open && "-rotate-90")} />
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  );
+}
+
+// ── Save indicator ────────────────────────────────────────────────────────
+
+function SaveIndicator({ status }: { status: SaveStatus }) {
+  if (status === "saving" || status === "dirty")
+    return <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Guardando…</span>;
+  if (status === "saved")
+    return <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1"><CloudCheck className="h-3 w-3" /> Guardado</span>;
+  if (status === "error")
+    return <span className="hidden sm:flex text-xs text-destructive items-center gap-1"><CloudOff className="h-3 w-3" /> Error al guardar</span>;
+  return null;
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
 
 export function PedidoPage({ pedidoId }: { pedidoId: number }) {
   const router = useRouter();
@@ -64,7 +143,6 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
   const pedido = pedidoQ.data;
   const draft = usePedidoDraft(pedido);
 
-  const [tab, setTab] = useState<"carrito" | "info" | "pagos" | "docs">("carrito");
   const [askDelete, setAskDelete] = useState(false);
   const [openActionMenu, setOpenActionMenu] = useState(false);
 
@@ -95,37 +173,45 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
   }
 
   const jornadas = jornadasEntre(draft.datos.fecha_desde, draft.datos.fecha_hasta);
-  const bruto = draft.items.reduce(
-    (s, it) => s + it.precio_jornada * it.cantidad * jornadas, 0,
-  );
+  const bruto = draft.items.reduce((s, it) => s + it.precio_jornada * it.cantidad * jornadas, 0);
   const total = Math.round(bruto * (1 - (draft.datos.descuento_pct || 0) / 100));
-  const saldo = total - (pedido.monto_pagado ?? 0);
-
+  const pagado = pedido.monto_pagado ?? 0;
+  const saldo = total - pagado;
   const numero = pedido.numero_pedido ? `#${pedido.numero_pedido}` : `(borrador #${pedido.id})`;
+  const clienteNombre = draft.datos.cliente_nombre || "Sin cliente";
+
+  const nextAction = (() => {
+    switch (pedido.estado) {
+      case "borrador":    return { label: "Confirmar presupuesto", estado: "presupuesto" as PedidoEstado, needsItems: true };
+      case "presupuesto": return { label: "Confirmar pedido",      estado: "confirmado"  as PedidoEstado, needsItems: true };
+      case "confirmado":  return { label: "Marcar retirado",       estado: "retirado"    as PedidoEstado };
+      case "retirado":    return { label: "Marcar devuelto",       estado: "devuelto"    as PedidoEstado };
+      case "devuelto":    return { label: "Finalizar",             estado: "finalizado"  as PedidoEstado };
+      default:            return null;
+    }
+  })();
+
+  const actionDisabled = draft.estadoMut.isPending ||
+    (nextAction?.needsItems === true && draft.items.length === 0);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3rem)] -mx-4 md:-mx-6 -my-6">
-      {/* Header sticky */}
-      <header className="sticky top-0 z-20 bg-background border-b hairline">
-        <div className="px-4 md:px-6 py-3 flex items-center gap-2">
-          <Button asChild size="icon" variant="ghost" className="-ml-2 shrink-0">
-            <Link to="/admin/pedidos">
-              <ChevronLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-display text-lg md:text-xl text-ink truncate">
-                Pedido {numero}
-              </h1>
-              <Badge variant={pedidoEstadoVariant(pedido.estado)}>
-                {ESTADO_LABEL[pedido.estado]}
-              </Badge>
-            </div>
-            <div className="text-xs text-muted-foreground truncate">
-              {draft.datos.cliente_nombre || "Sin cliente"}
-            </div>
-          </div>
+    <div className="-mx-4 md:-mx-6 -my-6">
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-20 bg-background border-b hairline px-4 md:px-6 py-3 flex items-center gap-3">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <Link to="/admin/pedidos" className="text-muted-foreground hover:text-ink transition shrink-0">
+            <ChevronLeft className="h-4 w-4" />
+          </Link>
+          <span className="text-muted-foreground text-sm hidden sm:inline">Pedidos</span>
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground hidden sm:inline shrink-0" />
+          <span className="font-semibold text-sm text-ink truncate">{numero}</span>
+          <Badge variant={pedidoEstadoVariant(pedido.estado)} className="ml-1 shrink-0">
+            {ESTADO_LABEL[pedido.estado]}
+          </Badge>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
           <SaveIndicator status={draft.saveStatus} />
           <WhatsAppButton
             pedido={{
@@ -135,29 +221,22 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
               fecha_desde: draft.datos.fecha_desde,
               fecha_hasta: draft.datos.fecha_hasta,
               monto_total: total,
-              monto_pagado: pedido.monto_pagado,
-              estado: pedido.estado,
-            }}
-            phone={draft.datos.cliente_telefono}
-            variant="compact"
-            className="hidden md:inline-flex"
-          />
-          <WhatsAppButton
-            pedido={{
-              numero_pedido: pedido.numero_pedido,
-              numero_remito: pedido.numero_remito,
-              cliente_nombre: draft.datos.cliente_nombre,
-              fecha_desde: draft.datos.fecha_desde,
-              fecha_hasta: draft.datos.fecha_hasta,
-              monto_total: total,
-              monto_pagado: pedido.monto_pagado,
+              monto_pagado: pagado,
               estado: pedido.estado,
             }}
             phone={draft.datos.cliente_telefono}
             variant="icon"
-            className="md:hidden"
           />
-          {/* Desktop: dropdown */}
+          {nextAction && (
+            <Button
+              size="sm"
+              onClick={() => draft.estadoMut.mutate(nextAction.estado)}
+              disabled={actionDisabled}
+              className="hidden sm:inline-flex"
+            >
+              <Check className="h-3.5 w-3.5 mr-1" /> {nextAction.label}
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="icon" variant="ghost" className="hidden sm:inline-flex">
@@ -180,71 +259,175 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          {/* Mobile: bottom drawer */}
           <Button size="icon" variant="ghost" className="sm:hidden" onClick={() => setOpenActionMenu(true)}>
             <MoreHorizontal className="h-5 w-5" />
           </Button>
         </div>
-
-        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-          <TabsList className="w-full justify-start rounded-none bg-transparent border-t hairline h-auto p-0">
-            <TabTrigger value="carrito" icon={<ShoppingCart className="h-4 w-4" />} label="Carrito" badge={draft.items.length} />
-            <TabTrigger value="info" icon={<Info className="h-4 w-4" />} label="Info" />
-            <TabTrigger value="pagos" icon={<CreditCard className="h-4 w-4" />} label="Pagos" />
-            <TabTrigger value="docs" icon={<FileText className="h-4 w-4" />} label="Docs" />
-          </TabsList>
-        </Tabs>
       </header>
 
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto">
-        {tab === "carrito" && (
-          <CarritoTab
+      {/* ── 3-column body ──────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_280px] gap-4 lg:gap-6 p-4 md:p-6 items-start">
+
+        {/* ── Columna 1: Cliente + Items + Totales ── */}
+        <div className="space-y-4">
+
+          {/* Cliente */}
+          <section className="rounded-lg border hairline bg-background overflow-hidden">
+            <div className="px-4 py-3 border-b hairline">
+              <h2 className="font-medium text-sm">Cliente</h2>
+            </div>
+            <div className="p-4 space-y-3">
+              {clienteNombre !== "Sin cliente" && (
+                <div className="flex items-center gap-3 rounded-md border hairline bg-muted/20 px-3 py-2.5">
+                  <ClienteAvatar name={clienteNombre} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-ink truncate">{clienteNombre}</div>
+                    {draft.datos.cliente_email && (
+                      <div className="text-xs text-muted-foreground truncate">{draft.datos.cliente_email}</div>
+                    )}
+                  </div>
+                  {draft.datos.cliente_id && (
+                    <button
+                      type="button"
+                      onClick={() => draft.setDatos({ ...draft.datos!, cliente_id: null })}
+                      className="rounded p-1 text-muted-foreground hover:text-ink transition"
+                      aria-label="Desvincular ficha"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              )}
+              <ClienteAutocomplete
+                datos={draft.datos}
+                onPick={(c) => draft.setDatos({
+                  ...draft.datos!,
+                  cliente_id: c.id,
+                  cliente_nombre: `${c.apellido}, ${c.nombre}`,
+                  cliente_email: c.email ?? "",
+                  cliente_telefono: c.telefono ?? "",
+                  descuento_pct: c.descuento ?? draft.datos!.descuento_pct,
+                })}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Nombre</Label>
+                  <Input
+                    value={draft.datos.cliente_nombre}
+                    onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_nombre: e.target.value })}
+                    className="h-8 text-sm text-base sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Email</Label>
+                  <Input
+                    value={draft.datos.cliente_email}
+                    onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_email: e.target.value })}
+                    className="h-8 text-sm text-base sm:text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label className="text-xs">Teléfono</Label>
+                  <Input
+                    value={draft.datos.cliente_telefono}
+                    onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_telefono: e.target.value })}
+                    className="h-8 text-sm text-base sm:text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Items */}
+          <ItemsCard
             items={draft.items}
             setItems={draft.setItems}
             jornadas={jornadas}
             fechaDesde={draft.datos.fecha_desde}
             fechaHasta={draft.datos.fecha_hasta}
-            descuentoPct={draft.datos.descuento_pct}
-            setDescuentoPct={(v) => draft.setDatos({ ...draft.datos!, descuento_pct: v })}
-            bruto={bruto}
-            total={total}
             pedidoId={pedido.id}
           />
-        )}
-        {tab === "info" && (
-          <InfoTab
-            datos={draft.datos}
-            setDatos={(d) => draft.setDatos(d)}
-          />
-        )}
-        {tab === "pagos" && (
-          <PagosTab pedidoId={pedido.id} total={total} pagado={pedido.monto_pagado ?? 0} pagos={pedido.pagos ?? []} />
-        )}
-        {tab === "docs" && <DocsTab pedidoId={pedido.id} />}
-      </div>
 
-      {/* Footer sticky con acción primaria contextual */}
-      <footer className="sticky bottom-0 bg-background border-t hairline px-4 md:px-6 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-center justify-between gap-2">
-        <div className="text-xs text-muted-foreground">
-          <div>{jornadas} jornada{jornadas !== 1 && "s"} · {fmtArs(total)}</div>
-          {saldo > 0 && pedido.monto_pagado > 0 && (
-            <div>Saldo {fmtArs(saldo)}</div>
+          {/* Totales */}
+          <TotalesCard
+            bruto={bruto}
+            total={total}
+            jornadas={jornadas}
+            descuentoPct={draft.datos.descuento_pct}
+            setDescuentoPct={(v) => draft.setDatos({ ...draft.datos!, descuento_pct: v })}
+            pagado={pagado}
+            saldo={saldo}
+          />
+        </div>
+
+        {/* ── Columna 2: Recogida ── */}
+        <div className="space-y-4">
+          <RecogidaCard
+            datos={draft.datos}
+            setDatos={draft.setDatos}
+            jornadas={jornadas}
+          />
+        </div>
+
+        {/* ── Columna 3: Sidebar ── */}
+        <div className="rounded-lg border hairline bg-background overflow-hidden">
+          <SidebarSection title="Pagos" defaultOpen>
+            <PagosSidebar
+              pedidoId={pedido.id}
+              total={total}
+              pagado={pagado}
+              saldo={saldo}
+              pagos={pedido.pagos ?? []}
+            />
+          </SidebarSection>
+
+          <SidebarSection title="Documentos" defaultOpen>
+            <DocumentosSidebar pedidoId={pedido.id} />
+          </SidebarSection>
+
+          <SidebarSection title="Notas" defaultOpen={false}>
+            <Textarea
+              rows={4}
+              value={draft.datos.notas}
+              onChange={(e) => draft.setDatos({ ...draft.datos!, notas: e.target.value })}
+              placeholder="Visibles solo en el back-office"
+              className="text-sm resize-none text-base sm:text-sm"
+            />
+          </SidebarSection>
+
+          {pedido.fuente && pedido.fuente !== "historico" && (
+            <SidebarSection title="Etiquetas" badge={1} defaultOpen>
+              <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2.5 py-1 text-xs font-medium text-ink">
+                {pedido.fuente.toUpperCase()}
+              </span>
+            </SidebarSection>
           )}
         </div>
-        <ContextualAction
-          estado={pedido.estado}
-          itemsCount={draft.items.length}
-          onChange={(e) => draft.estadoMut.mutate(e)}
-          pending={draft.estadoMut.isPending}
-        />
-      </footer>
+      </div>
+
+      {/* Mobile: acción primaria flotante */}
+      {nextAction && (
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-background border-t hairline px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] z-20">
+          <Button
+            className="w-full"
+            onClick={() => draft.estadoMut.mutate(nextAction.estado)}
+            disabled={actionDisabled}
+          >
+            <Check className="h-4 w-4 mr-1" /> {nextAction.label}
+          </Button>
+        </div>
+      )}
 
       <ActionMenu
         open={openActionMenu}
         onOpenChange={setOpenActionMenu}
         title={numero}
         actions={[
+          ...(nextAction ? [{
+            label: nextAction.label,
+            icon: <Check className="h-4 w-4" />,
+            onClick: () => draft.estadoMut.mutate(nextAction.estado),
+          }] : []),
           ...(pedido.estado !== "cancelado" ? [{
             label: "Cancelar pedido",
             icon: <X className="h-4 w-4" />,
@@ -282,93 +465,18 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
   );
 }
 
-function TabTrigger({ value, icon, label, badge }: { value: string; icon: React.ReactNode; label: string; badge?: number }) {
-  return (
-    <TabsTrigger
-      value={value}
-      className={cn(
-        "flex-1 rounded-none border-b-2 border-transparent",
-        "data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:shadow-none",
-        "py-3 gap-1.5 text-xs font-medium",
-      )}
-    >
-      {icon}
-      <span className="hidden sm:inline">{label}</span>
-      {!!badge && badge > 0 && (
-        <span className="ml-1 inline-flex items-center justify-center rounded-full bg-ink text-background text-[10px] h-4 min-w-4 px-1">
-          {badge}
-        </span>
-      )}
-    </TabsTrigger>
-  );
-}
-
-function SaveIndicator({ status }: { status: SaveStatus }) {
-  if (status === "saving") {
-    return <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Guardando…</span>;
-  }
-  if (status === "saved") {
-    return <span className="text-xs text-muted-foreground flex items-center gap-1"><CloudCheck className="h-3 w-3" /> Guardado</span>;
-  }
-  if (status === "error") {
-    return <span className="text-xs text-destructive flex items-center gap-1"><CloudOff className="h-3 w-3" /> Error</span>;
-  }
-  if (status === "dirty") {
-    return <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Guardando…</span>;
-  }
-  return null;
-}
-
 // ─────────────────────────────────────────────────────────────────────────
-// Acción contextual del footer según estado
+// Items card
 // ─────────────────────────────────────────────────────────────────────────
 
-function ContextualAction({
-  estado, itemsCount, onChange, pending,
-}: {
-  estado: PedidoEstado;
-  itemsCount: number;
-  onChange: (e: PedidoEstado) => void;
-  pending: boolean;
-}) {
-  const next: { label: string; estado: PedidoEstado; needsItems?: boolean } | null = (() => {
-    switch (estado) {
-      case "borrador":    return { label: "Confirmar presupuesto", estado: "presupuesto", needsItems: true };
-      case "presupuesto": return { label: "Confirmar pedido",      estado: "confirmado",  needsItems: true };
-      case "confirmado":  return { label: "Marcar retirado",       estado: "retirado" };
-      case "retirado":    return { label: "Marcar devuelto",       estado: "devuelto" };
-      case "devuelto":    return { label: "Finalizar",             estado: "finalizado" };
-      default:            return null;
-    }
-  })();
-
-  if (!next) return <div />;
-  const disabled = pending || (next.needsItems === true && itemsCount === 0);
-
-  return (
-    <Button onClick={() => onChange(next.estado)} disabled={disabled}>
-      <Check className="h-4 w-4 mr-1" /> {next.label}
-    </Button>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Tab: Carrito
-// ─────────────────────────────────────────────────────────────────────────
-
-function CarritoTab({
-  items, setItems, jornadas, fechaDesde, fechaHasta,
-  descuentoPct, setDescuentoPct, bruto, total, pedidoId,
+function ItemsCard({
+  items, setItems, jornadas, fechaDesde, fechaHasta, pedidoId,
 }: {
   items: DraftItem[];
   setItems: (v: DraftItem[]) => void;
   jornadas: number;
   fechaDesde: string;
   fechaHasta: string;
-  descuentoPct: number;
-  setDescuentoPct: (v: number) => void;
-  bruto: number;
-  total: number;
   pedidoId: number;
 }) {
   const [openSearch, setOpenSearch] = useState(false);
@@ -378,25 +486,44 @@ function CarritoTab({
     queryFn: () => adminApi.getDisponibilidad(fechaDesde, fechaHasta, pedidoId),
     enabled: !!fechaDesde && !!fechaHasta,
   });
-
   const stockMap = dispoQ.data ?? {};
 
-  const updateItem = (equipoId: number, patch: Partial<DraftItem>) => {
+  const updateItem = (equipoId: number, patch: Partial<DraftItem>) =>
     setItems(items.map((it) => it.equipo_id === equipoId ? { ...it, ...patch } : it));
-  };
+
   const removeItem = (equipoId: number) => {
     if (items.length === 1) {
-      toast.error("El pedido debe tener al menos un equipo. Eliminá el pedido si querés vaciarlo.");
+      toast.error("El pedido debe tener al menos un equipo.");
       return;
     }
     setItems(items.filter((it) => it.equipo_id !== equipoId));
   };
 
   return (
-    <div className="px-4 md:px-6 py-4 space-y-4">
+    <section className="rounded-lg border hairline bg-background overflow-hidden">
+      {/* Search trigger */}
+      <button
+        type="button"
+        onClick={() => setOpenSearch(true)}
+        className="flex w-full items-center gap-2.5 px-4 py-3 border-b hairline text-sm text-muted-foreground hover:bg-muted/30 transition"
+      >
+        <Search className="h-4 w-4 shrink-0" />
+        <span>Buscar para añadir productos</span>
+      </button>
+
+      {/* Column headers */}
+      {items.length > 0 && (
+        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 py-2 border-b hairline bg-muted/20 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span>Producto</span>
+          <span className="text-right w-20">Disponible</span>
+          <span className="text-right w-16">Cantidad</span>
+          <span className="text-right w-24">Cargo</span>
+        </div>
+      )}
+
       {items.length === 0 && (
-        <div className="rounded-md border hairline border-dashed p-8 text-center text-sm text-muted-foreground">
-          Sin equipos. Tocá <span className="text-ink">+ Agregar equipo</span> para empezar.
+        <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+          Sin equipos. Usá el buscador para agregar.
         </div>
       )}
 
@@ -406,61 +533,79 @@ function CarritoTab({
           const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : it.cantidad;
           const disponible = max - it.cantidad;
           const overstock = it.cantidad > max;
+          const subtotal = it.precio_jornada * it.cantidad * jornadas;
+
           return (
-            <li key={`${it.equipo_id}-${idx}`} className="py-3 flex items-start gap-3">
-              <div className="h-12 w-12 rounded-md bg-muted/50 border hairline shrink-0 flex items-center justify-center text-muted-foreground">
-                <ShoppingCart className="h-5 w-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {it.marca ?? "—"}
-                      {stock && (
-                        <> · <span className={overstock ? "text-destructive" : ""}>{disponible} libres</span></>
-                      )}
-                    </div>
+            <li key={`${it.equipo_id}-${idx}`} className="px-4 py-3 space-y-2.5">
+              {/* Row 1: thumb + info + disponible + total + remove */}
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-md bg-muted/50 border hairline shrink-0 flex items-center justify-center text-muted-foreground">
+                  <ShoppingCart className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-ink truncate">
+                    {it.nombre_publico || it.nombre}
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm tabular-nums text-ink">
-                      {fmtArs(it.precio_jornada * it.cantidad * jornadas)}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {it.cantidad} × {fmtArs(it.precio_jornada)} × {jornadas}j
-                    </div>
+                  <div className="text-xs text-muted-foreground">
+                    {it.marca ?? "—"}
+                    {stock && (
+                      <span className={cn("ml-1.5 inline-flex items-center rounded px-1.5 py-0.5 text-[10px]",
+                        disponible <= 0 ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
+                      )}>
+                        {disponible <= 0 ? `${disponible} restante` : `${disponible} libres`}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="mt-2 flex items-center gap-1">
+                <div className="text-right shrink-0">
+                  <div className="text-sm tabular-nums font-medium text-ink">{fmtArs(subtotal)}</div>
+                  <div className="text-[11px] text-muted-foreground">{jornadas}j</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeItem(it.equipo_id)}
+                  className="rounded p-1 text-muted-foreground hover:text-destructive transition shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Row 2: controls */}
+              <div className="flex items-center gap-2 pl-13">
+                <div className="flex items-center gap-1">
                   <Button
-                    size="icon" variant="outline" className="h-9 w-9 sm:h-7 sm:w-7"
+                    size="icon" variant="outline"
+                    className="h-7 w-7"
                     onClick={() => updateItem(it.equipo_id, { cantidad: Math.max(1, it.cantidad - 1) })}
-                  ><Minus className="h-3 w-3" /></Button>
+                  >
+                    <Minus className="h-3 w-3" />
+                  </Button>
                   <Input
                     type="number" min={1}
                     value={it.cantidad}
                     onChange={(e) => updateItem(it.equipo_id, { cantidad: parseInt(e.target.value) || 1 })}
-                    className={cn("h-9 sm:h-7 w-14 text-center", overstock && "border-destructive text-destructive")}
+                    className={cn("h-7 w-10 text-center text-sm p-0", overstock && "border-destructive text-destructive")}
                   />
                   <Button
-                    size="icon" variant="outline" className="h-9 w-9 sm:h-7 sm:w-7"
+                    size="icon" variant="outline"
+                    className="h-7 w-7"
                     onClick={() => updateItem(it.equipo_id, { cantidad: it.cantidad + 1 })}
-                  ><Plus className="h-3 w-3" /></Button>
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="flex items-center gap-1 ml-2">
                   <Input
                     type="number" min={0}
                     value={it.precio_jornada}
                     onChange={(e) => updateItem(it.equipo_id, { precio_jornada: parseInt(e.target.value) || 0 })}
-                    className="h-9 sm:h-7 ml-2 sm:text-xs flex-1 max-w-[100px]"
+                    className="h-7 w-24 text-sm text-base sm:text-sm"
                   />
-                  <span className="text-xs text-muted-foreground">/día</span>
-                  <Button
-                    size="icon" variant="ghost" className="h-9 w-9 sm:h-7 sm:w-7 ml-auto text-muted-foreground hover:text-destructive"
-                    onClick={() => removeItem(it.equipo_id)}
-                  ><X className="h-4 w-4" /></Button>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">/día</span>
                 </div>
                 {overstock && (
-                  <div className="mt-1 text-[11px] text-destructive flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> Excede stock disponible ({max})
+                  <div className="ml-auto text-[11px] text-destructive flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> Excede stock ({max})
                   </div>
                 )}
               </div>
@@ -468,37 +613,6 @@ function CarritoTab({
           );
         })}
       </ul>
-
-      <Button variant="outline" className="w-full" onClick={() => setOpenSearch(true)}>
-        <Plus className="h-4 w-4 mr-1" /> Agregar equipo
-      </Button>
-
-      {/* Totales */}
-      <div className="rounded-md border hairline p-4 space-y-2 text-sm">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Subtotal</span>
-          <span className="tabular-nums">{fmtArs(bruto)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <Label className="text-muted-foreground text-sm">Descuento %</Label>
-          <Input
-            type="number" min={0} max={100} step="0.5"
-            value={descuentoPct}
-            onChange={(e) => setDescuentoPct(parseFloat(e.target.value) || 0)}
-            className="h-7 w-20 text-right tabular-nums"
-          />
-        </div>
-        {descuentoPct > 0 && (
-          <div className="flex justify-between text-muted-foreground">
-            <span>−{descuentoPct}%</span>
-            <span className="tabular-nums">−{fmtArs(bruto - total)}</span>
-          </div>
-        )}
-        <div className="flex justify-between border-t hairline pt-2 text-ink font-medium">
-          <span>Total</span>
-          <span className="tabular-nums">{fmtArs(total)}</span>
-        </div>
-      </div>
 
       <EquipoSearchSheet
         open={openSearch}
@@ -525,9 +639,306 @@ function CarritoTab({
           setOpenSearch(false);
         }}
       />
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Totales card
+// ─────────────────────────────────────────────────────────────────────────
+
+function TotalesCard({
+  bruto, total, jornadas, descuentoPct, setDescuentoPct, pagado, saldo,
+}: {
+  bruto: number;
+  total: number;
+  jornadas: number;
+  descuentoPct: number;
+  setDescuentoPct: (v: number) => void;
+  pagado: number;
+  saldo: number;
+}) {
+  return (
+    <section className="rounded-lg border hairline bg-background overflow-hidden">
+      <div className="px-4 py-3 space-y-2.5 text-sm">
+        <div className="flex justify-between text-muted-foreground">
+          <span>Subtotal</span>
+          <span className="tabular-nums">{fmtArs(bruto)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-muted-foreground">Descuento %</span>
+          <Input
+            type="number" min={0} max={100} step="0.5"
+            value={descuentoPct}
+            onChange={(e) => setDescuentoPct(parseFloat(e.target.value) || 0)}
+            className="h-7 w-20 text-right text-sm"
+          />
+        </div>
+        {descuentoPct > 0 && (
+          <div className="flex justify-between text-muted-foreground">
+            <span>−{descuentoPct}%</span>
+            <span className="tabular-nums">−{fmtArs(bruto - total)}</span>
+          </div>
+        )}
+        <div className="flex justify-between border-t hairline pt-2.5 font-semibold text-ink">
+          <span>Total con impuestos incluidos</span>
+          <span className="tabular-nums">{fmtArs(total)}</span>
+        </div>
+        {jornadas > 0 && (
+          <div className="text-xs text-muted-foreground text-right">
+            {jornadas} jornada{jornadas !== 1 ? "s" : ""}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Recogida card (columna 2)
+// ─────────────────────────────────────────────────────────────────────────
+
+function RecogidaCard({
+  datos, setDatos, jornadas,
+}: {
+  datos: DraftDatos;
+  setDatos: (d: DraftDatos) => void;
+  jornadas: number;
+}) {
+  const set = <K extends keyof DraftDatos>(k: K, v: DraftDatos[K]) =>
+    setDatos({ ...datos, [k]: v });
+
+  return (
+    <section className="rounded-lg border hairline bg-background overflow-hidden">
+      <div className="px-4 py-3 border-b hairline">
+        <h2 className="font-medium text-sm">Recogida</h2>
+      </div>
+      <div className="p-4 space-y-4">
+        <div>
+          <Label className="text-xs text-muted-foreground mb-1.5">Desde</Label>
+          <div className="rounded-md border hairline px-3 py-3">
+            <div className="text-lg font-semibold text-ink tabular-nums">
+              {datos.fecha_desde ? fmtFecha(datos.fecha_desde) : "—"}
+            </div>
+            <Input
+              type="date"
+              value={datos.fecha_desde}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (datos.fecha_hasta && new Date(datos.fecha_hasta) < new Date(v)) {
+                  setDatos({ ...datos, fecha_desde: v, fecha_hasta: v });
+                } else {
+                  set("fecha_desde", v);
+                }
+              }}
+              className="mt-2 h-8 text-sm text-base sm:text-sm"
+            />
+          </div>
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground mb-1.5">Hasta</Label>
+          <div className="rounded-md border hairline px-3 py-3">
+            <div className="text-lg font-semibold text-ink tabular-nums">
+              {datos.fecha_hasta ? fmtFecha(datos.fecha_hasta) : "—"}
+            </div>
+            <Input
+              type="date"
+              value={datos.fecha_hasta}
+              min={datos.fecha_desde || undefined}
+              onChange={(e) => set("fecha_hasta", e.target.value)}
+              className="mt-2 h-8 text-sm text-base sm:text-sm"
+            />
+          </div>
+        </div>
+        {jornadas > 0 && (
+          <div className="text-sm text-muted-foreground text-center">
+            {jornadas} jornada{jornadas !== 1 ? "s" : ""}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Pagos sidebar
+// ─────────────────────────────────────────────────────────────────────────
+
+function PagosSidebar({
+  pedidoId, total, pagado, saldo, pagos,
+}: {
+  pedidoId: number;
+  total: number;
+  pagado: number;
+  saldo: number;
+  pagos: { id: number; monto: number; concepto: string | null; fecha: string }[];
+}) {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [monto, setMonto] = useState("");
+  const [concepto, setConcepto] = useState("");
+
+  const addMut = useMutation({
+    mutationFn: () => adminApi.addPago(pedidoId, parseInt(monto || "0", 10), concepto || undefined),
+    onSuccess: () => {
+      toast.success("Pago registrado");
+      setMonto(""); setConcepto(""); setShowForm(false);
+      qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
+      qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const delMut = useMutation({
+    mutationFn: (pagoId: number) => adminApi.deletePago(pedidoId, pagoId),
+    onSuccess: () => {
+      toast.success("Pago eliminado");
+      qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
+      qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const estadoPago = saldo <= 0 ? "pagado" : "pendiente";
+
+  return (
+    <div className="space-y-3">
+      {/* Badge estado + importes */}
+      <div className={cn(
+        "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
+        estadoPago === "pagado"
+          ? "bg-green-100 text-green-700"
+          : "bg-amber-100 text-amber-700",
+      )}>
+        {estadoPago === "pagado" ? "Pagado" : "Pago pendiente"}
+      </div>
+      <div className="text-sm space-y-1">
+        <div className="flex justify-between text-muted-foreground">
+          <span>Pagado</span>
+          <span className="tabular-nums">{fmtArs(pagado)}</span>
+        </div>
+        <div className="flex justify-between font-medium text-ink">
+          <span>Debido</span>
+          <span className="tabular-nums">{fmtArs(total)}</span>
+        </div>
+      </div>
+
+      {/* Historial */}
+      {pagos.length > 0 && (
+        <div className="divide-y hairline rounded-md border hairline overflow-hidden">
+          {pagos.map((pg) => (
+            <div key={pg.id} className="flex items-center justify-between px-3 py-2 text-xs">
+              <div>
+                <div className="tabular-nums font-medium text-ink">{fmtArs(pg.monto)}</div>
+                <div className="text-muted-foreground">{pg.fecha}{pg.concepto ? ` · ${pg.concepto}` : ""}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => delMut.mutate(pg.id)}
+                className="rounded p-1 text-muted-foreground hover:text-destructive transition"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Nuevo pago */}
+      {showForm ? (
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Monto</Label>
+              <Input
+                type="number"
+                value={monto}
+                onChange={(e) => setMonto(e.target.value)}
+                placeholder="0"
+                className="h-8 text-sm text-base sm:text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Concepto</Label>
+              <Input
+                value={concepto}
+                onChange={(e) => setConcepto(e.target.value)}
+                placeholder="Seña, saldo…"
+                className="h-8 text-sm text-base sm:text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm" className="flex-1"
+              onClick={() => {
+                const n = parseInt(monto || "0", 10);
+                if (!n || n <= 0) return toast.error("Monto inválido");
+                addMut.mutate();
+              }}
+              disabled={addMut.isPending}
+            >
+              {addMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              {" "}Guardar
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setShowForm(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button variant="outline" size="sm" className="w-full" onClick={() => setShowForm(true)}>
+          <Plus className="h-3.5 w-3.5 mr-1" /> Nuevo Pago
+        </Button>
+      )}
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Documentos sidebar
+// ─────────────────────────────────────────────────────────────────────────
+
+function DocumentosSidebar({ pedidoId }: { pedidoId: number }) {
+  const docs: { kind: "pdf" | "albaran" | "contrato"; label: string; icon: React.ReactNode }[] = [
+    { kind: "contrato", label: "Contrato",    icon: <FileSignature className="h-4 w-4" /> },
+    { kind: "pdf",      label: "Presupuesto", icon: <FileText className="h-4 w-4" /> },
+    { kind: "albaran",  label: "Albarán",     icon: <Truck className="h-4 w-4" /> },
+  ];
+
+  return (
+    <div className="space-y-1.5">
+      {docs.map((d) => (
+        <div key={d.kind} className="flex items-center gap-2 rounded-md border hairline px-3 py-2">
+          <span className="text-muted-foreground shrink-0">{d.icon}</span>
+          <span className="flex-1 text-sm text-ink">{d.label}</span>
+          <div className="flex items-center gap-1 shrink-0">
+            <a
+              href={`${pedidoPdfUrl(pedidoId, d.kind)}?format=html`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded p-1 text-muted-foreground hover:text-ink transition"
+              title="Ver"
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href={pedidoPdfUrl(pedidoId, d.kind)}
+              className="rounded p-1 text-muted-foreground hover:text-ink transition"
+              title="Descargar PDF"
+            >
+              <Download className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Buscar equipo (BottomSheet)
+// ─────────────────────────────────────────────────────────────────────────
 
 function EquipoSearchSheet({
   open, onOpenChange, existing, stockMap, onAdd,
@@ -543,7 +954,6 @@ function EquipoSearchSheet({
     queryKey: ["admin", "equipos", "all"],
     queryFn: () => adminApi.listEquipos({ per_page: 500 }),
   });
-
   const categoriasQ = useQuery({
     queryKey: ["categorias"],
     queryFn: () => adminApi.listCategorias(),
@@ -572,19 +982,14 @@ function EquipoSearchSheet({
       arr.push(eq);
       map.set(cat, arr);
     }
-    // Construir peso por nombre: parentPri * 1000 + nodePri.
-    // Funciona con la respuesta nueva (árbol con children) y la legacy (subtags).
     const weight: Record<string, number> = {};
     const tree = categoriasQ.data ?? [];
     for (const root of tree) {
       const rp = root.prioridad ?? 999;
       weight[root.nombre] = rp * 1000;
-      const children = root.children ?? [];
-      for (const c of children) {
-        const cp = (c as { prioridad?: number }).prioridad ?? 100;
-        weight[c.nombre] = rp * 1000 + cp;
+      for (const c of root.children ?? []) {
+        weight[c.nombre] = rp * 1000 + ((c as { prioridad?: number }).prioridad ?? 100);
       }
-      // legacy subtags (sin prioridad propia → orden alfabético dentro del padre)
       (root.subtags ?? []).forEach((s, i) => {
         if (weight[s.nombre] == null) weight[s.nombre] = rp * 1000 + (i + 1) * 10;
       });
@@ -592,24 +997,21 @@ function EquipoSearchSheet({
     return Array.from(map.entries()).sort(([a], [b]) => {
       if (a === SIN) return 1;
       if (b === SIN) return -1;
-      const wa = weight[a] ?? 999_000;
-      const wb = weight[b] ?? 999_000;
-      if (wa !== wb) return wa - wb;
-      return a.localeCompare(b, "es");
+      return (weight[a] ?? 999_000) - (weight[b] ?? 999_000) || a.localeCompare(b, "es");
     });
   }, [lista, categoriasQ.data]);
 
   return (
-    <BottomSheet
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Agregar equipo"
-      showClose
-    >
+    <BottomSheet open={open} onOpenChange={onOpenChange} title="Agregar equipo" showClose>
       <div className="px-4 pt-3 pb-3 border-b hairline">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" className="pl-9 text-base sm:text-sm" />
+          <Input
+            autoFocus value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar…"
+            className="pl-9 text-base sm:text-sm"
+          />
         </div>
       </div>
       <div className="px-4 pb-4">
@@ -620,28 +1022,28 @@ function EquipoSearchSheet({
           <section key={cat} className="mb-2">
             <div className="sticky top-0 z-10 bg-background/95 backdrop-blur py-2 flex items-center justify-between border-b hairline">
               <h4 className="font-display text-sm text-ink">{cat}</h4>
-              <span className="text-[11px] text-muted-foreground tabular-nums">{equipos.length}</span>
+              <span className="text-[11px] text-muted-foreground">{equipos.length}</span>
             </div>
             <ul className="divide-y hairline">
               {equipos.map((eq) => {
                 const stock = stockMap[String(eq.id)];
                 const inCart = existing.find((i) => i.equipo_id === eq.id);
                 const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : eq.cantidad;
-                const usado = inCart?.cantidad ?? 0;
-                const disponible = max - usado;
+                const disponible = max - (inCart?.cantidad ?? 0);
                 return (
                   <li key={eq.id} className="flex items-center justify-between gap-2 py-3">
                     <div className="min-w-0 flex-1">
                       <div className="text-sm text-ink truncate">{eq.nombre_publico || eq.nombre}</div>
                       <div className="text-xs text-muted-foreground truncate">
                         {[eq.marca, eq.modelo].filter(Boolean).join(" / ")}
-                        <> · <span className={disponible <= 0 ? "text-destructive" : ""}>{disponible} libres</span></>
+                        {" · "}
+                        <span className={disponible <= 0 ? "text-destructive" : ""}>{disponible} libres</span>
                         {eq.precio_jornada ? ` · ${fmtArs(eq.precio_jornada)}/día` : ""}
                       </div>
                     </div>
                     <Button
                       size="icon"
-                      className="h-10 w-10 shrink-0 sm:h-9 sm:w-9"
+                      className="h-10 w-10 shrink-0"
                       disabled={disponible <= 0}
                       onClick={() => onAdd(eq)}
                       aria-label="Agregar"
@@ -660,102 +1062,8 @@ function EquipoSearchSheet({
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Tab: Info
+// Cliente autocomplete
 // ─────────────────────────────────────────────────────────────────────────
-
-
-
-function InfoTab({
-  datos, setDatos,
-}: {
-  datos: DraftDatos;
-  setDatos: (d: DraftDatos) => void;
-}) {
-  const set = <K extends keyof DraftDatos>(k: K, v: DraftDatos[K]) =>
-    setDatos({ ...datos, [k]: v });
-
-  return (
-    <div className="px-4 md:px-6 py-4 space-y-6 max-w-2xl">
-      {/* Cliente */}
-      <section className="space-y-3">
-        <h3 className="font-display text-lg">Cliente</h3>
-        <ClienteAutocomplete
-          datos={datos}
-          onPick={(c) => setDatos({
-            ...datos,
-            cliente_id: c.id,
-            cliente_nombre: `${c.apellido}, ${c.nombre}`,
-            cliente_email: c.email ?? "",
-            cliente_telefono: c.telefono ?? "",
-            descuento_pct: c.descuento ?? datos.descuento_pct,
-          })}
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <Label className="text-xs">Nombre completo</Label>
-            <Input value={datos.cliente_nombre} onChange={(e) => set("cliente_nombre", e.target.value)} />
-          </div>
-          <div>
-            <Label className="text-xs">Email</Label>
-            <Input value={datos.cliente_email} onChange={(e) => set("cliente_email", e.target.value)} />
-          </div>
-          <div>
-            <Label className="text-xs">Teléfono</Label>
-            <Input value={datos.cliente_telefono} onChange={(e) => set("cliente_telefono", e.target.value)} />
-          </div>
-          {datos.cliente_id && (
-            <div className="self-end">
-              <Button variant="ghost" size="sm" onClick={() => set("cliente_id", null)}>
-                <X className="h-4 w-4 mr-1" /> Desvincular ficha
-              </Button>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Fechas */}
-      <section className="space-y-3">
-        <h3 className="font-display text-lg">Fechas</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label className="text-xs">Desde</Label>
-            <Input
-              type="date" value={datos.fecha_desde}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (datos.fecha_hasta && new Date(datos.fecha_hasta) < new Date(v)) {
-                  setDatos({ ...datos, fecha_desde: v, fecha_hasta: v });
-                } else {
-                  set("fecha_desde", v);
-                }
-              }}
-            />
-          </div>
-          <div>
-            <Label className="text-xs">Hasta</Label>
-            <Input
-              type="date" value={datos.fecha_hasta} min={datos.fecha_desde || undefined}
-              onChange={(e) => set("fecha_hasta", e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="text-xs text-muted-foreground">
-          {jornadasEntre(datos.fecha_desde, datos.fecha_hasta)} jornada(s)
-        </div>
-      </section>
-
-      {/* Notas */}
-      <section className="space-y-2">
-        <h3 className="font-display text-lg">Notas internas</h3>
-        <Textarea
-          rows={4} value={datos.notas}
-          onChange={(e) => set("notas", e.target.value)}
-          placeholder="Visibles solo en el back-office"
-        />
-      </section>
-    </div>
-  );
-}
 
 function ClienteAutocomplete({
   datos, onPick,
@@ -780,17 +1088,17 @@ function ClienteAutocomplete({
 
   return (
     <div className="relative">
-      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
       <Input
         value={q}
         onChange={(e) => { setQ(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="Buscar ficha existente…"
-        className="pl-9"
+        className="pl-9 h-8 text-sm text-base sm:text-sm"
       />
       {open && q.trim().length > 0 && (
-        <div className="absolute z-30 left-0 right-0 mt-1 rounded-md border hairline bg-background shadow-md max-h-64 overflow-auto">
+        <div className="absolute z-30 left-0 right-0 mt-1 rounded-md border hairline bg-background shadow-md max-h-52 overflow-auto">
           {clientesQ.isLoading && <div className="p-3 text-xs text-muted-foreground">Buscando…</div>}
           {clientesQ.data?.items.length === 0 && (
             <div className="p-3 text-xs text-muted-foreground">Sin resultados</div>
@@ -800,7 +1108,7 @@ function ClienteAutocomplete({
               key={c.id}
               type="button"
               onMouseDown={(e) => { e.preventDefault(); onPick(c); setQ(""); setOpen(false); }}
-              className="w-full text-left px-3 py-2 hover:bg-accent/50"
+              className="w-full text-left px-3 py-2 hover:bg-accent/50 transition"
             >
               <div className="text-sm text-ink">{c.apellido ? `${c.apellido}, ${c.nombre}` : c.nombre}</div>
               <div className="text-xs text-muted-foreground">{[c.email, c.telefono].filter(Boolean).join(" · ") || "—"}</div>
@@ -808,170 +1116,6 @@ function ClienteAutocomplete({
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Tab: Pagos
-// ─────────────────────────────────────────────────────────────────────────
-
-function PagosTab({
-  pedidoId, total, pagado, pagos,
-}: {
-  pedidoId: number;
-  total: number;
-  pagado: number;
-  pagos: { id: number; monto: number; concepto: string | null; fecha: string }[];
-}) {
-  const qc = useQueryClient();
-  const [monto, setMonto] = useState("");
-  const [concepto, setConcepto] = useState("");
-  const saldo = total - pagado;
-
-  const addMut = useMutation({
-    mutationFn: () => adminApi.addPago(pedidoId, parseInt(monto || "0", 10), concepto || undefined),
-    onSuccess: () => {
-      toast.success("Pago registrado");
-      setMonto(""); setConcepto("");
-      qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
-      qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const delMut = useMutation({
-    mutationFn: (pagoId: number) => adminApi.deletePago(pedidoId, pagoId),
-    onSuccess: () => {
-      toast.success("Pago eliminado");
-      qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
-      qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  return (
-    <div className="px-4 md:px-6 py-4 space-y-5 max-w-xl">
-      <div className="grid grid-cols-3 gap-3 text-sm">
-        <Stat label="Total" value={fmtArs(total)} />
-        <Stat label="Pagado" value={fmtArs(pagado)} />
-        <Stat label="Saldo" value={fmtArs(saldo)} highlight={saldo > 0} />
-      </div>
-
-      <div className="rounded-md border hairline divide-y">
-        {pagos.length === 0 && <div className="p-4 text-sm text-muted-foreground">Sin pagos registrados.</div>}
-        {pagos.map((pg) => (
-          <div key={pg.id} className="flex items-center justify-between p-3 text-sm">
-            <div>
-              <div className="tabular-nums">{fmtArs(pg.monto)}</div>
-              <div className="text-xs text-muted-foreground">
-                {pg.fecha} {pg.concepto ? `· ${pg.concepto}` : ""}
-              </div>
-            </div>
-            <Button size="icon" variant="ghost" onClick={() => delMut.mutate(pg.id)} disabled={delMut.isPending}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        ))}
-      </div>
-
-      <div className="rounded-md border hairline p-3 space-y-3">
-        <h4 className="font-display text-base">Registrar pago</h4>
-        <div className="grid grid-cols-[1fr_1fr] gap-2">
-          <div>
-            <Label className="text-xs">Monto</Label>
-            <Input type="number" value={monto} onChange={(e) => setMonto(e.target.value)} placeholder="0" />
-          </div>
-          <div>
-            <Label className="text-xs">Concepto</Label>
-            <Input value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Seña, saldo…" />
-          </div>
-        </div>
-        <Button
-          className="w-full"
-          onClick={() => {
-            const n = parseInt(monto || "0", 10);
-            if (!n || n <= 0) return toast.error("Monto inválido");
-            addMut.mutate();
-          }}
-          disabled={addMut.isPending}
-        >
-          <Plus className="h-4 w-4 mr-1" /> Agregar pago
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
-  return (
-    <div className="rounded-md border hairline px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={cn("text-sm tabular-nums mt-0.5", highlight ? "text-ink font-medium" : "text-muted-foreground")}>{value}</div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Tab: Documentos
-// ─────────────────────────────────────────────────────────────────────────
-
-function DocsTab({ pedidoId }: { pedidoId: number }) {
-  const docs = [
-    {
-      kind: "pdf" as const,
-      label: "Presupuesto",
-      desc: "Cotización formal con ítems y total.",
-      icon: <FileText className="h-5 w-5" />,
-    },
-    {
-      kind: "albaran" as const,
-      label: "Albarán",
-      desc: "Lista de entrega con números de serie.",
-      icon: <Truck className="h-5 w-5" />,
-    },
-    {
-      kind: "contrato" as const,
-      label: "Contrato",
-      desc: "Documento legal con cláusulas y firma.",
-      icon: <FileSignature className="h-5 w-5" />,
-    },
-  ];
-  return (
-    <div className="px-4 md:px-6 py-4 space-y-3 max-w-2xl">
-      <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-        Documentos del pedido
-      </div>
-      {docs.map((d) => (
-        <div
-          key={d.kind}
-          className="flex items-center gap-4 rounded-lg border hairline bg-surface p-4 hover:border-ink/20 transition"
-        >
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-amber-soft text-ink">
-            {d.icon}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="font-display text-base text-ink">{d.label}</div>
-            <div className="text-xs text-muted-foreground">{d.desc}</div>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <a
-              href={`${pedidoPdfUrl(pedidoId, d.kind)}?format=html`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-accent/30 transition"
-            >
-              <Eye className="h-3.5 w-3.5" /> Ver
-            </a>
-            <a
-              href={pedidoPdfUrl(pedidoId, d.kind)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-amber hover:brightness-110 transition"
-            >
-              <Download className="h-3.5 w-3.5" /> PDF
-            </a>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

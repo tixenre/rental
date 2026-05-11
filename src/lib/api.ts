@@ -88,6 +88,7 @@ export type BackendEquipo = {
   kit: unknown[];
   categorias?: BackendCategoriaRef[];
   ficha?: BackendFicha;
+  specs_destacados?: { label: string; value: string }[];
 };
 
 export type BackendCategoria = {

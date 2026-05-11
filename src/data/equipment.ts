@@ -39,6 +39,10 @@ export type Equipment = {
   pricePerDay: number;
   description: string;
   specs: { label: string; value: string }[];
+  /** Specs marcadas como destacado en el template de la categoría. Se usan
+   *  como "quick facts" en la fila del catálogo. Vacío → fallback a montura/
+   *  formato/resolución hardcodeados. */
+  specsDestacados?: { label: string; value: string }[];
   /** Palabras clave editoriales (selling points) — distintas de las etiquetas de búsqueda. */
   keywords?: string[];
   // Campos de Lovable

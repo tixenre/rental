@@ -204,8 +204,9 @@ export function SpecTemplatesSection() {
                   </td>
                   <td className="px-3 py-2 hidden md:table-cell">
                     <div className="flex flex-wrap gap-1 text-[10px]">
+                      {t.destacado && <Badge tone="amber">destacado</Badge>}
                       {t.obligatorio && <Badge>obligatorio</Badge>}
-                      {t.visible_en_nombre && <Badge tone="amber">en nombre</Badge>}
+                      {t.visible_en_nombre && <Badge>en nombre</Badge>}
                       {t.visible_en_card && <Badge>en card</Badge>}
                       {t.visible_en_filtros && <Badge>en filtros</Badge>}
                     </div>
@@ -314,6 +315,7 @@ function SpecTemplateFormModal({
     visible_en_nombre: template?.visible_en_nombre ?? false,
     obligatorio: template?.obligatorio ?? false,
     ayuda: template?.ayuda ?? "",
+    destacado: template?.destacado ?? false,
   });
   const [enumInput, setEnumInput] = useState((template?.enum_options ?? []).join(", "));
 
@@ -482,6 +484,11 @@ function SpecTemplateFormModal({
 
           <fieldset className="border hairline rounded-md p-3 space-y-2">
             <legend className="px-1 text-xs text-muted-foreground">Visibilidad</legend>
+            <Toggle
+              label="Spec destacada — aparece como quick fact en la fila del catálogo"
+              checked={!!form.destacado}
+              onChange={(v) => setForm({ ...form, destacado: v })}
+            />
             <Toggle
               label="Obligatorio al crear equipo"
               checked={!!form.obligatorio}

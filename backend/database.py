@@ -625,6 +625,7 @@ def init_db():
             visible_en_nombre   BOOLEAN DEFAULT FALSE,
             obligatorio         BOOLEAN DEFAULT FALSE,
             ayuda               TEXT,
+            destacado           BOOLEAN DEFAULT FALSE,
             UNIQUE (categoria_id, spec_key)
         )
     """)
@@ -959,6 +960,42 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     for e in equipos:
         e["ficha"] = f_map.get(e["id"]) or dict(_empty)
     cur.close()
+    return equipos
+
+
+def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
+    """Agrega `specs_destacados` a cada equipo: lista [{label, value}] de las
+    specs marcadas como destacado=true en el template de su categoría."""
+    if not equipos:
+        return equipos
+    ids = [e["id"] for e in equipos]
+    placeholders = ",".join(["%s"] * len(ids))
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT es.equipo_id, t.label, es.value, t.prioridad
+        FROM equipo_specs es
+        JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
+        JOIN categoria_spec_templates t
+            ON t.spec_key = es.spec_key
+           AND t.categoria_id = ec.categoria_id
+        WHERE t.destacado = TRUE
+          AND es.equipo_id IN ({placeholders})
+        ORDER BY es.equipo_id, t.prioridad, t.label
+    """, ids)
+    rows = cur.fetchall()
+    cur.close()
+
+    dest_map: dict[int, list[dict]] = {e["id"]: [] for e in equipos}
+    seen: dict[int, set] = {e["id"]: set() for e in equipos}
+    for r in rows:
+        eid = r["equipo_id"]
+        key = r["label"]
+        if key not in seen[eid]:
+            dest_map[eid].append({"label": r["label"], "value": r["value"]})
+            seen[eid].add(key)
+
+    for e in equipos:
+        e["specs_destacados"] = dest_map[e["id"]]
     return equipos
 
 
