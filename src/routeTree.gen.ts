@@ -11,6 +11,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TerminosRouteImport } from './routes/terminos'
+import { Route as PrivacidadRouteImport } from './routes/privacidad'
 import { Route as PreguntasFrecuentesRouteImport } from './routes/preguntas-frecuentes'
 import { Route as EstudioRouteImport } from './routes/estudio'
 import { Route as ClienteRouteImport } from './routes/cliente'
@@ -56,6 +58,16 @@ const AdminEquiposCategoriasLazyRouteImport = createFileRoute(
   '/admin/equipos/categorias',
 )()
 
+const TerminosRoute = TerminosRouteImport.update({
+  id: '/terminos',
+  path: '/terminos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacidadRoute = PrivacidadRouteImport.update({
+  id: '/privacidad',
+  path: '/privacidad',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreguntasFrecuentesRoute = PreguntasFrecuentesRouteImport.update({
   id: '/preguntas-frecuentes',
   path: '/preguntas-frecuentes',
@@ -237,6 +249,8 @@ export interface FileRoutesByFullPath {
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
+  '/privacidad': typeof PrivacidadRoute
+  '/terminos': typeof TerminosRoute
   '/admin/equipos': typeof AdminEquiposRouteWithChildren
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
@@ -266,6 +280,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/estudio': typeof EstudioRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
+  '/privacidad': typeof PrivacidadRoute
+  '/terminos': typeof TerminosRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
   '/cliente/login': typeof ClienteLoginRoute
@@ -297,6 +313,8 @@ export interface FileRoutesById {
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
+  '/privacidad': typeof PrivacidadRoute
+  '/terminos': typeof TerminosRoute
   '/admin/equipos': typeof AdminEquiposRouteWithChildren
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
@@ -330,6 +348,8 @@ export interface FileRouteTypes {
     | '/cliente'
     | '/estudio'
     | '/preguntas-frecuentes'
+    | '/privacidad'
+    | '/terminos'
     | '/admin/equipos'
     | '/admin/login'
     | '/admin/novedades'
@@ -359,6 +379,8 @@ export interface FileRouteTypes {
     | '/'
     | '/estudio'
     | '/preguntas-frecuentes'
+    | '/privacidad'
+    | '/terminos'
     | '/admin/login'
     | '/admin/novedades'
     | '/cliente/login'
@@ -389,6 +411,8 @@ export interface FileRouteTypes {
     | '/cliente'
     | '/estudio'
     | '/preguntas-frecuentes'
+    | '/privacidad'
+    | '/terminos'
     | '/admin/equipos'
     | '/admin/login'
     | '/admin/novedades'
@@ -421,11 +445,27 @@ export interface RootRouteChildren {
   ClienteRoute: typeof ClienteRouteWithChildren
   EstudioRoute: typeof EstudioRoute
   PreguntasFrecuentesRoute: typeof PreguntasFrecuentesRoute
+  PrivacidadRoute: typeof PrivacidadRoute
+  TerminosRoute: typeof TerminosRoute
   EquipoSlugRoute: typeof EquipoSlugRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terminos': {
+      id: '/terminos'
+      path: '/terminos'
+      fullPath: '/terminos'
+      preLoaderRoute: typeof TerminosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidad': {
+      id: '/privacidad'
+      path: '/privacidad'
+      fullPath: '/privacidad'
+      preLoaderRoute: typeof PrivacidadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preguntas-frecuentes': {
       id: '/preguntas-frecuentes'
       path: '/preguntas-frecuentes'
@@ -711,6 +751,8 @@ const rootRouteChildren: RootRouteChildren = {
   ClienteRoute: ClienteRouteWithChildren,
   EstudioRoute: EstudioRoute,
   PreguntasFrecuentesRoute: PreguntasFrecuentesRoute,
+  PrivacidadRoute: PrivacidadRoute,
+  TerminosRoute: TerminosRoute,
   EquipoSlugRoute: EquipoSlugRoute,
 }
 export const routeTree = rootRouteImport

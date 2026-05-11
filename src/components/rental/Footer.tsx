@@ -74,6 +74,17 @@ function FooterMobile() {
           </a>
         </nav>
 
+        {/* Legal */}
+        <nav className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          <Link to="/privacidad" className="hover:text-ink transition">
+            Privacidad
+          </Link>
+          <span className="text-muted-foreground/40">·</span>
+          <Link to="/terminos" className="hover:text-ink transition">
+            Términos
+          </Link>
+        </nav>
+
         {/* Contacto compacto */}
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
           <a
@@ -234,8 +245,14 @@ function FooterDesktop() {
         </div>
 
         <div className="mt-10 pt-6 border-t hairline flex flex-col-reverse gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            © {new Date().getFullYear()} Rambla Rental
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            <span>© {new Date().getFullYear()} Rambla Rental</span>
+            <Link to="/privacidad" className="hover:text-ink transition">
+              Privacidad
+            </Link>
+            <Link to="/terminos" className="hover:text-ink transition">
+              Términos
+            </Link>
           </div>
 
           <div className="flex flex-wrap gap-x-4 gap-y-2 items-center font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
