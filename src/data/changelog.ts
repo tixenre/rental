@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 136,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Albarán PDF: 'valor por unidad' aclarado + cálculo por línea",
+    body: "Cuando un equipo tiene cantidad > 1, el albarán ahora muestra explícitamente 'valor unitario × cantidad = subtotal' (antes solo aparecía el valor unitario y era confuso para el cliente). El header de la columna aclara '(por unidad)' debajo. Total al pie incluye los componentes de kits y dice claro de qué está compuesto.",
+    labels: ["pdf", "operativa"],
+  },
+  {
     number: 135,
     date: "2026-05-11",
     type: "fix",
