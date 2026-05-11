@@ -57,7 +57,8 @@ function fmt(n?: number) {
 }
 function fmtDate(s?: string) {
   if (!s) return "—";
-  return new Date(s + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" });
+  // slice(0,10) normaliza "YYYY-MM-DD HH:MM:SS" y "YYYY-MM-DDTHH:MM:SS" a "YYYY-MM-DD"
+  return new Date(s.slice(0, 10) + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" });
 }
 
 export default function ClientePortal() {
