@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 141,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Calendario embebido en el dashboard + vista semanal",
+    body: "El calendario ahora aparece directamente en /admin, debajo de las tarjetas de 'salen/devuelven hoy', con todo a la vista sin tener que navegar a otra página. Bonus: ahora se puede alternar entre vista 'Mes' y vista 'Semana' (útil para producciones con pedidos densos). La página /admin/calendario sigue existiendo para una vista a pantalla completa. Click en un pedido del calendario abre el detalle.",
+    labels: ["admin", "ux"],
+  },
+  {
     number: 140,
     date: "2026-05-11",
     type: "feat",
