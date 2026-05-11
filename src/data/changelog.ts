@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 118,
+    date: "2026-05-11",
+    type: "fix",
+    title: "Footer en mobile más compacto",
+    body: "Antes el footer en celular era gigante con todos los datos en 3 bloques verticales. Ahora es chico: logo + botón WhatsApp en una fila, links navegación en chips horizontales, contacto comprimido a ciudad + email, copyright. Si necesitás más info (horarios, dirección completa, Instagram), todo eso queda en desktop intacto.",
+    labels: ["público", "mobile", "ux"],
+  },
+  {
     number: 117,
     date: "2026-05-11",
     type: "fix",
