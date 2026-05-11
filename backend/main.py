@@ -164,12 +164,37 @@ def spa_fallback(full_path: str):
 # ── Init DB (non-blocking) ───────────────────────────────────────────────────
 # Initialize DB in background thread to not block app startup / healthcheck
 
+def _run_alembic_migrations() -> None:
+    """Corre `alembic upgrade head` en background al arrancar.
+
+    Falla silenciosamente con log de error — la app sigue arrancando. Crítico
+    para no romper deploys si una migración tiene un bug.
+
+    Idempotente: en BD pre-Alembic, el baseline es no-op + agrega la tabla
+    `alembic_version`. Próximos arranques solo aplican migraciones nuevas.
+    """
+    from pathlib import Path
+    from alembic import command
+    from alembic.config import Config
+    backend_root = Path(__file__).resolve().parent
+    cfg = Config(str(backend_root / "alembic.ini"))
+    cfg.set_main_option("script_location", str(backend_root / "migrations"))
+    command.upgrade(cfg, "head")
+
+
 def init_db_bg():
     try:
         init_db()
         logger.info("BD PostgreSQL inicializada")
     except Exception as e:
         logger.error("No se pudo inicializar BD: %s. La app continuará — verificar DATABASE_URL.", e, exc_info=True)
+        return  # Si init_db falló, no tiene sentido correr alembic.
+
+    try:
+        _run_alembic_migrations()
+        logger.info("Migraciones Alembic al día")
+    except Exception as e:
+        logger.error("Falló alembic upgrade: %s. La app sigue arrancando — revisar manualmente.", e, exc_info=True)
 
 db_init_thread = threading.Thread(target=init_db_bg, daemon=True)
 db_init_thread.start()
