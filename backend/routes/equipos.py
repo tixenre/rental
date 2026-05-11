@@ -1163,7 +1163,10 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
     require_admin(request)
     sets, vals = [], []
     if patch.nombre is not None:
-        sets.append("nombre = ?"); vals.append(patch.nombre.strip())
+        nombre_clean = patch.nombre.strip()
+        if not nombre_clean:
+            raise HTTPException(400, "El nombre no puede estar vacío")
+        sets.append("nombre = ?"); vals.append(nombre_clean)
     if patch.prioridad is not None:
         sets.append("prioridad = ?"); vals.append(int(patch.prioridad))
     if patch.set_parent_null:
@@ -1192,17 +1195,40 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
         raise HTTPException(400, "Sin cambios")
     conn = get_db()
     try:
+        # 404 check: la categoría tiene que existir
+        if not conn.execute("SELECT id FROM categorias WHERE id = ?", (cid,)).fetchone():
+            raise HTTPException(404, "Categoría no encontrada")
+
         vals.append(cid)
-        conn.execute(f"UPDATE categorias SET {', '.join(sets)} WHERE id = ?", tuple(vals))
+        try:
+            conn.execute(f"UPDATE categorias SET {', '.join(sets)} WHERE id = ?", tuple(vals))
+        except Exception as e:
+            conn.rollback()
+            msg = str(e).lower()
+            # UNIQUE constraint en nombre → 409
+            if "unique" in msg or "duplicate" in msg:
+                raise HTTPException(409, f"Ya existe una categoría con el nombre '{patch.nombre}'")
+            raise HTTPException(400, f"Error al actualizar categoría: {e}")
+
         # Si renombró, regenerar auto-tags de los equipos afectados.
         if patch.nombre is not None:
             eq_rows = conn.execute(
                 "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = ?", (cid,)
             ).fetchall()
             for r in eq_rows:
-                regenerate_auto_tags(conn, r["equipo_id"])
+                try:
+                    regenerate_auto_tags(conn, r["equipo_id"])
+                except Exception as e:
+                    # No fallar el update entero por un auto-tag roto; loguear y seguir.
+                    print(f"⚠️  regenerate_auto_tags({r['equipo_id']}) falló: {e}")
         conn.commit()
         return {"ok": True}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(500, f"Error inesperado: {e}")
     finally:
         conn.close()
 
