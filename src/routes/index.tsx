@@ -2,14 +2,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LayoutGrid, List, ArrowRight, Search, X, Sparkles, Loader2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { zodValidator, fallback } from "@tanstack/zod-adapter";
-import { z } from "zod";
 import { TopBar } from "@/components/rental/TopBar";
 import { MobileStickyBar } from "@/components/rental/MobileStickyBar";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
 import { CartDrawer } from "@/components/rental/CartDrawer";
-import { EquipmentDetailDialog } from "@/components/rental/EquipmentDetailDialog";
 import { CartMiniBar } from "@/components/rental/CartMiniBar";
 import { CarouselRow } from "@/components/rental/CarouselRow";
 import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
@@ -17,18 +14,12 @@ import { BrandCarousel } from "@/components/rental/BrandCarousel";
 import { ListFilters } from "@/components/rental/ListFilters";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { Footer } from "@/components/rental/Footer";
-import { EquipmentDetailProvider } from "@/lib/equipment-detail-context";
 import { useEquipos, useDisponibilidad, useCategorias, useMarcas } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 
-const searchSchema = z.object({
-  eq: fallback(z.string().optional(), undefined),
-});
-
 export const Route = createFileRoute("/")({
-  validateSearch: zodValidator(searchSchema),
   head: () => ({
     meta: [
       { title: "Rambla Rental — Alquiler de equipos de cine y foto en Mar del Plata" },
@@ -63,9 +54,6 @@ export const Route = createFileRoute("/")({
 type Mode = "grid" | "list";
 
 function Index() {
-  const { eq } = Route.useSearch();
-  const navigate = useNavigate({ from: Route.fullPath });
-
   // Datos de la API
   const { data: allEquipos = [], isLoading, isError } = useEquipos();
   const { data: backendCats = [] } = useCategorias();
@@ -88,14 +76,6 @@ function Index() {
   }, [allEquipos, backendCats]);
   const marcas = marcasData?.items ?? [];
 
-  const setOpenId = (id: string | null) => {
-    navigate({
-      search: (prev: { eq?: string }) => ({ ...prev, eq: id ?? undefined }),
-      replace: true,
-      resetScroll: false,
-    });
-  };
-
   const [mode, setMode] = useState<Mode>("grid");
 
   useEffect(() => {
@@ -107,36 +87,6 @@ function Index() {
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [brand, setBrand] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-
-  // Scroll into view only on initial deep-link
-  const shouldScrollInitialDeepLinkRef = useRef(Boolean(eq));
-  const didInitialScrollRef = useRef(false);
-  useEffect(() => {
-    if (!shouldScrollInitialDeepLinkRef.current) return;
-    if (didInitialScrollRef.current) return;
-    if (!eq) return;
-    didInitialScrollRef.current = true;
-    requestAnimationFrame(() => {
-      const el = document.getElementById(`eq-${eq}`);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-  }, [eq]);
-
-  // Esc cierra la fila expandida en list mode
-  useEffect(() => {
-    if (!eq || mode !== "list") return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      const trigger = document.querySelector<HTMLButtonElement>(
-        `#eq-${eq} button[aria-expanded="true"]`,
-      );
-      setOpenId(null);
-      requestAnimationFrame(() => trigger?.focus());
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eq, mode]);
 
   const toggleCat = (c: string) => {
     setSelectedCats((prev) => {
@@ -188,9 +138,8 @@ function Index() {
       : undefined;
 
   return (
-    <EquipmentDetailProvider value={{ openId: eq ?? null, setOpenId }}>
-      <div className="min-h-screen bg-background text-foreground">
-        <TopBar />
+    <div className="min-h-screen bg-background text-foreground">
+      <TopBar />
 
         {/* Hero amarillo brand */}
         <section className="relative overflow-hidden border-b hairline bg-amber text-ink">
@@ -362,61 +311,7 @@ function Index() {
         )}
 
         <CartDrawer allEquipos={allEquipos} getDisponible={getDisponible} />
-        <GlobalDetailDialog allEquipos={allEquipos} mode={mode} getDisponible={getDisponible} />
       </div>
-    </EquipmentDetailProvider>
-  );
-}
-
-/**
- * Renders the equipment detail dialog at the route level whenever ?eq= matches
- * a known equipment. In list mode, the row expands inline so we don't open the
- * modal on top. In grid mode we always open the modal.
- */
-function GlobalDetailDialog({
-  allEquipos,
-  mode,
-  getDisponible,
-}: {
-  allEquipos: Equipment[];
-  mode: Mode;
-  getDisponible: (item: Equipment) => number | undefined;
-}) {
-  const { eq } = Route.useSearch();
-  const navigate = useNavigate({ from: Route.fullPath });
-  const savedScrollY = useRef(0);
-
-  const item = eq ? allEquipos.find((e: Equipment) => e.id === eq) : undefined;
-  const open = !!item && mode === "grid";
-
-  // Guardar posición de scroll cuando se abre el modal
-  useEffect(() => {
-    if (open) {
-      savedScrollY.current = window.scrollY;
-    }
-  }, [open]);
-
-  if (!item) return null;
-  return (
-    <EquipmentDetailDialog
-      item={item}
-      open={open}
-      disponible={getDisponible(item)}
-      onOpenChange={(v) => {
-        if (!v) {
-          const scrollY = savedScrollY.current;
-          navigate({
-            search: (prev: { eq?: string }) => ({ ...prev, eq: undefined }),
-            replace: true,
-            resetScroll: false,
-          });
-          // Restaurar posición de scroll luego de que el router re-renderice
-          requestAnimationFrame(() => {
-            window.scrollTo({ top: scrollY, behavior: "instant" as ScrollBehavior });
-          });
-        }
-      }}
-    />
   );
 }
 

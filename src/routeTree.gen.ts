@@ -17,6 +17,7 @@ import { Route as ClienteRouteImport } from './routes/cliente'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClienteIndexRouteImport } from './routes/cliente.index'
+import { Route as EquipoIdRouteImport } from './routes/equipo.$id'
 import { Route as ClienteRegistroRouteImport } from './routes/cliente.registro'
 import { Route as ClientePortalRouteImport } from './routes/cliente.portal'
 import { Route as ClientePerfilRouteImport } from './routes/cliente.perfil'
@@ -118,6 +119,11 @@ const AdminCalendarioLazyRoute = AdminCalendarioLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/calendario.lazy').then((d) => d.Route),
 )
+const EquipoIdRoute = EquipoIdRouteImport.update({
+  id: '/equipo/$id',
+  path: '/equipo/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClienteRegistroRoute = ClienteRegistroRouteImport.update({
   id: '/registro',
   path: '/registro',
@@ -238,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
+  '/equipo/$id': typeof EquipoIdRoute
   '/admin/calendario': typeof AdminCalendarioLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
@@ -265,6 +272,7 @@ export interface FileRoutesByTo {
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
+  '/equipo/$id': typeof EquipoIdRoute
   '/admin/calendario': typeof AdminCalendarioLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
@@ -296,6 +304,7 @@ export interface FileRoutesById {
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
+  '/equipo/$id': typeof EquipoIdRoute
   '/admin/calendario': typeof AdminCalendarioLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
@@ -328,6 +337,7 @@ export interface FileRouteTypes {
     | '/cliente/perfil'
     | '/cliente/portal'
     | '/cliente/registro'
+    | '/equipo/$id'
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/estadisticas'
@@ -355,6 +365,7 @@ export interface FileRouteTypes {
     | '/cliente/perfil'
     | '/cliente/portal'
     | '/cliente/registro'
+    | '/equipo/$id'
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/estadisticas'
@@ -385,6 +396,7 @@ export interface FileRouteTypes {
     | '/cliente/perfil'
     | '/cliente/portal'
     | '/cliente/registro'
+    | '/equipo/$id'
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/estadisticas'
@@ -409,6 +421,7 @@ export interface RootRouteChildren {
   ClienteRoute: typeof ClienteRouteWithChildren
   EstudioRoute: typeof EstudioRoute
   PreguntasFrecuentesRoute: typeof PreguntasFrecuentesRoute
+  EquipoIdRoute: typeof EquipoIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -489,6 +502,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/calendario'
       preLoaderRoute: typeof AdminCalendarioLazyRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/equipo/$id': {
+      id: '/equipo/$id'
+      path: '/equipo/$id'
+      fullPath: '/equipo/$id'
+      preLoaderRoute: typeof EquipoIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/cliente/registro': {
       id: '/cliente/registro'
@@ -691,6 +711,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClienteRoute: ClienteRouteWithChildren,
   EstudioRoute: EstudioRoute,
   PreguntasFrecuentesRoute: PreguntasFrecuentesRoute,
+  EquipoIdRoute: EquipoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -37,14 +37,43 @@ def sitemap():
     today = datetime.utcnow().strftime("%Y-%m-%d")
 
     # Páginas estáticas con priority/changefreq.
-    # NO incluimos /equipo/{id} todavía: hoy no es route real de TanStack,
-    # es un modal abierto sobre /. Google vería duplicados de la home.
-    # Cuando se haga SSR/SSG por equipo, agregar dynamic urls acá.
     urls: list[dict] = [
         {"loc": f"{SITE_URL}/", "lastmod": today, "changefreq": "daily", "priority": "1.0"},
         {"loc": f"{SITE_URL}/estudio", "lastmod": today, "changefreq": "monthly", "priority": "0.8"},
         {"loc": f"{SITE_URL}/preguntas-frecuentes", "lastmod": today, "changefreq": "monthly", "priority": "0.6"},
     ]
+
+    # Detalle por equipo: cada uno tiene URL única indexable (PR #107).
+    # Si la BD no está disponible, devolvemos sitemap parcial con solo
+    # estáticas — Google reintenta, mejor que un 500.
+    try:
+        conn = get_db()
+        try:
+            rows = conn.execute("""
+                SELECT id,
+                       COALESCE(updated_at, created_at) AS lastmod
+                FROM equipos
+                WHERE COALESCE(visible_catalogo, true) = true
+                ORDER BY id
+            """).fetchall()
+        finally:
+            conn.close()
+
+        for r in rows:
+            lastmod_raw = r["lastmod"]
+            lastmod = (
+                lastmod_raw.strftime("%Y-%m-%d")
+                if hasattr(lastmod_raw, "strftime")
+                else today
+            )
+            urls.append({
+                "loc": f"{SITE_URL}/equipo/{r['id']}",
+                "lastmod": lastmod,
+                "changefreq": "weekly",
+                "priority": "0.7",
+            })
+    except Exception:
+        pass
 
     # Construir XML.
     body = ['<?xml version="1.0" encoding="UTF-8"?>']

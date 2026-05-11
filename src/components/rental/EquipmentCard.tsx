@@ -1,11 +1,11 @@
 import { motion } from "framer-motion";
+import { useNavigate } from "@tanstack/react-router";
 import { Check, Plus, Minus, Sparkles } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { priceBreakdown } from "@/lib/pricing";
 import { EmptyImage } from "./EmptyImage";
-import { useEquipmentDetail } from "@/lib/equipment-detail-context";
 import { cn } from "@/lib/utils";
 
 export function EquipmentCard({
@@ -32,8 +32,8 @@ export function EquipmentCard({
   // ya entrega effectivePerDay para mostrar el valor real por jornada.
   const price = priceBreakdown(item.pricePerDay, jornadas, 1);
   const showPeriodTotal = hasDateRange && jornadas > 1;
-  const { setOpenId } = useEquipmentDetail();
-  const setOpen = (v: boolean) => setOpenId(v ? item.id : null);
+  const navigate = useNavigate();
+  const openDetail = () => navigate({ to: "/equipo/$id", params: { id: item.id } });
   // Tope efectivo: disponibilidad real (con fechas) o stock total del equipo
   const cap = disponible ?? item.cantidad ?? Infinity;
   const noStock = cap <= 0;
@@ -62,7 +62,7 @@ export function EquipmentCard({
     >
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openDetail}
         aria-label={`Ver detalle de ${item.name}`}
         className="relative block aspect-square w-full shrink-0 overflow-hidden text-left bg-white"
       >
@@ -105,7 +105,7 @@ export function EquipmentCard({
         {/* Columna izquierda: brand + name (truncado) */}
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={openDetail}
           className="flex min-w-0 flex-1 flex-col text-left"
         >
           <div className="truncate font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
