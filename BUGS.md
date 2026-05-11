@@ -114,14 +114,7 @@ Fijados en PR #26 (`feat/sistema-specs-bulletproof`).
 - Mostrar mensaje: "Debes iniciar sesión o crear una cuenta"
 - Ofrecimiento: Login o Sign Up
 
-**Steps to reproduce:**
-1. No estar logeado
-2. Agregar equipos al carrito
-3. Click "Confirmar solicitud"
-4. Verificar que no valida login
-
-**Estado:** 🔵 Reportado  
-**Impacto:** Crítico (bloquea flujo de checkout)
+**Estado:** ✅ Resuelto (PR #32) — pre-check de `/api/cliente/me` antes de submit. Si no hay sesión, panel "Necesitás una cuenta" con botones "Iniciar sesión" / "Crear cuenta".
 
 ---
 
@@ -131,10 +124,7 @@ Fijados en PR #26 (`feat/sistema-specs-bulletproof`).
 **Módulo:** Cliente/Cotización  
 **Descripción:** Si el usuario no selecciona fechas (muestra "– 09:00"), debería haber validación/popup cuando intenta confirmar.
 
-**Esperado:** Mostrar modal pidiendo que seleccione fechas
-
-**Estado:** 🔵 Reportado  
-**Impacto:** Alto (información esencial incompleta)
+**Estado:** ✅ Resuelto (PR #32) — botón ya no se disable por fechas faltantes; toast.error claro al click + mensaje amber visible.
 
 ---
 
@@ -146,10 +136,8 @@ Fijados en PR #26 (`feat/sistema-specs-bulletproof`).
 1. ❌ Eliminar badges: CALIDAD, VARIEDAD, AMISTAD, COMUNIDAD, INTERCAMBIO, LOCAL
 2. ❌ Eliminar sección "PRODUCTO ESTRELLA"
 3. ✅ Dar más importancia a "Conocé el Estudio"
-   - Destacar visualmente
-   - Mayor jerarquía en la página
 
-**Estado:** 🔵 Solicitado  
+**Estado:** ✅ Resuelto (PR #33) — badges + "Producto estrella" eliminados. CTA Estudio ahora es la caja `border-ink bg-ink` con tipografía amber, protagonista del banner.
 
 ---
 
@@ -159,8 +147,51 @@ Fijados en PR #26 (`feat/sistema-specs-bulletproof`).
 **Módulo:** Estudio (página nueva/mejorada)  
 **Descripción:** La página del estudio existe pero necesita desarrollo/mejora. Actualmente está bien pero se puede mejorar.
 
-**Acción:** Diseño y desarrollo de página del estudio mejorada
+**Estado:** ✅ Resuelto (PR #36) — copy real (description completa, 6 FAQ con respuestas, addon expandido), nueva sección "Por qué Rambla" con 3 features, CTA WhatsApp final con link directo a wa.me. Solo queda como TODO el precio real ($/hora y addon/día) que carga el dueño en `studio.ts`.
 
-**Estado:** 🔵 Pendiente  
+---
+
+## ✅ Estado al cierre — mayo 2026 (segunda tanda)
+
+Tabla resumen de los bugs reportados por el usuario en mayo 2026 (#1–#30, todos los del sistema en uso real):
+
+| # | Bug | Estado | PR |
+|---|-----|--------|-----|
+| 1 | PNG fondo negro | ✅ | #25 |
+| 2 | Cambios en categorías no se guardan | ✅ | #26 |
+| 3 | Link "Enriquecer con IA" no funciona | ✅ | #26 |
+| 4 | Opción "Info técnica" buscaba fotos | ✅ | #27 |
+| 5 | Búsqueda "Solo fotos" calidad baja | ✅ | #33 |
+| 6 | Botón "Ingresar" no lleva a ningún lado | ✅ | #27 |
+| 7 | Modal vuelve al top al cerrarlo | ✅ | #27 |
+| 8 | Imágenes tamaños inconsistentes | 🟡 Parcial — falta remove.bg |
+| 9 | Calendario en dashboard | ✅ | #33 |
+| 10 | Título Back Office | ✅ | (ya estaba) |
+| 11 | Gap entre tarjetas | ✅ | #31 |
+| 12 | Nombres archivos R2 (slug) | ✅ | #32 |
+| 13 | Modal editar equipo (Kit DnD + buscador) | ✅ | #29 |
+| 14 | Carruseles ordenados por relevancia | ✅ | #32 |
+| 15 | Marcas duplicadas | ✅ | #34 |
+| 16 | Logos SVG marcas | ✅ | #33 |
+| 17 | Colores por estado en pedidos | ✅ | #31 |
+| 18 | Rediseñar documentos pedidos | ✅ | #34 |
+| 19 | Grid categorías denso | ✅ | #31 |
+| 20 | Error 500 modificar categorías | ✅ | #32 |
+| 21 | Carrusel marcas muestra 0 equipos | ✅ | #30 |
+| 22 | "Invalid Date" en Mis Pedidos | ✅ | #30 |
+| 23 | Orden pedidos cliente descendente | ✅ | (ya estaba) |
+| 24 | Branding cliente | ✅ | #33 |
+| 25 | Link "Volver al catálogo" en portal | ✅ | #31 |
+| 26 | Sección Perfil cliente | ✅ | #34 |
+| 27 | Validación login en cotización | ✅ | #32 |
+| 28 | Validación fechas en cotización | ✅ | #32 |
+| 29 | Rediseño banner home | ✅ | #33 |
+| 30 | Página del Estudio | ✅ | #36 |
+
+**Plus features:**
+- **PR #29** — Kit con drag-and-drop + buscador en modal Editar equipo
+- **PR #35** — Sección Novedades en admin (changelog automático desde GitHub)
+
+**Total: 29/30 resueltos** + 2 features nuevas. Único pendiente: #8 (normalización de tamaños vía remove.bg) por decisión del dueño.
 
 ---
