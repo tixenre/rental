@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
-import { Plus, Search, Pencil, Trash2, Eye } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-} from "@/components/ui/sheet";
+import { ActionMenu, BottomSheet } from "@/components/mobile";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -37,6 +35,7 @@ function ClientesPage() {
   const [creating, setCreating] = useState(false);
   const [viewing, setViewing] = useState<Cliente | null>(null);
   const [deleting, setDeleting] = useState<Cliente | null>(null);
+  const [menuCliente, setMenuCliente] = useState<Cliente | null>(null);
 
   const listQ = useQuery({
     queryKey: ["admin", "clientes", { q }],
@@ -79,7 +78,7 @@ function ClientesPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar por nombre, apellido, email o CUIT…"
-          className="pl-9"
+          className="pl-9 text-base sm:text-sm"
         />
       </div>
 
@@ -133,7 +132,12 @@ function ClientesPage() {
                   {c.descuento ? `${c.descuento}%` : "—"}
                 </TableCell>
                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                  <div className="inline-flex gap-1">
+                  {/* Mobile: un botón → ActionMenu */}
+                  <Button size="icon" variant="ghost" className="md:hidden" onClick={() => setMenuCliente(c)}>
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                  {/* Desktop: botones individuales */}
+                  <div className="hidden md:inline-flex gap-1">
                     <Button size="icon" variant="ghost" onClick={() => setViewing(c)}>
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -150,6 +154,17 @@ function ClientesPage() {
           </TableBody>
         </Table>
       </div>
+
+      <ActionMenu
+        open={!!menuCliente}
+        onOpenChange={(v) => { if (!v) setMenuCliente(null); }}
+        title={menuCliente ? [menuCliente.apellido, menuCliente.nombre].filter(Boolean).join(", ") || menuCliente.nombre : undefined}
+        actions={[
+          { label: "Ver historial", icon: <Eye className="h-4 w-4" />, onClick: () => setViewing(menuCliente!) },
+          { label: "Editar datos",  icon: <Pencil className="h-4 w-4" />, onClick: () => setEditing(menuCliente!) },
+          { label: "Eliminar",      icon: <Trash2 className="h-4 w-4" />, variant: "destructive", onClick: () => setDeleting(menuCliente!) },
+        ]}
+      />
 
       <ClienteFormDialog open={creating} onOpenChange={setCreating} cliente={null} />
       <ClienteFormDialog
@@ -208,19 +223,18 @@ function ClienteHistorialSheet({
 
   return (
     <>
-      <Sheet open={!!cliente} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>
-              {cliente ? `${cliente.apellido}, ${cliente.nombre}` : ""}
-            </SheetTitle>
-            <SheetDescription>
-              {cliente?.email || cliente?.telefono || "Sin contacto registrado"}
-            </SheetDescription>
-          </SheetHeader>
-
+      <BottomSheet
+        open={!!cliente}
+        onOpenChange={onOpenChange}
+        title={cliente ? [cliente.apellido, cliente.nombre].filter(Boolean).join(", ") || cliente.nombre : ""}
+        showClose
+        maxH="max-h-[90vh]"
+      >
           {cliente && (
-            <div className="mt-4 space-y-4">
+            <div className="px-4 pb-6 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {cliente.email || cliente.telefono || "Sin contacto registrado"}
+              </p>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <Info label="CUIT" value={cliente.cuit || "—"} />
                 <Info label="Descuento" value={cliente.descuento ? `${cliente.descuento}%` : "—"} />
@@ -284,8 +298,7 @@ function ClienteHistorialSheet({
               </div>
             </div>
           )}
-        </SheetContent>
-      </Sheet>
+      </BottomSheet>
     </>
   );
 }

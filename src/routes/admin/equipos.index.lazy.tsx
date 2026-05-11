@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 
 import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
+import { ActionMenu } from "@/components/mobile";
 import { EquipoFormDialog } from "@/components/admin/EquipoFormDialog";
 import { EnriquecerEquipoDialog } from "@/components/admin/enriquecedor";
 
@@ -35,6 +36,7 @@ function EquiposPage() {
   const [editing, setEditing] = useState<Equipo | null>(null);
   const [deleting, setDeleting] = useState<Equipo | null>(null);
   const [enriching, setEnriching] = useState<Equipo | null>(null);
+  const [menuEquipo, setMenuEquipo] = useState<Equipo | null>(null);
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", { q, etiqueta }],
@@ -126,7 +128,7 @@ function EquiposPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar por nombre, marca, modelo…"
-            className="pl-9"
+            className="pl-9 text-base sm:text-sm"
           />
         </div>
         <Select value={etiqueta || "__all"} onValueChange={(v) => setEtiqueta(v === "__all" ? "" : v)}>
@@ -229,33 +231,26 @@ function EquiposPage() {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="inline-flex gap-1">
+                  {/* Mobile: un botón → ActionMenu */}
+                  <Button size="icon" variant="ghost" className="sm:hidden" onClick={() => setMenuEquipo(eq)}>
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                  {/* Desktop: botones individuales */}
+                  <div className="hidden sm:inline-flex gap-1">
                     <Button
                       size="icon" variant="ghost"
                       title={eq.visible_catalogo ? "Ocultar del catálogo" : "Mostrar en catálogo"}
                       onClick={() => toggleVisibleMut.mutate(eq)}
                     >
-                      {eq.visible_catalogo
-                        ? <Eye className="h-4 w-4" />
-                        : <EyeOff className="h-4 w-4" />}
+                      {eq.visible_catalogo ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                     </Button>
-                    <Button
-                      size="icon" variant="ghost"
-                      title="Auto-completar info (B&H/Adorama)"
-                      onClick={() => setEnriching(eq)}
-                    >
+                    <Button size="icon" variant="ghost" title="Auto-completar info (B&H/Adorama)" onClick={() => setEnriching(eq)}>
                       <Sparkles className="h-4 w-4 text-amber" />
                     </Button>
-                    <Button
-                      size="icon" variant="ghost"
-                      onClick={() => { setEditing(eq); setOpenForm(true); }}
-                    >
+                    <Button size="icon" variant="ghost" onClick={() => { setEditing(eq); setOpenForm(true); }}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button
-                      size="icon" variant="ghost"
-                      onClick={() => setDeleting(eq)}
-                    >
+                    <Button size="icon" variant="ghost" onClick={() => setDeleting(eq)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -265,6 +260,35 @@ function EquiposPage() {
           </TableBody>
         </Table>
       </div>
+
+      <ActionMenu
+        open={!!menuEquipo}
+        onOpenChange={(v) => { if (!v) setMenuEquipo(null); }}
+        title={menuEquipo?.nombre}
+        actions={[
+          {
+            label: menuEquipo?.visible_catalogo ? "Ocultar del catálogo" : "Mostrar en catálogo",
+            icon: menuEquipo?.visible_catalogo ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />,
+            onClick: () => toggleVisibleMut.mutate(menuEquipo!),
+          },
+          {
+            label: "Auto-completar info",
+            icon: <Sparkles className="h-4 w-4" />,
+            onClick: () => setEnriching(menuEquipo!),
+          },
+          {
+            label: "Editar equipo",
+            icon: <Pencil className="h-4 w-4" />,
+            onClick: () => { setEditing(menuEquipo!); setOpenForm(true); },
+          },
+          {
+            label: "Eliminar equipo",
+            icon: <Trash2 className="h-4 w-4" />,
+            variant: "destructive" as const,
+            onClick: () => setDeleting(menuEquipo!),
+          },
+        ]}
+      />
 
       {openForm && (
         <EquipoFormDialog

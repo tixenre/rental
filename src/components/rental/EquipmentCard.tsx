@@ -159,7 +159,7 @@ export function EquipmentCard({
             onClick={() => !sinStock && add(item.id)}
             disabled={sinStock}
             aria-label="Agregar al carrito"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-md border hairline transition hover:border-amber hover:bg-amber hover:text-ink active:bg-amber active:border-amber active:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+            className="grid h-10 w-10 sm:h-9 sm:w-9 shrink-0 place-items-center rounded-md border hairline transition hover:border-amber hover:bg-amber hover:text-ink active:bg-amber active:border-amber active:text-ink active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Plus className="h-4 w-4" />
           </button>
