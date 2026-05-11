@@ -282,7 +282,7 @@ function Index() {
             apiCategories={apiCategories}
             marcas={marcas}
             selectedBrand={brand}
-            onBrandSelect={(brandId) => setBrand(brandId !== null ? String(brandId) : null)}
+            onBrandSelect={(brandName) => setBrand(brandName)}
             onJumpToCategory={jumpToCategory}
             selectedCats={selectedCats}
             onClearCats={() => setSelectedCats(new Set())}
@@ -331,7 +331,7 @@ function GridMode({
   apiCategories: string[];
   marcas: any[];
   selectedBrand?: string | null;
-  onBrandSelect: (brandId: number | null) => void;
+  onBrandSelect: (brandName: string | null) => void;
   onJumpToCategory: (c: string) => void;
   selectedCats: Set<string>;
   onClearCats: () => void;

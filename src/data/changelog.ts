@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 132,
+    date: "2026-05-11",
+    type: "fix",
+    title: "Carrusel de marcas: click ahora filtra el catálogo",
+    body: "Bug en desktop: hacer click en una marca del carrusel no filtraba nada. El carrusel pasaba el ID numérico pero el filtro espera el nombre. Ahora se pasa el nombre y al hacer click se filtran solo los equipos de esa marca. Re-click deselecciona (toggle).",
+    labels: ["bug", "público"],
+  },
+  {
     number: 130,
     date: "2026-05-11",
     type: "feat",
