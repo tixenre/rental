@@ -46,6 +46,7 @@ import {
   type PedidoEstado, type Equipo, type Cliente,
 } from "@/lib/admin/api";
 import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
+import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
   usePedidoDraft, jornadasEntre,
   type DraftItem, type DraftDatos, type SaveStatus,
@@ -128,6 +129,36 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
             </div>
           </div>
           <SaveIndicator status={draft.saveStatus} />
+          <WhatsAppButton
+            pedido={{
+              numero_pedido: pedido.numero_pedido,
+              numero_remito: pedido.numero_remito,
+              cliente_nombre: draft.datos.cliente_nombre,
+              fecha_desde: draft.datos.fecha_desde,
+              fecha_hasta: draft.datos.fecha_hasta,
+              monto_total: total,
+              monto_pagado: pedido.monto_pagado,
+              estado: pedido.estado,
+            }}
+            phone={draft.datos.cliente_telefono}
+            variant="compact"
+            className="hidden md:inline-flex"
+          />
+          <WhatsAppButton
+            pedido={{
+              numero_pedido: pedido.numero_pedido,
+              numero_remito: pedido.numero_remito,
+              cliente_nombre: draft.datos.cliente_nombre,
+              fecha_desde: draft.datos.fecha_desde,
+              fecha_hasta: draft.datos.fecha_hasta,
+              monto_total: total,
+              monto_pagado: pedido.monto_pagado,
+              estado: pedido.estado,
+            }}
+            phone={draft.datos.cliente_telefono}
+            variant="icon"
+            className="md:hidden"
+          />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="icon" variant="ghost"><MoreHorizontal className="h-5 w-5" /></Button>

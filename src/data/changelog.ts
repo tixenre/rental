@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 110,
+    date: "2026-05-11",
+    type: "feat",
+    title: "WhatsApp click-to-chat con plantillas en el back-office",
+    body: "Botón de WhatsApp en cada pedido (lista + detalle) que abre la app con mensaje pre-cargado. 7 plantillas según el estado: saludo, cotización lista, confirmación, recordatorios de retiro/devolución, pago, mensaje libre. El admin elige y envía con 2 clicks. Si el cliente no tiene teléfono cargado, el botón aparece deshabilitado.",
+    labels: ["admin", "comunicación"],
+  },
+  {
     number: 108,
     date: "2026-05-11",
     type: "feat",
