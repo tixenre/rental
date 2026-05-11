@@ -32,7 +32,7 @@ import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/li
 import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
 import { EnriquecerEquipoDialog, type EnriquecerResult } from "./enriquecedor";
-import { Link as LinkIcon, Image as ImageIcon, Check as CheckIcon } from "lucide-react";
+import { Link as LinkIcon, Image as ImageIcon, Check as CheckIcon, X } from "lucide-react";
 
 const TPL_TOKENS = ["tipo", "marca", "modelo", "nombre", "montura", "formato", "resolucion"] as const;
 
@@ -816,35 +816,109 @@ export function EquipoFormDialog({
 
                 <Field label="Foto">
                   <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input {...form.register("foto_url")} className="font-mono text-xs flex-1" placeholder="https://… o subí una" />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={photoSearching || (!form.watch("nombre") && !form.watch("marca"))}
-                        onClick={buscarFotos}
-                      >
-                        {photoSearching ? (
-                          <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Buscando…</>
-                        ) : (
-                          <><ImageIcon className="h-4 w-4 mr-1" />Buscar fotos</>
-                        )}
-                      </Button>
-                      <label className="inline-flex">
-                        <input
-                          type="file" accept="image/*" className="hidden"
-                          onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
-                        />
-                        <Button type="button" variant="outline" size="sm" disabled={uploading} asChild>
-                          <span className="cursor-pointer">
-                            {uploading
-                              ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Subiendo…</>
-                              : <><Upload className="h-4 w-4 mr-1" />Subir</>}
-                          </span>
+                    {/* Foto card: cuando hay foto elegida */}
+                    {(pendingFilePreview || form.watch("foto_url")) ? (
+                      <div className="rounded-lg border hairline bg-muted/20 overflow-hidden">
+                        <div className="relative">
+                          <img
+                            src={pendingFilePreview || form.watch("foto_url") || ""}
+                            alt="Foto"
+                            className="w-full max-h-52 object-contain bg-white"
+                            onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+                          />
+                          {/* Badge estado */}
+                          <div className="absolute top-2 left-2">
+                            {pendingFile ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[11px] text-blue-700">
+                                Archivo local
+                              </span>
+                            ) : isHostedUrl(form.watch("foto_url")) ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] text-emerald-700 font-medium">
+                                ✓ En R2
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] text-amber-700">
+                                URL externa
+                              </span>
+                            )}
+                          </div>
+                          {/* Botón limpiar */}
+                          <button
+                            type="button"
+                            className="absolute top-2 right-2 rounded-full bg-background/90 border hairline p-1 hover:bg-background"
+                            onClick={() => {
+                              form.setValue("foto_url", "", { shouldDirty: true });
+                              setPendingFile(null);
+                              if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+                              setPendingFilePreview("");
+                            }}
+                          >
+                            <X className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                        </div>
+                        <div className="px-3 py-2 flex items-center gap-2 border-t hairline">
+                          {!pendingFile && form.watch("foto_url") && !isHostedUrl(form.watch("foto_url")) && isEdit && (
+                            <Button
+                              type="button" variant="outline" size="sm"
+                              className="h-7 text-xs shrink-0"
+                              disabled={uploadingToR2}
+                              onClick={subirFotoUrlAR2}
+                            >
+                              {uploadingToR2
+                                ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Subiendo…</>
+                                : "Subir a R2"}
+                            </Button>
+                          )}
+                          <p className="font-mono text-[10px] text-muted-foreground truncate min-w-0 flex-1">
+                            {pendingFile ? pendingFile.name : form.watch("foto_url")}
+                          </p>
+                          <div className="flex gap-1 shrink-0">
+                            <Button
+                              type="button" variant="ghost" size="sm"
+                              className="h-7 text-xs px-2"
+                              disabled={photoSearching || (!form.watch("nombre") && !form.watch("marca"))}
+                              onClick={buscarFotos}
+                            >
+                              {photoSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
+                            </Button>
+                            <label className="inline-flex">
+                              <input type="file" accept="image/*" className="hidden"
+                                onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} />
+                              <Button type="button" variant="ghost" size="sm" className="h-7 text-xs px-2" disabled={uploading} asChild>
+                                <span className="cursor-pointer">
+                                  {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                                </span>
+                              </Button>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Sin foto: input URL + botones */
+                      <div className="flex gap-2">
+                        <Input {...form.register("foto_url")} className="font-mono text-xs flex-1" placeholder="https://… o buscá / subí una foto" />
+                        <Button
+                          type="button" variant="outline" size="sm"
+                          disabled={photoSearching || (!form.watch("nombre") && !form.watch("marca"))}
+                          onClick={buscarFotos}
+                        >
+                          {photoSearching
+                            ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Buscando…</>
+                            : <><ImageIcon className="h-4 w-4 mr-1" />Buscar fotos</>}
                         </Button>
-                      </label>
-                    </div>
+                        <label className="inline-flex">
+                          <input type="file" accept="image/*" className="hidden"
+                            onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} />
+                          <Button type="button" variant="outline" size="sm" disabled={uploading} asChild>
+                            <span className="cursor-pointer">
+                              {uploading
+                                ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Subiendo…</>
+                                : <><Upload className="h-4 w-4 mr-1" />Subir</>}
+                            </span>
+                          </Button>
+                        </label>
+                      </div>
+                    )}
 
                     {/* Candidatos de buscar-fotos */}
                     {photoCands.length > 0 && (
@@ -892,44 +966,6 @@ export function EquipoFormDialog({
                             );
                           })}
                         </div>
-                      </div>
-                    )}
-
-                    {(pendingFilePreview || form.watch("foto_url")) && (
-                      <div className="space-y-1">
-                        <img
-                          src={pendingFilePreview || form.watch("foto_url") || ""}
-                          alt="Preview"
-                          className="rounded-md border hairline max-h-40 object-contain bg-muted/30"
-                          onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
-                        />
-                        {pendingFile && (
-                          <p className="text-[11px] text-muted-foreground">
-                            Archivo local "{pendingFile.name}" — se va a subir a storage al crear el equipo.
-                          </p>
-                        )}
-                        {/* Advertencia cuando la foto no está hosteada en R2 */}
-                        {!pendingFile && form.watch("foto_url") && !isHostedUrl(form.watch("foto_url")) && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
-                              URL externa — no está en R2
-                            </span>
-                            {isEdit && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-6 text-[11px] px-2"
-                                disabled={uploadingToR2}
-                                onClick={subirFotoUrlAR2}
-                              >
-                                {uploadingToR2
-                                  ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Subiendo…</>
-                                  : "Subir a R2"}
-                              </Button>
-                            )}
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>

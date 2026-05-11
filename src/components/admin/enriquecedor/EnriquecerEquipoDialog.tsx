@@ -1,4 +1,4 @@
-import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Image as ImageIcon, FileText, Link as LinkIcon } from "lucide-react";
+import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Image as ImageIcon, FileText, Link as LinkIcon, CloudUpload } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 
 import { type Equipo } from "@/lib/admin/api";
+import { isHostedUrl } from "@/lib/equipment/photos";
 import { useEnriquecedor } from "./useEnriquecedor";
 import { PhotoGrid } from "./PhotoGrid";
 import { PhotoDiag } from "./PhotoDiag";
@@ -28,7 +29,7 @@ export function EnriquecerEquipoDialog({
     loading, saving, result, error,
     marca, setMarca,
     modelo, setModelo,
-    fotoUrl, setFotoUrl,
+    fotoUrl, setFotoUrl, uploadingFotoUrl, selectFoto,
     bhUrl, setBhUrl,
     aplicarMarca, setAplicarMarca,
     aplicarModelo, setAplicarModelo,
@@ -139,21 +140,37 @@ export function EnriquecerEquipoDialog({
         {fotosResult.length > 0 && !result && !loading && !error && (
           <div className="space-y-3">
             {fotoUrl && (
-              <div className="rounded-md border hairline overflow-hidden bg-white">
+              <div className="rounded-md border hairline overflow-hidden bg-white relative">
                 <img
                   src={fotoUrl}
                   alt="Preview"
                   className="w-full max-h-64 object-contain"
                   onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
                 />
+                <div className="absolute top-2 right-2">
+                  {uploadingFotoUrl ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-background/90 border hairline px-2 py-0.5 text-[11px] text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Subiendo a R2…
+                    </span>
+                  ) : isHostedUrl(fotoUrl) ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] text-emerald-700 font-medium">
+                      <CloudUpload className="h-3 w-3" /> En R2
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] text-amber-700">
+                      URL externa
+                    </span>
+                  )}
+                </div>
               </div>
             )}
             <PhotoGrid
               candidates={fotosResult}
               selected={fotoUrl}
-              onSelect={setFotoUrl}
+              onSelect={selectFoto}
               onBuscarMas={buscarMasFotos}
               searching={searchingPhotos}
+              loadingUrl={uploadingFotoUrl}
             />
             {photoDiag && <PhotoDiag steps={photoDiag} />}
           </div>
@@ -194,22 +211,38 @@ export function EnriquecerEquipoDialog({
             </div>
 
             {fotoUrl && (
-              <div className="rounded-md border hairline overflow-hidden bg-muted/30">
+              <div className="rounded-md border hairline overflow-hidden bg-muted/30 relative">
                 <img
                   src={fotoUrl}
                   alt="Preview"
                   className="w-full max-h-64 object-contain"
                   onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
                 />
+                <div className="absolute top-2 right-2">
+                  {uploadingFotoUrl ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-background/90 border hairline px-2 py-0.5 text-[11px] text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Subiendo a R2…
+                    </span>
+                  ) : isHostedUrl(fotoUrl) ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] text-emerald-700 font-medium">
+                      <CloudUpload className="h-3 w-3" /> En R2
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] text-amber-700">
+                      URL externa
+                    </span>
+                  )}
+                </div>
               </div>
             )}
 
             <PhotoGrid
               candidates={fotosResult}
               selected={fotoUrl}
-              onSelect={setFotoUrl}
+              onSelect={selectFoto}
               onBuscarMas={buscarMasFotos}
               searching={searchingPhotos}
+              loadingUrl={uploadingFotoUrl}
             />
 
             {!fotoUrl && result.foto_motivo && (

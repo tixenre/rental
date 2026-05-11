@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { authedJson, authedFetch } from "@/lib/authedFetch";
-import { isBucketUrl } from "@/lib/equipment/photos";
+import { isBucketUrl, isHostedUrl, uploadExternalUrlToBucket } from "@/lib/equipment/photos";
 import { type DiagStep, type EnriquecerResult } from "./types";
 
 export function useEnriquecedor({
@@ -24,6 +24,7 @@ export function useEnriquecedor({
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
   const [fotoUrl, setFotoUrl] = useState("");
+  const [uploadingFotoUrl, setUploadingFotoUrl] = useState("");
   const [bhUrl, setBhUrl] = useState("");
 
   const [aplicarMarca, setAplicarMarca] = useState(true);
@@ -403,11 +404,27 @@ export function useEnriquecedor({
     }
   };
 
+  const selectFoto = async (url: string) => {
+    setFotoUrl(url);
+    setAplicarFoto(true);
+    if (isHostedUrl(url)) return;
+    setUploadingFotoUrl(url);
+    try {
+      const r2url = await uploadExternalUrlToBucket(equipo.id, url);
+      setFotoUrl(r2url);
+    } catch {
+      // Mantener URL externa — se reintentará al aplicar
+    } finally {
+      setUploadingFotoUrl("");
+    }
+  };
+
   return {
     loading, saving, result, error,
     marca, setMarca,
     modelo, setModelo,
     fotoUrl, setFotoUrl,
+    uploadingFotoUrl, selectFoto,
     bhUrl, setBhUrl,
     aplicarMarca, setAplicarMarca,
     aplicarModelo, setAplicarModelo,
