@@ -3,6 +3,7 @@ import { Check, Plus, Minus, Sparkles } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
+import { priceBreakdown } from "@/lib/pricing";
 import { EmptyImage } from "./EmptyImage";
 import { useEquipmentDetail } from "@/lib/equipment-detail-context";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,14 @@ export function EquipmentCard({
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
   const remove = useCart((s) => s.remove);
+  const jornadas = useCart((s) => s.days());
+  const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
   const selected = qty > 0;
+  // Cuando hay fechas y > 1 jornada, mostramos el total del período además
+  // del precio por jornada. TODO #73: cuando haya descuentos, priceBreakdown
+  // ya entrega effectivePerDay para mostrar el valor real por jornada.
+  const price = priceBreakdown(item.pricePerDay, jornadas, 1);
+  const showPeriodTotal = hasDateRange && jornadas > 1;
   const { setOpenId } = useEquipmentDetail();
   const setOpen = (v: boolean) => setOpenId(v ? item.id : null);
   // Tope efectivo: disponibilidad real (con fechas) o stock total del equipo
@@ -128,6 +136,16 @@ export function EquipmentCard({
               </span>
             )}
           </div>
+          {showPeriodTotal && (
+            <div className="flex items-baseline gap-1 mt-0.5 leading-none">
+              <span className="font-display text-xs tabular text-amber">
+                {formatARS(price.total)}
+              </span>
+              <span className="font-mono text-[8px] uppercase tracking-widest text-muted-foreground">
+                · {price.jornadas} jornadas
+              </span>
+            </div>
+          )}
         </button>
 
         {/* Columna derecha: agregar / cantidad */}

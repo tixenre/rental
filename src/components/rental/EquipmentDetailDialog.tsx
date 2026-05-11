@@ -10,6 +10,7 @@ import {
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
+import { priceBreakdown } from "@/lib/pricing";
 import { EmptyImage } from "./EmptyImage";
 import { IncludedList } from "./IncludedList";
 import { KeywordChips } from "./KeywordChips";
@@ -27,7 +28,13 @@ export function EquipmentDetailDialog({
 }) {
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
+  const jornadas = useCart((s) => s.days());
+  const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
   const [copied, setCopied] = useState(false);
+  // TODO #73: cuando se implementen descuentos por jornada/cliente,
+  // priceBreakdown ya devuelve total con descuentos aplicados.
+  const price = priceBreakdown(item.pricePerDay, jornadas, 1);
+  const showPeriodTotal = hasDateRange && jornadas > 1;
   const [specsOpen, setSpecsOpen] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const DESC_LIMIT = 240;
@@ -176,8 +183,18 @@ export function EquipmentDetailDialog({
               {formatARS(item.pricePerDay)}
             </div>
             <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              / 1 jornada
+              / jornada
             </div>
+            {showPeriodTotal && (
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="font-display text-lg tabular text-amber">
+                  {formatARS(price.total)}
+                </span>
+                <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  · {price.jornadas} jornadas
+                </span>
+              </div>
+            )}
           </div>
 
           {qty === 0 ? (
