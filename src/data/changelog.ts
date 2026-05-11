@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 85,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Tests automatizados del backend (77 tests)",
+    body: "Red de seguridad para refactors futuros. Cubre regresiones de seguridad (allowlist anti-SSRF, separación admin/cliente), validaciones de fechas y stock, formato de precios y fechas. Cada PR ahora corre los tests automáticamente.",
+    labels: ["calidad", "infra"],
+  },
+  {
     number: 82,
     date: "2026-05-11",
     type: "fix",
