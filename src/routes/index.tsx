@@ -431,7 +431,6 @@ function GridMode({
     (e.brand ?? "").toLowerCase().includes(q) ||
     (e.category ?? "").toLowerCase().includes(q);
 
-  const combos = allEquipos.filter((e) => e.isCombo && matches(e));
   const isFiltered = selectedCats.size > 0;
   const isSearching = q.length > 0;
   const visibleCategories = isFiltered
@@ -489,19 +488,6 @@ function GridMode({
         />
       )}
 
-      {!isFiltered && !isSearching && combos.length > 0 && (
-        <CarouselRow title="Combos" count={combos.length}>
-          {combos.map((item, i) => (
-            <EquipmentCard
-              key={item.id}
-              item={item}
-              index={i}
-              width={cardW + 40}
-              disponible={getDisponible(item)}
-            />
-          ))}
-        </CarouselRow>
-      )}
 
       {visibleCategories.map((c) => {
         const items = allEquipos.filter((e) => e.category === c && matches(e));

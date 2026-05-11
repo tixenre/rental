@@ -55,7 +55,14 @@ export function MarcasSection() {
 
   useEffect(() => {
     if (allMarcas.length > 0 && selected.length === 0) {
-      setSelected(allMarcas.filter((m) => m.visible).sort((a, b) => a.orden - b.orden));
+      const visibles = allMarcas.filter((m) => m.visible).sort((a, b) => a.orden - b.orden);
+      // Si ninguna está marcada como visible, mostrar todas en "Seleccionadas"
+      // para que el usuario vea que existen y pueda ordenarlas.
+      if (visibles.length > 0) {
+        setSelected(visibles);
+      } else {
+        setSelected(allMarcas.sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      }
     }
   }, [allMarcas, selected.length]);
 
@@ -137,7 +144,11 @@ export function MarcasSection() {
               />
             </div>
             <div className="border hairline rounded-md p-2 space-y-1 max-h-96 overflow-auto">
-              {filteredAvailable.length > 0 ? (
+              {allMarcas.length === 0 ? (
+                <div className="text-xs text-muted-foreground py-4 text-center">
+                  No hay marcas aún. Se crean automáticamente cuando agregás equipos.
+                </div>
+              ) : filteredAvailable.length > 0 ? (
                 filteredAvailable.map((marca) => (
                   <button
                     key={marca.id}

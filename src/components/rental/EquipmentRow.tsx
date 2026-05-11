@@ -70,9 +70,6 @@ export function EquipmentRow({
                   <Sparkles className="h-2.5 w-2.5" /> nuevo
                 </span>
               )}
-              {item.isCombo && (
-                <span className="shrink-0 rounded-full bg-amber px-1.5 py-0.5 text-ink">combo</span>
-              )}
               {disponible !== undefined && (
                 <span className={cn(
                   "shrink-0 hidden sm:inline",

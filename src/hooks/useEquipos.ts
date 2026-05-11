@@ -253,7 +253,6 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     specs: parsedSpecs,
     keywords: parsedKeywords,
     isNew: false,
-    isCombo: includes.length > 0,
     destacado: ((e as unknown as { relevancia_manual?: number }).relevancia_manual ?? 100) <= 30,
     includes,
     _backendId: e.id,

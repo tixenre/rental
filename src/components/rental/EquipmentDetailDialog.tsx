@@ -68,9 +68,6 @@ export function EquipmentDetailDialog({
                 <Sparkles className="h-2.5 w-2.5" /> nuevo
               </span>
             )}
-            {item.isCombo && (
-              <span className="rounded-full bg-amber px-1.5 py-0.5 text-ink">combo</span>
-            )}
             {item.destacado && (
               <span className="inline-flex items-center gap-0.5 rounded-full bg-amber/15 text-ink px-1.5 py-0.5">
                 ★ destacado
