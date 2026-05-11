@@ -3,6 +3,7 @@ routes/pedidos.py — CRUD de pedidos, disponibilidad y generación de PDFs.
 """
 
 import datetime
+import logging
 from math import ceil
 from typing import Optional
 
@@ -14,6 +15,7 @@ from database import get_db, row_to_dict
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 ESTADOS_VALIDOS    = {"borrador", "presupuesto", "confirmado", "retirado", "devuelto", "finalizado", "cancelado"}
@@ -300,6 +302,13 @@ def create_pedido(data: PedidoCreate):
         if data.fecha_desde and data.fecha_hasta:
             d0 = datetime.datetime.fromisoformat(data.fecha_desde)
             d1 = datetime.datetime.fromisoformat(data.fecha_hasta)
+            hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+            if d0 >= d1:
+                raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
+            if d0 < hoy:
+                raise HTTPException(400, "fecha_desde no puede ser en el pasado")
+
             jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
         else:
             jornadas = 1
@@ -340,6 +349,7 @@ def create_pedido(data: PedidoCreate):
         pedido = _get_alquiler_detail(conn, pedido_id)
         return pedido
     except Exception:
+        logger.error("Error creando pedido", exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -431,6 +441,7 @@ def delete_pedido(id: int, request: Request):
         conn.execute("DELETE FROM alquileres       WHERE id=?",        (id,))
         conn.commit()
     except Exception:
+        logger.error("Error eliminando pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -441,7 +452,10 @@ ESTADOS_REQUIEREN_FECHAS = {"confirmado", "retirado", "devuelto", "finalizado"}
 
 
 def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> list[str]:
-    """Devuelve lista de nombres de equipos sin stock suficiente para el rango dado."""
+    """Devuelve lista de nombres de equipos sin stock suficiente para el rango dado.
+
+    Usa SELECT ... FOR UPDATE en equipos para evitar race conditions de concurrencia.
+    """
     items = conn.execute("""
         SELECT pi.equipo_id, pi.cantidad, e.nombre, e.cantidad AS stock_total
         FROM alquiler_items pi
@@ -451,6 +465,20 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
 
     problemas = []
     for it in items:
+        # Lock la fila de equipo durante el chequeo para evitar race conditions.
+        # SELECT ... FOR UPDATE evita que otra transacción concurrente lea el stock
+        # mientras estamos validando.
+        lock_result = conn.execute(
+            "SELECT cantidad FROM equipos WHERE id = ? FOR UPDATE",
+            (it["equipo_id"],)
+        ).fetchone()
+
+        if not lock_result:
+            problemas.append(f"{it['nombre']} (equipo no encontrado)")
+            continue
+
+        stock_total = lock_result["cantidad"]
+
         # Cuánto está reservado para ese equipo en el rango (excluyendo este pedido)
         reservado = conn.execute(f"""
             SELECT COALESCE(SUM(pi2.cantidad), 0)
@@ -463,7 +491,7 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
               AND p.fecha_hasta > ?
         """, (it["equipo_id"], pedido_id, fecha_hasta, fecha_desde)).fetchone()[0]
 
-        disponible = it["stock_total"] - reservado
+        disponible = stock_total - reservado
         if disponible < it["cantidad"]:
             problemas.append(
                 f"{it['nombre']} (necesitás {it['cantidad']}, disponible: {max(0, disponible)})"
@@ -488,11 +516,24 @@ def update_pedido(id: int, data: PedidoEstado, request: Request):
             errores = []
             if not p_row["fecha_desde"] or not p_row["fecha_hasta"]:
                 errores.append("El pedido no tiene fechas de inicio y fin.")
+            else:
+                try:
+                    d0 = datetime.datetime.fromisoformat(p_row["fecha_desde"])
+                    d1 = datetime.datetime.fromisoformat(p_row["fecha_hasta"])
+                    hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+                    if d0 >= d1:
+                        errores.append("fecha_hasta debe ser posterior a fecha_desde")
+                    if d0 < hoy:
+                        errores.append("fecha_desde no puede ser en el pasado")
+                except ValueError:
+                    errores.append("Las fechas tienen formato inválido")
+
             if not conn.execute(
                 "SELECT 1 FROM alquiler_items WHERE pedido_id=?", (id,)
             ).fetchone():
                 errores.append("El pedido no tiene equipos cargados.")
-            if p_row["fecha_desde"] and p_row["fecha_hasta"]:
+            if p_row["fecha_desde"] and p_row["fecha_hasta"] and not errores:
                 sin_stock = _check_stock(conn, id, p_row["fecha_desde"], p_row["fecha_hasta"])
                 for s in sin_stock:
                     errores.append(f"Sin stock suficiente: {s}")
@@ -517,6 +558,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request):
         pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
+        logger.error("Error actualizando estado del pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -539,6 +581,7 @@ def registrar_pago(id: int, data: PagoParcial, request: Request):
         pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
+        logger.error("Error actualizando monto_pagado del pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -587,6 +630,7 @@ def agregar_pago(id: int, data: PagoCreate, request: Request):
         pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
+        logger.error("Error agregando pago al pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -618,6 +662,7 @@ def eliminar_pago(id: int, pago_id: int, request: Request):
         pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
+        logger.error("Error registrando pago en pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -645,6 +690,20 @@ def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
                 # Solo usar descuento del cliente si no vino uno manual en el payload
                 if "descuento_pct" not in payload:
                     payload["descuento_pct"] = c["descuento"] or 0.0
+
+        # Validar fechas si se están actualizando
+        if "fecha_desde" in payload or "fecha_hasta" in payload:
+            nueva_desde = payload.get("fecha_desde") or p["fecha_desde"]
+            nueva_hasta = payload.get("fecha_hasta") or p["fecha_hasta"]
+            if nueva_desde and nueva_hasta:
+                d0 = datetime.datetime.fromisoformat(nueva_desde)
+                d1 = datetime.datetime.fromisoformat(nueva_hasta)
+                hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+                if d0 >= d1:
+                    raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
+                if d0 < hoy:
+                    raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 
         if payload:
             cols = ", ".join(f"{k}=?" for k in payload)
@@ -674,6 +733,7 @@ def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
         pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
+        logger.error("Error actualizando datos del pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -719,6 +779,7 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
         pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
+        logger.error("Error actualizando items del pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:

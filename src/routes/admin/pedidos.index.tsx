@@ -58,6 +58,7 @@ function PedidosPage() {
       estado: estado || undefined,
       per_page: 200,
     }),
+    refetchInterval: 5000,
   });
 
   const deleteMut = useMutation({
