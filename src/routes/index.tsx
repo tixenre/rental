@@ -274,18 +274,34 @@ function Index() {
 
         {/* Loading / Error states */}
         {isLoading ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5 px-4 lg:px-12 mt-2">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="aspect-[4/5] rounded-lg border hairline overflow-hidden flex flex-col">
-                <Skeleton className="aspect-square w-full rounded-none shrink-0" />
-                <div className="flex flex-1 flex-col gap-1.5 px-2.5 py-2">
-                  <Skeleton className="h-2 w-1/2" />
-                  <Skeleton className="h-3 w-full" />
-                  <Skeleton className="h-2 w-1/3" />
+          mode === "list" ? (
+            <div className="divide-y hairline border-t hairline mt-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3 sm:px-6">
+                  <Skeleton className="h-16 w-16 shrink-0 rounded-md" />
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <Skeleton className="h-2.5 w-1/4" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-2.5 w-2/5" />
+                  </div>
+                  <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5 px-4 lg:px-12 mt-2">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="aspect-[4/5] rounded-lg border hairline overflow-hidden flex flex-col">
+                  <Skeleton className="aspect-square w-full rounded-none shrink-0" />
+                  <div className="flex flex-1 flex-col gap-1.5 px-2.5 py-2">
+                    <Skeleton className="h-2 w-1/2" />
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-2 w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         ) : isError ? (
           <div className="mx-4 rounded-lg border hairline bg-surface px-6 py-16 text-center mt-8 lg:mx-12">
             <div className="font-display text-2xl text-muted-foreground">
