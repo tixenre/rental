@@ -17,5 +17,10 @@ python-json-logger>=2.0.7
 # Costo: ~300-400MB de RAM residente con Chromium arrancado.
 playwright>=1.40.0
 
+# Migraciones versionadas. SQLAlchemy se usa solo como engine para Alembic
+# (no como ORM — el código sigue usando psycopg2 directo via PGCursor wrapper).
+alembic>=1.13.0
+SQLAlchemy>=2.0.0
+
 # Tests (no se instalan en prod; el CI corre `pip install -r requirements-dev.txt`).
 # Mantener acá los runtime deps; los test deps van en requirements-dev.txt.

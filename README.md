@@ -57,6 +57,30 @@ cd backend && ./run_local.sh
 └── Dockerfile            Build de producción (Railway)
 ```
 
+## Migraciones (Alembic)
+
+Schema versionado. El `backend/database.py::init_db()` sigue creando tablas con `CREATE IF NOT EXISTS` para BD nuevas; Alembic registra y aplica cambios incrementales en BD existentes.
+
+```bash
+# Crear una migración nueva (cambio de schema)
+cd backend
+alembic revision -m "agregar columna foo a equipos"
+# Editar el archivo generado en backend/migrations/versions/
+
+# Aplicar migraciones pendientes (BD local)
+alembic upgrade head
+
+# Ver estado actual
+alembic current
+
+# Listar migraciones
+alembic history
+```
+
+En **producción**, las migraciones corren automáticamente al arrancar la app (`main.py::init_db_bg`).
+
+**No usamos autogenerate** porque el proyecto no tiene modelos SQLAlchemy. Las migraciones se escriben a mano con `op.execute("SQL...")` o helpers de `alembic.op`.
+
 ## Tests
 
 ```bash

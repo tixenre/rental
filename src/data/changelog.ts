@@ -9,10 +9,18 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 89,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Migraciones de base de datos versionadas (Alembic)",
+    body: "Los cambios al schema ahora se trackean como migraciones versionadas. Cada vez que se modifica una tabla queda registrado y aplicado en orden — antes era \"ALTER TABLE IF NOT EXISTS\" suelto sin trazabilidad. Las migraciones corren automáticamente al arrancar la app.",
+    labels: ["infra"],
+  },
+  {
     number: 85,
     date: "2026-05-11",
     type: "feat",
-    title: "Tests automatizados del backend (77 tests)",
+    title: "Tests automatizados del backend (83 tests)",
     body: "Red de seguridad para refactors futuros. Cubre regresiones de seguridad (allowlist anti-SSRF, separación admin/cliente), validaciones de fechas y stock, formato de precios y fechas. Cada PR ahora corre los tests automáticamente.",
     labels: ["calidad", "infra"],
   },
