@@ -26,6 +26,11 @@ const queryClient = new QueryClient({
 const router = createRouter({
   routeTree,
   context: { queryClient },
+  // Restaurar posición de scroll al hacer back/forward.
+  // Crítico para el flujo: catálogo → /equipo/X → back → mismo scroll.
+  // Sin esto, back vuelve al top — UX horrible en mobile listando muchos
+  // equipos. Default scroll-to-top en navegaciones forward.
+  scrollRestoration: true,
 });
 
 declare module "@tanstack/react-router" {

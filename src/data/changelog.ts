@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 114,
+    date: "2026-05-11",
+    type: "fix",
+    title: "Mobile: vuelve la mini-ficha inline + scroll se mantiene al volver",
+    body: "Regresión del PR de ficha de equipo (#111): en mobile click expandía inline una mini ficha con kit y datos clave para navegar rápido. Ahora vuelve eso, y para ir al detalle completo hay un botón 'Ver ficha completa →' dentro. Bonus: al hacer back desde la ficha el catálogo vuelve al mismo punto del scroll donde estabas (scrollRestoration de TanStack Router).",
+    labels: ["público", "mobile", "ux"],
+  },
+  {
     number: 113,
     date: "2026-05-11",
     type: "feat",
