@@ -99,6 +99,7 @@ export function EquipoFormDialog({
   const isEdit = !!initial;
   const [enriching, setEnriching] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingToR2, setUploadingToR2] = useState(false);
   const [tab, setTab] = useState("basicos");
 
   // Settings globales: tipo de cambio + ROI default. Se usan para
@@ -294,6 +295,22 @@ export function EquipoFormDialog({
     if (keywords.includes(v)) { setKeywordInput(""); return; }
     setKeywords([...keywords, v]);
     setKeywordInput("");
+  };
+
+  const subirFotoUrlAR2 = async () => {
+    if (!initial?.id) return;
+    const url = form.getValues("foto_url");
+    if (!url || isHostedUrl(url)) return;
+    setUploadingToR2(true);
+    try {
+      const r2url = await uploadExternalUrlToBucket(initial.id, url);
+      form.setValue("foto_url", r2url, { shouldDirty: true });
+      toast.success("Foto subida a R2");
+    } catch (e) {
+      toast.error(`No se pudo subir a R2: ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setUploadingToR2(false);
+    }
   };
 
   const importarDesdeUrl = async () => {
@@ -890,6 +907,28 @@ export function EquipoFormDialog({
                           <p className="text-[11px] text-muted-foreground">
                             Archivo local "{pendingFile.name}" — se va a subir a storage al crear el equipo.
                           </p>
+                        )}
+                        {/* Advertencia cuando la foto no está hosteada en R2 */}
+                        {!pendingFile && form.watch("foto_url") && !isHostedUrl(form.watch("foto_url")) && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                              URL externa — no está en R2
+                            </span>
+                            {isEdit && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-6 text-[11px] px-2"
+                                disabled={uploadingToR2}
+                                onClick={subirFotoUrlAR2}
+                              >
+                                {uploadingToR2
+                                  ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Subiendo…</>
+                                  : "Subir a R2"}
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
