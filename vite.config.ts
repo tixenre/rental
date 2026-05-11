@@ -75,7 +75,11 @@ export default defineConfig({
             // Framer Motion: animaciones del catálogo y carousels.
             if (id.includes("framer-motion")) return "vendor-motion";
             // Radix UI primitives (muchos componentes shadcn).
-            if (id.includes("@radix-ui")) return "vendor-radix";
+            // vaul se incluye acá porque depende de @radix-ui/react-dialog
+            // y ponerlo en el chunk genérico "vendor" crea una dependencia
+            // circular: vendor→vendor-radix→vendor (para react) que rompe
+            // el módulo en Safari iOS.
+            if (id.includes("@radix-ui") || id.includes("/vaul/")) return "vendor-radix";
             // Date picker (catálogo + admin).
             if (id.includes("react-day-picker") || id.includes("date-fns")) {
               return "vendor-dates";
