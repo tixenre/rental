@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 135,
+    date: "2026-05-11",
+    type: "fix",
+    title: "Catálogo: el ranking automático ahora SÍ se aplica",
+    body: "Dos bugs que hacían que el ranking pareciera no funcionar: (1) el frontend re-ordenaba categorías y equipos perdiendo la popularidad que calculaba el backend — ahora respeta el orden completo. (2) Si nunca se había corrido el cálculo, todos los scores quedaban en 0 y el orden caía a alfabético — ahora se corre automáticamente la primera vez que arranca la app. Resultado: los equipos, marcas y categorías más alquilados aparecen primero, sin que el admin tenga que hacer nada.",
+    labels: ["bug", "público", "catálogo"],
+  },
+  {
     number: 134,
     date: "2026-05-11",
     type: "feat",
