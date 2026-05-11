@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 130,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Ranking automático del catálogo: prioridad calculada por uso real",
+    body: "El sistema ya existía pero estaba escondido. Ahora en /admin/settings hay un botón 'Ranking automático' que calcula la prioridad de cada equipo según cuántas veces se alquiló y cuánto generó en los últimos 6 meses, normalizado por categoría (un equipo no compite contra todo el inventario, solo contra otros de su tipo). Tiene modo preview (dry-run) para ver qué cambiaría antes de aplicar. Esto reemplaza la idea de asignar prioridades a mano. Más parámetros vendrán pronto (issue #129).",
+    labels: ["admin", "catálogo"],
+  },
+  {
     number: 128,
     date: "2026-05-11",
     type: "fix",
