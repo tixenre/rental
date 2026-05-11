@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 119,
+    date: "2026-05-11",
+    type: "fix",
+    title: "Validación de stock más estricta: equipos duplicados en pedido",
+    body: "Bug latente arreglado: si un pedido tenía dos items separados del mismo equipo (raro pero posible vía API directa o bug del frontend), la validación de stock los chequeaba por separado y podía pasar cuando no debía. Ahora se suman las cantidades del mismo equipo antes de validar contra el stock. 5 tests de regresión agregados.",
+    labels: ["bug", "estabilidad"],
+  },
+  {
     number: 118,
     date: "2026-05-11",
     type: "fix",
