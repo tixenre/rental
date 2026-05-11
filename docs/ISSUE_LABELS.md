@@ -41,6 +41,14 @@ Independiente de prioridad — algo urgente puede ser chico o grande.
 | `infrastructure` | CI, deploy, monitoreo |
 | `dx` | Developer Experience |
 | `performance` | Optimización |
+| `mobile` | Bug o mejora que afecta específicamente la experiencia mobile (< 640px). **Trato prioritario** — la mayoría de los clientes entra desde el celular, así que cualquier issue con esta etiqueta sube un nivel de prioridad efectiva. |
+
+### Convención sobre `mobile`
+
+- Aplicar **además** del tipo (`bug`/`design`/`feature`) y de la `priority:*` normal. La label no reemplaza ninguna de las otras.
+- Si una issue afecta mobile **y** desktop pero el problema es más grave en mobile (ej. layout roto solo en viewport chico), aplicarla igual.
+- Sólo lo que es **exclusivo desktop** (admin back-office, dashboards densos) **no** lleva esta label.
+- El código no se separa: el mismo componente usa responsive utilities (Tailwind `sm:`, `md:`). La label es para **triage**, no para dividir el código.
 
 ## Cómo elegir issue para trabajar
 
@@ -56,6 +64,15 @@ Filtrar por `complexity:medium`. Suficiente alcance sin requerir días.
 
 ### Sprints (semana)
 Combinar `complexity:large` con `priority:high` (pre-launch focus).
+
+### Foco mobile
+Filtrar por `mobile` para ver toda la deuda visible desde el celular. La
+mayoría del tráfico entra desde ahí, así que vale la pena pasar de tanto
+en tanto:
+
+```bash
+gh issue list --state open --label "mobile"
+```
 
 ### Subdividir antes de empezar
 Cualquier `complexity:epic` requiere descomponerse en sub-issues antes de tocar código. Si no, se vuelve interminable.
