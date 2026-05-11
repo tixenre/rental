@@ -3,7 +3,7 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown, ArrowUp, Upload, Wrench, AlertTriangle, Loader2, Image as ImageIcon,
-  TrendingUp, TrendingDown, Sparkles,
+  TrendingUp, TrendingDown, Sparkles, FolderSync,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -71,6 +71,8 @@ function SettingsPage() {
       <CambioYPreciosSection />
 
       <RankingSection />
+
+      <MigrarStorageSection />
 
       <section className="rounded-lg border hairline bg-background p-4 space-y-3">
         <h2 className="font-display text-lg text-ink">Imports CSV</h2>
@@ -610,6 +612,104 @@ function CambioYPreciosSection() {
   );
 }
 
+
+// ── Migración de paths R2 ───────────────────────────────────────────────────
+
+function MigrarStorageSection() {
+  type MigrateResult = Awaited<ReturnType<typeof adminApi.migrarStoragePaths>>;
+  const [preview, setPreview] = useState<MigrateResult | null>(null);
+  const [applied, setApplied] = useState<MigrateResult | null>(null);
+
+  const previewMut = useMutation({
+    mutationFn: () => adminApi.migrarStoragePaths(true),
+    onSuccess: (data) => {
+      setPreview(data);
+      setApplied(null);
+      if ((data.to_rename ?? 0) === 0) {
+        toast.info("Todas las fotos ya tienen el formato correcto.");
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const applyMut = useMutation({
+    mutationFn: () => adminApi.migrarStoragePaths(false),
+    onSuccess: (data) => {
+      setApplied(data);
+      setPreview(null);
+      toast.success(`${data.moved ?? 0} fotos renombradas${data.errors ? ` · ${data.errors} errores` : ""}`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const busy = previewMut.isPending || applyMut.isPending;
+  const toRename = preview?.to_rename ?? 0;
+
+  return (
+    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+      <div>
+        <h2 className="font-display text-lg text-ink flex items-center gap-2">
+          <FolderSync className="h-4 w-4 text-muted-foreground" />
+          Migrar fotos R2
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Renombra las carpetas y archivos de fotos al nuevo esquema{" "}
+          <code className="font-mono text-[11px] bg-muted/50 px-1 py-0.5 rounded">
+            id_slug/id_slug.ext
+          </code>
+          . Actualizá el deploy primero, luego ejecutá esto una sola vez.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2 pt-1">
+        <Button variant="outline" onClick={() => previewMut.mutate()} disabled={busy}>
+          {previewMut.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+          Ver preview
+        </Button>
+        {toRename > 0 && !applied && (
+          <Button onClick={() => applyMut.mutate()} disabled={busy}>
+            {applyMut.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+            Renombrar {toRename} fotos
+          </Button>
+        )}
+      </div>
+
+      {preview && toRename > 0 && (
+        <div className="rounded-md border hairline bg-muted/20 p-3 space-y-2">
+          <p className="text-xs text-muted-foreground">
+            <strong className="text-ink">{toRename}</strong> fotos para renombrar:
+          </p>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {(preview.detail ?? []).slice(0, 30).map((r, i) => (
+              <div key={i} className="font-mono text-[11px] text-muted-foreground leading-tight">
+                <span className="line-through">{r.old}</span>
+                <span className="text-ink"> → {r.new}</span>
+              </div>
+            ))}
+            {toRename > 30 && (
+              <p className="text-xs text-muted-foreground">…y {toRename - 30} más.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {applied && (
+        <div className="rounded-md border hairline bg-muted/20 p-3 text-sm space-y-1">
+          <p className="text-ink font-medium">Migración completa</p>
+          <p className="text-xs text-muted-foreground">
+            {applied.moved ?? 0} fotos movidas · {applied.db_updated ?? 0} URLs actualizadas en BD
+            {(applied.errors ?? 0) > 0 && (
+              <span className="text-destructive"> · {applied.errors} errores</span>
+            )}
+          </p>
+          {(applied.error_detail ?? []).map((e, i) => (
+            <p key={i} className="text-xs text-destructive font-mono truncate">{e.key}: {e.error}</p>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
 /** Lista los equipos con precio_jornada_manual=TRUE y muestra qué precio
  *  daría la fórmula con el USD rate actual. Permite seleccionar manualmente

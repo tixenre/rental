@@ -698,6 +698,18 @@ export const adminApi = {
       {},
     ),
 
+  migrarStoragePaths: (dry_run: boolean) =>
+    authedPostJson<{
+      dry_run: boolean;
+      to_rename?: number;
+      moved?: number;
+      db_updated?: number;
+      errors?: number;
+      error_detail?: { key: string; stage: string; error: string }[];
+      skipped?: number;
+      detail?: { equipo_id: number; old: string; new: string }[];
+    }>(`/api/admin/storage/migrate-paths?dry_run=${dry_run}`, {}),
+
   uploadLogo: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();
     fd.append("file", file);
