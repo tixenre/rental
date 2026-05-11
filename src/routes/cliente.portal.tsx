@@ -403,14 +403,14 @@ function DocActions({
         <button
           type="button"
           onClick={() => setPreviewOpen(true)}
-          className="flex-1 inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-muted/50 transition justify-start"
+          className="flex-1 inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-3 text-xs font-medium text-ink hover:bg-muted/50 transition justify-start"
         >
           <PdfIcon /> Ver {label}
         </button>
         <a
           href={`/api/cliente/pedidos/${pedidoId}/${tipo}.pdf`}
           download={`${tipo}-${numero}.pdf`}
-          className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-ink transition"
+          className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-3 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-ink transition"
           title={`Descargar ${label} en PDF`}
         >
           ⬇ PDF
@@ -474,14 +474,14 @@ function DocPreviewModal({
             <a
               href={downloadUrl}
               download={downloadFilename}
-              className="inline-flex items-center gap-1.5 rounded-md bg-ink text-amber px-3 py-1.5 text-xs font-medium hover:brightness-110 transition"
+              className="inline-flex items-center gap-1.5 rounded-md bg-ink text-amber px-3 py-2 text-xs font-medium hover:brightness-110 transition"
             >
               ⬇ Descargar PDF
             </a>
             <button
               type="button"
               onClick={onClose}
-              className="grid h-9 w-9 place-items-center rounded-md hover:bg-muted transition"
+              className="grid h-10 w-10 place-items-center rounded-md hover:bg-muted transition"
               aria-label="Cerrar"
             >
               ✕
