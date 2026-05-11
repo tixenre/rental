@@ -2212,16 +2212,81 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
             pass
         return False
 
+    def _og_images_from_html(url: str, client) -> list[str]:
+        """Extrae og:image y twitter:image directamente del HTML sin Firecrawl.
+        Más rápido y confiable para páginas de producto de B&H y similares."""
+        try:
+            r = client.get(
+                url,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+                    ),
+                    "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
+                    "Accept-Language": "en-US,en;q=0.9",
+                },
+                timeout=15.0,
+                follow_redirects=True,
+            )
+        except httpx.HTTPError:
+            return []
+        if r.status_code != 200:
+            return []
+        html = r.text[:100_000]
+        imgs: list[str] = []
+        seen: set[str] = set()
+        def _push_og(u: str | None) -> None:
+            if not u:
+                return
+            u = u.strip()
+            if u.lower().startswith(("http://", "https://")) and u.lower() not in seen:
+                seen.add(u.lower())
+                imgs.append(u)
+        # og:image (dos posibles órdenes de atributos)
+        for pat in [
+            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+            r'og:image["\'][^>]*content=["\']([^"\']+)["\']',
+        ]:
+            m = re.search(pat, html, re.IGNORECASE)
+            if m:
+                _push_og(m.group(1))
+                break
+        # twitter:image
+        for pat in [
+            r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)["\']',
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']twitter:image["\']',
+        ]:
+            m = re.search(pat, html, re.IGNORECASE)
+            if m:
+                _push_og(m.group(1))
+                break
+        return imgs
+
     all_cands: list[str] = []
     seen_lc: set[str] = set()
+    # Cuando el usuario pegó una URL directa, marcamos las fotos obtenidas para
+    # saltear la validación HEAD (B&H CDN puede rechazar HEADs cross-origin).
+    direct_url_cands: set[str] = set()
 
     with httpx.Client(timeout=45.0) as client:
         if direct_url:
-            # 1) Si la URL apunta directamente a una imagen, usarla tal cual.
+            # 1) Si la URL es directamente una imagen, usarla tal cual.
             if direct_url.lower().rsplit(".", 1)[-1] in ("jpg", "jpeg", "png", "webp", "avif", "gif"):
                 all_cands.append(direct_url)
                 seen_lc.add(direct_url.lower())
-            # 2) Scrapear la página con filtros relajados (trust_url=True)
+                direct_url_cands.add(direct_url.lower())
+
+            # 2) Extraer og:image directamente del HTML (rápido, sin Firecrawl).
+            #    Más confiable para B&H y sitios JS-pesados.
+            for u in _og_images_from_html(direct_url, client):
+                if u.lower() not in seen_lc:
+                    seen_lc.add(u.lower())
+                    all_cands.append(u)
+                    direct_url_cands.add(u.lower())
+
+            # 3) Firecrawl para más candidatos (especialmente imgs del body).
             for u in _extract_images_from_page(direct_url, client, trust_url=True):
                 if u.lower() not in seen_lc:
                     seen_lc.add(u.lower())
@@ -2236,11 +2301,13 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
                             seen_lc.add(u.lower())
                             all_cands.append(u)
 
-        # Validar (paralelo no necesario para 18 imgs)
+        # Validar candidatos — los que vienen de URL directa se saltan la
+        # validación (B&H CDN rechaza HEADs cross-origin; el og:image del propio
+        # sitio es confiable sin necesidad de un round-trip extra).
         with httpx.Client(timeout=10.0) as vc:
             validated = [
                 u for u in all_cands[:MAX_PHOTO_CANDIDATES_BUSCAR_VALIDATE]
-                if _is_valid_image(u, vc)
+                if u.lower() in direct_url_cands or _is_valid_image(u, vc)
             ][:MAX_PHOTO_CANDIDATES_BUSCAR_RETURN]
 
     return {"foto_candidates": validated, "total_inspeccionadas": len(all_cands)}
