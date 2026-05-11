@@ -20,6 +20,7 @@ import { Route as ClientePortalRouteImport } from './routes/cliente.portal'
 import { Route as ClientePerfilRouteImport } from './routes/cliente.perfil'
 import { Route as ClienteLoginRouteImport } from './routes/cliente.login'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
+import { Route as AdminNovedadesRouteImport } from './routes/admin/novedades'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminEstadisticasRouteImport } from './routes/admin/estadisticas'
 import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
@@ -89,6 +90,11 @@ const ClienteLoginRoute = ClienteLoginRouteImport.update({
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminNovedadesRoute = AdminNovedadesRouteImport.update({
+  id: '/novedades',
+  path: '/novedades',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
@@ -177,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/admin/equipos': typeof AdminEquiposRouteWithChildren
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/novedades': typeof AdminNovedadesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
@@ -202,6 +209,7 @@ export interface FileRoutesByTo {
   '/admin/clientes': typeof AdminClientesRoute
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/novedades': typeof AdminNovedadesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/admin/equipos': typeof AdminEquiposRouteWithChildren
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/novedades': typeof AdminNovedadesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
@@ -261,6 +270,7 @@ export interface FileRouteTypes {
     | '/admin/equipos'
     | '/admin/estadisticas'
     | '/admin/login'
+    | '/admin/novedades'
     | '/admin/settings'
     | '/cliente/login'
     | '/cliente/perfil'
@@ -286,6 +296,7 @@ export interface FileRouteTypes {
     | '/admin/clientes'
     | '/admin/estadisticas'
     | '/admin/login'
+    | '/admin/novedades'
     | '/admin/settings'
     | '/cliente/login'
     | '/cliente/perfil'
@@ -314,6 +325,7 @@ export interface FileRouteTypes {
     | '/admin/equipos'
     | '/admin/estadisticas'
     | '/admin/login'
+    | '/admin/novedades'
     | '/admin/settings'
     | '/cliente/login'
     | '/cliente/perfil'
@@ -417,6 +429,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/novedades': {
+      id: '/admin/novedades'
+      path: '/novedades'
+      fullPath: '/admin/novedades'
+      preLoaderRoute: typeof AdminNovedadesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/login': {
@@ -557,6 +576,7 @@ interface AdminRouteChildren {
   AdminEquiposRoute: typeof AdminEquiposRouteWithChildren
   AdminEstadisticasRoute: typeof AdminEstadisticasRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  AdminNovedadesRoute: typeof AdminNovedadesRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminPedidosIdRoute: typeof AdminPedidosIdRoute
@@ -570,6 +590,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEquiposRoute: AdminEquiposRouteWithChildren,
   AdminEstadisticasRoute: AdminEstadisticasRoute,
   AdminLoginRoute: AdminLoginRoute,
+  AdminNovedadesRoute: AdminNovedadesRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminPedidosIdRoute: AdminPedidosIdRoute,
