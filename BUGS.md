@@ -164,3 +164,21 @@ Fijados en PR #26 (`feat/sistema-specs-bulletproof`).
 **Estado:** 🔵 Pendiente  
 
 ---
+
+## 🔴 CRÍTICO — Seguridad
+
+### #31 - Endpoints admin sin `require_admin` (escalada de privilegios)
+**Módulo:** Backend / Auth  
+**Descripción:** Auditoría detectó que el middleware solo valida sesión genérica — no diferencia admin de cliente. Encontrado:
+- `routes/clientes.py`: **6 endpoints** sin `require_admin` (listar/ver/crear/modificar/borrar clientes + ver sus pedidos)
+- `routes/alquileres.py`: **14 endpoints** sin `require_admin` (CRUD completo de pedidos, pagos, PDFs)
+- `routes/estadisticas.py`: **2 endpoints** sin `require_admin` (estadísticas del negocio)
+
+**Impacto:** Cualquier cliente logueado en el portal podía:
+- Ver datos personales (email/teléfono/dirección/CUIT) de TODOS los clientes
+- Ver, modificar o borrar pedidos ajenos
+- Acceder a estadísticas y montos del negocio
+
+**Estado:** ✅ Resuelto (PR #38) — `require_admin(request)` agregado a los 22 endpoints. `/disponibilidad` sigue público. `create_pedido` refactorizado en dos: endpoint admin + helper (`cliente_portal.cliente_crear_pedido` sigue usándolo con su `require_cliente` propio).
+
+---
