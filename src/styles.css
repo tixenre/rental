@@ -180,6 +180,19 @@
     background-color: var(--amber);
     color: var(--ink);
   }
+
+  /* Mobile: forzar font-size mínimo 16px en inputs/textarea/select para
+   * evitar el zoom automático de iOS al hacer focus. iOS solo dispara
+   * el zoom si el font-size es menor a 16px. Desktop (≥ 768px) puede
+   * volver a ser más chico — algunas UIs del admin tienen muchos campos
+   * y se justifica el text-sm. */
+  @media (max-width: 767px) {
+    input,
+    textarea,
+    select {
+      font-size: max(16px, 1em);
+    }
+  }
 }
 
 @layer utilities {

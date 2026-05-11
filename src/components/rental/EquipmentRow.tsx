@@ -56,7 +56,12 @@ export function EquipmentRow({
           {/* Thumb */}
           <div className="relative aspect-square w-14 shrink-0 overflow-hidden rounded-md sm:aspect-[4/3] sm:w-16 bg-white">
             {item.fotoUrl ? (
-              <img src={item.fotoUrl} alt={item.name} className="h-full w-full object-contain p-1.5" />
+              <img
+                src={item.fotoUrl}
+                alt={item.name}
+                className="h-full w-full object-contain p-1.5"
+                loading="lazy"
+              />
             ) : (
               <EmptyImage category={item.category} brand={item.brand} />
             )}

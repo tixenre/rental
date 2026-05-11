@@ -54,16 +54,16 @@ export function TopBar() {
           {/* Mobile: logo centrado con ícono de usuario a la derecha */}
           <div className="flex items-center md:hidden">
             {/* Espaciador izquierdo igual al ancho del ícono derecho */}
-            <div className="w-8" />
+            <div className="w-10" />
             <Link to="/" className="flex-1 flex justify-center">
               <LogoContent logoUrl={logoUrl} />
             </Link>
             <Link
               to="/cliente"
-              className="flex items-center justify-center w-8 h-8 rounded-full border hairline hover:border-foreground/40"
+              className="flex items-center justify-center w-10 h-10 rounded-full border hairline hover:border-foreground/40"
               aria-label="Ingresar"
             >
-              <User className="h-4 w-4" />
+              <User className="h-5 w-5" />
             </Link>
           </div>
 
