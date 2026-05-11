@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 137,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Cliente puede previsualizar documentos antes de descargar",
+    body: "En el portal del cliente, cada documento (remito, contrato, albarán) ahora tiene dos botones: 'Ver' abre el documento en un modal (mejor UX en mobile, no abre apps externas), 'PDF' descarga la versión final. Útil para revisar datos antes de mandarle el PDF a alguien, y para ahorrar datos en mobile.",
+    labels: ["cliente", "ux"],
+  },
+  {
     number: 136,
     date: "2026-05-11",
     type: "feat",
