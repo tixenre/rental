@@ -10,7 +10,7 @@
  *  - Editar una existente (mismo modal).
  *  - Borrar una. (Las equipo_specs huérfanas NO se borran — quedan como extras.)
  *
- * Plan maestro DISEÑO_SPECS.md §8 (riesgos): "editor de templates desde día 1"
+ * Plan maestro docs/DISEÑO_SPECS.md §8 (riesgos): "editor de templates desde día 1"
  * como mitigación a templates mal definidos.
  */
 

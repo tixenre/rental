@@ -5,7 +5,7 @@ Cada categoría raíz tiene un template que define qué specs van a tener
 sus equipos. Cuando el admin asigna una categoría a un equipo, el form
 muestra los inputs según este template.
 
-Diseño completo en DISEÑO_SPECS.md sección 3.
+Diseño completo en docs/DISEÑO_SPECS.md sección 3.
 
 Convenciones del campo `tipo`:
     string  →  texto libre (ej. "Full-frame CMOS 12.1MP")
