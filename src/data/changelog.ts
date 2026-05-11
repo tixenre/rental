@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 122,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Fecha de compra del equipo: ahora se elige mes + año (no día)",
+    body: "Antes era un input de fecha completo. Cambiamos a dos selectores (mes + año) — solo importa la época en que se compró, no el día exacto. Se guarda como 'YYYY-MM' (compatible con la columna actual). Los valores legacy con fecha completa siguen funcionando.",
+    labels: ["admin", "calidad-datos"],
+  },
+  {
     number: 121,
     date: "2026-05-11",
     type: "feat",

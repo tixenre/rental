@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DUENOS, isCanonicalDueno } from "@/lib/admin/duenos";
+import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
 
 import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin, type KitComponente } from "@/lib/admin/api";
 import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
@@ -739,7 +740,12 @@ export function EquipoFormDialog({
                   <Field label="Valor reposición (USD)">
                     <Input type="number" min={0} step="0.01" {...form.register("valor_reposicion")} />
                   </Field>
-                  <Field label="Fecha de compra"><Input type="date" {...form.register("fecha_compra")} /></Field>
+                  <Field label="Fecha de compra">
+                    <MonthYearPicker
+                      value={form.watch("fecha_compra")}
+                      onChange={(v) => form.setValue("fecha_compra", v, { shouldDirty: true })}
+                    />
+                  </Field>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
