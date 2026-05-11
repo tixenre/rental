@@ -21,6 +21,39 @@ export const Route = createFileRoute("/preguntas-frecuentes")({
         content:
           "Respuestas a las preguntas más comunes sobre alquiler de equipos audiovisuales en Rambla Rental: reservas, pago, retiro, devolución, seguros.",
       },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://ramblarental.com/preguntas-frecuentes" },
+      { property: "og:title", content: "Preguntas frecuentes — Rambla Rental" },
+      {
+        property: "og:description",
+        content: "Reservas, pago, retiro, devolución, seguros.",
+      },
+      { property: "og:image", content: "https://ramblarental.com/icon-512.png" },
+      { property: "og:locale", content: "es_AR" },
+      { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "Preguntas frecuentes — Rambla Rental" },
+      { name: "twitter:description", content: "Reservas, pago, retiro, devolución, seguros." },
+    ],
+    // Structured data FAQPage: Google muestra rich snippets con las preguntas
+    // en los resultados de búsqueda (gran impacto visual + click-through).
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: FAQ_GROUPS.flatMap((g) =>
+            g.items.map((q) => ({
+              "@type": "Question",
+              name: q.q,
+              acceptedAnswer: { "@type": "Answer", text: q.a },
+            })),
+          ),
+        }),
+      },
+    ],
+    links: [
+      { rel: "canonical", href: "https://ramblarental.com/preguntas-frecuentes" },
     ],
   }),
   component: FaqPage,

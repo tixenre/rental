@@ -3,8 +3,55 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rambla Rental — Alquiler de equipos de cine y foto</title>
-    <meta name="description" content="Catálogo de cámaras, lentes, iluminación, audio y soportes para producciones audiovisuales." />
+
+    <!-- SEO básico — meta tags se sobrescriben por página vía TanStack Router. -->
+    <title>Rambla Rental — Alquiler de equipos de cine y foto en Mar del Plata</title>
+    <meta name="description" content="Cámaras, lentes, iluminación, audio y soportes para producciones audiovisuales. Estudio de foto y video en Mar del Plata." />
+    <meta name="keywords" content="alquiler equipos cine, rental cámaras Mar del Plata, alquiler lentes, iluminación producciones, estudio foto video" />
+    <link rel="canonical" href="https://ramblarental.com/" />
+
+    <!-- Open Graph (Facebook, WhatsApp, LinkedIn, Slack). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ramblarental.com/" />
+    <meta property="og:title" content="Rambla Rental — Alquiler de equipos de cine y foto" />
+    <meta property="og:description" content="Cámaras, lentes, iluminación, audio y soportes para producciones audiovisuales. Estudio de foto y video en Mar del Plata." />
+    <meta property="og:image" content="https://ramblarental.com/icon-512.png" />
+    <meta property="og:locale" content="es_AR" />
+    <meta property="og:site_name" content="Rambla Rental" />
+
+    <!-- Twitter Cards. -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Rambla Rental — Alquiler de equipos de cine y foto" />
+    <meta name="twitter:description" content="Cámaras, lentes, iluminación, audio y soportes. Mar del Plata." />
+    <meta name="twitter:image" content="https://ramblarental.com/icon-512.png" />
+
+    <!-- Structured data: Organization (Google Knowledge Panel). -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "Rambla Rental",
+      "description": "Alquiler de equipos audiovisuales y estudio de foto/video en Mar del Plata.",
+      "url": "https://ramblarental.com/",
+      "telephone": "+5492235852510",
+      "email": "ramblarental@gmail.com",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Chaco 1392",
+        "addressLocality": "Mar del Plata",
+        "addressRegion": "Buenos Aires",
+        "postalCode": "7600",
+        "addressCountry": "AR"
+      },
+      "openingHoursSpecification": [
+        { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"], "opens": "10:00", "closes": "19:00" },
+        { "@type": "OpeningHoursSpecification", "dayOfWeek": "Saturday", "opens": "10:00", "closes": "14:00" }
+      ],
+      "priceRange": "$$",
+      "image": "https://ramblarental.com/icon-512.png",
+      "sameAs": ["https://instagram.com/ramblarental"]
+    }
+    </script>
 
     <!-- Favicon: PNG (todos los browsers modernos lo soportan) + Apple touch icon. -->
     <link rel="icon" type="image/png" href="/favicon.png" />

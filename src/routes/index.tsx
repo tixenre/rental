@@ -31,17 +31,30 @@ export const Route = createFileRoute("/")({
   validateSearch: zodValidator(searchSchema),
   head: () => ({
     meta: [
-      { title: "Rambla Rental — Alquiler de equipos de cine y foto" },
+      { title: "Rambla Rental — Alquiler de equipos de cine y foto en Mar del Plata" },
       {
         name: "description",
         content:
-          "Cámaras, lentes, iluminación, audio y soportes para producciones audiovisuales. Mar del Plata.",
+          "Cámaras, lentes, iluminación, audio y soportes para producciones audiovisuales. Estudio de foto y video en Mar del Plata.",
       },
-      { property: "og:title", content: "Rambla Rental" },
+      // Open Graph (Facebook, WhatsApp, LinkedIn).
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://ramblarental.com/" },
+      { property: "og:title", content: "Rambla Rental — Alquiler de equipos de cine y foto" },
       {
         property: "og:description",
-        content: "Equipos de cine y foto para alquilar por jornada.",
+        content: "Cámaras, lentes, iluminación, audio y soportes. Estudio en Mar del Plata.",
       },
+      { property: "og:image", content: "https://ramblarental.com/icon-512.png" },
+      { property: "og:locale", content: "es_AR" },
+      // Twitter Cards.
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Rambla Rental" },
+      { name: "twitter:description", content: "Equipos audiovisuales · Mar del Plata" },
+      { name: "twitter:image", content: "https://ramblarental.com/icon-512.png" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://ramblarental.com/" },
     ],
   }),
   component: Index,

@@ -33,6 +33,7 @@ from routes.cliente_portal   import router as cliente_portal_router
 from routes.marcas           import router as marcas_router
 from routes.specs            import router as specs_router
 from routes.changelog        import router as changelog_router
+from routes.seo              import router as seo_router
 from middleware          import auth_middleware
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,7 @@ app.include_router(settings_router,       prefix="/api")
 app.include_router(marcas_router,         prefix="/api")
 app.include_router(specs_router,          prefix="/api")
 app.include_router(changelog_router,      prefix="/api")
+app.include_router(seo_router)  # /sitemap.xml (sin prefijo /api — debe estar en root)
 app.include_router(cliente_portal_router)
 
 # ── Health Check ─────────────────────────────────────────────────────────────
