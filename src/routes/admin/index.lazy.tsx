@@ -8,10 +8,12 @@ import {
   Users,
   AlertCircle,
   ArrowRight,
+  Maximize2,
 } from "lucide-react";
 
 import { adminApi, type PedidoResumen } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
+import { CalendarioWidget } from "@/components/admin/CalendarioWidget";
 
 export const Route = createLazyFileRoute("/admin/")({
   component: AdminDashboard,
@@ -79,22 +81,13 @@ function AdminDashboard() {
             />
           </div>
 
-          {/* Sección Calendario */}
+          {/* Movimientos del día */}
           <div className="mt-10">
-            <div className="mb-4 flex items-end justify-between">
-              <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                  Movimiento de equipos
-                </div>
-                <h2 className="font-display text-xl text-ink mt-0.5">Calendario</h2>
+            <div className="mb-4">
+              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                Movimiento de equipos
               </div>
-              <Link
-                to="/admin/calendario"
-                className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition border hairline rounded-full px-3 py-1.5"
-              >
-                <Calendar className="h-3 w-3" /> Ver mes completo
-                <ArrowRight className="h-3 w-3" />
-              </Link>
+              <h2 className="font-display text-xl text-ink mt-0.5">Hoy y mañana</h2>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4 md:gap-6">
@@ -118,6 +111,27 @@ function AdminDashboard() {
               />
               <EquiposAfueraCard items={data.equipos_afuera} />
             </div>
+          </div>
+
+          {/* Calendario embebido */}
+          <div className="mt-10">
+            <div className="mb-4 flex items-end justify-between">
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                  Vista mensual
+                </div>
+                <h2 className="font-display text-xl text-ink mt-0.5">Calendario</h2>
+              </div>
+              <Link
+                to="/admin/calendario"
+                className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition border hairline rounded-full px-3 py-1.5"
+                aria-label="Abrir calendario en pantalla completa"
+              >
+                <Maximize2 className="h-3 w-3" /> Pantalla completa
+              </Link>
+            </div>
+
+            <CalendarioWidget variant="compact" initialView="mes" showLegend={false} />
           </div>
         </>
       )}
