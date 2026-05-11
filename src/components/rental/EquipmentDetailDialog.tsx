@@ -85,12 +85,12 @@ export function EquipmentDetailDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="relative aspect-[16/9] overflow-hidden rounded-lg">
+        <div className="relative aspect-[16/9] overflow-hidden rounded-lg bg-white">
           {item.fotoUrl ? (
             <img
               src={item.fotoUrl}
               alt={item.name}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain p-4"
               loading="lazy"
             />
           ) : (

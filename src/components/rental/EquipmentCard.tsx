@@ -56,13 +56,13 @@ export function EquipmentCard({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`Ver detalle de ${item.name}`}
-        className="relative block aspect-square w-full shrink-0 overflow-hidden text-left"
+        className="relative block aspect-square w-full shrink-0 overflow-hidden text-left bg-white"
       >
         {item.fotoUrl ? (
           <img
             src={item.fotoUrl}
             alt={item.name}
-            className="h-full w-full object-cover transition group-hover:scale-[1.02]"
+            className="h-full w-full object-contain p-3 transition group-hover:scale-[1.02]"
           />
         ) : (
           <EmptyImage category={item.category} brand={item.brand} />
