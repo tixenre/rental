@@ -114,6 +114,10 @@ class KitItem(BaseModel):
     cantidad:      int = 1
 
 
+class KitReorder(BaseModel):
+    orden: list[int]  # lista de componente_id en el orden deseado
+
+
 class EtiquetasUpdate(BaseModel):
     # Lista ordenada de etiquetas MANUALES. Las auto (marca/modelo/nombre/categorías)
     # se regeneran solas, no las toques desde acá.
@@ -539,12 +543,12 @@ def get_kit(id: int):
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
         rows = conn.execute("""
-            SELECT kc.id, kc.componente_id, kc.cantidad,
+            SELECT kc.id, kc.componente_id, kc.cantidad, kc.orden,
                    e.nombre, e.marca, e.modelo, e.foto_url, e.visible_catalogo
             FROM kit_componentes kc
             JOIN equipos e ON e.id = kc.componente_id
             WHERE kc.equipo_id = ?
-            ORDER BY e.nombre
+            ORDER BY kc.orden ASC, e.nombre ASC
         """, (id,)).fetchall()
         return [row_to_dict(r) for r in rows]
     finally:
@@ -587,6 +591,26 @@ def remove_kit_item(id: int, componente_id: int):
             (id, componente_id)
         )
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.post("/admin/equipos/{id}/kit/reorder")
+def reorder_kit(id: int, data: KitReorder, request: Request):
+    """Reordena los componentes del kit según el array de componente_id."""
+    require_admin(request)
+    conn = get_db()
+    try:
+        for i, componente_id in enumerate(data.orden):
+            conn.execute(
+                "UPDATE kit_componentes SET orden=? WHERE equipo_id=? AND componente_id=?",
+                (i, id, componente_id)
+            )
+        conn.commit()
+        return {"ok": True}
     except Exception:
         conn.rollback()
         raise

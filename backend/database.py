@@ -701,6 +701,10 @@ def init_db():
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_kit_comp ON kit_componentes(componente_id)
     """)
+    # Columna orden para kit (migración idempotente)
+    conn.execute("""
+        ALTER TABLE kit_componentes ADD COLUMN IF NOT EXISTS orden INTEGER NOT NULL DEFAULT 0
+    """)
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquiler_pagos (

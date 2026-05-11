@@ -106,6 +106,7 @@ export type Equipo = {
 export type KitComponente = {
   componente_id: number;
   cantidad: number;
+  orden: number;
   nombre: string;
   marca?: string | null;
   foto_url?: string | null;
@@ -286,6 +287,8 @@ export const adminApi = {
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
     }
   },
+  reorderKit: (id: number, orden: number[]) =>
+    authedPostJson<{ ok: boolean }>(`/api/admin/equipos/${id}/kit/reorder`, { orden }),
   listEtiquetas: (incluirAuto = false) =>
     authedJson<Etiqueta[]>(`/api/etiquetas${incluirAuto ? "?incluir_auto=1" : ""}`),
 
