@@ -23,12 +23,15 @@ type UploadResponse = {
 };
 
 /** ¿La URL ya está hospedada en nuestro storage? Detecta R2 (pub-*.r2.dev) o
- *  custom domain (cualquier dominio que sirva /equipos/{id}/*).
- *  Soporta tanto el patrón viejo (foto-{timestamp}) como el nuevo ({id}_{slug}).
+ *  custom domain. Soporta el esquema nuevo ({id}_{slug}/{id}_{slug}.ext) y
+ *  el viejo (equipos/{id}/...) para compatibilidad durante la migración.
  */
 export function isHostedUrl(url: string | null | undefined): boolean {
   if (!url) return false;
-  return /\/equipos\/\d+\/[^/]+\.(webp|jpg|jpeg|png|avif|gif)/i.test(url);
+  return (
+    /\/equipos\/\d+\/[^/]+\.(webp|jpg|jpeg|png|avif|gif)/i.test(url) ||
+    /\/\d+_[a-z0-9-]+\/[^/]+\.(webp|jpg|jpeg|png|avif|gif)/i.test(url)
+  );
 }
 
 /** Backwards compat: alias del antiguo isBucketUrl. */

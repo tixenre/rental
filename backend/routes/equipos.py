@@ -2714,7 +2714,7 @@ def _get_r2_client(cfg: dict) -> object:
 
 
 def _foto_path(equipo_id: int, ext: str) -> str:
-    """Genera path R2: equipos/{id}/{id}_{slug}.{ext}
+    """Genera path R2: {id}_{slug}/{id}_{slug}.{ext}
     Busca el nombre del equipo en la BD; si falla usa solo el id."""
     try:
         conn = get_db()
@@ -2730,8 +2730,13 @@ def _foto_path(equipo_id: int, ext: str) -> str:
     else:
         slug = ""
 
-    filename = f"{equipo_id}_{slug}.{ext}" if slug else f"{equipo_id}.{ext}"
-    return f"equipos/{equipo_id}/{filename}"
+    if slug:
+        folder   = f"{equipo_id}_{slug}"
+        filename = f"{equipo_id}_{slug}.{ext}"
+    else:
+        folder   = f"{equipo_id}"
+        filename = f"{equipo_id}.{ext}"
+    return f"{folder}/{filename}"
 
 
 def _upload_to_r2(path: str, content: bytes, content_type: str) -> str:
@@ -2930,3 +2935,137 @@ def admin_storage_diag(request: Request):
         return {"ok": False, "vars": vars_status, "tested": True, "error": e.detail}
     except Exception as e:
         return {"ok": False, "vars": vars_status, "tested": True, "error": str(e)}
+
+
+# ── Admin: migración de paths R2 al nuevo esquema {id}_{slug}/ ───────────────
+
+@router.post("/admin/storage/migrate-paths")
+def admin_migrate_storage_paths(request: Request, dry_run: bool = True):
+    """Renombra todos los objetos R2 que están bajo el prefijo 'equipos/'
+    al nuevo esquema {id}_{slug}/{id}_{slug}.ext.
+    Con dry_run=true (default) solo lista los cambios sin aplicarlos.
+    Llamar con ?dry_run=false para ejecutar la migración real."""
+    require_admin(request)
+
+    cfg    = _r2_config()
+    client = _get_r2_client(cfg)
+    bucket = cfg["bucket"]
+    public_base = cfg["public_base"]
+
+    # 1. Cargar todos los equipos para construir el mapa id → slug
+    conn = get_db()
+    try:
+        equipo_rows = conn.execute("SELECT id, nombre FROM equipos").fetchall()
+    finally:
+        conn.close()
+
+    def _make_slug(nombre: str) -> str:
+        s = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode()
+        return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:50]
+
+    equipo_slugs: dict[int, str] = {}
+    for row in equipo_rows:
+        eid, nombre = int(row[0]), row[1] or ""
+        equipo_slugs[eid] = _make_slug(nombre) if nombre else ""
+
+    # 2. Listar objetos con prefix equipos/ (paginado)
+    old_keys: list[str] = []
+    paginator = client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=bucket, Prefix="equipos/"):
+        for obj in page.get("Contents", []):
+            old_keys.append(obj["Key"])
+
+    # 3. Calcular nuevos paths
+    renames: list[dict] = []
+    skipped: list[str] = []
+    for old_key in old_keys:
+        parts = old_key.split("/")
+        if len(parts) < 3:
+            skipped.append(old_key)
+            continue
+        try:
+            equipo_id = int(parts[1])
+        except ValueError:
+            skipped.append(old_key)
+            continue
+        filename = parts[-1]
+        m = re.search(r"\.([a-z0-9]+)$", filename, re.IGNORECASE)
+        if not m:
+            skipped.append(old_key)
+            continue
+        ext  = m.group(1).lower()
+        slug = equipo_slugs.get(equipo_id, "")
+        if slug:
+            new_key = f"{equipo_id}_{slug}/{equipo_id}_{slug}.{ext}"
+        else:
+            new_key = f"{equipo_id}/{equipo_id}.{ext}"
+        if old_key == new_key:
+            continue
+        renames.append({
+            "equipo_id": equipo_id,
+            "old": old_key,
+            "new": new_key,
+            "old_url": f"{public_base}/{old_key}",
+            "new_url": f"{public_base}/{new_key}",
+        })
+
+    if dry_run:
+        return {
+            "dry_run":  True,
+            "to_rename": len(renames),
+            "skipped":  len(skipped),
+            "detail":   renames,
+        }
+
+    # 4. Ejecutar copias + actualizaciones + borrado
+    moved:      list[dict] = []
+    db_updated: list[dict] = []
+    errors:     list[dict] = []
+
+    _CT_MAP = {"webp": "image/webp", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+               "png": "image/png", "avif": "image/avif", "gif": "image/gif"}
+
+    for r in renames:
+        ext_new = r["new"].rsplit(".", 1)[-1].lower()
+        ctype   = _CT_MAP.get(ext_new, "image/webp")
+        try:
+            client.copy_object(
+                Bucket=bucket,
+                CopySource={"Bucket": bucket, "Key": r["old"]},
+                Key=r["new"],
+                CacheControl="public, max-age=31536000, immutable",
+                MetadataDirective="REPLACE",
+                ContentType=ctype,
+            )
+        except Exception as e:
+            errors.append({"key": r["old"], "stage": "copy", "error": str(e)})
+            continue
+
+        # Actualizar foto en DB si coincide con la URL vieja
+        try:
+            db_conn = get_db()
+            try:
+                db_conn.execute(
+                    "UPDATE equipos SET foto = %s WHERE id = %s AND foto = %s",
+                    (r["new_url"], r["equipo_id"], r["old_url"]),
+                )
+                db_conn.commit()
+                db_updated.append({"equipo_id": r["equipo_id"], "new_url": r["new_url"]})
+            finally:
+                db_conn.close()
+        except Exception as e:
+            errors.append({"key": r["old"], "stage": "db_update", "error": str(e)})
+
+        try:
+            client.delete_object(Bucket=bucket, Key=r["old"])
+            moved.append({"old": r["old"], "new": r["new"]})
+        except Exception as e:
+            errors.append({"key": r["old"], "stage": "delete", "error": str(e)})
+
+    return {
+        "dry_run":   False,
+        "moved":     len(moved),
+        "db_updated": len(db_updated),
+        "errors":    len(errors),
+        "error_detail": errors,
+    }
