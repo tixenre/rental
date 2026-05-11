@@ -72,12 +72,7 @@ export function EquipmentCard({
             <Sparkles className="h-2.5 w-2.5" /> nuevo
           </div>
         )}
-        {item.isCombo && !item.isNew && (
-          <div className="absolute left-2 top-2 rounded-full bg-amber px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-ink">
-            combo
-          </div>
-        )}
-        {/* Destacado: convive con isNew/isCombo en otra esquina */}
+        {/* Destacado: convive con isNew en otra esquina */}
         {item.destacado && (
           <div className="absolute right-2 top-2 rounded-full bg-amber/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-ink shadow-sm">
             ★ destacado
