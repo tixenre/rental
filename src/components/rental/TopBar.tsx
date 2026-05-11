@@ -7,7 +7,7 @@ import { Calendar as CalendarIcon, ShoppingBag, User } from "lucide-react";
 import { RentalDateModal } from "./RentalDateModal";
 import { useQuery } from "@tanstack/react-query";
 
-import logoWordmark from "@/assets/rambla-wordmark.png";
+import logoWordmark from "@/assets/rambla-wordmark.webp";
 
 function LogoContent({ logoUrl }: { logoUrl: string | null }) {
   // logoUrl viene de settings (admin puede sobrescribir desde back-office).

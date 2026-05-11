@@ -72,6 +72,9 @@ export function EquipmentCard({
           <img
             src={item.fotoUrl}
             alt={item.name}
+            loading={index < 4 ? "eager" : "lazy"}
+            decoding="async"
+            fetchPriority={index < 4 ? "high" : "low"}
             className="h-full w-full object-contain p-3 transition group-hover:scale-[1.02]"
           />
         ) : (
