@@ -270,7 +270,7 @@ def cliente_pedidos(request: Request):
                    monto_total, monto_pagado, descuento_pct, notas, created_at
             FROM alquileres
             WHERE cliente_id = ?
-            ORDER BY created_at DESC
+            ORDER BY created_at DESC NULLS LAST, numero_pedido DESC
         """, (cliente_id,)).fetchall()
 
         result = []
