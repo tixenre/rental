@@ -5,7 +5,7 @@ import { authedFetch } from "@/lib/authedFetch";
 export const Route = createFileRoute("/admin/login")({
   head: () => ({
     meta: [
-      { title: "Acceso admin — Rambla Rental" },
+      { title: "Login · Back Office" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),

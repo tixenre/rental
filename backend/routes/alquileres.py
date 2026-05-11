@@ -395,11 +395,14 @@ def list_pedidos(
 
         col = SORT_COLS.get(sort_by, "p.numero_pedido")
         direction = "ASC" if sort_dir == "asc" else "DESC"
-        # Poner "Registro manual" (numero_remito IS NULL) al final
-        order = f"p.numero_remito IS NOT NULL DESC, {col} {direction}"
+        # Poner "Registro manual" al final (los importados del histórico tienen
+        # numero_remito NULL o string vacío — antes solo chequeábamos NULL y
+        # los string vacíos se trataban como "tiene número" y subían arriba).
+        has_numero = "(p.numero_remito IS NOT NULL AND p.numero_remito != '')"
+        order = f"{has_numero} DESC, {col} {direction} NULLS LAST"
         # secundario: número descendente para desempate
         if col != "p.numero_pedido":
-            order += ", p.numero_pedido DESC"
+            order += ", p.numero_pedido DESC NULLS LAST"
 
         total = conn.execute(f"SELECT COUNT(*) FROM alquileres p {where}", params).fetchone()[0]
         rows  = conn.execute(

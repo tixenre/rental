@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 105,
+    date: "2026-05-11",
+    type: "fix",
+    title: "Quick wins: logo PNG en mobile, favicon, títulos de tab, orden de pedidos manuales",
+    body: "Cuatro fixes chicos que suman: (1) el logo del top bar en mobile ahora usa el PNG real (antes era texto); (2) favicon agregado (el ícono que aparece en la pestaña del navegador); (3) títulos de tab diferenciados — 'Back Office · Rambla' vs 'Rambla Rental' para distinguir desde la tab; (4) los pedidos manuales viejos (sin número) ahora aparecen al final del listado, no arriba.",
+    labels: ["admin", "público", "ux"],
+  },
+  {
     number: 103,
     date: "2026-05-11",
     type: "fix",

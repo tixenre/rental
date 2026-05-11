@@ -7,17 +7,18 @@ import { Calendar as CalendarIcon, ShoppingBag, User } from "lucide-react";
 import { RentalDateModal } from "./RentalDateModal";
 import { useQuery } from "@tanstack/react-query";
 
+import logoWordmark from "@/assets/rambla-wordmark.png";
+
 function LogoContent({ logoUrl }: { logoUrl: string | null }) {
-  if (logoUrl) {
-    return <img src={logoUrl} alt="Rambla Rental" className="h-10 sm:h-11 w-auto object-contain" />;
-  }
+  // logoUrl viene de settings (admin puede sobrescribir desde back-office).
+  // Si no hay, usamos el PNG del repo — consistente con el footer.
+  const src = logoUrl || logoWordmark;
   return (
-    <>
-      <span className="wordmark text-2xl sm:text-3xl text-amber leading-none">rambla</span>
-      <span className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
-        Rental
-      </span>
-    </>
+    <img
+      src={src}
+      alt="Rambla Rental"
+      className="h-9 sm:h-11 w-auto object-contain"
+    />
   );
 }
 

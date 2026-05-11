@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { changelog, type ChangelogEntry } from "@/data/changelog";
 
 export const Route = createFileRoute("/admin/novedades")({
-  head: () => ({ meta: [{ title: "Novedades — Rambla Rental" }] }),
+  head: () => ({ meta: [{ title: "Novedades · Back Office" }] }),
   component: NovedadesPage,
 });
 
