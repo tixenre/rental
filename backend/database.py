@@ -682,6 +682,8 @@ def init_db():
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS ranking_actualizado TIMESTAMP")
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS nombre_publico TEXT")
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS nombre_publico_largo TEXT")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS nombre_publico_override TEXT")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS nombre_publico_revisado BOOLEAN DEFAULT FALSE")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_equipos_ranking "
         "ON equipos(relevancia_manual ASC, popularidad_score DESC, nombre ASC)"
