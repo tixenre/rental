@@ -231,7 +231,9 @@ export function EquipmentRow({
             className="overflow-hidden"
           >
             <div className="border-t hairline px-3 py-3 sm:px-4 sm:py-4 space-y-3">
-              {/* Quick facts (peso, montura, etc.) */}
+              {/* Quick facts fundamentales (montura, formato, resolución...).
+               * TODO #116: hacer configurables desde admin por categoría —
+               * hoy son los primeros 3 con valor entre un set fijo. */}
               {quickFacts.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {quickFacts.map((f) => (
@@ -248,14 +250,8 @@ export function EquipmentRow({
                 </div>
               )}
 
-              {/* Descripción corta */}
-              {item.description && (
-                <p className="text-sm text-foreground/85 leading-relaxed line-clamp-3">
-                  {item.description}
-                </p>
-              )}
-
-              {/* Lista de componentes del kit (si lo tiene) */}
+              {/* Componentes del kit (si tiene). Es lo más útil para decidir
+               * rápido si el equipo viene con lo necesario. */}
               <IncludedList item={item} />
 
               {/* CTA: ver ficha completa */}
