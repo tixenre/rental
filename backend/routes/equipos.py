@@ -2723,7 +2723,7 @@ def _get_r2_client(cfg: dict) -> object:
 
 
 def _foto_path(equipo_id: int, ext: str) -> str:
-    """Genera path R2: {id}_{slug}/{id}_{slug}.{ext}
+    """Genera path R2: equipos/{id}_{slug}/{id}_{slug}.{ext}
     Busca el nombre del equipo en la BD; si falla usa solo el id."""
     try:
         conn = get_db()
@@ -2745,7 +2745,7 @@ def _foto_path(equipo_id: int, ext: str) -> str:
     else:
         folder   = f"{equipo_id}"
         filename = f"{equipo_id}.{ext}"
-    return f"{folder}/{filename}"
+    return f"equipos/{folder}/{filename}"
 
 
 def _upload_to_r2(path: str, content: bytes, content_type: str) -> str:
@@ -3005,9 +3005,9 @@ def admin_migrate_storage_paths(request: Request, dry_run: bool = True):
         ext  = m.group(1).lower()
         slug = equipo_slugs.get(equipo_id, "")
         if slug:
-            new_key = f"{equipo_id}_{slug}/{equipo_id}_{slug}.{ext}"
+            new_key = f"equipos/{equipo_id}_{slug}/{equipo_id}_{slug}.{ext}"
         else:
-            new_key = f"{equipo_id}/{equipo_id}.{ext}"
+            new_key = f"equipos/{equipo_id}/{equipo_id}.{ext}"
         if old_key == new_key:
             continue
         renames.append({
