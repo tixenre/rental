@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 
@@ -8,10 +8,16 @@ export const Route = createFileRoute("/cliente")({
 
 type ClienteSession = { email?: string; name?: string; cliente_id?: number };
 
+// Rutas dentro de /cliente que NO requieren auth
+const PUBLIC_PATHS = ["/cliente/login", "/cliente/registro"];
+
 function ClienteLayout() {
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+
   const [session, setSession] = useState<ClienteSession | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isPublic);
 
   useEffect(() => {
     let alive = true;
@@ -19,15 +25,18 @@ function ClienteLayout() {
       .then(async (r) => {
         if (!alive) return;
         if (r.ok) {
-          setSession(await r.json());
-        } else {
+          const data = (await r.json()) as ClienteSession;
+          setSession(data);
+          // Si estaba en login/registro y ya tiene sesión, mandarlo al portal
+          if (isPublic) navigate({ to: "/cliente/portal" });
+        } else if (!isPublic) {
           navigate({ to: "/cliente/login" });
         }
       })
-      .catch(() => navigate({ to: "/cliente/login" }))
+      .catch(() => { if (alive && !isPublic) navigate({ to: "/cliente/login" }); })
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [navigate]);
+  }, [navigate, isPublic]);
 
   if (loading) {
     return (
@@ -36,7 +45,6 @@ function ClienteLayout() {
       </div>
     );
   }
-  if (!session) return <Outlet />;
 
   return <Outlet />;
 }
