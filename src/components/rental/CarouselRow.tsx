@@ -94,7 +94,7 @@ export function CarouselRow({
 
       <div
         ref={ref}
-        className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-pl-6 px-6 pb-2 lg:scroll-pl-12 lg:px-12 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-pl-6 px-6 pb-2 lg:scroll-pl-12 lg:px-12 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
       >
         {children}
       </div>

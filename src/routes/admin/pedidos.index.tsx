@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, ESTADO_LABEL, type Pedido, type PedidoEstado } from "@/lib/admin/api";
-import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 
 export const Route = createFileRoute("/admin/pedidos/")({
   component: PedidosPage,
@@ -28,6 +27,17 @@ export const Route = createFileRoute("/admin/pedidos/")({
 const ESTADOS: PedidoEstado[] = [
   "borrador", "presupuesto", "confirmado", "retirado", "devuelto", "finalizado", "cancelado",
 ];
+
+const ESTADO_CLASS: Record<string, string> = {
+  borrador:    "bg-muted/60 text-muted-foreground border-transparent",
+  presupuesto: "bg-blue-50 text-blue-700 border-blue-200",
+  solicitado:  "bg-amber-50 text-amber-700 border-amber-200",
+  confirmado:  "bg-green-50 text-green-700 border-green-200",
+  retirado:    "bg-green-100 text-green-800 border-green-300",
+  devuelto:    "bg-slate-100 text-slate-600 border-slate-300",
+  finalizado:  "bg-slate-100 text-slate-500 border-slate-200",
+  cancelado:   "bg-red-50 text-red-600 border-red-200",
+};
 
 const fmtArs = (n: number | null | undefined) =>
   n ? `$${Math.round(Number(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : "$0";
@@ -158,7 +168,10 @@ function PedidosPage() {
                     {fmtArs(saldo)}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={pedidoEstadoVariant(p.estado)}>
+                    <Badge
+                      variant="outline"
+                      className={ESTADO_CLASS[p.estado] ?? ""}
+                    >
                       {ESTADO_LABEL[p.estado]}
                     </Badge>
                   </TableCell>
