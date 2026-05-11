@@ -56,17 +56,23 @@ def test_baseline_migration_es_importable():
     )
     assert revisions, "No hay migraciones"
 
-    baseline = revisions[0]
-    spec = importlib.util.spec_from_file_location("baseline_migration", baseline)
-    assert spec is not None and spec.loader is not None
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    # Buscar la migración baseline (down_revision = None). NO es siempre
+    # el primer archivo alfabéticamente: a medida que se agregan migraciones,
+    # el orden por filename cambia.
+    baseline = None
+    for path in revisions:
+        spec = importlib.util.spec_from_file_location(f"mig_{path.stem}", path)
+        assert spec is not None and spec.loader is not None
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        assert hasattr(mod, "upgrade")
+        assert hasattr(mod, "downgrade")
+        assert hasattr(mod, "revision")
+        if mod.down_revision is None:
+            baseline = mod
+            break
 
-    # Verificar que tiene las funciones requeridas y son no-op (no tiran)
-    assert hasattr(mod, "upgrade")
-    assert hasattr(mod, "downgrade")
-    assert hasattr(mod, "revision")
-    assert mod.down_revision is None, "El baseline debería ser la primera (down_revision = None)"
+    assert baseline is not None, "No se encontró migración con down_revision=None (baseline)"
 
 
 def test_script_directory_lista_revisiones():
