@@ -21,7 +21,7 @@ import {
 
 import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
 import { EquipoFormDialog } from "@/components/admin/EquipoFormDialog";
-import { EnriquecerEquipoDialog } from "@/components/admin/EnriquecerEquipoDialog";
+import { EnriquecerEquipoDialog } from "@/components/admin/enriquecedor";
 
 export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
