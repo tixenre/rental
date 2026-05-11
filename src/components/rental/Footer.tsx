@@ -7,11 +7,107 @@ import logoWordmark from "@/assets/rambla-wordmark.png";
 /**
  * Footer público — usado en home, catálogo, estudio, FAQ, portal cliente.
  *
+ * Dos layouts:
+ * - Mobile (< md): compacto. Logo + WhatsApp CTA, contacto en línea,
+ *   links en chips horizontales. Menos info pero todo accesible.
+ * - Desktop (md+): completo. Grid de 3 columnas con todos los datos
+ *   (dirección con maps, horarios desglosados, navegación full, etc.).
+ *
  * NO incluir en páginas /admin/* (tienen su propio layout de back-office).
  */
 export function Footer() {
   return (
-    <footer className="border-t hairline bg-background">
+    <>
+      <FooterMobile />
+      <FooterDesktop />
+    </>
+  );
+}
+
+// ── Mobile compact ──────────────────────────────────────────────────────────
+
+function FooterMobile() {
+  return (
+    <footer className="md:hidden border-t hairline bg-background">
+      <div className="px-4 py-6 space-y-4">
+        {/* Logo + WhatsApp CTA en una fila */}
+        <div className="flex items-center justify-between gap-3">
+          <img
+            src={logoWordmark}
+            alt="Rambla Rental"
+            className="h-7 w-auto"
+            loading="lazy"
+          />
+          <a
+            href={whatsappUrl("Hola! Tengo una consulta.")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full bg-ink text-amber px-3 py-1.5 text-xs font-medium"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            WhatsApp
+          </a>
+        </div>
+
+        {/* Links de navegación en chips */}
+        <nav className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs">
+          <Link to="/" className="text-ink hover:text-amber transition">
+            Catálogo
+          </Link>
+          <span className="text-muted-foreground/40">·</span>
+          <Link to="/estudio" className="text-ink hover:text-amber transition">
+            Estudio
+          </Link>
+          <span className="text-muted-foreground/40">·</span>
+          <Link to="/preguntas-frecuentes" className="text-ink hover:text-amber transition">
+            FAQ
+          </Link>
+          <span className="text-muted-foreground/40">·</span>
+          <a
+            href={`https://instagram.com/${CONTACT.social.instagram}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-ink hover:text-amber transition"
+          >
+            <Instagram className="h-3 w-3" />
+            Instagram
+          </a>
+        </nav>
+
+        {/* Contacto compacto */}
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          <a
+            href={CONTACT.address.mapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 hover:text-ink transition"
+          >
+            <MapPin className="h-3 w-3 shrink-0" />
+            {CONTACT.address.city}
+          </a>
+          <a
+            href={`mailto:${CONTACT.email}`}
+            className="inline-flex items-center gap-1 hover:text-ink transition"
+          >
+            <Mail className="h-3 w-3 shrink-0" />
+            {CONTACT.email}
+          </a>
+        </div>
+
+        {/* Copyright */}
+        <div className="pt-3 border-t hairline font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+          © {new Date().getFullYear()} Rambla Rental
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ── Desktop full ────────────────────────────────────────────────────────────
+
+function FooterDesktop() {
+  return (
+    <footer className="hidden md:block border-t hairline bg-background">
       <div className="mx-auto max-w-7xl px-6 lg:px-12 py-12">
         <div className="grid gap-10 md:grid-cols-12">
           {/* Branding + tagline */}
@@ -27,7 +123,6 @@ export function Footer() {
               Producciones de cualquier escala.
             </p>
 
-            {/* WhatsApp CTA prominente */}
             <a
               href={whatsappUrl("Hola! Tengo una consulta.")}
               target="_blank"
@@ -138,7 +233,6 @@ export function Footer() {
           </div>
         </div>
 
-        {/* Bottom bar */}
         <div className="mt-10 pt-6 border-t hairline flex flex-col-reverse gap-4 md:flex-row md:items-center md:justify-between">
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
             © {new Date().getFullYear()} Rambla Rental
