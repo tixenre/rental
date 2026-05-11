@@ -79,26 +79,45 @@ function AdminDashboard() {
             />
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4 md:gap-6 mt-8">
-            <PedidosCard
-              title="Salen hoy"
-              icon={<Calendar className="h-4 w-4" />}
-              pedidos={data.salen_hoy}
-              empty="Nadie retira hoy."
-            />
-            <PedidosCard
-              title="Devuelven hoy"
-              icon={<Calendar className="h-4 w-4" />}
-              pedidos={data.devuelven_hoy}
-              empty="Sin devoluciones hoy."
-            />
-            <PedidosCard
-              title="Devuelven mañana"
-              icon={<Calendar className="h-4 w-4" />}
-              pedidos={data.devuelven_manana}
-              empty="Sin devoluciones mañana."
-            />
-            <EquiposAfueraCard items={data.equipos_afuera} />
+          {/* Sección Calendario */}
+          <div className="mt-10">
+            <div className="mb-4 flex items-end justify-between">
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                  Movimiento de equipos
+                </div>
+                <h2 className="font-display text-xl text-ink mt-0.5">Calendario</h2>
+              </div>
+              <Link
+                to="/admin/calendario"
+                className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition border hairline rounded-full px-3 py-1.5"
+              >
+                <Calendar className="h-3 w-3" /> Ver mes completo
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+              <PedidosCard
+                title="Salen hoy"
+                icon={<Calendar className="h-4 w-4" />}
+                pedidos={data.salen_hoy}
+                empty="Nadie retira hoy."
+              />
+              <PedidosCard
+                title="Devuelven hoy"
+                icon={<Calendar className="h-4 w-4" />}
+                pedidos={data.devuelven_hoy}
+                empty="Sin devoluciones hoy."
+              />
+              <PedidosCard
+                title="Devuelven mañana"
+                icon={<Calendar className="h-4 w-4" />}
+                pedidos={data.devuelven_manana}
+                empty="Sin devoluciones mañana."
+              />
+              <EquiposAfueraCard items={data.equipos_afuera} />
+            </div>
           </div>
         </>
       )}

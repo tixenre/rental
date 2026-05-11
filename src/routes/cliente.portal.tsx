@@ -94,24 +94,27 @@ export default function ClientePortal() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* Header con branding Rambla */}
       <header className="border-b hairline bg-background sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 h-12 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-2 group">
+            <span className="wordmark text-2xl text-amber leading-none group-hover:brightness-110 transition">rambla</span>
+            <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
+              Rental
+            </span>
+          </a>
           <div className="flex items-center gap-3">
-            <a href="/" className="font-display text-sm text-ink hover:underline">Rambla Rental</a>
-            <a href="/" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-ink transition">
+            <a href="/" className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition">
               ← Catálogo
             </a>
-          </div>
-          <div className="flex items-center gap-3">
             {perfil && (
               <span className="text-xs text-muted-foreground hidden sm:block">
-                {perfil.nombre} {perfil.apellido}
+                {perfil.nombre}
               </span>
             )}
             <button
               onClick={handleLogout}
-              className="text-xs text-muted-foreground hover:text-ink transition"
+              className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition"
             >
               Salir
             </button>
@@ -119,8 +122,20 @@ export default function ClientePortal() {
         </div>
       </header>
 
+      {/* Sub-header amarillo Rambla */}
+      <div className="bg-amber border-b hairline">
+        <div className="max-w-2xl mx-auto px-4 py-5">
+          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/70">
+            Portal de clientes
+          </div>
+          <h1 className="font-display text-3xl text-ink mt-1">
+            {perfil ? `Hola, ${perfil.nombre}` : "Mi cuenta"}
+          </h1>
+        </div>
+      </div>
+
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        <h1 className="font-display text-xl text-ink">Mis pedidos</h1>
+        <h2 className="font-display text-xl text-ink">Mis pedidos</h2>
 
         {pedidos.length === 0 ? (
           <div className="rounded-xl border hairline p-8 text-center text-sm text-muted-foreground">
