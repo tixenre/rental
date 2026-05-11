@@ -11,7 +11,7 @@
  * specs (el admin se hizo cargo). Esto evita que mejorar specs después
  * sobrescriba lo que validó.
  */
-import { createFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Check, Pencil, RotateCcw, Search, Sparkles } from "lucide-react";
@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { adminApi } from "@/lib/admin/api";
 
 
-export const Route = createFileRoute("/admin/equipos/validacion")({
+export const Route = createLazyFileRoute("/admin/equipos/validacion")({
   component: ValidacionPage,
 });
 

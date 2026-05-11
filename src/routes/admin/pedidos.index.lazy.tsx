@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Trash2, ExternalLink, Plus } from "lucide-react";
@@ -20,7 +20,7 @@ import {
 
 import { adminApi, ESTADO_LABEL, type Pedido, type PedidoEstado } from "@/lib/admin/api";
 
-export const Route = createFileRoute("/admin/pedidos/")({
+export const Route = createLazyFileRoute("/admin/pedidos/")({
   component: PedidosPage,
 });
 

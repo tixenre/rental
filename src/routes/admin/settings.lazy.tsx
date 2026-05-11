@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown, ArrowUp, Upload, Wrench, AlertTriangle, Loader2, Image as ImageIcon,
@@ -15,7 +15,7 @@ import {
 
 import { adminApi, type ImportCsvResp } from "@/lib/admin/api";
 
-export const Route = createFileRoute("/admin/settings")({
+export const Route = createLazyFileRoute("/admin/settings")({
   component: SettingsPage,
 });
 

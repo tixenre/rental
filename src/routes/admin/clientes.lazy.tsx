@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { Plus, Search, Pencil, Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,7 +22,7 @@ import { adminApi, ESTADO_LABEL, type Cliente } from "@/lib/admin/api";
 import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
 import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 
-export const Route = createFileRoute("/admin/clientes")({
+export const Route = createLazyFileRoute("/admin/clientes")({
   component: ClientesPage,
 });
 

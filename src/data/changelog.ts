@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 95,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Carga más rápida — bundle JavaScript -34%",
+    body: "Optimización del bundle del frontend: el código del back-office se separa en chunks que solo bajan cuando el admin navega ahí. Visitors del catálogo público bajan 126 KB menos (de 375 KB a 249 KB gzipped). Mejora visible en redes lentas y móviles.",
+    labels: ["performance", "público"],
+  },
+  {
     number: 89,
     date: "2026-05-11",
     type: "feat",

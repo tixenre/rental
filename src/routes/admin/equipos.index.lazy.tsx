@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles } from "lucide-react";
@@ -23,7 +23,7 @@ import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
 import { EquipoFormDialog } from "@/components/admin/EquipoFormDialog";
 import { EnriquecerEquipoDialog } from "@/components/admin/EnriquecerEquipoDialog";
 
-export const Route = createFileRoute("/admin/equipos/")({
+export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
 });
 

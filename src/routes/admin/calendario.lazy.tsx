@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { adminApi, ESTADO_LABEL, type CalendarioPedido } from "@/lib/admin/api";
 import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 
-export const Route = createFileRoute("/admin/calendario")({
+export const Route = createLazyFileRoute("/admin/calendario")({
   component: CalendarioPage,
 });
 
