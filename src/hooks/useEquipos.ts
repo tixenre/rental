@@ -253,7 +253,8 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     specs: parsedSpecs,
     keywords: parsedKeywords,
     isNew: false,
-    destacado: ((e as unknown as { relevancia_manual?: number }).relevancia_manual ?? 100) <= 30,
+    relevanciaManual: e.relevancia_manual ?? 100,
+    destacado: (e.relevancia_manual ?? 100) <= 30,
     includes,
     _backendId: e.id,
     // Ficha extendida

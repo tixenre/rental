@@ -46,6 +46,8 @@ export type Equipment = {
   /** True si relevancia_manual ≤ 30 (flagship/premium). Aparece como
    *  badge "destacado" en el card del catálogo. */
   destacado?: boolean;
+  /** Copia del relevancia_manual del backend (menor = más importante). Default 100. */
+  relevanciaManual?: number;
   includes?: IncludedItem[];
   // Campos extra del backend (opcionales para mantener compat con datos locales)
   fotoUrl?: string | null;

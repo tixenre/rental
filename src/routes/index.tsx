@@ -504,7 +504,9 @@ function GridMode({
 
 
       {visibleCategories.map((c) => {
-        const items = allEquipos.filter((e) => e.category === c && matches(e));
+        const items = allEquipos
+          .filter((e) => e.category === c && matches(e))
+          .sort((a, b) => (a.relevanciaManual ?? 100) - (b.relevanciaManual ?? 100));
         if (items.length === 0) return null;
 
         if (isFiltered) {

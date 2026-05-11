@@ -81,6 +81,7 @@ export type BackendEquipo = {
   foto_url: string | null;
   estado: string;
   visible_catalogo: number;
+  relevancia_manual?: number;
   etiquetas: string[];
   kit: unknown[];
   categorias?: BackendCategoriaRef[];
@@ -106,6 +107,7 @@ export function apiGetEquipos() {
   return get<{ total: number; items: BackendEquipo[] }>("/api/equipos", {
     per_page: "500",
     solo_visibles: "true",
+    sort: "ranking",
   });
 }
 
