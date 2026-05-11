@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 121,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Series de equipos: botón N/A + banner de cuántos faltan cargar",
+    body: "En el form del equipo aparece un botón 'N/A' al lado del número de serie — útil para equipos como reflectores o cables que no tienen serie. La lista de equipos en el admin muestra un banner amarillo cuando hay equipos sin serie cargada, ordenados por valor de reposición (los caros primero). Te ayuda a priorizar qué completar.",
+    labels: ["admin", "calidad-datos"],
+  },
+  {
     number: 120,
     date: "2026-05-11",
     type: "feat",
