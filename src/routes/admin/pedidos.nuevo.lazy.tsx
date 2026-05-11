@@ -1,10 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { adminApi } from "@/lib/admin/api";
 
-export const Route = createFileRoute("/admin/pedidos/nuevo")({
+export const Route = createLazyFileRoute("/admin/pedidos/nuevo")({
   component: NuevoPedidoPage,
 });
 

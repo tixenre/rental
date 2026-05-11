@@ -8,6 +8,8 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
+import { createFileRoute } from '@tanstack/react-router'
+
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PreguntasFrecuentesRouteImport } from './routes/preguntas-frecuentes'
 import { Route as EstudioRouteImport } from './routes/estudio'
@@ -15,28 +17,43 @@ import { Route as ClienteRouteImport } from './routes/cliente'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClienteIndexRouteImport } from './routes/cliente.index'
-import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ClienteRegistroRouteImport } from './routes/cliente.registro'
 import { Route as ClientePortalRouteImport } from './routes/cliente.portal'
 import { Route as ClientePerfilRouteImport } from './routes/cliente.perfil'
 import { Route as ClienteLoginRouteImport } from './routes/cliente.login'
-import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminNovedadesRouteImport } from './routes/admin/novedades'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
-import { Route as AdminEstadisticasRouteImport } from './routes/admin/estadisticas'
 import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
-import { Route as AdminClientesRouteImport } from './routes/admin/clientes'
-import { Route as AdminCalendarioRouteImport } from './routes/admin/calendario'
-import { Route as AdminPedidosIndexRouteImport } from './routes/admin/pedidos.index'
-import { Route as AdminEquiposIndexRouteImport } from './routes/admin/equipos.index'
-import { Route as AdminPedidosNuevoRouteImport } from './routes/admin/pedidos.nuevo'
-import { Route as AdminPedidosIdRouteImport } from './routes/admin/pedidos.$id'
-import { Route as AdminEquiposValidacionRouteImport } from './routes/admin/equipos.validacion'
-import { Route as AdminEquiposSpecsRouteImport } from './routes/admin/equipos.specs'
-import { Route as AdminEquiposMarcasRouteImport } from './routes/admin/equipos.marcas'
 import { Route as AdminEquiposEtiquetasRouteImport } from './routes/admin/equipos.etiquetas'
-import { Route as AdminEquiposClasificarRouteImport } from './routes/admin/equipos.clasificar'
-import { Route as AdminEquiposCategoriasRouteImport } from './routes/admin/equipos.categorias'
+
+const AdminIndexLazyRouteImport = createFileRoute('/admin/')()
+const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
+const AdminEstadisticasLazyRouteImport = createFileRoute(
+  '/admin/estadisticas',
+)()
+const AdminClientesLazyRouteImport = createFileRoute('/admin/clientes')()
+const AdminCalendarioLazyRouteImport = createFileRoute('/admin/calendario')()
+const AdminPedidosIndexLazyRouteImport = createFileRoute('/admin/pedidos/')()
+const AdminEquiposIndexLazyRouteImport = createFileRoute('/admin/equipos/')()
+const AdminPedidosNuevoLazyRouteImport = createFileRoute(
+  '/admin/pedidos/nuevo',
+)()
+const AdminPedidosIdLazyRouteImport = createFileRoute('/admin/pedidos/$id')()
+const AdminEquiposValidacionLazyRouteImport = createFileRoute(
+  '/admin/equipos/validacion',
+)()
+const AdminEquiposSpecsLazyRouteImport = createFileRoute(
+  '/admin/equipos/specs',
+)()
+const AdminEquiposMarcasLazyRouteImport = createFileRoute(
+  '/admin/equipos/marcas',
+)()
+const AdminEquiposClasificarLazyRouteImport = createFileRoute(
+  '/admin/equipos/clasificar',
+)()
+const AdminEquiposCategoriasLazyRouteImport = createFileRoute(
+  '/admin/equipos/categorias',
+)()
 
 const PreguntasFrecuentesRoute = PreguntasFrecuentesRouteImport.update({
   id: '/preguntas-frecuentes',
@@ -63,16 +80,44 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexLazyRoute = AdminIndexLazyRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() => import('./routes/admin/index.lazy').then((d) => d.Route))
 const ClienteIndexRoute = ClienteIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => ClienteRoute,
 } as any)
-const AdminIndexRoute = AdminIndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AdminSettingsLazyRoute = AdminSettingsLazyRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AdminRoute,
-} as any)
+} as any).lazy(() =>
+  import('./routes/admin/settings.lazy').then((d) => d.Route),
+)
+const AdminEstadisticasLazyRoute = AdminEstadisticasLazyRouteImport.update({
+  id: '/estadisticas',
+  path: '/estadisticas',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/estadisticas.lazy').then((d) => d.Route),
+)
+const AdminClientesLazyRoute = AdminClientesLazyRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/clientes.lazy').then((d) => d.Route),
+)
+const AdminCalendarioLazyRoute = AdminCalendarioLazyRouteImport.update({
+  id: '/calendario',
+  path: '/calendario',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/calendario.lazy').then((d) => d.Route),
+)
 const ClienteRegistroRoute = ClienteRegistroRouteImport.update({
   id: '/registro',
   path: '/registro',
@@ -93,11 +138,6 @@ const ClienteLoginRoute = ClienteLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => ClienteRoute,
 } as any)
-const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminNovedadesRoute = AdminNovedadesRouteImport.update({
   id: '/novedades',
   path: '/novedades',
@@ -108,74 +148,80 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminEstadisticasRoute = AdminEstadisticasRouteImport.update({
-  id: '/estadisticas',
-  path: '/estadisticas',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminEquiposRoute = AdminEquiposRouteImport.update({
   id: '/equipos',
   path: '/equipos',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminClientesRoute = AdminClientesRouteImport.update({
-  id: '/clientes',
-  path: '/clientes',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminCalendarioRoute = AdminCalendarioRouteImport.update({
-  id: '/calendario',
-  path: '/calendario',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminPedidosIndexRoute = AdminPedidosIndexRouteImport.update({
+const AdminPedidosIndexLazyRoute = AdminPedidosIndexLazyRouteImport.update({
   id: '/pedidos/',
   path: '/pedidos/',
   getParentRoute: () => AdminRoute,
-} as any)
-const AdminEquiposIndexRoute = AdminEquiposIndexRouteImport.update({
+} as any).lazy(() =>
+  import('./routes/admin/pedidos.index.lazy').then((d) => d.Route),
+)
+const AdminEquiposIndexLazyRoute = AdminEquiposIndexLazyRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminEquiposRoute,
-} as any)
-const AdminPedidosNuevoRoute = AdminPedidosNuevoRouteImport.update({
+} as any).lazy(() =>
+  import('./routes/admin/equipos.index.lazy').then((d) => d.Route),
+)
+const AdminPedidosNuevoLazyRoute = AdminPedidosNuevoLazyRouteImport.update({
   id: '/pedidos/nuevo',
   path: '/pedidos/nuevo',
   getParentRoute: () => AdminRoute,
-} as any)
-const AdminPedidosIdRoute = AdminPedidosIdRouteImport.update({
+} as any).lazy(() =>
+  import('./routes/admin/pedidos.nuevo.lazy').then((d) => d.Route),
+)
+const AdminPedidosIdLazyRoute = AdminPedidosIdLazyRouteImport.update({
   id: '/pedidos/$id',
   path: '/pedidos/$id',
   getParentRoute: () => AdminRoute,
-} as any)
-const AdminEquiposValidacionRoute = AdminEquiposValidacionRouteImport.update({
-  id: '/validacion',
-  path: '/validacion',
-  getParentRoute: () => AdminEquiposRoute,
-} as any)
-const AdminEquiposSpecsRoute = AdminEquiposSpecsRouteImport.update({
+} as any).lazy(() =>
+  import('./routes/admin/pedidos.$id.lazy').then((d) => d.Route),
+)
+const AdminEquiposValidacionLazyRoute =
+  AdminEquiposValidacionLazyRouteImport.update({
+    id: '/validacion',
+    path: '/validacion',
+    getParentRoute: () => AdminEquiposRoute,
+  } as any).lazy(() =>
+    import('./routes/admin/equipos.validacion.lazy').then((d) => d.Route),
+  )
+const AdminEquiposSpecsLazyRoute = AdminEquiposSpecsLazyRouteImport.update({
   id: '/specs',
   path: '/specs',
   getParentRoute: () => AdminEquiposRoute,
-} as any)
-const AdminEquiposMarcasRoute = AdminEquiposMarcasRouteImport.update({
+} as any).lazy(() =>
+  import('./routes/admin/equipos.specs.lazy').then((d) => d.Route),
+)
+const AdminEquiposMarcasLazyRoute = AdminEquiposMarcasLazyRouteImport.update({
   id: '/marcas',
   path: '/marcas',
   getParentRoute: () => AdminEquiposRoute,
-} as any)
+} as any).lazy(() =>
+  import('./routes/admin/equipos.marcas.lazy').then((d) => d.Route),
+)
+const AdminEquiposClasificarLazyRoute =
+  AdminEquiposClasificarLazyRouteImport.update({
+    id: '/clasificar',
+    path: '/clasificar',
+    getParentRoute: () => AdminEquiposRoute,
+  } as any).lazy(() =>
+    import('./routes/admin/equipos.clasificar.lazy').then((d) => d.Route),
+  )
+const AdminEquiposCategoriasLazyRoute =
+  AdminEquiposCategoriasLazyRouteImport.update({
+    id: '/categorias',
+    path: '/categorias',
+    getParentRoute: () => AdminEquiposRoute,
+  } as any).lazy(() =>
+    import('./routes/admin/equipos.categorias.lazy').then((d) => d.Route),
+  )
 const AdminEquiposEtiquetasRoute = AdminEquiposEtiquetasRouteImport.update({
   id: '/etiquetas',
   path: '/etiquetas',
-  getParentRoute: () => AdminEquiposRoute,
-} as any)
-const AdminEquiposClasificarRoute = AdminEquiposClasificarRouteImport.update({
-  id: '/clasificar',
-  path: '/clasificar',
-  getParentRoute: () => AdminEquiposRoute,
-} as any)
-const AdminEquiposCategoriasRoute = AdminEquiposCategoriasRouteImport.update({
-  id: '/categorias',
-  path: '/categorias',
   getParentRoute: () => AdminEquiposRoute,
 } as any)
 
@@ -185,56 +231,56 @@ export interface FileRoutesByFullPath {
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
-  '/admin/calendario': typeof AdminCalendarioRoute
-  '/admin/clientes': typeof AdminClientesRoute
   '/admin/equipos': typeof AdminEquiposRouteWithChildren
-  '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
-  '/admin/settings': typeof AdminSettingsRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
-  '/admin/': typeof AdminIndexRoute
+  '/admin/calendario': typeof AdminCalendarioLazyRoute
+  '/admin/clientes': typeof AdminClientesLazyRoute
+  '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/settings': typeof AdminSettingsLazyRoute
   '/cliente/': typeof ClienteIndexRoute
-  '/admin/equipos/categorias': typeof AdminEquiposCategoriasRoute
-  '/admin/equipos/clasificar': typeof AdminEquiposClasificarRoute
+  '/admin/': typeof AdminIndexLazyRoute
   '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
-  '/admin/equipos/marcas': typeof AdminEquiposMarcasRoute
-  '/admin/equipos/specs': typeof AdminEquiposSpecsRoute
-  '/admin/equipos/validacion': typeof AdminEquiposValidacionRoute
-  '/admin/pedidos/$id': typeof AdminPedidosIdRoute
-  '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
-  '/admin/equipos/': typeof AdminEquiposIndexRoute
-  '/admin/pedidos/': typeof AdminPedidosIndexRoute
+  '/admin/equipos/categorias': typeof AdminEquiposCategoriasLazyRoute
+  '/admin/equipos/clasificar': typeof AdminEquiposClasificarLazyRoute
+  '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
+  '/admin/equipos/specs': typeof AdminEquiposSpecsLazyRoute
+  '/admin/equipos/validacion': typeof AdminEquiposValidacionLazyRoute
+  '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
+  '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
+  '/admin/equipos/': typeof AdminEquiposIndexLazyRoute
+  '/admin/pedidos/': typeof AdminPedidosIndexLazyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/estudio': typeof EstudioRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
-  '/admin/calendario': typeof AdminCalendarioRoute
-  '/admin/clientes': typeof AdminClientesRoute
-  '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
-  '/admin/settings': typeof AdminSettingsRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
-  '/admin': typeof AdminIndexRoute
+  '/admin/calendario': typeof AdminCalendarioLazyRoute
+  '/admin/clientes': typeof AdminClientesLazyRoute
+  '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/settings': typeof AdminSettingsLazyRoute
   '/cliente': typeof ClienteIndexRoute
-  '/admin/equipos/categorias': typeof AdminEquiposCategoriasRoute
-  '/admin/equipos/clasificar': typeof AdminEquiposClasificarRoute
+  '/admin': typeof AdminIndexLazyRoute
   '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
-  '/admin/equipos/marcas': typeof AdminEquiposMarcasRoute
-  '/admin/equipos/specs': typeof AdminEquiposSpecsRoute
-  '/admin/equipos/validacion': typeof AdminEquiposValidacionRoute
-  '/admin/pedidos/$id': typeof AdminPedidosIdRoute
-  '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
-  '/admin/equipos': typeof AdminEquiposIndexRoute
-  '/admin/pedidos': typeof AdminPedidosIndexRoute
+  '/admin/equipos/categorias': typeof AdminEquiposCategoriasLazyRoute
+  '/admin/equipos/clasificar': typeof AdminEquiposClasificarLazyRoute
+  '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
+  '/admin/equipos/specs': typeof AdminEquiposSpecsLazyRoute
+  '/admin/equipos/validacion': typeof AdminEquiposValidacionLazyRoute
+  '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
+  '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
+  '/admin/equipos': typeof AdminEquiposIndexLazyRoute
+  '/admin/pedidos': typeof AdminPedidosIndexLazyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -243,29 +289,29 @@ export interface FileRoutesById {
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
-  '/admin/calendario': typeof AdminCalendarioRoute
-  '/admin/clientes': typeof AdminClientesRoute
   '/admin/equipos': typeof AdminEquiposRouteWithChildren
-  '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
-  '/admin/settings': typeof AdminSettingsRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
-  '/admin/': typeof AdminIndexRoute
+  '/admin/calendario': typeof AdminCalendarioLazyRoute
+  '/admin/clientes': typeof AdminClientesLazyRoute
+  '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/settings': typeof AdminSettingsLazyRoute
   '/cliente/': typeof ClienteIndexRoute
-  '/admin/equipos/categorias': typeof AdminEquiposCategoriasRoute
-  '/admin/equipos/clasificar': typeof AdminEquiposClasificarRoute
+  '/admin/': typeof AdminIndexLazyRoute
   '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
-  '/admin/equipos/marcas': typeof AdminEquiposMarcasRoute
-  '/admin/equipos/specs': typeof AdminEquiposSpecsRoute
-  '/admin/equipos/validacion': typeof AdminEquiposValidacionRoute
-  '/admin/pedidos/$id': typeof AdminPedidosIdRoute
-  '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
-  '/admin/equipos/': typeof AdminEquiposIndexRoute
-  '/admin/pedidos/': typeof AdminPedidosIndexRoute
+  '/admin/equipos/categorias': typeof AdminEquiposCategoriasLazyRoute
+  '/admin/equipos/clasificar': typeof AdminEquiposClasificarLazyRoute
+  '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
+  '/admin/equipos/specs': typeof AdminEquiposSpecsLazyRoute
+  '/admin/equipos/validacion': typeof AdminEquiposValidacionLazyRoute
+  '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
+  '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
+  '/admin/equipos/': typeof AdminEquiposIndexLazyRoute
+  '/admin/pedidos/': typeof AdminPedidosIndexLazyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -275,22 +321,22 @@ export interface FileRouteTypes {
     | '/cliente'
     | '/estudio'
     | '/preguntas-frecuentes'
-    | '/admin/calendario'
-    | '/admin/clientes'
     | '/admin/equipos'
-    | '/admin/estadisticas'
     | '/admin/login'
     | '/admin/novedades'
-    | '/admin/settings'
     | '/cliente/login'
     | '/cliente/perfil'
     | '/cliente/portal'
     | '/cliente/registro'
-    | '/admin/'
+    | '/admin/calendario'
+    | '/admin/clientes'
+    | '/admin/estadisticas'
+    | '/admin/settings'
     | '/cliente/'
+    | '/admin/'
+    | '/admin/equipos/etiquetas'
     | '/admin/equipos/categorias'
     | '/admin/equipos/clasificar'
-    | '/admin/equipos/etiquetas'
     | '/admin/equipos/marcas'
     | '/admin/equipos/specs'
     | '/admin/equipos/validacion'
@@ -303,21 +349,21 @@ export interface FileRouteTypes {
     | '/'
     | '/estudio'
     | '/preguntas-frecuentes'
-    | '/admin/calendario'
-    | '/admin/clientes'
-    | '/admin/estadisticas'
     | '/admin/login'
     | '/admin/novedades'
-    | '/admin/settings'
     | '/cliente/login'
     | '/cliente/perfil'
     | '/cliente/portal'
     | '/cliente/registro'
-    | '/admin'
+    | '/admin/calendario'
+    | '/admin/clientes'
+    | '/admin/estadisticas'
+    | '/admin/settings'
     | '/cliente'
+    | '/admin'
+    | '/admin/equipos/etiquetas'
     | '/admin/equipos/categorias'
     | '/admin/equipos/clasificar'
-    | '/admin/equipos/etiquetas'
     | '/admin/equipos/marcas'
     | '/admin/equipos/specs'
     | '/admin/equipos/validacion'
@@ -332,22 +378,22 @@ export interface FileRouteTypes {
     | '/cliente'
     | '/estudio'
     | '/preguntas-frecuentes'
-    | '/admin/calendario'
-    | '/admin/clientes'
     | '/admin/equipos'
-    | '/admin/estadisticas'
     | '/admin/login'
     | '/admin/novedades'
-    | '/admin/settings'
     | '/cliente/login'
     | '/cliente/perfil'
     | '/cliente/portal'
     | '/cliente/registro'
-    | '/admin/'
+    | '/admin/calendario'
+    | '/admin/clientes'
+    | '/admin/estadisticas'
+    | '/admin/settings'
     | '/cliente/'
+    | '/admin/'
+    | '/admin/equipos/etiquetas'
     | '/admin/equipos/categorias'
     | '/admin/equipos/clasificar'
-    | '/admin/equipos/etiquetas'
     | '/admin/equipos/marcas'
     | '/admin/equipos/specs'
     | '/admin/equipos/validacion'
@@ -402,6 +448,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/cliente/': {
       id: '/cliente/'
       path: '/'
@@ -409,11 +462,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClienteIndexRouteImport
       parentRoute: typeof ClienteRoute
     }
-    '/admin/': {
-      id: '/admin/'
-      path: '/'
-      fullPath: '/admin/'
-      preLoaderRoute: typeof AdminIndexRouteImport
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/estadisticas': {
+      id: '/admin/estadisticas'
+      path: '/estadisticas'
+      fullPath: '/admin/estadisticas'
+      preLoaderRoute: typeof AdminEstadisticasLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/clientes': {
+      id: '/admin/clientes'
+      path: '/clientes'
+      fullPath: '/admin/clientes'
+      preLoaderRoute: typeof AdminClientesLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/calendario': {
+      id: '/admin/calendario'
+      path: '/calendario'
+      fullPath: '/admin/calendario'
+      preLoaderRoute: typeof AdminCalendarioLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/cliente/registro': {
@@ -444,13 +518,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClienteLoginRouteImport
       parentRoute: typeof ClienteRoute
     }
-    '/admin/settings': {
-      id: '/admin/settings'
-      path: '/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/novedades': {
       id: '/admin/novedades'
       path: '/novedades'
@@ -465,13 +532,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/estadisticas': {
-      id: '/admin/estadisticas'
-      path: '/estadisticas'
-      fullPath: '/admin/estadisticas'
-      preLoaderRoute: typeof AdminEstadisticasRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/equipos': {
       id: '/admin/equipos'
       path: '/equipos'
@@ -479,67 +539,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEquiposRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/clientes': {
-      id: '/admin/clientes'
-      path: '/clientes'
-      fullPath: '/admin/clientes'
-      preLoaderRoute: typeof AdminClientesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/calendario': {
-      id: '/admin/calendario'
-      path: '/calendario'
-      fullPath: '/admin/calendario'
-      preLoaderRoute: typeof AdminCalendarioRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/pedidos/': {
       id: '/admin/pedidos/'
       path: '/pedidos'
       fullPath: '/admin/pedidos/'
-      preLoaderRoute: typeof AdminPedidosIndexRouteImport
+      preLoaderRoute: typeof AdminPedidosIndexLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/equipos/': {
       id: '/admin/equipos/'
       path: '/'
       fullPath: '/admin/equipos/'
-      preLoaderRoute: typeof AdminEquiposIndexRouteImport
+      preLoaderRoute: typeof AdminEquiposIndexLazyRouteImport
       parentRoute: typeof AdminEquiposRoute
     }
     '/admin/pedidos/nuevo': {
       id: '/admin/pedidos/nuevo'
       path: '/pedidos/nuevo'
       fullPath: '/admin/pedidos/nuevo'
-      preLoaderRoute: typeof AdminPedidosNuevoRouteImport
+      preLoaderRoute: typeof AdminPedidosNuevoLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/pedidos/$id': {
       id: '/admin/pedidos/$id'
       path: '/pedidos/$id'
       fullPath: '/admin/pedidos/$id'
-      preLoaderRoute: typeof AdminPedidosIdRouteImport
+      preLoaderRoute: typeof AdminPedidosIdLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/equipos/validacion': {
       id: '/admin/equipos/validacion'
       path: '/validacion'
       fullPath: '/admin/equipos/validacion'
-      preLoaderRoute: typeof AdminEquiposValidacionRouteImport
+      preLoaderRoute: typeof AdminEquiposValidacionLazyRouteImport
       parentRoute: typeof AdminEquiposRoute
     }
     '/admin/equipos/specs': {
       id: '/admin/equipos/specs'
       path: '/specs'
       fullPath: '/admin/equipos/specs'
-      preLoaderRoute: typeof AdminEquiposSpecsRouteImport
+      preLoaderRoute: typeof AdminEquiposSpecsLazyRouteImport
       parentRoute: typeof AdminEquiposRoute
     }
     '/admin/equipos/marcas': {
       id: '/admin/equipos/marcas'
       path: '/marcas'
       fullPath: '/admin/equipos/marcas'
-      preLoaderRoute: typeof AdminEquiposMarcasRouteImport
+      preLoaderRoute: typeof AdminEquiposMarcasLazyRouteImport
+      parentRoute: typeof AdminEquiposRoute
+    }
+    '/admin/equipos/clasificar': {
+      id: '/admin/equipos/clasificar'
+      path: '/clasificar'
+      fullPath: '/admin/equipos/clasificar'
+      preLoaderRoute: typeof AdminEquiposClasificarLazyRouteImport
+      parentRoute: typeof AdminEquiposRoute
+    }
+    '/admin/equipos/categorias': {
+      id: '/admin/equipos/categorias'
+      path: '/categorias'
+      fullPath: '/admin/equipos/categorias'
+      preLoaderRoute: typeof AdminEquiposCategoriasLazyRouteImport
       parentRoute: typeof AdminEquiposRoute
     }
     '/admin/equipos/etiquetas': {
@@ -549,41 +609,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEquiposEtiquetasRouteImport
       parentRoute: typeof AdminEquiposRoute
     }
-    '/admin/equipos/clasificar': {
-      id: '/admin/equipos/clasificar'
-      path: '/clasificar'
-      fullPath: '/admin/equipos/clasificar'
-      preLoaderRoute: typeof AdminEquiposClasificarRouteImport
-      parentRoute: typeof AdminEquiposRoute
-    }
-    '/admin/equipos/categorias': {
-      id: '/admin/equipos/categorias'
-      path: '/categorias'
-      fullPath: '/admin/equipos/categorias'
-      preLoaderRoute: typeof AdminEquiposCategoriasRouteImport
-      parentRoute: typeof AdminEquiposRoute
-    }
   }
 }
 
 interface AdminEquiposRouteChildren {
-  AdminEquiposCategoriasRoute: typeof AdminEquiposCategoriasRoute
-  AdminEquiposClasificarRoute: typeof AdminEquiposClasificarRoute
   AdminEquiposEtiquetasRoute: typeof AdminEquiposEtiquetasRoute
-  AdminEquiposMarcasRoute: typeof AdminEquiposMarcasRoute
-  AdminEquiposSpecsRoute: typeof AdminEquiposSpecsRoute
-  AdminEquiposValidacionRoute: typeof AdminEquiposValidacionRoute
-  AdminEquiposIndexRoute: typeof AdminEquiposIndexRoute
+  AdminEquiposCategoriasLazyRoute: typeof AdminEquiposCategoriasLazyRoute
+  AdminEquiposClasificarLazyRoute: typeof AdminEquiposClasificarLazyRoute
+  AdminEquiposMarcasLazyRoute: typeof AdminEquiposMarcasLazyRoute
+  AdminEquiposSpecsLazyRoute: typeof AdminEquiposSpecsLazyRoute
+  AdminEquiposValidacionLazyRoute: typeof AdminEquiposValidacionLazyRoute
+  AdminEquiposIndexLazyRoute: typeof AdminEquiposIndexLazyRoute
 }
 
 const AdminEquiposRouteChildren: AdminEquiposRouteChildren = {
-  AdminEquiposCategoriasRoute: AdminEquiposCategoriasRoute,
-  AdminEquiposClasificarRoute: AdminEquiposClasificarRoute,
   AdminEquiposEtiquetasRoute: AdminEquiposEtiquetasRoute,
-  AdminEquiposMarcasRoute: AdminEquiposMarcasRoute,
-  AdminEquiposSpecsRoute: AdminEquiposSpecsRoute,
-  AdminEquiposValidacionRoute: AdminEquiposValidacionRoute,
-  AdminEquiposIndexRoute: AdminEquiposIndexRoute,
+  AdminEquiposCategoriasLazyRoute: AdminEquiposCategoriasLazyRoute,
+  AdminEquiposClasificarLazyRoute: AdminEquiposClasificarLazyRoute,
+  AdminEquiposMarcasLazyRoute: AdminEquiposMarcasLazyRoute,
+  AdminEquiposSpecsLazyRoute: AdminEquiposSpecsLazyRoute,
+  AdminEquiposValidacionLazyRoute: AdminEquiposValidacionLazyRoute,
+  AdminEquiposIndexLazyRoute: AdminEquiposIndexLazyRoute,
 }
 
 const AdminEquiposRouteWithChildren = AdminEquiposRoute._addFileChildren(
@@ -591,31 +637,31 @@ const AdminEquiposRouteWithChildren = AdminEquiposRoute._addFileChildren(
 )
 
 interface AdminRouteChildren {
-  AdminCalendarioRoute: typeof AdminCalendarioRoute
-  AdminClientesRoute: typeof AdminClientesRoute
   AdminEquiposRoute: typeof AdminEquiposRouteWithChildren
-  AdminEstadisticasRoute: typeof AdminEstadisticasRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminNovedadesRoute: typeof AdminNovedadesRoute
-  AdminSettingsRoute: typeof AdminSettingsRoute
-  AdminIndexRoute: typeof AdminIndexRoute
-  AdminPedidosIdRoute: typeof AdminPedidosIdRoute
-  AdminPedidosNuevoRoute: typeof AdminPedidosNuevoRoute
-  AdminPedidosIndexRoute: typeof AdminPedidosIndexRoute
+  AdminCalendarioLazyRoute: typeof AdminCalendarioLazyRoute
+  AdminClientesLazyRoute: typeof AdminClientesLazyRoute
+  AdminEstadisticasLazyRoute: typeof AdminEstadisticasLazyRoute
+  AdminSettingsLazyRoute: typeof AdminSettingsLazyRoute
+  AdminIndexLazyRoute: typeof AdminIndexLazyRoute
+  AdminPedidosIdLazyRoute: typeof AdminPedidosIdLazyRoute
+  AdminPedidosNuevoLazyRoute: typeof AdminPedidosNuevoLazyRoute
+  AdminPedidosIndexLazyRoute: typeof AdminPedidosIndexLazyRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
-  AdminCalendarioRoute: AdminCalendarioRoute,
-  AdminClientesRoute: AdminClientesRoute,
   AdminEquiposRoute: AdminEquiposRouteWithChildren,
-  AdminEstadisticasRoute: AdminEstadisticasRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminNovedadesRoute: AdminNovedadesRoute,
-  AdminSettingsRoute: AdminSettingsRoute,
-  AdminIndexRoute: AdminIndexRoute,
-  AdminPedidosIdRoute: AdminPedidosIdRoute,
-  AdminPedidosNuevoRoute: AdminPedidosNuevoRoute,
-  AdminPedidosIndexRoute: AdminPedidosIndexRoute,
+  AdminCalendarioLazyRoute: AdminCalendarioLazyRoute,
+  AdminClientesLazyRoute: AdminClientesLazyRoute,
+  AdminEstadisticasLazyRoute: AdminEstadisticasLazyRoute,
+  AdminSettingsLazyRoute: AdminSettingsLazyRoute,
+  AdminIndexLazyRoute: AdminIndexLazyRoute,
+  AdminPedidosIdLazyRoute: AdminPedidosIdLazyRoute,
+  AdminPedidosNuevoLazyRoute: AdminPedidosNuevoLazyRoute,
+  AdminPedidosIndexLazyRoute: AdminPedidosIndexLazyRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

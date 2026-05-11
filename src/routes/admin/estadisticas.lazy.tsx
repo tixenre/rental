@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, TrendingDown, Users, Package, DollarSign, Calendar } from "lucide-react";
 
 import { adminApi } from "@/lib/admin/api";
 
-export const Route = createFileRoute("/admin/estadisticas")({
+export const Route = createLazyFileRoute("/admin/estadisticas")({
   component: EstadisticasPage,
 });
 

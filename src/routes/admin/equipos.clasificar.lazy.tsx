@@ -12,7 +12,7 @@
  *
  * Diseño: docs/DISEÑO_SPECS.md sección 2.3 (asignación masiva).
  */
-import { createFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Sparkles, Check, ChevronRight, AlertTriangle } from "lucide-react";
@@ -27,7 +27,7 @@ import {
 import { adminApi, type CategoriaAdmin } from "@/lib/admin/api";
 
 
-export const Route = createFileRoute("/admin/equipos/clasificar")({
+export const Route = createLazyFileRoute("/admin/equipos/clasificar")({
   component: ClasificarPage,
 });
 

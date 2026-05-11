@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute } from "@tanstack/react-router";
 import { SpecTemplatesSection } from "@/components/admin/specs/SpecTemplatesSection";
 
-export const Route = createFileRoute("/admin/equipos/specs")({
+export const Route = createLazyFileRoute("/admin/equipos/specs")({
   component: SpecsPage,
 });
 

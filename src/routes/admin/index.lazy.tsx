@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Calendar,
@@ -13,7 +13,7 @@ import {
 import { adminApi, type PedidoResumen } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
 
-export const Route = createFileRoute("/admin/")({
+export const Route = createLazyFileRoute("/admin/")({
   component: AdminDashboard,
 });
 
