@@ -184,7 +184,7 @@ export function EquipmentRow({
             onClick={() => !sinStock && add(item.id)}
             disabled={sinStock}
             aria-label={`Agregar ${item.name}`}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border hairline hover:border-amber hover:bg-amber hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:w-auto sm:rounded-md sm:px-3 sm:py-1.5"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border hairline hover:border-amber hover:bg-amber hover:text-ink active:border-amber active:bg-amber active:text-ink disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:w-auto sm:rounded-md sm:px-3 sm:py-1.5"
           >
             <Plus className="h-4 w-4 sm:hidden" />
             <span className="hidden items-center gap-1.5 text-xs uppercase tracking-wider sm:flex">
@@ -196,7 +196,7 @@ export function EquipmentRow({
             <button
               onClick={() => remove(item.id)}
               aria-label="Quitar uno"
-              className="grid h-7 w-7 place-items-center rounded-full text-amber hover:bg-amber/20 sm:rounded"
+              className="grid h-9 w-9 place-items-center rounded-full text-amber hover:bg-amber/20 active:bg-amber/30 sm:h-7 sm:w-7 sm:rounded"
             >
               <Minus className="h-3 w-3" />
             </button>
@@ -211,7 +211,7 @@ export function EquipmentRow({
               }}
               disabled={disponible !== undefined && qty >= disponible}
               aria-label="Agregar uno"
-              className="grid h-7 w-7 place-items-center rounded-full text-amber hover:bg-amber/20 disabled:opacity-40 disabled:cursor-not-allowed sm:rounded"
+              className="grid h-9 w-9 place-items-center rounded-full text-amber hover:bg-amber/20 active:bg-amber/30 disabled:opacity-40 disabled:cursor-not-allowed sm:h-7 sm:w-7 sm:rounded"
             >
               <Plus className="h-3 w-3" />
             </button>
