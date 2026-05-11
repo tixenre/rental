@@ -1,7 +1,5 @@
-# Rambla Rental — Monorepo Unificado
+# Rambla Rental — Monorepo
 
-Frontend: Lovable + React/Vite
+Frontend: React + Vite + TanStack Router + Tailwind
 Backend: FastAPI + PostgreSQL
 Deployment: Railway
-
-Rama activa: lovable

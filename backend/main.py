@@ -36,7 +36,6 @@ app = FastAPI(title="Rambla Rental API", version="2.0")
 ALLOWED_ORIGINS = [
     o.strip() for o in os.getenv(
         "FRONTEND_ORIGINS",
-        "https://id-preview--cd1cc884-084b-435b-8af0-167f25bc78ca.lovable.app,"
         "http://localhost:5173,http://localhost:8000",
     ).split(",") if o.strip()
 ]
@@ -46,7 +45,6 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://.*\.lovable\.app",
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
