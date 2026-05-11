@@ -26,11 +26,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle,
-} from "@/components/ui/sheet";
+import { BottomSheet } from "@/components/mobile";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
   DropdownMenuSeparator,
@@ -576,64 +573,62 @@ function EquipoSearchSheet({
   }, [lista, categoriasQ.data]);
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="h-[85vh] flex flex-col"
-        style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
-      >
-        <SheetHeader>
-          <SheetTitle className="font-display">Agregar equipo</SheetTitle>
-        </SheetHeader>
-        <div className="relative mt-3 mb-2">
+    <BottomSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Agregar equipo"
+      showClose
+    >
+      <div className="px-4 pt-3 pb-3 border-b hairline">
+        <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" className="pl-9" />
+          <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar…" className="pl-9 text-base sm:text-sm" />
         </div>
-        <ScrollArea className="flex-1 -mx-6 px-6">
-          {grupos.length === 0 && (
-            <div className="py-8 text-center text-sm text-muted-foreground">Sin equipos.</div>
-          )}
-          {grupos.map(([cat, equipos]) => (
-            <section key={cat} className="mb-2">
-              <div className="sticky top-0 z-10 bg-background/95 backdrop-blur py-2 flex items-center justify-between border-b hairline">
-                <h4 className="font-display text-sm text-ink">{cat}</h4>
-                <span className="text-[11px] text-muted-foreground tabular-nums">{equipos.length}</span>
-              </div>
-              <ul className="divide-y hairline">
-                {equipos.map((eq) => {
-                  const stock = stockMap[String(eq.id)];
-                  const inCart = existing.find((i) => i.equipo_id === eq.id);
-                  const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : eq.cantidad;
-                  const usado = inCart?.cantidad ?? 0;
-                  const disponible = max - usado;
-                  return (
-                    <li key={eq.id} className="flex items-center justify-between gap-2 py-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm text-ink truncate">{eq.nombre_publico || eq.nombre}</div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {[eq.marca, eq.modelo].filter(Boolean).join(" / ")}
-                          <> · <span className={disponible <= 0 ? "text-destructive" : ""}>{disponible} libres</span></>
-                          {eq.precio_jornada ? ` · ${fmtArs(eq.precio_jornada)}/día` : ""}
-                        </div>
+      </div>
+      <div className="px-4 pb-4">
+        {grupos.length === 0 && (
+          <div className="py-8 text-center text-sm text-muted-foreground">Sin equipos.</div>
+        )}
+        {grupos.map(([cat, equipos]) => (
+          <section key={cat} className="mb-2">
+            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur py-2 flex items-center justify-between border-b hairline">
+              <h4 className="font-display text-sm text-ink">{cat}</h4>
+              <span className="text-[11px] text-muted-foreground tabular-nums">{equipos.length}</span>
+            </div>
+            <ul className="divide-y hairline">
+              {equipos.map((eq) => {
+                const stock = stockMap[String(eq.id)];
+                const inCart = existing.find((i) => i.equipo_id === eq.id);
+                const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : eq.cantidad;
+                const usado = inCart?.cantidad ?? 0;
+                const disponible = max - usado;
+                return (
+                  <li key={eq.id} className="flex items-center justify-between gap-2 py-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-ink truncate">{eq.nombre_publico || eq.nombre}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {[eq.marca, eq.modelo].filter(Boolean).join(" / ")}
+                        <> · <span className={disponible <= 0 ? "text-destructive" : ""}>{disponible} libres</span></>
+                        {eq.precio_jornada ? ` · ${fmtArs(eq.precio_jornada)}/día` : ""}
                       </div>
-                      <Button
-                        size="icon"
-                        className="h-10 w-10 shrink-0 sm:h-9 sm:w-9"
-                        disabled={disponible <= 0}
-                        onClick={() => onAdd(eq)}
-                        aria-label="Agregar"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
-        </ScrollArea>
-      </SheetContent>
-    </Sheet>
+                    </div>
+                    <Button
+                      size="icon"
+                      className="h-10 w-10 shrink-0 sm:h-9 sm:w-9"
+                      disabled={disponible <= 0}
+                      onClick={() => onAdd(eq)}
+                      aria-label="Agregar"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </BottomSheet>
   );
 }
 
