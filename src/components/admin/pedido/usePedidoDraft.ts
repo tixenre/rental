@@ -211,8 +211,8 @@ export function usePedidoDraft(pedido: Pedido | undefined) {
 
 export function jornadasEntre(d1?: string, d2?: string): number {
   if (!d1 || !d2) return 1;
-  const a = new Date(d1).getTime();
-  const b = new Date(d2).getTime();
-  if (Number.isNaN(a) || Number.isNaN(b) || b <= a) return 1;
-  return Math.max(1, Math.ceil((b - a) / 86_400_000));
+  const a = new Date(d1 + "T12:00:00").getTime();
+  const b = new Date(d2 + "T12:00:00").getTime();
+  if (Number.isNaN(a) || Number.isNaN(b) || b < a) return 1;
+  return Math.max(1, Math.ceil((b - a) / 86_400_000) + 1);
 }
