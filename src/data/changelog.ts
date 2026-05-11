@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 111,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Cada equipo tiene su propia página: /equipo/{id}",
+    body: "El detalle del equipo dejó de ser un modal y pasó a ser una página real con URL única. Esto desbloquea: (1) Google indexa cada equipo como producto único con su foto, precio y marca; (2) compartir el link de un equipo muestra preview con título y foto; (3) bookmark + back/forward del navegador funcionan; (4) mejor experiencia en mobile. Datos estructurados Product agregados — Google puede mostrar rich snippets con precio y disponibilidad en resultados.",
+    labels: ["público", "seo", "ux"],
+  },
+  {
     number: 110,
     date: "2026-05-11",
     type: "feat",

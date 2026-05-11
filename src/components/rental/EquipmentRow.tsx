@@ -1,12 +1,10 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { Plus, Minus, Sparkles, ChevronDown } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { Plus, Minus, Sparkles, ChevronRight } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { priceBreakdown } from "@/lib/pricing";
 import { EmptyImage } from "./EmptyImage";
-import { IncludedList } from "./IncludedList";
-import { useEquipmentDetail } from "@/lib/equipment-detail-context";
 import { cn } from "@/lib/utils";
 
 export function EquipmentRow({
@@ -22,11 +20,10 @@ export function EquipmentRow({
   const jornadas = useCart((s) => s.days());
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
   const selected = qty > 0;
-  const { openId, setOpenId } = useEquipmentDetail();
-  const expanded = openId === item.id;
+  const navigate = useNavigate();
+  const openDetail = () => navigate({ to: "/equipo/$id", params: { id: item.id } });
   const cap = disponible ?? item.cantidad ?? Infinity;
   const noStock = cap <= 0;
-  const reachedMax = qty >= cap;
 
   const sinStock = noStock;
   const stockBajo = !noStock && cap > 0 && cap <= 2;
@@ -41,21 +38,19 @@ export function EquipmentRow({
       id={`eq-${item.id}`}
       className={cn(
         "rounded-lg border bg-surface transition-all",
-        expanded
-          ? "border-ink/40 bg-accent/30 shadow-sm ring-1 ring-ink/10"
-          : selected
-            ? "border-amber/60 bg-amber-soft/30"
-            : sinStock
-            ? "hairline opacity-50"
-            : "hairline hover:border-foreground/20",
+        selected
+          ? "border-amber/60 bg-amber-soft/30"
+          : sinStock
+          ? "hairline opacity-50"
+          : "hairline hover:border-foreground/20",
       )}
     >
       <div className="group flex items-center gap-3 p-2.5 sm:gap-4 sm:px-3">
-        {/* Toggle area: thumb + info */}
+        {/* Click area: thumb + info → navega a la ficha del equipo */}
         <button
           type="button"
-          onClick={() => setOpenId(expanded ? null : item.id)}
-          aria-expanded={expanded}
+          onClick={openDetail}
+          aria-label={`Ver ficha de ${item.name}`}
           className="flex min-w-0 flex-1 items-center gap-3 text-left sm:gap-4"
         >
           {/* Thumb */}
@@ -91,12 +86,7 @@ export function EquipmentRow({
               <div className="truncate font-display text-[15px] leading-tight text-ink sm:text-base">
                 {item.name}
               </div>
-              <ChevronDown
-                className={cn(
-                  "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
-                  expanded && "rotate-180",
-                )}
-              />
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition group-hover:text-ink" />
             </div>
             {/* Precio inline en mobile */}
             <div className="mt-0.5 flex items-baseline gap-1 sm:hidden">
@@ -187,23 +177,6 @@ export function EquipmentRow({
           </div>
         )}
       </div>
-
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            key="content"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className="overflow-hidden"
-          >
-            <div className="border-t hairline px-3 py-3 sm:px-4 sm:py-4">
-              <IncludedList item={item} />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
