@@ -37,8 +37,11 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # -- Playwright + Chromium (necesario para PDF generation) --
-# RUN playwright install --with-deps chromium
-# NOTA: Deshabilitado para ahorrar memoria en Railway. Si se necesita, descomentar.
+# Costo: ~300-400MB RAM residente con Chromium activo (pdf.py lo lanza una
+# única vez y reutiliza la instancia). Si Railway empieza a OOM-killear,
+# evaluar migrar pdf.py a WeasyPrint (50MB, Python puro, sin browser).
+# Detalles del trade-off: issue #81.
+RUN playwright install --with-deps chromium
 
 # -- Build del frontend (Vite SPA) --
 RUN bun install

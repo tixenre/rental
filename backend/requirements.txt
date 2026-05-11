@@ -11,3 +11,8 @@ python-dotenv>=1.0.0
 Pillow>=10.0.0
 boto3>=1.34.0
 python-json-logger>=2.0.7
+# Playwright + Chromium para generar PDFs de cotizaciones / remitos /
+# albaranes / contratos. El Dockerfile corre `playwright install --with-deps`
+# para instalar Chromium + dependencias de sistema (libnss3, fonts, etc.).
+# Costo: ~300-400MB de RAM residente con Chromium arrancado.
+playwright>=1.40.0
