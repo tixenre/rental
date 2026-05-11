@@ -252,8 +252,12 @@ function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: 
                 return (
                   <li key={i} className="flex items-start gap-3 text-sm">
                     {item.foto_url ? (
-                      <img src={item.foto_url} alt={display}
-                        className="h-10 w-10 rounded object-cover shrink-0 bg-muted" />
+                      <img
+                        src={item.foto_url}
+                        alt={display}
+                        loading="lazy"
+                        className="h-10 w-10 rounded object-cover shrink-0 bg-muted"
+                      />
                     ) : (
                       <div className="h-10 w-10 rounded bg-muted shrink-0" />
                     )}

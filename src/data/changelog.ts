@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 112,
+    date: "2026-05-11",
+    type: "fix",
+    title: "Mobile fixes + checklist de auditoría",
+    body: "Mejoras para la experiencia en celulares: (1) los inputs ya no hacen zoom al hacer focus en iOS (era el problema más molesto en formularios); (2) el botón de usuario en el top bar es más grande y fácil de tocar; (3) las imágenes del catálogo y lista de pedidos cargan en forma diferida (perf). Más un documento docs/MOBILE_AUDIT.md con el checklist de revisión para mantener todo en orden.",
+    labels: ["público", "mobile", "ux"],
+  },
+  {
     number: 111,
     date: "2026-05-11",
     type: "feat",
