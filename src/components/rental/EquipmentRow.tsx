@@ -1,13 +1,29 @@
+import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Plus, Minus, Sparkles, ChevronRight } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Plus, Minus, Sparkles, ChevronDown, ArrowRight } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { priceBreakdown } from "@/lib/pricing";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { EmptyImage } from "./EmptyImage";
+import { IncludedList } from "./IncludedList";
 import { cn } from "@/lib/utils";
 
+/**
+ * Row del catálogo (mobile default + desktop opcional).
+ *
+ * Comportamiento:
+ * - Click en thumb/info → **expande inline** una mini-ficha (kit + specs
+ *   clave). Permite hojear el catálogo rápido sin perder scroll position.
+ * - Dentro del expanded, botón "Ver ficha completa →" navega a la página
+ *   dedicada (/equipo/<slug>) para SEO y compartir links.
+ *
+ * Por qué no abrir directo la página: en mobile el flujo "click → page →
+ * back → re-scroll" es lento y pierde fluidez. El expand inline mantiene
+ * al usuario hojeando.
+ */
 export function EquipmentRow({
   item,
   disponible,
@@ -24,35 +40,48 @@ export function EquipmentRow({
   const navigate = useNavigate();
   const openDetail = () =>
     navigate({ to: "/equipo/$slug", params: { slug: buildEquipoSlug(item) } });
+
+  const [expanded, setExpanded] = useState(false);
   const cap = disponible ?? item.cantidad ?? Infinity;
   const noStock = cap <= 0;
-
   const sinStock = noStock;
   const stockBajo = !noStock && cap > 0 && cap <= 2;
-
-  // TODO #73: cuando se implementen descuentos por jornada / cliente,
-  // este breakdown ya devolverá total con descuentos aplicados.
   const price = priceBreakdown(item.pricePerDay, jornadas, 1);
   const showPeriodTotal = hasDateRange && jornadas > 1;
+
+  // Specs clave para mostrar en la mini-ficha: peso, montura, formato,
+  // resolución (lo que aplique). Máx 3 para no romper layout.
+  const quickFacts = [
+    item.montura && { label: "Montura", value: item.montura },
+    item.formato && { label: "Formato", value: item.formato },
+    item.resolucion && { label: "Resolución", value: item.resolucion },
+    item.peso && { label: "Peso", value: item.peso },
+    item.alimentacion && { label: "Alimentación", value: item.alimentacion },
+  ]
+    .filter((x): x is { label: string; value: string } => !!x)
+    .slice(0, 3);
 
   return (
     <div
       id={`eq-${item.id}`}
       className={cn(
         "rounded-lg border bg-surface transition-all",
-        selected
-          ? "border-amber/60 bg-amber-soft/30"
-          : sinStock
-          ? "hairline opacity-50"
-          : "hairline hover:border-foreground/20",
+        expanded
+          ? "border-ink/40 bg-accent/30 shadow-sm ring-1 ring-ink/10"
+          : selected
+            ? "border-amber/60 bg-amber-soft/30"
+            : sinStock
+              ? "hairline opacity-50"
+              : "hairline hover:border-foreground/20",
       )}
     >
       <div className="group flex items-center gap-3 p-2.5 sm:gap-4 sm:px-3">
-        {/* Click area: thumb + info → navega a la ficha del equipo */}
+        {/* Click area: thumb + info → expande inline (NO navega) */}
         <button
           type="button"
-          onClick={openDetail}
-          aria-label={`Ver ficha de ${item.name}`}
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={`${expanded ? "Cerrar" : "Ver"} info de ${item.name}`}
           className="flex min-w-0 flex-1 items-center gap-3 text-left sm:gap-4"
         >
           {/* Thumb */}
@@ -93,7 +122,12 @@ export function EquipmentRow({
               <div className="truncate font-display text-[15px] leading-tight text-ink sm:text-base">
                 {item.name}
               </div>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition group-hover:text-ink" />
+              <ChevronDown
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+                  expanded && "rotate-180",
+                )}
+              />
             </div>
             {/* Precio inline en mobile */}
             <div className="mt-0.5 flex items-baseline gap-1 sm:hidden">
@@ -184,6 +218,59 @@ export function EquipmentRow({
           </div>
         )}
       </div>
+
+      {/* Mini-ficha expandida inline */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
+            <div className="border-t hairline px-3 py-3 sm:px-4 sm:py-4 space-y-3">
+              {/* Quick facts (peso, montura, etc.) */}
+              {quickFacts.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {quickFacts.map((f) => (
+                    <span
+                      key={f.label}
+                      className="inline-flex items-center gap-1.5 rounded-full border hairline bg-background px-2 py-0.5 text-[11px]"
+                    >
+                      <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                        {f.label}
+                      </span>
+                      <span className="font-medium text-ink">{f.value}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Descripción corta */}
+              {item.description && (
+                <p className="text-sm text-foreground/85 leading-relaxed line-clamp-3">
+                  {item.description}
+                </p>
+              )}
+
+              {/* Lista de componentes del kit (si lo tiene) */}
+              <IncludedList item={item} />
+
+              {/* CTA: ver ficha completa */}
+              <button
+                type="button"
+                onClick={openDetail}
+                className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-widest text-ink hover:text-amber transition mt-1"
+              >
+                Ver ficha completa
+                <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
