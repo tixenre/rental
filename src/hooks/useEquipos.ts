@@ -279,18 +279,9 @@ export function useEquipos() {
   const q = useQuery<EquiposQueryResult>({
     queryKey: ["equipos"],
     queryFn: async () => {
-      try {
-        const data = await apiGetEquipos();
-        const items = (data?.items ?? []).map(backendToEquipment);
-        if (items.length === 0) {
-          console.warn("[useEquipos] backend devolvió 0 items, fallback al mock");
-          return { items: MOCK_EQUIPMENT, usingFallback: true };
-        }
-        return { items, usingFallback: false };
-      } catch (err) {
-        console.warn("[useEquipos] backend offline, fallback al mock:", err);
-        return { items: MOCK_EQUIPMENT, usingFallback: true };
-      }
+      const data = await apiGetEquipos();
+      const items = (data?.items ?? []).map(backendToEquipment);
+      return { items, usingFallback: false };
     },
     staleTime: 5 * 60 * 1000,
     retry: 1,
