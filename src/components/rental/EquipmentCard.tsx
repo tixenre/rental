@@ -167,7 +167,7 @@ export function EquipmentCard({
           <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-amber/40 bg-amber-soft p-0.5">
             <button
               onClick={() => remove(item.id)}
-              className="grid h-8 w-8 place-items-center rounded text-amber hover:bg-amber/20 active:bg-amber/30"
+              className="grid h-9 w-9 place-items-center rounded text-amber hover:bg-amber/20 active:bg-amber/30"
               aria-label="Quitar uno"
             >
               <Minus className="h-4 w-4" />
@@ -178,7 +178,7 @@ export function EquipmentCard({
                 if (!reachedMax) add(item.id);
               }}
               disabled={reachedMax}
-              className="grid h-8 w-8 place-items-center rounded text-amber hover:bg-amber/20 active:bg-amber/30 disabled:cursor-not-allowed disabled:opacity-40"
+              className="grid h-9 w-9 place-items-center rounded text-amber hover:bg-amber/20 active:bg-amber/30 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Sumar uno"
             >
               <Plus className="h-4 w-4" />

@@ -18,6 +18,7 @@ import { useEquipos, useDisponibilidad, useCategorias, useMarcas } from "@/hooks
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -273,9 +274,17 @@ function Index() {
 
         {/* Loading / Error states */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-24 text-muted-foreground">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            Cargando catálogo…
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5 px-4 lg:px-12 mt-2">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="aspect-[4/5] rounded-lg border hairline overflow-hidden flex flex-col">
+                <Skeleton className="aspect-square w-full rounded-none shrink-0" />
+                <div className="flex flex-1 flex-col gap-1.5 px-2.5 py-2">
+                  <Skeleton className="h-2 w-1/2" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-2 w-1/3" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : isError ? (
           <div className="mx-4 rounded-lg border hairline bg-surface px-6 py-16 text-center mt-8 lg:mx-12">
