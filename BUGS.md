@@ -105,3 +105,62 @@ Fijados en PR #26 (`feat/sistema-specs-bulletproof`).
 | Imágenes de distintos tamaños | 🟡 Mejorado — `object-contain` + aspect-ratio fijo; normalización completa pendiente (remove.bg) |
 | Búsqueda "Solo fotos" calidad baja | 🔵 Pendiente (low priority) |
 | Calendario en dashboard | 🔵 Sugerencia pendiente |
+
+## 🔴 CRÍTICO
+
+### #27 - Falta validación de login en cotización
+**Módulo:** Cliente/Cotización - Autenticación  
+**Descripción:** Al intentar "Confirmar solicitud" sin estar logeado, no hay validación. Debería:
+- Mostrar mensaje: "Debes iniciar sesión o crear una cuenta"
+- Ofrecimiento: Login o Sign Up
+
+**Steps to reproduce:**
+1. No estar logeado
+2. Agregar equipos al carrito
+3. Click "Confirmar solicitud"
+4. Verificar que no valida login
+
+**Estado:** 🔵 Reportado  
+**Impacto:** Crítico (bloquea flujo de checkout)
+
+---
+
+## 🟠 ALTO
+
+### #28 - Falta validación de fechas en cotización
+**Módulo:** Cliente/Cotización  
+**Descripción:** Si el usuario no selecciona fechas (muestra "– 09:00"), debería haber validación/popup cuando intenta confirmar.
+
+**Esperado:** Mostrar modal pidiendo que seleccione fechas
+
+**Estado:** 🔵 Reportado  
+**Impacto:** Alto (información esencial incompleta)
+
+---
+
+## 🟡 MEJORA - Home
+
+### #29 - Rediseñar home: enfoque en Estudio
+**Módulo:** Home/Landing  
+**Cambios solicitados:**
+1. ❌ Eliminar badges: CALIDAD, VARIEDAD, AMISTAD, COMUNIDAD, INTERCAMBIO, LOCAL
+2. ❌ Eliminar sección "PRODUCTO ESTRELLA"
+3. ✅ Dar más importancia a "Conocé el Estudio"
+   - Destacar visualmente
+   - Mayor jerarquía en la página
+
+**Estado:** 🔵 Solicitado  
+
+---
+
+## 🟢 FEATURE - Página del Estudio
+
+### #30 - Desarrollar página del Estudio
+**Módulo:** Estudio (página nueva/mejorada)  
+**Descripción:** La página del estudio existe pero necesita desarrollo/mejora. Actualmente está bien pero se puede mejorar.
+
+**Acción:** Diseño y desarrollo de página del estudio mejorada
+
+**Estado:** 🔵 Pendiente  
+
+---

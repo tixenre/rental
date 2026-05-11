@@ -16,8 +16,9 @@ export function BrandCarousel({
   return (
     <CarouselRow title="Marcas" count={brands.length}>
       {brands.map((brand) => {
+        // e.brand es un string (nombre de marca) en el tipo Equipment
         const count = allEquipos.filter(
-          (e) => e.brand?.id === brand.id || e.brand?.nombre === brand.nombre
+          (e) => (e.brand as string).toLowerCase() === brand.nombre.toLowerCase()
         ).length;
         const isSelected = selectedBrand ? parseInt(selectedBrand) === brand.id : false;
 
