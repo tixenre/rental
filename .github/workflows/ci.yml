@@ -35,6 +35,32 @@ jobs:
       - name: Compile all Python files
         run: python -m compileall -q backend/
 
+  python-tests:
+    name: Python tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - name: Install dev dependencies
+        run: |
+          cd backend
+          pip install -r requirements-dev.txt
+      - name: Run pytest
+        run: |
+          cd backend
+          # SECRET_KEY y ADMIN_EMAILS los setea conftest.py, pero por las
+          # dudas los pasamos también acá para handlers que no los lean
+          # vía conftest.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          python -m pytest tests/ -v --tb=short
+
   build:
     name: Build frontend
     runs-on: ubuntu-latest
