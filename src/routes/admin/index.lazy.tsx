@@ -162,7 +162,7 @@ function Stat({
         </div>
         <div className="text-muted-foreground">{icon}</div>
       </div>
-      <div className="mt-2 font-display text-2xl text-ink truncate" title={String(value)}>
+      <div className="mt-2 font-display text-xl sm:text-2xl text-ink truncate" title={String(value)}>
         {value}
       </div>
     </div>
@@ -196,7 +196,8 @@ function PedidosCard({
           {pedidos.map((p) => (
             <li key={p.id}>
               <Link
-                to="/admin/pedidos"
+                to="/admin/pedidos/$id"
+                params={{ id: String(p.id) }}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent/30 transition-colors"
               >
                 <div className="min-w-0 flex-1">
