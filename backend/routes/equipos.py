@@ -1165,8 +1165,12 @@ def admin_create_categoria(data: CategoriaCreate, request: Request):
 def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
     require_admin(request)
     sets, vals = [], []
+    nuevo_nombre = None
     if patch.nombre is not None:
-        sets.append("nombre = ?"); vals.append(patch.nombre.strip())
+        nuevo_nombre = patch.nombre.strip()
+        if not nuevo_nombre:
+            raise HTTPException(400, "El nombre no puede estar vacío")
+        sets.append("nombre = ?"); vals.append(nuevo_nombre)
     if patch.prioridad is not None:
         sets.append("prioridad = ?"); vals.append(int(patch.prioridad))
     if patch.set_parent_null:
@@ -1193,19 +1197,52 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
         sets.append("parent_id = ?"); vals.append(int(patch.parent_id))
     if not sets:
         raise HTTPException(400, "Sin cambios")
+
+    # Pre-check: si hay rename, verificar que la categoría existe y que el
+    # nuevo nombre no choca con otra. Mejor error de conflicto explícito que
+    # 500 por UniqueViolation de psycopg2.
+    if nuevo_nombre is not None:
+        conn0 = get_db()
+        try:
+            existe = conn0.execute(
+                "SELECT id FROM categorias WHERE id = ?", (cid,)
+            ).fetchone()
+            if not existe:
+                raise HTTPException(404, f"Categoría {cid} no existe")
+            choca = conn0.execute(
+                "SELECT id, nombre FROM categorias WHERE LOWER(nombre) = LOWER(?) AND id != ?",
+                (nuevo_nombre, cid),
+            ).fetchone()
+            if choca:
+                raise HTTPException(409, f"Ya existe una categoría llamada '{choca['nombre']}'")
+        finally:
+            conn0.close()
+
     conn = get_db()
     try:
         vals.append(cid)
         conn.execute(f"UPDATE categorias SET {', '.join(sets)} WHERE id = ?", tuple(vals))
         # Si renombró, regenerar auto-tags de los equipos afectados.
-        if patch.nombre is not None:
+        if nuevo_nombre is not None:
             eq_rows = conn.execute(
                 "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = ?", (cid,)
             ).fetchall()
             for r in eq_rows:
-                regenerate_auto_tags(conn, r["equipo_id"])
+                try:
+                    regenerate_auto_tags(conn, r["equipo_id"])
+                except Exception:
+                    # No abortar el rename si un equipo falla regenerar tags.
+                    logger.warning("regenerate_auto_tags falló para equipo %s tras rename de cat %s",
+                                   r["equipo_id"], cid, exc_info=True)
         conn.commit()
         return {"ok": True}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        logger.error("Error en admin_update_categoria(cid=%s): %s", cid, e, exc_info=True)
+        raise HTTPException(500, "Error al actualizar categoría — ver logs del servidor")
     finally:
         conn.close()
 

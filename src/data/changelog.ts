@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 103,
+    date: "2026-05-11",
+    type: "fix",
+    title: "Editar categorías ya no tira error 500",
+    body: "Al renombrar una categoría a un nombre que ya existía, el servidor devolvía 'Internal Server Error' sin explicación. Ahora detecta el duplicado antes de intentar guardar y muestra un mensaje claro: 'Ya existe una categoría llamada X'.",
+    labels: ["admin", "bug"],
+  },
+  {
     number: 96,
     date: "2026-05-11",
     type: "fix",
