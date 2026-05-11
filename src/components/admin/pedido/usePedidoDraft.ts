@@ -26,6 +26,7 @@ export type DraftItem = {
   precio_jornada: number;
   nombre: string;
   marca: string | null;
+  nombre_publico?: string | null;
 };
 
 export type DraftDatos = {
@@ -61,6 +62,7 @@ function pedidoToItems(p: Pedido): DraftItem[] {
     precio_jornada: it.precio_jornada,
     nombre: it.nombre,
     marca: it.marca,
+    nombre_publico: it.nombre_publico ?? null,
   }));
 }
 

@@ -93,6 +93,14 @@ export type Equipo = {
   kit?: KitComponente[];
   categorias?: CategoriaRef[];
   ficha?: Ficha;
+  /** Nombre público corto (catálogo / cards). Lo arma el backend a partir de specs. */
+  nombre_publico?: string | null;
+  /** Nombre público extendido (PDFs formales: albarán, contrato). */
+  nombre_publico_largo?: string | null;
+  /** Relevancia manual (1=más destacado, 100=neutro). */
+  relevancia_manual?: number;
+  /** Score de popularidad (0..100, normalizado por categoría). */
+  popularidad_score?: number;
 };
 
 export type KitComponente = {
@@ -168,6 +176,40 @@ export type MarcaAdmin = {
   visible: boolean;
   orden: number;
   total: number;
+};
+
+// ── Templates de specs por categoría (CRUD admin) ────────────────────────
+
+export type SpecTipo = "string" | "number" | "enum" | "bool";
+
+export type SpecTemplate = {
+  id: number;
+  categoria_id: number;
+  spec_key: string;
+  label: string;
+  tipo: SpecTipo;
+  unidad: string | null;
+  enum_options: string[] | null;
+  prioridad: number;
+  visible_en_card: boolean;
+  visible_en_filtros: boolean;
+  visible_en_nombre: boolean;
+  obligatorio: boolean;
+  ayuda: string | null;
+};
+
+export type SpecTemplateInput = {
+  spec_key: string;
+  label: string;
+  tipo: SpecTipo;
+  unidad?: string | null;
+  enum_options?: string[] | null;
+  prioridad?: number;
+  visible_en_card?: boolean;
+  visible_en_filtros?: boolean;
+  visible_en_nombre?: boolean;
+  obligatorio?: boolean;
+  ayuda?: string | null;
 };
 
 export const adminApi = {
@@ -359,6 +401,148 @@ export const adminApi = {
         delta: number | null;
       }>;
     }>("/api/admin/equipos/precios-manuales"),
+
+  // ── Clasificación (PR C) ───────────────────────────────────────────
+  clasificarBulk: (args: { solo_sin_categoria?: boolean; equipo_ids?: number[] } = {}) =>
+    authedPostJson<{
+      total: number; alta_confianza: number; media_confianza: number;
+      baja_confianza: number; sin_clasificar: number;
+      items: Array<{
+        equipo_id: number; nombre: string; marca: string | null; modelo: string | null;
+        foto_url: string | null; raiz: string | null; sub: string | null;
+        raiz_id: number | null; sub_id: number | null;
+        confianza: number; razon: string;
+      }>;
+    }>("/api/admin/equipos/clasificar-bulk", args),
+  aplicarClasificacion: (asignaciones: Array<{ equipo_id: number; categoria_ids: number[] }>) =>
+    authedPostJson<{
+      aplicados: number;
+      errores: Array<{ equipo_id: number; error: string }>;
+      equipo_ids: number[];
+    }>("/api/admin/equipos/aplicar-clasificacion", { asignaciones }),
+  contarSinCategoria: () => authedJson<{ total: number }>("/api/admin/equipos/sin-categoria"),
+
+  // ── Specs por equipo (PR D) ────────────────────────────────────────
+  getEquipoSpecs: (id: number) =>
+    authedJson<{
+      equipo_id: number;
+      specs: Record<string, string>;
+      template: Array<{
+        spec_key: string; label: string; tipo: string;
+        unidad: string | null; enum_options: string[] | null;
+        prioridad: number;
+        visible_en_card: boolean; visible_en_filtros: boolean; visible_en_nombre: boolean;
+        obligatorio: boolean; ayuda: string | null;
+        categoria_nombre: string;
+      }>;
+    }>(`/api/admin/equipos/${id}/specs`),
+  putEquipoSpecs: (id: number, specs: Record<string, string>) =>
+    authedJson<{ ok: true; equipo_id: number; specs_count: number }>(
+      `/api/admin/equipos/${id}/specs`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ specs }),
+      },
+    ),
+
+  // ── CRUD templates de specs por categoría ──────────────────────────
+  specTemplatesResumen: () =>
+    authedJson<Record<number, number>>("/api/admin/spec-templates/resumen"),
+  listSpecTemplates: (categoriaId: number) =>
+    authedJson<{ items: SpecTemplate[] }>(`/api/admin/categorias/${categoriaId}/spec-templates`),
+  createSpecTemplate: (categoriaId: number, input: SpecTemplateInput) =>
+    authedJson<SpecTemplate>(`/api/admin/categorias/${categoriaId}/spec-templates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  updateSpecTemplate: (templateId: number, input: Partial<SpecTemplateInput>) =>
+    authedJson<{ ok: true; id: number }>(`/api/admin/spec-templates/${templateId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteSpecTemplate: async (templateId: number) => {
+    const res = await authedFetch(`/api/admin/spec-templates/${templateId}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+  },
+
+  // ── Compatibilidades ───────────────────────────────────────────────
+  listarCompatibilidades: (id: number) =>
+    authedJson<{
+      items: Array<{
+        id: number; otro_id: number; otro_nombre: string; otro_foto: string | null;
+        tipo: "compatible" | "incompatible" | "requiere_adaptador";
+        nota: string | null;
+        adaptador_id: number | null; adaptador_nombre: string | null;
+      }>;
+    }>(`/api/admin/equipos/${id}/compatibilidades`),
+  crearCompatibilidad: (
+    id: number,
+    data: {
+      equipo_b_id: number;
+      tipo: "compatible" | "incompatible" | "requiere_adaptador";
+      nota?: string;
+      adaptador_id?: number;
+    },
+  ) => authedPostJson<{ id: number }>(`/api/admin/equipos/${id}/compatibilidades`, data),
+  borrarCompatibilidad: async (compat_id: number) => {
+    const res = await authedFetch(`/api/admin/compatibilidades/${compat_id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+  },
+
+  // ── Nombres públicos / validación ──────────────────────────────────
+  regenerarNombres: (dry_run = true) =>
+    authedPostJson<{
+      total: number;
+      cambios: Array<{ id: number; nombre_interno: string; actual: string | null; nuevo: string; largo: string }>;
+      sin_cambios: number;
+      errores: Array<{ id: number; error: string }>;
+      dry_run: boolean;
+      cambios_truncados?: boolean;
+      cambios_total?: number;
+    }>("/api/admin/equipos/regenerar-nombres", { dry_run }),
+  recalcularRanking: (args: { dry_run?: boolean; ventana_dias?: number } = {}) =>
+    authedPostJson<{
+      total: number; ventana_dias: number;
+      cambios: Array<{
+        id: number; nombre: string;
+        antes: { score: number; pedidos: number; ingreso: number };
+        despues: { score: number; pedidos: number; ingreso: number };
+      }>;
+      sin_cambios: number; dry_run: boolean;
+    }>("/api/admin/equipos/recalcular-ranking", { dry_run: true, ventana_dias: 180, ...args }),
+  listarParaValidacion: (filtro: "all" | "pendientes" | "aprobados" | "editados" = "all") =>
+    authedJson<{
+      items: Array<{
+        id: number; nombre: string; marca: string | null; modelo: string | null;
+        foto_url: string | null;
+        nombre_publico: string | null;
+        nombre_publico_largo: string | null;
+        nombre_publico_override: string | null;
+        revisado: boolean;
+      }>;
+      stats: { pendientes: number; aprobados: number; editados: number; total: number };
+    }>(`/api/admin/equipos/nombres-validacion?filtro=${filtro}`),
+  aprobarNombre: (id: number, args: { override?: string | null; revisado?: boolean } = {}) =>
+    authedJson<{
+      id: number;
+      nombre_publico: string | null;
+      nombre_publico_largo: string | null;
+      nombre_publico_override: string | null;
+      nombre_publico_revisado: boolean;
+    }>(`/api/admin/equipos/${id}/nombre-publico`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        override: args.override ?? null,
+        revisado: args.revisado !== false,
+      }),
+    }),
 
   // pedidos / alquileres
   listPedidos: (params: { estado?: string; q?: string; per_page?: number; page?: number } = {}) => {
@@ -609,6 +793,8 @@ export type PedidoItem = {
   subtotal: number;
   nombre: string;
   marca: string | null;
+  nombre_publico?: string | null;
+  nombre_publico_largo?: string | null;
 };
 
 export type PedidoPago = {

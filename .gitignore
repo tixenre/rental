@@ -43,3 +43,4 @@ backend/.env.local
 .env
 .env.local
 .env.*.local
+backend/.venv

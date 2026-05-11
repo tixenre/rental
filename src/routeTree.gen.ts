@@ -24,8 +24,15 @@ import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
 import { Route as AdminClientesRouteImport } from './routes/admin/clientes'
 import { Route as AdminCalendarioRouteImport } from './routes/admin/calendario'
 import { Route as AdminPedidosIndexRouteImport } from './routes/admin/pedidos.index'
+import { Route as AdminEquiposIndexRouteImport } from './routes/admin/equipos.index'
 import { Route as AdminPedidosNuevoRouteImport } from './routes/admin/pedidos.nuevo'
 import { Route as AdminPedidosIdRouteImport } from './routes/admin/pedidos.$id'
+import { Route as AdminEquiposValidacionRouteImport } from './routes/admin/equipos.validacion'
+import { Route as AdminEquiposSpecsRouteImport } from './routes/admin/equipos.specs'
+import { Route as AdminEquiposMarcasRouteImport } from './routes/admin/equipos.marcas'
+import { Route as AdminEquiposEtiquetasRouteImport } from './routes/admin/equipos.etiquetas'
+import { Route as AdminEquiposClasificarRouteImport } from './routes/admin/equipos.clasificar'
+import { Route as AdminEquiposCategoriasRouteImport } from './routes/admin/equipos.categorias'
 
 const EstudioRoute = EstudioRouteImport.update({
   id: '/estudio',
@@ -102,6 +109,11 @@ const AdminPedidosIndexRoute = AdminPedidosIndexRouteImport.update({
   path: '/pedidos/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminEquiposIndexRoute = AdminEquiposIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminEquiposRoute,
+} as any)
 const AdminPedidosNuevoRoute = AdminPedidosNuevoRouteImport.update({
   id: '/pedidos/nuevo',
   path: '/pedidos/nuevo',
@@ -112,6 +124,36 @@ const AdminPedidosIdRoute = AdminPedidosIdRouteImport.update({
   path: '/pedidos/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminEquiposValidacionRoute = AdminEquiposValidacionRouteImport.update({
+  id: '/validacion',
+  path: '/validacion',
+  getParentRoute: () => AdminEquiposRoute,
+} as any)
+const AdminEquiposSpecsRoute = AdminEquiposSpecsRouteImport.update({
+  id: '/specs',
+  path: '/specs',
+  getParentRoute: () => AdminEquiposRoute,
+} as any)
+const AdminEquiposMarcasRoute = AdminEquiposMarcasRouteImport.update({
+  id: '/marcas',
+  path: '/marcas',
+  getParentRoute: () => AdminEquiposRoute,
+} as any)
+const AdminEquiposEtiquetasRoute = AdminEquiposEtiquetasRouteImport.update({
+  id: '/etiquetas',
+  path: '/etiquetas',
+  getParentRoute: () => AdminEquiposRoute,
+} as any)
+const AdminEquiposClasificarRoute = AdminEquiposClasificarRouteImport.update({
+  id: '/clasificar',
+  path: '/clasificar',
+  getParentRoute: () => AdminEquiposRoute,
+} as any)
+const AdminEquiposCategoriasRoute = AdminEquiposCategoriasRouteImport.update({
+  id: '/categorias',
+  path: '/categorias',
+  getParentRoute: () => AdminEquiposRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -120,7 +162,7 @@ export interface FileRoutesByFullPath {
   '/estudio': typeof EstudioRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
-  '/admin/equipos': typeof AdminEquiposRoute
+  '/admin/equipos': typeof AdminEquiposRouteWithChildren
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -128,8 +170,15 @@ export interface FileRoutesByFullPath {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/equipos/categorias': typeof AdminEquiposCategoriasRoute
+  '/admin/equipos/clasificar': typeof AdminEquiposClasificarRoute
+  '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
+  '/admin/equipos/marcas': typeof AdminEquiposMarcasRoute
+  '/admin/equipos/specs': typeof AdminEquiposSpecsRoute
+  '/admin/equipos/validacion': typeof AdminEquiposValidacionRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
+  '/admin/equipos/': typeof AdminEquiposIndexRoute
   '/admin/pedidos/': typeof AdminPedidosIndexRoute
 }
 export interface FileRoutesByTo {
@@ -138,7 +187,6 @@ export interface FileRoutesByTo {
   '/estudio': typeof EstudioRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
-  '/admin/equipos': typeof AdminEquiposRoute
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -146,8 +194,15 @@ export interface FileRoutesByTo {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/admin': typeof AdminIndexRoute
+  '/admin/equipos/categorias': typeof AdminEquiposCategoriasRoute
+  '/admin/equipos/clasificar': typeof AdminEquiposClasificarRoute
+  '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
+  '/admin/equipos/marcas': typeof AdminEquiposMarcasRoute
+  '/admin/equipos/specs': typeof AdminEquiposSpecsRoute
+  '/admin/equipos/validacion': typeof AdminEquiposValidacionRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
+  '/admin/equipos': typeof AdminEquiposIndexRoute
   '/admin/pedidos': typeof AdminPedidosIndexRoute
 }
 export interface FileRoutesById {
@@ -158,7 +213,7 @@ export interface FileRoutesById {
   '/estudio': typeof EstudioRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
-  '/admin/equipos': typeof AdminEquiposRoute
+  '/admin/equipos': typeof AdminEquiposRouteWithChildren
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -166,8 +221,15 @@ export interface FileRoutesById {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/equipos/categorias': typeof AdminEquiposCategoriasRoute
+  '/admin/equipos/clasificar': typeof AdminEquiposClasificarRoute
+  '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
+  '/admin/equipos/marcas': typeof AdminEquiposMarcasRoute
+  '/admin/equipos/specs': typeof AdminEquiposSpecsRoute
+  '/admin/equipos/validacion': typeof AdminEquiposValidacionRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
+  '/admin/equipos/': typeof AdminEquiposIndexRoute
   '/admin/pedidos/': typeof AdminPedidosIndexRoute
 }
 export interface FileRouteTypes {
@@ -187,8 +249,15 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/admin/'
+    | '/admin/equipos/categorias'
+    | '/admin/equipos/clasificar'
+    | '/admin/equipos/etiquetas'
+    | '/admin/equipos/marcas'
+    | '/admin/equipos/specs'
+    | '/admin/equipos/validacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
+    | '/admin/equipos/'
     | '/admin/pedidos/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -197,7 +266,6 @@ export interface FileRouteTypes {
     | '/estudio'
     | '/admin/calendario'
     | '/admin/clientes'
-    | '/admin/equipos'
     | '/admin/estadisticas'
     | '/admin/login'
     | '/admin/settings'
@@ -205,8 +273,15 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/admin'
+    | '/admin/equipos/categorias'
+    | '/admin/equipos/clasificar'
+    | '/admin/equipos/etiquetas'
+    | '/admin/equipos/marcas'
+    | '/admin/equipos/specs'
+    | '/admin/equipos/validacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
+    | '/admin/equipos'
     | '/admin/pedidos'
   id:
     | '__root__'
@@ -224,8 +299,15 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/admin/'
+    | '/admin/equipos/categorias'
+    | '/admin/equipos/clasificar'
+    | '/admin/equipos/etiquetas'
+    | '/admin/equipos/marcas'
+    | '/admin/equipos/specs'
+    | '/admin/equipos/validacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
+    | '/admin/equipos/'
     | '/admin/pedidos/'
   fileRoutesById: FileRoutesById
 }
@@ -343,6 +425,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPedidosIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/equipos/': {
+      id: '/admin/equipos/'
+      path: '/'
+      fullPath: '/admin/equipos/'
+      preLoaderRoute: typeof AdminEquiposIndexRouteImport
+      parentRoute: typeof AdminEquiposRoute
+    }
     '/admin/pedidos/nuevo': {
       id: '/admin/pedidos/nuevo'
       path: '/pedidos/nuevo'
@@ -357,13 +446,79 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPedidosIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/equipos/validacion': {
+      id: '/admin/equipos/validacion'
+      path: '/validacion'
+      fullPath: '/admin/equipos/validacion'
+      preLoaderRoute: typeof AdminEquiposValidacionRouteImport
+      parentRoute: typeof AdminEquiposRoute
+    }
+    '/admin/equipos/specs': {
+      id: '/admin/equipos/specs'
+      path: '/specs'
+      fullPath: '/admin/equipos/specs'
+      preLoaderRoute: typeof AdminEquiposSpecsRouteImport
+      parentRoute: typeof AdminEquiposRoute
+    }
+    '/admin/equipos/marcas': {
+      id: '/admin/equipos/marcas'
+      path: '/marcas'
+      fullPath: '/admin/equipos/marcas'
+      preLoaderRoute: typeof AdminEquiposMarcasRouteImport
+      parentRoute: typeof AdminEquiposRoute
+    }
+    '/admin/equipos/etiquetas': {
+      id: '/admin/equipos/etiquetas'
+      path: '/etiquetas'
+      fullPath: '/admin/equipos/etiquetas'
+      preLoaderRoute: typeof AdminEquiposEtiquetasRouteImport
+      parentRoute: typeof AdminEquiposRoute
+    }
+    '/admin/equipos/clasificar': {
+      id: '/admin/equipos/clasificar'
+      path: '/clasificar'
+      fullPath: '/admin/equipos/clasificar'
+      preLoaderRoute: typeof AdminEquiposClasificarRouteImport
+      parentRoute: typeof AdminEquiposRoute
+    }
+    '/admin/equipos/categorias': {
+      id: '/admin/equipos/categorias'
+      path: '/categorias'
+      fullPath: '/admin/equipos/categorias'
+      preLoaderRoute: typeof AdminEquiposCategoriasRouteImport
+      parentRoute: typeof AdminEquiposRoute
+    }
   }
 }
+
+interface AdminEquiposRouteChildren {
+  AdminEquiposCategoriasRoute: typeof AdminEquiposCategoriasRoute
+  AdminEquiposClasificarRoute: typeof AdminEquiposClasificarRoute
+  AdminEquiposEtiquetasRoute: typeof AdminEquiposEtiquetasRoute
+  AdminEquiposMarcasRoute: typeof AdminEquiposMarcasRoute
+  AdminEquiposSpecsRoute: typeof AdminEquiposSpecsRoute
+  AdminEquiposValidacionRoute: typeof AdminEquiposValidacionRoute
+  AdminEquiposIndexRoute: typeof AdminEquiposIndexRoute
+}
+
+const AdminEquiposRouteChildren: AdminEquiposRouteChildren = {
+  AdminEquiposCategoriasRoute: AdminEquiposCategoriasRoute,
+  AdminEquiposClasificarRoute: AdminEquiposClasificarRoute,
+  AdminEquiposEtiquetasRoute: AdminEquiposEtiquetasRoute,
+  AdminEquiposMarcasRoute: AdminEquiposMarcasRoute,
+  AdminEquiposSpecsRoute: AdminEquiposSpecsRoute,
+  AdminEquiposValidacionRoute: AdminEquiposValidacionRoute,
+  AdminEquiposIndexRoute: AdminEquiposIndexRoute,
+}
+
+const AdminEquiposRouteWithChildren = AdminEquiposRoute._addFileChildren(
+  AdminEquiposRouteChildren,
+)
 
 interface AdminRouteChildren {
   AdminCalendarioRoute: typeof AdminCalendarioRoute
   AdminClientesRoute: typeof AdminClientesRoute
-  AdminEquiposRoute: typeof AdminEquiposRoute
+  AdminEquiposRoute: typeof AdminEquiposRouteWithChildren
   AdminEstadisticasRoute: typeof AdminEstadisticasRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
@@ -376,7 +531,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCalendarioRoute: AdminCalendarioRoute,
   AdminClientesRoute: AdminClientesRoute,
-  AdminEquiposRoute: AdminEquiposRoute,
+  AdminEquiposRoute: AdminEquiposRouteWithChildren,
   AdminEstadisticasRoute: AdminEstadisticasRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminSettingsRoute: AdminSettingsRoute,

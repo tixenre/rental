@@ -92,6 +92,11 @@ function resolveCategory(etiquetas: string[], nombre: string, marca: string): Ca
 // cae al combo viejo "nombre + modelo".
 
 export function buildPublicName(e: BackendEquipo): string {
+  // 1) Si el backend ya calculó el nombre_publico (PR B/D del rediseño),
+  // lo usamos directamente. Es la single source of truth.
+  const backendNombre = ((e as unknown as { nombre_publico?: string | null }).nombre_publico ?? "").trim();
+  if (backendNombre) return backendNombre;
+
   const tipo = e.categorias?.[0]?.nombre?.trim() ?? "";
   const marca = (e.marca ?? "").trim();
   const modelo = (e.modelo ?? "").trim();
@@ -224,11 +229,12 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
   const parsedConectividad   = parseStringList(ficha?.conectividad_json);
   const parsedCompatibleCon  = parseStringList(ficha?.compatible_con_json);
 
-  const kit = Array.isArray(e.kit) ? e.kit as Array<{ componente_id: number; nombre: string; cantidad: number }> : [];
+  const kit = Array.isArray(e.kit) ? e.kit as Array<{ componente_id: number; nombre: string; cantidad: number; foto_url?: string | null }> : [];
   const includes = kit.map((k) => ({
     id: String(k.componente_id),
     name: k.nombre,
     qty: k.cantidad,
+    fotoUrl: k.foto_url ?? null,
   }));
 
   return {
@@ -248,6 +254,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     keywords: parsedKeywords,
     isNew: false,
     isCombo: includes.length > 0,
+    destacado: ((e as unknown as { relevancia_manual?: number }).relevancia_manual ?? 100) <= 30,
     includes,
     _backendId: e.id,
     // Ficha extendida

@@ -358,7 +358,7 @@ function CarritoTab({
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="text-sm text-ink truncate">{it.nombre}</div>
+                    <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
                     <div className="text-xs text-muted-foreground">
                       {it.marca ?? "—"}
                       {stock && (
@@ -450,10 +450,11 @@ function CarritoTab({
         existing={items}
         stockMap={stockMap}
         onAdd={(eq) => {
+          const display = eq.nombre_publico || eq.nombre;
           const idx = items.findIndex((i) => i.equipo_id === eq.id);
           if (idx >= 0) {
             updateItem(eq.id, { cantidad: items[idx].cantidad + 1 });
-            toast.success(`+1 ${eq.nombre}`);
+            toast.success(`+1 ${display}`);
           } else {
             setItems([...items, {
               equipo_id: eq.id,
@@ -461,8 +462,9 @@ function CarritoTab({
               precio_jornada: eq.precio_jornada ?? 0,
               nombre: eq.nombre,
               marca: eq.marca,
+              nombre_publico: eq.nombre_publico ?? null,
             }]);
-            toast.success(`Agregado: ${eq.nombre}`);
+            toast.success(`Agregado: ${display}`);
           }
           setOpenSearch(false);
         }}
@@ -499,6 +501,7 @@ function EquipoSearchSheet({
       .filter((e) => e.estado !== "fuera_servicio")
       .filter((e) => !ql ||
         e.nombre.toLowerCase().includes(ql) ||
+        (e.nombre_publico ?? "").toLowerCase().includes(ql) ||
         (e.marca ?? "").toLowerCase().includes(ql) ||
         (e.modelo ?? "").toLowerCase().includes(ql),
       );
@@ -570,7 +573,7 @@ function EquipoSearchSheet({
                   return (
                     <li key={eq.id} className="flex items-center justify-between gap-2 py-3">
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm text-ink truncate">{eq.nombre}</div>
+                        <div className="text-sm text-ink truncate">{eq.nombre_publico || eq.nombre}</div>
                         <div className="text-xs text-muted-foreground truncate">
                           {[eq.marca, eq.modelo].filter(Boolean).join(" / ")}
                           <> · <span className={disponible <= 0 ? "text-destructive" : ""}>{disponible} libres</span></>
@@ -861,12 +864,11 @@ function DocsTab({ pedidoId }: { pedidoId: number }) {
         <a
           key={d.kind}
           href={pedidoPdfUrl(pedidoId, d.kind)}
-          target="_blank" rel="noreferrer"
           className="flex items-center gap-3 rounded-md border hairline p-4 hover:bg-accent/30"
         >
           {d.icon}
           <span className="text-sm text-ink">{d.label}</span>
-          <span className="ml-auto text-xs text-muted-foreground">PDF</span>
+          <span className="ml-auto text-xs text-muted-foreground">Descargar PDF</span>
         </a>
       ))}
     </div>

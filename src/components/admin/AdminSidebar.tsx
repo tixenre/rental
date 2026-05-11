@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -10,6 +10,14 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  ChevronRight,
+  List,
+  FolderTree,
+  Tag,
+  Wrench,
+  Sparkles,
+  CheckCircle2,
+  Building2,
 } from "lucide-react";
 
 import {
@@ -23,19 +31,43 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { authedFetch } from "@/lib/authedFetch";
 
-type NavItem = { title: string; url: string; icon: typeof LayoutDashboard; exact?: boolean };
+type SubItem = { title: string; url: string; icon?: typeof LayoutDashboard };
+type NavItem = {
+  title: string;
+  url: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+  children?: SubItem[];
+};
+
 const items: NavItem[] = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard, exact: true },
-  { title: "Equipos", url: "/admin/equipos", icon: Package },
-  { title: "Pedidos", url: "/admin/pedidos", icon: ClipboardList },
-  { title: "Clientes", url: "/admin/clientes", icon: Users },
-  { title: "Calendario", url: "/admin/calendario", icon: CalendarDays },
+  {
+    title: "Equipos",
+    url: "/admin/equipos",
+    icon: Package,
+    children: [
+      { title: "Listado",            url: "/admin/equipos",            icon: List },
+      { title: "Categorías",          url: "/admin/equipos/categorias", icon: FolderTree },
+      { title: "Marcas",              url: "/admin/equipos/marcas",     icon: Building2 },
+      { title: "Etiquetas",           url: "/admin/equipos/etiquetas",  icon: Tag },
+      { title: "Specs por categoría", url: "/admin/equipos/specs",      icon: Wrench },
+      { title: "Clasificar",          url: "/admin/equipos/clasificar", icon: Sparkles },
+      { title: "Validar nombres",     url: "/admin/equipos/validacion", icon: CheckCircle2 },
+    ],
+  },
+  { title: "Pedidos",     url: "/admin/pedidos",     icon: ClipboardList },
+  { title: "Clientes",    url: "/admin/clientes",    icon: Users },
+  { title: "Calendario",  url: "/admin/calendario",  icon: CalendarDays },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
-  { title: "Settings", url: "/admin/settings", icon: Settings },
+  { title: "Settings",    url: "/admin/settings",    icon: Settings },
 ];
 
 export function AdminSidebar({ email }: { email: string }) {
@@ -46,6 +78,19 @@ export function AdminSidebar({ email }: { email: string }) {
   });
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => ({
+    "/admin/equipos": true, // empieza expandido si estoy en una sub-ruta
+  }));
+
+  // Cuando navego a una sub-ruta, auto-expandir el grupo padre
+  useEffect(() => {
+    for (const item of items) {
+      if (item.children?.some((c) => isActive(c.url, false))) {
+        setOpenGroups((s) => ({ ...s, [item.url]: true }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPath]);
 
   const handleSignOut = async () => {
     if (isSigningOut) return;
@@ -61,8 +106,21 @@ export function AdminSidebar({ email }: { email: string }) {
     }
   };
 
-  const isActive = (url: string, exact?: boolean) =>
-    exact ? currentPath === url : currentPath === url || currentPath.startsWith(url + "/");
+  function isActive(url: string, exact?: boolean): boolean {
+    if (exact) return currentPath === url;
+    return currentPath === url || currentPath.startsWith(url + "/");
+  }
+
+  // Para items con children, el padre se considera "activo" si yo estoy
+  // exactamente en su URL O en cualquiera de sus hijos.
+  function isParentActive(item: NavItem): boolean {
+    if (isActive(item.url, true)) return true;
+    return !!item.children?.some((c) => isActive(c.url, false));
+  }
+
+  function toggleGroup(url: string) {
+    setOpenGroups((s) => ({ ...s, [url]: !s[url] }));
+  }
 
   return (
     <Sidebar collapsible="icon" className="border-r hairline">
@@ -97,20 +155,79 @@ export function AdminSidebar({ email }: { email: string }) {
           )}
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url, item.exact)}
-                    tooltip={collapsed ? item.title : undefined}
-                  >
-                    <Link to={item.url} className="flex items-center gap-2">
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {items.map((item) => {
+                const hasChildren = !!item.children && item.children.length > 0;
+                const isOpen = openGroups[item.url] ?? false;
+                const active = hasChildren ? isParentActive(item) : isActive(item.url, item.exact);
+
+                // Item con hijos
+                if (hasChildren && !collapsed) {
+                  return (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton
+                        onClick={() => toggleGroup(item.url)}
+                        isActive={active && isActive(item.url, true)}
+                        className="cursor-pointer"
+                      >
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span>{item.title}</span>
+                        <ChevronRight
+                          className={`ml-auto h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                        />
+                      </SidebarMenuButton>
+                      {isOpen && (
+                        <SidebarMenuSub>
+                          {item.children!.map((child) => {
+                            const childActive = child.url === item.url
+                              ? isActive(child.url, true)
+                              : isActive(child.url, false);
+                            return (
+                              <SidebarMenuSubItem key={child.url}>
+                                <SidebarMenuSubButton asChild isActive={childActive}>
+                                  <Link to={child.url} className="flex items-center gap-2">
+                                    {child.icon && <child.icon className="h-3.5 w-3.5 shrink-0" />}
+                                    <span>{child.title}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      )}
+                    </SidebarMenuItem>
+                  );
+                }
+
+                // Item con hijos pero sidebar colapsada — link directo al padre
+                // (los sub-items se acceden al expandir la sidebar)
+                if (hasChildren && collapsed) {
+                  return (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton asChild isActive={active} tooltip={item.title}>
+                        <Link to={item.url}>
+                          <item.icon className="h-4 w-4 shrink-0" />
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                }
+
+                // Item simple
+                return (
+                  <SidebarMenuItem key={item.url}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={active}
+                      tooltip={collapsed ? item.title : undefined}
+                    >
+                      <Link to={item.url} className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
