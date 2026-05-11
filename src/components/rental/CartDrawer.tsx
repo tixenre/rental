@@ -337,7 +337,7 @@ export function CartDrawer({
                                     <button
                                       onClick={() => remove(it.id)}
                                       aria-label="Quitar uno"
-                                      className="grid h-8 w-8 place-items-center rounded-full hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+                                      className="grid h-10 w-10 place-items-center rounded-full hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
                                     >
                                       <Minus className="h-3.5 w-3.5" />
                                     </button>
@@ -353,7 +353,7 @@ export function CartDrawer({
                                       }}
                                       disabled={reachedMax}
                                       aria-label="Sumar uno"
-                                      className="grid h-8 w-8 place-items-center rounded-full hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+                                      className="grid h-10 w-10 place-items-center rounded-full hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
                                     >
                                       <Plus className="h-3.5 w-3.5" />
                                     </button>
