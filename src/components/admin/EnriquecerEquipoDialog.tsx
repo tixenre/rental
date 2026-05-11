@@ -90,11 +90,12 @@ export function EnriquecerEquipoDialog({
 
   const [keywordInput, setKeywordInput] = useState("");
   const [photoDiag, setPhotoDiag] = useState<DiagStep[] | null>(null);
-  // Candidatos extra obtenidos por la búsqueda dedicada de fotos
-  const [extraCands, setExtraCands] = useState<string[]>([]);
+  // Todos los candidatos de foto (de /buscar-fotos y/o foto_candidates de /enriquecer)
+  const [fotosResult, setFotosResult] = useState<string[]>([]);
   const [searchingPhotos, setSearchingPhotos] = useState(false);
-  // Modo: "info" = enriquecimiento completo (B&H + IA). "photos" = solo buscar fotos.
-  const [mode, setMode] = useState<"info" | "photos" | null>(null);
+  // Toggles independientes: qué queremos buscar
+  const [wantFotos, setWantFotos] = useState(true);
+  const [wantSpecs, setWantSpecs] = useState(false);
   // URL manual opcional que guía la búsqueda (ej. página de B&H, sitio oficial)
   const [customUrl, setCustomUrl] = useState("");
 
@@ -103,49 +104,113 @@ export function EnriquecerEquipoDialog({
       setResult(null);
       setError(null);
       setPhotoDiag(null);
-      setExtraCands([]);
-      setMode(null);
+      setFotosResult([]);
+      setWantFotos(true);
+      setWantSpecs(false);
       setFotoUrl("");
       setCustomUrl("");
     }
   }, [open]);
 
-  /** Modo "solo fotos": no llama a /enriquecer, solo a /buscar-fotos. */
-  const buscarSoloFotos = async () => {
-    setMode("photos");
+  /** Orquesta las búsquedas según los toggles wantFotos / wantSpecs. */
+  const runSearch = async () => {
     setLoading(true);
     setError(null);
+    setResult(null);
+    setFotosResult([]);
+    setFotoUrl("");
+
+    const fetchFotos = () =>
+      authedJson<{ foto_candidates: string[] }>("/api/admin/equipos/buscar-fotos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: equipo.nombre, marca: equipo.marca, modelo: equipo.modelo }),
+      });
+
+    const fetchSpecs = () =>
+      enriquecer({ nombre: equipo.nombre, marca: equipo.marca, modelo: equipo.modelo, url: customUrl.trim() || null });
+
     try {
-      const r = await authedJson<{ foto_candidates: string[] }>(
-        "/api/admin/equipos/buscar-fotos",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nombre: equipo.nombre,
-            marca: equipo.marca,
-            modelo: equipo.modelo,
-          }),
-        },
-      );
-      const cands = r.foto_candidates ?? [];
-      setExtraCands(cands);
-      if (cands.length === 0) {
-        toast.info("No se encontraron fotos.");
-      } else {
-        // Pre-seleccionar la primera
-        setFotoUrl(cands[0]);
-        setAplicarFoto(true);
-        toast.success(`${cands.length} fotos encontradas`);
+      if (wantFotos && wantSpecs) {
+        const [fotosSettled, specsSettled] = await Promise.allSettled([fetchFotos(), fetchSpecs()]);
+
+        const allCands: string[] = [];
+
+        if (fotosSettled.status === "fulfilled") {
+          allCands.push(...(fotosSettled.value.foto_candidates ?? []));
+        } else {
+          toast.error("Error buscando fotos: " + ((fotosSettled.reason as Error)?.message ?? "desconocido"));
+        }
+
+        if (specsSettled.status === "fulfilled") {
+          const r = specsSettled.value;
+          setResult(r);
+          setMarca(r.marca ?? "");
+          setModelo(r.modelo ?? "");
+          setBhUrl(r.fuente_url);
+          setAplicarMarca(!equipo.marca && !!r.marca);
+          setAplicarModelo(!equipo.modelo && !!r.modelo);
+          setAplicarBh(!equipo.bh_url);
+          setAplicarDescripcion(!!r.descripcion);
+          setAplicarSpecs(r.specs.length > 0);
+          setKeywords(r.keywords ?? []);
+          setAplicarKeywords((r.keywords ?? []).length > 0);
+          const tieneFichaExt = !!(r.peso || r.dimensiones || r.montura || r.formato || r.resolucion || r.alimentacion || r.video_url || typeof r.precio_bh_usd === "number" || (r.incluye?.length ?? 0) > 0 || (r.conectividad?.length ?? 0) > 0 || (r.compatible_con?.length ?? 0) > 0);
+          setAplicarFichaExtendida(tieneFichaExt);
+          for (const u of (r.foto_candidates ?? [])) {
+            if (!allCands.includes(u)) allCands.push(u);
+          }
+        } else {
+          toast.error("Error buscando specs: " + ((specsSettled.reason as Error)?.message ?? "desconocido"));
+        }
+
+        const preferredFoto = allCands[0] ?? "";
+        setFotoUrl(preferredFoto);
+        setAplicarFoto(!equipo.foto_url && !!preferredFoto);
+        setFotosResult(allCands);
+        if (allCands.length === 0 && fotosSettled.status !== "fulfilled" && specsSettled.status !== "fulfilled") {
+          setError("No se pudo completar ninguna búsqueda.");
+        }
+      } else if (wantFotos) {
+        const r = await fetchFotos();
+        const cands = r.foto_candidates ?? [];
+        setFotosResult(cands);
+        if (cands.length === 0) {
+          toast.info("No se encontraron fotos.");
+        } else {
+          setFotoUrl(cands[0]);
+          setAplicarFoto(true);
+          toast.success(`${cands.length} fotos encontradas`);
+        }
+      } else if (wantSpecs) {
+        const r = await fetchSpecs();
+        setResult(r);
+        setMarca(r.marca ?? "");
+        setModelo(r.modelo ?? "");
+        setBhUrl(r.fuente_url);
+        const cands = r.foto_candidates ?? [];
+        const firstFoto = cands[0] ?? r.foto_url ?? "";
+        setFotoUrl(firstFoto);
+        setFotosResult(cands);
+        setAplicarMarca(!equipo.marca && !!r.marca);
+        setAplicarModelo(!equipo.modelo && !!r.modelo);
+        setAplicarFoto(!equipo.foto_url && !!firstFoto);
+        setAplicarBh(!equipo.bh_url);
+        setAplicarDescripcion(!!r.descripcion);
+        setAplicarSpecs(r.specs.length > 0);
+        setKeywords(r.keywords ?? []);
+        setAplicarKeywords((r.keywords ?? []).length > 0);
+        const tieneFichaExt = !!(r.peso || r.dimensiones || r.montura || r.formato || r.resolucion || r.alimentacion || r.video_url || typeof r.precio_bh_usd === "number" || (r.incluye?.length ?? 0) > 0 || (r.conectividad?.length ?? 0) > 0 || (r.compatible_con?.length ?? 0) > 0);
+        setAplicarFichaExtendida(tieneFichaExt);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error buscando fotos");
+      setError(e instanceof Error ? e.message : "Error desconocido");
     } finally {
       setLoading(false);
     }
   };
 
-  /** Aplicar solo la foto seleccionada (modo "photos"). */
+  /** Aplicar solo la foto seleccionada (cuando no hay specs). */
   const aplicarSoloFoto = async () => {
     if (!fotoUrl) {
       toast.info("Elegí una foto primero.");
@@ -168,26 +233,14 @@ export function EnriquecerEquipoDialog({
   const buscarMasFotos = async () => {
     setSearchingPhotos(true);
     try {
-      const known = [
-        ...(result?.foto_candidates ?? []),
-        ...(fotoUrl ? [fotoUrl] : []),
-        ...extraCands,
-      ];
-      const r = await authedJson<{ foto_candidates: string[] }>(
-        "/api/admin/equipos/buscar-fotos",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nombre: equipo.nombre,
-            marca:  equipo.marca,
-            modelo: equipo.modelo,
-            exclude: known,
-          }),
-        },
-      );
+      const known = [...fotosResult, ...(fotoUrl && !fotosResult.includes(fotoUrl) ? [fotoUrl] : [])];
+      const r = await authedJson<{ foto_candidates: string[] }>("/api/admin/equipos/buscar-fotos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: equipo.nombre, marca: equipo.marca, modelo: equipo.modelo, exclude: known }),
+      });
       const news = (r.foto_candidates ?? []).filter((u) => !known.includes(u));
-      setExtraCands((prev) => [...prev, ...news]);
+      setFotosResult((prev) => [...prev, ...news]);
       if (news.length === 0) {
         toast.info("No se encontraron fotos nuevas.");
       } else {
@@ -240,7 +293,7 @@ export function EnriquecerEquipoDialog({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: externalUrl }),
+          body: JSON.stringify({ url: externalUrl, bypass_whitelist: true }),
         },
       );
       if (!response.ok) {
@@ -269,47 +322,6 @@ export function EnriquecerEquipoDialog({
       if (steps[1].status !== "ok") update(1, { status: "fail", detail: msg });
       else update(2, { status: "fail", detail: msg });
       throw e;
-    }
-  };
-
-  const run = async () => {
-    setMode("info");
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    try {
-      const r = await enriquecer({
-        nombre: equipo.nombre,
-        marca: equipo.marca,
-        modelo: equipo.modelo,
-        url: customUrl.trim() || null,
-      });
-      setResult(r);
-      setMarca(r.marca ?? "");
-      setModelo(r.modelo ?? "");
-      setFotoUrl(r.foto_url ?? "");
-      setBhUrl(r.fuente_url);
-      setAplicarMarca(!equipo.marca && !!r.marca);
-      setAplicarModelo(!equipo.modelo && !!r.modelo);
-      setAplicarFoto(!equipo.foto_url && !!r.foto_url);
-      setAplicarBh(!equipo.bh_url);
-      setAplicarDescripcion(!!r.descripcion);
-      setAplicarSpecs(r.specs.length > 0);
-      setKeywords(r.keywords ?? []);
-      setAplicarKeywords((r.keywords ?? []).length > 0);
-      const tieneFichaExt = !!(
-        r.peso || r.dimensiones || r.montura || r.formato ||
-        r.resolucion || r.alimentacion || r.video_url ||
-        typeof r.precio_bh_usd === "number" ||
-        (r.incluye?.length ?? 0) > 0 ||
-        (r.conectividad?.length ?? 0) > 0 ||
-        (r.compatible_con?.length ?? 0) > 0
-      );
-      setAplicarFichaExtendida(tieneFichaExt);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error desconocido");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -431,7 +443,7 @@ export function EnriquecerEquipoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-amber" />
@@ -450,7 +462,7 @@ export function EnriquecerEquipoDialog({
           </div>
         </div>
 
-        {!result && !loading && !error && mode !== "photos" && (
+        {!result && fotosResult.length === 0 && !loading && !error && (
           <div className="py-4 space-y-4">
             {/* Input de URL opcional */}
             <div className="space-y-1.5">
@@ -469,146 +481,75 @@ export function EnriquecerEquipoDialog({
               </p>
             </div>
 
-            <p className="text-xs text-muted-foreground text-center">¿Qué querés buscar?</p>
+            <p className="text-xs text-muted-foreground">¿Qué querés buscar?</p>
             <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={buscarSoloFotos}
-                className="rounded-md border hairline p-4 text-left transition hover:border-amber hover:bg-amber-soft/40"
-              >
-                <ImageIcon className="h-5 w-5 mb-2 text-amber" />
-                <div className="font-medium text-sm">Solo fotos</div>
-                <div className="text-[11px] text-muted-foreground mt-1">
-                  Wikipedia, sitios oficiales y reviews. Rápido (~5s).
+              <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${wantFotos ? "border-amber bg-amber/10" : "border-border hover:border-ink/40"}`}>
+                <Checkbox checked={wantFotos} onCheckedChange={(v) => setWantFotos(v === true)} className="mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <ImageIcon className="h-4 w-4 mb-1 text-amber" />
+                  <div className="font-medium text-sm">Fotos</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    B&H, sitios oficiales. ~5s.
+                  </div>
                 </div>
-              </button>
-              <button
-                type="button"
-                onClick={run}
-                className="rounded-md border hairline p-4 text-left transition hover:border-amber hover:bg-amber-soft/40"
-              >
-                <FileText className="h-5 w-5 mb-2 text-amber" />
-                <div className="font-medium text-sm">
-                  {customUrl.trim() ? "Buscar desde este link" : "Specs + foto"}
+              </label>
+              <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${wantSpecs ? "border-amber bg-amber/10" : "border-border hover:border-ink/40"}`}>
+                <Checkbox checked={wantSpecs} onCheckedChange={(v) => setWantSpecs(v === true)} className="mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <FileText className="h-4 w-4 mb-1 text-amber" />
+                  <div className="font-medium text-sm">Specs</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    B&H + IA: ficha técnica. ~15s.
+                  </div>
                 </div>
-                <div className="text-[11px] text-muted-foreground mt-1">
-                  {customUrl.trim()
-                    ? `Scrapea ${(() => { try { return new URL(customUrl.trim()).hostname; } catch { return "el link"; } })()} con IA.`
-                    : "B&H + IA: specs, peso, montura, foto, precio. ~15s."
-                  }
-                </div>
-              </button>
+              </label>
             </div>
+            <Button
+              onClick={runSearch}
+              disabled={!wantFotos && !wantSpecs}
+              className="w-full"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              {customUrl.trim() ? "Buscar desde este link" : "Buscar"}
+            </Button>
           </div>
         )}
 
         {loading && (
           <div className="py-12 text-center text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin mx-auto mb-3" />
-            {mode === "photos"
+            {wantFotos && !wantSpecs
               ? "Buscando fotos en internet…"
-              : "Buscando en B&H, scrapeando y extrayendo specs…"}
+              : wantSpecs && !wantFotos
+              ? "Buscando en B&H, scrapeando y extrayendo specs…"
+              : "Buscando fotos y specs en paralelo…"}
             <div className="text-xs mt-1">
-              {mode === "photos" ? "Suele tardar 5-10 segundos." : "Suele tardar 10-20 segundos."}
+              {wantSpecs ? "Suele tardar 10-20 segundos." : "Suele tardar 5-10 segundos."}
             </div>
           </div>
         )}
 
-        {/* Modo "solo fotos": grid de candidatos + botón aplicar */}
-        {mode === "photos" && !loading && !error && (
+        {/* Foto-only results: grid de candidatos cuando no hay specs */}
+        {fotosResult.length > 0 && !result && !loading && !error && (
           <div className="space-y-3">
-            {extraCands.length === 0 ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                Sin resultados. Probá con la búsqueda completa o cargá una URL manual.
-                <div className="mt-3">
-                  <Button variant="outline" size="sm" onClick={buscarSoloFotos}>
-                    Reintentar
-                  </Button>
-                </div>
+            {fotoUrl && (
+              <div className="rounded-md border hairline overflow-hidden bg-white">
+                <img
+                  src={fotoUrl}
+                  alt="Preview"
+                  className="w-full max-h-64 object-contain"
+                  onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+                />
               </div>
-            ) : (
-              <>
-                {fotoUrl && (
-                  <div className="rounded-md border hairline overflow-hidden bg-muted/30">
-                    <img
-                      src={fotoUrl}
-                      alt="Preview"
-                      className="w-full max-h-64 object-contain"
-                      onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
-                    />
-                  </div>
-                )}
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      {extraCands.length} fotos — click para elegir
-                    </span>
-                    <Button
-                      type="button" size="sm" variant="ghost" className="h-7 text-xs"
-                      onClick={buscarMasFotos} disabled={searchingPhotos}
-                    >
-                      {searchingPhotos ? (
-                        <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Buscando…</>
-                      ) : (
-                        <><Sparkles className="h-3 w-3 mr-1 text-amber" />Buscar más</>
-                      )}
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {extraCands.map((u) => {
-                      const selected = u === fotoUrl;
-                      return (
-                        <button
-                          type="button" key={u} onClick={() => setFotoUrl(u)} title={u}
-                          className={
-                            "relative h-16 w-16 overflow-hidden rounded border transition " +
-                            (selected
-                              ? "border-amber ring-2 ring-amber/40"
-                              : "border-muted hover:border-ink/30")
-                          }
-                        >
-                          <img
-                            src={u} alt=""
-                            className="h-full w-full object-cover"
-                            onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.2"; }}
-                          />
-                          {selected && (
-                            <span className="absolute right-0.5 top-0.5 rounded-full bg-amber p-0.5">
-                              <Check className="h-2.5 w-2.5 text-ink" />
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                {photoDiag && (
-                  <div className="rounded-md border hairline bg-muted/30 p-3 text-xs">
-                    <div className="flex items-center gap-1.5 mb-2 font-mono uppercase tracking-wide text-muted-foreground">
-                      <Bug className="h-3.5 w-3.5" /> Subida de foto
-                    </div>
-                    <ul className="space-y-1">
-                      {photoDiag.map((s, i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <span className="mt-0.5">
-                            {s.status === "ok" && <Check className="h-3.5 w-3.5 text-emerald-600" />}
-                            {s.status === "fail" && <X className="h-3.5 w-3.5 text-destructive" />}
-                            {s.status === "pending" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                            {s.status === "skip" && <span className="block h-3.5 w-3.5 rounded-full border" />}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <div className={s.status === "fail" ? "text-destructive font-medium" : ""}>{s.label}</div>
-                            {s.detail && (
-                              <div className="text-[10px] text-muted-foreground break-all">{s.detail}</div>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </>
             )}
+            <PhotoGrid
+              candidates={fotosResult}
+              selected={fotoUrl}
+              onSelect={setFotoUrl}
+              onBuscarMas={buscarMasFotos}
+              searching={searchingPhotos}
+            />
+            {photoDiag && <PhotoDiag steps={photoDiag} />}
           </div>
         )}
 
@@ -616,7 +557,7 @@ export function EnriquecerEquipoDialog({
           <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
             {error}
             <div className="mt-2">
-              <Button variant="outline" size="sm" onClick={run}>Reintentar</Button>
+              <Button variant="outline" size="sm" onClick={runSearch}>Reintentar</Button>
             </div>
           </div>
         )}
@@ -660,72 +601,14 @@ export function EnriquecerEquipoDialog({
               </div>
             )}
 
-            {/* Selector de fotos: candidatos del enriquecedor + extras de buscar-fotos */}
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Otras opciones — click para elegir
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 text-xs"
-                  onClick={buscarMasFotos}
-                  disabled={searchingPhotos}
-                >
-                  {searchingPhotos ? (
-                    <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Buscando…</>
-                  ) : (
-                    <><Sparkles className="h-3 w-3 mr-1 text-amber" />Buscar más fotos</>
-                  )}
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {[...(result.foto_candidates ?? []), ...extraCands].map((u, idx) => {
-                  const isExtra = idx >= (result.foto_candidates?.length ?? 0);
-                  const selected = u === fotoUrl;
-                  return (
-                    <button
-                      type="button"
-                      key={u}
-                      onClick={() => setFotoUrl(u)}
-                      title={u}
-                      className={
-                        "relative h-16 w-16 overflow-hidden rounded border transition " +
-                        (selected
-                          ? "border-amber ring-2 ring-amber/40"
-                          : "border-muted hover:border-ink/30")
-                      }
-                    >
-                      <img
-                        src={u}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.opacity = "0.2";
-                        }}
-                      />
-                      {selected && (
-                        <span className="absolute right-0.5 top-0.5 rounded-full bg-amber p-0.5">
-                          <Check className="h-2.5 w-2.5 text-ink" />
-                        </span>
-                      )}
-                      {isExtra && !selected && (
-                        <span className="absolute left-0.5 top-0.5 rounded-full bg-ink/70 px-1 py-px text-[8px] font-mono text-amber">
-                          EXTRA
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-                {(result.foto_candidates?.length ?? 0) === 0 && extraCands.length === 0 && (
-                  <span className="text-[11px] text-muted-foreground italic py-2">
-                    Sin candidatos. Click "Buscar más fotos" para intentar otros sitios.
-                  </span>
-                )}
-              </div>
-            </div>
+            {/* Selector de fotos */}
+            <PhotoGrid
+              candidates={fotosResult}
+              selected={fotoUrl}
+              onSelect={setFotoUrl}
+              onBuscarMas={buscarMasFotos}
+              searching={searchingPhotos}
+            />
 
             {!fotoUrl && result.foto_motivo && (
               <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -814,7 +697,7 @@ export function EnriquecerEquipoDialog({
                     Aplicar
                   </label>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
                   {result.specs.map((s, i) => (
                     <div key={i} className="rounded border hairline px-2 py-1">
                       <div className="text-muted-foreground">{s.label}</div>
@@ -897,7 +780,7 @@ export function EnriquecerEquipoDialog({
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   Datos físicos / técnicos detectados. Se guardan en la ficha y aparecen en el catálogo.
                 </p>
-                <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
                   {result.peso && <FichaCell label="Peso" value={result.peso} />}
                   {result.dimensiones && <FichaCell label="Dimensiones" value={result.dimensiones} />}
                   {result.montura && <FichaCell label="Montura" value={result.montura} />}
@@ -923,32 +806,7 @@ export function EnriquecerEquipoDialog({
               </div>
             )}
 
-            {/* Estado de subida de foto */}
-            {photoDiag && (
-              <div className="rounded-md border hairline bg-muted/30 p-3 text-xs">
-                <div className="flex items-center gap-1.5 mb-2 font-mono uppercase tracking-wide text-muted-foreground">
-                  <Bug className="h-3.5 w-3.5" /> Subida de foto
-                </div>
-                <ul className="space-y-1">
-                  {photoDiag.map((s, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="mt-0.5">
-                        {s.status === "ok" && <Check className="h-3.5 w-3.5 text-emerald-600" />}
-                        {s.status === "fail" && <X className="h-3.5 w-3.5 text-destructive" />}
-                        {s.status === "pending" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                        {s.status === "skip" && <span className="block h-3.5 w-3.5 rounded-full border" />}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className={s.status === "fail" ? "text-destructive font-medium" : ""}>{s.label}</div>
-                        {s.detail && (
-                          <div className="text-[10px] text-muted-foreground break-all">{s.detail}</div>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {photoDiag && <PhotoDiag steps={photoDiag} />}
           </div>
         )}
 
@@ -956,7 +814,7 @@ export function EnriquecerEquipoDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          {mode === "photos" && extraCands.length > 0 && !loading && (
+          {fotosResult.length > 0 && !result && !loading && (
             <Button onClick={aplicarSoloFoto} disabled={saving || !fotoUrl}>
               {saving ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</>
@@ -967,7 +825,7 @@ export function EnriquecerEquipoDialog({
           )}
           {result && (
             <>
-              <Button variant="outline" onClick={run} disabled={loading || saving}>
+              <Button variant="outline" onClick={runSearch} disabled={loading || saving}>
                 Re-buscar
               </Button>
               <Button onClick={aplicar} disabled={saving}>
@@ -1058,6 +916,107 @@ function FichaList({ label, items }: { label: string; items: string[] }) {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+function PhotoGrid({
+  candidates,
+  selected,
+  onSelect,
+  onBuscarMas,
+  searching,
+}: {
+  candidates: string[];
+  selected: string;
+  onSelect: (u: string) => void;
+  onBuscarMas: () => void;
+  searching: boolean;
+}) {
+  if (candidates.length === 0) {
+    return (
+      <div className="py-6 text-center text-sm text-muted-foreground">
+        Sin resultados. Probá con otra búsqueda o cargá una URL manual.
+        <div className="mt-3">
+          <Button variant="outline" size="sm" onClick={onBuscarMas} disabled={searching}>
+            {searching ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Buscando…</> : "Buscar más"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          {candidates.length} fotos — tocá para elegir
+        </span>
+        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={onBuscarMas} disabled={searching}>
+          {searching ? (
+            <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Buscando…</>
+          ) : (
+            <><Sparkles className="h-3 w-3 mr-1 text-amber" />Buscar más</>
+          )}
+        </Button>
+      </div>
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        {candidates.map((u) => {
+          const isSelected = u === selected;
+          return (
+            <button
+              type="button"
+              key={u}
+              onClick={() => onSelect(u)}
+              title={u}
+              className={`relative aspect-square overflow-hidden rounded-lg border-2 transition ${
+                isSelected
+                  ? "border-amber ring-2 ring-amber/30"
+                  : "border-transparent hover:border-muted-foreground/30"
+              }`}
+            >
+              <img
+                src={u}
+                alt=""
+                className="h-full w-full object-contain bg-white"
+                onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.2"; }}
+              />
+              {isSelected && (
+                <span className="absolute right-1 top-1 rounded-full bg-amber p-0.5">
+                  <Check className="h-3 w-3 text-ink" />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PhotoDiag({ steps }: { steps: DiagStep[] }) {
+  return (
+    <div className="rounded-md border hairline bg-muted/30 p-3 text-xs">
+      <div className="flex items-center gap-1.5 mb-2 font-mono uppercase tracking-wide text-muted-foreground">
+        <Bug className="h-3.5 w-3.5" /> Subida de foto
+      </div>
+      <ul className="space-y-1">
+        {steps.map((s, i) => (
+          <li key={i} className="flex items-start gap-2">
+            <span className="mt-0.5">
+              {s.status === "ok" && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+              {s.status === "fail" && <X className="h-3.5 w-3.5 text-destructive" />}
+              {s.status === "pending" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+              {s.status === "skip" && <span className="block h-3.5 w-3.5 rounded-full border" />}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className={s.status === "fail" ? "text-destructive font-medium" : ""}>{s.label}</div>
+              {s.detail && (
+                <div className="text-[10px] text-muted-foreground break-all">{s.detail}</div>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
