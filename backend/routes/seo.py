@@ -15,6 +15,8 @@ NO incluye:
 from __future__ import annotations
 
 import os
+import re
+import unicodedata
 from datetime import datetime
 from xml.sax.saxutils import escape
 
@@ -23,6 +25,22 @@ from fastapi import APIRouter, Response
 from database import get_db
 
 router = APIRouter()
+
+
+def _build_equipo_slug(marca: str | None, nombre: str | None, equipo_id: int) -> str:
+    """Construye el slug-id canónico para un equipo. Equivalente al helper
+    frontend `buildEquipoSlug()` — mantener sincronizado.
+
+    Ej: ("Sony", "FX3 Cuerpo", 47) → "sony-fx3-cuerpo-47"
+    """
+    text = f"{marca or ''} {nombre or ''}".strip()
+    # Sacar acentos: NFD descompone, encode/decode quita los combining marks.
+    normalized = unicodedata.normalize("NFD", text)
+    no_accents = normalized.encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", "-", no_accents.lower()).strip("-")[:80]
+    if not slug:
+        return str(equipo_id)
+    return f"{slug}-{equipo_id}"
 
 # URL pública del sitio. Override con env var SITE_URL si se cambia el dominio.
 SITE_URL = os.getenv("SITE_URL", "https://ramblarental.com").rstrip("/")
@@ -43,14 +61,14 @@ def sitemap():
         {"loc": f"{SITE_URL}/preguntas-frecuentes", "lastmod": today, "changefreq": "monthly", "priority": "0.6"},
     ]
 
-    # Detalle por equipo: cada uno tiene URL única indexable (PR #107).
-    # Si la BD no está disponible, devolvemos sitemap parcial con solo
-    # estáticas — Google reintenta, mejor que un 500.
+    # Detalle por equipo: URL canónica = slug-id (`/equipo/sony-fx3-cuerpo-47`).
+    # Keywords en URL = mejor SEO. Si la BD no está disponible, devolvemos
+    # sitemap parcial con solo estáticas — Google reintenta.
     try:
         conn = get_db()
         try:
             rows = conn.execute("""
-                SELECT id,
+                SELECT id, marca, nombre,
                        COALESCE(updated_at, created_at) AS lastmod
                 FROM equipos
                 WHERE COALESCE(visible_catalogo, true) = true
@@ -66,8 +84,9 @@ def sitemap():
                 if hasattr(lastmod_raw, "strftime")
                 else today
             )
+            slug = _build_equipo_slug(r["marca"], r["nombre"], r["id"])
             urls.append({
-                "loc": f"{SITE_URL}/equipo/{r['id']}",
+                "loc": f"{SITE_URL}/equipo/{slug}",
                 "lastmod": lastmod,
                 "changefreq": "weekly",
                 "priority": "0.7",

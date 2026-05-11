@@ -9,9 +9,9 @@
  * equipo cargado antes del render — mejor UX y SEO friendly.
  */
 
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Plus,
@@ -31,6 +31,7 @@ import { backendToEquipment } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { formatARS } from "@/lib/format";
 import { priceBreakdown } from "@/lib/pricing";
+import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { type Equipment } from "@/data/equipment";
 
 const SITE_URL = "https://ramblarental.com";
@@ -42,18 +43,21 @@ async function fetchEquipo(id: string): Promise<Equipment | null> {
   return backendToEquipment(raw);
 }
 
-export const Route = createFileRoute("/equipo/$id")({
+export const Route = createFileRoute("/equipo/$slug")({
   loader: async ({ params, context }) => {
-    // Pre-fetch con queryClient para que el render inicial no haga otro fetch.
-    const ctx = context as { queryClient?: { fetchQuery: <T>(opts: { queryKey: unknown[]; queryFn: () => Promise<T> }) => Promise<T> } };
+    const ctx = context as {
+      queryClient?: {
+        fetchQuery: <T>(opts: { queryKey: unknown[]; queryFn: () => Promise<T> }) => Promise<T>;
+      };
+    };
     const qc = ctx.queryClient;
     if (qc) {
       return qc.fetchQuery({
-        queryKey: ["equipo", params.id],
-        queryFn: () => fetchEquipo(params.id),
+        queryKey: ["equipo", params.slug],
+        queryFn: () => fetchEquipo(params.slug),
       });
     }
-    return fetchEquipo(params.id);
+    return fetchEquipo(params.slug);
   },
   head: ({ loaderData }) => {
     const equipo = loaderData as Equipment | null;
@@ -70,7 +74,10 @@ export const Route = createFileRoute("/equipo/$id")({
       equipo.description ||
       `${equipo.brand} ${equipo.name} para alquilar por jornada en Rambla Rental, Mar del Plata.`;
     const truncatedDesc = desc.length > 160 ? desc.slice(0, 157) + "..." : desc;
-    const url = `${SITE_URL}/equipo/${equipo.id}`;
+    // URL canónica = slug-id. Aunque el visitor haya llegado con solo /equipo/47,
+    // le decimos a Google que indexe /equipo/<slug>-47.
+    const canonicalSlug = buildEquipoSlug(equipo);
+    const url = `${SITE_URL}/equipo/${canonicalSlug}`;
     const image = equipo.fotoUrl || `${SITE_URL}/icon-512.png`;
 
     return {
@@ -135,13 +142,23 @@ export const Route = createFileRoute("/equipo/$id")({
 });
 
 function EquipoPage() {
-  const { id } = Route.useParams();
+  const { slug } = Route.useParams();
   const navigate = useNavigate();
   const { data: equipo, isLoading, isError } = useQuery({
-    queryKey: ["equipo", id],
-    queryFn: () => fetchEquipo(id),
+    queryKey: ["equipo", slug],
+    queryFn: () => fetchEquipo(slug),
     staleTime: 60_000,
   });
+
+  // Redirect a la URL canónica con slug-id si el visitor llegó con solo el ID
+  // (back-compat). Mejor para SEO — Google ve la canónica con keywords.
+  useEffect(() => {
+    if (!equipo) return;
+    const canonical = buildEquipoSlug(equipo);
+    if (slug !== canonical) {
+      navigate({ to: "/equipo/$slug", params: { slug: canonical }, replace: true });
+    }
+  }, [equipo, slug, navigate]);
 
   if (isLoading) {
     return (

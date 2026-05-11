@@ -306,11 +306,33 @@ def list_equipos(
         conn.close()
 
 
-@router.get("/equipos/{id}")
-def get_equipo(id: int):
+@router.get("/equipos/{id_or_slug}")
+def get_equipo(id_or_slug: str):
+    """Devuelve el detalle de un equipo.
+
+    Acepta tanto ID numérico puro (`47`) como slug-id mixto al estilo
+    Stack Overflow (`sony-fx3-cuerpo-47`). El slug es solo cosmético —
+    el ID al final es lo que importa. Esto mejora SEO (keywords en URL)
+    sin perder back-compat con URLs viejas `/equipo/47`.
+
+    Si el cliente manda solo el slug sin ID (`sony-fx3-cuerpo`), devuelve
+    400 — preferimos ser explícitos y no adivinar.
+    """
+    # Caso 1: ID puro (compat con URLs viejas)
+    if id_or_slug.isdigit():
+        actual_id = int(id_or_slug)
+    else:
+        # Caso 2: slug-id, extraer el ID del final.
+        m = re.search(r"-(\d+)$", id_or_slug)
+        if not m:
+            raise HTTPException(400, "URL inválida — falta el id del equipo")
+        actual_id = int(m.group(1))
+
     conn = get_db()
     try:
-        row  = conn.execute("SELECT * FROM equipos WHERE id = ?", (id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM equipos WHERE id = ?", (actual_id,)
+        ).fetchone()
         if not row:
             raise HTTPException(404, "Equipo no encontrado")
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
@@ -319,7 +341,7 @@ def get_equipo(id: int):
             SELECT kc.componente_id, kc.cantidad, e.nombre, e.marca, e.foto_url
             FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id
             WHERE kc.equipo_id = ?  ORDER BY e.nombre
-        """, (id,)).fetchall()
+        """, (actual_id,)).fetchall()
         equipo["kit"] = [row_to_dict(r) for r in kit]
         return equipo
     finally:

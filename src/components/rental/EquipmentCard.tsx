@@ -5,6 +5,7 @@ import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { priceBreakdown } from "@/lib/pricing";
+import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { EmptyImage } from "./EmptyImage";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +34,8 @@ export function EquipmentCard({
   const price = priceBreakdown(item.pricePerDay, jornadas, 1);
   const showPeriodTotal = hasDateRange && jornadas > 1;
   const navigate = useNavigate();
-  const openDetail = () => navigate({ to: "/equipo/$id", params: { id: item.id } });
+  const openDetail = () =>
+    navigate({ to: "/equipo/$slug", params: { slug: buildEquipoSlug(item) } });
   // Tope efectivo: disponibilidad real (con fechas) o stock total del equipo
   const cap = disponible ?? item.cantidad ?? Infinity;
   const noStock = cap <= 0;
