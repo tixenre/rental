@@ -6,9 +6,9 @@
  * - El input de prioridad manual desaparece.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Trash2, ChevronRight, ChevronDown, GripVertical } from "lucide-react";
+import { Loader2, Plus, Trash2, ChevronRight, ChevronDown, GripVertical, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
@@ -51,7 +51,7 @@ export function CategoriasSection() {
   const updateMut = useMutation({
     mutationFn: ({ id, ...patch }: { id: number; nombre?: string; prioridad?: number; parent_id?: number | null; set_parent_null?: boolean }) =>
       adminApi.adminUpdateCategoria(id, patch),
-    onSuccess: invalidate,
+    onSuccess: () => { invalidate(); toast.success("Categoría actualizada"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -70,7 +70,7 @@ export function CategoriasSection() {
 
   const reorderMut = useMutation({
     mutationFn: (ids: number[]) => adminApi.adminReorderCategorias(ids),
-    onSuccess: invalidate,
+    onSuccess: () => { invalidate(); toast.success("Orden actualizado"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -280,14 +280,10 @@ function SortableRootItem({
           ) : <span className="h-4 w-4 inline-block" />}
         </button>
 
-        <Input
-          defaultValue={root.nombre}
-          key={`${root.id}-name-${root.nombre}`}
+        <EditableNameInput
+          value={root.nombre}
+          onSave={onRename}
           className="h-8 flex-1 font-medium"
-          onBlur={(e) => {
-            const v = e.target.value.trim();
-            if (v && v !== root.nombre) onRename(v);
-          }}
         />
         <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
           {root.total}
@@ -371,14 +367,10 @@ function SortableChildItem({
         >
           <GripVertical className="h-4 w-4" />
         </button>
-        <Input
-          defaultValue={child.nombre}
-          key={`${child.id}-name-${child.nombre}`}
+        <EditableNameInput
+          value={child.nombre}
+          onSave={onRename}
           className="h-8 flex-1"
-          onBlur={(e) => {
-            const v = e.target.value.trim();
-            if (v && v !== child.nombre) onRename(v);
-          }}
         />
         <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
           {child.total}
@@ -400,5 +392,88 @@ function SortableChildItem({
         </Button>
       </div>
     </li>
+  );
+}
+
+
+// ── Input editable con feedback visual ────────────────────────────────────────
+//
+// El input anterior usaba `defaultValue + onBlur` → silencioso, sin
+// indicador de "dirty" ni botón de save. El admin tipeaba, no veía nada y
+// asumía "no se puede editar". Issue #94.
+//
+// Este componente:
+// - Estado local controlado.
+// - Cuando hay cambios sin guardar (dirty): aparece botón ✓ (guardar) y ✗ (cancelar).
+// - Guarda al click del check o Enter; cancela con Escape o click en ✗.
+// - Re-sincroniza con `value` si cambia desde afuera (re-fetch post-save).
+
+function EditableNameInput({
+  value,
+  onSave,
+  className,
+}: {
+  value: string;
+  onSave: (v: string) => void;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  // Sincronizar cuando el valor del server cambia (después de un save exitoso,
+  // o si otra tab editó). Solo sincroniza si NO hay edición pendiente local.
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const trimmed = draft.trim();
+  const dirty = trimmed !== value && trimmed.length > 0;
+
+  const save = () => {
+    if (dirty) onSave(trimmed);
+  };
+  const cancel = () => {
+    setDraft(value);
+  };
+
+  return (
+    <div className="flex items-center gap-1 flex-1">
+      <Input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            save();
+          }
+          if (e.key === "Escape") {
+            e.preventDefault();
+            cancel();
+          }
+        }}
+        className={className}
+      />
+      {dirty && (
+        <>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 shrink-0"
+            onClick={save}
+            title="Guardar (Enter)"
+          >
+            <Check className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:bg-muted shrink-0"
+            onClick={cancel}
+            title="Cancelar (Esc)"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </>
+      )}
+    </div>
   );
 }
