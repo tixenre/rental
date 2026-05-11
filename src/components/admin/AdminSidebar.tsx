@@ -67,6 +67,7 @@ const items: NavItem[] = [
   { title: "Clientes",    url: "/admin/clientes",    icon: Users },
   { title: "Calendario",  url: "/admin/calendario",  icon: CalendarDays },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
+  { title: "Novedades",   url: "/admin/novedades",   icon: Sparkles },
   { title: "Settings",    url: "/admin/settings",    icon: Settings },
 ];
 
