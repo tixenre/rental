@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 96,
+    date: "2026-05-11",
+    type: "fix",
+    title: "Edición de categorías: ahora con feedback visual al guardar",
+    body: "El editor de categorías guardaba los cambios sin avisar (el campo se 'auto-guardaba' al perder el foco, sin botón ni confirmación). Ahora cuando se modifica un nombre aparece un botón verde ✓ para confirmar y uno gris ✗ para cancelar, con toast de éxito. También se pueden usar Enter (guardar) y Esc (cancelar). Resuelve la queja de 'no puedo editar las categorías'.",
+    labels: ["admin", "ux"],
+  },
+  {
     number: 95,
     date: "2026-05-11",
     type: "feat",
