@@ -1,6 +1,10 @@
+import { useState } from "react";
 import { type Equipment, type Category } from "@/data/equipment";
 import { CategoryIllustration } from "./illustrations/CategoryIllustration";
 import { cn } from "@/lib/utils";
+
+// Cuántas categorías mostrar por defecto (≈ 2 filas en desktop 5-col)
+const DEFAULT_VISIBLE = 10;
 
 /**
  * Mosaico de categorías estilo brand: ilustración + nombre + contador.
@@ -16,6 +20,10 @@ export function CategoryMosaic({
   categories: string[];
   onSelect: (c: string) => void;
 }) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? categories : categories.slice(0, DEFAULT_VISIBLE);
+  const hasMore = categories.length > DEFAULT_VISIBLE;
+
   return (
     <section className="px-6 py-8 lg:px-12 lg:py-12">
       <header className="mb-6 flex items-baseline justify-between">
@@ -31,7 +39,7 @@ export function CategoryMosaic({
       </header>
 
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {categories.map((c) => {
+        {visible.map((c) => {
           const count = allEquipos.filter((e) => e.category === c).length;
           return (
             <li key={c}>
@@ -56,6 +64,19 @@ export function CategoryMosaic({
           );
         })}
       </ul>
+
+      {hasMore && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={() => setShowAll((v) => !v)}
+            className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition px-4 py-2 rounded-full border hairline hover:border-ink"
+          >
+            {showAll
+              ? "← Mostrar menos"
+              : `Ver todas las categorías (${categories.length - DEFAULT_VISIBLE} más)`}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

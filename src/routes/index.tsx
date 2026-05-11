@@ -516,7 +516,7 @@ function GridMode({
                   {items.length} {items.length === 1 ? "equipo" : "equipos"}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5">
                 {items.map((item, i) => (
                   <EquipmentCard
                     key={item.id}

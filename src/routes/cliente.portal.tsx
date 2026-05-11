@@ -97,7 +97,12 @@ export default function ClientePortal() {
       {/* Header */}
       <header className="border-b hairline bg-background sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 h-12 flex items-center justify-between">
-          <span className="font-display text-sm text-ink">Rambla Rental</span>
+          <div className="flex items-center gap-3">
+            <a href="/" className="font-display text-sm text-ink hover:underline">Rambla Rental</a>
+            <a href="/" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-ink transition">
+              ← Catálogo
+            </a>
+          </div>
           <div className="flex items-center gap-3">
             {perfil && (
               <span className="text-xs text-muted-foreground hidden sm:block">
