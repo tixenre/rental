@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 128,
+    date: "2026-05-11",
+    type: "fix",
+    title: "Logo: subir uno nuevo se ve en todos lados (sin recorte ni grosor extra)",
+    body: "Tres problemas resueltos: (1) Antes el logo se guardaba con un nombre nuevo cada vez (logo-1234567890.png), entonces quedaban versiones viejas en el storage como basura. Ahora se guarda en un path fijo y se sobreescribe. (2) El logo se procesaba con el mismo helper de las fotos de equipos, que recortaba al ras y hacía cuadrado — eso engrosaba el top bar mobile porque los wordmarks horizontales pasaban a cuadrados con mucho padding. Ahora se preserva el aspect ratio original. (3) Si subías un logo nuevo, tardaba hasta 5 min en aparecer — ahora se ve en menos de 30s.",
+    labels: ["admin", "bug", "ux"],
+  },
+  {
     number: 122,
     date: "2026-05-11",
     type: "feat",

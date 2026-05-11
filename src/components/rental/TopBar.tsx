@@ -41,7 +41,10 @@ export function TopBar() {
     queryKey: ["settings", "logo_url"],
     queryFn: () =>
       fetch("/api/settings/logo_url").then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    staleTime: 5 * 60 * 1000,
+    // 30s — si el admin sube un logo nuevo, en menos de medio minuto se ve.
+    // El URL del setting trae cache buster (?v=<timestamp>) que invalida
+    // el cache del navegador / CDN automáticamente. Issue #127.
+    staleTime: 30_000,
   });
   const logoUrl: string | null = logoSetting?.value ?? null;
 
