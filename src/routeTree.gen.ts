@@ -24,6 +24,7 @@ import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
 import { Route as AdminClientesRouteImport } from './routes/admin/clientes'
 import { Route as AdminCalendarioRouteImport } from './routes/admin/calendario'
 import { Route as AdminPedidosIndexRouteImport } from './routes/admin/pedidos.index'
+import { Route as AdminEquiposIndexRouteImport } from './routes/admin/equipos.index'
 import { Route as AdminPedidosNuevoRouteImport } from './routes/admin/pedidos.nuevo'
 import { Route as AdminPedidosIdRouteImport } from './routes/admin/pedidos.$id'
 import { Route as AdminEquiposValidacionRouteImport } from './routes/admin/equipos.validacion'
@@ -108,6 +109,11 @@ const AdminPedidosIndexRoute = AdminPedidosIndexRouteImport.update({
   path: '/pedidos/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminEquiposIndexRoute = AdminEquiposIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminEquiposRoute,
+} as any)
 const AdminPedidosNuevoRoute = AdminPedidosNuevoRouteImport.update({
   id: '/pedidos/nuevo',
   path: '/pedidos/nuevo',
@@ -172,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/admin/equipos/validacion': typeof AdminEquiposValidacionRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
+  '/admin/equipos/': typeof AdminEquiposIndexRoute
   '/admin/pedidos/': typeof AdminPedidosIndexRoute
 }
 export interface FileRoutesByTo {
@@ -180,7 +187,6 @@ export interface FileRoutesByTo {
   '/estudio': typeof EstudioRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
-  '/admin/equipos': typeof AdminEquiposRouteWithChildren
   '/admin/estadisticas': typeof AdminEstadisticasRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -196,6 +202,7 @@ export interface FileRoutesByTo {
   '/admin/equipos/validacion': typeof AdminEquiposValidacionRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
+  '/admin/equipos': typeof AdminEquiposIndexRoute
   '/admin/pedidos': typeof AdminPedidosIndexRoute
 }
 export interface FileRoutesById {
@@ -222,6 +229,7 @@ export interface FileRoutesById {
   '/admin/equipos/validacion': typeof AdminEquiposValidacionRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoRoute
+  '/admin/equipos/': typeof AdminEquiposIndexRoute
   '/admin/pedidos/': typeof AdminPedidosIndexRoute
 }
 export interface FileRouteTypes {
@@ -249,6 +257,7 @@ export interface FileRouteTypes {
     | '/admin/equipos/validacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
+    | '/admin/equipos/'
     | '/admin/pedidos/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -257,7 +266,6 @@ export interface FileRouteTypes {
     | '/estudio'
     | '/admin/calendario'
     | '/admin/clientes'
-    | '/admin/equipos'
     | '/admin/estadisticas'
     | '/admin/login'
     | '/admin/settings'
@@ -273,6 +281,7 @@ export interface FileRouteTypes {
     | '/admin/equipos/validacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
+    | '/admin/equipos'
     | '/admin/pedidos'
   id:
     | '__root__'
@@ -298,6 +307,7 @@ export interface FileRouteTypes {
     | '/admin/equipos/validacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
+    | '/admin/equipos/'
     | '/admin/pedidos/'
   fileRoutesById: FileRoutesById
 }
@@ -415,6 +425,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPedidosIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/equipos/': {
+      id: '/admin/equipos/'
+      path: '/'
+      fullPath: '/admin/equipos/'
+      preLoaderRoute: typeof AdminEquiposIndexRouteImport
+      parentRoute: typeof AdminEquiposRoute
+    }
     '/admin/pedidos/nuevo': {
       id: '/admin/pedidos/nuevo'
       path: '/pedidos/nuevo'
@@ -481,6 +498,7 @@ interface AdminEquiposRouteChildren {
   AdminEquiposMarcasRoute: typeof AdminEquiposMarcasRoute
   AdminEquiposSpecsRoute: typeof AdminEquiposSpecsRoute
   AdminEquiposValidacionRoute: typeof AdminEquiposValidacionRoute
+  AdminEquiposIndexRoute: typeof AdminEquiposIndexRoute
 }
 
 const AdminEquiposRouteChildren: AdminEquiposRouteChildren = {
@@ -490,6 +508,7 @@ const AdminEquiposRouteChildren: AdminEquiposRouteChildren = {
   AdminEquiposMarcasRoute: AdminEquiposMarcasRoute,
   AdminEquiposSpecsRoute: AdminEquiposSpecsRoute,
   AdminEquiposValidacionRoute: AdminEquiposValidacionRoute,
+  AdminEquiposIndexRoute: AdminEquiposIndexRoute,
 }
 
 const AdminEquiposRouteWithChildren = AdminEquiposRoute._addFileChildren(
