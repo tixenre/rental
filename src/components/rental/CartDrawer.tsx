@@ -1,11 +1,14 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Trash2, Plus, Minus, Loader2 } from "lucide-react";
+import { X, Trash2, Plus, Minus, Loader2, AlertCircle } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useNavigate } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
 import { createOrder } from "@/lib/orders";
+import { authedFetch } from "@/lib/authedFetch";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -37,9 +40,11 @@ export function CartDrawer({
 
   const isBottom = drawerPlacement === "bottom";
 
+  const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [needsLogin, setNeedsLogin] = useState(false);
   const [notas, setNotas] = useState("");
   const [showNotas, setShowNotas] = useState(false);
 
@@ -112,12 +117,36 @@ export function CartDrawer({
   }, [drawerOpen, setDrawerOpen]);
 
   async function handleSubmit() {
-    if (!startDate || !endDate) return;
     if (list.length === 0) return;
-    
+
+    // #28 — Validación de fechas explícita con toast (antes el botón quedaba
+    // disabled silencioso y el user no sabía qué le faltaba)
+    if (!startDate || !endDate) {
+      toast.error("Seleccioná fechas de retiro y devolución antes de confirmar", {
+        duration: 4000,
+      });
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError(null);
+    setNeedsLogin(false);
+
+    // #27 — Pre-check de login antes de submitear. Si no hay sesión, mostramos
+    // panel con login/registro en vez del 401 críptico.
+    try {
+      const me = await authedFetch("/api/cliente/me");
+      if (!me.ok) {
+        setNeedsLogin(true);
+        setSubmitting(false);
+        return;
+      }
+    } catch {
+      setNeedsLogin(true);
+      setSubmitting(false);
+      return;
+    }
+
     try {
       await createOrder({
         status: "solicitado",
@@ -144,6 +173,16 @@ export function CartDrawer({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function goToLogin() {
+    setDrawerOpen(false);
+    navigate({ to: "/cliente/login" });
+  }
+
+  function goToRegister() {
+    setDrawerOpen(false);
+    navigate({ to: "/cliente/registro" });
   }
 
   function reset() {
@@ -391,12 +430,7 @@ export function CartDrawer({
                   )}
                   <button
                     type="button"
-                    disabled={
-                      submitting ||
-                      list.length === 0 ||
-                      !startDate ||
-                      !endDate
-                    }
+                    disabled={submitting || list.length === 0}
                     onClick={handleSubmit}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
                   >
@@ -410,10 +444,39 @@ export function CartDrawer({
                   </button>
 
                   {(!startDate || !endDate) ? (
-                    <p className="text-center text-xs text-muted-foreground">
-                      Elegí fechas para solicitar la cotización
+                    <p className="flex items-center justify-center gap-1.5 text-center text-xs text-amber-700">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      Elegí fechas para confirmar
                     </p>
                   ) : null}
+
+                  {/* #27 — Panel "necesitás cuenta" cuando el pre-check falla */}
+                  {needsLogin && (
+                    <div className="rounded-md border border-amber/40 bg-amber-soft p-3 space-y-2">
+                      <p className="text-sm text-ink font-medium">
+                        Necesitás una cuenta para confirmar
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Iniciá sesión o creá una cuenta para mandarnos tu solicitud.
+                      </p>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={goToLogin}
+                          className="flex-1 rounded-md bg-ink px-3 py-2 text-xs font-medium uppercase tracking-wider text-amber transition hover:brightness-110"
+                        >
+                          Iniciar sesión
+                        </button>
+                        <button
+                          type="button"
+                          onClick={goToRegister}
+                          className="flex-1 rounded-md border hairline px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink transition hover:bg-background"
+                        >
+                          Crear cuenta
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {list.length > 0 && (
                     <button
