@@ -1,7 +1,7 @@
 /**
  * PedidoPage — detalle de pedido.
  *
- * Desktop (≥ lg): 3 columnas — [Cliente + Items + Totales] | [Recogida] | [Sidebar]
+ * Desktop (≥ lg): 2 columnas — [Cliente+Recogida / Items / Totales] | [Sidebar sticky]
  * Mobile: columna única con las mismas secciones apiladas.
  */
 
@@ -195,7 +195,7 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
     (nextAction?.needsItems === true && draft.items.length === 0);
 
   return (
-    <div className="-mx-4 md:-mx-6 -my-6">
+    <div className="-mx-4 md:-mx-6 -my-6 bg-muted/40">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 bg-background border-b hairline px-4 md:px-6 py-3 flex items-center gap-3">
@@ -265,75 +265,122 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
         </div>
       </header>
 
-      {/* ── 3-column body ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_280px] gap-4 lg:gap-6 p-4 md:p-6 items-start">
+      {/* ── 2-column body: main (2/3) + sidebar (1/3) ─────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_300px] gap-4 lg:gap-6 p-4 md:p-6 items-start">
 
-        {/* ── Columna 1: Cliente + Items + Totales ── */}
+        {/* ── Columna principal ── */}
         <div className="space-y-4">
 
-          {/* Cliente */}
+          {/* Cliente + Recogida — una sola card, lado a lado */}
           <section className="rounded-lg border hairline bg-background overflow-hidden">
-            <div className="px-4 py-3 border-b hairline">
-              <h2 className="font-medium text-sm">Cliente</h2>
-            </div>
-            <div className="p-4 space-y-3">
-              {clienteNombre !== "Sin cliente" && (
-                <div className="flex items-center gap-3 rounded-md border hairline bg-muted/20 px-3 py-2.5">
-                  <ClienteAvatar name={clienteNombre} />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-ink truncate">{clienteNombre}</div>
-                    {draft.datos.cliente_email && (
-                      <div className="text-xs text-muted-foreground truncate">{draft.datos.cliente_email}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2">
+              {/* Cliente */}
+              <div className="p-4 space-y-3 border-b hairline sm:border-b-0 sm:border-r">
+                <h2 className="font-medium text-sm">Cliente</h2>
+                {clienteNombre !== "Sin cliente" && (
+                  <div className="flex items-center gap-3 rounded-md border hairline bg-muted/20 px-3 py-2.5">
+                    <ClienteAvatar name={clienteNombre} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-ink truncate">{clienteNombre}</div>
+                      {draft.datos.cliente_email && (
+                        <div className="text-xs text-muted-foreground truncate">{draft.datos.cliente_email}</div>
+                      )}
+                    </div>
+                    {draft.datos.cliente_id && (
+                      <button
+                        type="button"
+                        onClick={() => draft.setDatos({ ...draft.datos!, cliente_id: null })}
+                        className="rounded p-1 text-muted-foreground hover:text-ink transition"
+                        aria-label="Desvincular ficha"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     )}
                   </div>
-                  {draft.datos.cliente_id && (
-                    <button
-                      type="button"
-                      onClick={() => draft.setDatos({ ...draft.datos!, cliente_id: null })}
-                      className="rounded p-1 text-muted-foreground hover:text-ink transition"
-                      aria-label="Desvincular ficha"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
+                )}
+                <ClienteAutocomplete
+                  datos={draft.datos}
+                  onPick={(c) => draft.setDatos({
+                    ...draft.datos!,
+                    cliente_id: c.id,
+                    cliente_nombre: `${c.apellido}, ${c.nombre}`,
+                    cliente_email: c.email ?? "",
+                    cliente_telefono: c.telefono ?? "",
+                    descuento_pct: c.descuento ?? draft.datos!.descuento_pct,
+                  })}
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Nombre</Label>
+                    <Input
+                      value={draft.datos.cliente_nombre}
+                      onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_nombre: e.target.value })}
+                      className="h-8 text-sm text-base sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Email</Label>
+                    <Input
+                      value={draft.datos.cliente_email}
+                      onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_email: e.target.value })}
+                      className="h-8 text-sm text-base sm:text-sm"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="text-xs">Teléfono</Label>
+                    <Input
+                      value={draft.datos.cliente_telefono}
+                      onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_telefono: e.target.value })}
+                      className="h-8 text-sm text-base sm:text-sm"
+                    />
+                  </div>
                 </div>
-              )}
-              <ClienteAutocomplete
-                datos={draft.datos}
-                onPick={(c) => draft.setDatos({
-                  ...draft.datos!,
-                  cliente_id: c.id,
-                  cliente_nombre: `${c.apellido}, ${c.nombre}`,
-                  cliente_email: c.email ?? "",
-                  cliente_telefono: c.telefono ?? "",
-                  descuento_pct: c.descuento ?? draft.datos!.descuento_pct,
-                })}
-              />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              </div>
+
+              {/* Recogida */}
+              <div className="p-4 space-y-4">
+                <h2 className="font-medium text-sm">Recogida</h2>
                 <div>
-                  <Label className="text-xs">Nombre</Label>
-                  <Input
-                    value={draft.datos.cliente_nombre}
-                    onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_nombre: e.target.value })}
-                    className="h-8 text-sm text-base sm:text-sm"
-                  />
+                  <Label className="text-xs text-muted-foreground mb-1.5">Desde</Label>
+                  <div className="rounded-md border hairline px-3 py-3">
+                    <div className="text-lg font-semibold text-ink tabular-nums">
+                      {draft.datos.fecha_desde ? fmtFecha(draft.datos.fecha_desde) : "—"}
+                    </div>
+                    <Input
+                      type="date"
+                      value={draft.datos.fecha_desde}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (draft.datos!.fecha_hasta && new Date(draft.datos!.fecha_hasta) < new Date(v)) {
+                          draft.setDatos({ ...draft.datos!, fecha_desde: v, fecha_hasta: v });
+                        } else {
+                          draft.setDatos({ ...draft.datos!, fecha_desde: v });
+                        }
+                      }}
+                      className="mt-2 h-8 text-sm text-base sm:text-sm"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <Label className="text-xs">Email</Label>
-                  <Input
-                    value={draft.datos.cliente_email}
-                    onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_email: e.target.value })}
-                    className="h-8 text-sm text-base sm:text-sm"
-                  />
+                  <Label className="text-xs text-muted-foreground mb-1.5">Hasta</Label>
+                  <div className="rounded-md border hairline px-3 py-3">
+                    <div className="text-lg font-semibold text-ink tabular-nums">
+                      {draft.datos.fecha_hasta ? fmtFecha(draft.datos.fecha_hasta) : "—"}
+                    </div>
+                    <Input
+                      type="date"
+                      value={draft.datos.fecha_hasta}
+                      min={draft.datos.fecha_desde || undefined}
+                      onChange={(e) => draft.setDatos({ ...draft.datos!, fecha_hasta: e.target.value })}
+                      className="mt-2 h-8 text-sm text-base sm:text-sm"
+                    />
+                  </div>
                 </div>
-                <div className="sm:col-span-2">
-                  <Label className="text-xs">Teléfono</Label>
-                  <Input
-                    value={draft.datos.cliente_telefono}
-                    onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_telefono: e.target.value })}
-                    className="h-8 text-sm text-base sm:text-sm"
-                  />
-                </div>
+                {jornadas > 0 && (
+                  <div className="text-sm text-muted-foreground text-center">
+                    {jornadas} jornada{jornadas !== 1 ? "s" : ""}
+                  </div>
+                )}
               </div>
             </div>
           </section>
@@ -360,17 +407,8 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
           />
         </div>
 
-        {/* ── Columna 2: Recogida ── */}
-        <div className="space-y-4">
-          <RecogidaCard
-            datos={draft.datos}
-            setDatos={draft.setDatos}
-            jornadas={jornadas}
-          />
-        </div>
-
-        {/* ── Columna 3: Sidebar ── */}
-        <div className="rounded-lg border hairline bg-background overflow-hidden">
+        {/* ── Sidebar: Pagos + Docs + Notas — todo el alto ── */}
+        <div className="rounded-lg border hairline bg-background overflow-hidden lg:sticky lg:top-16">
           <SidebarSection title="Pagos" defaultOpen>
             <PagosSidebar
               pedidoId={pedido.id}
@@ -686,72 +724,6 @@ function TotalesCard({
         </div>
         {jornadas > 0 && (
           <div className="text-xs text-muted-foreground text-right">
-            {jornadas} jornada{jornadas !== 1 ? "s" : ""}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Recogida card (columna 2)
-// ─────────────────────────────────────────────────────────────────────────
-
-function RecogidaCard({
-  datos, setDatos, jornadas,
-}: {
-  datos: DraftDatos;
-  setDatos: (d: DraftDatos) => void;
-  jornadas: number;
-}) {
-  const set = <K extends keyof DraftDatos>(k: K, v: DraftDatos[K]) =>
-    setDatos({ ...datos, [k]: v });
-
-  return (
-    <section className="rounded-lg border hairline bg-background overflow-hidden">
-      <div className="px-4 py-3 border-b hairline">
-        <h2 className="font-medium text-sm">Recogida</h2>
-      </div>
-      <div className="p-4 space-y-4">
-        <div>
-          <Label className="text-xs text-muted-foreground mb-1.5">Desde</Label>
-          <div className="rounded-md border hairline px-3 py-3">
-            <div className="text-lg font-semibold text-ink tabular-nums">
-              {datos.fecha_desde ? fmtFecha(datos.fecha_desde) : "—"}
-            </div>
-            <Input
-              type="date"
-              value={datos.fecha_desde}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (datos.fecha_hasta && new Date(datos.fecha_hasta) < new Date(v)) {
-                  setDatos({ ...datos, fecha_desde: v, fecha_hasta: v });
-                } else {
-                  set("fecha_desde", v);
-                }
-              }}
-              className="mt-2 h-8 text-sm text-base sm:text-sm"
-            />
-          </div>
-        </div>
-        <div>
-          <Label className="text-xs text-muted-foreground mb-1.5">Hasta</Label>
-          <div className="rounded-md border hairline px-3 py-3">
-            <div className="text-lg font-semibold text-ink tabular-nums">
-              {datos.fecha_hasta ? fmtFecha(datos.fecha_hasta) : "—"}
-            </div>
-            <Input
-              type="date"
-              value={datos.fecha_hasta}
-              min={datos.fecha_desde || undefined}
-              onChange={(e) => set("fecha_hasta", e.target.value)}
-              className="mt-2 h-8 text-sm text-base sm:text-sm"
-            />
-          </div>
-        </div>
-        {jornadas > 0 && (
-          <div className="text-sm text-muted-foreground text-center">
             {jornadas} jornada{jornadas !== 1 ? "s" : ""}
           </div>
         )}
