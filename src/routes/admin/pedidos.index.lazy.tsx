@@ -21,6 +21,15 @@ import {
 
 import { adminApi, ESTADO_LABEL, type Pedido, type PedidoEstado } from "@/lib/admin/api";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
+import {
+  AdminCard,
+  AdminCardHeader,
+  AdminCardMeta,
+  AdminCardFooter,
+  AdminCardPrice,
+  AdminCardActions,
+  FAB,
+} from "@/components/mobile";
 
 export const Route = createLazyFileRoute("/admin/pedidos/")({
   component: PedidosPage,
@@ -45,6 +54,37 @@ const fmtArs = (n: number | null | undefined) =>
   n ? `$${Math.round(Number(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : "$0";
 
 const fmtFecha = (s: string | null) => (s ? s.slice(0, 10) : "—");
+
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const fmtFechaMobile = (s: string | null) => {
+  if (!s) return "—";
+  const [, m, d] = s.slice(0, 10).split("-");
+  return `${parseInt(d)} ${MESES[parseInt(m) - 1]}`;
+};
+
+function MobileCardSkeleton() {
+  return (
+    <div className="rounded-xl border hairline bg-surface p-4 space-y-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-1.5 flex-1">
+          <Skeleton className="h-3 w-8" />
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-3 w-28" />
+        </div>
+        <Skeleton className="h-5 w-20 rounded-full shrink-0" />
+      </div>
+      <Skeleton className="h-3 w-44" />
+      <div className="flex items-center justify-between pt-0.5">
+        <Skeleton className="h-4 w-24" />
+        <div className="flex gap-1">
+          <Skeleton className="h-9 w-9 rounded-md" />
+          <Skeleton className="h-9 w-9 rounded-md" />
+          <Skeleton className="h-9 w-9 rounded-md" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PedidosPage() {
   const qc = useQueryClient();
@@ -91,7 +131,10 @@ function PedidosPage() {
             {pedidosQ.isLoading ? "Cargando…" : `${total} pedidos`}
           </p>
         </div>
-        <Button onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}>
+        <Button
+          onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}
+          className="hidden md:flex"
+        >
           <Plus className="h-4 w-4 mr-1" /> Nuevo pedido
         </Button>
       </header>
@@ -123,7 +166,58 @@ function PedidosPage() {
         </div>
       )}
 
-      <div className="rounded-lg border hairline overflow-x-auto bg-background">
+      {/* Mobile: cards (< md) */}
+      <div className="md:hidden space-y-3 pb-24">
+        {pedidosQ.isLoading && Array.from({ length: 3 }).map((_, i) => (
+          <MobileCardSkeleton key={i} />
+        ))}
+        {!pedidosQ.isLoading && items.length === 0 && (
+          <div className="py-12 text-center text-sm text-muted-foreground">Sin pedidos.</div>
+        )}
+        {items.map((p) => {
+          const saldo = (p.monto_total ?? 0) - (p.monto_pagado ?? 0);
+          return (
+            <AdminCard key={p.id} onClick={() => openPedido(p.id)}>
+              <AdminCardHeader
+                label={`#${p.numero_pedido ?? p.id}`}
+                title={p.cliente_nombre || "Sin cliente"}
+                subtitle={p.cliente_email ?? undefined}
+                badge={
+                  <Badge variant="outline" className={ESTADO_CLASS[p.estado] ?? ""}>
+                    {ESTADO_LABEL[p.estado]}
+                  </Badge>
+                }
+              />
+              <AdminCardMeta>
+                {fmtFechaMobile(p.fecha_desde)} → {fmtFechaMobile(p.fecha_hasta)}
+              </AdminCardMeta>
+              <AdminCardFooter>
+                <AdminCardPrice
+                  total={p.monto_total ?? 0}
+                  saldo={saldo > 0 ? saldo : null}
+                />
+                <AdminCardActions>
+                  <div
+                    className="flex gap-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <WhatsAppButton pedido={p} phone={p.cliente_telefono} variant="icon" />
+                    <Button size="icon" variant="ghost" onClick={() => openPedido(p.id)}>
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => setDeleting(p)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </AdminCardActions>
+              </AdminCardFooter>
+            </AdminCard>
+          );
+        })}
+      </div>
+
+      {/* Desktop: tabla (≥ md) */}
+      <div className="hidden md:block rounded-lg border hairline overflow-x-auto bg-background">
         <Table>
           <TableHeader>
             <TableRow>
@@ -206,6 +300,13 @@ function PedidosPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* FAB mobile — nuevo pedido */}
+      <FAB
+        className="md:hidden"
+        onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}
+        label="Nuevo pedido"
+      />
 
       <AlertDialog open={!!deleting} onOpenChange={(v) => { if (!v) setDeleting(null); }}>
         <AlertDialogContent>

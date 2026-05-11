@@ -10,19 +10,17 @@ export function AdminCard({
   onClick?: () => void;
   className?: string;
 }) {
-  const Tag = onClick ? "button" : "div";
   return (
-    <Tag
-      type={onClick ? "button" : undefined}
+    <div
       onClick={onClick}
       className={cn(
-        "w-full rounded-xl border hairline bg-surface p-4 space-y-2.5 text-left transition",
-        onClick && "active:bg-muted",
+        "w-full rounded-xl border hairline bg-surface p-4 space-y-2.5 transition",
+        onClick && "cursor-pointer active:bg-muted",
         className,
       )}
     >
       {children}
-    </Tag>
+    </div>
   );
 }
 
