@@ -2058,21 +2058,21 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
         "Content-Type":  "application/json",
     }
 
-    # Queries específicos para fotos. Wikipedia primero (sin hotlink-block,
-    # imágenes limpias), después review sites, después manufacturer.
+    # Queries optimizados para fotos de producto con fondo blanco/neutro,
+    # bien iluminadas — ideal para equipos audiovisuales de renta.
+    # B&H primero: hero shots standarizados sobre fondo gris/blanco.
     PHOTO_QUERIES = [
-        # 1. Wikipedia: imágenes limpias, alta resolución, sin paywall
-        f"{query} (site:en.wikipedia.org OR site:commons.wikimedia.org OR site:es.wikipedia.org)",
-        # 2. Retailers: páginas de producto suelen tener fotos hero grandes
-        f"{query} (site:bhphotovideo.com OR site:adorama.com OR site:keh.com)",
-        # 3. Manufacturer oficial: fotos de producto canon
-        f"{query} (site:canon.com OR site:usa.canon.com OR site:sony.com OR site:nikon.com OR "
+        # 1. B&H Photo: fotos hero de producto, alta resolución, fondo neutro
+        f"{query} product photo site:bhphotovideo.com",
+        # 2. Adorama / KEH: misma categoría de retailers
+        f"{query} product image (site:adorama.com OR site:keh.com)",
+        # 3. Manufacturer oficial — página de producto
+        f"{query} product page (site:canon.com OR site:usa.canon.com OR site:sony.com OR site:nikon.com OR "
         f"site:fujifilm.com OR site:panasonic.com OR site:blackmagicdesign.com OR site:aputure.com OR "
         f"site:godox.com OR site:rode.com OR site:sennheiser.com OR site:dji.com OR site:atomos.com OR "
         f"site:tilta.com OR site:smallrig.com OR site:saramonic.com OR site:zoom-na.com)",
-        # 4. Review sites: producto en uso, suele tener fotos cuidadas
-        f"{query} review (site:dpreview.com OR site:photographyblog.com OR site:cinema5d.com OR "
-        f"site:newsshooter.com OR site:fstoppers.com OR site:petapixel.com OR site:cinematography.com)",
+        # 4. Wikipedia: fallback con imágenes limpias y sin paywall
+        f"{query} (site:en.wikipedia.org OR site:commons.wikimedia.org OR site:es.wikipedia.org)",
     ]
 
     def _fc_search(q: str, client) -> list[str]:
@@ -2143,11 +2143,11 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
             m = _re.search(r"[-_/](\d{2,4})x(\d{2,4})", lo)
             if m:
                 w, h = int(m.group(1)), int(m.group(2))
-                if w < 400 or h < 400:
+                if w < 800 or h < 800:
                     return
             # width=NN o w=NN <= 300 en query string
             m = _re.search(r"[?&](?:width|w|size)=(\d+)", lo)
-            if m and int(m.group(1)) < 400:
+            if m and int(m.group(1)) < 800:
                 return
             k = lo
             if k in seen or k in exclude_lc:
@@ -2164,6 +2164,17 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
         for m in re.finditer(r'<img[^>]+src=["\']?([^"\'>\s]+)', markdown):
             push(m.group(1))
 
+        # Ordenar: primero URLs con indicadores de foto de producto (fondo blanco/hero)
+        PRODUCT_INDICATORS = (
+            "/product/", "_hero", "-hero", "_main", "-main",
+            "-product-", "/images/", "bhphotovideo.com",
+            "_front", "-front", "_top", "-top",
+        )
+        def _product_score(u: str) -> int:
+            lo = u.lower()
+            return sum(1 for p in PRODUCT_INDICATORS if p in lo)
+
+        cands.sort(key=_product_score, reverse=True)
         return cands[:10]
 
     # Validación rápida: HEAD/GET parcial, descarta lo que no sea imagen real
@@ -2414,8 +2425,26 @@ def _host_resolves_to_private(host: str) -> bool:
     return False
 
 
+def _validate_ssrf_only(url: str) -> None:
+    """Anti-SSRF sin whitelist de dominios. Usado cuando el admin selecciona
+    manualmente una URL (no batch import). Protege contra IPs privadas/loopback
+    pero no restringe el dominio."""
+    from urllib.parse import urlparse as _urlparse
+    if not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "URL inválida — sólo http/https")
+    parsed = _urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if not host:
+        raise HTTPException(400, "URL inválida — host vacío")
+    port = parsed.port
+    if port and port not in (80, 443):
+        raise HTTPException(400, f"Puerto no permitido: {port}")
+    if _host_resolves_to_private(host):
+        raise HTTPException(403, f"Host '{host}' resuelve a IP privada/interna")
+
+
 def _validate_external_image_url(url: str) -> None:
-    """Anti-SSRF. Eleva HTTPException si la URL no es segura para descargar."""
+    """Anti-SSRF con whitelist de dominios. Eleva HTTPException si la URL no es segura."""
     from urllib.parse import urlparse as _urlparse
     if not url.lower().startswith(("http://", "https://")):
         raise HTTPException(400, "URL inválida — sólo http/https")
@@ -2769,6 +2798,7 @@ def _upload_to_supabase_storage(path: str, content: bytes, content_type: str) ->
 
 class UploadFotoFromUrlInput(BaseModel):
     url: str
+    bypass_whitelist: bool = False
 
 
 @router.post("/admin/equipos/{equipo_id}/upload-foto-from-url")
@@ -2794,7 +2824,10 @@ def admin_upload_foto_from_url(
         return {"public_url": url, "path": None, "skipped": True}
 
     # SSRF guard: validar host antes de descargar.
-    _validate_external_image_url(url)
+    if payload.bypass_whitelist:
+        _validate_ssrf_only(url)
+    else:
+        _validate_external_image_url(url)
 
     raw_content, raw_ctype = _download_image_bytes(url)
     # Optimización: resize a max 1600px + WebP q=85

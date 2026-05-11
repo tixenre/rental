@@ -34,7 +34,7 @@ export function TimeStepSelect({ value, onChange, className, ...rest }: Props) {
       value={safe}
       onChange={(e) => onChange(e.target.value)}
       className={cn(
-        "tabular-nums bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/50 rounded-md cursor-pointer",
+        "tabular-nums bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/50 rounded-md cursor-pointer min-h-[44px] px-1",
         className,
       )}
       aria-label={rest["aria-label"] ?? "Horario"}

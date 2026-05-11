@@ -31,7 +31,7 @@ import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin, type KitC
 import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
 import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
-import { EnriquecerEquipoDialog, type EnriquecerResult } from "./EnriquecerEquipoDialog";
+import { EnriquecerEquipoDialog, type EnriquecerResult } from "./enriquecedor";
 import { Link as LinkIcon, Image as ImageIcon, Check as CheckIcon } from "lucide-react";
 
 const TPL_TOKENS = ["tipo", "marca", "modelo", "nombre", "montura", "formato", "resolucion"] as const;

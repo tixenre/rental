@@ -62,7 +62,7 @@ function Chip({
       aria-label={`Quitar filtro ${label}`}
     >
       {icon}
-      <span className="max-w-[140px] truncate">{label}</span>
+      <span className="max-w-[40vw] truncate">{label}</span>
       <X className="h-3 w-3" />
     </button>
   );

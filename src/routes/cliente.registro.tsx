@@ -94,7 +94,7 @@ function ClienteRegistroPage() {
 
         {info && (
           <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Nombre *" value={form.nombre}
                 onChange={(v) => setForm((f) => ({ ...f, nombre: v }))} />
               <Field label="Apellido *" value={form.apellido}

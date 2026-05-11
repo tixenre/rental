@@ -5,6 +5,7 @@ import { Search, Trash2, ExternalLink, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -122,7 +123,7 @@ function PedidosPage() {
         </div>
       )}
 
-      <div className="rounded-lg border hairline overflow-hidden bg-background">
+      <div className="rounded-lg border hairline overflow-x-auto bg-background">
         <Table>
           <TableHeader>
             <TableRow>
@@ -136,6 +137,17 @@ function PedidosPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {pedidosQ.isLoading && Array.from({ length: 5 }).map((_, i) => (
+              <TableRow key={`sk-${i}`}>
+                <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-28" /></TableCell>
+                <TableCell className="hidden sm:table-cell text-right"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                <TableCell className="hidden md:table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                <TableCell className="text-right"><Skeleton className="h-7 w-16 ml-auto" /></TableCell>
+              </TableRow>
+            ))}
             {items.length === 0 && !pedidosQ.isLoading && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
