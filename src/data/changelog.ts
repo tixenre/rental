@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 117,
+    date: "2026-05-11",
+    type: "fix",
+    title: "Mini-ficha más limpia: sin descripción, solo lo importante",
+    body: "En la mini-ficha que aparece al hacer click en un equipo del catálogo, se sacó la descripción corta. Quedan solo los datos clave (quick facts) + los componentes del kit (lo más útil para decidir rápido) + el botón 'Ver ficha completa'. Pronto los quick facts van a poder definirse por categoría desde el back-office (issue #116).",
+    labels: ["público", "mobile", "ux"],
+  },
+  {
     number: 114,
     date: "2026-05-11",
     type: "fix",
