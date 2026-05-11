@@ -2,6 +2,7 @@
 routes/auth.py — Google OAuth 2.0 + cookie de sesión firmada.
 """
 
+import logging
 import os
 import time
 from collections import defaultdict
@@ -11,6 +12,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # ── Config ──────────────────────────────────────────────────────────────────
@@ -197,7 +199,7 @@ def auth_callback(request: Request):
     try:
         token = client.fetch_token(GOOGLE_TOKEN_URL, code=code)
     except Exception as e:
-        print(f"[auth] token_error: {e}")
+        logger.warning("Admin OAuth token_error: %s", e, exc_info=True)
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=token_error", status_code=303)
 
@@ -207,7 +209,7 @@ def auth_callback(request: Request):
         resp.raise_for_status()
         userinfo = resp.json()
     except Exception as e:
-        print(f"[auth] userinfo_error: {e}")
+        logger.warning("Admin OAuth userinfo_error: %s", e, exc_info=True)
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=userinfo_error", status_code=303)
 
@@ -311,7 +313,7 @@ def cliente_auth_callback(request: Request):
     try:
         client.fetch_token(GOOGLE_TOKEN_URL, code=code)
     except Exception as e:
-        print(f"[cliente_auth] token_error: {e}")
+        logger.warning("Cliente OAuth token_error: %s", e, exc_info=True)
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=token_error", status_code=303)
 
@@ -320,7 +322,7 @@ def cliente_auth_callback(request: Request):
         resp.raise_for_status()
         userinfo = resp.json()
     except Exception as e:
-        print(f"[cliente_auth] userinfo_error: {e}")
+        logger.warning("Cliente OAuth userinfo_error: %s", e, exc_info=True)
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=userinfo_error", status_code=303)
 

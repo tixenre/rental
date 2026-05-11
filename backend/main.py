@@ -3,8 +3,10 @@ Rambla Rental API — FastAPI + PostgreSQL
 Run: uvicorn main:app --reload --port 8000
 """
 
+import logging
 import os
 import threading
+import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -13,6 +15,11 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+
+# Configurar logging ANTES de importar cualquier módulo del proyecto
+# (algunos crean loggers a nivel de módulo).
+from logging_config import setup_logging, request_id_var
+setup_logging()
 
 from database import init_db, FRONT, FRONT_NEW
 from routes.equipos          import router as equipos_router
@@ -28,9 +35,27 @@ from routes.specs            import router as specs_router
 from routes.changelog        import router as changelog_router
 from middleware          import auth_middleware
 
+logger = logging.getLogger(__name__)
+
 # ── App ──────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="Rambla Rental API", version="2.0")
+
+
+async def request_id_middleware(request: Request, call_next):
+    """Inyecta un request_id único en context para que los logs lo incluyan.
+
+    Si el cliente envía un header X-Request-Id, lo respeta (útil para tracear
+    desde Sentry/Cloudflare). Si no, generamos un UUID4.
+    """
+    rid = request.headers.get("x-request-id") or uuid.uuid4().hex
+    token = request_id_var.set(rid)
+    try:
+        response = await call_next(request)
+        response.headers["X-Request-Id"] = rid
+        return response
+    finally:
+        request_id_var.reset(token)
 
 # Orígenes permitidos para CORS con credenciales (cookie de sesión).
 ALLOWED_ORIGINS = [
@@ -42,6 +67,7 @@ ALLOWED_ORIGINS = [
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
+app.add_middleware(BaseHTTPMiddleware, dispatch=request_id_middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -141,10 +167,9 @@ def spa_fallback(full_path: str):
 def init_db_bg():
     try:
         init_db()
-        print("✅ BD PostgreSQL inicializada")
+        logger.info("BD PostgreSQL inicializada")
     except Exception as e:
-        print(f"⚠️  No se pudo inicializar BD: {e}")
-        print("   La app continuará ejecutándose. Verifica DATABASE_URL.")
+        logger.error("No se pudo inicializar BD: %s. La app continuará — verificar DATABASE_URL.", e, exc_info=True)
 
 db_init_thread = threading.Thread(target=init_db_bg, daemon=True)
 db_init_thread.start()

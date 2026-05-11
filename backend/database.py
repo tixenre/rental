@@ -2,12 +2,15 @@
 database.py — Conexión PostgreSQL con pool de conexiones, migraciones y helpers.
 """
 
+import logging
 import os
 import pathlib
 import psycopg2
 import psycopg2.extras
 import psycopg2.pool
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 try:
     from dotenv import load_dotenv
@@ -49,7 +52,7 @@ def get_connection_params():
             'database': parsed.path.lstrip('/') or 'rambla_rental',
         }
     except Exception as e:
-        print(f"Error parsing DATABASE_URL: {e}")
+        logger.error("Error parsing DATABASE_URL: %s", e, exc_info=True)
         raise
 
 
@@ -293,7 +296,7 @@ def init_db():
             ) WHERE marca IS NOT NULL AND marca != ''
         """)
     except Exception as e:
-        print(f"⚠️  Migración de marcas parcial: {e}")
+        logger.warning("Migración de marcas parcial: %s", e)
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS clientes (
@@ -668,9 +671,9 @@ def init_db():
         from seeds.spec_templates import seed_spec_templates
         n = seed_spec_templates(conn)
         if n > 0:
-            print(f"   ↳ {n} templates de specs seedeados/actualizados")
+            logger.info("%d templates de specs seedeados/actualizados", n)
     except Exception as ex:
-        print(f"⚠️  No se pudieron seedear los templates de specs: {ex}")
+        logger.warning("No se pudieron seedear los templates de specs: %s", ex)
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_precio_historial (
@@ -779,13 +782,13 @@ def init_db():
     # con marca/modelo/nombre/categorías.
     try:
         n = regenerate_auto_tags_all(conn)
-        print(f"   ↳ {n} equipos con etiquetas auto regeneradas")
+        logger.info("%d equipos con etiquetas auto regeneradas", n)
     except Exception as ex:
-        print(f"⚠️  No se pudieron regenerar etiquetas auto: {ex}")
+        logger.warning("No se pudieron regenerar etiquetas auto: %s", ex)
 
     conn.commit()
     conn.close()
-    print("✅ Base de datos PostgreSQL inicializada")
+    logger.info("Base de datos PostgreSQL inicializada")
 
 
 # ── Helpers de conexión ──────────────────────────────────────────────────────
