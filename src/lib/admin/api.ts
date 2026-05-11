@@ -352,6 +352,11 @@ export const adminApi = {
     }),
   adminReorderMarcas: (reorder: { id: number; orden: number }[]) =>
     authedPostJson<{ ok: true }>("/api/admin/marcas/reorder", { marcas: reorder }),
+  adminMergeMarcas: (sourceId: number, targetId: number) =>
+    authedPostJson<{ ok: boolean; merged_into: string }>(
+      "/api/admin/marcas/merge",
+      { source_id: sourceId, target_id: targetId },
+    ),
 
   adminClasificarDryRun: () =>
     authedPostJson<ClasificarResult>("/api/admin/categorias/clasificar?apply=0", {}),

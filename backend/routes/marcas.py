@@ -33,6 +33,11 @@ class MarcasReorderRequest(BaseModel):
     marcas: list[dict]  # [{"id": 1, "orden": 2}, ...]
 
 
+class MarcaMergeRequest(BaseModel):
+    source_id: int  # marca a eliminar (sus equipos van a target)
+    target_id: int  # marca destino (recibe los equipos de source)
+
+
 # ── Public API ───────────────────────────────────────────────────────────────
 
 @router.get("/marcas")
@@ -123,6 +128,54 @@ def admin_update_marca(marca_id: int, patch: MarcaPatch, request: Request):
 
         conn.commit()
         return dict(row) if row else {}
+    finally:
+        conn.close()
+
+
+@router.post("/admin/marcas/merge")
+def admin_merge_marcas(req: MarcaMergeRequest, request: Request):
+    """Fusiona dos marcas duplicadas: reasigna todos los equipos de
+    `source_id` a `target_id` (vía `brand_id` y `marca` TEXT) y borra source.
+    Útil para consolidar "Red" + "RED DIGITAL CINEMA" → una sola marca.
+    """
+    require_admin(request)
+    if req.source_id == req.target_id:
+        raise HTTPException(400, "source_id y target_id no pueden ser iguales")
+    conn = get_db()
+    try:
+        # Validar que ambas existen
+        rows = conn.execute(
+            "SELECT id, nombre FROM marcas WHERE id IN (%s, %s)",
+            (req.source_id, req.target_id),
+        ).fetchall()
+        existing = {r["id"]: r["nombre"] for r in rows}
+        if req.source_id not in existing:
+            raise HTTPException(404, f"Marca source {req.source_id} no encontrada")
+        if req.target_id not in existing:
+            raise HTTPException(404, f"Marca target {req.target_id} no encontrada")
+
+        target_nombre = existing[req.target_id]
+
+        # Reasignar brand_id (FK)
+        conn.execute(
+            "UPDATE equipos SET brand_id = %s WHERE brand_id = %s",
+            (req.target_id, req.source_id),
+        )
+        # Sincronizar el TEXT marca por si quedó desincronizado
+        conn.execute(
+            "UPDATE equipos SET marca = %s WHERE brand_id = %s",
+            (target_nombre, req.target_id),
+        )
+        # Borrar la source
+        conn.execute("DELETE FROM marcas WHERE id = %s", (req.source_id,))
+        conn.commit()
+        return {"ok": True, "merged_into": target_nombre}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(500, f"Error al fusionar marcas: {e}")
     finally:
         conn.close()
 
