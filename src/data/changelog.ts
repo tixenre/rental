@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 120,
+    date: "2026-05-11",
+    type: "feat",
+    title: "Dueño de equipo ahora es un dropdown (Rambla / Pablo / Tincho)",
+    body: "Antes el campo dueño era texto libre — generaba inconsistencias por capitalización (\"Pablo\" vs \"pablo\" vs \"PABLO\") que fragmentaban los reportes. Ahora es un selector con las 3 opciones fijas. Los valores existentes se normalizaron automáticamente via migración Alembic. Si algún equipo tiene un dueño legacy (raro), aparece como '(legacy: X)' en el form y al guardar se reemplaza por la opción elegida del dropdown.",
+    labels: ["admin", "calidad-datos"],
+  },
+  {
     number: 119,
     date: "2026-05-11",
     type: "fix",

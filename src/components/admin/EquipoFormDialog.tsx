@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DUENOS, isCanonicalDueno } from "@/lib/admin/duenos";
 
 import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin, type KitComponente } from "@/lib/admin/api";
 import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
@@ -743,7 +744,27 @@ export function EquipoFormDialog({
 
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="N° Serie"><Input {...form.register("serie")} /></Field>
-                  <Field label="Dueño"><Input {...form.register("dueno")} /></Field>
+                  <Field label="Dueño">
+                    {(() => {
+                      const value = form.watch("dueno") ?? "Rambla";
+                      const isLegacy = value && !isCanonicalDueno(value);
+                      return (
+                        <Select
+                          value={isLegacy ? "" : value}
+                          onValueChange={(v) => form.setValue("dueno", v, { shouldDirty: true })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={isLegacy ? `(legacy: ${value})` : "Elegir"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DUENOS.map((d) => (
+                              <SelectItem key={d} value={d}>{d}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    })()}
+                  </Field>
                 </div>
 
                 <Field label="Link de fuente (B&H, Adorama…)">
