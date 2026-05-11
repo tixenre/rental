@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PreguntasFrecuentesRouteImport } from './routes/preguntas-frecuentes'
 import { Route as EstudioRouteImport } from './routes/estudio'
 import { Route as ClienteRouteImport } from './routes/cliente'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -37,6 +38,11 @@ import { Route as AdminEquiposEtiquetasRouteImport } from './routes/admin/equipo
 import { Route as AdminEquiposClasificarRouteImport } from './routes/admin/equipos.clasificar'
 import { Route as AdminEquiposCategoriasRouteImport } from './routes/admin/equipos.categorias'
 
+const PreguntasFrecuentesRoute = PreguntasFrecuentesRouteImport.update({
+  id: '/preguntas-frecuentes',
+  path: '/preguntas-frecuentes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EstudioRoute = EstudioRouteImport.update({
   id: '/estudio',
   path: '/estudio',
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
+  '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
   '/admin/equipos': typeof AdminEquiposRouteWithChildren
@@ -205,6 +212,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/estudio': typeof EstudioRoute
+  '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
   '/admin/estadisticas': typeof AdminEstadisticasRoute
@@ -234,6 +242,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
+  '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/admin/calendario': typeof AdminCalendarioRoute
   '/admin/clientes': typeof AdminClientesRoute
   '/admin/equipos': typeof AdminEquiposRouteWithChildren
@@ -265,6 +274,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/cliente'
     | '/estudio'
+    | '/preguntas-frecuentes'
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/equipos'
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/estudio'
+    | '/preguntas-frecuentes'
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/estadisticas'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/cliente'
     | '/estudio'
+    | '/preguntas-frecuentes'
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/equipos'
@@ -350,10 +362,18 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   ClienteRoute: typeof ClienteRouteWithChildren
   EstudioRoute: typeof EstudioRoute
+  PreguntasFrecuentesRoute: typeof PreguntasFrecuentesRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/preguntas-frecuentes': {
+      id: '/preguntas-frecuentes'
+      path: '/preguntas-frecuentes'
+      fullPath: '/preguntas-frecuentes'
+      preLoaderRoute: typeof PreguntasFrecuentesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/estudio': {
       id: '/estudio'
       path: '/estudio'
@@ -624,6 +644,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   ClienteRoute: ClienteRouteWithChildren,
   EstudioRoute: EstudioRoute,
+  PreguntasFrecuentesRoute: PreguntasFrecuentesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -16,11 +16,11 @@ import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { BrandCarousel } from "@/components/rental/BrandCarousel";
 import { ListFilters } from "@/components/rental/ListFilters";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
-import { CategoryIllustration } from "@/components/rental/illustrations/CategoryIllustration";
+import { Footer } from "@/components/rental/Footer";
 import { EquipmentDetailProvider } from "@/lib/equipment-detail-context";
 import { useEquipos, useDisponibilidad, useCategorias, useMarcas } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
-import { type Equipment, type Category } from "@/data/equipment";
+import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 
 const searchSchema = z.object({
@@ -563,33 +563,7 @@ function GridMode({
         </div>
       )}
 
-      {/* Footer mínimo */}
-      <footer className="border-t hairline px-6 py-12 lg:px-12">
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div>
-            <div className="wordmark text-4xl text-amber">rambla</div>
-            <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-              Rental · Mar del Plata
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-6 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            {(["Cámaras", "Lentes", "Iluminación", "Audio", "Soportes"] as Category[]).map((c) => (
-              <div key={c} className="flex flex-col items-center gap-2 text-ink">
-                <CategoryIllustration category={c} className="h-6 w-6" />
-                <span>{c}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="mt-8 flex justify-end">
-          <Link
-            to="/admin"
-            className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground hover:text-ink"
-          >
-            Admin
-          </Link>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
