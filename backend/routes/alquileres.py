@@ -441,7 +441,10 @@ ESTADOS_REQUIEREN_FECHAS = {"confirmado", "retirado", "devuelto", "finalizado"}
 
 
 def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> list[str]:
-    """Devuelve lista de nombres de equipos sin stock suficiente para el rango dado."""
+    """Devuelve lista de nombres de equipos sin stock suficiente para el rango dado.
+
+    Usa SELECT ... FOR UPDATE en equipos para evitar race conditions de concurrencia.
+    """
     items = conn.execute("""
         SELECT pi.equipo_id, pi.cantidad, e.nombre, e.cantidad AS stock_total
         FROM alquiler_items pi
@@ -451,6 +454,20 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
 
     problemas = []
     for it in items:
+        # Lock la fila de equipo durante el chequeo para evitar race conditions.
+        # SELECT ... FOR UPDATE evita que otra transacción concurrente lea el stock
+        # mientras estamos validando.
+        lock_result = conn.execute(
+            "SELECT cantidad FROM equipos WHERE id = ? FOR UPDATE",
+            (it["equipo_id"],)
+        ).fetchone()
+
+        if not lock_result:
+            problemas.append(f"{it['nombre']} (equipo no encontrado)")
+            continue
+
+        stock_total = lock_result["cantidad"]
+
         # Cuánto está reservado para ese equipo en el rango (excluyendo este pedido)
         reservado = conn.execute(f"""
             SELECT COALESCE(SUM(pi2.cantidad), 0)
@@ -463,7 +480,7 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
               AND p.fecha_hasta > ?
         """, (it["equipo_id"], pedido_id, fecha_hasta, fecha_desde)).fetchone()[0]
 
-        disponible = it["stock_total"] - reservado
+        disponible = stock_total - reservado
         if disponible < it["cantidad"]:
             problemas.append(
                 f"{it['nombre']} (necesitás {it['cantidad']}, disponible: {max(0, disponible)})"
