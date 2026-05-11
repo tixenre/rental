@@ -57,6 +57,21 @@ cd backend && ./run_local.sh
 └── Dockerfile            Build de producción (Railway)
 ```
 
+## Novedades (changelog)
+
+El feed de "Novedades" en `/admin/novedades` se alimenta de `src/data/changelog.ts`. Cada entrada se agrega **manualmente** en el mismo PR que la cambio — el feed está **curado** (no es 1:1 con los commits).
+
+Para no olvidarse de agregar entrada al mergear PRs:
+
+```bash
+npm run changelog:draft         # default: últimos 30 PRs
+npm run changelog:draft -- --limit 50
+```
+
+El script lista los PRs mergeados que **no están** en `changelog.ts` con un draft TS listo para pegar al inicio del array. Después editás `title` y `body` para que estén en lenguaje claro al usuario (no técnico), y commiteás.
+
+Requiere `gh` CLI autenticado.
+
 ## Migraciones (Alembic)
 
 Schema versionado. El `backend/database.py::init_db()` sigue creando tablas con `CREATE IF NOT EXISTS` para BD nuevas; Alembic registra y aplica cambios incrementales en BD existentes.
