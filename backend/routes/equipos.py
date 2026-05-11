@@ -4,11 +4,14 @@ routes/equipos.py — CRUD de equipos, kits, etiquetas, categorías y fichas.
 
 import calendar as _cal
 import datetime
+import logging
 import os
 import re
 import unicodedata
 from datetime import date as _date
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Query, HTTPException, Request
 from pydantic import BaseModel
@@ -2519,7 +2522,7 @@ def _optimize_image(content: bytes) -> tuple[bytes, str, int, int]:
         try:
             img = _trim_and_square(img, padding_pct=0.06)
         except Exception as e:
-            print(f"[optimize_image] trim_and_square falló, sigo sin trim: {e}")
+            logger.warning("optimize_image: trim_and_square falló, sigo sin trim: %s", e)
 
         # Resize a 1200x1200 (cuadrado) si excede
         TARGET_SIDE = 1200
@@ -2530,7 +2533,7 @@ def _optimize_image(content: bytes) -> tuple[bytes, str, int, int]:
         img.save(out, format="WEBP", quality=85, method=6)
         return out.getvalue(), "image/webp", img.width, img.height
     except Exception as e:
-        print(f"[optimize_image] fallback (no se pudo optimizar): {e}")
+        logger.warning("optimize_image: fallback (no se pudo optimizar): %s", e, exc_info=True)
         return content, "image/jpeg", 0, 0
 
 

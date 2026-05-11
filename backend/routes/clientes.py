@@ -93,15 +93,15 @@ def get_cliente_pedidos(id: int, request: Request):
             raise HTTPException(404, "Cliente no encontrado")
         rows = conn.execute("""
             SELECT p.id, p.numero_pedido, p.estado, p.fecha_desde, p.fecha_hasta,
-                   p.monto_total, p.monto_pagado, p.descuento_pct,
+                   p.monto_total, p.monto_pagado, p.descuento_pct, p.created_at,
                    STRING_AGG(e.nombre, ' · ') AS equipos
             FROM alquileres p
             LEFT JOIN alquiler_items pi ON pi.pedido_id = p.id
             LEFT JOIN equipos e ON e.id = pi.equipo_id
             WHERE p.cliente_id = ?
             GROUP BY p.id, p.numero_pedido, p.estado, p.fecha_desde, p.fecha_hasta,
-                     p.monto_total, p.monto_pagado, p.descuento_pct
-            ORDER BY p.numero_pedido DESC
+                     p.monto_total, p.monto_pagado, p.descuento_pct, p.created_at
+            ORDER BY p.created_at DESC NULLS LAST, p.numero_pedido DESC
         """, (id,)).fetchall()
         return [row_to_dict(r) for r in rows]
     finally:
