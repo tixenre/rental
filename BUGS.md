@@ -102,7 +102,7 @@ Fijados en PR #26 (`feat/sistema-specs-bulletproof`).
 | Opciones de búsqueda confusas ("Info técnica" buscaba fotos también) | ✅ Resuelto — renombrado a "Specs + foto" |
 | Botón "Ingresar" no lleva a ningún lado | ✅ Resuelto — creado `cliente.index.tsx` con redirect; TanStack Router necesitaba un index route |
 | Modal de producto vuelve al top al cerrarlo | ✅ Resuelto — `savedScrollY` ref + `resetScroll: false` en navigate + `requestAnimationFrame` restore |
-| Imágenes de distintos tamaños | 🟡 Mejorado — `object-contain` + aspect-ratio fijo; normalización completa pendiente (remove.bg) |
+| Imágenes de distintos tamaños | ✅ Resuelto (PR #39) — `_optimize_image` ahora auto-recorta whitespace + empareja a cuadrado con padding 6% + resize a 1200×1200 antes de guardar a R2. Sin necesidad de remove.bg. |
 | Búsqueda "Solo fotos" calidad baja | 🔵 Pendiente (low priority) |
 | Calendario en dashboard | 🔵 Sugerencia pendiente |
 
@@ -114,7 +114,7 @@ Fijados en PR #26 (`feat/sistema-specs-bulletproof`).
 - Mostrar mensaje: "Debes iniciar sesión o crear una cuenta"
 - Ofrecimiento: Login o Sign Up
 
-**Estado:** ✅ Resuelto (PR #32) — pre-check de `/api/cliente/me` antes de submit. Si no hay sesión, panel "Necesitás una cuenta" con botones "Iniciar sesión" / "Crear cuenta".
+**Estado:** ✅ Resuelto (PR #39) — pre-check de `/api/cliente/me` antes de submit. Si no hay sesión, panel "Necesitás una cuenta" con botones "Iniciar sesión" / "Crear cuenta". (Versión original de PR #32 había sido revertida manualmente, esta vez aplicada nuevamente.)
 
 ---
 
@@ -124,7 +124,7 @@ Fijados en PR #26 (`feat/sistema-specs-bulletproof`).
 **Módulo:** Cliente/Cotización  
 **Descripción:** Si el usuario no selecciona fechas (muestra "– 09:00"), debería haber validación/popup cuando intenta confirmar.
 
-**Estado:** ✅ Resuelto (PR #32) — botón ya no se disable por fechas faltantes; toast.error claro al click + mensaje amber visible.
+**Estado:** ✅ Resuelto (PR #39) — botón ya no se disable por fechas faltantes; toast.error claro al click + mensaje amber con ícono visible debajo. (Versión original de PR #32 había sido revertida manualmente.)
 
 ---
 

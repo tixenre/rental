@@ -2447,10 +2447,59 @@ def _ext_from_ctype(ct: str) -> str:
     return "jpg"
 
 
+def _trim_and_square(img, padding_pct: float = 0.06):
+    """Recorta bordes (transparentes o casi blancos) y empareja a cuadrado
+    con fondo blanco + padding. Sirve para que productos con mucho whitespace
+    queden visualmente del mismo tamaño que productos con poco whitespace.
+
+    Args:
+        img: PIL.Image (RGB o RGBA)
+        padding_pct: porcentaje de padding alrededor del bbox encontrado.
+                     0.06 = 6% del lado más largo.
+    Returns:
+        PIL.Image en modo RGB cuadrado con fondo blanco.
+    """
+    from PIL import Image, ImageChops
+
+    # 1) Encontrar el bbox del contenido
+    if img.mode == "RGBA":
+        # Bbox por canal alpha — funciona perfecto con PNG transparente
+        bbox = img.split()[-1].getbbox()
+        if bbox:
+            img = img.crop(bbox)
+        img_rgb = Image.new("RGB", img.size, (255, 255, 255))
+        img_rgb.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
+        img = img_rgb
+    else:
+        img = img.convert("RGB")
+        # Bbox por diferencia con un fondo blanco — captura productos sobre fondo blanco
+        bg = Image.new("RGB", img.size, (255, 255, 255))
+        diff = ImageChops.difference(img, bg)
+        # Reducir ruido (compresión JPEG deja píxeles "casi blancos")
+        diff = ImageChops.add(diff, diff, 2.0, -30)
+        bbox = diff.getbbox()
+        if bbox:
+            img = img.crop(bbox)
+
+    # 2) Hacer cuadrado: pegar centrado en un canvas blanco más grande
+    w, h = img.size
+    side = max(w, h)
+    pad = int(side * padding_pct)
+    canvas_side = side + 2 * pad
+    canvas = Image.new("RGB", (canvas_side, canvas_side), (255, 255, 255))
+    offset = ((canvas_side - w) // 2, (canvas_side - h) // 2)
+    canvas.paste(img, offset)
+    return canvas
+
+
 def _optimize_image(content: bytes) -> tuple[bytes, str, int, int]:
-    """Optimiza la imagen: auto-orient + resize a max 1600px ancho + WebP q=85.
-    Devuelve (bytes_optimizados, content_type, width, height).
+    """Optimiza la imagen: auto-orient + trim de bordes + cuadrado con fondo
+    blanco + resize a 1200x1200 + WebP q=85. Devuelve (bytes, ct, w, h).
     Si algo falla, devuelve el contenido original como fallback.
+
+    El trim+cuadrado normaliza el tamaño visual de los productos en el grid:
+    sin esto, los PNG con mucho whitespace alrededor se ven chicos comparados
+    con los que llenan el frame.
     """
     try:
         from PIL import Image, ImageOps
@@ -2462,16 +2511,20 @@ def _optimize_image(content: bytes) -> tuple[bytes, str, int, int]:
         img = Image.open(BytesIO(content))
         img = ImageOps.exif_transpose(img)  # auto-orient
 
-        # Convertir a RGB para WebP (los PNGs con transparencia se conservan en RGBA→WebP soporta)
+        # Normalizar a RGBA o RGB según corresponda (preservamos transparencia en PNG)
         if img.mode not in ("RGB", "RGBA"):
             img = img.convert("RGBA" if "A" in img.mode else "RGB")
 
-        # Resize si excede 1600px de ancho
-        MAX_WIDTH = 1600
-        if img.width > MAX_WIDTH:
-            ratio = MAX_WIDTH / img.width
-            new_size = (MAX_WIDTH, int(img.height * ratio))
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
+        # Trim + cuadrado con fondo blanco (#8 — tamaños inconsistentes)
+        try:
+            img = _trim_and_square(img, padding_pct=0.06)
+        except Exception as e:
+            print(f"[optimize_image] trim_and_square falló, sigo sin trim: {e}")
+
+        # Resize a 1200x1200 (cuadrado) si excede
+        TARGET_SIDE = 1200
+        if img.width > TARGET_SIDE:
+            img = img.resize((TARGET_SIDE, TARGET_SIDE), Image.Resampling.LANCZOS)
 
         out = BytesIO()
         img.save(out, format="WEBP", quality=85, method=6)
