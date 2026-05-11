@@ -108,10 +108,20 @@ export default function ClientePortal() {
               ← Catálogo
             </a>
             {perfil && (
-              <span className="text-xs text-muted-foreground hidden sm:block">
-                {perfil.nombre}
-              </span>
+              <a
+                href="/cliente/perfil"
+                className="text-xs text-muted-foreground hover:text-ink transition hidden sm:block"
+                title="Editar mi perfil"
+              >
+                {perfil.nombre} {perfil.apellido}
+              </a>
             )}
+            <a
+              href="/cliente/perfil"
+              className="text-xs text-muted-foreground hover:text-ink transition sm:hidden"
+            >
+              Perfil
+            </a>
             <button
               onClick={handleLogout}
               className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition"

@@ -703,7 +703,8 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate):
 # ── PDFs ─────────────────────────────────────────────────────────────────────
 
 @router.get("/alquileres/{id}/pdf")
-async def pedido_pdf(id: int):
+async def pedido_pdf(id: int, format: str = "pdf"):
+    """`format=html` devuelve el preview HTML sin pasar por el renderer."""
     conn = get_db()
     try:
         row  = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
@@ -714,7 +715,10 @@ async def pedido_pdf(id: int):
     finally:
         conn.close()
 
-    html      = _pedido_html(pedido)
+    html = _pedido_html(pedido)
+    if format == "html":
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html)
     pdf_bytes = await _render_pdf(html)
     filename  = _pedido_filename(pedido)
     return Response(
@@ -725,7 +729,8 @@ async def pedido_pdf(id: int):
 
 
 @router.get("/alquileres/{id}/albaran")
-async def pedido_albaran(id: int):
+async def pedido_albaran(id: int, format: str = "pdf"):
+    """`format=html` devuelve el preview HTML sin pasar por el renderer."""
     conn = get_db()
     try:
         row  = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
@@ -755,7 +760,10 @@ async def pedido_albaran(id: int):
     finally:
         conn.close()
 
-    html      = _albaran_html(pedido)
+    html = _albaran_html(pedido)
+    if format == "html":
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html)
     pdf_bytes = await _render_pdf(html)
     filename  = _pedido_filename(pedido, suffix="albaran")
     return Response(
@@ -766,7 +774,7 @@ async def pedido_albaran(id: int):
 
 
 @router.get("/alquileres/{id}/contrato")
-async def pedido_contrato(id: int):
+async def pedido_contrato(id: int, format: str = "pdf"):
     """Genera el PDF del contrato de alquiler."""
     conn    = get_db()
     try:
@@ -785,7 +793,10 @@ async def pedido_contrato(id: int):
     finally:
         conn.close()
 
-    html      = _contrato_html(pedido)
+    html = _contrato_html(pedido)
+    if format == "html":
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html)
     pdf_bytes = await _render_pdf(html)
     filename  = _pedido_filename(pedido, suffix="contrato")
     return Response(

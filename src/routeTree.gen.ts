@@ -17,6 +17,7 @@ import { Route as ClienteIndexRouteImport } from './routes/cliente.index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ClienteRegistroRouteImport } from './routes/cliente.registro'
 import { Route as ClientePortalRouteImport } from './routes/cliente.portal'
+import { Route as ClientePerfilRouteImport } from './routes/cliente.perfil'
 import { Route as ClienteLoginRouteImport } from './routes/cliente.login'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
@@ -73,6 +74,11 @@ const ClienteRegistroRoute = ClienteRegistroRouteImport.update({
 const ClientePortalRoute = ClientePortalRouteImport.update({
   id: '/portal',
   path: '/portal',
+  getParentRoute: () => ClienteRoute,
+} as any)
+const ClientePerfilRoute = ClientePerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
   getParentRoute: () => ClienteRoute,
 } as any)
 const ClienteLoginRoute = ClienteLoginRouteImport.update({
@@ -173,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/cliente/login': typeof ClienteLoginRoute
+  '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/admin/': typeof AdminIndexRoute
@@ -197,6 +204,7 @@ export interface FileRoutesByTo {
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/cliente/login': typeof ClienteLoginRoute
+  '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/admin': typeof AdminIndexRoute
@@ -225,6 +233,7 @@ export interface FileRoutesById {
   '/admin/login': typeof AdminLoginRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/cliente/login': typeof ClienteLoginRoute
+  '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/admin/': typeof AdminIndexRoute
@@ -254,6 +263,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/settings'
     | '/cliente/login'
+    | '/cliente/perfil'
     | '/cliente/portal'
     | '/cliente/registro'
     | '/admin/'
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/settings'
     | '/cliente/login'
+    | '/cliente/perfil'
     | '/cliente/portal'
     | '/cliente/registro'
     | '/admin'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/settings'
     | '/cliente/login'
+    | '/cliente/perfil'
     | '/cliente/portal'
     | '/cliente/registro'
     | '/admin/'
@@ -384,6 +396,13 @@ declare module '@tanstack/react-router' {
       path: '/portal'
       fullPath: '/cliente/portal'
       preLoaderRoute: typeof ClientePortalRouteImport
+      parentRoute: typeof ClienteRoute
+    }
+    '/cliente/perfil': {
+      id: '/cliente/perfil'
+      path: '/perfil'
+      fullPath: '/cliente/perfil'
+      preLoaderRoute: typeof ClientePerfilRouteImport
       parentRoute: typeof ClienteRoute
     }
     '/cliente/login': {
@@ -562,6 +581,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface ClienteRouteChildren {
   ClienteLoginRoute: typeof ClienteLoginRoute
+  ClientePerfilRoute: typeof ClientePerfilRoute
   ClientePortalRoute: typeof ClientePortalRoute
   ClienteRegistroRoute: typeof ClienteRegistroRoute
   ClienteIndexRoute: typeof ClienteIndexRoute
@@ -569,6 +589,7 @@ interface ClienteRouteChildren {
 
 const ClienteRouteChildren: ClienteRouteChildren = {
   ClienteLoginRoute: ClienteLoginRoute,
+  ClientePerfilRoute: ClientePerfilRoute,
   ClientePortalRoute: ClientePortalRoute,
   ClienteRegistroRoute: ClienteRegistroRoute,
   ClienteIndexRoute: ClienteIndexRoute,

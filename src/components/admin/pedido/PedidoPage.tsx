@@ -17,6 +17,7 @@ import {
   ChevronLeft, ShoppingCart, Info, CreditCard, FileText,
   Plus, Minus, Search, X, Trash2, AlertTriangle, Check,
   FileSignature, Truck, MoreHorizontal, Loader2, CloudOff, CloudCheck,
+  Eye, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -854,22 +855,59 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
 
 function DocsTab({ pedidoId }: { pedidoId: number }) {
   const docs = [
-    { kind: "pdf" as const,      label: "Presupuesto", icon: <FileText className="h-4 w-4" /> },
-    { kind: "albaran" as const,  label: "Albarán",     icon: <Truck className="h-4 w-4" /> },
-    { kind: "contrato" as const, label: "Contrato",    icon: <FileSignature className="h-4 w-4" /> },
+    {
+      kind: "pdf" as const,
+      label: "Presupuesto",
+      desc: "Cotización formal con ítems y total.",
+      icon: <FileText className="h-5 w-5" />,
+    },
+    {
+      kind: "albaran" as const,
+      label: "Albarán",
+      desc: "Lista de entrega con números de serie.",
+      icon: <Truck className="h-5 w-5" />,
+    },
+    {
+      kind: "contrato" as const,
+      label: "Contrato",
+      desc: "Documento legal con cláusulas y firma.",
+      icon: <FileSignature className="h-5 w-5" />,
+    },
   ];
   return (
-    <div className="px-4 md:px-6 py-4 space-y-2 max-w-xl">
+    <div className="px-4 md:px-6 py-4 space-y-3 max-w-2xl">
+      <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        Documentos del pedido
+      </div>
       {docs.map((d) => (
-        <a
+        <div
           key={d.kind}
-          href={pedidoPdfUrl(pedidoId, d.kind)}
-          className="flex items-center gap-3 rounded-md border hairline p-4 hover:bg-accent/30"
+          className="flex items-center gap-4 rounded-lg border hairline bg-surface p-4 hover:border-ink/20 transition"
         >
-          {d.icon}
-          <span className="text-sm text-ink">{d.label}</span>
-          <span className="ml-auto text-xs text-muted-foreground">Descargar PDF</span>
-        </a>
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-amber-soft text-ink">
+            {d.icon}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-base text-ink">{d.label}</div>
+            <div className="text-xs text-muted-foreground">{d.desc}</div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <a
+              href={`${pedidoPdfUrl(pedidoId, d.kind)}?format=html`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-1.5 text-xs font-medium text-ink hover:bg-accent/30 transition"
+            >
+              <Eye className="h-3.5 w-3.5" /> Ver
+            </a>
+            <a
+              href={pedidoPdfUrl(pedidoId, d.kind)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-amber hover:brightness-110 transition"
+            >
+              <Download className="h-3.5 w-3.5" /> PDF
+            </a>
+          </div>
+        </div>
       ))}
     </div>
   );

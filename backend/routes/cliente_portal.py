@@ -138,6 +138,59 @@ def cliente_me(request: Request):
         conn.close()
 
 
+class PerfilUpdate(BaseModel):
+    nombre:    Optional[str] = None
+    apellido:  Optional[str] = None
+    telefono:  Optional[str] = None
+    direccion: Optional[str] = None
+    cuit:      Optional[str] = None
+
+
+@router.patch("/api/cliente/me")
+def cliente_update_me(data: PerfilUpdate, request: Request):
+    """Permite al cliente actualizar sus datos personales.
+    NO se permite cambiar email (clave de identidad OAuth) ni descuento."""
+    session = require_cliente(request)
+    cliente_id = session["cliente_id"]
+
+    sets, vals = [], []
+    if data.nombre is not None:
+        n = data.nombre.strip()
+        if not n:
+            raise HTTPException(400, "El nombre no puede estar vacío")
+        sets.append("nombre = ?"); vals.append(n)
+    if data.apellido is not None:
+        sets.append("apellido = ?"); vals.append(data.apellido.strip())
+    if data.telefono is not None:
+        sets.append("telefono = ?"); vals.append(data.telefono.strip())
+    if data.direccion is not None:
+        sets.append("direccion = ?"); vals.append(data.direccion.strip())
+    if data.cuit is not None:
+        sets.append("cuit = ?"); vals.append(data.cuit.strip() or None)
+
+    if not sets:
+        raise HTTPException(400, "Sin cambios")
+
+    conn = get_db()
+    try:
+        vals.append(cliente_id)
+        conn.execute(f"UPDATE clientes SET {', '.join(sets)} WHERE id = ?", tuple(vals))
+        conn.commit()
+        row = conn.execute(
+            "SELECT id, nombre, apellido, email, telefono, direccion, cuit, perfil_impuestos, descuento, direccion_maps_url FROM clientes WHERE id = ?",
+            (cliente_id,),
+        ).fetchone()
+        return row_to_dict(row) if row else {}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(500, f"Error al actualizar perfil: {e}")
+    finally:
+        conn.close()
+
+
 # ── Crear / cancelar pedido ───────────────────────────────────────────────────
 
 class CartItemIn(BaseModel):

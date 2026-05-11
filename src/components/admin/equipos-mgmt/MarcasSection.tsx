@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, GripVertical, X } from "lucide-react";
+import { Loader2, GripVertical, X, AlertTriangle, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
@@ -51,7 +51,39 @@ export function MarcasSection() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const mergeMut = useMutation({
+    mutationFn: ({ sourceId, targetId }: { sourceId: number; targetId: number }) =>
+      adminApi.adminMergeMarcas(sourceId, targetId),
+    onSuccess: (data) => {
+      toast.success(`Marcas fusionadas en "${data.merged_into}"`);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const allMarcas = listQ.data?.items ?? [];
+
+  // ── Detección de marcas duplicadas ─────────────────────────────────────
+  // Agrupa por la primera palabra normalizada (lowercase, sin acentos).
+  // Ej: "Red" + "RED DIGITAL CINEMA" → grupo "red".
+  const duplicateGroups = useMemo(() => {
+    const norm = (s: string) =>
+      s.toLowerCase()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .trim()
+        .split(/\s+/)[0] ?? "";
+    const groups = new Map<string, MarcaAdmin[]>();
+    for (const m of allMarcas) {
+      const k = norm(m.nombre);
+      if (!k) continue;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k)!.push(m);
+    }
+    return Array.from(groups.values())
+      .filter((g) => g.length > 1)
+      .sort((a, b) => b.reduce((s, m) => s + m.total, 0) - a.reduce((s, m) => s + m.total, 0));
+  }, [allMarcas]);
 
   useEffect(() => {
     if (allMarcas.length > 0 && selected.length === 0) {
@@ -126,6 +158,49 @@ export function MarcasSection() {
       )}
       {listQ.error && (
         <div className="text-sm text-destructive">Error: {(listQ.error as Error).message}</div>
+      )}
+
+      {!listQ.isLoading && duplicateGroups.length > 0 && (
+        <div className="rounded-md border border-amber/40 bg-amber-soft/50 p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-700" />
+            <span className="text-sm font-medium text-ink">
+              Marcas posiblemente duplicadas ({duplicateGroups.length})
+            </span>
+          </div>
+          {duplicateGroups.map((group, gi) => {
+            // El target por defecto: la que tiene más equipos
+            const sorted = [...group].sort((a, b) => b.total - a.total);
+            const target = sorted[0];
+            const sources = sorted.slice(1);
+            return (
+              <div key={gi} className="rounded bg-background/60 px-3 py-2 text-xs space-y-1.5">
+                <div className="text-muted-foreground">
+                  Mantener <span className="font-medium text-ink">{target.nombre}</span> ({target.total} equipos):
+                </div>
+                {sources.map((src) => (
+                  <div key={src.id} className="flex items-center gap-2">
+                    <span className="text-ink flex-1 truncate">
+                      {src.nombre} <span className="text-muted-foreground">({src.total})</span>
+                    </span>
+                    <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <button
+                      onClick={() => {
+                        if (confirm(`¿Fusionar "${src.nombre}" en "${target.nombre}"? Los ${src.total} equipos pasarán a "${target.nombre}" y "${src.nombre}" se borrará.`)) {
+                          mergeMut.mutate({ sourceId: src.id, targetId: target.id });
+                        }
+                      }}
+                      disabled={mergeMut.isPending}
+                      className="rounded-md border hairline bg-background px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-ink hover:bg-amber-soft transition disabled:opacity-50"
+                    >
+                      Fusionar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {!listQ.isLoading && (
