@@ -122,7 +122,7 @@ export function StudioBookingForm() {
             <select
               value={startSlot}
               onChange={(e) => setStartSlot(e.target.value)}
-              className="mt-1.5 w-full rounded-md border hairline bg-background px-3 py-2 text-sm focus:border-amber/60 focus:outline-none"
+              className="mt-1.5 h-10 w-full rounded-md border hairline bg-background px-3 text-base sm:text-sm focus:border-amber/60 focus:outline-none"
             >
               {slots.map((s) => (
                 <option key={s.value} value={s.value}>
