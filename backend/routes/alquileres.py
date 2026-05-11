@@ -454,10 +454,42 @@ def delete_pedido(id: int, request: Request):
 ESTADOS_REQUIEREN_FECHAS = {"confirmado", "retirado", "devuelto", "finalizado"}
 
 
+def _consolidar_items_por_equipo(items) -> dict:
+    """Consolida items del mismo equipo sumando cantidades.
+
+    Si un pedido tiene 2 items con equipo_id=42 (cantidad=2 cada uno),
+    necesitamos validar 4 vs stock, no 2 cada uno por separado. Sino
+    pasaría la validación con falsa negativa (cada iteración chequea
+    2 < stock sin sumar el otro item del mismo equipo).
+
+    Issue #102 — bug latente cuando el frontend permite items duplicados
+    o si se usa la API directamente.
+
+    Acepta iterable de filas con keys: equipo_id, cantidad, nombre, stock_total.
+    Devuelve dict[equipo_id, {equipo_id, cantidad_total, nombre, stock_total}].
+    """
+    out: dict[int, dict] = {}
+    for it in items:
+        eq_id = it["equipo_id"]
+        if eq_id not in out:
+            out[eq_id] = {
+                "equipo_id": eq_id,
+                "cantidad": 0,
+                "nombre": it["nombre"],
+                "stock_total": it["stock_total"],
+            }
+        out[eq_id]["cantidad"] += it["cantidad"]
+    return out
+
+
 def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> list[str]:
     """Devuelve lista de nombres de equipos sin stock suficiente para el rango dado.
 
     Usa SELECT ... FOR UPDATE en equipos para evitar race conditions de concurrencia.
+
+    Si el pedido tiene varios items del MISMO equipo (raro pero posible si el
+    frontend tiene un bug o si se usa la API directamente), suma las cantidades
+    antes de validar — sino la validación pasaría con falsa negativa. Issue #102.
     """
     items = conn.execute("""
         SELECT pi.equipo_id, pi.cantidad, e.nombre, e.cantidad AS stock_total
@@ -466,8 +498,10 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
         WHERE pi.pedido_id = ?
     """, (pedido_id,)).fetchall()
 
+    consolidated = _consolidar_items_por_equipo(items)
+
     problemas = []
-    for it in items:
+    for it in consolidated.values():
         # Lock la fila de equipo durante el chequeo para evitar race conditions.
         # SELECT ... FOR UPDATE evita que otra transacción concurrente lea el stock
         # mientras estamos validando.

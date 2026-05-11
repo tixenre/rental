@@ -1,11 +1,63 @@
-"""Tests de helpers de precio en alquileres.py."""
+"""Tests de helpers de precio + stock en alquileres.py."""
 
 import pytest
 
-from routes.alquileres import _aplicar_descuento, _parse_precio
+from routes.alquileres import (
+    _aplicar_descuento,
+    _consolidar_items_por_equipo,
+    _parse_precio,
+)
 
 
 pytestmark = pytest.mark.unit
+
+
+class TestConsolidarItemsPorEquipo:
+    """Regresión de #102 — items duplicados del mismo equipo deben sumarse
+    antes de validar stock. Sino la validación pasa con falsa negativa."""
+
+    def test_items_distintos_se_mantienen_separados(self):
+        items = [
+            {"equipo_id": 1, "cantidad": 2, "nombre": "Sony FX3", "stock_total": 3},
+            {"equipo_id": 2, "cantidad": 1, "nombre": "Canon R5", "stock_total": 5},
+        ]
+        out = _consolidar_items_por_equipo(items)
+        assert len(out) == 2
+        assert out[1]["cantidad"] == 2
+        assert out[2]["cantidad"] == 1
+
+    def test_items_del_mismo_equipo_se_suman(self):
+        # El bug latente: dos items del mismo equipo_id deberían validarse
+        # como uno solo con la cantidad total.
+        items = [
+            {"equipo_id": 42, "cantidad": 2, "nombre": "Sony FX3", "stock_total": 3},
+            {"equipo_id": 42, "cantidad": 2, "nombre": "Sony FX3", "stock_total": 3},
+        ]
+        out = _consolidar_items_por_equipo(items)
+        assert len(out) == 1
+        assert out[42]["cantidad"] == 4  # Sumadas
+        assert out[42]["stock_total"] == 3
+        # Con 4 necesitadas y 3 stock, _check_stock debería ahora detectar
+        # el problema (antes pasaba porque cada item validaba 2 vs 3).
+
+    def test_lista_vacia_devuelve_dict_vacio(self):
+        assert _consolidar_items_por_equipo([]) == {}
+
+    def test_un_solo_item(self):
+        items = [{"equipo_id": 7, "cantidad": 1, "nombre": "Lente", "stock_total": 2}]
+        out = _consolidar_items_por_equipo(items)
+        assert out == {
+            7: {"equipo_id": 7, "cantidad": 1, "nombre": "Lente", "stock_total": 2}
+        }
+
+    def test_tres_items_mismo_equipo(self):
+        items = [
+            {"equipo_id": 1, "cantidad": 1, "nombre": "X", "stock_total": 10},
+            {"equipo_id": 1, "cantidad": 2, "nombre": "X", "stock_total": 10},
+            {"equipo_id": 1, "cantidad": 3, "nombre": "X", "stock_total": 10},
+        ]
+        out = _consolidar_items_por_equipo(items)
+        assert out[1]["cantidad"] == 6
 
 
 class TestAplicarDescuento:
