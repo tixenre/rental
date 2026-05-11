@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 108,
+    date: "2026-05-11",
+    type: "feat",
+    title: "SEO: meta tags, sitemap, structured data para Google",
+    body: "Ahora cuando Google indexa el sitio aparece con título, descripción e imagen propios (antes era genérico). Al compartir un link en WhatsApp/Instagram/Facebook se ve una preview con logo y texto. Agregado sitemap.xml para que Google encuentre todas las páginas, robots.txt para bloquear el back-office del indexado, y datos estructurados (LocalBusiness + FAQPage) para que aparezca con rich snippets en los resultados.",
+    labels: ["público", "seo"],
+  },
+  {
     number: 105,
     date: "2026-05-11",
     type: "fix",
