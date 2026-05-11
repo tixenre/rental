@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 138,
+    date: "2026-05-11",
+    type: "docs",
+    title: "Issues ahora se clasifican también por complejidad",
+    body: "Además de la prioridad (urgencia), ahora cada bug/feature tiene una etiqueta de complejidad (trivial, small, medium, large, epic) según el tiempo estimado. Útil para elegir qué hacer según el tiempo disponible — sesiones cortas tackle trivial+small, sprints epic. Aplicado a los 28 issues abiertos.",
+    labels: ["infra"],
+  },
+  {
     number: 137,
     date: "2026-05-11",
     type: "feat",
