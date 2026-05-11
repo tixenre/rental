@@ -3,9 +3,10 @@ routes/marcas.py — CRUD de marcas (brands).
 """
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from database import get_db, row_to_dict
+from admin_guard import require_admin
 
 router = APIRouter()
 
@@ -54,8 +55,9 @@ def list_marcas():
 # ── Admin API ────────────────────────────────────────────────────────────────
 
 @router.get("/admin/marcas")
-def admin_list_marcas():
+def admin_list_marcas(request: Request):
     """Lista todas las marcas (visible/invisible) con count de equipos."""
+    require_admin(request)
     conn = get_db()
     try:
         rows = conn.execute("""
@@ -74,8 +76,9 @@ def admin_list_marcas():
 
 
 @router.patch("/admin/marcas/{marca_id}")
-def admin_update_marca(marca_id: int, patch: MarcaPatch):
+def admin_update_marca(marca_id: int, patch: MarcaPatch, request: Request):
     """Actualiza una marca (nombre, logo_url, visible, orden)."""
+    require_admin(request)
     conn = get_db()
     try:
         # Verificar que existe
@@ -125,8 +128,9 @@ def admin_update_marca(marca_id: int, patch: MarcaPatch):
 
 
 @router.post("/admin/marcas/reorder")
-def admin_reorder_marcas(req: MarcasReorderRequest):
+def admin_reorder_marcas(req: MarcasReorderRequest, request: Request):
     """Actualiza el orden de múltiples marcas."""
+    require_admin(request)
     conn = get_db()
     try:
         for item in req.marcas:

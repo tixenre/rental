@@ -18,6 +18,8 @@ from database import (
     attach_ficha, regenerate_auto_tags,
 )
 from routes.auth import get_session
+from admin_guard import require_admin
+from services.nombre_service import actualizar_nombres_de
 
 router = APIRouter()
 
@@ -335,7 +337,6 @@ def create_equipo(data: EquipoCreate):
         # Hook: calcular nombre_publico inicial. No falla el create si esto
         # rompe (ej. si los servicios no están disponibles).
         try:
-            from services.nombre_service import actualizar_nombres_de
             actualizar_nombres_de(conn, new_id, commit=False)
         except Exception:
             pass
@@ -391,7 +392,6 @@ def update_equipo(id: int, data: EquipoUpdate):
         # No falla el update si el recálculo rompe.
         if any(k in updates for k in ("nombre", "marca", "modelo")):
             try:
-                from services.nombre_service import actualizar_nombres_de
                 actualizar_nombres_de(conn, id, commit=False)
             except Exception:
                 pass
@@ -475,7 +475,6 @@ def upsert_ficha(id: int, data: FichaUpdate):
             }
             if any(k in patch for k in keys_que_afectan_nombre):
                 try:
-                    from services.nombre_service import actualizar_nombres_de
                     actualizar_nombres_de(conn, id, commit=False)
                 except Exception:
                     pass
@@ -685,7 +684,6 @@ def set_categorias(id: int, data: CategoriasUpdate):
         # Hook: cambió la categoría → cambia el template de specs aplicable
         # → puede cambiar el nombre público auto-generado.
         try:
-            from services.nombre_service import actualizar_nombres_de
             actualizar_nombres_de(conn, id, commit=False)
         except Exception:
             pass
@@ -831,7 +829,6 @@ class EtiquetasReorder(BaseModel):
 
 @router.get("/admin/etiquetas")
 def admin_list_etiquetas(request: Request):
-    from admin_guard import require_admin
     require_admin(request)
     conn = get_db()
     try:
@@ -859,7 +856,6 @@ def admin_list_etiquetas(request: Request):
 
 @router.post("/admin/etiquetas", status_code=201)
 def admin_create_etiqueta(data: EtiquetaCreate, request: Request):
-    from admin_guard import require_admin
     require_admin(request)
     nombre = (data.nombre or "").strip()
     if not nombre:
@@ -901,7 +897,6 @@ def admin_create_etiqueta(data: EtiquetaCreate, request: Request):
 
 @router.patch("/admin/etiquetas/{eid}")
 def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
-    from admin_guard import require_admin
     require_admin(request)
     sets, vals = [], []
     if patch.nombre is not None:
@@ -946,7 +941,6 @@ def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
 
 @router.delete("/admin/etiquetas/{eid}", status_code=204)
 def admin_delete_etiqueta(eid: int, request: Request):
-    from admin_guard import require_admin
     require_admin(request)
     conn = get_db()
     try:
@@ -959,7 +953,6 @@ def admin_delete_etiqueta(eid: int, request: Request):
 
 @router.post("/admin/etiquetas/reorder")
 def admin_reorder_etiquetas(payload: EtiquetasReorder, request: Request):
-    from admin_guard import require_admin
     require_admin(request)
     conn = get_db()
     try:
@@ -1084,7 +1077,6 @@ class CategoriasReorder(BaseModel):
 
 @router.get("/admin/categorias")
 def admin_list_categorias(request: Request):
-    from admin_guard import require_admin
     require_admin(request)
     conn = get_db()
     try:
@@ -1107,7 +1099,6 @@ def admin_list_categorias(request: Request):
 
 @router.post("/admin/categorias", status_code=201)
 def admin_create_categoria(data: CategoriaCreate, request: Request):
-    from admin_guard import require_admin
     require_admin(request)
     nombre = (data.nombre or "").strip()
     if not nombre:
@@ -1145,7 +1136,6 @@ def admin_create_categoria(data: CategoriaCreate, request: Request):
 
 @router.patch("/admin/categorias/{cid}")
 def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
-    from admin_guard import require_admin
     require_admin(request)
     sets, vals = [], []
     if patch.nombre is not None:
@@ -1195,7 +1185,6 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
 
 @router.delete("/admin/categorias/{cid}", status_code=204)
 def admin_delete_categoria(cid: int, request: Request):
-    from admin_guard import require_admin
     require_admin(request)
     conn = get_db()
     try:
@@ -1213,7 +1202,6 @@ def admin_delete_categoria(cid: int, request: Request):
 
 @router.post("/admin/categorias/reorder")
 def admin_reorder_categorias(payload: CategoriasReorder, request: Request):
-    from admin_guard import require_admin
     require_admin(request)
     conn = get_db()
     try:
@@ -1238,7 +1226,6 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
     - apply=1: REEMPLAZA las categorías de cada equipo que matchee al menos 1
       regla; los que no matchean no se tocan. Regenera auto-tags después.
     """
-    from admin_guard import require_admin
     require_admin(request)
 
     conn = get_db()
@@ -1394,7 +1381,6 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     extraer marca/modelo/specs/foto en JSON estructurado. Devuelve un preview;
     el frontend decide qué campos aplicar via PATCH normal.
     """
-    from admin_guard import require_admin
     require_admin(request)
 
     import os, httpx
@@ -1929,7 +1915,6 @@ class BuscarFotosInput(BaseModel):
 def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
     """Busca fotos del equipo en fuentes optimizadas para imágenes (Wikipedia,
     manufacturer oficial, review sites). Devuelve lista validada de candidatos."""
-    from admin_guard import require_admin
     require_admin(request)
 
     import httpx
@@ -2129,7 +2114,6 @@ def admin_aplicar_enriquecimiento(id: int, payload: AplicarEnriquecimientoInput,
     en una sola transacción los campos que el cliente decidió aplicar.
     Cualquier campo NO incluido en el body queda como está (no se nullea).
     """
-    from admin_guard import require_admin
     require_admin(request)
 
     import json as _json
@@ -2595,7 +2579,6 @@ def admin_upload_foto_from_url(
 
     Reemplaza el upload directo desde el browser y el storage de Supabase.
     """
-    from admin_guard import require_admin
     require_admin(request)
 
     url = (payload.url or "").strip()
@@ -2639,7 +2622,6 @@ async def admin_upload_foto_file(
     """Sube un archivo (multipart/form-data, campo `file`) a R2 después de
     optimizarlo. Devuelve {public_url, path, ...}.
     """
-    from admin_guard import require_admin
     require_admin(request)
 
     form = await request.form()
@@ -2677,7 +2659,6 @@ def admin_storage_diag(request: Request):
     """Verifica que R2 esté configurado correctamente. Sólo dice si las vars
     están presentes y si el upload+read end-to-end funciona. NUNCA devuelve
     el contenido del secret."""
-    from admin_guard import require_admin
     require_admin(request)
 
     import time as _time
