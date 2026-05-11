@@ -1,0 +1,9 @@
+# Test dependencies — NO instalar en producción.
+# CI las instala con `pip install -r requirements-dev.txt` (que ya incluye
+# requirements.txt vía `-r`).
+
+-r requirements.txt
+
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-mock>=3.12.0

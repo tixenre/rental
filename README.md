@@ -57,6 +57,22 @@ cd backend && ./run_local.sh
 └── Dockerfile            Build de producción (Railway)
 ```
 
+## Tests
+
+```bash
+# Backend (pytest)
+cd backend
+source .venv/bin/activate
+pip install -r requirements-dev.txt   # primera vez
+python -m pytest tests/                # corre todo
+python -m pytest tests/test_ssrf.py    # un archivo
+python -m pytest -k "fecha" -v         # filtrar por nombre
+```
+
+Los tests están marcados con `@pytest.mark.unit` (sin DB, sin red) y eventualmente `@pytest.mark.integration` (con BD efímera — pendiente). Hoy son todos `unit`.
+
+CI corre `pytest` automáticamente en cada PR a `main` (job `python-tests` en `.github/workflows/ci.yml`).
+
 ## Workflow de desarrollo
 
 Solo dos branches long-lived:
