@@ -3,6 +3,7 @@ routes/pedidos.py — CRUD de pedidos, disponibilidad y generación de PDFs.
 """
 
 import datetime
+import logging
 from math import ceil
 from typing import Optional
 
@@ -14,6 +15,7 @@ from database import get_db, row_to_dict
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 ESTADOS_VALIDOS    = {"borrador", "presupuesto", "confirmado", "retirado", "devuelto", "finalizado", "cancelado"}
@@ -347,6 +349,7 @@ def create_pedido(data: PedidoCreate):
         pedido = _get_alquiler_detail(conn, pedido_id)
         return pedido
     except Exception:
+        logger.error("Error creando pedido", exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -438,6 +441,7 @@ def delete_pedido(id: int, request: Request):
         conn.execute("DELETE FROM alquileres       WHERE id=?",        (id,))
         conn.commit()
     except Exception:
+        logger.error("Error eliminando pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -554,6 +558,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request):
         pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
+        logger.error("Error actualizando estado del pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -576,6 +581,7 @@ def registrar_pago(id: int, data: PagoParcial, request: Request):
         pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
+        logger.error("Error actualizando monto_pagado del pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -624,6 +630,7 @@ def agregar_pago(id: int, data: PagoCreate, request: Request):
         pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
+        logger.error("Error agregando pago al pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -655,6 +662,7 @@ def eliminar_pago(id: int, pago_id: int, request: Request):
         pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
+        logger.error("Error registrando pago en pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -725,6 +733,7 @@ def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
         pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
+        logger.error("Error actualizando datos del pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
@@ -770,6 +779,7 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
         pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
+        logger.error("Error actualizando items del pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
