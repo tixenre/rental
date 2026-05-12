@@ -490,14 +490,14 @@ def duplicate_equipo(id: int):
                 [new_id] + [f.get(c) for c in cols],
             )
 
-        # Copiar categorías
+        # Copiar categorías (con orden manual preservado)
         cats = conn.execute(
-            "SELECT categoria_id FROM equipo_categorias WHERE equipo_id=?", (id,)
+            "SELECT categoria_id, orden FROM equipo_categorias WHERE equipo_id=?", (id,)
         ).fetchall()
-        for (cat_id,) in cats:
+        for cat in cats:
             conn.execute(
-                "INSERT INTO equipo_categorias (equipo_id, categoria_id) VALUES (?, ?)",
-                (new_id, cat_id),
+                "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
+                (new_id, cat["categoria_id"], cat["orden"]),
             )
 
         # Copiar kit
