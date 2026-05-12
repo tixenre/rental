@@ -1,4 +1,4 @@
-import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Image as ImageIcon, FileText, Link as LinkIcon } from "lucide-react";
+import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Image as ImageIcon, FileText, Link as LinkIcon, CloudUpload } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,33 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 
 import { type Equipo } from "@/lib/admin/api";
+import { isHostedUrl } from "@/lib/equipment/photos";
 import { useEnriquecedor } from "./useEnriquecedor";
 import { PhotoGrid } from "./PhotoGrid";
 import { PhotoDiag } from "./PhotoDiag";
 import { FieldRow, FichaCell, FichaList } from "./FieldRow";
+
+function FotoBadge({ fotoUrl, uploadingFotoUrl }: { fotoUrl: string; uploadingFotoUrl: string }) {
+  if (uploadingFotoUrl) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-background/90 border hairline px-2 py-0.5 text-[11px] text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" /> Subiendo a R2…
+      </span>
+    );
+  }
+  if (isHostedUrl(fotoUrl)) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] text-emerald-700 font-medium">
+        <CloudUpload className="h-3 w-3" /> En R2
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] text-amber-700">
+      URL externa
+    </span>
+  );
+}
 
 export function EnriquecerEquipoDialog({
   equipo,
@@ -25,10 +48,10 @@ export function EnriquecerEquipoDialog({
   onApplied: () => void;
 }) {
   const {
-    loading, saving, result, error,
+    loading, loadingFoto, saving, result, error,
     marca, setMarca,
     modelo, setModelo,
-    fotoUrl, setFotoUrl,
+    fotoUrl, setFotoUrl, uploadingFotoUrl, selectFoto,
     bhUrl, setBhUrl,
     aplicarMarca, setAplicarMarca,
     aplicarModelo, setAplicarModelo,
@@ -42,12 +65,13 @@ export function EnriquecerEquipoDialog({
     photoDiag,
     fotosResult,
     searchingPhotos,
-    wantFotos, setWantFotos,
-    wantSpecs, setWantSpecs,
     customUrl, setCustomUrl,
     fichaExtendidaTieneDatos,
-    runSearch, aplicarSoloFoto, buscarMasFotos, addKeyword, removeKeyword, setAll, aplicar,
+    buscarFoto, runSearch, aplicarSoloFoto, buscarMasFotos, addKeyword, removeKeyword, setAll, aplicar,
   } = useEnriquecedor({ equipo, open, onApplied, onOpenChange });
+
+  const isInitial = !result && !fotoUrl && !loading && !loadingFoto && !error;
+  const isFotoOnly = !!fotoUrl && !result && !loading && !loadingFoto;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -58,8 +82,7 @@ export function EnriquecerEquipoDialog({
             Auto-completar info
           </DialogTitle>
           <DialogDescription>
-            Buscamos en B&amp;H y sitios oficiales — la IA extrae specs, foto, ficha técnica
-            y datos físicos. Revisá antes de aplicar.
+            Pegá el link del producto para obtener la foto o la ficha técnica completa.
           </DialogDescription>
         </DialogHeader>
 
@@ -70,104 +93,110 @@ export function EnriquecerEquipoDialog({
           </div>
         </div>
 
-        {!result && fotosResult.length === 0 && !loading && !error && (
+        {/* ── Pantalla inicial ─────────────────────────────────────── */}
+        {isInitial && (
           <div className="py-4 space-y-4">
             <div className="space-y-1.5">
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium uppercase tracking-wide">
                 <LinkIcon className="h-3.5 w-3.5" />
-                Link del producto (opcional)
+                Link del producto
               </label>
               <Input
                 value={customUrl}
                 onChange={(e) => setCustomUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void buscarFoto(); }}
                 placeholder="https://www.bhphotovideo.com/… o sitio oficial"
                 className="font-mono text-xs h-9"
+                autoFocus
               />
-              <p className="text-[11px] text-muted-foreground">
-                Si pegás un link, la IA va directo ahí en vez de buscar.
-              </p>
             </div>
 
-            <p className="text-xs text-muted-foreground">¿Qué querés buscar?</p>
-            <div className="grid grid-cols-2 gap-3">
-              <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${wantFotos ? "border-amber bg-amber/10" : "border-border hover:border-ink/40"}`}>
-                <Checkbox checked={wantFotos} onCheckedChange={(v) => setWantFotos(v === true)} className="mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <ImageIcon className="h-4 w-4 mb-1 text-amber" />
-                  <div className="font-medium text-sm">Fotos</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    B&H, sitios oficiales. ~5s.
-                  </div>
-                </div>
-              </label>
-              <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${wantSpecs ? "border-amber bg-amber/10" : "border-border hover:border-ink/40"}`}>
-                <Checkbox checked={wantSpecs} onCheckedChange={(v) => setWantSpecs(v === true)} className="mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <FileText className="h-4 w-4 mb-1 text-amber" />
-                  <div className="font-medium text-sm">Specs</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    B&H + IA: ficha técnica. ~15s.
-                  </div>
-                </div>
-              </label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button onClick={() => void buscarFoto()} className="w-full">
+                <ImageIcon className="h-4 w-4 mr-2" />
+                Buscar foto
+              </Button>
+              <Button onClick={() => void runSearch()} variant="outline" className="w-full">
+                <FileText className="h-4 w-4 mr-2" />
+                + Specs también
+              </Button>
             </div>
-            <Button
-              onClick={runSearch}
-              disabled={!wantFotos && !wantSpecs}
-              className="w-full"
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              {customUrl.trim() ? "Buscar desde este link" : "Buscar"}
-            </Button>
+
+            <p className="text-[11px] text-muted-foreground">
+              <strong>Buscar foto</strong> agarra la imagen del producto (~5s).{" "}
+              <strong>+ Specs también</strong> extrae ficha técnica, precio y más (~15s).
+            </p>
           </div>
         )}
 
-        {loading && (
+        {/* ── Loading ──────────────────────────────────────────────── */}
+        {(loading || loadingFoto) && (
           <div className="py-12 text-center text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin mx-auto mb-3" />
-            {wantFotos && !wantSpecs
-              ? "Buscando fotos en internet…"
-              : wantSpecs && !wantFotos
-              ? "Buscando en B&H, scrapeando y extrayendo specs…"
-              : "Buscando fotos y specs en paralelo…"}
+            {loadingFoto ? "Buscando foto…" : "Buscando specs y foto en paralelo…"}
             <div className="text-xs mt-1">
-              {wantSpecs ? "Suele tardar 10-20 segundos." : "Suele tardar 5-10 segundos."}
+              {loading ? "Suele tardar 10-20 segundos." : "Suele tardar 5-10 segundos."}
             </div>
           </div>
         )}
 
-        {fotosResult.length > 0 && !result && !loading && !error && (
+        {/* ── Foto encontrada (sin specs) ───────────────────────────── */}
+        {isFotoOnly && (
           <div className="space-y-3">
-            {fotoUrl && (
-              <div className="rounded-md border hairline overflow-hidden bg-white">
-                <img
-                  src={fotoUrl}
-                  alt="Preview"
-                  className="w-full max-h-64 object-contain"
-                  onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
-                />
+            <div className="rounded-md border hairline overflow-hidden bg-white relative group">
+              <img
+                src={fotoUrl}
+                alt="Preview"
+                className="w-full max-h-64 object-contain"
+                onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+              />
+              <div className="absolute top-2 right-2">
+                <FotoBadge fotoUrl={fotoUrl} uploadingFotoUrl={uploadingFotoUrl} />
               </div>
+              <button
+                type="button"
+                onClick={() => { setFotoUrl(""); }}
+                className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-background/80 p-1 hover:bg-destructive/10"
+                title="Quitar foto"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+
+            {fotosResult.length > 1 && (
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground hover:text-ink py-1">
+                  Otras opciones ({fotosResult.length - 1})
+                </summary>
+                <div className="mt-2">
+                  <PhotoGrid
+                    candidates={fotosResult}
+                    selected={fotoUrl}
+                    onSelect={selectFoto}
+                    onBuscarMas={buscarMasFotos}
+                    searching={searchingPhotos}
+                    loadingUrl={uploadingFotoUrl}
+                  />
+                </div>
+              </details>
             )}
-            <PhotoGrid
-              candidates={fotosResult}
-              selected={fotoUrl}
-              onSelect={setFotoUrl}
-              onBuscarMas={buscarMasFotos}
-              searching={searchingPhotos}
-            />
+
             {photoDiag && <PhotoDiag steps={photoDiag} />}
           </div>
         )}
 
+        {/* ── Error ────────────────────────────────────────────────── */}
         {error && (
           <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
             {error}
-            <div className="mt-2">
-              <Button variant="outline" size="sm" onClick={runSearch}>Reintentar</Button>
+            <div className="mt-2 flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => void buscarFoto()}>Reintentar foto</Button>
+              <Button variant="outline" size="sm" onClick={() => void runSearch()}>Reintentar specs</Button>
             </div>
           </div>
         )}
 
+        {/* ── Resultado completo (con specs) ───────────────────────── */}
         {result && (
           <div className="space-y-4">
             <div className="flex flex-col gap-1">
@@ -194,23 +223,36 @@ export function EnriquecerEquipoDialog({
             </div>
 
             {fotoUrl && (
-              <div className="rounded-md border hairline overflow-hidden bg-muted/30">
+              <div className="rounded-md border hairline overflow-hidden bg-muted/30 relative group">
                 <img
                   src={fotoUrl}
                   alt="Preview"
                   className="w-full max-h-64 object-contain"
                   onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
                 />
+                <div className="absolute top-2 right-2">
+                  <FotoBadge fotoUrl={fotoUrl} uploadingFotoUrl={uploadingFotoUrl} />
+                </div>
               </div>
             )}
 
-            <PhotoGrid
-              candidates={fotosResult}
-              selected={fotoUrl}
-              onSelect={setFotoUrl}
-              onBuscarMas={buscarMasFotos}
-              searching={searchingPhotos}
-            />
+            {fotosResult.length > 1 && (
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground hover:text-ink py-1">
+                  Otras opciones de foto ({fotosResult.length - 1})
+                </summary>
+                <div className="mt-2">
+                  <PhotoGrid
+                    candidates={fotosResult}
+                    selected={fotoUrl}
+                    onSelect={selectFoto}
+                    onBuscarMas={buscarMasFotos}
+                    searching={searchingPhotos}
+                    loadingUrl={uploadingFotoUrl}
+                  />
+                </div>
+              </details>
+            )}
 
             {!fotoUrl && result.foto_motivo && (
               <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -368,8 +410,8 @@ export function EnriquecerEquipoDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          {fotosResult.length > 0 && !result && !loading && (
-            <Button onClick={aplicarSoloFoto} disabled={saving || !fotoUrl}>
+          {isFotoOnly && (
+            <Button onClick={() => void aplicarSoloFoto()} disabled={saving || !fotoUrl || !!uploadingFotoUrl}>
               {saving ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</>
               ) : (
@@ -379,10 +421,10 @@ export function EnriquecerEquipoDialog({
           )}
           {result && (
             <>
-              <Button variant="outline" onClick={runSearch} disabled={loading || saving}>
+              <Button variant="outline" onClick={() => void runSearch()} disabled={loading || saving}>
                 Re-buscar
               </Button>
-              <Button onClick={aplicar} disabled={saving}>
+              <Button onClick={() => void aplicar()} disabled={saving}>
                 {saving ? (
                   <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</>
                 ) : (

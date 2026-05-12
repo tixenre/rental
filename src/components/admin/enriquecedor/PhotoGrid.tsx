@@ -7,12 +7,14 @@ export function PhotoGrid({
   onSelect,
   onBuscarMas,
   searching,
+  loadingUrl,
 }: {
   candidates: string[];
   selected: string;
   onSelect: (u: string) => void;
   onBuscarMas: () => void;
   searching: boolean;
+  loadingUrl?: string;
 }) {
   if (candidates.length === 0) {
     return (
@@ -43,12 +45,14 @@ export function PhotoGrid({
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
         {candidates.map((u) => {
           const isSelected = u === selected;
+          const isLoading = u === loadingUrl;
           return (
             <button
               type="button"
               key={u}
-              onClick={() => onSelect(u)}
+              onClick={() => !isLoading && onSelect(u)}
               title={u}
+              disabled={isLoading}
               className={`relative aspect-square overflow-hidden rounded-lg border-2 transition ${
                 isSelected
                   ? "border-amber ring-2 ring-amber/30"
@@ -61,7 +65,12 @@ export function PhotoGrid({
                 className="h-full w-full object-contain bg-white"
                 onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.2"; }}
               />
-              {isSelected && (
+              {isLoading && (
+                <div className="absolute inset-0 grid place-items-center bg-background/70">
+                  <Loader2 className="h-5 w-5 animate-spin text-ink" />
+                </div>
+              )}
+              {isSelected && !isLoading && (
                 <span className="absolute right-1 top-1 rounded-full bg-amber p-0.5">
                   <Check className="h-3 w-3 text-ink" />
                 </span>
