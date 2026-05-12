@@ -957,7 +957,8 @@ export function EquipoFormDialogV2({
                     type="button" size="icon" variant="outline"
                     className="h-9 w-9 shrink-0"
                     onClick={() => {
-                      const current = Number(form.getValues("cantidad") ?? 0);
+                      const raw = Number(form.getValues("cantidad") ?? 0);
+                      const current = Number.isFinite(raw) ? raw : 0;
                       form.setValue("cantidad", Math.max(0, current - 1), { shouldDirty: true });
                     }}
                     aria-label="Restar 1 al stock"
@@ -967,7 +968,8 @@ export function EquipoFormDialogV2({
                     type="button" size="icon" variant="outline"
                     className="h-9 w-9 shrink-0"
                     onClick={() => {
-                      const current = Number(form.getValues("cantidad") ?? 0);
+                      const raw = Number(form.getValues("cantidad") ?? 0);
+                      const current = Number.isFinite(raw) ? raw : 0;
                       form.setValue("cantidad", current + 1, { shouldDirty: true });
                     }}
                     aria-label="Sumar 1 al stock"
