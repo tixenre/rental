@@ -22,8 +22,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-import { TopBar } from "@/components/rental/TopBar";
-import { Footer } from "@/components/rental/Footer";
+import { PublicLayout } from "@/components/rental/PublicLayout";
 import { EmptyImage } from "@/components/rental/EmptyImage";
 import { IncludedList } from "@/components/rental/IncludedList";
 import { KeywordChips } from "@/components/rental/KeywordChips";
@@ -162,21 +161,18 @@ function EquipoPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <TopBar />
-        <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-10 text-center text-muted-foreground">
+      <PublicLayout>
+        <div className="max-w-4xl mx-auto w-full px-6 py-10 text-center text-muted-foreground">
           Cargando equipo…
-        </main>
-        <Footer />
-      </div>
+        </div>
+      </PublicLayout>
     );
   }
 
   if (isError || !equipo) {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <TopBar />
-        <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-10">
+      <PublicLayout>
+        <div className="max-w-4xl mx-auto w-full px-6 py-10">
           <button
             onClick={() => navigate({ to: "/" })}
             className="text-sm text-muted-foreground hover:text-ink transition flex items-center gap-1.5 mb-6"
@@ -190,20 +186,17 @@ function EquipoPage() {
             Tal vez fue retirado del catálogo o el link es viejo. Volvé al
             catálogo para ver lo disponible.
           </p>
-        </main>
-        <Footer />
-      </div>
+        </div>
+      </PublicLayout>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <TopBar />
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 md:px-6 py-6 md:py-10">
+    <PublicLayout>
+      <div className="max-w-4xl mx-auto w-full px-4 md:px-6 py-6 md:py-10">
         <EquipmentDetailBody item={equipo} />
-      </main>
-      <Footer />
-    </div>
+      </div>
+    </PublicLayout>
   );
 }
 

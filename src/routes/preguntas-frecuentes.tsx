@@ -7,8 +7,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Footer } from "@/components/rental/Footer";
-import { TopBar } from "@/components/rental/TopBar";
+import { PublicLayout } from "@/components/rental/PublicLayout";
 import { FAQ_GROUPS } from "@/data/faq";
 import { whatsappUrl } from "@/data/contact";
 
@@ -61,10 +60,8 @@ export const Route = createFileRoute("/preguntas-frecuentes")({
 
 function FaqPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <TopBar />
-
-      <main className="flex-1 px-6 lg:px-12 py-12 max-w-3xl mx-auto w-full">
+    <PublicLayout>
+      <div className="px-6 lg:px-12 py-12 max-w-3xl mx-auto w-full">
         <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
           Ayuda
         </div>
@@ -119,9 +116,7 @@ function FaqPage() {
             Escribinos por WhatsApp
           </a>
         </div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </PublicLayout>
   );
 }
