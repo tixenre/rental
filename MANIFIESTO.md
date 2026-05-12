@@ -1,9 +1,12 @@
 # Manifiesto — Rambla Rental
 
-> **Source of truth** del proyecto: qué es, cómo trabajamos, decisiones tomadas,
-> qué está pendiente. Este archivo es el contexto que se carga al inicio de
-> cualquier sesión (con vos, con Claude, o con quien sea que toque el proyecto).
+> **Memoria para Claude.** Este archivo es el prompt que se carga al inicio de
+> cualquier sesión con Claude. Acá vive lo que necesita saber para no
+> arrancar desde cero: qué es el proyecto, cómo trabajamos, decisiones tomadas,
+> qué está pendiente.
+>
 > Si algo cambia (workflow, decisión, herramienta), se actualiza acá.
+> El [`README.md`](README.md) cubre la cara de GitHub (setup, stack, links). Este archivo cubre el contexto.
 
 ---
 
@@ -222,22 +225,25 @@ Reportar bugs nuevos como issues con label `bug` + prioridad. **No** abrir un `B
 
 ---
 
-## 7. Cómo darle contexto a Claude (o a cualquier dev nuevo)
+## 7. Cómo arrancar una sesión nueva con Claude
 
-1. **Leer este manifiesto.** Cubre el 80% del context.
-2. Para detalle de workflow: [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
-3. Para deploy: [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md).
-4. Para mobile: [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md).
-5. Para diseño del sistema de specs: [`docs/DISEÑO_SPECS.md`](docs/DISEÑO_SPECS.md).
-6. Para ver qué se está cocinando: `gh issue list --state open --label feature`.
-7. Para ver bugs reportados: `gh issue list --state open --label bug`.
-
-### Prompt sugerido al iniciar sesión
+Este manifiesto se carga al inicio. Si Claude se pierde, decirle:
 
 ```
-Leé MANIFIESTO.md y los issues abiertos en https://github.com/tixenre/rental/issues.
-Después decime qué querés hacer.
+Releé MANIFIESTO.md y los issues abiertos en https://github.com/tixenre/rental/issues.
 ```
+
+Otros docs que puede tener que abrir según la tarea:
+
+- `docs/PROTOCOLO.md` — workflow de PRs / auditoría.
+- `docs/DEPLOY_RAILWAY.md` — deploy.
+- `docs/MOBILE_AUDIT.md` — checklist mobile.
+- `docs/DISEÑO_SPECS.md` — diseño del sistema de specs.
+
+Para ver pendientes:
+
+- `gh issue list --state open --label feature` — features abiertas.
+- `gh issue list --state open --label bug` — bugs reportados.
 
 ---
 

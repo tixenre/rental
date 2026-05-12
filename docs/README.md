@@ -1,6 +1,6 @@
 # Documentación interna
 
-> **Source of truth**: [`../MANIFIESTO.md`](../MANIFIESTO.md). Estos archivos cubren detalle específico.
+> Para el contexto general del proyecto (workflow, decisiones, estado) ver [`../MANIFIESTO.md`](../MANIFIESTO.md) — es la memoria que Claude carga al inicio de cada sesión. Estos archivos cubren detalle técnico específico.
 
 ## Índice
 
@@ -18,5 +18,5 @@
 
 - **Bugs activos** → GitHub Issues con label `bug`.
 - **Features activas** → GitHub Issues con label `feature`.
-- **Ideas tempranas / decisiones pendientes** → sección "Pendientes" del [`MANIFIESTO.md`](../MANIFIESTO.md). Se promueven a issues cuando hay decisión.
+- **Ideas tempranas / decisiones pendientes** → sección "Pendientes" del [`../MANIFIESTO.md`](../MANIFIESTO.md). Se promueven a issues cuando hay decisión.
 - **Docs técnicas** (cómo funciona X, por qué la decisión Y) → archivo nuevo en `docs/`.

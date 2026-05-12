@@ -1,8 +1,5 @@
 # Rambla Rental
 
-> **Source of truth del proyecto**: [`MANIFIESTO.md`](MANIFIESTO.md). Workflow, decisiones, estado actual, pendientes.
-> Este README cubre setup técnico. Para todo lo demás → manifiesto.
-
 Plataforma de alquiler de equipos audiovisuales. Catálogo público, portal de cotización para clientes, y back-office completo para administrar pedidos, stock, pagos y documentos (cotizaciones, albaranes, contratos).
 
 ## Stack
@@ -117,21 +114,9 @@ CI corre `pytest` automáticamente en cada PR a `main` (job `python-tests` en `.
 
 ## Workflow de desarrollo
 
-Solo dos branches long-lived:
+Cada cambio va por PR contra `main` con `Closes #N` linkeando un Issue. Branch corta por PR (`claude/<descripcion>` para sesiones con Claude). Después de mergear: borrar la branch local y remota.
 
-- `bugs` → arreglos de bugs
-- `features` → features nuevas
-
-Cada cambio va por PR contra `main` con `Closes #N` linkeando un Issue.
-Detalle completo en [docs/PROTOCOLO.md](docs/PROTOCOLO.md).
-
-```bash
-git checkout bugs                       # o features
-git pull origin main --rebase           # traer lo último de main
-# ... cambios ...
-git push origin bugs
-gh pr create --base main --head bugs    # PR con "Closes #N"
-```
+Detalle del flow + decisiones del proyecto en [`MANIFIESTO.md`](MANIFIESTO.md). Protocolo de auditoría + PRs en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
 
 ## Tracking (GitHub Issues)
 
@@ -149,8 +134,9 @@ Producción corre en Railway. Detalle de variables, build, troubleshooting:
 
 ## Docs
 
+- [MANIFIESTO.md](MANIFIESTO.md) — contexto del proyecto para sesiones con Claude (workflow, decisiones, estado actual)
 - [docs/PROTOCOLO.md](docs/PROTOCOLO.md) — protocolo de auditoría + PRs
 - [docs/DEPLOY_RAILWAY.md](docs/DEPLOY_RAILWAY.md) — setup de Railway
 - [docs/DISEÑO_SPECS.md](docs/DISEÑO_SPECS.md) — diseño del sistema de specs por categoría
-- [docs/MEJORAS.md](docs/MEJORAS.md) — ideas de mejora (impacto/esfuerzo)
+- [docs/MEJORAS.md](docs/MEJORAS.md) — backlog histórico (deprecated, referencia)
 - [docs/BUGS.md](docs/BUGS.md) — histórico de bugs (mayo 2026, referencia)
