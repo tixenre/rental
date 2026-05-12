@@ -872,40 +872,21 @@ export function EquipoFormDialog({
                           <p className="font-mono text-[10px] text-muted-foreground truncate min-w-0 flex-1">
                             {pendingFile ? pendingFile.name : form.watch("foto_url")}
                           </p>
-                          <div className="flex gap-1 shrink-0">
-                            <Button
-                              type="button" variant="ghost" size="sm"
-                              className="h-7 text-xs px-2"
-                              disabled={photoSearching || (!form.watch("nombre") && !form.watch("marca"))}
-                              onClick={buscarFotos}
-                            >
-                              {photoSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
+                          <label className="inline-flex shrink-0">
+                            <input type="file" accept="image/*" className="hidden"
+                              onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} />
+                            <Button type="button" variant="ghost" size="sm" className="h-7 text-xs px-2" disabled={uploading} asChild>
+                              <span className="cursor-pointer" title="Subir otra foto">
+                                {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                              </span>
                             </Button>
-                            <label className="inline-flex">
-                              <input type="file" accept="image/*" className="hidden"
-                                onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} />
-                              <Button type="button" variant="ghost" size="sm" className="h-7 text-xs px-2" disabled={uploading} asChild>
-                                <span className="cursor-pointer">
-                                  {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                                </span>
-                              </Button>
-                            </label>
-                          </div>
+                          </label>
                         </div>
                       </div>
                     ) : (
-                      /* Sin foto: input URL + botones */
+                      /* Sin foto: input URL + botón Subir */
                       <div className="flex gap-2">
-                        <Input {...form.register("foto_url")} className="font-mono text-xs flex-1" placeholder="https://… o buscá / subí una foto" />
-                        <Button
-                          type="button" variant="outline" size="sm"
-                          disabled={photoSearching || (!form.watch("nombre") && !form.watch("marca"))}
-                          onClick={buscarFotos}
-                        >
-                          {photoSearching
-                            ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Buscando…</>
-                            : <><ImageIcon className="h-4 w-4 mr-1" />Buscar fotos</>}
-                        </Button>
+                        <Input {...form.register("foto_url")} className="font-mono text-xs flex-1" placeholder="https://… o subí una foto" />
                         <label className="inline-flex">
                           <input type="file" accept="image/*" className="hidden"
                             onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} />
