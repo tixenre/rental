@@ -94,6 +94,8 @@ export type Equipo = {
   estado: string;
   /** Flag manual del admin: ficha cargada y revisada (no requiere más trabajo). */
   ficha_completa?: boolean;
+  /** Timestamp ISO si el equipo está soft-deleted. null = activo (#206). */
+  eliminado_at?: string | null;
   etiquetas?: string[];
   kit?: KitComponente[];
   categorias?: CategoriaRef[];
@@ -289,14 +291,25 @@ export const adminApi = {
     authedJson<DashboardUso>(`/api/admin/dashboard/uso?dias_sin_uso=${dias_sin_uso}`),
 
   // equipos
-  listEquipos: (params: { q?: string; etiqueta?: string; per_page?: number; solo_incompletos?: boolean } = {}) => {
+  listEquipos: (params: {
+    q?: string;
+    etiqueta?: string;
+    per_page?: number;
+    solo_incompletos?: boolean;
+    solo_eliminados?: boolean;
+    incluir_eliminados?: boolean;
+  } = {}) => {
     const sp = new URLSearchParams();
     if (params.q) sp.set("q", params.q);
     if (params.etiqueta) sp.set("etiqueta", params.etiqueta);
     if (params.solo_incompletos) sp.set("solo_incompletos", "true");
+    if (params.solo_eliminados) sp.set("solo_eliminados", "true");
+    if (params.incluir_eliminados) sp.set("incluir_eliminados", "true");
     sp.set("per_page", String(params.per_page ?? 500));
     return authedJson<EquiposListResp>(`/api/equipos?${sp.toString()}`);
   },
+  restoreEquipo: (id: number) =>
+    authedPostJson<{ ok: true; message?: string }>(`/api/equipos/${id}/restore`, {}),
   getEquipo: (id: number) => authedJson<Equipo>(`/api/equipos/${id}`),
   /** Equipos sin número de serie cargado (NULL o vacío). Issue #91. */
   getEquiposSinSerie: () =>
@@ -330,6 +343,15 @@ export const adminApi = {
   },
   duplicateEquipo: (id: number) =>
     authedJson<Equipo>(`/api/equipos/${id}/duplicate`, { method: "POST" }),
+  /** Bulk action sobre múltiples equipos. */
+  bulkAction: (payload: {
+    ids: number[];
+    action: "set_visible" | "set_ficha_completa" | "set_categoria" | "delete";
+    visible?: boolean;
+    ficha_completa?: boolean;
+    categoria_id?: number;
+  }) =>
+    authedPostJson<{ affected: number }>("/api/admin/equipos/bulk", payload),
   /** Batch autocompletar: procesa hasta 3 equipos por call, guarda el scrape
    *  en cache (raw_json). El frontend re-batchea hasta terminar. */
   batchEnriquecer: (equipo_ids: number[]) =>
@@ -405,11 +427,11 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }),
-  /** Aplica el resultado de /admin/equipos/enriquecer en un único call.
+  /** Aplica el resultado de /admin/equipos/autocompletar en un único call.
    *  Acepta cualquier subset de campos; los no enviados quedan como están. */
   aplicarEnriquecimiento: (id: number, data: Record<string, unknown>) =>
     authedJson<{ equipo: Equipo; ficha: Ficha | null }>(
-      `/api/admin/equipos/${id}/aplicar-enriquecimiento`,
+      `/api/admin/equipos/${id}/aplicar-autocompletado`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

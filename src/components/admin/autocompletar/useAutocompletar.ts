@@ -62,7 +62,7 @@ export function useAutocompletar({
     modelo?: string | null;
     url?: string | null;
   }) =>
-    authedJson<AutocompletarResult>("/api/admin/equipos/enriquecer", {
+    authedJson<AutocompletarResult>("/api/admin/equipos/autocompletar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),

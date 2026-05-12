@@ -256,6 +256,12 @@ def init_db():
     # de carga incremental de inventario.
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS ficha_completa BOOLEAN NOT NULL DEFAULT FALSE")
 
+    # Migration: soft delete. NULL = activo. Timestamp = eliminado.
+    # Las listas filtran eliminado_at IS NULL por default. Preserva historial
+    # de alquileres de equipos dados de baja (#206).
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS eliminado_at TIMESTAMP")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_equipos_eliminado_at ON equipos(eliminado_at) WHERE eliminado_at IS NOT NULL")
+
     # Tabla de marcas (brands)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS marcas (

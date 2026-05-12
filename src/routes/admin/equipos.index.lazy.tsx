@@ -1,12 +1,13 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wrench, History, Copy, BarChart3 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wrench, History, Copy, BarChart3, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useUsdRate, calcularPrecioJornada } from "@/hooks/useSettings";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -37,6 +38,7 @@ function EquiposPage() {
   const [q, setQ] = useState("");
   const [etiqueta, setEtiqueta] = useState<string>("");
   const [soloIncompletos, setSoloIncompletos] = useState(false);
+  const [vistaPapelera, setVistaPapelera] = useState(false);
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Equipo | null>(null);
   const [deleting, setDeleting] = useState<Equipo | null>(null);
@@ -46,13 +48,15 @@ function EquiposPage() {
   const [mantenimientoEquipo, setMantenimientoEquipo] = useState<Equipo | null>(null);
   const [historialEquipo, setHistorialEquipo] = useState<Equipo | null>(null);
   const [openDashboard, setOpenDashboard] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const equiposQ = useQuery({
-    queryKey: ["admin", "equipos", { q, etiqueta, soloIncompletos }],
+    queryKey: ["admin", "equipos", { q, etiqueta, soloIncompletos, vistaPapelera }],
     queryFn: () => adminApi.listEquipos({
       q: q || undefined,
       etiqueta: etiqueta || undefined,
       solo_incompletos: soloIncompletos || undefined,
+      solo_eliminados: vistaPapelera || undefined,
     }),
   });
   const etiquetasQ = useQuery({
@@ -121,6 +125,40 @@ function EquiposPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const restoreMut = useMutation({
+    mutationFn: (id: number) => adminApi.restoreEquipo(id),
+    onSuccess: () => {
+      toast.success("Equipo restaurado");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(`No se pudo restaurar: ${e.message}`),
+  });
+
+  const bulkMut = useMutation({
+    mutationFn: (payload: Parameters<typeof adminApi.bulkAction>[0]) =>
+      adminApi.bulkAction(payload),
+    onSuccess: (r) => {
+      toast.success(`${r.affected} equipo${r.affected === 1 ? "" : "s"} actualizado${r.affected === 1 ? "" : "s"}`);
+      setSelectedIds(new Set());
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(`Bulk falló: ${e.message}`),
+  });
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = (allItems: Equipo[]) => {
+    setSelectedIds((prev) => {
+      if (prev.size === allItems.length) return new Set();
+      return new Set(allItems.map((e) => e.id));
+    });
+  };
+
   const items = equiposQ.data?.items ?? [];
   const total = equiposQ.data?.total ?? 0;
 
@@ -185,6 +223,16 @@ function EquiposPage() {
         >
           {soloIncompletos ? "✓ Solo incompletos" : "Solo incompletos"}
         </Button>
+        <Button
+          type="button"
+          variant={vistaPapelera ? "destructive" : "outline"}
+          size="sm"
+          onClick={() => setVistaPapelera((v) => !v)}
+          title="Ver equipos dados de baja (soft-deleted)"
+          className="md:w-auto"
+        >
+          {vistaPapelera ? <><Trash2 className="h-3.5 w-3.5 mr-1" /> Papelera</> : "Papelera"}
+        </Button>
       </div>
 
       {equiposQ.error && (
@@ -207,10 +255,74 @@ function EquiposPage() {
         </div>
       )}
 
+      {/* Barra flotante de bulk actions */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-0 z-10 flex items-center gap-2 rounded-md border hairline bg-ink text-background px-3 py-2 shadow-md">
+          <span className="text-sm font-medium flex-1">
+            {selectedIds.size} seleccionado{selectedIds.size === 1 ? "" : "s"}
+          </span>
+          <Button
+            size="sm" variant="secondary"
+            onClick={() => bulkMut.mutate({ ids: [...selectedIds], action: "set_visible", visible: true })}
+            disabled={bulkMut.isPending}
+          >
+            <Eye className="h-3.5 w-3.5 mr-1" /> Mostrar
+          </Button>
+          <Button
+            size="sm" variant="secondary"
+            onClick={() => bulkMut.mutate({ ids: [...selectedIds], action: "set_visible", visible: false })}
+            disabled={bulkMut.isPending}
+          >
+            <EyeOff className="h-3.5 w-3.5 mr-1" /> Ocultar
+          </Button>
+          <Button
+            size="sm" variant="secondary"
+            onClick={() => bulkMut.mutate({ ids: [...selectedIds], action: "set_ficha_completa", ficha_completa: true })}
+            disabled={bulkMut.isPending}
+            title="Marcar fichas como completas"
+          >
+            ✓ Completas
+          </Button>
+          <Button
+            size="sm" variant="secondary"
+            onClick={() => bulkMut.mutate({ ids: [...selectedIds], action: "set_ficha_completa", ficha_completa: false })}
+            disabled={bulkMut.isPending}
+            title="Marcar fichas como pendientes"
+          >
+            ☐ Pendientes
+          </Button>
+          <Button
+            size="sm" variant="destructive"
+            onClick={() => {
+              if (confirm(`Eliminar ${selectedIds.size} equipo${selectedIds.size === 1 ? "" : "s"}? Esta acción no se puede deshacer.`)) {
+                bulkMut.mutate({ ids: [...selectedIds], action: "delete" });
+              }
+            }}
+            disabled={bulkMut.isPending}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
+          </Button>
+          <Button
+            size="sm" variant="ghost"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-background hover:text-background/70"
+          >
+            Cancelar
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-lg border hairline overflow-hidden bg-background">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={items.length > 0 && selectedIds.size === items.length}
+                  onCheckedChange={() => toggleSelectAll(items)}
+                  aria-label="Seleccionar todos"
+                />
+              </TableHead>
               <TableHead className="w-14"></TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead className="hidden md:table-cell">Marca / Modelo</TableHead>
@@ -224,7 +336,7 @@ function EquiposPage() {
           <TableBody>
             {items.length === 0 && !equiposQ.isLoading && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                   Sin equipos.{" "}
                   {(q || etiqueta) && (
                     <button
@@ -240,6 +352,13 @@ function EquiposPage() {
             )}
             {items.map((eq) => (
               <TableRow key={eq.id} className={eq.visible_catalogo ? "" : "opacity-60"}>
+                <TableCell>
+                  <Checkbox
+                    checked={selectedIds.has(eq.id)}
+                    onCheckedChange={() => toggleSelect(eq.id)}
+                    aria-label={`Seleccionar ${eq.nombre}`}
+                  />
+                </TableCell>
                 <TableCell>
                   {eq.foto_url ? (
                     <img
@@ -321,9 +440,20 @@ function EquiposPage() {
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => setDeleting(eq)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {eq.eliminado_at ? (
+                      <Button
+                        size="icon" variant="ghost"
+                        title="Restaurar"
+                        onClick={() => restoreMut.mutate(eq.id)}
+                        disabled={restoreMut.isPending}
+                      >
+                        <RotateCcw className="h-4 w-4 text-amber" />
+                      </Button>
+                    ) : (
+                      <Button size="icon" variant="ghost" onClick={() => setDeleting(eq)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

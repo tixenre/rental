@@ -336,7 +336,7 @@ export function EquipoFormDialogV2({
     }
     setAutocompletando(true);
     try {
-      const r = await authedJson<AutocompletarResult>("/api/admin/equipos/enriquecer", {
+      const r = await authedJson<AutocompletarResult>("/api/admin/equipos/autocompletar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: u }),
