@@ -1,6 +1,12 @@
-# Bugs — roadmap de fixes
+# Bugs — histórico (CERRADO)
 
-> Auditoría hecha el **2026-05-10** sobre la branch `claude/local-database-testing-o6pXj`.
+> **HISTÓRICO — archivado**. Los bugs activos ahora viven en
+> [GitHub Issues](https://github.com/tixenre/rental/issues) (label `bug`).
+> Ver [`MANIFIESTO.md`](../MANIFIESTO.md) para el workflow.
+>
+> Auditoría hecha el **2026-05-10**. **Todos los 23 bugs trackeados están
+> cerrados.** Este archivo queda como referencia histórica.
+>
 > Convención: `[ ]` por hacer, `[x]` arreglado. Tachá a medida que vayas avanzando.
 
 ---

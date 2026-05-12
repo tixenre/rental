@@ -1,5 +1,12 @@
-# Mejoras — roadmap de funcionalidades
+# Mejoras — roadmap de funcionalidades (DEPRECATED)
 
+> **DEPRECATED — archivado**. El backlog activo ahora vive en [GitHub Issues](https://github.com/tixenre/rental/issues)
+> (label `feature`). Ver [`MANIFIESTO.md`](../MANIFIESTO.md) para el workflow.
+>
+> Este archivo queda como referencia histórica con marca de qué se hizo en
+> las sesiones 2026-05-10 y 2026-05-12. Items todavía `[ ]` son ideas que
+> podrían ir a issues cuando haya decisión.
+>
 > Ideas de mejora ordenadas por **impacto / esfuerzo**. No son bugs (eso está en `BUGS.md`), son features o pulidas que suman.
 
 ---
@@ -14,9 +21,9 @@
 
 - [ ] **Atajo de teclado para abrir "Nuevo equipo"** — `n` en la página de equipos. Para flujos rápidos al cargar muchos.
 
-- [ ] **Botón "duplicar equipo"** — útil cuando tenés varios cuerpos del mismo modelo. Copia todo menos `serie` y `id`, deja editar antes de guardar.
+- [x] **Botón "duplicar equipo"** — _Hecho en PR #213 (2026-05-12). Clona equipo + ficha + categorías + kit; copia con serie vacía y `ficha_completa = false`._
 
-- [ ] **Toggle bulk de visibilidad** — checkbox en cada fila + acción masiva "ocultar / mostrar seleccionados". Hoy hay que hacer click uno por uno.
+- [x] **Toggle bulk de visibilidad** — _Hecho en PR #220 (2026-05-12) — generalizado a bulk actions (visible/incompleta/eliminar) con checkboxes + barra flotante._
 
 - [ ] **Storage diag visible en Settings** — el endpoint `/api/admin/storage/diag` ya existe; ponerle UI en `/admin/settings` con un botón "test R2" que muestre OK/error.
 
@@ -32,7 +39,7 @@
 
 - [ ] **Merge de "buscar fotos" en el form de edición** — hoy en el form ya hay un botón "Buscar fotos" pero no hay preview grande. Mostrar la foto seleccionada en grande con un botón "X otras opciones" colapsable, en vez del row de thumbs.
 
-- [ ] **Búsqueda full-text en el catálogo público** — hoy el filtro busca en `nombre`, `marca`, `modelo`. Extender a `descripcion`, `keywords`, `specs`. Postgres tiene `tsvector` nativo.
+- [x] **Búsqueda full-text en el catálogo público** — _Hecho en PR #214 (2026-05-12) — extiende `q` a serie + descripción + specs_json + keywords_json. ILIKE crudo (no `tsvector`), aceptable para inventario chico-mediano. Aplica a admin y catálogo público._
 
 - [ ] **Auto-sugerencia de categoría desde el enriquecimiento** — Firecrawl ya devuelve `categoria_sugerida` pero no se usa. Mostrarla como hint en el form ("¿Asignar a 'Cámaras'?") con un click.
 
@@ -54,9 +61,9 @@
 
 - [ ] **App pública del cliente** — hoy `/cliente` es básico. Agregar: ver pedidos pasados, descargar facturas, subir DNI desde el celu, firmar contrato digital.
 
-- [ ] **Reportes / dashboard** — `dashboard.py` ya tiene algunos KPIs. Expandir: equipos más alquilados, ROI por equipo, ingresos por mes, clientes top.
+- [x] **Reportes / dashboard** — _Hecho en PRs #222 (dashboard de uso: top alquilados, sin uso, revenue por categoría) y #227 (cuentas por cobrar). ROI real por equipo todavía pendiente — issue separado para llevarlo a estadísticas._
 
-- [ ] **Sistema de mantenimiento** — cuando un equipo entra a "en_mantenimiento", registrar fecha, motivo, costo, técnico. Reporte de costos de mantenimiento por equipo.
+- [x] **Sistema de mantenimiento** — _Hecho en PR #216 (2026-05-12). Tabla `equipo_mantenimiento` + CRUD + modal desde la lista con badge rojo si la próxima revisión está vencida._
 
 ---
 
@@ -80,11 +87,11 @@
 
 ## TÉCNICO / DX — para vos como dev, no se ve pero ayuda
 
-- [ ] **Tests unitarios mínimos del backend** — al menos `enriquecer`, `upload-foto-from-url`, `aplicar-enriquecimiento`. Hoy un cambio en `_scrape` puede romper sin avisar.
+- [x] **Tests unitarios mínimos del backend** — _Parcial: existen tests SSRF, auth, pricing, validaciones de pedido. Tests E2E del form admin agregados en PR #224 (2026-05-12). Falta cobertura específica de `enriquecer/autocompletar` y `aplicar-autocompletado` — issue separado._
 
-- [ ] **CI con typecheck + lint** — GitHub Actions que corra `tsc --noEmit` y `ruff` en cada PR. 5 min de setup, mucho ojo evitado.
+- [x] **CI con typecheck + lint** — _Hecho. CI corre Python tests, Python syntax check, TypeScript typecheck, Build frontend y mobile-smoke en cada PR (`.github/workflows/`)._
 
-- [ ] **Migrations versionadas** — hoy los `ALTER TABLE IF NOT EXISTS` están sueltos en `database.py`. Pasar a Alembic o migraciones numeradas.
+- [x] **Migrations versionadas** — _Hecho. Alembic configurado en `backend/migrations/`. Cambios incrementales en `versions/`. Schema base sigue en `init_db()` con `CREATE IF NOT EXISTS`._
 
 - [ ] **`uv` para Python** — más rápido que pip, lockfile reproducible. Tu `requirements.txt` ya está, solo agregar `uv.lock`.
 
