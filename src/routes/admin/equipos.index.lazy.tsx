@@ -136,7 +136,7 @@ function EquiposPage() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por nombre, marca, modelo…"
+            placeholder="Buscar (nombre, marca, modelo, serie, specs, keywords…)"
             className="pl-9 text-base sm:text-sm"
           />
         </div>
