@@ -23,7 +23,11 @@ import { adminApi, type Equipo } from "@/lib/admin/api";
 
 const fmtFecha = (iso: string) => {
   try {
-    return new Date(iso).toLocaleDateString("es-AR", {
+    // El backend devuelve fechas como TEXT "YYYY-MM-DD" (a veces con timestamp).
+    // Si solo tenemos día (10 chars), parseamos como medianoche LOCAL para que
+    // toLocaleDateString no shiftee al día anterior por timezone (es-AR es UTC-3).
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso + "T00:00:00" : iso;
+    return new Date(dateOnly).toLocaleDateString("es-AR", {
       day: "2-digit", month: "short", year: "numeric",
     });
   } catch { return iso; }
