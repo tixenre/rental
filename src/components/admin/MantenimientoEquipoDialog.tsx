@@ -43,7 +43,19 @@ const fmtFecha = (iso: string) => {
 const fmtMoneda = (n: number) =>
   new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
 
-const hoyISO = () => new Date().toISOString().slice(0, 10);
+/**
+ * Devuelve la fecha de HOY en formato YYYY-MM-DD según la zona horaria local.
+ * `toISOString().slice(0,10)` daba la fecha UTC, lo cual shifteaba un día
+ * para usuarios en zonas con offset negativo (es-AR es UTC-3) entre 21:00
+ * y 23:59 → mostraba "mañana" como default.
+ */
+const hoyISO = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+};
 
 export function MantenimientoEquipoDialog({
   equipo,
