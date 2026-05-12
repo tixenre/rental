@@ -1589,12 +1589,27 @@ def admin_batch_enriquecer(payload: BatchEnriquecerInput, request: Request):
                     "specs_count": len(scrape.get("specs") or []),
                     "filled": list(patch.keys()),
                 })
-            except Exception as e:
+            except HTTPException as he:
+                # Errores HTTP del scrape: mostrar el detail (que ya está
+                # sanitizado por el endpoint upstream).
                 conn.rollback()
-                results.append({"equipo_id": eid, "status": "error", "error": str(e)[:200]})
+                results.append({"equipo_id": eid, "status": "error", "error": str(he.detail)[:200]})
+            except Exception as e:
+                # Errores no esperados: NO exponer str(e) al frontend (puede
+                # contener paths/internals). Log completo server-side; al user
+                # un mensaje genérico.
+                conn.rollback()
+                logger.exception("batch-enriquecer falló para equipo %s", eid)
+                results.append({
+                    "equipo_id": eid,
+                    "status": "error",
+                    "error": f"Error inesperado ({type(e).__name__})",
+                })
 
-            # Rate limit B&H
-            _time.sleep(1)
+            # Rate limit B&H — saltamos el sleep en la última iteración del
+            # chunk para no demorar la respuesta gratis.
+            if eid != ids[-1]:
+                _time.sleep(1)
 
         return {"results": results}
     finally:
