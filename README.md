@@ -1,5 +1,8 @@
 # Rambla Rental
 
+> **Source of truth del proyecto**: [`MANIFIESTO.md`](MANIFIESTO.md). Workflow, decisiones, estado actual, pendientes.
+> Este README cubre setup técnico. Para todo lo demás → manifiesto.
+
 Plataforma de alquiler de equipos audiovisuales. Catálogo público, portal de cotización para clientes, y back-office completo para administrar pedidos, stock, pagos y documentos (cotizaciones, albaranes, contratos).
 
 ## Stack

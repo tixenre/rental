@@ -1,20 +1,22 @@
 # Documentación interna
 
-Documentación viva del proyecto Rambla Rental. Para el panorama general, ver el [README de la raíz](../README.md).
+> **Source of truth**: [`../MANIFIESTO.md`](../MANIFIESTO.md). Estos archivos cubren detalle específico.
 
 ## Índice
 
 | Archivo | Para qué sirve |
 |---|---|
-| [PROTOCOLO.md](PROTOCOLO.md) | Cómo auditar el repo, abrir PRs prolijos, y trackear cambios via Issues. **Leer antes del primer PR.** |
-| [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) | Setup de Railway: variables de entorno, build, dominio, troubleshooting. |
-| [DISEÑO_SPECS.md](DISEÑO_SPECS.md) | Diseño técnico del sistema de specs por categoría (templates, asignación masiva, etc.). |
-| [MEJORAS.md](MEJORAS.md) | Backlog de ideas de mejora ordenadas por impacto / esfuerzo. No bugs — features y pulidas. |
-| [BUGS.md](BUGS.md) | **Histórico** de bugs resueltos en mayo 2026. Sólo referencia — los bugs activos ahora viven en GitHub Issues. |
+| [PROTOCOLO.md](PROTOCOLO.md) | Detalle del workflow de auditoría + PRs prolijos. Referenciado desde el manifiesto. |
+| [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) | Setup de Railway: variables, build, dominio, troubleshooting. |
+| [DISEÑO_SPECS.md](DISEÑO_SPECS.md) | Diseño técnico del sistema de specs por categoría. |
+| [MOBILE.md](MOBILE.md) + [MOBILE_AUDIT.md](MOBILE_AUDIT.md) | Guidelines mobile y checklist de audit. |
+| [ISSUE_LABELS.md](ISSUE_LABELS.md) | Convenciones de labels de GitHub Issues. |
+| [MEJORAS.md](MEJORAS.md) | **DEPRECATED** — backlog histórico con marca de qué se hizo. Items todavía abiertos pueden convertirse en issues. |
+| [BUGS.md](BUGS.md) | **HISTÓRICO** — bugs cerrados en mayo 2026. Bugs activos viven en GitHub Issues. |
 
 ## Convención
 
 - **Bugs activos** → GitHub Issues con label `bug`.
 - **Features activas** → GitHub Issues con label `feature`.
-- **Ideas tempranas** → [MEJORAS.md](MEJORAS.md), después se promueven a Issues cuando hay decisión.
+- **Ideas tempranas / decisiones pendientes** → sección "Pendientes" del [`MANIFIESTO.md`](../MANIFIESTO.md). Se promueven a issues cuando hay decisión.
 - **Docs técnicas** (cómo funciona X, por qué la decisión Y) → archivo nuevo en `docs/`.
