@@ -552,7 +552,46 @@ export function EquipoFormDialogV2({
   // ════════════════════════════════════════════════════════════════════
   // Submit — mismo flow que el viejo (delegamos en adminApi).
   // ════════════════════════════════════════════════════════════════════
+  // Keyboard shortcut: Cmd/Ctrl+S guarda el form (Esc lo maneja el Dialog).
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        if (saving) return;
+        const formEl = document.querySelector<HTMLFormElement>("form[data-equipo-form-v2]");
+        formEl?.requestSubmit();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, saving]);
+
   const submit = form.handleSubmit(async (values) => {
+    // Pre-flight: validación de duplicados por serie. La serie es lo más
+    // único; si ya hay otro equipo con la misma, le pedimos confirmación al
+    // user antes de seguir (puede ser legítimo en kits, pero conviene avisar).
+    const serieTrim = values.serie?.trim();
+    if (serieTrim) {
+      try {
+        const r = await adminApi.listEquipos({ q: serieTrim });
+        const dups = r.items.filter(
+          (e) => e.id !== initial?.id &&
+                 (e.serie ?? "").trim().toLowerCase() === serieTrim.toLowerCase(),
+        );
+        if (dups.length > 0) {
+          const ok = window.confirm(
+            `Ya hay otro equipo con la serie "${serieTrim}":\n  • ${dups[0].nombre}` +
+            (dups.length > 1 ? ` (+${dups.length - 1} más)` : "") +
+            `\n\n¿Guardar igual?`,
+          );
+          if (!ok) return;
+        }
+      } catch {
+        // Si la búsqueda falla, no bloqueamos el save.
+      }
+    }
+
     // Tags unificadas (chip UI) → se envían a ambos backends: etiquetas (top-level
     // equipo, para filtros/categorización) y keywords_json (ficha, para chips públicos).
     const etiquetas = uniq(tags.map((t) => t.trim()).filter(Boolean));
@@ -721,9 +760,8 @@ export function EquipoFormDialogV2({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl flex items-center gap-2">
+          <DialogTitle className="font-display text-2xl">
             {isEdit ? "Editar equipo" : "Nuevo equipo"}
-            <Badge variant="outline" className="text-[10px]">V2</Badge>
           </DialogTitle>
           {nombrePublico && (
             <p className="text-xs text-muted-foreground">
@@ -732,7 +770,7 @@ export function EquipoFormDialogV2({
           )}
         </DialogHeader>
 
-        <form onSubmit={submit} className="space-y-5">
+        <form onSubmit={submit} className="space-y-5" data-equipo-form-v2>
 
           {/* ════════════════════════════════════════════════════════════════
               STATUS STRIP — switches de estado (visible + ficha completa)
@@ -759,9 +797,9 @@ export function EquipoFormDialogV2({
           </div>
 
           {/* ════════════════════════════════════════════════════════════════
-              AUTOCOMPLETAR BAR — primera cosa del form
+              AUTOCOMPLETAR BAR — sticky en mobile para no perderla al scrollear
           ════════════════════════════════════════════════════════════════ */}
-          <section className="rounded-md border hairline bg-amber-soft/40 p-3 space-y-2">
+          <section className="rounded-md border hairline bg-amber-soft/40 p-3 space-y-2 sticky top-0 z-10 sm:static">
             <div className="flex items-center gap-1.5 text-xs font-medium text-ink/80">
               <LinkIcon className="h-3.5 w-3.5" />
               Link del producto (B&amp;H, Adorama, sitio oficial)
@@ -914,7 +952,27 @@ export function EquipoFormDialogV2({
           <section className="space-y-3 pt-2 border-t hairline">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <Field label="Stock">
-                <Input type="number" min={0} {...form.register("cantidad")} />
+                <div className="flex gap-1">
+                  <Button
+                    type="button" size="icon" variant="outline"
+                    className="h-9 w-9 shrink-0"
+                    onClick={() => {
+                      const current = Number(form.getValues("cantidad") ?? 0);
+                      form.setValue("cantidad", Math.max(0, current - 1), { shouldDirty: true });
+                    }}
+                    aria-label="Restar 1 al stock"
+                  >−</Button>
+                  <Input type="number" min={0} className="text-center" {...form.register("cantidad")} />
+                  <Button
+                    type="button" size="icon" variant="outline"
+                    className="h-9 w-9 shrink-0"
+                    onClick={() => {
+                      const current = Number(form.getValues("cantidad") ?? 0);
+                      form.setValue("cantidad", current + 1, { shouldDirty: true });
+                    }}
+                    aria-label="Sumar 1 al stock"
+                  >+</Button>
+                </div>
               </Field>
               <Field label="Valor USD">
                 <Input type="number" step="0.01" {...form.register("precio_usd")} />
