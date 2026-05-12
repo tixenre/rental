@@ -251,6 +251,11 @@ def init_db():
     # al actualizar el USD rate, los manuales se respetan por default.
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS precio_jornada_manual BOOLEAN NOT NULL DEFAULT FALSE")
 
+    # Migration: flag manual que el admin marca cuando termina de cargar la
+    # ficha de un equipo. Permite filtrar "equipos pendientes" en el workflow
+    # de carga incremental de inventario.
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS ficha_completa BOOLEAN NOT NULL DEFAULT FALSE")
+
     # Tabla de marcas (brands)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS marcas (
@@ -645,6 +650,26 @@ def init_db():
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_equipo_specs_key "
         "ON equipo_specs(spec_key, value)"
+    )
+
+    # ── Mantenimiento log por equipo ─────────────────────────────────────
+    # Una fila por evento de mantenimiento (revisión, reparación, limpieza,
+    # etc.). proxima_revision opcional para recordatorios.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS equipo_mantenimiento (
+            id                SERIAL PRIMARY KEY,
+            equipo_id         INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            fecha             TEXT NOT NULL,
+            tipo              VARCHAR(32) NOT NULL DEFAULT 'revision',
+            descripcion       TEXT,
+            costo             INTEGER,
+            proxima_revision  TEXT,
+            created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mantenimiento_equipo "
+        "ON equipo_mantenimiento(equipo_id, fecha DESC)"
     )
 
     # ── Compatibilidades entre equipos (FX3 + Sigma EF → requiere MC-11) ──

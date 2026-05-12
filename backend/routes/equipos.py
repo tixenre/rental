@@ -63,6 +63,7 @@ class EquipoCreate(BaseModel):
     dueno:            Optional[str]   = "Rambla"
     visible_catalogo: Optional[int]   = 1
     estado:           Optional[str]   = "operativo"   # operativo / en_mantenimiento / fuera_servicio
+    ficha_completa:   Optional[bool]  = False
 
 
 class EquipoUpdate(BaseModel):
@@ -86,6 +87,7 @@ class EquipoUpdate(BaseModel):
     dueno:            Optional[str]   = None
     visible_catalogo: Optional[int]   = None
     estado:           Optional[str]   = None
+    ficha_completa:   Optional[bool]  = None
 
 
 class FichaUpdate(BaseModel):
@@ -132,6 +134,22 @@ class CategoriasUpdate(BaseModel):
     categoria_ids: list[int]
 
 
+class MantenimientoCreate(BaseModel):
+    fecha:            str
+    tipo:             Optional[str] = "revision"   # revision / reparacion / limpieza / otro
+    descripcion:      Optional[str] = None
+    costo:            Optional[int] = None
+    proxima_revision: Optional[str] = None
+
+
+class MantenimientoUpdate(BaseModel):
+    fecha:            Optional[str] = None
+    tipo:             Optional[str] = None
+    descripcion:      Optional[str] = None
+    costo:            Optional[int] = None
+    proxima_revision: Optional[str] = None
+
+
 # ── Disponibilidad en tiempo real ────────────────────────────────────────────
 
 @router.get("/equipos/afuera")
@@ -173,10 +191,11 @@ def equipos_afuera():
 @router.get("/equipos")
 def list_equipos(
     request:       Request,
-    q:             Optional[str]  = Query(None),
-    etiqueta:      Optional[str]  = Query(None),
-    categoria:     Optional[str]  = Query(None),
-    solo_visibles: Optional[bool] = Query(None),
+    q:                Optional[str]  = Query(None),
+    etiqueta:         Optional[str]  = Query(None),
+    categoria:        Optional[str]  = Query(None),
+    solo_visibles:    Optional[bool] = Query(None),
+    solo_incompletos: Optional[bool] = Query(None),
     sort:          Optional[str]  = Query(None, description="ranking | nombre | precio_asc | precio_desc | id"),
     spec:          Optional[list[str]] = Query(None, description="Filtros por specs: spec=key:valor"),
     page:          int = Query(1, ge=1),
@@ -201,6 +220,10 @@ def list_equipos(
     if solo_visibles or not is_admin:
         base_sql += " AND e.visible_catalogo = 1 AND e.estado != 'fuera_servicio'"
 
+    # Filtro admin: equipos cuya ficha el admin aún no marcó como completa.
+    if solo_incompletos and is_admin:
+        base_sql += " AND e.ficha_completa = FALSE"
+
     # ── Filtros por specs estructurados (PR E) ──
     # Cada `spec=key:valor` agrega un AND EXISTS sobre equipo_specs.
     if spec:
@@ -219,10 +242,26 @@ def list_equipos(
             )
             params += [key, value]
     if q:
-        # ILIKE = case-insensitive (Postgres). Permite buscar "sony" / "Sony" / "SONY".
-        base_sql += " AND (e.nombre ILIKE ? OR e.marca ILIKE ? OR e.modelo ILIKE ?)"
+        # Búsqueda fuzzy global: ILIKE case-insensitive sobre nombre/marca/modelo
+        # del equipo + serie + campos de la ficha (descripción, specs, keywords).
+        # Convierte la barra en un find-anything: buscás "log3" o "iso 25600" y
+        # aparece el equipo aunque la palabra esté en un spec, no en el nombre.
         like = f"%{q}%"
-        params += [like, like, like]
+        base_sql += """ AND (
+            e.nombre ILIKE ?
+            OR COALESCE(e.marca, '') ILIKE ?
+            OR COALESCE(e.modelo, '') ILIKE ?
+            OR COALESCE(e.serie, '') ILIKE ?
+            OR EXISTS (
+                SELECT 1 FROM equipo_fichas ef
+                WHERE ef.equipo_id = e.id AND (
+                    COALESCE(ef.descripcion, '') ILIKE ?
+                    OR COALESCE(ef.specs_json, '') ILIKE ?
+                    OR COALESCE(ef.keywords_json, '') ILIKE ?
+                )
+            )
+        )"""
+        params += [like] * 7
     if categoria:
         # Filtro recursivo: si es padre, incluye descendientes (árbol de `categorias`).
         # Acepta id numérico o nombre.
@@ -357,12 +396,14 @@ def create_equipo(data: EquipoCreate):
             INSERT INTO equipos (nombre, marca, modelo, cantidad,
                                  precio_jornada, precio_usd, roi_pct,
                                  valor_reposicion, foto_url, fecha_compra,
-                                 serie, bh_url, dueno, visible_catalogo, estado)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                 serie, bh_url, dueno, visible_catalogo, estado,
+                                 ficha_completa)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (data.nombre, data.marca, data.modelo, data.cantidad,
               data.precio_jornada, data.precio_usd, data.roi_pct,
               data.valor_reposicion, data.foto_url, data.fecha_compra,
-              data.serie, data.bh_url, data.dueno, data.visible_catalogo, data.estado))
+              data.serie, data.bh_url, data.dueno, data.visible_catalogo, data.estado,
+              bool(data.ficha_completa)))
         new_id = cur.lastrowid
         # Hook: calcular nombre_publico inicial. No falla el create si esto
         # rompe (ej. si los servicios no están disponibles).
@@ -556,6 +597,111 @@ def get_equipo_historial(id: int):
                 "ultimo_alquiler":  items[0]["fecha_desde"] if items else None,
             },
         }
+    finally:
+        conn.close()
+
+
+# ── Mantenimiento log ────────────────────────────────────────────────────────
+
+@router.get("/equipos/{id}/mantenimiento")
+def list_mantenimiento(id: int):
+    """Lista los eventos de mantenimiento del equipo, más recientes primero."""
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+        rows = conn.execute("""
+            SELECT id, equipo_id, fecha, tipo, descripcion, costo, proxima_revision, created_at
+            FROM equipo_mantenimiento WHERE equipo_id = ?
+            ORDER BY fecha DESC, id DESC
+        """, (id,)).fetchall()
+        items = [row_to_dict(r) for r in rows]
+        # Proxima revisión pendiente más cercana (futura o vencida).
+        pendientes = [r for r in items if r.get("proxima_revision")]
+        proxima = min(pendientes, key=lambda r: r["proxima_revision"]) if pendientes else None
+        return {
+            "items": items,
+            "stats": {
+                "total_eventos": len(items),
+                "total_costo": sum((r.get("costo") or 0) for r in items),
+                "proxima_revision": proxima["proxima_revision"] if proxima else None,
+            },
+        }
+    finally:
+        conn.close()
+
+
+@router.post("/equipos/{id}/mantenimiento", status_code=201)
+def add_mantenimiento(id: int, data: MantenimientoCreate):
+    """Agrega un evento de mantenimiento al equipo."""
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+        cur = conn.execute("""
+            INSERT INTO equipo_mantenimiento (equipo_id, fecha, tipo, descripcion, costo, proxima_revision)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (id, data.fecha, data.tipo or "revision", data.descripcion, data.costo, data.proxima_revision))
+        conn.commit()
+        new_id = cur.lastrowid
+        row = conn.execute(
+            "SELECT * FROM equipo_mantenimiento WHERE id = ?", (new_id,)
+        ).fetchone()
+        return row_to_dict(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.patch("/equipos/{id}/mantenimiento/{log_id}")
+def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate):
+    """Actualiza un evento de mantenimiento existente."""
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT * FROM equipo_mantenimiento WHERE id = ? AND equipo_id = ?",
+            (log_id, id),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Evento no encontrado")
+        updates = data.model_dump(exclude_unset=True)
+        if not updates:
+            raise HTTPException(400, "Nada para actualizar")
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        conn.execute(
+            f"UPDATE equipo_mantenimiento SET {set_clause} WHERE id = ?",
+            list(updates.values()) + [log_id],
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM equipo_mantenimiento WHERE id = ?", (log_id,)
+        ).fetchone()
+        return row_to_dict(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.delete("/equipos/{id}/mantenimiento/{log_id}", status_code=204)
+def delete_mantenimiento(id: int, log_id: int):
+    """Elimina un evento de mantenimiento."""
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM equipo_mantenimiento WHERE id = ? AND equipo_id = ?",
+            (log_id, id),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Evento no encontrado")
+        conn.execute("DELETE FROM equipo_mantenimiento WHERE id = ?", (log_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 

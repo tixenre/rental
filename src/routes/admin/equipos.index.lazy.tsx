@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wand2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wand2, Wrench, History } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,8 @@ import { EquipoFormDialog } from "@/components/admin/EquipoFormDialog";
 import { EquipoFormDialogV2 } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
 import { AutocompletarEquipoDialog } from "@/components/admin/autocompletar";
 import { BatchAutocompletarDialog } from "@/components/admin/BatchAutocompletarDialog";
+import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquipoDialog";
+import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
 
 export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
@@ -34,6 +36,7 @@ function EquiposPage() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [etiqueta, setEtiqueta] = useState<string>("");
+  const [soloIncompletos, setSoloIncompletos] = useState(false);
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Equipo | null>(null);
   // V2 paralelo — el usuario lo prueba antes de descartar el viejo.
@@ -43,10 +46,16 @@ function EquiposPage() {
   const [enriching, setEnriching] = useState<Equipo | null>(null);
   const [menuEquipo, setMenuEquipo] = useState<Equipo | null>(null);
   const [openBatch, setOpenBatch] = useState(false);
+  const [mantenimientoEquipo, setMantenimientoEquipo] = useState<Equipo | null>(null);
+  const [historialEquipo, setHistorialEquipo] = useState<Equipo | null>(null);
 
   const equiposQ = useQuery({
-    queryKey: ["admin", "equipos", { q, etiqueta }],
-    queryFn: () => adminApi.listEquipos({ q: q || undefined, etiqueta: etiqueta || undefined }),
+    queryKey: ["admin", "equipos", { q, etiqueta, soloIncompletos }],
+    queryFn: () => adminApi.listEquipos({
+      q: q || undefined,
+      etiqueta: etiqueta || undefined,
+      solo_incompletos: soloIncompletos || undefined,
+    }),
   });
   const etiquetasQ = useQuery({
     queryKey: ["admin", "etiquetas"],
@@ -141,7 +150,7 @@ function EquiposPage() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por nombre, marca, modelo…"
+            placeholder="Buscar (nombre, marca, modelo, serie, specs, keywords…)"
             className="pl-9 text-base sm:text-sm"
           />
         </div>
@@ -156,6 +165,16 @@ function EquiposPage() {
             ))}
           </SelectContent>
         </Select>
+        <Button
+          type="button"
+          variant={soloIncompletos ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSoloIncompletos((v) => !v)}
+          title="Filtrar equipos cuya ficha aún no marcaste como completa"
+          className="md:w-auto"
+        >
+          {soloIncompletos ? "✓ Solo incompletos" : "Solo incompletos"}
+        </Button>
       </div>
 
       {equiposQ.error && (
@@ -228,7 +247,19 @@ function EquiposPage() {
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="font-medium">{eq.nombre}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <span>{eq.nombre}</span>
+                    {!eq.ficha_completa && (
+                      <span
+                        className="text-[10px] text-amber-700 bg-amber-soft/40 px-1 py-0.5 rounded shrink-0"
+                        title="Ficha pendiente — marcala como completa en el form cuando termines de cargarla"
+                      >
+                        pendiente
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                   {[eq.marca, eq.modelo].filter(Boolean).join(" / ") || "—"}
                 </TableCell>
@@ -261,6 +292,12 @@ function EquiposPage() {
                     <Button size="icon" variant="ghost" title="Auto-completar info (B&H/Adorama)" onClick={() => setEnriching(eq)}>
                       <Sparkles className="h-4 w-4 text-amber" />
                     </Button>
+                    <Button size="icon" variant="ghost" title="Historial de alquileres" onClick={() => setHistorialEquipo(eq)}>
+                      <History className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" title="Mantenimiento" onClick={() => setMantenimientoEquipo(eq)}>
+                      <Wrench className="h-4 w-4" />
+                    </Button>
                     <Button size="icon" variant="ghost" title="Editar (V2 — rediseñado)" onClick={() => { setEditingV2(eq); setOpenFormV2(true); }}>
                       <Wand2 className="h-4 w-4 text-amber" />
                     </Button>
@@ -292,6 +329,16 @@ function EquiposPage() {
             label: "Auto-completar info",
             icon: <Sparkles className="h-4 w-4" />,
             onClick: () => setEnriching(menuEquipo!),
+          },
+          {
+            label: "Historial de alquileres",
+            icon: <History className="h-4 w-4" />,
+            onClick: () => setHistorialEquipo(menuEquipo!),
+          },
+          {
+            label: "Mantenimiento",
+            icon: <Wrench className="h-4 w-4" />,
+            onClick: () => setMantenimientoEquipo(menuEquipo!),
           },
           {
             label: "Editar (V2 — rediseñado)",
@@ -337,6 +384,22 @@ function EquiposPage() {
           equipos={items}
           open={openBatch}
           onOpenChange={setOpenBatch}
+        />
+      )}
+
+      {mantenimientoEquipo && (
+        <MantenimientoEquipoDialog
+          equipo={mantenimientoEquipo}
+          open={!!mantenimientoEquipo}
+          onOpenChange={(v) => { if (!v) setMantenimientoEquipo(null); }}
+        />
+      )}
+
+      {historialEquipo && (
+        <HistorialEquipoDialog
+          equipo={historialEquipo}
+          open={!!historialEquipo}
+          onOpenChange={(v) => { if (!v) setHistorialEquipo(null); }}
         />
       )}
 
