@@ -1,3 +1,9 @@
+# check=skip=SecretsUsedInArgOrEnv
+# El linter dispara porque ve "KEY" en VITE_SUPABASE_PUBLISHABLE_KEY, pero
+# las VITE_* son públicas por diseño: Vite las inlinea en el JS del frontend
+# que se sirve al navegador. La anon key de Supabase es pensada para estar
+# expuesta — la seguridad la dan las RLS policies, no esconder la key.
+
 # ── Stage 1: build del frontend (Vite SPA) ───────────────────────────────
 # Imagen oficial de Bun (más chica y rápida que instalar bun via curl).
 # Esta etapa se descarta — solo se copia /app/dist al runtime.
@@ -5,6 +11,7 @@ FROM oven/bun:1 AS frontend
 WORKDIR /app
 
 # Variables públicas que Vite inlinea en el bundle.
+# (Ver nota al tope sobre SecretsUsedInArgOrEnv: estos no son secretos).
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_PUBLISHABLE_KEY
 ARG VITE_SUPABASE_PROJECT_ID
