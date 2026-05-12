@@ -173,7 +173,8 @@ export function EquipoFormDialogV2({
   const [nombrePublicoAuto, setNombrePublicoAuto] = useState(false);
 
   // ── Autocompletar (URL importer) ───────────────────────────────────
-  const [autocompletarUrl, setAutocompletarUrl] = useState("");
+  // El URL del autocompletar es el mismo bh_url del form — un único link
+  // para todo (autocompletar, buscar fotos, referencia, copiar/abrir).
   const [autocompletando, setAutocompletando] = useState(false);
   const [importedFichaExt, setImportedFichaExt] = useState<Partial<AutocompletarResult> | null>(null);
 
@@ -319,7 +320,7 @@ export function EquipoFormDialogV2({
   // Specs van a una lista de "propuestos" para que el usuario los apruebe.
   // ════════════════════════════════════════════════════════════════════
   const autocompletar = async () => {
-    const u = autocompletarUrl.trim();
+    const u = (form.getValues("bh_url") ?? "").trim();
     if (!u) {
       toast.error("Pegá un link primero");
       return;
@@ -374,7 +375,7 @@ export function EquipoFormDialogV2({
       if (propuestos.length) parts.push(`${propuestos.length} specs propuestos`);
       if (r.keywords?.length) parts.push(`${r.keywords.length} etiquetas`);
       if (r.descripcion) parts.push("descripción");
-      toast.success("Datos importados", { description: parts.join(" · ") || "datos básicos" });
+      toast.success("Specs importados", { description: parts.join(" · ") || "datos básicos" });
     } catch (e) {
       toast.error(`No se pudo importar: ${e instanceof Error ? e.message : ""}`);
     } finally {
@@ -386,7 +387,7 @@ export function EquipoFormDialogV2({
   // Buscar fotos (solo foto, ~5s)
   // ════════════════════════════════════════════════════════════════════
   const buscarFotos = async () => {
-    const u = autocompletarUrl.trim();
+    const u = (form.getValues("bh_url") ?? "").trim();
     setPhotoSearching(true);
     const ctrl = new AbortController();
     const timeoutId = setTimeout(() => ctrl.abort(), 30_000);
@@ -749,7 +750,6 @@ export function EquipoFormDialogV2({
   // Render
   // ════════════════════════════════════════════════════════════════════
   const fotoActual = pendingFilePreview || form.watch("foto_url");
-  const bhUrl = form.watch("bh_url");
 
   /** Botón ✨ que re-aplica una sección desde el scrape cacheado. */
   const CacheBtn = ({ section, label = "cache" }: { section: CacheSection; label?: string }) => {
@@ -814,14 +814,11 @@ export function EquipoFormDialogV2({
               <LinkIcon className="h-3.5 w-3.5" />
               Link del producto (B&amp;H, Adorama, sitio oficial)
             </div>
-            <div className="flex gap-1.5">
-              <Input
-                value={autocompletarUrl}
-                onChange={(e) => setAutocompletarUrl(e.target.value)}
-                placeholder="https://www.bhphotovideo.com/c/product/..."
-                className="font-mono text-xs"
-              />
-            </div>
+            <LinkInput
+              value={form.watch("bh_url") ?? ""}
+              onChange={(v) => form.setValue("bh_url", v, { shouldDirty: true })}
+              placeholder="https://www.bhphotovideo.com/c/product/..."
+            />
             <div className="flex flex-wrap gap-1.5">
               <Button
                 type="button" size="sm" variant="outline"
@@ -838,8 +835,8 @@ export function EquipoFormDialogV2({
                 disabled={autocompletando}
               >
                 {autocompletando
-                  ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Importando…</>
-                  : <><Sparkles className="h-3.5 w-3.5 mr-1" /> Autocompletar todo (~15s)</>}
+                  ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Buscando…</>
+                  : <><Sparkles className="h-3.5 w-3.5 mr-1" /> Buscar specs (~15s)</>}
               </Button>
             </div>
           </section>
@@ -1026,19 +1023,6 @@ export function EquipoFormDialogV2({
                   )}
                 </SelectContent>
               </Select>
-            </Field>
-          </section>
-
-          {/* ════════════════════════════════════════════════════════════════
-              LINK DE FUENTE — copiable + clickeable
-          ════════════════════════════════════════════════════════════════ */}
-          <section className="pt-2 border-t hairline">
-            <Field label="Link de fuente (B&H, sitio oficial — para referencia interna)">
-              <LinkInput
-                value={bhUrl ?? ""}
-                onChange={(v) => form.setValue("bh_url", v, { shouldDirty: true })}
-                placeholder="https://www.bhphotovideo.com/c/product/..."
-              />
             </Field>
           </section>
 
