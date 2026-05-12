@@ -1,20 +1,12 @@
-FROM python:3.11-slim
+# syntax=docker/dockerfile:1.6
 
+# ── Stage 1: build del frontend (Vite SPA) ───────────────────────────────
+# Imagen oficial de Bun (más chica y rápida que instalar bun via curl).
+# Esta etapa se descarta — solo se copia /app/dist al runtime.
+FROM oven/bun:1 AS frontend
 WORKDIR /app
 
-# -- Sistema base --
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    curl \
-    unzip \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
-# -- Node.js (para buildear el frontend) --
-RUN curl -fsSL https://bun.sh/install | bash
-ENV PATH="/root/.bun/bin:$PATH"
-
-# Variables públicas que Vite necesita durante el build en Railway.
+# Variables públicas que Vite inlinea en el bundle.
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_PUBLISHABLE_KEY
 ARG VITE_SUPABASE_PROJECT_ID
@@ -24,32 +16,45 @@ ENV VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
 ENV VITE_SUPABASE_PROJECT_ID=$VITE_SUPABASE_PROJECT_ID
 ENV VITE_API_URL=$VITE_API_URL
 
-# -- Directorio para volumen persistente (BD + datos) --
-RUN mkdir -p /app/backend/data
+# Deps primero — capa cacheada mientras no cambien package.json/bun.lock.
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
-# -- Copiar código fuente --
-COPY package.json bun.lock vite.config.ts tsconfig.json index.html ./
+# Después código y config — capa que se invalida en cada cambio de UI.
+COPY vite.config.ts tsconfig.json index.html ./
+COPY public/ ./public/
 COPY src/ ./src/
-COPY backend/ ./backend/
-
-# -- Dependencias Python --
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# -- Playwright + Chromium (necesario para PDF generation) --
-# Costo: ~300-400MB RAM residente con Chromium activo (pdf.py lo lanza una
-# única vez y reutiliza la instancia). Si Railway empieza a OOM-killear,
-# evaluar migrar pdf.py a WeasyPrint (50MB, Python puro, sin browser).
-# Detalles del trade-off: issue #81.
-RUN playwright install --with-deps chromium
-
-# -- Build del frontend (Vite SPA) --
-RUN bun install
 RUN bun run build
 
-# -- Healthcheck para Railway --
+# ── Stage 2: runtime (Python + Chromium) ─────────────────────────────────
+FROM python:3.11-slim
+WORKDIR /app
+
+# curl para healthcheck. gcc no hace falta — todas las deps Python tienen
+# wheels precompilados (psycopg2-binary, Pillow, pydantic, cryptography).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python deps primero — capa cacheada mientras no cambie requirements.txt.
+# BuildKit cache mount acelera re-downloads cuando se agrega/cambia algún pin.
+COPY backend/requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt
+
+# Playwright + Chromium (300-400 MB). Sin cache mount: el binario tiene que
+# quedar en la capa para que esté disponible en runtime. Capa cacheada
+# mientras no cambie requirements.txt — que es la mayoría de los deploys.
+RUN playwright install --with-deps chromium
+
+# Directorio para volumen persistente de Railway (BD SQLite legacy, datos).
+RUN mkdir -p /app/backend/data
+
+# Código del backend y dist del frontend al final — lo que cambia más seguido.
+COPY backend/ ./backend/
+COPY --from=frontend /app/dist ./dist
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# -- Comando para iniciar --
 CMD ["sh", "-c", "cd /app/backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
