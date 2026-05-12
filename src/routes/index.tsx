@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LayoutGrid, List, ArrowRight, Search, X, Sparkles, Loader2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { TopBar } from "@/components/rental/TopBar";
+import { PublicLayout } from "@/components/rental/PublicLayout";
 import { MobileStickyBar } from "@/components/rental/MobileStickyBar";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
@@ -13,7 +13,6 @@ import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { BrandCarousel } from "@/components/rental/BrandCarousel";
 import { ListFilters } from "@/components/rental/ListFilters";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
-import { Footer } from "@/components/rental/Footer";
 import { useEquipos, useDisponibilidad, useCategorias, useMarcas } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
@@ -148,9 +147,7 @@ function Index() {
       : undefined;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <TopBar />
-
+    <PublicLayout>
         {/* Hero amarillo brand */}
         <section className="relative overflow-hidden border-b hairline bg-amber text-ink">
           <div className="absolute inset-0 grain opacity-40" />
@@ -346,7 +343,7 @@ function Index() {
         )}
 
         <CartDrawer allEquipos={allEquipos} getDisponible={getDisponible} />
-      </div>
+    </PublicLayout>
   );
 }
 
@@ -508,8 +505,6 @@ function GridMode({
           </p>
         </div>
       )}
-
-      <Footer />
     </div>
   );
 }

@@ -1,8 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 
-import { TopBar } from "@/components/rental/TopBar";
-import { Footer } from "@/components/rental/Footer";
+import { PublicLayout } from "@/components/rental/PublicLayout";
 import { LAST_UPDATED, PRIVACY_SECTIONS } from "@/data/legal";
 
 const SITE_URL = "https://ramblarental.com";
@@ -27,9 +26,8 @@ export const Route = createFileRoute("/privacidad")({
 
 function PrivacidadPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <TopBar />
-      <main className="flex-1 max-w-3xl mx-auto w-full px-4 md:px-6 py-8 md:py-12">
+    <PublicLayout>
+      <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-8 md:py-12">
         <Link
           to="/"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-ink transition mb-6"
@@ -60,8 +58,7 @@ function PrivacidadPage() {
           Si encontrás algo que querés revisar o consultar, escribinos por
           WhatsApp o email — los datos están en la sección 10.
         </div>
-      </main>
-      <Footer />
-    </div>
+      </div>
+    </PublicLayout>
   );
 }
