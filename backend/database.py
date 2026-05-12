@@ -251,6 +251,11 @@ def init_db():
     # al actualizar el USD rate, los manuales se respetan por default.
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS precio_jornada_manual BOOLEAN NOT NULL DEFAULT FALSE")
 
+    # Migration: flag manual que el admin marca cuando termina de cargar la
+    # ficha de un equipo. Permite filtrar "equipos pendientes" en el workflow
+    # de carga incremental de inventario.
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS ficha_completa BOOLEAN NOT NULL DEFAULT FALSE")
+
     # Tabla de marcas (brands)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS marcas (

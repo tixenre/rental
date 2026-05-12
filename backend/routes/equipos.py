@@ -63,6 +63,7 @@ class EquipoCreate(BaseModel):
     dueno:            Optional[str]   = "Rambla"
     visible_catalogo: Optional[int]   = 1
     estado:           Optional[str]   = "operativo"   # operativo / en_mantenimiento / fuera_servicio
+    ficha_completa:   Optional[bool]  = False
 
 
 class EquipoUpdate(BaseModel):
@@ -86,6 +87,7 @@ class EquipoUpdate(BaseModel):
     dueno:            Optional[str]   = None
     visible_catalogo: Optional[int]   = None
     estado:           Optional[str]   = None
+    ficha_completa:   Optional[bool]  = None
 
 
 class FichaUpdate(BaseModel):
@@ -189,10 +191,11 @@ def equipos_afuera():
 @router.get("/equipos")
 def list_equipos(
     request:       Request,
-    q:             Optional[str]  = Query(None),
-    etiqueta:      Optional[str]  = Query(None),
-    categoria:     Optional[str]  = Query(None),
-    solo_visibles: Optional[bool] = Query(None),
+    q:                Optional[str]  = Query(None),
+    etiqueta:         Optional[str]  = Query(None),
+    categoria:        Optional[str]  = Query(None),
+    solo_visibles:    Optional[bool] = Query(None),
+    solo_incompletos: Optional[bool] = Query(None),
     sort:          Optional[str]  = Query(None, description="ranking | nombre | precio_asc | precio_desc | id"),
     spec:          Optional[list[str]] = Query(None, description="Filtros por specs: spec=key:valor"),
     page:          int = Query(1, ge=1),
@@ -217,6 +220,10 @@ def list_equipos(
     if solo_visibles or not is_admin:
         base_sql += " AND e.visible_catalogo = 1 AND e.estado != 'fuera_servicio'"
 
+    # Filtro admin: equipos cuya ficha el admin aún no marcó como completa.
+    if solo_incompletos and is_admin:
+        base_sql += " AND e.ficha_completa = FALSE"
+
     # ── Filtros por specs estructurados (PR E) ──
     # Cada `spec=key:valor` agrega un AND EXISTS sobre equipo_specs.
     if spec:
@@ -235,10 +242,26 @@ def list_equipos(
             )
             params += [key, value]
     if q:
-        # ILIKE = case-insensitive (Postgres). Permite buscar "sony" / "Sony" / "SONY".
-        base_sql += " AND (e.nombre ILIKE ? OR e.marca ILIKE ? OR e.modelo ILIKE ?)"
+        # Búsqueda fuzzy global: ILIKE case-insensitive sobre nombre/marca/modelo
+        # del equipo + serie + campos de la ficha (descripción, specs, keywords).
+        # Convierte la barra en un find-anything: buscás "log3" o "iso 25600" y
+        # aparece el equipo aunque la palabra esté en un spec, no en el nombre.
         like = f"%{q}%"
-        params += [like, like, like]
+        base_sql += """ AND (
+            e.nombre ILIKE ?
+            OR COALESCE(e.marca, '') ILIKE ?
+            OR COALESCE(e.modelo, '') ILIKE ?
+            OR COALESCE(e.serie, '') ILIKE ?
+            OR EXISTS (
+                SELECT 1 FROM equipo_fichas ef
+                WHERE ef.equipo_id = e.id AND (
+                    COALESCE(ef.descripcion, '') ILIKE ?
+                    OR COALESCE(ef.specs_json, '') ILIKE ?
+                    OR COALESCE(ef.keywords_json, '') ILIKE ?
+                )
+            )
+        )"""
+        params += [like] * 7
     if categoria:
         # Filtro recursivo: si es padre, incluye descendientes (árbol de `categorias`).
         # Acepta id numérico o nombre.
@@ -373,12 +396,14 @@ def create_equipo(data: EquipoCreate):
             INSERT INTO equipos (nombre, marca, modelo, cantidad,
                                  precio_jornada, precio_usd, roi_pct,
                                  valor_reposicion, foto_url, fecha_compra,
-                                 serie, bh_url, dueno, visible_catalogo, estado)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                 serie, bh_url, dueno, visible_catalogo, estado,
+                                 ficha_completa)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (data.nombre, data.marca, data.modelo, data.cantidad,
               data.precio_jornada, data.precio_usd, data.roi_pct,
               data.valor_reposicion, data.foto_url, data.fecha_compra,
-              data.serie, data.bh_url, data.dueno, data.visible_catalogo, data.estado))
+              data.serie, data.bh_url, data.dueno, data.visible_catalogo, data.estado,
+              bool(data.ficha_completa)))
         new_id = cur.lastrowid
         # Hook: calcular nombre_publico inicial. No falla el create si esto
         # rompe (ej. si los servicios no están disponibles).
