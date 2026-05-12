@@ -24,6 +24,7 @@ import { ActionMenu } from "@/components/mobile";
 import { EquipoFormDialog } from "@/components/admin/EquipoFormDialog";
 import { EquipoFormDialogV2 } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
 import { AutocompletarEquipoDialog } from "@/components/admin/autocompletar";
+import { BatchAutocompletarDialog } from "@/components/admin/BatchAutocompletarDialog";
 
 export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
@@ -41,6 +42,7 @@ function EquiposPage() {
   const [deleting, setDeleting] = useState<Equipo | null>(null);
   const [enriching, setEnriching] = useState<Equipo | null>(null);
   const [menuEquipo, setMenuEquipo] = useState<Equipo | null>(null);
+  const [openBatch, setOpenBatch] = useState(false);
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", { q, etiqueta }],
@@ -121,6 +123,9 @@ function EquiposPage() {
           </p>
         </div>
         <div className="flex gap-1.5">
+          <Button variant="outline" onClick={() => setOpenBatch(true)} title="Buscar specs en bulk para los equipos con link de fuente">
+            <Sparkles className="h-4 w-4 mr-1" /> Batch specs
+          </Button>
           <Button variant="outline" onClick={() => { setEditingV2(null); setOpenFormV2(true); }} title="Probar el form rediseñado (V2)">
             <Wand2 className="h-4 w-4 mr-1" /> Nuevo (V2)
           </Button>
@@ -324,6 +329,14 @@ function EquiposPage() {
           initial={editingV2}
           saving={saveMut.isPending}
           onSubmit={(data, etiquetas) => saveMut.mutateAsync({ data, etiquetas })}
+        />
+      )}
+
+      {openBatch && (
+        <BatchAutocompletarDialog
+          equipos={items}
+          open={openBatch}
+          onOpenChange={setOpenBatch}
         />
       )}
 

@@ -1494,14 +1494,111 @@ class EnriquecerInput(BaseModel):
     url:    Optional[str] = None   # Si está presente, salta la búsqueda y scrapea esa URL directo
 
 
+class BatchEnriquecerInput(BaseModel):
+    # Hasta 3 equipo_ids por request (evita timeouts). El frontend re-batchea.
+    equipo_ids: list[int]
+
+
+@router.post("/admin/equipos/batch-enriquecer")
+def admin_batch_enriquecer(payload: BatchEnriquecerInput, request: Request):
+    """
+    Procesa un chunk de equipos: para cada uno, scrapea su bh_url y guarda el
+    resultado en `equipo_fichas.raw_json` (cache). El admin después aplica los
+    campos por sección con los botones ✨ del form V2.
+
+    Límite: 3 equipos por request. El frontend re-batchea hasta terminar.
+    Entre cada scrape duerme 1s para no rate-limitear B&H.
+
+    NO sobrescribe campos no vacíos del equipo. Solo llena marca/modelo/foto_url
+    si están vacíos. Specs y descripción siempre van al cache; el admin decide
+    qué aplicar después.
+    """
+    require_admin(request)
+
+    import time as _time, json as _json
+
+    ids = payload.equipo_ids[:3]   # hard cap defensivo
+    if not ids:
+        return {"results": []}
+
+    conn = get_db()
+    results = []
+    try:
+        for eid in ids:
+            eq = conn.execute("SELECT id, nombre, marca, modelo, foto_url, bh_url FROM equipos WHERE id=?", (eid,)).fetchone()
+            if not eq:
+                results.append({"equipo_id": eid, "status": "error", "error": "no existe"})
+                continue
+            eq_d = row_to_dict(eq)
+            if not eq_d.get("bh_url"):
+                results.append({"equipo_id": eid, "status": "skipped", "reason": "sin bh_url"})
+                continue
+
+            try:
+                # Llamada interna al enriquecer (sin auth doble)
+                scrape = admin_enriquecer_equipo(
+                    EnriquecerInput(url=eq_d["bh_url"]),
+                    request=None,
+                )
+
+                # Persistir raw_json en equipo_fichas (cache para botones ✨)
+                conn.execute(
+                    """INSERT INTO equipo_fichas (equipo_id, raw_json, fuente_url, enriquecido_at)
+                       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                       ON CONFLICT (equipo_id) DO UPDATE
+                       SET raw_json = EXCLUDED.raw_json,
+                           fuente_url = COALESCE(EXCLUDED.fuente_url, equipo_fichas.fuente_url),
+                           enriquecido_at = EXCLUDED.enriquecido_at""",
+                    (eid, _json.dumps(scrape, ensure_ascii=False), scrape.get("fuente_url") or eq_d["bh_url"]),
+                )
+
+                # Llenar campos top-level del equipo si están vacíos
+                patch = {}
+                if not eq_d.get("marca") and scrape.get("marca"):
+                    patch["marca"] = scrape["marca"]
+                if not eq_d.get("modelo") and scrape.get("modelo"):
+                    patch["modelo"] = scrape["modelo"]
+                if not eq_d.get("foto_url") and scrape.get("foto_url"):
+                    patch["foto_url"] = scrape["foto_url"]
+                if patch:
+                    set_clause = ", ".join(f"{k} = ?" for k in patch)
+                    set_clause += ", updated_at = CURRENT_TIMESTAMP"
+                    conn.execute(
+                        f"UPDATE equipos SET {set_clause} WHERE id = ?",
+                        list(patch.values()) + [eid],
+                    )
+
+                conn.commit()
+                results.append({
+                    "equipo_id": eid,
+                    "status": "ok",
+                    "specs_count": len(scrape.get("specs") or []),
+                    "filled": list(patch.keys()),
+                })
+            except Exception as e:
+                conn.rollback()
+                results.append({"equipo_id": eid, "status": "error", "error": str(e)[:200]})
+
+            # Rate limit B&H
+            _time.sleep(1)
+
+        return {"results": results}
+    finally:
+        conn.close()
+
+
 @router.post("/admin/equipos/enriquecer")
-def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
+def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request | None = None):
     """
     Busca el equipo en B&H/Adorama, scrapea la página y usa Lovable AI para
     extraer marca/modelo/specs/foto en JSON estructurado. Devuelve un preview;
     el frontend decide qué campos aplicar via PATCH normal.
+
+    `request` es opcional: si viene, valida admin. Si es None (llamado interno
+    desde batch-enriquecer), saltea la validación porque ya validó arriba.
     """
-    require_admin(request)
+    if request is not None:
+        require_admin(request)
 
     import os, httpx
 

@@ -257,6 +257,19 @@ export const adminApi = {
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
     }
   },
+  /** Batch autocompletar: procesa hasta 3 equipos por call, guarda el scrape
+   *  en cache (raw_json). El frontend re-batchea hasta terminar. */
+  batchEnriquecer: (equipo_ids: number[]) =>
+    authedPostJson<{
+      results: Array<{
+        equipo_id: number;
+        status: "ok" | "skipped" | "error";
+        reason?: string;
+        error?: string;
+        specs_count?: number;
+        filled?: string[];
+      }>;
+    }>("/api/admin/equipos/batch-enriquecer", { equipo_ids }),
   setEtiquetas: (id: number, etiquetas: string[]) =>
     authedJson<{ ok: true }>(`/api/equipos/${id}/etiquetas`, {
       method: "PUT",
