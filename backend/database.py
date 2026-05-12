@@ -652,6 +652,26 @@ def init_db():
         "ON equipo_specs(spec_key, value)"
     )
 
+    # ── Mantenimiento log por equipo ─────────────────────────────────────
+    # Una fila por evento de mantenimiento (revisión, reparación, limpieza,
+    # etc.). proxima_revision opcional para recordatorios.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS equipo_mantenimiento (
+            id                SERIAL PRIMARY KEY,
+            equipo_id         INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            fecha             TEXT NOT NULL,
+            tipo              VARCHAR(32) NOT NULL DEFAULT 'revision',
+            descripcion       TEXT,
+            costo             INTEGER,
+            proxima_revision  TEXT,
+            created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mantenimiento_equipo "
+        "ON equipo_mantenimiento(equipo_id, fecha DESC)"
+    )
+
     # ── Compatibilidades entre equipos (FX3 + Sigma EF → requiere MC-11) ──
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_compatibilidad (
