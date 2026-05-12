@@ -286,6 +286,15 @@ export const adminApi = {
   },
   duplicateEquipo: (id: number) =>
     authedJson<Equipo>(`/api/equipos/${id}/duplicate`, { method: "POST" }),
+  /** Bulk action sobre múltiples equipos. */
+  bulkAction: (payload: {
+    ids: number[];
+    action: "set_visible" | "set_ficha_completa" | "set_categoria" | "delete";
+    visible?: boolean;
+    ficha_completa?: boolean;
+    categoria_id?: number;
+  }) =>
+    authedPostJson<{ affected: number }>("/api/admin/equipos/bulk", payload),
   /** Batch autocompletar: procesa hasta 3 equipos por call, guarda el scrape
    *  en cache (raw_json). El frontend re-batchea hasta terminar. */
   batchEnriquecer: (equipo_ids: number[]) =>

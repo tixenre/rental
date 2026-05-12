@@ -575,6 +575,94 @@ def duplicate_equipo(id: int):
         conn.close()
 
 
+class BulkActionInput(BaseModel):
+    ids: list[int] = Field(..., min_length=1, max_length=500)
+    action: str   # "set_visible" | "set_ficha_completa" | "set_categoria" | "delete"
+    visible: Optional[bool] = None
+    ficha_completa: Optional[bool] = None
+    categoria_id: Optional[int] = None
+
+
+@router.post("/admin/equipos/bulk")
+def bulk_action(payload: BulkActionInput, request: Request):
+    """Aplica una acción a varios equipos a la vez. Acciones soportadas:
+    - set_visible (visible: bool)
+    - set_ficha_completa (ficha_completa: bool)
+    - set_categoria (categoria_id: int) — REEMPLAZA las categorías existentes
+    - delete
+
+    Retorna {"affected": N} con la cantidad de equipos modificados.
+    """
+    require_admin(request)
+    ids = payload.ids
+    if not ids:
+        return {"affected": 0}
+
+    conn = get_db()
+    placeholders = ",".join(["?"] * len(ids))
+    try:
+        if payload.action == "set_visible":
+            if payload.visible is None:
+                raise HTTPException(400, "set_visible requiere visible: bool")
+            v = 1 if payload.visible else 0
+            conn.execute(
+                f"UPDATE equipos SET visible_catalogo = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN ({placeholders})",
+                [v, *ids],
+            )
+
+        elif payload.action == "set_ficha_completa":
+            if payload.ficha_completa is None:
+                raise HTTPException(400, "set_ficha_completa requiere ficha_completa: bool")
+            conn.execute(
+                f"UPDATE equipos SET ficha_completa = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN ({placeholders})",
+                [bool(payload.ficha_completa), *ids],
+            )
+
+        elif payload.action == "set_categoria":
+            if not payload.categoria_id:
+                raise HTTPException(400, "set_categoria requiere categoria_id: int")
+            cat_exists = conn.execute(
+                "SELECT id FROM categorias WHERE id = ?", (payload.categoria_id,)
+            ).fetchone()
+            if not cat_exists:
+                raise HTTPException(404, f"Categoría {payload.categoria_id} no existe")
+            # Reemplaza las categorías existentes con la nueva
+            conn.execute(
+                f"DELETE FROM equipo_categorias WHERE equipo_id IN ({placeholders})",
+                ids,
+            )
+            for eid in ids:
+                conn.execute(
+                    "INSERT INTO equipo_categorias (equipo_id, categoria_id) VALUES (?, ?)",
+                    (eid, payload.categoria_id),
+                )
+                try:
+                    regenerate_auto_tags(conn, eid)
+                except Exception as e:
+                    logger.warning("regenerate_auto_tags falló para %s en bulk: %s", eid, e)
+
+        elif payload.action == "delete":
+            conn.execute(
+                f"DELETE FROM equipos WHERE id IN ({placeholders})",
+                ids,
+            )
+
+        else:
+            raise HTTPException(400, f"Acción desconocida: {payload.action}")
+
+        conn.commit()
+        return {"affected": len(ids)}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        logger.exception("bulk_action falló: %s", payload.action)
+        raise HTTPException(500, f"Error bulk: {type(e).__name__}")
+    finally:
+        conn.close()
+
+
 @router.delete("/equipos/{id}", status_code=204)
 def delete_equipo(id: int):
     conn = get_db()
