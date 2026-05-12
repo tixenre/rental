@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wrench, History, Copy } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wrench, History, Copy, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ function EquiposPage() {
   const [q, setQ] = useState("");
   const [etiqueta, setEtiqueta] = useState<string>("");
   const [soloIncompletos, setSoloIncompletos] = useState(false);
+  const [vistaPapelera, setVistaPapelera] = useState(false);
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Equipo | null>(null);
   const [deleting, setDeleting] = useState<Equipo | null>(null);
@@ -48,11 +49,12 @@ function EquiposPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const equiposQ = useQuery({
-    queryKey: ["admin", "equipos", { q, etiqueta, soloIncompletos }],
+    queryKey: ["admin", "equipos", { q, etiqueta, soloIncompletos, vistaPapelera }],
     queryFn: () => adminApi.listEquipos({
       q: q || undefined,
       etiqueta: etiqueta || undefined,
       solo_incompletos: soloIncompletos || undefined,
+      solo_eliminados: vistaPapelera || undefined,
     }),
   });
   const etiquetasQ = useQuery({
@@ -119,6 +121,15 @@ function EquiposPage() {
       adminApi.updateEquipo(eq.id, { visible_catalogo: eq.visible_catalogo ? 0 : 1 }),
     onSuccess: () => invalidate(),
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  const restoreMut = useMutation({
+    mutationFn: (id: number) => adminApi.restoreEquipo(id),
+    onSuccess: () => {
+      toast.success("Equipo restaurado");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(`No se pudo restaurar: ${e.message}`),
   });
 
   const bulkMut = useMutation({
@@ -206,6 +217,16 @@ function EquiposPage() {
           className="md:w-auto"
         >
           {soloIncompletos ? "✓ Solo incompletos" : "Solo incompletos"}
+        </Button>
+        <Button
+          type="button"
+          variant={vistaPapelera ? "destructive" : "outline"}
+          size="sm"
+          onClick={() => setVistaPapelera((v) => !v)}
+          title="Ver equipos dados de baja (soft-deleted)"
+          className="md:w-auto"
+        >
+          {vistaPapelera ? <><Trash2 className="h-3.5 w-3.5 mr-1" /> Papelera</> : "Papelera"}
         </Button>
       </div>
 
@@ -414,9 +435,20 @@ function EquiposPage() {
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => setDeleting(eq)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {eq.eliminado_at ? (
+                      <Button
+                        size="icon" variant="ghost"
+                        title="Restaurar"
+                        onClick={() => restoreMut.mutate(eq.id)}
+                        disabled={restoreMut.isPending}
+                      >
+                        <RotateCcw className="h-4 w-4 text-amber" />
+                      </Button>
+                    ) : (
+                      <Button size="icon" variant="ghost" onClick={() => setDeleting(eq)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
