@@ -1154,6 +1154,14 @@ function CollapsibleSection({
   title, defaultOpen = false, children, actions,
 }: { title: string; defaultOpen?: boolean; children: React.ReactNode; actions?: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
+  // Re-abre la sección si defaultOpen transiciona false→true (ej. llegaron
+  // specs propuestos por cache). No fuerza cerrar si transiciona al revés —
+  // respeta el toggle manual del user.
+  const prevDefaultOpen = useRef(defaultOpen);
+  useEffect(() => {
+    if (defaultOpen && !prevDefaultOpen.current) setOpen(true);
+    prevDefaultOpen.current = defaultOpen;
+  }, [defaultOpen]);
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="border-t hairline pt-2">
       <div className="flex items-center gap-2">
