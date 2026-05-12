@@ -681,7 +681,12 @@ export function EquipoFormDialogV2({
           if (r.fuente_url) ext.fuente_url = r.fuente_url;
           if (r.fuente_titulo) ext.fuente_titulo = r.fuente_titulo;
           if (r.enriquecido_fuente) ext.enriquecido_fuente = r.enriquecido_fuente;
-          if (r.raw) ext.raw = r.raw;
+          // Guardar el AutocompletarResult completo como raw para que los
+          // botones ✨ por sección puedan re-aplicar campos normalizados.
+          // Antes guardábamos sólo r.raw (AI extracted) pero eso quedaba
+          // pre-normalización (EN/imperial), inconsistente con el batch que
+          // guarda el result post-normalización (ES/métrico). #punto4
+          ext.raw = r;
           if (Object.keys(ext).length > 0) {
             await adminApi.aplicarEnriquecimiento(equipoId, ext);
           }

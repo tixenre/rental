@@ -862,6 +862,16 @@ def bulk_action(payload: BulkActionInput, request: Request):
                 ids,
             )
 
+        elif payload.action == "delete_permanent":
+            # Hard delete (DROP). Usado desde la vista papelera para vaciar
+            # definitivamente. CASCADE borra ficha, kit, categorías, etiquetas
+            # del equipo. Los alquiler_items quedan huérfanos pero el catálogo
+            # público ya no los referencia. #punto4
+            conn.execute(
+                f"DELETE FROM equipos WHERE id IN ({placeholders})",
+                ids,
+            )
+
         else:
             raise HTTPException(400, f"Acción desconocida: {payload.action}")
 
