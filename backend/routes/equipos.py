@@ -500,6 +500,21 @@ def duplicate_equipo(id: int):
                 (new_id, cat["categoria_id"], cat["orden"]),
             )
 
+        # Copiar etiquetas MANUALES (las auto se regeneran al setear marca/
+        # modelo/categorías). Sin esto, el duplicado pierde los tags que
+        # el admin tipeó a mano.
+        etqs = conn.execute(
+            "SELECT etiqueta_id, orden FROM equipo_etiquetas "
+            "WHERE equipo_id=? AND origen='manual'",
+            (id,),
+        ).fetchall()
+        for e in etqs:
+            conn.execute(
+                "INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen) "
+                "VALUES (?, ?, ?, 'manual')",
+                (new_id, e["etiqueta_id"], e["orden"]),
+            )
+
         # Copiar kit
         kit = conn.execute(
             "SELECT componente_id, cantidad, orden FROM kit_componentes WHERE equipo_id=?", (id,)
@@ -509,6 +524,14 @@ def duplicate_equipo(id: int):
                 "INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, orden) VALUES (?, ?, ?, ?)",
                 (new_id, componente_id, cantidad, orden),
             )
+
+        # Regenerar etiquetas auto (categoría/marca/modelo/nombre) sobre el
+        # duplicado. Las manuales ya las copiamos arriba; esto agrega las auto
+        # que normalmente se generan en setCategorias.
+        try:
+            regenerate_auto_tags(conn, new_id)
+        except Exception as e:
+            logger.warning("regenerate_auto_tags falló para duplicado %s: %s", new_id, e)
 
         conn.commit()
         row = conn.execute("SELECT * FROM equipos WHERE id=?", (new_id,)).fetchone()
