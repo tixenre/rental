@@ -4,10 +4,13 @@ Cada issue tiene **3 dimensiones** de clasificación:
 
 ## 1. Tipo
 
+Una sola label de esta sección por issue. Obligatoria.
+
 | Label | Cuándo |
 |---|---|
 | `bug` | Algo roto que tiene que andar |
 | `feature` | Funcionalidad nueva |
+| `refactor` | Reorganización de código sin cambiar comportamiento |
 | `documentation` | Cambio de docs |
 | `design` | Cambio visual / UX |
 | `security` | Tema de seguridad |
@@ -35,10 +38,14 @@ Independiente de prioridad — algo urgente puede ser chico o grande.
 
 ## Otras dimensiones
 
+Cross-cutting. Aplicar **además** de las 3 obligatorias. Cero o más por issue.
+
 | Label | Cuándo |
 |---|---|
 | `launch-blocker` | Indispensable antes de publicar a producción |
 | `infrastructure` | CI, deploy, monitoreo |
+| `backend` | Cambia código del backend (FastAPI / DB / etc.) |
+| `admin` | Cambia el back-office (`/admin/*`) |
 | `dx` | Developer Experience |
 | `performance` | Optimización |
 | `mobile` | Bug o mejora que afecta específicamente la experiencia mobile (< 640px). **Trato prioritario** — la mayoría de los clientes entra desde el celular, así que cualquier issue con esta etiqueta sube un nivel de prioridad efectiva. |
