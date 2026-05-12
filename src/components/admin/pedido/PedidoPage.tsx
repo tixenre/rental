@@ -613,7 +613,7 @@ function ItemsCard({
                 <div className="flex items-center gap-1">
                   <Button
                     size="icon" variant="outline"
-                    className="h-7 w-7"
+                    className="h-9 w-9 sm:h-7 sm:w-7"
                     onClick={() => updateItem(it.equipo_id, { cantidad: Math.max(1, it.cantidad - 1) })}
                   >
                     <Minus className="h-3 w-3" />
@@ -622,11 +622,11 @@ function ItemsCard({
                     type="number" min={1}
                     value={it.cantidad}
                     onChange={(e) => updateItem(it.equipo_id, { cantidad: parseInt(e.target.value) || 1 })}
-                    className={cn("h-7 w-10 text-center text-sm p-0", overstock && "border-destructive text-destructive")}
+                    className={cn("h-9 w-10 text-center text-sm p-0 sm:h-7", overstock && "border-destructive text-destructive")}
                   />
                   <Button
                     size="icon" variant="outline"
-                    className="h-7 w-7"
+                    className="h-9 w-9 sm:h-7 sm:w-7"
                     onClick={() => updateItem(it.equipo_id, { cantidad: it.cantidad + 1 })}
                   >
                     <Plus className="h-3 w-3" />
@@ -637,7 +637,7 @@ function ItemsCard({
                     type="number" min={0}
                     value={it.precio_jornada}
                     onChange={(e) => updateItem(it.equipo_id, { precio_jornada: parseInt(e.target.value) || 0 })}
-                    className="h-7 w-24 text-sm text-base sm:text-sm"
+                    className="h-9 w-24 text-sm text-base sm:text-sm sm:h-7"
                   />
                   <span className="text-xs text-muted-foreground whitespace-nowrap">/día</span>
                 </div>
