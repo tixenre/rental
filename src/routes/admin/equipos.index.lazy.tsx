@@ -63,6 +63,12 @@ function EquiposPage() {
     queryKey: ["admin", "etiquetas"],
     queryFn: () => adminApi.listEtiquetas(),
   });
+  // Categorías para el selector de bulk "set categoría" (issue #231).
+  const categoriasQ = useQuery({
+    queryKey: ["admin", "categorias"],
+    queryFn: () => adminApi.listCategorias(),
+    staleTime: 60_000,
+  });
   // Banner de calidad de inventario: equipos sin serie. Issue #91.
   const sinSerieQ = useQuery({
     queryKey: ["admin", "equipos-sin-serie"],
@@ -291,6 +297,33 @@ function EquiposPage() {
           >
             ☐ Pendientes
           </Button>
+          {/* Set categoría (#231): asigna categoría a los seleccionados.
+              Reemplaza las categorías existentes (backend hace DELETE + INSERT
+              + regenerate_auto_tags). */}
+          <Select
+            value=""
+            onValueChange={(v) => {
+              const categoria_id = Number(v);
+              if (!Number.isFinite(categoria_id)) return;
+              bulkMut.mutate({
+                ids: [...selectedIds],
+                action: "set_categoria",
+                categoria_id,
+              });
+            }}
+            disabled={bulkMut.isPending || !categoriasQ.data?.length}
+          >
+            <SelectTrigger className="h-8 w-44 bg-secondary text-secondary-foreground border-0">
+              <SelectValue placeholder="Asignar categoría…" />
+            </SelectTrigger>
+            <SelectContent>
+              {(categoriasQ.data ?? []).map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {c.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             size="sm" variant="destructive"
             onClick={() => {
