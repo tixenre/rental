@@ -31,7 +31,7 @@ import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin, type KitC
 import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
 import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
-import { EnriquecerEquipoDialog, type EnriquecerResult } from "./enriquecedor";
+import { AutocompletarEquipoDialog, type AutocompletarResult } from "./autocompletar";
 import { Link as LinkIcon, Image as ImageIcon, Check as CheckIcon, X } from "lucide-react";
 
 const TPL_TOKENS = ["tipo", "marca", "modelo", "nombre", "montura", "formato", "resolucion"] as const;
@@ -174,7 +174,7 @@ export function EquipoFormDialog({
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   // Ficha extendida importada (se persiste vía aplicarEnriquecimiento al guardar)
-  const [importedFichaExt, setImportedFichaExt] = useState<Partial<EnriquecerResult> | null>(null);
+  const [importedFichaExt, setImportedFichaExt] = useState<Partial<AutocompletarResult> | null>(null);
   const [importSummary, setImportSummary] = useState<string | null>(null);
 
   // ── Búsqueda dedicada de fotos ─────────────────────────────────────────
@@ -334,7 +334,7 @@ export function EquipoFormDialog({
     setImportError(null);
     setImportSummary(null);
     try {
-      const r = await authedJson<EnriquecerResult>("/api/admin/equipos/enriquecer", {
+      const r = await authedJson<AutocompletarResult>("/api/admin/equipos/enriquecer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: u }),
@@ -1217,7 +1217,7 @@ export function EquipoFormDialog({
       </Dialog>
 
       {enriching && initial && (
-        <EnriquecerEquipoDialog
+        <AutocompletarEquipoDialog
           equipo={initial}
           open={enriching}
           onOpenChange={setEnriching}
