@@ -22,18 +22,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Loader2, Upload, Plus, Trash2, Sparkles, Search, GripVertical,
+  Loader2, Upload, Plus, Trash2, Sparkles, Search,
   Link as LinkIcon, Image as ImageIcon, X, Copy, ExternalLink, ChevronDown,
 } from "lucide-react";
-import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
