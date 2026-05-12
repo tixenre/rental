@@ -129,7 +129,7 @@ Para cada página, verificar **todos** estos puntos antes de marcar como OK:
 | El Estudio | `/estudio` | 🟡 Verificar | FAQ accordion + booking form en mobile. |
 | Preguntas frecuentes | `/preguntas-frecuentes` | 🟢 OK | Layout simple, accordions. |
 | Login cliente | `/cliente/login` | 🟡 Verificar | Funciona por defecto pero sin responsive utils explícitas. |
-| Registro cliente | `/cliente/registro` | 🟡 Verificar | Idem. |
+| Registro cliente | `/cliente/registro` | 🟢 OK | Form en card centrada `max-w-sm`, `grid-cols-1 sm:grid-cols-2`, submit `w-full py-2.5`. Regla CSS global cubre anti-zoom iOS. Code audit confirma 🟢. |
 
 ### Admin (prioritario mobile)
 
@@ -143,7 +143,7 @@ Para cada página, verificar **todos** estos puntos antes de marcar como OK:
 | Página | URL | Status | Notas |
 |---|---|---|---|
 | Lista de pedidos | `/cliente/portal` | 🟢 OK | Acordeón expandible por pedido. |
-| Perfil | `/cliente/perfil` | 🟡 Verificar | Sin responsive utils explícitas. |
+| Perfil | `/cliente/perfil` | 🟢 OK (mobile) | Header sticky + sub-header amarillo + form `grid-cols-1 sm:grid-cols-2`. Nombre/apellido tienen `text-base sm:text-sm` explícito. Submit `w-full py-3` (~48px). **Nota**: tiene drift de chrome (issue #256) — el patrón mobile per se está bien. |
 
 ### Componentes críticos
 
