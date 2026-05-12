@@ -1124,6 +1124,99 @@ class EtiquetasReorder(BaseModel):
     ids: list[int]
 
 
+@router.get("/admin/dashboard/uso")
+def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
+    """Dashboard de uso de equipos: top alquilados, sin movimiento, revenue
+    por categoría. v1 con métricas clave (#205).
+
+    `dias_sin_uso` (default 90): umbral para considerar un equipo "sin
+    movimiento". Equipos cuyo último alquiler fue hace más días aparecen
+    como candidatos a revisar/vender.
+    """
+    require_admin(request)
+    conn = get_db()
+    try:
+        # ── Top 10 más alquilados (cantidad de pedidos + revenue total) ──
+        top_alquilados = conn.execute("""
+            SELECT
+                e.id, e.nombre, e.marca, e.modelo, e.foto_url,
+                COUNT(DISTINCT p.id) AS cant_pedidos,
+                SUM(
+                    COALESCE(pi.precio_jornada, 0) * COALESCE(pi.cantidad, 1)
+                    * GREATEST(1, DATE_PART('day', LEFT(p.fecha_hasta, 10)::TIMESTAMP - LEFT(p.fecha_desde, 10)::TIMESTAMP))::INTEGER
+                ) AS revenue_total
+            FROM equipos e
+            JOIN alquiler_items pi ON pi.equipo_id = e.id
+            JOIN alquileres p ON p.id = pi.pedido_id
+            WHERE e.eliminado_at IS NULL
+            GROUP BY e.id, e.nombre, e.marca, e.modelo, e.foto_url
+            ORDER BY cant_pedidos DESC, revenue_total DESC
+            LIMIT 10
+        """).fetchall()
+
+        # ── Equipos sin movimiento (último alquiler hace > N días, o nunca) ──
+        sin_uso = conn.execute("""
+            SELECT
+                e.id, e.nombre, e.marca, e.modelo, e.foto_url, e.valor_reposicion,
+                MAX(p.fecha_desde) AS ultimo_alquiler,
+                COUNT(DISTINCT p.id) AS total_alquileres
+            FROM equipos e
+            LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
+            LEFT JOIN alquileres p ON p.id = pi.pedido_id
+            WHERE e.eliminado_at IS NULL
+            GROUP BY e.id, e.nombre, e.marca, e.modelo, e.foto_url, e.valor_reposicion
+            HAVING (MAX(p.fecha_desde) IS NULL OR MAX(p.fecha_desde) < (CURRENT_DATE - (? || ' days')::INTERVAL)::TEXT)
+            ORDER BY ultimo_alquiler ASC NULLS FIRST
+            LIMIT 25
+        """, (dias_sin_uso,)).fetchall()
+
+        # ── Revenue por categoría (top 10) ──
+        por_categoria = conn.execute("""
+            SELECT
+                cat.id, cat.nombre,
+                COUNT(DISTINCT p.id) AS cant_pedidos,
+                SUM(
+                    COALESCE(pi.precio_jornada, 0) * COALESCE(pi.cantidad, 1)
+                    * GREATEST(1, DATE_PART('day', LEFT(p.fecha_hasta, 10)::TIMESTAMP - LEFT(p.fecha_desde, 10)::TIMESTAMP))::INTEGER
+                ) AS revenue_total
+            FROM categorias cat
+            JOIN equipo_categorias ec ON ec.categoria_id = cat.id
+            JOIN alquiler_items pi ON pi.equipo_id = ec.equipo_id
+            JOIN alquileres p ON p.id = pi.pedido_id
+            JOIN equipos e ON e.id = ec.equipo_id
+            WHERE e.eliminado_at IS NULL
+            GROUP BY cat.id, cat.nombre
+            ORDER BY revenue_total DESC NULLS LAST
+            LIMIT 10
+        """).fetchall()
+
+        # ── Stats globales ──
+        totales = conn.execute("""
+            SELECT
+                COUNT(DISTINCT e.id) AS total_equipos,
+                COUNT(DISTINCT CASE WHEN e.visible_catalogo = 1 THEN e.id END) AS total_visibles,
+                COUNT(DISTINCT p.id) AS total_pedidos,
+                SUM(
+                    COALESCE(pi.precio_jornada, 0) * COALESCE(pi.cantidad, 1)
+                    * GREATEST(1, DATE_PART('day', LEFT(p.fecha_hasta, 10)::TIMESTAMP - LEFT(p.fecha_desde, 10)::TIMESTAMP))::INTEGER
+                ) AS revenue_total
+            FROM equipos e
+            LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
+            LEFT JOIN alquileres p ON p.id = pi.pedido_id
+            WHERE e.eliminado_at IS NULL
+        """).fetchone()
+
+        return {
+            "totales": row_to_dict(totales) if totales else {},
+            "top_alquilados": [row_to_dict(r) for r in top_alquilados],
+            "sin_uso": [row_to_dict(r) for r in sin_uso],
+            "por_categoria": [row_to_dict(r) for r in por_categoria],
+            "dias_sin_uso_threshold": dias_sin_uso,
+        }
+    finally:
+        conn.close()
+
+
 @router.get("/admin/equipos/sin-serie")
 def admin_equipos_sin_serie(request: Request):
     """Lista equipos sin número de serie cargado.

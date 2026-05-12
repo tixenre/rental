@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wrench, History, Copy } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wrench, History, Copy, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import { AutocompletarEquipoDialog } from "@/components/admin/autocompletar";
 import { BatchAutocompletarDialog } from "@/components/admin/BatchAutocompletarDialog";
 import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquipoDialog";
 import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
+import { DashboardUsoDialog } from "@/components/admin/DashboardUsoDialog";
 
 export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
@@ -44,6 +45,7 @@ function EquiposPage() {
   const [openBatch, setOpenBatch] = useState(false);
   const [mantenimientoEquipo, setMantenimientoEquipo] = useState<Equipo | null>(null);
   const [historialEquipo, setHistorialEquipo] = useState<Equipo | null>(null);
+  const [openDashboard, setOpenDashboard] = useState(false);
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", { q, etiqueta, soloIncompletos }],
@@ -140,6 +142,9 @@ function EquiposPage() {
           </p>
         </div>
         <div className="flex gap-1.5">
+          <Button variant="outline" onClick={() => setOpenDashboard(true)} title="Dashboard de uso (top alquilados, sin movimiento, revenue por categoría)">
+            <BarChart3 className="h-4 w-4 mr-1" /> Uso
+          </Button>
           <Button variant="outline" onClick={() => setOpenBatch(true)} title="Buscar specs en bulk para los equipos con link de fuente">
             <Sparkles className="h-4 w-4 mr-1" /> Batch specs
           </Button>
@@ -402,6 +407,13 @@ function EquiposPage() {
           equipo={historialEquipo}
           open={!!historialEquipo}
           onOpenChange={(v) => { if (!v) setHistorialEquipo(null); }}
+        />
+      )}
+
+      {openDashboard && (
+        <DashboardUsoDialog
+          open={openDashboard}
+          onOpenChange={setOpenDashboard}
         />
       )}
 
