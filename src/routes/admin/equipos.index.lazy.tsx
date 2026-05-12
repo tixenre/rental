@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wand2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wand2, History } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { ActionMenu } from "@/components/mobile";
 import { EquipoFormDialog } from "@/components/admin/EquipoFormDialog";
 import { EquipoFormDialogV2 } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
 import { AutocompletarEquipoDialog } from "@/components/admin/autocompletar";
+import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
 
 export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
@@ -42,6 +43,7 @@ function EquiposPage() {
   const [deleting, setDeleting] = useState<Equipo | null>(null);
   const [enriching, setEnriching] = useState<Equipo | null>(null);
   const [menuEquipo, setMenuEquipo] = useState<Equipo | null>(null);
+  const [historialEquipo, setHistorialEquipo] = useState<Equipo | null>(null);
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", { q, etiqueta, soloIncompletos }],
@@ -283,6 +285,9 @@ function EquiposPage() {
                     <Button size="icon" variant="ghost" title="Auto-completar info (B&H/Adorama)" onClick={() => setEnriching(eq)}>
                       <Sparkles className="h-4 w-4 text-amber" />
                     </Button>
+                    <Button size="icon" variant="ghost" title="Historial de alquileres" onClick={() => setHistorialEquipo(eq)}>
+                      <History className="h-4 w-4" />
+                    </Button>
                     <Button size="icon" variant="ghost" title="Editar (V2 — rediseñado)" onClick={() => { setEditingV2(eq); setOpenFormV2(true); }}>
                       <Wand2 className="h-4 w-4 text-amber" />
                     </Button>
@@ -314,6 +319,11 @@ function EquiposPage() {
             label: "Auto-completar info",
             icon: <Sparkles className="h-4 w-4" />,
             onClick: () => setEnriching(menuEquipo!),
+          },
+          {
+            label: "Historial de alquileres",
+            icon: <History className="h-4 w-4" />,
+            onClick: () => setHistorialEquipo(menuEquipo!),
           },
           {
             label: "Editar (V2 — rediseñado)",
@@ -351,6 +361,14 @@ function EquiposPage() {
           initial={editingV2}
           saving={saveMut.isPending}
           onSubmit={(data, etiquetas) => saveMut.mutateAsync({ data, etiquetas })}
+        />
+      )}
+
+      {historialEquipo && (
+        <HistorialEquipoDialog
+          equipo={historialEquipo}
+          open={!!historialEquipo}
+          onOpenChange={(v) => { if (!v) setHistorialEquipo(null); }}
         />
       )}
 

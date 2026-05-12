@@ -263,6 +263,26 @@ export const adminApi = {
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
     }
   },
+  getEquipoHistorial: (id: number) =>
+    authedJson<{
+      historial: Array<{
+        id: number;
+        numero_pedido: string;
+        estado: string;
+        fecha_desde: string;
+        fecha_hasta: string;
+        cliente: string;
+        cantidad: number;
+        precio_item: number;
+        dias: number;
+      }>;
+      stats: {
+        total_alquileres: number;
+        total_dias: number;
+        total_revenue: number;
+        ultimo_alquiler: string | null;
+      };
+    }>(`/api/equipos/${id}/historial`),
   setEtiquetas: (id: number, etiquetas: string[]) =>
     authedJson<{ ok: true }>(`/api/equipos/${id}/etiquetas`, {
       method: "PUT",
