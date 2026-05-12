@@ -243,8 +243,52 @@ export type SpecTemplateInput = {
   destacado?: boolean;
 };
 
+// Dashboard de uso (#205)
+export type DashboardUsoEquipo = {
+  id: number;
+  nombre: string;
+  marca: string | null;
+  modelo: string | null;
+  foto_url: string | null;
+  cant_pedidos: number;
+  revenue_total: number | null;
+};
+
+export type DashboardUsoSinUso = {
+  id: number;
+  nombre: string;
+  marca: string | null;
+  modelo: string | null;
+  foto_url: string | null;
+  valor_reposicion: number | null;
+  ultimo_alquiler: string | null;
+  total_alquileres: number;
+};
+
+export type DashboardUsoCategoria = {
+  id: number;
+  nombre: string;
+  cant_pedidos: number;
+  revenue_total: number | null;
+};
+
+export type DashboardUso = {
+  totales: {
+    total_equipos: number;
+    total_visibles: number;
+    total_pedidos: number;
+    revenue_total: number | null;
+  };
+  top_alquilados: DashboardUsoEquipo[];
+  sin_uso: DashboardUsoSinUso[];
+  por_categoria: DashboardUsoCategoria[];
+  dias_sin_uso_threshold: number;
+};
+
 export const adminApi = {
   dashboard: () => authedJson<DashboardData>("/api/dashboard"),
+  dashboardUso: (dias_sin_uso = 90) =>
+    authedJson<DashboardUso>(`/api/admin/dashboard/uso?dias_sin_uso=${dias_sin_uso}`),
 
   // equipos
   listEquipos: (params: {
