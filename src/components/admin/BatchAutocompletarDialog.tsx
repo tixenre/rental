@@ -9,7 +9,7 @@
  * Stats live durante el progreso: procesados, errores, saltados.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2, Play, Square, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -35,7 +35,9 @@ export function BatchAutocompletarDialog({
 }) {
   const qc = useQueryClient();
   const [running, setRunning] = useState(false);
-  const [cancelled, setCancelled] = useState(false);
+  // Cancellation usa ref (no state) para que el closure del loop vea el valor
+  // actualizado. Con useState, el closure capturaba el cancelled inicial false.
+  const cancelledRef = useRef(false);
   const [progress, setProgress] = useState({ done: 0, ok: 0, skipped: 0, errors: 0 });
   const [log, setLog] = useState<Array<{ id: number; nombre: string; status: ResultStatus; msg: string }>>([]);
 
@@ -45,7 +47,7 @@ export function BatchAutocompletarDialog({
 
   const start = async () => {
     setRunning(true);
-    setCancelled(false);
+    cancelledRef.current = false;
     setProgress({ done: 0, ok: 0, skipped: 0, errors: 0 });
     setLog([]);
 
@@ -55,7 +57,7 @@ export function BatchAutocompletarDialog({
 
     for (let i = 0; i < todo.length; i += chunkSize) {
       // Chequeo de cancelación al inicio de cada chunk
-      if (cancelled) break;
+      if (cancelledRef.current) break;
 
       const chunk = todo.slice(i, i + chunkSize);
       try {
@@ -94,7 +96,7 @@ export function BatchAutocompletarDialog({
 
     setRunning(false);
     qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
-    if (cancelled) {
+    if (cancelledRef.current) {
       toast.info("Batch cancelado");
     } else {
       toast.success(`Listo · ${ok} OK · ${skipped} saltados · ${errors} errores`);
@@ -102,7 +104,7 @@ export function BatchAutocompletarDialog({
   };
 
   const stop = () => {
-    setCancelled(true);
+    cancelledRef.current = true;
   };
 
   const pct = total > 0 ? Math.round((progress.done / conLink.length) * 100) : 0;

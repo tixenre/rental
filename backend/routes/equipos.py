@@ -14,7 +14,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Query, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import (
     get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
@@ -1496,7 +1496,9 @@ class EnriquecerInput(BaseModel):
 
 class BatchEnriquecerInput(BaseModel):
     # Hasta 3 equipo_ids por request (evita timeouts). El frontend re-batchea.
-    equipo_ids: list[int]
+    # `max_length=50` defensivo: aunque solo procesamos los primeros 3, evita
+    # que el body de la request crezca arbitrariamente (DoS por payload size).
+    equipo_ids: list[int] = Field(..., min_length=1, max_length=50)
 
 
 @router.post("/admin/equipos/batch-enriquecer")
@@ -1532,6 +1534,15 @@ def admin_batch_enriquecer(payload: BatchEnriquecerInput, request: Request):
             eq_d = row_to_dict(eq)
             if not eq_d.get("bh_url"):
                 results.append({"equipo_id": eid, "status": "skipped", "reason": "sin bh_url"})
+                continue
+
+            # Defense-in-depth: aunque bh_url ya pasó por validación cuando se guardó
+            # el equipo, revalidamos antes de scrapear (impide SSRF a IPs privadas si
+            # el equipo viene de una migración vieja o de un campo no validado).
+            try:
+                _validate_ssrf_only(eq_d["bh_url"])
+            except HTTPException as he:
+                results.append({"equipo_id": eid, "status": "error", "error": f"URL inválida: {he.detail}"[:200]})
                 continue
 
             try:
