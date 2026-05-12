@@ -2,6 +2,7 @@ import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { QueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
+import { PublicLayout } from "@/components/rental/PublicLayout";
 import { Component, type ReactNode } from "react";
 
 class RootErrorBoundary extends Component<
@@ -35,20 +36,22 @@ class RootErrorBoundary extends Component<
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Página no encontrada</h2>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Volver al catálogo
-          </Link>
+    <PublicLayout>
+      <div className="flex items-center justify-center px-4 py-24 min-h-[60vh]">
+        <div className="max-w-md text-center">
+          <h1 className="font-display text-7xl text-ink">404</h1>
+          <h2 className="mt-4 font-display text-xl text-ink">Página no encontrada</h2>
+          <div className="mt-6">
+            <Link
+              to="/"
+              className="inline-flex items-center justify-center rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition hover:bg-amber hover:text-ink"
+            >
+              Volver al catálogo
+            </Link>
+          </div>
         </div>
       </div>
-    </div>
+    </PublicLayout>
   );
 }
 

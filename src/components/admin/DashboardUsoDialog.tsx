@@ -96,7 +96,36 @@ export function DashboardUsoDialog({
               <h2 className="text-sm font-medium mb-2 flex items-center gap-1.5">
                 <TrendingUp className="h-4 w-4" /> Top 10 más alquilados
               </h2>
-              <div className="rounded-md border hairline overflow-hidden">
+
+              {/* Mobile: cards */}
+              <div className="md:hidden space-y-2">
+                {dataQ.data.top_alquilados.length === 0 ? (
+                  <div className="rounded-md border hairline px-3 py-4 text-center text-sm text-muted-foreground">
+                    Sin historial.
+                  </div>
+                ) : (
+                  dataQ.data.top_alquilados.map((e) => (
+                    <div key={e.id} className="rounded-md border hairline p-3 flex items-center gap-3">
+                      {e.foto_url
+                        ? <img src={e.foto_url} alt="" className="h-10 w-10 rounded object-cover bg-muted/30 shrink-0" loading="lazy" />
+                        : <div className="h-10 w-10 rounded bg-muted/30 shrink-0" />}
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm truncate">{e.nombre}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">
+                          {[e.marca, e.modelo].filter(Boolean).join(" / ")}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-medium tabular-nums text-sm">{e.cant_pedidos} <span className="text-[10px] text-muted-foreground font-normal">pedidos</span></div>
+                        <div className="text-[11px] text-muted-foreground tabular-nums">{fmtMoneda(e.revenue_total)}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop: tabla */}
+              <div className="hidden md:block rounded-md border hairline overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -143,14 +172,62 @@ export function DashboardUsoDialog({
                 Sin movimiento hace +{dataQ.data.dias_sin_uso_threshold} días
                 <span className="text-xs text-muted-foreground font-normal">· candidatos a revisar/vender</span>
               </h2>
-              <div className="rounded-md border hairline overflow-hidden">
+
+              {/* Mobile: cards */}
+              <div className="md:hidden space-y-2">
+                {dataQ.data.sin_uso.length === 0 ? (
+                  <div className="rounded-md border hairline px-3 py-4 text-center text-sm text-muted-foreground">
+                    Todos los equipos tuvieron movimiento reciente.
+                  </div>
+                ) : (
+                  dataQ.data.sin_uso.map((e) => {
+                    const dias = diasDesde(e.ultimo_alquiler);
+                    return (
+                      <div key={e.id} className="rounded-md border hairline p-3 flex items-center gap-3">
+                        {e.foto_url
+                          ? <img src={e.foto_url} alt="" className="h-10 w-10 rounded object-cover bg-muted/30 shrink-0" loading="lazy" />
+                          : <div className="h-10 w-10 rounded bg-muted/30 shrink-0" />}
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-sm truncate">{e.nombre}</div>
+                          <div className="text-[11px] text-muted-foreground truncate">
+                            {[e.marca, e.modelo].filter(Boolean).join(" / ")}
+                          </div>
+                          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                            {e.ultimo_alquiler ? (
+                              <>
+                                <span>{fmtFecha(e.ultimo_alquiler)}</span>
+                                <Badge variant="outline" className="text-[9px]">
+                                  {dias != null ? `${dias}d` : ""}
+                                </Badge>
+                              </>
+                            ) : (
+                              <Badge variant="destructive" className="text-[10px]">Nunca alquilado</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-xs tabular-nums font-medium">
+                            {e.valor_reposicion ? `USD ${e.valor_reposicion.toLocaleString("es-AR")}` : "—"}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground tabular-nums">
+                            {e.total_alquileres} total
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Desktop: tabla */}
+              <div className="hidden md:block rounded-md border hairline overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Equipo</TableHead>
                       <TableHead className="text-right">Último alquiler</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">Total</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
                       <TableHead className="text-right">Valor USD</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -189,7 +266,7 @@ export function DashboardUsoDialog({
                               <Badge variant="destructive" className="text-[10px]">Nunca</Badge>
                             )}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums hidden sm:table-cell text-muted-foreground text-xs">
+                          <TableCell className="text-right tabular-nums text-muted-foreground text-xs">
                             {e.total_alquileres}
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-xs">
@@ -221,48 +298,84 @@ export function DashboardUsoDialog({
                 </div>
               </div>
               {dataQ.data.por_cobrar.items.length > 0 && (
-                <div className="rounded-md border hairline overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Pedido</TableHead>
-                        <TableHead>Cliente</TableHead>
-                        <TableHead className="hidden sm:table-cell">Fechas</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="text-right">Pendiente</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {dataQ.data.por_cobrar.items.map((p) => (
-                        <TableRow key={p.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-mono text-xs">
-                                {p.numero_pedido ?? `#${p.id}`}
-                              </span>
-                              <Badge variant="outline" className="text-[10px]">{p.estado}</Badge>
+                <>
+                  {/* Mobile: cards */}
+                  <div className="md:hidden space-y-2">
+                    {dataQ.data.por_cobrar.items.map((p) => (
+                      <div key={p.id} className="rounded-md border hairline p-3 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-mono text-xs shrink-0">
+                              {p.numero_pedido ?? `#${p.id}`}
+                            </span>
+                            <Badge variant="outline" className="text-[10px]">{p.estado}</Badge>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-xs tabular-nums font-medium text-amber-700">
+                              {fmtMoneda(p.pendiente)}
                             </div>
-                          </TableCell>
-                          <TableCell className="text-xs">{p.cliente}</TableCell>
-                          <TableCell className="text-[11px] text-muted-foreground hidden sm:table-cell">
-                            {fmtFecha(p.fecha_desde)} → {fmtFecha(p.fecha_hasta)}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums text-xs">
-                            {fmtMoneda(p.monto_total)}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums text-xs font-medium text-amber-700">
-                            {fmtMoneda(p.pendiente)}
-                          </TableCell>
+                            <div className="text-[10px] text-muted-foreground tabular-nums">
+                              de {fmtMoneda(p.monto_total)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-xs truncate">{p.cliente}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {fmtFecha(p.fecha_desde)} → {fmtFecha(p.fecha_hasta)}
+                        </div>
+                      </div>
+                    ))}
+                    {dataQ.data.por_cobrar.count > dataQ.data.por_cobrar.items.length && (
+                      <p className="text-[11px] text-muted-foreground italic text-center pt-1">
+                        Mostrando top {dataQ.data.por_cobrar.items.length} de {dataQ.data.por_cobrar.count}.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Desktop: tabla */}
+                  <div className="hidden md:block rounded-md border hairline overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Pedido</TableHead>
+                          <TableHead>Cliente</TableHead>
+                          <TableHead>Fechas</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead className="text-right">Pendiente</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {dataQ.data.por_cobrar.count > dataQ.data.por_cobrar.items.length && (
-                    <p className="text-[11px] text-muted-foreground italic px-2 py-1.5 bg-muted/20">
-                      Mostrando top {dataQ.data.por_cobrar.items.length} de {dataQ.data.por_cobrar.count} — el resto suma al total de arriba.
-                    </p>
-                  )}
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {dataQ.data.por_cobrar.items.map((p) => (
+                          <TableRow key={p.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-xs">
+                                  {p.numero_pedido ?? `#${p.id}`}
+                                </span>
+                                <Badge variant="outline" className="text-[10px]">{p.estado}</Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs">{p.cliente}</TableCell>
+                            <TableCell className="text-[11px] text-muted-foreground">
+                              {fmtFecha(p.fecha_desde)} → {fmtFecha(p.fecha_hasta)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-xs">
+                              {fmtMoneda(p.monto_total)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-xs font-medium text-amber-700">
+                              {fmtMoneda(p.pendiente)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {dataQ.data.por_cobrar.count > dataQ.data.por_cobrar.items.length && (
+                      <p className="text-[11px] text-muted-foreground italic px-2 py-1.5 bg-muted/20">
+                        Mostrando top {dataQ.data.por_cobrar.items.length} de {dataQ.data.por_cobrar.count} — el resto suma al total de arriba.
+                      </p>
+                    )}
+                  </div>
+                </>
               )}
             </section>
 
@@ -271,7 +384,30 @@ export function DashboardUsoDialog({
               <h2 className="text-sm font-medium mb-2 flex items-center gap-1.5">
                 <DollarSign className="h-4 w-4" /> Revenue por categoría
               </h2>
-              <div className="rounded-md border hairline overflow-hidden">
+
+              {/* Mobile: cards */}
+              <div className="md:hidden rounded-md border hairline divide-y hairline">
+                {dataQ.data.por_categoria.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                    Sin datos.
+                  </div>
+                ) : (
+                  dataQ.data.por_categoria.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between gap-2 px-3 py-2.5">
+                      <div className="font-medium text-sm truncate">{c.nombre}</div>
+                      <div className="text-right shrink-0">
+                        <div className="text-sm tabular-nums">{fmtMoneda(c.revenue_total)}</div>
+                        <div className="text-[10px] text-muted-foreground tabular-nums">
+                          {c.cant_pedidos} pedidos
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop: tabla */}
+              <div className="hidden md:block rounded-md border hairline overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
