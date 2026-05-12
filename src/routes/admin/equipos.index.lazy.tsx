@@ -294,13 +294,23 @@ function EquiposPage() {
           <Button
             size="sm" variant="destructive"
             onClick={() => {
-              if (confirm(`Eliminar ${selectedIds.size} equipo${selectedIds.size === 1 ? "" : "s"}? Esta acción no se puede deshacer.`)) {
-                bulkMut.mutate({ ids: [...selectedIds], action: "delete" });
+              // En papelera, "Eliminar" hace hard delete (delete_permanent).
+              // En vista normal, soft delete (delete). #punto4
+              const permanent = vistaPapelera;
+              const msg = permanent
+                ? `Eliminar PERMANENTEMENTE ${selectedIds.size} equipo${selectedIds.size === 1 ? "" : "s"} de la papelera?\n\nEsta acción no se puede deshacer y borra ficha, kit, categorías y etiquetas asociadas.`
+                : `Eliminar ${selectedIds.size} equipo${selectedIds.size === 1 ? "" : "s"}? Quedan en la papelera y se pueden restaurar.`;
+              if (confirm(msg)) {
+                bulkMut.mutate({
+                  ids: [...selectedIds],
+                  action: permanent ? "delete_permanent" : "delete",
+                });
               }
             }}
             disabled={bulkMut.isPending}
           >
-            <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            {vistaPapelera ? "Eliminar permanente" : "Eliminar"}
           </Button>
           <Button
             size="sm" variant="ghost"
