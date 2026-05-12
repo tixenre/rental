@@ -132,6 +132,22 @@ class CategoriasUpdate(BaseModel):
     categoria_ids: list[int]
 
 
+class MantenimientoCreate(BaseModel):
+    fecha:            str
+    tipo:             Optional[str] = "revision"   # revision / reparacion / limpieza / otro
+    descripcion:      Optional[str] = None
+    costo:            Optional[int] = None
+    proxima_revision: Optional[str] = None
+
+
+class MantenimientoUpdate(BaseModel):
+    fecha:            Optional[str] = None
+    tipo:             Optional[str] = None
+    descripcion:      Optional[str] = None
+    costo:            Optional[int] = None
+    proxima_revision: Optional[str] = None
+
+
 # ── Disponibilidad en tiempo real ────────────────────────────────────────────
 
 @router.get("/equipos/afuera")
@@ -556,6 +572,111 @@ def get_equipo_historial(id: int):
                 "ultimo_alquiler":  items[0]["fecha_desde"] if items else None,
             },
         }
+    finally:
+        conn.close()
+
+
+# ── Mantenimiento log ────────────────────────────────────────────────────────
+
+@router.get("/equipos/{id}/mantenimiento")
+def list_mantenimiento(id: int):
+    """Lista los eventos de mantenimiento del equipo, más recientes primero."""
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+        rows = conn.execute("""
+            SELECT id, equipo_id, fecha, tipo, descripcion, costo, proxima_revision, created_at
+            FROM equipo_mantenimiento WHERE equipo_id = ?
+            ORDER BY fecha DESC, id DESC
+        """, (id,)).fetchall()
+        items = [row_to_dict(r) for r in rows]
+        # Proxima revisión pendiente más cercana (futura o vencida).
+        pendientes = [r for r in items if r.get("proxima_revision")]
+        proxima = min(pendientes, key=lambda r: r["proxima_revision"]) if pendientes else None
+        return {
+            "items": items,
+            "stats": {
+                "total_eventos": len(items),
+                "total_costo": sum((r.get("costo") or 0) for r in items),
+                "proxima_revision": proxima["proxima_revision"] if proxima else None,
+            },
+        }
+    finally:
+        conn.close()
+
+
+@router.post("/equipos/{id}/mantenimiento", status_code=201)
+def add_mantenimiento(id: int, data: MantenimientoCreate):
+    """Agrega un evento de mantenimiento al equipo."""
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+        cur = conn.execute("""
+            INSERT INTO equipo_mantenimiento (equipo_id, fecha, tipo, descripcion, costo, proxima_revision)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (id, data.fecha, data.tipo or "revision", data.descripcion, data.costo, data.proxima_revision))
+        conn.commit()
+        new_id = cur.lastrowid
+        row = conn.execute(
+            "SELECT * FROM equipo_mantenimiento WHERE id = ?", (new_id,)
+        ).fetchone()
+        return row_to_dict(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.patch("/equipos/{id}/mantenimiento/{log_id}")
+def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate):
+    """Actualiza un evento de mantenimiento existente."""
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT * FROM equipo_mantenimiento WHERE id = ? AND equipo_id = ?",
+            (log_id, id),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Evento no encontrado")
+        updates = data.model_dump(exclude_unset=True)
+        if not updates:
+            raise HTTPException(400, "Nada para actualizar")
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        conn.execute(
+            f"UPDATE equipo_mantenimiento SET {set_clause} WHERE id = ?",
+            list(updates.values()) + [log_id],
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM equipo_mantenimiento WHERE id = ?", (log_id,)
+        ).fetchone()
+        return row_to_dict(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.delete("/equipos/{id}/mantenimiento/{log_id}", status_code=204)
+def delete_mantenimiento(id: int, log_id: int):
+    """Elimina un evento de mantenimiento."""
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM equipo_mantenimiento WHERE id = ? AND equipo_id = ?",
+            (log_id, id),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Evento no encontrado")
+        conn.execute("DELETE FROM equipo_mantenimiento WHERE id = ?", (log_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
