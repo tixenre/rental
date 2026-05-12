@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
+import { Logo } from "@/components/rental/Logo";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({
@@ -56,7 +57,11 @@ function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background grid place-items-center px-4 py-12">
+    <div className="min-h-dvh bg-background flex flex-col">
+      <header className="border-b hairline px-4 py-3 md:px-6 flex items-center">
+        <Logo size="md" linkTo="/" />
+      </header>
+      <div className="flex-1 grid place-items-center px-4 py-12">
       <div className="w-full max-w-sm rounded-2xl border hairline bg-surface p-8 shadow-sm space-y-6">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
@@ -94,6 +99,7 @@ function AdminLoginPage() {
             Entrar con Google
           </button>
         )}
+      </div>
       </div>
     </div>
   );

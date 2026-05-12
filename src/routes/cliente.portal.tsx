@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
+import { PublicLayout } from "@/components/rental/PublicLayout";
 
 export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mi cuenta — Rambla Rental" }] }),
@@ -89,50 +90,22 @@ export default function ClientePortal() {
   }
 
   if (loading) {
-    return <div className="min-h-screen grid place-items-center text-sm text-muted-foreground">Cargando…</div>;
+    return (
+      <PublicLayout topBar={{ variant: "cliente" }}>
+        <div className="grid place-items-center py-24 text-sm text-muted-foreground">
+          Cargando…
+        </div>
+      </PublicLayout>
+    );
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header con branding Rambla */}
-      <header className="border-b hairline bg-background sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2 group">
-            <span className="wordmark text-2xl text-amber leading-none group-hover:brightness-110 transition">rambla</span>
-            <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
-              Rental
-            </span>
-          </a>
-          <div className="flex items-center gap-3">
-            <a href="/" className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition">
-              ← Catálogo
-            </a>
-            {perfil && (
-              <a
-                href="/cliente/perfil"
-                className="text-xs text-muted-foreground hover:text-ink transition hidden sm:block"
-                title="Editar mi perfil"
-              >
-                {perfil.nombre} {perfil.apellido}
-              </a>
-            )}
-            <a
-              href="/cliente/perfil"
-              className="text-xs text-muted-foreground hover:text-ink transition sm:hidden"
-            >
-              Perfil
-            </a>
-            <button
-              onClick={handleLogout}
-              className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition"
-            >
-              Salir
-            </button>
-          </div>
-        </div>
-      </header>
+  const userName = perfil ? `${perfil.nombre} ${perfil.apellido}` : undefined;
 
-      {/* Sub-header amarillo Rambla */}
+  return (
+    <PublicLayout
+      topBar={{ variant: "cliente", userName, onLogout: handleLogout }}
+    >
+      {/* Sub-header amarillo Rambla — saludo / título de página */}
       <div className="bg-amber border-b hairline">
         <div className="max-w-2xl mx-auto px-4 py-5">
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/70">
@@ -144,7 +117,7 @@ export default function ClientePortal() {
         </div>
       </div>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <h2 className="font-display text-xl text-ink">Mis pedidos</h2>
 
         {pedidos.length === 0 ? (
@@ -163,8 +136,8 @@ export default function ClientePortal() {
             ))}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </PublicLayout>
   );
 }
 
