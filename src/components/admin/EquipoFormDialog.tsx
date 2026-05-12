@@ -619,16 +619,16 @@ export function EquipoFormDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
               <DialogTitle className="font-display text-2xl">
                 {isEdit ? "Editar equipo" : "Nuevo equipo"}
               </DialogTitle>
               {isEdit && initial && (
                 <Button type="button" variant="outline" size="sm" onClick={() => setEnriching(true)}>
                   <Sparkles className="h-4 w-4 mr-1.5 text-amber" />
-                  Auto-completar info
+                  Auto-completar
                 </Button>
               )}
             </div>
@@ -687,14 +687,14 @@ export function EquipoFormDialog({
 
             <Tabs value={tab} onValueChange={setTab}>
               <TabsList className="w-full">
-                <TabsTrigger value="basicos" className="flex-1">Datos básicos</TabsTrigger>
-                <TabsTrigger value="ficha" className="flex-1" disabled={!isEdit}>
-                  Ficha técnica
+                <TabsTrigger value="basicos" className="flex-1 text-xs sm:text-sm">Básicos</TabsTrigger>
+                <TabsTrigger value="ficha" className="flex-1 text-xs sm:text-sm" disabled={!isEdit}>
+                  Ficha
                 </TabsTrigger>
-                <TabsTrigger value="cats" className="flex-1" disabled={!isEdit}>
-                  Categorías
+                <TabsTrigger value="cats" className="flex-1 text-xs sm:text-sm" disabled={!isEdit}>
+                  Cats
                 </TabsTrigger>
-                <TabsTrigger value="kit" className="flex-1" disabled={!isEdit}>
+                <TabsTrigger value="kit" className="flex-1 text-xs sm:text-sm" disabled={!isEdit}>
                   Kit
                 </TabsTrigger>
               </TabsList>
@@ -705,18 +705,18 @@ export function EquipoFormDialog({
                   <Input {...form.register("nombre")} placeholder="Ej: FX3 Cuerpo" />
                 </Field>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label="Marca"><Input {...form.register("marca")} /></Field>
                   <Field label="Modelo"><Input {...form.register("modelo")} /></Field>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
                   <Field label="Stock"><Input type="number" min={0} {...form.register("cantidad")} /></Field>
-                  <Field label="Valor (USD)"><Input type="number" min={0} step="0.01" {...form.register("precio_usd")} /></Field>
+                  <Field label="Valor USD"><Input type="number" min={0} step="0.01" {...form.register("precio_usd")} /></Field>
                   <Field label="ROI %"><Input type="number" min={0} step="0.01" {...form.register("roi_pct")} /></Field>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -765,7 +765,7 @@ export function EquipoFormDialog({
                   </Field>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label="N° Serie">
                     <div className="flex items-center gap-1.5">
                       <Input
@@ -956,7 +956,7 @@ export function EquipoFormDialog({
                   <Input placeholder="Ej: vintage, kit boda" {...form.register("etiquetas_csv")} />
                 </Field>
 
-                <div className="grid grid-cols-2 gap-3 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                   <Field label="Estado">
                     <Select
                       value={form.watch("estado")}
@@ -1036,7 +1036,7 @@ export function EquipoFormDialog({
                   </p>
                 </Field>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <Field label="Montura">
                     <Input value={montura} onChange={(e) => setMontura(e.target.value)} placeholder="Ej: Montura E" />
                   </Field>

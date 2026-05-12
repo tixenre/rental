@@ -239,3 +239,12 @@
     padding-right: env(safe-area-inset-right);
   }
 }
+
+/* Prevent iOS Safari from zooming in on input focus (font-size must be ≥ 16px) */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
