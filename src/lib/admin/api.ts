@@ -284,6 +284,8 @@ export const adminApi = {
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
     }
   },
+  duplicateEquipo: (id: number) =>
+    authedJson<Equipo>(`/api/equipos/${id}/duplicate`, { method: "POST" }),
   /** Batch autocompletar: procesa hasta 3 equipos por call, guarda el scrape
    *  en cache (raw_json). El frontend re-batchea hasta terminar. */
   batchEnriquecer: (equipo_ids: number[]) =>
