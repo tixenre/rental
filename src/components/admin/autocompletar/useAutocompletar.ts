@@ -3,9 +3,9 @@ import { toast } from "sonner";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { authedJson, authedFetch } from "@/lib/authedFetch";
 import { isBucketUrl, isHostedUrl, uploadExternalUrlToBucket } from "@/lib/equipment/photos";
-import { type DiagStep, type EnriquecerResult } from "./types";
+import { type DiagStep, type AutocompletarResult } from "./types";
 
-export function useEnriquecedor({
+export function useAutocompletar({
   equipo,
   open,
   onApplied,
@@ -19,7 +19,7 @@ export function useEnriquecedor({
   const [loading, setLoading] = useState(false);
   const [loadingFoto, setLoadingFoto] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [result, setResult] = useState<EnriquecerResult | null>(null);
+  const [result, setResult] = useState<AutocompletarResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [marca, setMarca] = useState("");
@@ -56,13 +56,13 @@ export function useEnriquecedor({
     }
   }, [open]);
 
-  const enriquecer = (input: {
+  const solicitarAutocompletado = (input: {
     nombre?: string | null;
     marca?: string | null;
     modelo?: string | null;
     url?: string | null;
   }) =>
-    authedJson<EnriquecerResult>("/api/admin/equipos/enriquecer", {
+    authedJson<AutocompletarResult>("/api/admin/equipos/enriquecer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
@@ -142,7 +142,7 @@ export function useEnriquecedor({
             url: urlToUse,
           }),
         }),
-        enriquecer({
+        solicitarAutocompletado({
           nombre: equipo.nombre,
           marca: equipo.marca,
           modelo: equipo.modelo,

@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,8 @@ import {
 import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
 import { ActionMenu } from "@/components/mobile";
 import { EquipoFormDialog } from "@/components/admin/EquipoFormDialog";
-import { EnriquecerEquipoDialog } from "@/components/admin/enriquecedor";
+import { EquipoFormDialogV2 } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
+import { AutocompletarEquipoDialog } from "@/components/admin/autocompletar";
 
 export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
@@ -34,6 +35,9 @@ function EquiposPage() {
   const [etiqueta, setEtiqueta] = useState<string>("");
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Equipo | null>(null);
+  // V2 paralelo — el usuario lo prueba antes de descartar el viejo.
+  const [openFormV2, setOpenFormV2] = useState(false);
+  const [editingV2, setEditingV2] = useState<Equipo | null>(null);
   const [deleting, setDeleting] = useState<Equipo | null>(null);
   const [enriching, setEnriching] = useState<Equipo | null>(null);
   const [menuEquipo, setMenuEquipo] = useState<Equipo | null>(null);
@@ -116,9 +120,14 @@ function EquiposPage() {
             {equiposQ.isLoading ? "Cargando…" : `${total} equipos`}
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setOpenForm(true); }}>
-          <Plus className="h-4 w-4 mr-1" /> Nuevo equipo
-        </Button>
+        <div className="flex gap-1.5">
+          <Button variant="outline" onClick={() => { setEditingV2(null); setOpenFormV2(true); }} title="Probar el form rediseñado (V2)">
+            <Wand2 className="h-4 w-4 mr-1" /> Nuevo (V2)
+          </Button>
+          <Button onClick={() => { setEditing(null); setOpenForm(true); }}>
+            <Plus className="h-4 w-4 mr-1" /> Nuevo equipo
+          </Button>
+        </div>
       </header>
 
       <div className="flex flex-col md:flex-row gap-2">
@@ -247,7 +256,10 @@ function EquiposPage() {
                     <Button size="icon" variant="ghost" title="Auto-completar info (B&H/Adorama)" onClick={() => setEnriching(eq)}>
                       <Sparkles className="h-4 w-4 text-amber" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => { setEditing(eq); setOpenForm(true); }}>
+                    <Button size="icon" variant="ghost" title="Editar (V2 — rediseñado)" onClick={() => { setEditingV2(eq); setOpenFormV2(true); }}>
+                      <Wand2 className="h-4 w-4 text-amber" />
+                    </Button>
+                    <Button size="icon" variant="ghost" title="Editar (original)" onClick={() => { setEditing(eq); setOpenForm(true); }}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button size="icon" variant="ghost" onClick={() => setDeleting(eq)}>
@@ -277,7 +289,12 @@ function EquiposPage() {
             onClick: () => setEnriching(menuEquipo!),
           },
           {
-            label: "Editar equipo",
+            label: "Editar (V2 — rediseñado)",
+            icon: <Wand2 className="h-4 w-4" />,
+            onClick: () => { setEditingV2(menuEquipo!); setOpenFormV2(true); },
+          },
+          {
+            label: "Editar (original)",
             icon: <Pencil className="h-4 w-4" />,
             onClick: () => { setEditing(menuEquipo!); setOpenForm(true); },
           },
@@ -300,8 +317,18 @@ function EquiposPage() {
         />
       )}
 
+      {openFormV2 && (
+        <EquipoFormDialogV2
+          open={openFormV2}
+          onOpenChange={(v) => { setOpenFormV2(v); if (!v) setEditingV2(null); }}
+          initial={editingV2}
+          saving={saveMut.isPending}
+          onSubmit={(data, etiquetas) => saveMut.mutateAsync({ data, etiquetas })}
+        />
+      )}
+
       {enriching && (
-        <EnriquecerEquipoDialog
+        <AutocompletarEquipoDialog
           equipo={enriching}
           open={!!enriching}
           onOpenChange={(v) => { if (!v) setEnriching(null); }}

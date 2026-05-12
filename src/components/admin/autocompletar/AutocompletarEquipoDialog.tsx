@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import { type Equipo } from "@/lib/admin/api";
 import { isHostedUrl } from "@/lib/equipment/photos";
-import { useEnriquecedor } from "./useEnriquecedor";
+import { useAutocompletar } from "./useAutocompletar";
 import { PhotoGrid } from "./PhotoGrid";
 import { PhotoDiag } from "./PhotoDiag";
 import { FieldRow, FichaCell, FichaList } from "./FieldRow";
@@ -36,7 +36,7 @@ function FotoBadge({ fotoUrl, uploadingFotoUrl }: { fotoUrl: string; uploadingFo
   );
 }
 
-export function EnriquecerEquipoDialog({
+export function AutocompletarEquipoDialog({
   equipo,
   open,
   onOpenChange,
@@ -68,7 +68,7 @@ export function EnriquecerEquipoDialog({
     customUrl, setCustomUrl,
     fichaExtendidaTieneDatos,
     buscarFoto, runSearch, aplicarSoloFoto, buscarMasFotos, addKeyword, removeKeyword, setAll, aplicar,
-  } = useEnriquecedor({ equipo, open, onApplied, onOpenChange });
+  } = useAutocompletar({ equipo, open, onApplied, onOpenChange });
 
   const isInitial = !result && !fotoUrl && !loading && !loadingFoto && !error;
   const isFotoOnly = !!fotoUrl && !result && !loading && !loadingFoto;

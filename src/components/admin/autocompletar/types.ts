@@ -1,6 +1,6 @@
 export type DiagStep = { label: string; status: "pending" | "ok" | "fail" | "skip"; detail?: string };
 
-export type EnriquecerResult = {
+export type AutocompletarResult = {
   marca: string | null;
   modelo: string | null;
   nombre_normalizado: string;
