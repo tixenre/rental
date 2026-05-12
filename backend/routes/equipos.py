@@ -1514,12 +1514,46 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
             WHERE e.eliminado_at IS NULL
         """).fetchone()
 
+        # ── Cuentas por cobrar ───────────────────────────────────────────
+        # Suma de (monto_total - monto_pagado) sobre pedidos confirmados pero
+        # no totalmente pagos. Independiente de la fecha del alquiler — incluye
+        # los que ya terminaron y siguen debiendo, y los futuros que ya están
+        # confirmados.
+        #
+        # Excluye estados borrador / presupuesto (todavía no son ventas) y
+        # cancelado (ventas que no van).
+        por_cobrar_rows = conn.execute("""
+            SELECT
+                p.id,
+                p.numero_pedido,
+                p.estado,
+                COALESCE(c.nombre || ' ' || c.apellido, p.cliente_nombre) AS cliente,
+                p.fecha_desde, p.fecha_hasta,
+                p.monto_total,
+                p.monto_pagado,
+                (COALESCE(p.monto_total, 0) - COALESCE(p.monto_pagado, 0)) AS pendiente
+            FROM alquileres p
+            LEFT JOIN clientes c ON c.id = p.cliente_id
+            WHERE p.estado IN ('confirmado', 'retirado', 'devuelto', 'finalizado')
+              AND COALESCE(p.monto_total, 0) > COALESCE(p.monto_pagado, 0)
+            ORDER BY (COALESCE(p.monto_total, 0) - COALESCE(p.monto_pagado, 0)) DESC
+            LIMIT 50
+        """).fetchall()
+
+        por_cobrar_items = [row_to_dict(r) for r in por_cobrar_rows]
+        por_cobrar_total = sum(r.get("pendiente") or 0 for r in por_cobrar_items)
+
         return {
             "totales": row_to_dict(totales) if totales else {},
             "top_alquilados": [row_to_dict(r) for r in top_alquilados],
             "sin_uso": [row_to_dict(r) for r in sin_uso],
             "por_categoria": [row_to_dict(r) for r in por_categoria],
             "dias_sin_uso_threshold": dias_sin_uso,
+            "por_cobrar": {
+                "total": por_cobrar_total,
+                "count": len(por_cobrar_items),
+                "items": por_cobrar_items[:20],   # top 20 mostrados; el resto suma al total
+            },
         }
     finally:
         conn.close()

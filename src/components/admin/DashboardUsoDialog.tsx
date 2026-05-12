@@ -203,6 +203,69 @@ export function DashboardUsoDialog({
               </div>
             </section>
 
+            {/* Cuentas por cobrar */}
+            <section>
+              <h2 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                <DollarSign className="h-4 w-4 text-amber" /> Por cobrar
+                <span className="text-xs text-muted-foreground font-normal">
+                  · pedidos confirmados con monto pendiente
+                </span>
+              </h2>
+              <div className="rounded-md border hairline bg-amber-soft/30 p-3 mb-2">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total adeudado</div>
+                <div className="text-2xl font-medium tabular-nums">
+                  {fmtMoneda(dataQ.data.por_cobrar.total)}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {dataQ.data.por_cobrar.count} pedido{dataQ.data.por_cobrar.count === 1 ? "" : "s"} con saldo
+                </div>
+              </div>
+              {dataQ.data.por_cobrar.items.length > 0 && (
+                <div className="rounded-md border hairline overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Pedido</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead className="hidden sm:table-cell">Fechas</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Pendiente</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {dataQ.data.por_cobrar.items.map((p) => (
+                        <TableRow key={p.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-xs">
+                                {p.numero_pedido ?? `#${p.id}`}
+                              </span>
+                              <Badge variant="outline" className="text-[10px]">{p.estado}</Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs">{p.cliente}</TableCell>
+                          <TableCell className="text-[11px] text-muted-foreground hidden sm:table-cell">
+                            {fmtFecha(p.fecha_desde)} → {fmtFecha(p.fecha_hasta)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-xs">
+                            {fmtMoneda(p.monto_total)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-xs font-medium text-amber-700">
+                            {fmtMoneda(p.pendiente)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {dataQ.data.por_cobrar.count > dataQ.data.por_cobrar.items.length && (
+                    <p className="text-[11px] text-muted-foreground italic px-2 py-1.5 bg-muted/20">
+                      Mostrando top {dataQ.data.por_cobrar.items.length} de {dataQ.data.por_cobrar.count} — el resto suma al total de arriba.
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
+
             {/* Por categoría */}
             <section>
               <h2 className="text-sm font-medium mb-2 flex items-center gap-1.5">

@@ -272,6 +272,18 @@ export type DashboardUsoCategoria = {
   revenue_total: number | null;
 };
 
+export type DashboardUsoPorCobrarItem = {
+  id: number;
+  numero_pedido: string | number | null;
+  estado: string;
+  cliente: string;
+  fecha_desde: string;
+  fecha_hasta: string;
+  monto_total: number;
+  monto_pagado: number;
+  pendiente: number;
+};
+
 export type DashboardUso = {
   totales: {
     total_equipos: number;
@@ -282,6 +294,11 @@ export type DashboardUso = {
   top_alquilados: DashboardUsoEquipo[];
   sin_uso: DashboardUsoSinUso[];
   por_categoria: DashboardUsoCategoria[];
+  por_cobrar: {
+    total: number;
+    count: number;
+    items: DashboardUsoPorCobrarItem[];
+  };
   dias_sin_uso_threshold: number;
 };
 
