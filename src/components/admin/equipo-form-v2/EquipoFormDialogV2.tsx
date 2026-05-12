@@ -523,7 +523,17 @@ export function EquipoFormDialogV2({
         break;
       }
       case "foto": {
-        if (r.foto_url) form.setValue("foto_url", r.foto_url, { shouldDirty: true });
+        if (r.foto_url) {
+          // Limpiar pendingFile (si había una foto local pendiente de subir) —
+          // sino quedaría en estado inconsistente: URL del cache + archivo local
+          // que ya no aplica, y al guardar se subirían los dos.
+          if (pendingFile) {
+            setPendingFile(null);
+            if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+            setPendingFilePreview("");
+          }
+          form.setValue("foto_url", r.foto_url, { shouldDirty: true });
+        }
         toast.success("Foto recargada desde cache");
         break;
       }
@@ -957,7 +967,8 @@ export function EquipoFormDialogV2({
                     type="button" size="icon" variant="outline"
                     className="h-9 w-9 shrink-0"
                     onClick={() => {
-                      const current = Number(form.getValues("cantidad") ?? 0);
+                      const raw = Number(form.getValues("cantidad") ?? 0);
+                      const current = Number.isFinite(raw) ? raw : 0;
                       form.setValue("cantidad", Math.max(0, current - 1), { shouldDirty: true });
                     }}
                     aria-label="Restar 1 al stock"
@@ -967,7 +978,8 @@ export function EquipoFormDialogV2({
                     type="button" size="icon" variant="outline"
                     className="h-9 w-9 shrink-0"
                     onClick={() => {
-                      const current = Number(form.getValues("cantidad") ?? 0);
+                      const raw = Number(form.getValues("cantidad") ?? 0);
+                      const current = Number.isFinite(raw) ? raw : 0;
                       form.setValue("cantidad", current + 1, { shouldDirty: true });
                     }}
                     aria-label="Sumar 1 al stock"
@@ -1212,6 +1224,14 @@ function CollapsibleSection({
   title, defaultOpen = false, children, actions,
 }: { title: string; defaultOpen?: boolean; children: React.ReactNode; actions?: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
+  // Re-abre la sección si defaultOpen transiciona false→true (ej. llegaron
+  // specs propuestos por cache). No fuerza cerrar si transiciona al revés —
+  // respeta el toggle manual del user.
+  const prevDefaultOpen = useRef(defaultOpen);
+  useEffect(() => {
+    if (defaultOpen && !prevDefaultOpen.current) setOpen(true);
+    prevDefaultOpen.current = defaultOpen;
+  }, [defaultOpen]);
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="border-t hairline pt-2">
       <div className="flex items-center gap-2">

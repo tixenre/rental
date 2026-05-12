@@ -175,6 +175,27 @@ export type ClasificarResult = {
   items: ClasificarItem[];
 };
 
+// ── Mantenimiento por equipo ─────────────────────────────────────────────
+
+export type MantenimientoEvento = {
+  id: number;
+  equipo_id: number;
+  fecha: string;
+  tipo: string; // revision / reparacion / limpieza / otro
+  descripcion: string | null;
+  costo: number | null;
+  proxima_revision: string | null;
+  created_at?: string;
+};
+
+export type MantenimientoInput = {
+  fecha: string;
+  tipo?: string;
+  descripcion?: string | null;
+  costo?: number | null;
+  proxima_revision?: string | null;
+};
+
 export type MarcaAdmin = {
   id: number;
   nombre: string;
@@ -265,6 +286,60 @@ export const adminApi = {
   },
   duplicateEquipo: (id: number) =>
     authedJson<Equipo>(`/api/equipos/${id}/duplicate`, { method: "POST" }),
+  /** Batch autocompletar: procesa hasta 3 equipos por call, guarda el scrape
+   *  en cache (raw_json). El frontend re-batchea hasta terminar. */
+  batchEnriquecer: (equipo_ids: number[]) =>
+    authedPostJson<{
+      results: Array<{
+        equipo_id: number;
+        status: "ok" | "skipped" | "error";
+        reason?: string;
+        error?: string;
+        specs_count?: number;
+        filled?: string[];
+      }>;
+    }>("/api/admin/equipos/batch-enriquecer", { equipo_ids }),
+  // Mantenimiento log por equipo
+  listMantenimiento: (equipoId: number) =>
+    authedJson<{
+      items: MantenimientoEvento[];
+      stats: { total_eventos: number; total_costo: number; proxima_revision: string | null };
+    }>(`/api/equipos/${equipoId}/mantenimiento`),
+  addMantenimiento: (equipoId: number, data: MantenimientoInput) =>
+    authedPostJson<MantenimientoEvento>(`/api/equipos/${equipoId}/mantenimiento`, data),
+  updateMantenimiento: (equipoId: number, logId: number, data: Partial<MantenimientoInput>) =>
+    authedJson<MantenimientoEvento>(`/api/equipos/${equipoId}/mantenimiento/${logId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+  deleteMantenimiento: async (equipoId: number, logId: number) => {
+    const res = await authedFetch(`/api/equipos/${equipoId}/mantenimiento/${logId}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+  },
+  getEquipoHistorial: (id: number) =>
+    authedJson<{
+      historial: Array<{
+        id: number;
+        numero_pedido: string;
+        estado: string;
+        fecha_desde: string;
+        fecha_hasta: string;
+        cliente: string;
+        cantidad: number;
+        precio_item: number;
+        dias: number;
+      }>;
+      stats: {
+        total_alquileres: number;
+        total_dias: number;
+        total_revenue: number;
+        ultimo_alquiler: string | null;
+      };
+    }>(`/api/equipos/${id}/historial`),
   setEtiquetas: (id: number, etiquetas: string[]) =>
     authedJson<{ ok: true }>(`/api/equipos/${id}/etiquetas`, {
       method: "PUT",

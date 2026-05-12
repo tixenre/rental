@@ -14,7 +14,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Query, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import (
     get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
@@ -134,6 +134,22 @@ class CategoriasUpdate(BaseModel):
     categoria_ids: list[int]
 
 
+class MantenimientoCreate(BaseModel):
+    fecha:            str
+    tipo:             Optional[str] = "revision"   # revision / reparacion / limpieza / otro
+    descripcion:      Optional[str] = None
+    costo:            Optional[int] = None
+    proxima_revision: Optional[str] = None
+
+
+class MantenimientoUpdate(BaseModel):
+    fecha:            Optional[str] = None
+    tipo:             Optional[str] = None
+    descripcion:      Optional[str] = None
+    costo:            Optional[int] = None
+    proxima_revision: Optional[str] = None
+
+
 # ── Disponibilidad en tiempo real ────────────────────────────────────────────
 
 @router.get("/equipos/afuera")
@@ -226,10 +242,26 @@ def list_equipos(
             )
             params += [key, value]
     if q:
-        # ILIKE = case-insensitive (Postgres). Permite buscar "sony" / "Sony" / "SONY".
-        base_sql += " AND (e.nombre ILIKE ? OR e.marca ILIKE ? OR e.modelo ILIKE ?)"
+        # Búsqueda fuzzy global: ILIKE case-insensitive sobre nombre/marca/modelo
+        # del equipo + serie + campos de la ficha (descripción, specs, keywords).
+        # Convierte la barra en un find-anything: buscás "log3" o "iso 25600" y
+        # aparece el equipo aunque la palabra esté en un spec, no en el nombre.
         like = f"%{q}%"
-        params += [like, like, like]
+        base_sql += """ AND (
+            e.nombre ILIKE ?
+            OR COALESCE(e.marca, '') ILIKE ?
+            OR COALESCE(e.modelo, '') ILIKE ?
+            OR COALESCE(e.serie, '') ILIKE ?
+            OR EXISTS (
+                SELECT 1 FROM equipo_fichas ef
+                WHERE ef.equipo_id = e.id AND (
+                    COALESCE(ef.descripcion, '') ILIKE ?
+                    OR COALESCE(ef.specs_json, '') ILIKE ?
+                    OR COALESCE(ef.keywords_json, '') ILIKE ?
+                )
+            )
+        )"""
+        params += [like] * 7
     if categoria:
         # Filtro recursivo: si es padre, incluye descendientes (árbol de `categorias`).
         # Acepta id numérico o nombre.
@@ -663,6 +695,111 @@ def get_equipo_historial(id: int):
                 "ultimo_alquiler":  items[0]["fecha_desde"] if items else None,
             },
         }
+    finally:
+        conn.close()
+
+
+# ── Mantenimiento log ────────────────────────────────────────────────────────
+
+@router.get("/equipos/{id}/mantenimiento")
+def list_mantenimiento(id: int):
+    """Lista los eventos de mantenimiento del equipo, más recientes primero."""
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+        rows = conn.execute("""
+            SELECT id, equipo_id, fecha, tipo, descripcion, costo, proxima_revision, created_at
+            FROM equipo_mantenimiento WHERE equipo_id = ?
+            ORDER BY fecha DESC, id DESC
+        """, (id,)).fetchall()
+        items = [row_to_dict(r) for r in rows]
+        # Proxima revisión pendiente más cercana (futura o vencida).
+        pendientes = [r for r in items if r.get("proxima_revision")]
+        proxima = min(pendientes, key=lambda r: r["proxima_revision"]) if pendientes else None
+        return {
+            "items": items,
+            "stats": {
+                "total_eventos": len(items),
+                "total_costo": sum((r.get("costo") or 0) for r in items),
+                "proxima_revision": proxima["proxima_revision"] if proxima else None,
+            },
+        }
+    finally:
+        conn.close()
+
+
+@router.post("/equipos/{id}/mantenimiento", status_code=201)
+def add_mantenimiento(id: int, data: MantenimientoCreate):
+    """Agrega un evento de mantenimiento al equipo."""
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+        cur = conn.execute("""
+            INSERT INTO equipo_mantenimiento (equipo_id, fecha, tipo, descripcion, costo, proxima_revision)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (id, data.fecha, data.tipo or "revision", data.descripcion, data.costo, data.proxima_revision))
+        conn.commit()
+        new_id = cur.lastrowid
+        row = conn.execute(
+            "SELECT * FROM equipo_mantenimiento WHERE id = ?", (new_id,)
+        ).fetchone()
+        return row_to_dict(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.patch("/equipos/{id}/mantenimiento/{log_id}")
+def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate):
+    """Actualiza un evento de mantenimiento existente."""
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT * FROM equipo_mantenimiento WHERE id = ? AND equipo_id = ?",
+            (log_id, id),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Evento no encontrado")
+        updates = data.model_dump(exclude_unset=True)
+        if not updates:
+            raise HTTPException(400, "Nada para actualizar")
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        conn.execute(
+            f"UPDATE equipo_mantenimiento SET {set_clause} WHERE id = ?",
+            list(updates.values()) + [log_id],
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM equipo_mantenimiento WHERE id = ?", (log_id,)
+        ).fetchone()
+        return row_to_dict(row)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.delete("/equipos/{id}/mantenimiento/{log_id}", status_code=204)
+def delete_mantenimiento(id: int, log_id: int):
+    """Elimina un evento de mantenimiento."""
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM equipo_mantenimiento WHERE id = ? AND equipo_id = ?",
+            (log_id, id),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Evento no encontrado")
+        conn.execute("DELETE FROM equipo_mantenimiento WHERE id = ?", (log_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -1599,6 +1736,128 @@ class EnriquecerInput(BaseModel):
     marca:  Optional[str] = None
     modelo: Optional[str] = None
     url:    Optional[str] = None   # Si está presente, salta la búsqueda y scrapea esa URL directo
+
+
+class BatchEnriquecerInput(BaseModel):
+    # Hasta 3 equipo_ids por request (evita timeouts). El frontend re-batchea.
+    # `max_length=50` defensivo: aunque solo procesamos los primeros 3, evita
+    # que el body de la request crezca arbitrariamente (DoS por payload size).
+    equipo_ids: list[int] = Field(..., min_length=1, max_length=50)
+
+
+@router.post("/admin/equipos/batch-enriquecer")
+def admin_batch_enriquecer(payload: BatchEnriquecerInput, request: Request):
+    """
+    Procesa un chunk de equipos: para cada uno, scrapea su bh_url y guarda el
+    resultado en `equipo_fichas.raw_json` (cache). El admin después aplica los
+    campos por sección con los botones ✨ del form V2.
+
+    Límite: 3 equipos por request. El frontend re-batchea hasta terminar.
+    Entre cada scrape duerme 1s para no rate-limitear B&H.
+
+    NO sobrescribe campos no vacíos del equipo. Solo llena marca/modelo/foto_url
+    si están vacíos. Specs y descripción siempre van al cache; el admin decide
+    qué aplicar después.
+    """
+    require_admin(request)
+
+    import time as _time, json as _json
+
+    ids = payload.equipo_ids[:3]   # hard cap defensivo
+    if not ids:
+        return {"results": []}
+
+    conn = get_db()
+    results = []
+    try:
+        for eid in ids:
+            eq = conn.execute("SELECT id, nombre, marca, modelo, foto_url, bh_url FROM equipos WHERE id=?", (eid,)).fetchone()
+            if not eq:
+                results.append({"equipo_id": eid, "status": "error", "error": "no existe"})
+                continue
+            eq_d = row_to_dict(eq)
+            if not eq_d.get("bh_url"):
+                results.append({"equipo_id": eid, "status": "skipped", "reason": "sin bh_url"})
+                continue
+
+            # Defense-in-depth: aunque bh_url ya pasó por validación cuando se guardó
+            # el equipo, revalidamos antes de scrapear (impide SSRF a IPs privadas si
+            # el equipo viene de una migración vieja o de un campo no validado).
+            try:
+                _validate_ssrf_only(eq_d["bh_url"])
+            except HTTPException as he:
+                results.append({"equipo_id": eid, "status": "error", "error": f"URL inválida: {he.detail}"[:200]})
+                continue
+
+            try:
+                # Llamada interna al enriquecer. Pasamos el mismo `request` ya
+                # validado — require_admin se ejecuta de nuevo (idempotente)
+                # pero no hace daño y mantiene el endpoint protegido si se
+                # llama directo.
+                scrape = admin_enriquecer_equipo(
+                    EnriquecerInput(url=eq_d["bh_url"]),
+                    request,
+                )
+
+                # Persistir raw_json en equipo_fichas (cache para botones ✨)
+                conn.execute(
+                    """INSERT INTO equipo_fichas (equipo_id, raw_json, fuente_url, enriquecido_at)
+                       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                       ON CONFLICT (equipo_id) DO UPDATE
+                       SET raw_json = EXCLUDED.raw_json,
+                           fuente_url = COALESCE(EXCLUDED.fuente_url, equipo_fichas.fuente_url),
+                           enriquecido_at = EXCLUDED.enriquecido_at""",
+                    (eid, _json.dumps(scrape, ensure_ascii=False), scrape.get("fuente_url") or eq_d["bh_url"]),
+                )
+
+                # Llenar campos top-level del equipo si están vacíos
+                patch = {}
+                if not eq_d.get("marca") and scrape.get("marca"):
+                    patch["marca"] = scrape["marca"]
+                if not eq_d.get("modelo") and scrape.get("modelo"):
+                    patch["modelo"] = scrape["modelo"]
+                if not eq_d.get("foto_url") and scrape.get("foto_url"):
+                    patch["foto_url"] = scrape["foto_url"]
+                if patch:
+                    set_clause = ", ".join(f"{k} = ?" for k in patch)
+                    set_clause += ", updated_at = CURRENT_TIMESTAMP"
+                    conn.execute(
+                        f"UPDATE equipos SET {set_clause} WHERE id = ?",
+                        list(patch.values()) + [eid],
+                    )
+
+                conn.commit()
+                results.append({
+                    "equipo_id": eid,
+                    "status": "ok",
+                    "specs_count": len(scrape.get("specs") or []),
+                    "filled": list(patch.keys()),
+                })
+            except HTTPException as he:
+                # Errores HTTP del scrape: mostrar el detail (que ya está
+                # sanitizado por el endpoint upstream).
+                conn.rollback()
+                results.append({"equipo_id": eid, "status": "error", "error": str(he.detail)[:200]})
+            except Exception as e:
+                # Errores no esperados: NO exponer str(e) al frontend (puede
+                # contener paths/internals). Log completo server-side; al user
+                # un mensaje genérico.
+                conn.rollback()
+                logger.exception("batch-enriquecer falló para equipo %s", eid)
+                results.append({
+                    "equipo_id": eid,
+                    "status": "error",
+                    "error": f"Error inesperado ({type(e).__name__})",
+                })
+
+            # Rate limit B&H — saltamos el sleep en la última iteración del
+            # chunk para no demorar la respuesta gratis.
+            if eid != ids[-1]:
+                _time.sleep(1)
+
+        return {"results": results}
+    finally:
+        conn.close()
 
 
 @router.post("/admin/equipos/enriquecer")

@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Copy } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wrench, History, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,9 @@ import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
 import { ActionMenu } from "@/components/mobile";
 import { EquipoFormDialogV2 as EquipoFormDialog } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
 import { AutocompletarEquipoDialog } from "@/components/admin/autocompletar";
+import { BatchAutocompletarDialog } from "@/components/admin/BatchAutocompletarDialog";
+import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquipoDialog";
+import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
 
 export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
@@ -38,6 +41,9 @@ function EquiposPage() {
   const [deleting, setDeleting] = useState<Equipo | null>(null);
   const [enriching, setEnriching] = useState<Equipo | null>(null);
   const [menuEquipo, setMenuEquipo] = useState<Equipo | null>(null);
+  const [openBatch, setOpenBatch] = useState(false);
+  const [mantenimientoEquipo, setMantenimientoEquipo] = useState<Equipo | null>(null);
+  const [historialEquipo, setHistorialEquipo] = useState<Equipo | null>(null);
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", { q, etiqueta, soloIncompletos }],
@@ -134,6 +140,9 @@ function EquiposPage() {
           </p>
         </div>
         <div className="flex gap-1.5">
+          <Button variant="outline" onClick={() => setOpenBatch(true)} title="Buscar specs en bulk para los equipos con link de fuente">
+            <Sparkles className="h-4 w-4 mr-1" /> Batch specs
+          </Button>
           <Button onClick={() => { setEditing(null); setOpenForm(true); }}>
             <Plus className="h-4 w-4 mr-1" /> Nuevo equipo
           </Button>
@@ -146,7 +155,7 @@ function EquiposPage() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por nombre, marca, modelo…"
+            placeholder="Buscar (nombre, marca, modelo, serie, specs, keywords…)"
             className="pl-9 text-base sm:text-sm"
           />
         </div>
@@ -290,6 +299,12 @@ function EquiposPage() {
                     <Button size="icon" variant="ghost" title="Auto-completar info (B&H/Adorama)" onClick={() => setEnriching(eq)}>
                       <Sparkles className="h-4 w-4 text-amber" />
                     </Button>
+                    <Button size="icon" variant="ghost" title="Historial de alquileres" onClick={() => setHistorialEquipo(eq)}>
+                      <History className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" title="Mantenimiento" onClick={() => setMantenimientoEquipo(eq)}>
+                      <Wrench className="h-4 w-4" />
+                    </Button>
                     <Button size="icon" variant="ghost" title="Editar" onClick={() => { setEditing(eq); setOpenForm(true); }}>
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -328,6 +343,16 @@ function EquiposPage() {
             onClick: () => setEnriching(menuEquipo!),
           },
           {
+            label: "Historial de alquileres",
+            icon: <History className="h-4 w-4" />,
+            onClick: () => setHistorialEquipo(menuEquipo!),
+          },
+          {
+            label: "Mantenimiento",
+            icon: <Wrench className="h-4 w-4" />,
+            onClick: () => setMantenimientoEquipo(menuEquipo!),
+          },
+          {
             label: "Editar",
             icon: <Pencil className="h-4 w-4" />,
             onClick: () => { setEditing(menuEquipo!); setOpenForm(true); },
@@ -355,6 +380,31 @@ function EquiposPage() {
           onSubmit={(data, etiquetas) => saveMut.mutateAsync({ data, etiquetas })}
         />
       )}
+
+      {openBatch && (
+        <BatchAutocompletarDialog
+          equipos={items}
+          open={openBatch}
+          onOpenChange={setOpenBatch}
+        />
+      )}
+
+      {mantenimientoEquipo && (
+        <MantenimientoEquipoDialog
+          equipo={mantenimientoEquipo}
+          open={!!mantenimientoEquipo}
+          onOpenChange={(v) => { if (!v) setMantenimientoEquipo(null); }}
+        />
+      )}
+
+      {historialEquipo && (
+        <HistorialEquipoDialog
+          equipo={historialEquipo}
+          open={!!historialEquipo}
+          onOpenChange={(v) => { if (!v) setHistorialEquipo(null); }}
+        />
+      )}
+
 
       {enriching && (
         <AutocompletarEquipoDialog
