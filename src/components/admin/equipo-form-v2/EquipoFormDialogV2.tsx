@@ -957,7 +957,7 @@ export function EquipoFormDialogV2({
               <Field label="Valor USD">
                 <Input type="number" step="0.01" {...form.register("precio_usd")} />
               </Field>
-              <Field label="ROI %">
+              <Field label="% día">
                 <Input type="number" step="0.1" {...form.register("roi_pct")} />
               </Field>
               <Field label={precioJornadaManual ? "Precio/día (manual)" : "Precio/día (auto)"}>
