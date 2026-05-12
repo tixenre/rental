@@ -136,7 +136,7 @@ Para cada página, verificar **todos** estos puntos antes de marcar como OK:
 | Página | URL | Status | Notas |
 |---|---|---|---|
 | Pedidos | `/admin/pedidos` | 🔴 Pendiente | Lista y detalle de pedidos desde celu |
-| Dashboard | `/admin/dashboard` | 🔴 Pendiente | KPIs desde celu |
+| Dashboard | `/admin/dashboard` | 🟢 OK | Dialog `max-h-[92vh]` + stats `grid-cols-2 sm:grid-cols-4`. Las 4 tablas (Top alquilados, Sin movimiento, Por cobrar, Por categoría) tienen variante mobile card-based `md:hidden` + tabla desktop `hidden md:block`. |
 
 ### Portal cliente
 
