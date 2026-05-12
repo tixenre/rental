@@ -75,6 +75,7 @@ const schema = z.object({
   dueno: z.string().optional().nullable(),
   estado: z.enum(["operativo", "en_mantenimiento", "fuera_servicio"]).default("operativo"),
   visible_catalogo: z.boolean().default(true),
+  ficha_completa: z.boolean().default(false),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -149,6 +150,7 @@ export function EquipoFormDialogV2({
       dueno: initial?.dueno ?? "Rambla",
       estado: (initial?.estado as FormValues["estado"]) ?? "operativo",
       visible_catalogo: initial ? Boolean(initial.visible_catalogo) : true,
+      ficha_completa: initial ? Boolean(initial.ficha_completa) : false,
     },
   });
 
@@ -174,6 +176,11 @@ export function EquipoFormDialogV2({
   const [autocompletarUrl, setAutocompletarUrl] = useState("");
   const [autocompletando, setAutocompletando] = useState(false);
   const [importedFichaExt, setImportedFichaExt] = useState<Partial<AutocompletarResult> | null>(null);
+
+  // Cache del scrape: se carga desde ficha.raw_json al editar y se actualiza
+  // cuando se hace autocompletar. Habilita los botones ✨ por sección para
+  // re-aplicar campos sin volver a scrapear.
+  const [cachedScrape, setCachedScrape] = useState<Partial<AutocompletarResult> | null>(null);
 
   // Specs traídos del autocompletar: se guardan en una lista separada para
   // que el usuario los apruebe uno por uno (vs los specs actuales).
@@ -243,9 +250,17 @@ export function EquipoFormDialogV2({
         kws = Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
       } catch { kws = []; }
       setTags(uniq([...(initial?.etiquetas ?? []), ...kws]));
+
+      // Cargar cache del scrape (raw_json) para los botones ✨ por sección.
+      if (f.raw_json) {
+        try { setCachedScrape(JSON.parse(f.raw_json)); }
+        catch { setCachedScrape(null); }
+      } else {
+        setCachedScrape(null);
+      }
     } else if (!initial) {
       setDescripcion(""); setNotas(""); setSpecs([]); setTags([]);
-      setNombrePublico("");
+      setNombrePublico(""); setCachedScrape(null);
     }
   }, [fichaQ.data, initial]);
 
@@ -351,6 +366,9 @@ export function EquipoFormDialogV2({
       if (propuestos.length) setSpecsPropuestos(propuestos);
 
       setImportedFichaExt(r);
+      // Actualizar cache del scrape: habilita los botones ✨ por sección
+      // para re-aplicar después sin volver a scrapear.
+      setCachedScrape(r);
 
       const parts: string[] = [];
       if (propuestos.length) parts.push(`${propuestos.length} specs propuestos`);
@@ -475,13 +493,70 @@ export function EquipoFormDialogV2({
   };
 
   // ════════════════════════════════════════════════════════════════════
+  // Re-aplicar desde cache (botones ✨ por sección)
+  // ════════════════════════════════════════════════════════════════════
+  type CacheSection = "identificacion" | "foto" | "descripcion" | "ficha" | "etiquetas";
+
+  const cacheHas = (s: CacheSection): boolean => {
+    const r = cachedScrape;
+    if (!r) return false;
+    switch (s) {
+      case "identificacion": return !!(r.marca || r.modelo || r.nombre_normalizado);
+      case "foto":           return !!r.foto_url;
+      case "descripcion":    return !!r.descripcion;
+      case "ficha":          return !!(r.specs?.length || r.montura || r.formato || r.resolucion);
+      case "etiquetas":      return !!r.keywords?.length;
+    }
+  };
+
+  const applyFromCache = (s: CacheSection) => {
+    const r = cachedScrape;
+    if (!r) return;
+    switch (s) {
+      case "identificacion": {
+        if (r.marca) form.setValue("marca", r.marca, { shouldDirty: true });
+        if (r.modelo) form.setValue("modelo", r.modelo, { shouldDirty: true });
+        if (r.nombre_normalizado && !form.getValues("nombre")?.trim()) {
+          form.setValue("nombre", r.nombre_normalizado, { shouldDirty: true });
+        }
+        toast.success("Identificación recargada desde cache");
+        break;
+      }
+      case "foto": {
+        if (r.foto_url) form.setValue("foto_url", r.foto_url, { shouldDirty: true });
+        toast.success("Foto recargada desde cache");
+        break;
+      }
+      case "descripcion": {
+        if (r.descripcion) setDescripcion(r.descripcion);
+        toast.success("Descripción recargada desde cache");
+        break;
+      }
+      case "ficha": {
+        const propuestos: Spec[] = withIds(r.specs ?? []);
+        if (r.montura) propuestos.unshift(newSpec("Montura", r.montura));
+        if (r.formato) propuestos.unshift(newSpec("Formato", r.formato));
+        if (r.resolucion) propuestos.unshift(newSpec("Resolución", r.resolucion));
+        setSpecsPropuestos(propuestos);
+        toast.success(`${propuestos.length} specs propuestos desde cache`);
+        break;
+      }
+      case "etiquetas": {
+        if (r.keywords?.length) setTags((prev) => uniq([...prev, ...r.keywords!]));
+        toast.success("Etiquetas mergeadas desde cache");
+        break;
+      }
+    }
+  };
+
+  // ════════════════════════════════════════════════════════════════════
   // Submit — mismo flow que el viejo (delegamos en adminApi).
   // ════════════════════════════════════════════════════════════════════
   const submit = form.handleSubmit(async (values) => {
     // Tags unificadas (chip UI) → se envían a ambos backends: etiquetas (top-level
     // equipo, para filtros/categorización) y keywords_json (ficha, para chips públicos).
     const etiquetas = uniq(tags.map((t) => t.trim()).filter(Boolean));
-    const { visible_catalogo, ...rest } = values;
+    const { visible_catalogo, ficha_completa, ...rest } = values;
 
     const fotoUrlForm = rest.foto_url || null;
     const fotoExternaPendiente =
@@ -504,6 +579,7 @@ export function EquipoFormDialogV2({
       roi_pct: rest.roi_pct ?? null,
       valor_reposicion: rest.valor_reposicion ?? null,
       visible_catalogo: visible_catalogo ? 1 : 0,
+      ficha_completa: ficha_completa,
     };
 
     const fallidos: string[] = [];
@@ -626,6 +702,21 @@ export function EquipoFormDialogV2({
   const fotoActual = pendingFilePreview || form.watch("foto_url");
   const bhUrl = form.watch("bh_url");
 
+  /** Botón ✨ que re-aplica una sección desde el scrape cacheado. */
+  const CacheBtn = ({ section, label = "cache" }: { section: CacheSection; label?: string }) => {
+    if (!cacheHas(section)) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => applyFromCache(section)}
+        title="Re-aplicar desde scrape guardado"
+        className="text-[10px] text-muted-foreground hover:text-ink inline-flex items-center gap-0.5 shrink-0"
+      >
+        <Sparkles className="h-3 w-3" /> {label}
+      </button>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto">
@@ -642,6 +733,30 @@ export function EquipoFormDialogV2({
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-5">
+
+          {/* ════════════════════════════════════════════════════════════════
+              STATUS STRIP — switches de estado (visible + ficha completa)
+          ════════════════════════════════════════════════════════════════ */}
+          <div className="flex flex-wrap items-center gap-4 text-xs pb-2 border-b hairline">
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <Switch
+                checked={form.watch("visible_catalogo")}
+                onCheckedChange={(v) => form.setValue("visible_catalogo", v, { shouldDirty: true })}
+              />
+              <span className={form.watch("visible_catalogo") ? "text-ink" : "text-muted-foreground"}>
+                {form.watch("visible_catalogo") ? "Visible en catálogo" : "Oculto del catálogo"}
+              </span>
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <Switch
+                checked={form.watch("ficha_completa")}
+                onCheckedChange={(v) => form.setValue("ficha_completa", v, { shouldDirty: true })}
+              />
+              <span className={form.watch("ficha_completa") ? "text-ink" : "text-muted-foreground"}>
+                {form.watch("ficha_completa") ? "Ficha completa" : "Ficha pendiente"}
+              </span>
+            </label>
+          </div>
 
           {/* ════════════════════════════════════════════════════════════════
               AUTOCOMPLETAR BAR — primera cosa del form
@@ -687,7 +802,13 @@ export function EquipoFormDialogV2({
           <section className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-3">
               {/* Foto card */}
-              <PhotoCard
+              <div className="space-y-1">
+                {cacheHas("foto") && (
+                  <div className="flex justify-end">
+                    <CacheBtn section="foto" />
+                  </div>
+                )}
+                <PhotoCard
                 url={fotoActual}
                 pendingFile={pendingFile}
                 hasInitial={!!initial?.id}
@@ -702,9 +823,14 @@ export function EquipoFormDialogV2({
                 uploading={uploading}
                 uploadingToR2={uploadingToR2}
               />
+              </div>
 
               <div className="space-y-3">
-                <Field label="Nombre interno (técnico, para vos)" error={form.formState.errors.nombre?.message}>
+                <Field
+                  label="Nombre interno (técnico, para vos)"
+                  error={form.formState.errors.nombre?.message}
+                  actions={<CacheBtn section="identificacion" label="cache id." />}
+                >
                   <Input
                     {...form.register("nombre")}
                     placeholder="Ej: Sony ILME-FX30B Cuerpo"
@@ -863,9 +989,16 @@ export function EquipoFormDialogV2({
           {/* ════════════════════════════════════════════════════════════════
               FICHA TÉCNICA — colapsable
           ════════════════════════════════════════════════════════════════ */}
-          <CollapsibleSection title="Ficha técnica" defaultOpen={specsPropuestos.length > 0 || specs.length > 0}>
+          <CollapsibleSection
+            title="Ficha técnica"
+            defaultOpen={specsPropuestos.length > 0 || specs.length > 0}
+            actions={<CacheBtn section="ficha" />}
+          >
             <div className="space-y-3">
-              <Field label="Descripción (visible en el catálogo)">
+              <Field
+                label="Descripción (visible en el catálogo)"
+                actions={<CacheBtn section="descripcion" />}
+              >
                 <Textarea
                   rows={3}
                   value={descripcion}
@@ -894,7 +1027,7 @@ export function EquipoFormDialogV2({
                 }}
               />
 
-              <Field label="Etiquetas">
+              <Field label="Etiquetas" actions={<CacheBtn section="etiquetas" />}>
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap gap-1">
                     {tags.map((t) => (
@@ -958,17 +1091,6 @@ export function EquipoFormDialogV2({
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Visible en catálogo">
-                  <div className="flex items-center h-9">
-                    <Switch
-                      checked={form.watch("visible_catalogo")}
-                      onCheckedChange={(v) => form.setValue("visible_catalogo", v, { shouldDirty: true })}
-                    />
-                    <span className="ml-2 text-sm text-muted-foreground">
-                      {form.watch("visible_catalogo") ? "Sí" : "Oculto"}
-                    </span>
-                  </div>
-                </Field>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1014,11 +1136,14 @@ export function EquipoFormDialogV2({
 // ════════════════════════════════════════════════════════════════════
 
 function Field({
-  label, error, children,
-}: { label: string; error?: string; children: React.ReactNode }) {
+  label, error, children, actions,
+}: { label: string; error?: string; children: React.ReactNode; actions?: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>
+        {actions}
+      </div>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
@@ -1026,20 +1151,23 @@ function Field({
 }
 
 function CollapsibleSection({
-  title, defaultOpen = false, children,
-}: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  title, defaultOpen = false, children, actions,
+}: { title: string; defaultOpen?: boolean; children: React.ReactNode; actions?: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="border-t hairline pt-2">
-      <CollapsibleTrigger asChild>
-        <button
-          type="button"
-          className="flex items-center w-full text-left gap-1.5 py-1 text-sm font-medium hover:text-ink/70"
-        >
-          <ChevronDown className={`h-4 w-4 transition-transform ${open ? "" : "-rotate-90"}`} />
-          {title}
-        </button>
-      </CollapsibleTrigger>
+      <div className="flex items-center gap-2">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center flex-1 text-left gap-1.5 py-1 text-sm font-medium hover:text-ink/70"
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform ${open ? "" : "-rotate-90"}`} />
+            {title}
+          </button>
+        </CollapsibleTrigger>
+        {actions}
+      </div>
       <CollapsibleContent className="pt-2">
         {children}
       </CollapsibleContent>
