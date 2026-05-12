@@ -75,11 +75,39 @@ const schema = z.object({
   dueno: z.string().optional().nullable(),
   estado: z.enum(["operativo", "en_mantenimiento", "fuera_servicio"]).default("operativo"),
   visible_catalogo: z.boolean().default(true),
-  etiquetas_csv: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
-type Spec = { label: string; value: string };
+type Spec = { id: string; label: string; value: string };
+
+const newSpec = (label = "", value = ""): Spec => ({
+  id: crypto.randomUUID(),
+  label,
+  value,
+});
+
+const withIds = (raw: Array<{ label: string; value: string }>): Spec[] =>
+  raw.map((s) => newSpec(s.label, s.value));
+
+const sameLabel = (a: string, b: string) =>
+  a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** Une dos listas de specs por label (case-insensitive). Si ya existe, no pisa. */
+const mergeSpecs = (existing: Spec[], extras: Spec[]): Spec[] => {
+  const result = [...existing];
+  for (const e of extras) {
+    if (!e.value.trim()) continue;
+    if (result.some((s) => sameLabel(s.label, e.label))) continue;
+    result.push(e);
+  }
+  return result;
+};
+
+/** Devuelve el valor de un spec por label, o "". */
+const findSpecValue = (specs: Spec[], label: string): string =>
+  specs.find((s) => sameLabel(s.label, label))?.value ?? "";
+
+const uniq = <T,>(arr: T[]): T[] => Array.from(new Set(arr));
 
 // ════════════════════════════════════════════════════════════════════
 // Componente principal
@@ -121,28 +149,26 @@ export function EquipoFormDialogV2({
       dueno: initial?.dueno ?? "Rambla",
       estado: (initial?.estado as FormValues["estado"]) ?? "operativo",
       visible_catalogo: initial ? Boolean(initial.visible_catalogo) : true,
-      etiquetas_csv: initial?.etiquetas?.join(", ") ?? "",
     },
   });
 
   // ── Estado de ficha (campos que no van en form-hook) ───────────────
-  const [montura, setMontura] = useState("");
-  const [formato, setFormato] = useState("");
-  const [resolucion, setResolucion] = useState("");
+  // Nota: montura/formato/resolucion ya no son inputs propios — viven como
+  // specs. En load se migran a specs si los campos dedicados del backend
+  // tienen valor, y en save se extraen de specs para escribir los campos
+  // dedicados (que el catálogo público sigue leyendo).
   const [descripcion, setDescripcion] = useState("");
   const [notas, setNotas] = useState("");
   const [specs, setSpecs] = useState<Spec[]>([]);
-  const [keywords, setKeywords] = useState<string[]>([]);
-  const [keywordInput, setKeywordInput] = useState("");
+  // Etiquetas unificadas: en V2 keywords y etiquetas son lo mismo. En save se
+  // envían a los dos backends (etiquetas vía onSubmit, keywords_json vía setFicha).
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
 
   // ── Nombre público ─────────────────────────────────────────────────
-  // En el viejo es un template con tokens. Acá lo simplificamos: input libre
-  // + toggle "generar automático desde marca/modelo/montura" para casos
-  // donde la categoría tiene template definido (ver nombre-publico.ts).
+  // Input libre + toggle "generar automático desde categoría" (ver nombre-publico.ts).
   const [nombrePublico, setNombrePublico] = useState("");
   const [nombrePublicoAuto, setNombrePublicoAuto] = useState(false);
-  // El template legacy con tokens, oculto en "Avanzado" para no perderlo.
-  const [nombreTpl, setNombreTpl] = useState("");
 
   // ── Autocompletar (URL importer) ───────────────────────────────────
   const [autocompletarUrl, setAutocompletarUrl] = useState("");
@@ -190,21 +216,36 @@ export function EquipoFormDialogV2({
   useEffect(() => {
     const f = fichaQ.data;
     if (f) {
-      setMontura(f.montura ?? "");
-      setFormato(f.formato ?? "");
-      setResolucion(f.resolucion ?? "");
       setDescripcion(f.descripcion ?? "");
       setNotas(f.notas ?? "");
-      setNombreTpl(f.nombre_publico_template ?? "");
-      try { setSpecs(f.specs_json ? JSON.parse(f.specs_json) : []); }
-      catch { setSpecs([]); }
+      // Si el nombre público guardado no tiene tokens, lo usamos como literal.
+      // Si tiene tokens ({...}), lo dejamos vacío — el usuario regenera con auto.
+      const tpl = (f.nombre_publico_template ?? "").trim();
+      setNombrePublico(/\{[^}]+\}/.test(tpl) ? "" : tpl);
+
+      let parsedSpecs: Spec[] = [];
+      try {
+        const raw = f.specs_json ? JSON.parse(f.specs_json) : [];
+        parsedSpecs = withIds(Array.isArray(raw) ? raw : []);
+      } catch { parsedSpecs = []; }
+
+      // Migrar montura/formato/resolucion dedicados → specs (si todavía no están).
+      const dedicated: Spec[] = [];
+      if (f.montura?.trim()) dedicated.push(newSpec("Montura", f.montura.trim()));
+      if (f.formato?.trim()) dedicated.push(newSpec("Formato", f.formato.trim()));
+      if (f.resolucion?.trim()) dedicated.push(newSpec("Resolución", f.resolucion.trim()));
+      setSpecs(mergeSpecs(parsedSpecs, dedicated));
+
+      // Unificar keywords_json (ficha) + etiquetas (equipo top-level).
+      let kws: string[] = [];
       try {
         const arr = f.keywords_json ? JSON.parse(f.keywords_json) : [];
-        setKeywords(Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : []);
-      } catch { setKeywords([]); }
+        kws = Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
+      } catch { kws = []; }
+      setTags(uniq([...(initial?.etiquetas ?? []), ...kws]));
     } else if (!initial) {
-      setMontura(""); setFormato(""); setResolucion("");
-      setDescripcion(""); setNotas(""); setSpecs([]); setKeywords([]); setNombreTpl("");
+      setDescripcion(""); setNotas(""); setSpecs([]); setTags([]);
+      setNombrePublico("");
     }
   }, [fichaQ.data, initial]);
 
@@ -240,7 +281,8 @@ export function EquipoFormDialogV2({
 
   // ── Auto-generación del nombre público ────────────────────────────
   // Cuando el toggle está ON y la categoría tiene template, regenera al
-  // tocar cualquier campo relevante.
+  // tocar cualquier campo relevante. Montura/Formato/Resolución se leen
+  // de los specs por label (ya no son inputs dedicados).
   const watchedMarca = form.watch("marca");
   const watchedModelo = form.watch("modelo");
   useEffect(() => {
@@ -248,10 +290,12 @@ export function EquipoFormDialogV2({
     const gen = generarNombrePublico(categoriaRoot, {
       marca: watchedMarca ?? "",
       modelo: watchedModelo ?? "",
-      montura, formato, resolucion,
+      montura: findSpecValue(specs, "Montura"),
+      formato: findSpecValue(specs, "Formato"),
+      resolucion: findSpecValue(specs, "Resolución"),
     });
     if (gen) setNombrePublico(gen);
-  }, [nombrePublicoAuto, categoriaRoot, watchedMarca, watchedModelo, montura, formato, resolucion]);
+  }, [nombrePublicoAuto, categoriaRoot, watchedMarca, watchedModelo, specs]);
 
   const autoGenDisponible = categoriaSoportaAutoGen(categoriaRoot);
 
@@ -296,19 +340,21 @@ export function EquipoFormDialogV2({
       if (typeof r.precio_bh_usd === "number") sets("precio_usd", r.precio_bh_usd);
 
       if (r.descripcion) setDescripcion(r.descripcion);
-      if (r.keywords?.length) setKeywords((prev) => Array.from(new Set([...prev, ...r.keywords!])));
-      if (r.montura) setMontura(r.montura);
-      if (r.formato) setFormato(r.formato);
-      if (r.resolucion) setResolucion(r.resolucion);
+      if (r.keywords?.length) setTags((prev) => uniq([...prev, ...r.keywords!]));
 
-      // Specs van a propuestos — para que el usuario los apruebe uno por uno.
-      if (r.specs?.length) setSpecsPropuestos(r.specs);
+      // Specs propuestos = los que vienen del autocompletar + montura/formato/resolucion
+      // (que en V2 ya no son inputs dedicados — viven como specs).
+      const propuestos: Spec[] = withIds(r.specs ?? []);
+      if (r.montura) propuestos.unshift(newSpec("Montura", r.montura));
+      if (r.formato) propuestos.unshift(newSpec("Formato", r.formato));
+      if (r.resolucion) propuestos.unshift(newSpec("Resolución", r.resolucion));
+      if (propuestos.length) setSpecsPropuestos(propuestos);
 
       setImportedFichaExt(r);
 
       const parts: string[] = [];
-      if (r.specs?.length) parts.push(`${r.specs.length} specs propuestos`);
-      if (r.keywords?.length) parts.push(`${r.keywords.length} keywords`);
+      if (propuestos.length) parts.push(`${propuestos.length} specs propuestos`);
+      if (r.keywords?.length) parts.push(`${r.keywords.length} etiquetas`);
       if (r.descripcion) parts.push("descripción");
       toast.success("Datos importados", { description: parts.join(" · ") || "datos básicos" });
     } catch (e) {
@@ -418,24 +464,24 @@ export function EquipoFormDialogV2({
   };
 
   // ════════════════════════════════════════════════════════════════════
-  // Keywords
+  // Tags (etiquetas + keywords unificadas)
   // ════════════════════════════════════════════════════════════════════
-  const addKeyword = () => {
-    const v = keywordInput.trim().toLowerCase();
+  const addTag = () => {
+    const v = tagInput.trim().toLowerCase();
     if (!v) return;
-    if (keywords.includes(v)) { setKeywordInput(""); return; }
-    setKeywords([...keywords, v]);
-    setKeywordInput("");
+    if (tags.includes(v)) { setTagInput(""); return; }
+    setTags([...tags, v]);
+    setTagInput("");
   };
 
   // ════════════════════════════════════════════════════════════════════
   // Submit — mismo flow que el viejo (delegamos en adminApi).
   // ════════════════════════════════════════════════════════════════════
   const submit = form.handleSubmit(async (values) => {
-    const etiquetas = (values.etiquetas_csv ?? "")
-      .split(",").map((s: string) => s.trim()).filter(Boolean);
-    const { etiquetas_csv: _omit, visible_catalogo, ...rest } = values;
-    void _omit;
+    // Tags unificadas (chip UI) → se envían a ambos backends: etiquetas (top-level
+    // equipo, para filtros/categorización) y keywords_json (ficha, para chips públicos).
+    const etiquetas = uniq(tags.map((t) => t.trim()).filter(Boolean));
+    const { visible_catalogo, ...rest } = values;
 
     const fotoUrlForm = rest.foto_url || null;
     const fotoExternaPendiente =
@@ -493,11 +539,20 @@ export function EquipoFormDialogV2({
         }
       }
 
-      // Ficha
+      // Ficha — montura/formato/resolución se extraen de specs por label (V2
+      // los maneja como specs); el catálogo público sigue leyendo los campos
+      // dedicados, así que los seguimos guardando.
+      const monturaSpec = findSpecValue(specs, "Montura") || null;
+      const formatoSpec = findSpecValue(specs, "Formato") || null;
+      const resolucionSpec = findSpecValue(specs, "Resolución") || null;
+      const specsCleaned = specs
+        .filter((s) => s.label.trim() && s.value.trim())
+        .map(({ label, value }) => ({ label, value }));
+
       const tieneFicha = (
         isEdit ||
-        !!descripcion || !!notas || specs.length > 0 || keywords.length > 0 ||
-        !!montura || !!formato || !!resolucion || !!nombreTpl.trim() ||
+        !!descripcion || !!notas || specsCleaned.length > 0 || tags.length > 0 ||
+        !!monturaSpec || !!formatoSpec || !!resolucionSpec ||
         !!nombrePublico.trim() || !!importedFichaExt
       );
       if (tieneFicha) {
@@ -505,15 +560,13 @@ export function EquipoFormDialogV2({
           await adminApi.setFicha(equipoId, {
             descripcion: descripcion || null,
             notas: notas || null,
-            specs_json: specs.length ? JSON.stringify(specs.filter((s) => s.label && s.value)) : null,
-            montura: montura || null,
-            formato: formato || null,
-            resolucion: resolucion || null,
-            keywords_json: keywords.length ? JSON.stringify(keywords) : null,
-            // El nombre público manual lo guardamos como template literal (sin tokens)
-            // si el usuario lo escribió a mano. Si está en modo auto, no guardamos
-            // template — el cálculo lo hace la UI cada vez.
-            nombre_publico_template: nombreTpl.trim() || nombrePublico.trim() || null,
+            specs_json: specsCleaned.length ? JSON.stringify(specsCleaned) : null,
+            montura: monturaSpec,
+            formato: formatoSpec,
+            resolucion: resolucionSpec,
+            keywords_json: tags.length ? JSON.stringify(tags) : null,
+            // En V2 ya no hay template con tokens — el nombre público es literal.
+            nombre_publico_template: nombrePublico.trim() || null,
           });
         } catch (e) {
           fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
@@ -812,18 +865,6 @@ export function EquipoFormDialogV2({
           ════════════════════════════════════════════════════════════════ */}
           <CollapsibleSection title="Ficha técnica" defaultOpen={specsPropuestos.length > 0 || specs.length > 0}>
             <div className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Field label="Montura">
-                  <Input value={montura} onChange={(e) => setMontura(e.target.value)} placeholder="Ej: E" />
-                </Field>
-                <Field label="Formato">
-                  <Input value={formato} onChange={(e) => setFormato(e.target.value)} placeholder="Ej: Full Frame" />
-                </Field>
-                <Field label="Resolución">
-                  <Input value={resolucion} onChange={(e) => setResolucion(e.target.value)} placeholder="Ej: 4K" />
-                </Field>
-              </div>
-
               <Field label="Descripción (visible en el catálogo)">
                 <Textarea
                   rows={3}
@@ -838,49 +879,52 @@ export function EquipoFormDialogV2({
                 onChange={setSpecs}
                 onAceptarPropuesto={(s) => {
                   setSpecs((prev) => {
-                    const idx = prev.findIndex((x) => x.label.toLowerCase() === s.label.toLowerCase());
+                    const idx = prev.findIndex((x) => sameLabel(x.label, s.label));
                     if (idx >= 0) {
                       const next = [...prev];
-                      next[idx] = s;
+                      next[idx] = { ...next[idx], value: s.value };
                       return next;
                     }
-                    return [...prev, s];
+                    return [...prev, newSpec(s.label, s.value)];
                   });
-                  setSpecsPropuestos((prev) => prev.filter((x) => x.label !== s.label));
+                  setSpecsPropuestos((prev) => prev.filter((x) => x.id !== s.id));
                 }}
                 onDescartarPropuesto={(s) => {
-                  setSpecsPropuestos((prev) => prev.filter((x) => x.label !== s.label));
+                  setSpecsPropuestos((prev) => prev.filter((x) => x.id !== s.id));
                 }}
               />
 
-              <Field label="Palabras clave">
+              <Field label="Etiquetas">
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap gap-1">
-                    {keywords.map((k) => (
-                      <Badge key={k} variant="secondary" className="text-[10px] gap-1">
-                        {k}
-                        <button type="button" onClick={() => setKeywords(keywords.filter((x) => x !== k))}>
+                    {tags.map((t) => (
+                      <Badge key={t} variant="secondary" className="text-[10px] gap-1">
+                        {t}
+                        <button type="button" onClick={() => setTags(tags.filter((x) => x !== t))}>
                           <X className="h-3 w-3" />
                         </button>
                       </Badge>
                     ))}
-                    {keywords.length === 0 && (
-                      <span className="text-xs text-muted-foreground italic">Sin keywords</span>
+                    {tags.length === 0 && (
+                      <span className="text-xs text-muted-foreground italic">Sin etiquetas</span>
                     )}
                   </div>
                   <div className="flex gap-1">
                     <Input
-                      value={keywordInput}
-                      onChange={(e) => setKeywordInput(e.target.value)}
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") { e.preventDefault(); addKeyword(); }
+                        if (e.key === "Enter") { e.preventDefault(); addTag(); }
                       }}
-                      placeholder="Agregar palabra y Enter…"
+                      placeholder="Etiqueta y Enter… (ej. 4K, full frame, cinema)"
                     />
-                    <Button type="button" size="icon" variant="outline" onClick={addKeyword}>
+                    <Button type="button" size="icon" variant="outline" onClick={addTag}>
                       <Plus className="h-3.5 w-3.5" />
                     </Button>
                   </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Se usan para búsqueda, filtros del catálogo y chips visibles en la ficha pública.
+                  </p>
                 </div>
               </Field>
             </div>
@@ -944,25 +988,6 @@ export function EquipoFormDialogV2({
 
               <Field label="Notas internas (no se muestran al cliente)">
                 <Textarea rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} />
-              </Field>
-
-              <Field label="Nombre público — template con tokens (opcional)">
-                <div className="space-y-1">
-                  <Input
-                    value={nombreTpl}
-                    onChange={(e) => setNombreTpl(e.target.value)}
-                    placeholder="Ej: {marca} {modelo} — {montura}"
-                    className="font-mono text-xs"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    Tokens: {`{marca} {modelo} {montura} {formato} {resolucion} {tipo}`}.
-                    Si está vacío, se usa el "Nombre público" de arriba.
-                  </p>
-                </div>
-              </Field>
-
-              <Field label="Etiquetas manuales (CSV)">
-                <Input {...form.register("etiquetas_csv")} placeholder="cinema, super 35, log3" />
               </Field>
             </div>
           </CollapsibleSection>
@@ -1203,7 +1228,7 @@ function CategoriasPicker({
  * Specs editor con diff visual cuando hay propuestos del autocompletar.
  *
  * - Propuestos = vienen del autocompletar, esperan aprobación.
- * - Actuales = ya están guardados en la ficha.
+ * - Actuales = ya están guardados en la ficha, soportan drag-and-drop.
  *
  * El usuario puede aceptar uno por uno (reemplaza o agrega), descartar o editar.
  */
@@ -1216,18 +1241,39 @@ function SpecsDiffEditor({
   onAceptarPropuesto: (s: Spec) => void;
   onDescartarPropuesto: (s: Spec) => void;
 }) {
-  const updateSpec = (i: number, patch: Partial<Spec>) => {
-    onChange(specs.map((s, j) => j === i ? { ...s, ...patch } : s));
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const updateSpec = (id: string, patch: Partial<Spec>) => {
+    onChange(specs.map((s) => s.id === id ? { ...s, ...patch } : s));
   };
-  const removeSpec = (i: number) => onChange(specs.filter((_, j) => j !== i));
-  const addSpec = () => onChange([...specs, { label: "", value: "" }]);
+  const removeSpec = (id: string) => onChange(specs.filter((s) => s.id !== id));
+  const addSpec = () => onChange([...specs, newSpec()]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = specs.findIndex((s) => s.id === active.id);
+    const newIdx = specs.findIndex((s) => s.id === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
+    onChange(arrayMove(specs, oldIdx, newIdx));
+  };
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-          Specs ({specs.length})
-        </Label>
+        <span className="text-xs text-muted-foreground">
+          {specs.length > 0 && (
+            <>
+              {specs.length} {specs.length === 1 ? "ítem" : "ítems"}
+              {specs.length > 1 && (
+                <span className="ml-1.5 opacity-60">· arrastrá para reordenar</span>
+              )}
+            </>
+          )}
+        </span>
         <Button type="button" size="sm" variant="ghost" onClick={addSpec}>
           <Plus className="h-3 w-3 mr-1" /> Agregar
         </Button>
@@ -1237,12 +1283,12 @@ function SpecsDiffEditor({
       {propuestos.length > 0 && (
         <div className="rounded-md border hairline bg-amber-soft/30 p-2 space-y-1.5">
           <p className="text-[11px] text-ink/70 font-medium">
-            ✨ {propuestos.length} {propuestos.length === 1 ? "spec propuesto" : "specs propuestos"} del autocompletar
+            ✨ {propuestos.length} {propuestos.length === 1 ? "ítem propuesto" : "ítems propuestos"} del autocompletar
           </p>
-          {propuestos.map((s, i) => {
-            const existing = specs.find((x) => x.label.toLowerCase() === s.label.toLowerCase());
+          {propuestos.map((s) => {
+            const existing = specs.find((x) => sameLabel(x.label, s.label));
             return (
-              <div key={i} className="flex items-center gap-1.5 text-xs">
+              <div key={s.id} className="flex items-center gap-1.5 text-xs">
                 <div className="flex-1 min-w-0">
                   <span className="font-medium">{s.label}:</span>{" "}
                   <span>{s.value}</span>
@@ -1264,34 +1310,73 @@ function SpecsDiffEditor({
         </div>
       )}
 
-      {/* Specs actuales */}
+      {/* Specs actuales con drag-and-drop */}
       {specs.length > 0 ? (
-        <div className="space-y-1">
-          {specs.map((s, i) => (
-            <div key={i} className="flex gap-1">
-              <Input
-                value={s.label}
-                onChange={(e) => updateSpec(i, { label: e.target.value })}
-                placeholder="Spec"
-                className="text-xs"
-              />
-              <Input
-                value={s.value}
-                onChange={(e) => updateSpec(i, { value: e.target.value })}
-                placeholder="Valor"
-                className="text-xs"
-              />
-              <Button type="button" size="icon" variant="ghost" onClick={() => removeSpec(i)}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={specs.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-1">
+              {specs.map((s) => (
+                <SortableSpec
+                  key={s.id}
+                  spec={s}
+                  onUpdate={(patch) => updateSpec(s.id, patch)}
+                  onRemove={() => removeSpec(s.id)}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       ) : (
         propuestos.length === 0 && (
-          <p className="text-xs text-muted-foreground italic">Sin specs.</p>
+          <p className="text-xs text-muted-foreground italic">Sin ítems.</p>
         )
       )}
+    </div>
+  );
+}
+
+function SortableSpec({
+  spec, onUpdate, onRemove,
+}: {
+  spec: Spec;
+  onUpdate: (patch: Partial<Spec>) => void;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: spec.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex gap-1 items-center bg-background">
+      <button
+        type="button"
+        className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground touch-none px-0.5"
+        {...attributes}
+        {...listeners}
+        tabIndex={-1}
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </button>
+      <Input
+        value={spec.label}
+        onChange={(e) => onUpdate({ label: e.target.value })}
+        placeholder="Spec"
+        className="text-xs"
+      />
+      <Input
+        value={spec.value}
+        onChange={(e) => onUpdate({ value: e.target.value })}
+        placeholder="Valor"
+        className="text-xs"
+      />
+      <Button type="button" size="icon" variant="ghost" onClick={onRemove}>
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
     </div>
   );
 }
