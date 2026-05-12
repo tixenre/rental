@@ -328,7 +328,7 @@ function EquiposPage() {
               <TableHead className="hidden md:table-cell">Marca / Modelo</TableHead>
               <TableHead className="text-right">Stock</TableHead>
               <TableHead className="text-right hidden sm:table-cell">Precio/día</TableHead>
-              <TableHead className="text-right hidden sm:table-cell w-24">ROI %</TableHead>
+              <TableHead className="text-right hidden sm:table-cell w-24" title="% del valor del equipo cobrado por día (nombre tentativo)">% día</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -689,7 +689,7 @@ function RoiInline({
       onSaved();
     },
     onError: (e: Error) => {
-      toast.error(`No se pudo actualizar ROI: ${e.message}`);
+      toast.error(`No se pudo actualizar % día: ${e.message}`);
       // Revertir al valor original.
       setValue(initialRef.current != null ? String(initialRef.current) : "");
     },
@@ -701,14 +701,14 @@ function RoiInline({
       // Vacío → null (saca el ROI). Lo permitimos pero no recalcula precio.
       if (initialRef.current != null) {
         adminApi.updateEquipo(equipo.id, { roi_pct: null }).then(onSaved).catch((e) => {
-          toast.error(`No se pudo limpiar ROI: ${e instanceof Error ? e.message : ""}`);
+          toast.error(`No se pudo limpiar % día: ${e instanceof Error ? e.message : ""}`);
         });
       }
       return;
     }
     const num = Number(trimmed);
     if (!Number.isFinite(num) || num < 0) {
-      toast.error("ROI debe ser un número >= 0");
+      toast.error("% día debe ser un número >= 0");
       setValue(initialRef.current != null ? String(initialRef.current) : "");
       return;
     }
@@ -843,7 +843,7 @@ function PrecioJornadaInline({
         title={
           isManual
             ? "Precio fijado manualmente — no se actualiza al recalcular masivo"
-            : "Precio automático (calculado desde USD × ROI%)"
+            : "Precio automático (calculado desde USD × % día)"
         }
         className={
           "h-7 text-right text-xs tabular-nums pl-5 pr-2 py-0 " +
