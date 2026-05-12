@@ -196,6 +196,8 @@ def list_equipos(
     categoria:        Optional[str]  = Query(None),
     solo_visibles:    Optional[bool] = Query(None),
     solo_incompletos: Optional[bool] = Query(None),
+    incluir_eliminados: Optional[bool] = Query(None, description="Si true (solo admin), incluye soft-deleted"),
+    solo_eliminados:  Optional[bool] = Query(None, description="Si true (solo admin), SOLO soft-deleted (vista papelera)"),
     sort:          Optional[str]  = Query(None, description="ranking | nombre | precio_asc | precio_desc | id"),
     spec:          Optional[list[str]] = Query(None, description="Filtros por specs: spec=key:valor"),
     page:          int = Query(1, ge=1),
@@ -223,6 +225,15 @@ def list_equipos(
     # Filtro admin: equipos cuya ficha el admin aún no marcó como completa.
     if solo_incompletos and is_admin:
         base_sql += " AND e.ficha_completa = FALSE"
+
+    # Soft delete (#206): por default solo activos. Admin puede pedir ver
+    # eliminados (papelera) o todos.
+    if is_admin and solo_eliminados:
+        base_sql += " AND e.eliminado_at IS NOT NULL"
+    elif is_admin and incluir_eliminados:
+        pass  # no filter
+    else:
+        base_sql += " AND e.eliminado_at IS NULL"
 
     # ── Filtros por specs estructurados (PR E) ──
     # Cada `spec=key:valor` agrega un AND EXISTS sobre equipo_specs.
@@ -575,13 +586,44 @@ def duplicate_equipo(id: int):
         conn.close()
 
 
+@router.post("/equipos/{id}/restore")
+def restore_equipo(id: int, request: Request):
+    """Restaura un equipo soft-deleted (eliminado_at = NULL). #206."""
+    require_admin(request)
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT id, eliminado_at FROM equipos WHERE id=?", (id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Equipo no encontrado")
+        if row["eliminado_at"] is None:
+            return {"ok": True, "message": "Ya estaba activo"}
+        conn.execute(
+            "UPDATE equipos SET eliminado_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id=?",
+            (id,),
+        )
+        conn.commit()
+        return {"ok": True}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 @router.delete("/equipos/{id}", status_code=204)
 def delete_equipo(id: int):
+    """Soft delete: marca eliminado_at = NOW(). Preserva historial de
+    alquileres del equipo dado de baja. Restaurable vía POST /restore (#206)."""
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
-        conn.execute("DELETE FROM equipos WHERE id=?", (id,))
+        conn.execute(
+            "UPDATE equipos SET eliminado_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id=?",
+            (id,),
+        )
         conn.commit()
     except Exception:
         conn.rollback()

@@ -94,6 +94,8 @@ export type Equipo = {
   estado: string;
   /** Flag manual del admin: ficha cargada y revisada (no requiere más trabajo). */
   ficha_completa?: boolean;
+  /** Timestamp ISO si el equipo está soft-deleted. null = activo (#206). */
+  eliminado_at?: string | null;
   etiquetas?: string[];
   kit?: KitComponente[];
   categorias?: CategoriaRef[];
@@ -245,14 +247,25 @@ export const adminApi = {
   dashboard: () => authedJson<DashboardData>("/api/dashboard"),
 
   // equipos
-  listEquipos: (params: { q?: string; etiqueta?: string; per_page?: number; solo_incompletos?: boolean } = {}) => {
+  listEquipos: (params: {
+    q?: string;
+    etiqueta?: string;
+    per_page?: number;
+    solo_incompletos?: boolean;
+    solo_eliminados?: boolean;
+    incluir_eliminados?: boolean;
+  } = {}) => {
     const sp = new URLSearchParams();
     if (params.q) sp.set("q", params.q);
     if (params.etiqueta) sp.set("etiqueta", params.etiqueta);
     if (params.solo_incompletos) sp.set("solo_incompletos", "true");
+    if (params.solo_eliminados) sp.set("solo_eliminados", "true");
+    if (params.incluir_eliminados) sp.set("incluir_eliminados", "true");
     sp.set("per_page", String(params.per_page ?? 500));
     return authedJson<EquiposListResp>(`/api/equipos?${sp.toString()}`);
   },
+  restoreEquipo: (id: number) =>
+    authedPostJson<{ ok: true; message?: string }>(`/api/equipos/${id}/restore`, {}),
   getEquipo: (id: number) => authedJson<Equipo>(`/api/equipos/${id}`),
   /** Equipos sin número de serie cargado (NULL o vacío). Issue #91. */
   getEquiposSinSerie: () =>
