@@ -123,27 +123,30 @@ Para cada página, verificar **todos** estos puntos antes de marcar como OK:
 
 | Página | URL | Status | Notas |
 |---|---|---|---|
-| Catálogo (grid) | `/` | 🟢 OK | Hero escala bien (text-5xl→7xl→[7rem]). Cards responsive. |
+| Catálogo (grid) | `/` | 🟢 OK | Hero escala (text-5xl→7xl→[7rem]). MobileStickyBar + CartMiniBar. Code audit post-#249 confirma 🟢. |
 | Catálogo (list mode) | `/` con toggle list | 🟢 OK | Row simplificado post-PR #111. Sin expand inline. |
-| Ficha de equipo | `/equipo/{id}` | 🟢 OK | Layout mobile-first con precio sticky bottom (PR #111). |
-| El Estudio | `/estudio` | 🟡 Verificar | FAQ accordion + booking form en mobile. |
-| Preguntas frecuentes | `/preguntas-frecuentes` | 🟢 OK | Layout simple, accordions. |
-| Login cliente | `/cliente/login` | 🟡 Verificar | Funciona por defecto pero sin responsive utils explícitas. |
-| Registro cliente | `/cliente/registro` | 🟡 Verificar | Idem. |
+| Ficha de equipo | `/equipo/{id}` | 🟢 OK | Precio sticky bottom `md:hidden` + galería responsive. Code audit post-#249 confirma 🟢. |
+| El Estudio | `/estudio` | 🟡 Verificar | Galería 2 cols mobile, grids responsive. **Validar hero `text-[14vw]` en 375px** — ~52px multilínea, riesgo de desborde. Resto del código OK. |
+| Preguntas frecuentes | `/preguntas-frecuentes` | 🟢 OK | Accordion + layout `max-w-3xl`. Code audit post-#249 confirma 🟢. |
+| Términos | `/terminos` | 🟢 OK | Página legal trivial (lectura centrada). `px-4 md:px-6`, `max-w-3xl`. |
+| Privacidad | `/privacidad` | 🟢 OK | Página legal trivial. Mismo patrón que `/terminos`. |
+| Login cliente | `/cliente/login` | 🟢 OK | Card centrada con `<Logo />` (post-#246). Form trivial (solo OAuth). |
+| Registro cliente | `/cliente/registro` | 🟡 Verificar | Sin responsive utils explícitas — pendiente de auditoría dedicada (issue #253). |
+| 404 (NotFound) | cualquier ruta inexistente | 🟢 OK | Layout centrado en `<PublicLayout>` post-#246. Botón `rounded-full px-5 py-2.5` (~40px). |
 
 ### Admin (prioritario mobile)
 
 | Página | URL | Status | Notas |
 |---|---|---|---|
-| Pedidos | `/admin/pedidos` | 🔴 Pendiente | Lista y detalle de pedidos desde celu |
-| Dashboard | `/admin/dashboard` | 🔴 Pendiente | KPIs desde celu |
+| Pedidos | `/admin/pedidos` | 🔴 Pendiente | Lista y detalle de pedidos desde celu (issue #252) |
+| Dashboard | `/admin/dashboard` | 🔴 Pendiente | KPIs desde celu (issue #252) |
 
 ### Portal cliente
 
 | Página | URL | Status | Notas |
 |---|---|---|---|
-| Lista de pedidos | `/cliente/portal` | 🟢 OK | Acordeón expandible por pedido. |
-| Perfil | `/cliente/perfil` | 🟡 Verificar | Sin responsive utils explícitas. |
+| Lista de pedidos | `/cliente/portal` | 🟢 OK | Acordeón expandible + DocPreviewModal `h-full sm:h-auto`. Code audit post-#246 confirma 🟢. |
+| Perfil | `/cliente/perfil` | 🟡 Verificar | Sin responsive utils explícitas — pendiente de auditoría dedicada (issue #253). |
 
 ### Componentes críticos
 
