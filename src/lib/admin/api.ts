@@ -361,11 +361,11 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }),
-  /** Aplica el resultado de /admin/equipos/enriquecer en un único call.
+  /** Aplica el resultado de /admin/equipos/autocompletar en un único call.
    *  Acepta cualquier subset de campos; los no enviados quedan como están. */
   aplicarEnriquecimiento: (id: number, data: Record<string, unknown>) =>
     authedJson<{ equipo: Equipo; ficha: Ficha | null }>(
-      `/api/admin/equipos/${id}/aplicar-enriquecimiento`,
+      `/api/admin/equipos/${id}/aplicar-autocompletado`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
