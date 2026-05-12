@@ -66,14 +66,33 @@ Por qué:
 - **Tracking real**: el estado del trabajo se ve en `gh issue list`, no releyendo conversaciones viejas.
 - **Reordenar prioridades**: si una fase queda obsoleta o cambia de prioridad, se edita / cierra el issue, no se reescribe el plan entero.
 
-Regla práctica: si el plan tiene **más de una fase**, cada fase se crea como issue antes de empezar a tocar código. Excepción: la **primera fase** puede ejecutarse en el mismo PR donde se materializa el plan, pero las siguientes ya van como issues separados.
+Cada issue describe la fase con: contexto, scope (checklist accionable), cómo (pasos concretos), verificación, y por qué de los labels.
 
-El issue describe la fase con: contexto, scope (checklist accionable), cómo (pasos concretos), verificación, y por qué de los labels. Cuando el PR de esa fase mergea, el issue se cierra con `Closes #N`.
+### Una iniciativa = una rama = una PR
+
+**Default**: el trabajo de una iniciativa entera (aunque tenga N fases / N issues) va en **una sola rama con N commits adentro**, y se mergea como **una sola PR** que cierra todos los issues con varios `Closes #N`.
+
+Por qué: minimiza el costo de review + merge + deploy. Una iniciativa = 1 review, 1 merge, 1 deploy — no N.
+
+Pattern del commit history adentro de la rama:
+
+```
+feat(ui): wrappers chrome (Logo, PublicLayout, TopBar variant)
+refactor(ui): rutas con drift a PublicLayout
+refactor(ui): rutas restantes a PublicLayout
+docs(mobile): criterio mobile en MOBILE_AUDIT
+fix(mobile): tap targets en PedidoPage
+...
+```
+
+Cada commit es atómico y revertible. La PR los publica en bloque.
+
+**Excepción explícita**: para algo chico y aislado (typo, una decisión de label puntual, un bug fix de 5 líneas que no está atado a una iniciativa más grande), pedir abrir una **PR separada** de forma explícita. Sin esa indicación, default es agregar al branch en curso.
 
 ### Branches
 
 - `main` — siempre estable, deployable.
-- `claude/<descripcion>` — branches de Claude. Una por PR.
+- `claude/<descripcion>` — una rama por **iniciativa** (no por fase / no por commit). Múltiples commits dentro.
 - `bugs` / `features` — branches long-lived legacy del workflow viejo. **NO usar para nuevo trabajo**; quedaron porque hay docs que las mencionan.
 
 Después de mergear: **borrar la branch local** (`git branch -d`) **y remota** (`git push origin --delete`). Sin colgadas.
