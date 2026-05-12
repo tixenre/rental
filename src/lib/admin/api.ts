@@ -299,6 +299,15 @@ export const adminApi = {
   },
   duplicateEquipo: (id: number) =>
     authedJson<Equipo>(`/api/equipos/${id}/duplicate`, { method: "POST" }),
+  /** Bulk action sobre múltiples equipos. */
+  bulkAction: (payload: {
+    ids: number[];
+    action: "set_visible" | "set_ficha_completa" | "set_categoria" | "delete";
+    visible?: boolean;
+    ficha_completa?: boolean;
+    categoria_id?: number;
+  }) =>
+    authedPostJson<{ affected: number }>("/api/admin/equipos/bulk", payload),
   /** Batch autocompletar: procesa hasta 3 equipos por call, guarda el scrape
    *  en cache (raw_json). El frontend re-batchea hasta terminar. */
   batchEnriquecer: (equipo_ids: number[]) =>
@@ -374,11 +383,11 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }),
-  /** Aplica el resultado de /admin/equipos/enriquecer en un único call.
+  /** Aplica el resultado de /admin/equipos/autocompletar en un único call.
    *  Acepta cualquier subset de campos; los no enviados quedan como están. */
   aplicarEnriquecimiento: (id: number, data: Record<string, unknown>) =>
     authedJson<{ equipo: Equipo; ficha: Ficha | null }>(
-      `/api/admin/equipos/${id}/aplicar-enriquecimiento`,
+      `/api/admin/equipos/${id}/aplicar-autocompletado`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

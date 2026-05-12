@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useUsdRate, calcularPrecioJornada } from "@/hooks/useSettings";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -45,6 +46,7 @@ function EquiposPage() {
   const [openBatch, setOpenBatch] = useState(false);
   const [mantenimientoEquipo, setMantenimientoEquipo] = useState<Equipo | null>(null);
   const [historialEquipo, setHistorialEquipo] = useState<Equipo | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", { q, etiqueta, soloIncompletos, vistaPapelera }],
@@ -129,6 +131,31 @@ function EquiposPage() {
     },
     onError: (e: Error) => toast.error(`No se pudo restaurar: ${e.message}`),
   });
+
+  const bulkMut = useMutation({
+    mutationFn: (payload: Parameters<typeof adminApi.bulkAction>[0]) =>
+      adminApi.bulkAction(payload),
+    onSuccess: (r) => {
+      toast.success(`${r.affected} equipo${r.affected === 1 ? "" : "s"} actualizado${r.affected === 1 ? "" : "s"}`);
+      setSelectedIds(new Set());
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(`Bulk falló: ${e.message}`),
+  });
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = (allItems: Equipo[]) => {
+    setSelectedIds((prev) => {
+      if (prev.size === allItems.length) return new Set();
+      return new Set(allItems.map((e) => e.id));
+    });
+  };
 
   const items = equiposQ.data?.items ?? [];
   const total = equiposQ.data?.total ?? 0;
@@ -223,10 +250,74 @@ function EquiposPage() {
         </div>
       )}
 
+      {/* Barra flotante de bulk actions */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-0 z-10 flex items-center gap-2 rounded-md border hairline bg-ink text-background px-3 py-2 shadow-md">
+          <span className="text-sm font-medium flex-1">
+            {selectedIds.size} seleccionado{selectedIds.size === 1 ? "" : "s"}
+          </span>
+          <Button
+            size="sm" variant="secondary"
+            onClick={() => bulkMut.mutate({ ids: [...selectedIds], action: "set_visible", visible: true })}
+            disabled={bulkMut.isPending}
+          >
+            <Eye className="h-3.5 w-3.5 mr-1" /> Mostrar
+          </Button>
+          <Button
+            size="sm" variant="secondary"
+            onClick={() => bulkMut.mutate({ ids: [...selectedIds], action: "set_visible", visible: false })}
+            disabled={bulkMut.isPending}
+          >
+            <EyeOff className="h-3.5 w-3.5 mr-1" /> Ocultar
+          </Button>
+          <Button
+            size="sm" variant="secondary"
+            onClick={() => bulkMut.mutate({ ids: [...selectedIds], action: "set_ficha_completa", ficha_completa: true })}
+            disabled={bulkMut.isPending}
+            title="Marcar fichas como completas"
+          >
+            ✓ Completas
+          </Button>
+          <Button
+            size="sm" variant="secondary"
+            onClick={() => bulkMut.mutate({ ids: [...selectedIds], action: "set_ficha_completa", ficha_completa: false })}
+            disabled={bulkMut.isPending}
+            title="Marcar fichas como pendientes"
+          >
+            ☐ Pendientes
+          </Button>
+          <Button
+            size="sm" variant="destructive"
+            onClick={() => {
+              if (confirm(`Eliminar ${selectedIds.size} equipo${selectedIds.size === 1 ? "" : "s"}? Esta acción no se puede deshacer.`)) {
+                bulkMut.mutate({ ids: [...selectedIds], action: "delete" });
+              }
+            }}
+            disabled={bulkMut.isPending}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
+          </Button>
+          <Button
+            size="sm" variant="ghost"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-background hover:text-background/70"
+          >
+            Cancelar
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-lg border hairline overflow-hidden bg-background">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={items.length > 0 && selectedIds.size === items.length}
+                  onCheckedChange={() => toggleSelectAll(items)}
+                  aria-label="Seleccionar todos"
+                />
+              </TableHead>
               <TableHead className="w-14"></TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead className="hidden md:table-cell">Marca / Modelo</TableHead>
@@ -240,7 +331,7 @@ function EquiposPage() {
           <TableBody>
             {items.length === 0 && !equiposQ.isLoading && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                   Sin equipos.{" "}
                   {(q || etiqueta) && (
                     <button
@@ -256,6 +347,13 @@ function EquiposPage() {
             )}
             {items.map((eq) => (
               <TableRow key={eq.id} className={eq.visible_catalogo ? "" : "opacity-60"}>
+                <TableCell>
+                  <Checkbox
+                    checked={selectedIds.has(eq.id)}
+                    onCheckedChange={() => toggleSelect(eq.id)}
+                    aria-label={`Seleccionar ${eq.nombre}`}
+                  />
+                </TableCell>
                 <TableCell>
                   {eq.foto_url ? (
                     <img

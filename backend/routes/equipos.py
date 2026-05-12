@@ -27,6 +27,183 @@ from services.nombre_service import actualizar_nombres_de
 router = APIRouter()
 
 
+# ── Normalización de specs del autocompletar (#209) ───────────────────────────
+# Las specs vienen de scrapers de B&H/Adorama en inglés con unidades imperiales.
+# Acá las traducimos a español + métrico para tener ficha técnica consistente.
+
+import re as _re_specs
+
+# Mapping de labels EN → ES (case-insensitive sobre la clave). Si no está, el
+# label queda como vino (el admin puede ajustar a mano).
+_SPEC_KEY_TRANSLATIONS = {
+    "weight": "Peso",
+    "dimensions": "Dimensiones",
+    "size": "Tamaño",
+    "power consumption": "Consumo",
+    "power": "Alimentación",
+    "voltage": "Voltaje",
+    "battery": "Batería",
+    "battery life": "Duración de batería",
+    "battery type": "Tipo de batería",
+    "operating temperature": "Temperatura de operación",
+    "image sensor": "Sensor",
+    "sensor": "Sensor",
+    "sensor type": "Tipo de sensor",
+    "sensor size": "Tamaño del sensor",
+    "effective pixels": "Píxeles efectivos",
+    "lens mount": "Montura",
+    "mount": "Montura",
+    "format": "Formato",
+    "iso": "Rango ISO",
+    "iso range": "Rango ISO",
+    "iso sensitivity": "Sensibilidad ISO",
+    "shutter speed": "Velocidad de obturación",
+    "video resolution": "Resolución de video",
+    "resolution": "Resolución",
+    "max resolution": "Resolución máxima",
+    "frame rate": "Tasa de cuadros",
+    "fps": "Cuadros por segundo",
+    "memory card": "Tarjeta de memoria",
+    "storage": "Almacenamiento",
+    "internal storage": "Almacenamiento interno",
+    "wireless": "Conectividad inalámbrica",
+    "connectivity": "Conectividad",
+    "interface": "Interfaz",
+    "audio input": "Entrada de audio",
+    "audio output": "Salida de audio",
+    "headphone jack": "Salida auriculares",
+    "microphone": "Micrófono",
+    "viewfinder": "Visor",
+    "lcd": "Pantalla LCD",
+    "monitor": "Monitor",
+    "display": "Pantalla",
+    "focal length": "Distancia focal",
+    "aperture": "Apertura",
+    "max aperture": "Apertura máxima",
+    "min aperture": "Apertura mínima",
+    "filter size": "Tamaño de filtro",
+    "minimum focus distance": "Distancia mínima de enfoque",
+    "min focus distance": "Distancia mínima de enfoque",
+    "elements/groups": "Elementos / grupos",
+    "elements / groups": "Elementos / grupos",
+    "lens construction": "Construcción óptica",
+    "diaphragm": "Diafragma",
+    "blades": "Hojas del diafragma",
+    "image stabilization": "Estabilización",
+    "autofocus": "Autoenfoque",
+    "color": "Color",
+    "material": "Material",
+    "warranty": "Garantía",
+}
+
+
+def _convert_dim_pattern(s: str, unit_regex: str, factor: float, target_unit: str) -> str:
+    """Maneja casos `N x N x N <unit>` aplicando la conversión a TODOS los números."""
+    pattern = rf"((?:\d+(?:\.\d+)?\s*x\s*)+\d+(?:\.\d+)?)\s*(?:{unit_regex})\b"
+    def repl(m):
+        nums_part = _re_specs.sub(
+            r"\d+(?:\.\d+)?",
+            lambda nm: f"{float(nm.group(0)) * factor:.1f}",
+            m.group(1),
+        )
+        return f"{nums_part} {target_unit}"
+    return _re_specs.sub(pattern, repl, s, flags=_re_specs.IGNORECASE)
+
+
+def _convert_range_pattern(s: str, unit_regex: str, conv, target_unit: str) -> str:
+    """Maneja casos `N to N <unit>` aplicando la conversión a ambos extremos."""
+    pattern = rf"(-?\d+(?:\.\d+)?)\s*(?:to|-)\s*(-?\d+(?:\.\d+)?)\s*°?\s*(?:{unit_regex})\b"
+    def repl(m):
+        a, b = float(m.group(1)), float(m.group(2))
+        return f"{conv(a):.1f} a {conv(b):.1f} {target_unit}"
+    return _re_specs.sub(pattern, repl, s, flags=_re_specs.IGNORECASE)
+
+
+def _convert_units_in_value(value: str) -> str:
+    """Convierte unidades imperiales a métricas dentro de un string de spec.
+
+    Handlea:
+    - Single: `1.5 lbs` → `0.68 kg`
+    - Dimensions: `10 x 5 x 3 in` → `25.4 x 12.7 x 7.6 cm`
+    - Ranges: `32 to 104 °F` → `0.0 a 40.0 °C`
+
+    No toca strings que no matchean (idempotente).
+    """
+    if not value or not isinstance(value, str):
+        return value
+    s = value
+
+    # Rangos primero (sino el regex de single number se los come)
+    s = _convert_range_pattern(s, "F", lambda x: (x - 32) * 5/9, "°C")
+
+    # Dimensiones (N x N x N unit)
+    s = _convert_dim_pattern(s, r"inches?|in\.?|\"", 2.54, "cm")
+    s = _convert_dim_pattern(s, r"feet|ft\.?", 30.48, "cm")
+    s = _convert_dim_pattern(s, r"lbs?", 0.4536, "kg")
+
+    # Singles
+    # lbs / lb → kg
+    s = _re_specs.sub(
+        r"(\d+(?:\.\d+)?)\s*lbs?\b",
+        lambda m: f"{float(m.group(1)) * 0.4536:.2f} kg",
+        s, flags=_re_specs.IGNORECASE,
+    )
+    # oz → g
+    s = _re_specs.sub(
+        r"(\d+(?:\.\d+)?)\s*oz\b",
+        lambda m: f"{float(m.group(1)) * 28.35:.0f} g",
+        s, flags=_re_specs.IGNORECASE,
+    )
+    # inches / in / " → cm (negative lookahead para no matchear "inn", "inch_word")
+    s = _re_specs.sub(
+        r"(\d+(?:\.\d+)?)\s*(?:inches?|in\.?|\")(?![a-zA-Z])",
+        lambda m: f"{float(m.group(1)) * 2.54:.1f} cm",
+        s, flags=_re_specs.IGNORECASE,
+    )
+    # feet / ft → m
+    s = _re_specs.sub(
+        r"(\d+(?:\.\d+)?)\s*(?:feet|ft\.?)\b",
+        lambda m: f"{float(m.group(1)) * 0.3048:.2f} m",
+        s, flags=_re_specs.IGNORECASE,
+    )
+    # °F → °C single
+    s = _re_specs.sub(
+        r"(-?\d+(?:\.\d+)?)\s*°?\s*F\b",
+        lambda m: f"{(float(m.group(1)) - 32) * 5/9:.1f} °C",
+        s, flags=_re_specs.IGNORECASE,
+    )
+    return s
+
+
+def _translate_spec_label(label: str) -> str:
+    """Traduce un label de spec EN→ES si está en el mapping."""
+    if not label:
+        return label
+    key = label.strip().lower().rstrip(":").strip()
+    return _SPEC_KEY_TRANSLATIONS.get(key, label)
+
+
+def normalize_specs(specs: list[dict]) -> list[dict]:
+    """Normaliza una lista de specs: traduce labels + convierte unidades.
+
+    No toca specs que no reconocemos (label queda como vino).
+    Idempotente: aplicar dos veces da el mismo resultado.
+    """
+    if not specs:
+        return specs
+    out = []
+    for spec in specs:
+        if not isinstance(spec, dict):
+            continue
+        label = spec.get("label", "")
+        value = spec.get("value", "")
+        out.append({
+            "label": _translate_spec_label(str(label)),
+            "value": _convert_units_in_value(str(value)),
+        })
+    return out
+
+
 # ── Constantes de fotos / scraping ───────────────────────────────────────────
 # Antes estaban hardcodeadas como números mágicos en 3 lugares con valores
 # distintos (6, 8, 10, 18). Centralizadas acá con nombres explícitos.
@@ -608,6 +785,95 @@ def restore_equipo(id: int, request: Request):
     except Exception:
         conn.rollback()
         raise
+    finally:
+        conn.close()
+
+
+class BulkActionInput(BaseModel):
+    ids: list[int] = Field(..., min_length=1, max_length=500)
+    action: str   # "set_visible" | "set_ficha_completa" | "set_categoria" | "delete"
+    visible: Optional[bool] = None
+    ficha_completa: Optional[bool] = None
+    categoria_id: Optional[int] = None
+
+
+@router.post("/admin/equipos/bulk")
+def bulk_action(payload: BulkActionInput, request: Request):
+    """Aplica una acción a varios equipos a la vez. Acciones soportadas:
+    - set_visible (visible: bool)
+    - set_ficha_completa (ficha_completa: bool)
+    - set_categoria (categoria_id: int) — REEMPLAZA las categorías existentes
+    - delete (soft delete — marca eliminado_at; #206)
+
+    Retorna {"affected": N} con la cantidad de equipos modificados.
+    """
+    require_admin(request)
+    ids = payload.ids
+    if not ids:
+        return {"affected": 0}
+
+    conn = get_db()
+    placeholders = ",".join(["?"] * len(ids))
+    try:
+        if payload.action == "set_visible":
+            if payload.visible is None:
+                raise HTTPException(400, "set_visible requiere visible: bool")
+            v = 1 if payload.visible else 0
+            conn.execute(
+                f"UPDATE equipos SET visible_catalogo = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN ({placeholders})",
+                [v, *ids],
+            )
+
+        elif payload.action == "set_ficha_completa":
+            if payload.ficha_completa is None:
+                raise HTTPException(400, "set_ficha_completa requiere ficha_completa: bool")
+            conn.execute(
+                f"UPDATE equipos SET ficha_completa = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN ({placeholders})",
+                [bool(payload.ficha_completa), *ids],
+            )
+
+        elif payload.action == "set_categoria":
+            if not payload.categoria_id:
+                raise HTTPException(400, "set_categoria requiere categoria_id: int")
+            cat_exists = conn.execute(
+                "SELECT id FROM categorias WHERE id = ?", (payload.categoria_id,)
+            ).fetchone()
+            if not cat_exists:
+                raise HTTPException(404, f"Categoría {payload.categoria_id} no existe")
+            # Reemplaza las categorías existentes con la nueva
+            conn.execute(
+                f"DELETE FROM equipo_categorias WHERE equipo_id IN ({placeholders})",
+                ids,
+            )
+            for eid in ids:
+                conn.execute(
+                    "INSERT INTO equipo_categorias (equipo_id, categoria_id) VALUES (?, ?)",
+                    (eid, payload.categoria_id),
+                )
+                try:
+                    regenerate_auto_tags(conn, eid)
+                except Exception as e:
+                    logger.warning("regenerate_auto_tags falló para %s en bulk: %s", eid, e)
+
+        elif payload.action == "delete":
+            # Soft delete: consistente con el endpoint single DELETE (#206).
+            conn.execute(
+                f"UPDATE equipos SET eliminado_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id IN ({placeholders})",
+                ids,
+            )
+
+        else:
+            raise HTTPException(400, f"Acción desconocida: {payload.action}")
+
+        conn.commit()
+        return {"affected": len(ids)}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        logger.exception("bulk_action falló: %s", payload.action)
+        raise HTTPException(500, f"Error bulk: {type(e).__name__}")
     finally:
         conn.close()
 
@@ -1902,15 +2168,24 @@ def admin_batch_enriquecer(payload: BatchEnriquecerInput, request: Request):
         conn.close()
 
 
-@router.post("/admin/equipos/enriquecer")
+@router.post("/admin/equipos/autocompletar")
+def admin_autocompletar_equipo(payload: EnriquecerInput, request: Request):
+    """Endpoint canónico — alias de /enriquecer (legacy).
+    El frontend ya usa "autocompletar" como nombre del feature; este endpoint
+    coherente con el naming. /enriquecer queda como alias deprecated."""
+    return admin_enriquecer_equipo(payload, request)
+
+
+@router.post("/admin/equipos/enriquecer", deprecated=True)
 def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     """
     Busca el equipo en B&H/Adorama, scrapea la página y usa Lovable AI para
     extraer marca/modelo/specs/foto en JSON estructurado. Devuelve un preview;
     el frontend decide qué campos aplicar via PATCH normal.
+
+    DEPRECATED: usar /admin/equipos/autocompletar.
     """
     require_admin(request)
-
     import os, httpx
 
     FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
@@ -2397,13 +2672,16 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         "modelo": (extracted.get("modelo") or payload.modelo or "").strip() or None,
         "nombre_normalizado": (extracted.get("nombre_normalizado") or payload.nombre or "").strip() or None,
         "descripcion": (extracted.get("descripcion") or "").strip(),
-        "specs": (extracted.get("specs") or [])[:12],
+        # Specs normalizados: labels en español + unidades métricas (#209).
+        # Idempotente: si ya vinieron en español/métrico no toca nada.
+        "specs": normalize_specs((extracted.get("specs") or [])[:12]),
         "keywords": keywords,
         "foto_url": foto_url,
         "foto_candidates": foto_validas,  # todas las URLs válidas (la primera es la elegida por defecto)
-        # Ficha técnica extendida
-        "peso":           (extracted.get("peso") or "").strip() or None,
-        "dimensiones":    (extracted.get("dimensiones") or "").strip() or None,
+        # Ficha técnica extendida — peso/dimensiones también se pasan por el
+        # conversor de unidades (sin traducir label, ya están en español).
+        "peso":           _convert_units_in_value((extracted.get("peso") or "").strip()) or None,
+        "dimensiones":    _convert_units_in_value((extracted.get("dimensiones") or "").strip()) or None,
         "montura":        (extracted.get("montura") or "").strip() or None,
         "formato":        (extracted.get("formato") or "").strip() or None,
         "resolucion":     (extracted.get("resolucion") or "").strip() or None,
@@ -2753,7 +3031,13 @@ class AplicarEnriquecimientoInput(BaseModel):
     enriquecido_fuente: Optional[str] = None
 
 
-@router.post("/admin/equipos/{id}/aplicar-enriquecimiento")
+@router.post("/admin/equipos/{id}/aplicar-autocompletado")
+def admin_aplicar_autocompletado(id: int, payload: AplicarEnriquecimientoInput, request: Request):
+    """Endpoint canónico — alias de /aplicar-enriquecimiento (legacy)."""
+    return admin_aplicar_enriquecimiento(id, payload, request)
+
+
+@router.post("/admin/equipos/{id}/aplicar-enriquecimiento", deprecated=True)
 def admin_aplicar_enriquecimiento(id: int, payload: AplicarEnriquecimientoInput, request: Request):
     """
     Toma el resultado del endpoint /enriquecer (parcial o completo) y graba
