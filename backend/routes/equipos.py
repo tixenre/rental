@@ -1860,15 +1860,24 @@ def admin_batch_enriquecer(payload: BatchEnriquecerInput, request: Request):
         conn.close()
 
 
-@router.post("/admin/equipos/enriquecer")
+@router.post("/admin/equipos/autocompletar")
+def admin_autocompletar_equipo(payload: EnriquecerInput, request: Request):
+    """Endpoint canónico — alias de /enriquecer (legacy).
+    El frontend ya usa "autocompletar" como nombre del feature; este endpoint
+    coherente con el naming. /enriquecer queda como alias deprecated."""
+    return admin_enriquecer_equipo(payload, request)
+
+
+@router.post("/admin/equipos/enriquecer", deprecated=True)
 def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     """
     Busca el equipo en B&H/Adorama, scrapea la página y usa Lovable AI para
     extraer marca/modelo/specs/foto en JSON estructurado. Devuelve un preview;
     el frontend decide qué campos aplicar via PATCH normal.
+
+    DEPRECATED: usar /admin/equipos/autocompletar.
     """
     require_admin(request)
-
     import os, httpx
 
     FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
@@ -2711,7 +2720,13 @@ class AplicarEnriquecimientoInput(BaseModel):
     enriquecido_fuente: Optional[str] = None
 
 
-@router.post("/admin/equipos/{id}/aplicar-enriquecimiento")
+@router.post("/admin/equipos/{id}/aplicar-autocompletado")
+def admin_aplicar_autocompletado(id: int, payload: AplicarEnriquecimientoInput, request: Request):
+    """Endpoint canónico — alias de /aplicar-enriquecimiento (legacy)."""
+    return admin_aplicar_enriquecimiento(id, payload, request)
+
+
+@router.post("/admin/equipos/{id}/aplicar-enriquecimiento", deprecated=True)
 def admin_aplicar_enriquecimiento(id: int, payload: AplicarEnriquecimientoInput, request: Request):
     """
     Toma el resultado del endpoint /enriquecer (parcial o completo) y graba
