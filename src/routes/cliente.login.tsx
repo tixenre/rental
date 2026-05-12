@@ -1,6 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { Logo } from "@/components/rental/Logo";
 
 export const Route = createFileRoute("/cliente/login")({
   head: () => ({
@@ -24,14 +24,6 @@ const ERROR_MESSAGES: Record<string, string> = {
 function ClienteLoginPage() {
   const [error, setError] = useState<string | null>(null);
 
-  const { data: logoSetting } = useQuery({
-    queryKey: ["settings", "logo_url"],
-    queryFn: () =>
-      fetch("/api/settings/logo_url").then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    staleTime: 5 * 60 * 1000,
-  });
-  const logoUrl: string | null = logoSetting?.value ?? null;
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const errCode = params.get("error");
@@ -39,21 +31,10 @@ function ClienteLoginPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-dvh bg-background flex flex-col">
       {/* Header con branding */}
-      <header className="border-b hairline px-6 py-4 flex items-center">
-        <Link to="/" className="flex items-center gap-2">
-          {logoUrl ? (
-            <img src={logoUrl} alt="Rambla Rental" className="h-9 w-auto object-contain" />
-          ) : (
-            <>
-              <span className="wordmark text-2xl text-amber leading-none">rambla</span>
-              <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
-                Rental
-              </span>
-            </>
-          )}
-        </Link>
+      <header className="border-b hairline px-4 py-3 md:px-6 flex items-center">
+        <Logo size="md" linkTo="/" />
       </header>
 
       {/* Card de login */}

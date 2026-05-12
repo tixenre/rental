@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Camera, Check, Sparkles, MessageCircle, Lightbulb, Snowflake, Users } from "lucide-react";
-import { TopBar } from "@/components/rental/TopBar";
+import { PublicLayout } from "@/components/rental/PublicLayout";
 import { CartDrawer } from "@/components/rental/CartDrawer";
 import { StudioBookingForm } from "@/components/studio/StudioBookingForm";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
@@ -64,9 +64,7 @@ function PhotoPlaceholder({
 
 function EstudioPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <TopBar />
-
+    <PublicLayout>
       {/* Back link */}
       <div className="px-4 pt-4 lg:px-12">
         <Link
@@ -268,15 +266,8 @@ function EstudioPage() {
         </div>
       </section>
 
-      <footer className="border-t hairline px-4 py-10 lg:px-12">
-        <div className="wordmark text-3xl text-amber">rambla</div>
-        <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-          Rental · Mar del Plata
-        </div>
-      </footer>
-
       <CartDrawer allEquipos={[]} />
-    </div>
+    </PublicLayout>
   );
 }
 
