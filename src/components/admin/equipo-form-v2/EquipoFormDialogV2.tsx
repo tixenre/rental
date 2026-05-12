@@ -523,7 +523,17 @@ export function EquipoFormDialogV2({
         break;
       }
       case "foto": {
-        if (r.foto_url) form.setValue("foto_url", r.foto_url, { shouldDirty: true });
+        if (r.foto_url) {
+          // Limpiar pendingFile (si había una foto local pendiente de subir) —
+          // sino quedaría en estado inconsistente: URL del cache + archivo local
+          // que ya no aplica, y al guardar se subirían los dos.
+          if (pendingFile) {
+            setPendingFile(null);
+            if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+            setPendingFilePreview("");
+          }
+          form.setValue("foto_url", r.foto_url, { shouldDirty: true });
+        }
         toast.success("Foto recargada desde cache");
         break;
       }
