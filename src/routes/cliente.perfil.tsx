@@ -1,8 +1,9 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { PublicLayout } from "@/components/rental/PublicLayout";
 
 export const Route = createFileRoute("/cliente/perfil")({
   head: () => ({ meta: [{ title: "Mi perfil — Rambla Rental" }] }),
@@ -47,6 +48,11 @@ function PerfilPage() {
     return () => { alive = false; };
   }, [navigate]);
 
+  async function handleLogout() {
+    await authedFetch("/auth/logout", { method: "POST" }).catch(() => {});
+    navigate({ to: "/cliente/login" });
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (saving) return;
@@ -72,27 +78,22 @@ function PerfilPage() {
   }
 
   if (loading) {
-    return <div className="min-h-screen grid place-items-center text-sm text-muted-foreground">Cargando…</div>;
+    return (
+      <PublicLayout topBar={{ variant: "cliente" }}>
+        <div className="grid place-items-center py-24 text-sm text-muted-foreground">
+          Cargando…
+        </div>
+      </PublicLayout>
+    );
   }
   if (!perfil) return null;
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header con branding */}
-      <header className="border-b hairline bg-background sticky top-0 z-10">
-        <div className="max-w-xl mx-auto px-4 h-14 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2 group">
-            <span className="wordmark text-2xl text-amber leading-none group-hover:brightness-110 transition">rambla</span>
-            <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-foreground/70 border-l hairline pl-2">
-              Rental
-            </span>
-          </a>
-          <a href="/cliente/portal" className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition">
-            ← Mis pedidos
-          </a>
-        </div>
-      </header>
+  const userName = `${perfil.nombre} ${perfil.apellido}`.trim();
 
+  return (
+    <PublicLayout
+      topBar={{ variant: "cliente", userName, onLogout: handleLogout }}
+    >
       {/* Sub-header amarillo */}
       <div className="bg-amber border-b hairline">
         <div className="max-w-xl mx-auto px-4 py-5">
@@ -103,7 +104,13 @@ function PerfilPage() {
         </div>
       </div>
 
-      <main className="max-w-xl mx-auto px-4 py-8">
+      <div className="max-w-xl mx-auto px-4 py-8">
+        <Link
+          to="/cliente/portal"
+          className="inline-flex items-center gap-1.5 mb-6 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition"
+        >
+          <ArrowLeft className="h-3 w-3" /> Mis pedidos
+        </Link>
         <form onSubmit={handleSave} className="space-y-5">
           <Field label="Email" hint="No se puede modificar (es tu identidad de login)">
             <input
@@ -178,8 +185,8 @@ function PerfilPage() {
             </button>
           </div>
         </form>
-      </main>
-    </div>
+      </div>
+    </PublicLayout>
   );
 }
 
