@@ -175,6 +175,27 @@ export type ClasificarResult = {
   items: ClasificarItem[];
 };
 
+// ── Mantenimiento por equipo ─────────────────────────────────────────────
+
+export type MantenimientoEvento = {
+  id: number;
+  equipo_id: number;
+  fecha: string;
+  tipo: string; // revision / reparacion / limpieza / otro
+  descripcion: string | null;
+  costo: number | null;
+  proxima_revision: string | null;
+  created_at?: string;
+};
+
+export type MantenimientoInput = {
+  fecha: string;
+  tipo?: string;
+  descripcion?: string | null;
+  costo?: number | null;
+  proxima_revision?: string | null;
+};
+
 export type MarcaAdmin = {
   id: number;
   nombre: string;
@@ -258,6 +279,27 @@ export const adminApi = {
     }),
   deleteEquipo: async (id: number) => {
     const res = await authedFetch(`/api/equipos/${id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+  },
+  // Mantenimiento log por equipo
+  listMantenimiento: (equipoId: number) =>
+    authedJson<{
+      items: MantenimientoEvento[];
+      stats: { total_eventos: number; total_costo: number; proxima_revision: string | null };
+    }>(`/api/equipos/${equipoId}/mantenimiento`),
+  addMantenimiento: (equipoId: number, data: MantenimientoInput) =>
+    authedPostJson<MantenimientoEvento>(`/api/equipos/${equipoId}/mantenimiento`, data),
+  updateMantenimiento: (equipoId: number, logId: number, data: Partial<MantenimientoInput>) =>
+    authedJson<MantenimientoEvento>(`/api/equipos/${equipoId}/mantenimiento/${logId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+  deleteMantenimiento: async (equipoId: number, logId: number) => {
+    const res = await authedFetch(`/api/equipos/${equipoId}/mantenimiento/${logId}`, { method: "DELETE" });
     if (!res.ok && res.status !== 204) {
       const detail = await res.json().catch(() => ({}));
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);

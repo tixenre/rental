@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wand2, History } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wand2, Wrench, History } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { ActionMenu } from "@/components/mobile";
 import { EquipoFormDialog } from "@/components/admin/EquipoFormDialog";
 import { EquipoFormDialogV2 } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
 import { AutocompletarEquipoDialog } from "@/components/admin/autocompletar";
+import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquipoDialog";
 import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
 
 export const Route = createLazyFileRoute("/admin/equipos/")({
@@ -43,6 +44,7 @@ function EquiposPage() {
   const [deleting, setDeleting] = useState<Equipo | null>(null);
   const [enriching, setEnriching] = useState<Equipo | null>(null);
   const [menuEquipo, setMenuEquipo] = useState<Equipo | null>(null);
+  const [mantenimientoEquipo, setMantenimientoEquipo] = useState<Equipo | null>(null);
   const [historialEquipo, setHistorialEquipo] = useState<Equipo | null>(null);
 
   const equiposQ = useQuery({
@@ -288,6 +290,9 @@ function EquiposPage() {
                     <Button size="icon" variant="ghost" title="Historial de alquileres" onClick={() => setHistorialEquipo(eq)}>
                       <History className="h-4 w-4" />
                     </Button>
+                    <Button size="icon" variant="ghost" title="Mantenimiento" onClick={() => setMantenimientoEquipo(eq)}>
+                      <Wrench className="h-4 w-4" />
+                    </Button>
                     <Button size="icon" variant="ghost" title="Editar (V2 — rediseñado)" onClick={() => { setEditingV2(eq); setOpenFormV2(true); }}>
                       <Wand2 className="h-4 w-4 text-amber" />
                     </Button>
@@ -326,6 +331,11 @@ function EquiposPage() {
             onClick: () => setHistorialEquipo(menuEquipo!),
           },
           {
+            label: "Mantenimiento",
+            icon: <Wrench className="h-4 w-4" />,
+            onClick: () => setMantenimientoEquipo(menuEquipo!),
+          },
+          {
             label: "Editar (V2 — rediseñado)",
             icon: <Wand2 className="h-4 w-4" />,
             onClick: () => { setEditingV2(menuEquipo!); setOpenFormV2(true); },
@@ -361,6 +371,14 @@ function EquiposPage() {
           initial={editingV2}
           saving={saveMut.isPending}
           onSubmit={(data, etiquetas) => saveMut.mutateAsync({ data, etiquetas })}
+        />
+      )}
+
+      {mantenimientoEquipo && (
+        <MantenimientoEquipoDialog
+          equipo={mantenimientoEquipo}
+          open={!!mantenimientoEquipo}
+          onOpenChange={(v) => { if (!v) setMantenimientoEquipo(null); }}
         />
       )}
 
