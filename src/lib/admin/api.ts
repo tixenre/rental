@@ -61,6 +61,9 @@ export type Ficha = {
   fuente_titulo?:       string | null;
   enriquecido_at?:      string | null;
   enriquecido_fuente?:  string | null;
+  /** Scrape raw cacheado del autocompletar. Lo usa el form para re-aplicar
+   *  campos por sección sin volver a scrapear. */
+  raw_json?:            string | null;
 };
 
 export type CategoriaRef = {
@@ -89,6 +92,8 @@ export type Equipo = {
   dueno: string | null;
   visible_catalogo: number;
   estado: string;
+  /** Flag manual del admin: ficha cargada y revisada (no requiere más trabajo). */
+  ficha_completa?: boolean;
   etiquetas?: string[];
   kit?: KitComponente[];
   categorias?: CategoriaRef[];
@@ -219,10 +224,11 @@ export const adminApi = {
   dashboard: () => authedJson<DashboardData>("/api/dashboard"),
 
   // equipos
-  listEquipos: (params: { q?: string; etiqueta?: string; per_page?: number } = {}) => {
+  listEquipos: (params: { q?: string; etiqueta?: string; per_page?: number; solo_incompletos?: boolean } = {}) => {
     const sp = new URLSearchParams();
     if (params.q) sp.set("q", params.q);
     if (params.etiqueta) sp.set("etiqueta", params.etiqueta);
+    if (params.solo_incompletos) sp.set("solo_incompletos", "true");
     sp.set("per_page", String(params.per_page ?? 500));
     return authedJson<EquiposListResp>(`/api/equipos?${sp.toString()}`);
   },

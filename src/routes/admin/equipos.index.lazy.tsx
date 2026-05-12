@@ -33,6 +33,7 @@ function EquiposPage() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [etiqueta, setEtiqueta] = useState<string>("");
+  const [soloIncompletos, setSoloIncompletos] = useState(false);
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Equipo | null>(null);
   // V2 paralelo — el usuario lo prueba antes de descartar el viejo.
@@ -43,8 +44,12 @@ function EquiposPage() {
   const [menuEquipo, setMenuEquipo] = useState<Equipo | null>(null);
 
   const equiposQ = useQuery({
-    queryKey: ["admin", "equipos", { q, etiqueta }],
-    queryFn: () => adminApi.listEquipos({ q: q || undefined, etiqueta: etiqueta || undefined }),
+    queryKey: ["admin", "equipos", { q, etiqueta, soloIncompletos }],
+    queryFn: () => adminApi.listEquipos({
+      q: q || undefined,
+      etiqueta: etiqueta || undefined,
+      solo_incompletos: soloIncompletos || undefined,
+    }),
   });
   const etiquetasQ = useQuery({
     queryKey: ["admin", "etiquetas"],
@@ -151,6 +156,16 @@ function EquiposPage() {
             ))}
           </SelectContent>
         </Select>
+        <Button
+          type="button"
+          variant={soloIncompletos ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSoloIncompletos((v) => !v)}
+          title="Filtrar equipos cuya ficha aún no marcaste como completa"
+          className="md:w-auto"
+        >
+          {soloIncompletos ? "✓ Solo incompletos" : "Solo incompletos"}
+        </Button>
       </div>
 
       {equiposQ.error && (
@@ -223,7 +238,19 @@ function EquiposPage() {
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="font-medium">{eq.nombre}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <span>{eq.nombre}</span>
+                    {!eq.ficha_completa && (
+                      <span
+                        className="text-[10px] text-amber-700 bg-amber-soft/40 px-1 py-0.5 rounded shrink-0"
+                        title="Ficha pendiente — marcala como completa en el form cuando termines de cargarla"
+                      >
+                        pendiente
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                   {[eq.marca, eq.modelo].filter(Boolean).join(" / ") || "—"}
                 </TableCell>
