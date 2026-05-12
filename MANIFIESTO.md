@@ -56,6 +56,20 @@ Excepciones:
 - **Decisiones de arquitectura / diseño** → docs en `docs/` (ej. `DISEÑO_SPECS.md`).
 - **Ideas tempranas sin compromiso** → este manifiesto, sección "Pendientes / Ideas".
 
+### Planes multi-fase → issues
+
+Cuando Claude diseña un plan que se ejecuta en varias fases (refactor grande, feature con backend + frontend, migración por pasos), **cada fase es un GitHub issue independiente**. El plan no vive en un archivo markdown ni en la memoria de una sesión.
+
+Por qué:
+
+- **Sesión-agnóstico**: cualquier sesión nueva puede tomar una fase pendiente y avanzarla sin contexto perdido.
+- **Tracking real**: el estado del trabajo se ve en `gh issue list`, no releyendo conversaciones viejas.
+- **Reordenar prioridades**: si una fase queda obsoleta o cambia de prioridad, se edita / cierra el issue, no se reescribe el plan entero.
+
+Regla práctica: si el plan tiene **más de una fase**, cada fase se crea como issue antes de empezar a tocar código. Excepción: la **primera fase** puede ejecutarse en el mismo PR donde se materializa el plan, pero las siguientes ya van como issues separados.
+
+El issue describe la fase con: contexto, scope (checklist accionable), cómo (pasos concretos), verificación, y por qué de los labels. Cuando el PR de esa fase mergea, el issue se cierra con `Closes #N`.
+
 ### Branches
 
 - `main` — siempre estable, deployable.
