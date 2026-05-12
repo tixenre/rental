@@ -107,7 +107,9 @@ export function BatchAutocompletarDialog({
     cancelledRef.current = true;
   };
 
-  const pct = total > 0 ? Math.round((progress.done / conLink.length) * 100) : 0;
+  // Usar conLink.length (no total) para evitar división por cero cuando
+  // hay equipos pero ninguno tiene bh_url.
+  const pct = conLink.length > 0 ? Math.round((progress.done / conLink.length) * 100) : 0;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!running) onOpenChange(v); }}>
