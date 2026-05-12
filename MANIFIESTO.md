@@ -178,7 +178,7 @@ Cualquier PR que toque rutas de cliente (`/`, `/equipo/*`, `/cliente/*`, `/estud
 - **Frontend**: ya migró a "autocompletar" como nombre del feature.
 - **Backend**: endpoints canónicos `/autocompletar`. Los viejos `/enriquecer` quedan como aliases deprecated.
 - **Nombres de funciones internas** (`aplicarEnriquecimiento`, `admin_enriquecer_equipo`, `EnriquecerInput`) siguen con el nombre viejo — rename completo es un follow-up cuando duela.
-- **Columna DB `roi_pct`**: nombre técnicamente incorrecto. El valor es "% del valor del equipo cobrado por día" (tarifa diaria). Label UI pendiente de rename.
+- **Columna DB `roi_pct`**: nombre técnicamente incorrecto. El valor es "% del valor del equipo cobrado por día" (tarifa diaria). Decisión del nombre canónico para UI: pendiente — issue #262.
 
 ---
 
@@ -209,37 +209,7 @@ Aclaración para no buscarlas en vano:
 
 ---
 
-## 6. Pendientes / decisiones abiertas
-
-Items que están en discusión o que requieren tu input antes de hacerse. **No son issues todavía** — se vuelven issues cuando hay decisión.
-
-### Decisiones pendientes de input
-
-- **Rename `roi_pct` label**: el campo no es ROI técnicamente, es "% del valor cobrado por día". Candidatos: `Tarifa diaria %` / `% diario` / `Coeficiente diario` / `% amortización`. Mi pick: `Tarifa diaria %`. Decidir antes de hacer issue.
-- **Specs templates por categoría**: cuándo aplicar (manual al guardar, auto al cambiar categoría, o solo como hint visual). Decisión pendiente.
-
-### Ideas backlog (sin commitment todavía)
-
-Históricamente en `docs/MEJORAS.md`. Lista resumida — el detalle queda allí marcado contra lo hecho:
-
-- **Productividad admin**: persistir filtros en URL, atajo `n` para nuevo equipo, confirmación al cerrar form con cambios.
-- **Data preservation**: histórico de fotos por equipo, versiones de la ficha técnica.
-- **Cliente UX**: carrito persistente (localStorage), compartir equipo (link directo), skeleton loaders en catálogo.
-- **Polish**: empty states con ilustración, loading states consistentes, mejor manejo de imágenes rotas.
-- **DX**: `uv` para Python, logger estructurado JSON, pre-commit hook con lint/typecheck.
-- **Features grandes**: pagos online, notificaciones email, app cliente expandida.
-
-Cuando una idea pase a "vamos a hacerlo", se abre un GitHub issue con label `feature` y prioridad.
-
-### Bugs activos
-
-Hoy: **cero**. Histórico cerrado en [`docs/BUGS.md`](docs/BUGS.md) (referencia).
-
-Reportar bugs nuevos como issues con label `bug` + prioridad. **No** abrir un `BUGS.md` nuevo.
-
----
-
-## 7. Cómo arrancar una sesión nueva con Claude
+## 6. Cómo arrancar una sesión nueva con Claude
 
 Este manifiesto se carga al inicio. Si Claude se pierde, decirle:
 
@@ -254,14 +224,16 @@ Otros docs que puede tener que abrir según la tarea:
 - `docs/MOBILE_AUDIT.md` — checklist mobile.
 - `docs/DISEÑO_SPECS.md` — diseño del sistema de specs.
 
-Para ver pendientes:
+Para ver el trabajo pendiente / activo (todo vive en GitHub Issues):
 
 - `gh issue list --state open --label feature` — features abiertas.
 - `gh issue list --state open --label bug` — bugs reportados.
+- `gh issue list --state open --label design` — decisiones de diseño / UX.
+- `gh issue list --state open` — todo el backlog.
 
 ---
 
-## 8. Histórico — sesiones grandes
+## 7. Histórico — sesiones grandes
 
 | Sesión | Resumen | PRs |
 |---|---|---|
