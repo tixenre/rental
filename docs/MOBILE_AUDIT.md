@@ -135,8 +135,9 @@ Para cada página, verificar **todos** estos puntos antes de marcar como OK:
 
 | Página | URL | Status | Notas |
 |---|---|---|---|
-| Pedidos | `/admin/pedidos` | 🔴 Pendiente | Lista y detalle de pedidos desde celu |
-| Dashboard | `/admin/dashboard` | 🔴 Pendiente | KPIs desde celu |
+| Pedidos | `/admin/pedidos` (lista) | 🟢 OK | Dual render: `md:hidden` mobile cards (`AdminCard`) + `hidden md:block` tabla desktop. FAB nuevo pedido `h-14 w-14`. Code audit confirma 🟢. |
+| Pedidos | `/admin/pedidos/$id` | 🟢 OK | Layout responsive (`grid-cols-1 lg:grid-cols-[...]`), ActionMenu sheet mobile, botón primario sticky `sm:hidden fixed bottom-0`. Tap targets +/- cantidad subidos a `h-9 sm:h-7` (este PR). |
+| Dashboard | `/admin/dashboard` | 🟡 Verificar | Dialog `max-h-[92vh]` + stats `grid-cols-2 sm:grid-cols-4` OK. **Pendiente**: tablas de Top alquilados / Sin movimiento sin variante mobile card-based (issue #258). |
 
 ### Portal cliente
 
