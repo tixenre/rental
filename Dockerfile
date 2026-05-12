@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.6
-
 # ── Stage 1: build del frontend (Vite SPA) ───────────────────────────────
 # Imagen oficial de Bun (más chica y rápida que instalar bun via curl).
 # Esta etapa se descarta — solo se copia /app/dist al runtime.
@@ -37,10 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Python deps primero — capa cacheada mientras no cambie requirements.txt.
-# BuildKit cache mount acelera re-downloads cuando se agrega/cambia algún pin.
 COPY backend/requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Playwright + Chromium (300-400 MB). Sin cache mount: el binario tiene que
 # quedar en la capa para que esté disponible en runtime. Capa cacheada
