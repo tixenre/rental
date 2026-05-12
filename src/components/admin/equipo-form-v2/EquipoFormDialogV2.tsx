@@ -357,7 +357,7 @@ export function EquipoFormDialogV2({
       if (propuestos.length) parts.push(`${propuestos.length} specs propuestos`);
       if (r.keywords?.length) parts.push(`${r.keywords.length} etiquetas`);
       if (r.descripcion) parts.push("descripción");
-      toast.success("Datos importados", { description: parts.join(" · ") || "datos básicos" });
+      toast.success("Specs importados", { description: parts.join(" · ") || "datos básicos" });
     } catch (e) {
       toast.error(`No se pudo importar: ${e instanceof Error ? e.message : ""}`);
     } finally {
@@ -672,8 +672,8 @@ export function EquipoFormDialogV2({
                 disabled={autocompletando}
               >
                 {autocompletando
-                  ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Importando…</>
-                  : <><Sparkles className="h-3.5 w-3.5 mr-1" /> Autocompletar todo (~15s)</>}
+                  ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Buscando…</>
+                  : <><Sparkles className="h-3.5 w-3.5 mr-1" /> Buscar specs (~15s)</>}
               </Button>
             </div>
           </section>
