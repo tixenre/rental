@@ -131,7 +131,7 @@ Para cada página, verificar **todos** estos puntos antes de marcar como OK:
 | Términos | `/terminos` | 🟢 OK | Página legal trivial (lectura centrada). `px-4 md:px-6`, `max-w-3xl`. |
 | Privacidad | `/privacidad` | 🟢 OK | Página legal trivial. Mismo patrón que `/terminos`. |
 | Login cliente | `/cliente/login` | 🟢 OK | Card centrada con `<Logo />` (post-#246). Form trivial (solo OAuth). |
-| Registro cliente | `/cliente/registro` | 🟡 Verificar | Sin responsive utils explícitas — pendiente de auditoría dedicada (issue #253). |
+| Registro cliente | `/cliente/registro` | 🟢 OK | Form en card centrada `max-w-sm`, `grid-cols-1 sm:grid-cols-2`, submit `w-full py-2.5`. Regla CSS global cubre anti-zoom iOS. Code audit confirma 🟢. |
 | 404 (NotFound) | cualquier ruta inexistente | 🟢 OK | Layout centrado en `<PublicLayout>` post-#246. Botón `rounded-full px-5 py-2.5` (~40px). |
 
 ### Admin (prioritario mobile)
@@ -146,7 +146,7 @@ Para cada página, verificar **todos** estos puntos antes de marcar como OK:
 | Página | URL | Status | Notas |
 |---|---|---|---|
 | Lista de pedidos | `/cliente/portal` | 🟢 OK | Acordeón expandible + DocPreviewModal `h-full sm:h-auto`. Code audit post-#246 confirma 🟢. |
-| Perfil | `/cliente/perfil` | 🟡 Verificar | Sin responsive utils explícitas — pendiente de auditoría dedicada (issue #253). |
+| Perfil | `/cliente/perfil` | 🟢 OK | Header sticky + sub-header amarillo + form `grid-cols-1 sm:grid-cols-2`. Nombre/apellido tienen `text-base sm:text-sm` explícito. Submit `w-full py-3` (~48px). |
 
 ### Componentes críticos
 
