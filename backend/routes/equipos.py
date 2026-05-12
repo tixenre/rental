@@ -1535,10 +1535,13 @@ def admin_batch_enriquecer(payload: BatchEnriquecerInput, request: Request):
                 continue
 
             try:
-                # Llamada interna al enriquecer (sin auth doble)
+                # Llamada interna al enriquecer. Pasamos el mismo `request` ya
+                # validado — require_admin se ejecuta de nuevo (idempotente)
+                # pero no hace daño y mantiene el endpoint protegido si se
+                # llama directo.
                 scrape = admin_enriquecer_equipo(
                     EnriquecerInput(url=eq_d["bh_url"]),
-                    request=None,
+                    request,
                 )
 
                 # Persistir raw_json en equipo_fichas (cache para botones ✨)
@@ -1588,17 +1591,13 @@ def admin_batch_enriquecer(payload: BatchEnriquecerInput, request: Request):
 
 
 @router.post("/admin/equipos/enriquecer")
-def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request | None = None):
+def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
     """
     Busca el equipo en B&H/Adorama, scrapea la página y usa Lovable AI para
     extraer marca/modelo/specs/foto en JSON estructurado. Devuelve un preview;
     el frontend decide qué campos aplicar via PATCH normal.
-
-    `request` es opcional: si viene, valida admin. Si es None (llamado interno
-    desde batch-enriquecer), saltea la validación porque ya validó arriba.
     """
-    if request is not None:
-        require_admin(request)
+    require_admin(request)
 
     import os, httpx
 
