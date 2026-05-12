@@ -263,6 +263,8 @@ export const adminApi = {
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
     }
   },
+  duplicateEquipo: (id: number) =>
+    authedJson<Equipo>(`/api/equipos/${id}/duplicate`, { method: "POST" }),
   setEtiquetas: (id: number, etiquetas: string[]) =>
     authedJson<{ ok: true }>(`/api/equipos/${id}/etiquetas`, {
       method: "PUT",

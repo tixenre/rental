@@ -1,7 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -92,6 +92,18 @@ function EquiposPage() {
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  const duplicateMut = useMutation({
+    mutationFn: (id: number) => adminApi.duplicateEquipo(id),
+    onSuccess: (eq) => {
+      toast.success(`Duplicado: "${eq.nombre}"`);
+      invalidate();
+      // Abrir el form del duplicado para que el admin lo termine de configurar.
+      setEditing(eq);
+      setOpenForm(true);
+    },
+    onError: (e: Error) => toast.error(`No se pudo duplicar: ${e.message}`),
   });
 
   const toggleVisibleMut = useMutation({
@@ -247,7 +259,9 @@ function EquiposPage() {
                 <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                   {[eq.marca, eq.modelo].filter(Boolean).join(" / ") || "—"}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">{eq.cantidad}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  <StockInline equipo={eq} onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })} />
+                </TableCell>
                 <TableCell className="text-right hidden sm:table-cell w-32">
                   <PrecioJornadaInline equipo={eq} onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })} />
                 </TableCell>
@@ -279,6 +293,14 @@ function EquiposPage() {
                     <Button size="icon" variant="ghost" title="Editar" onClick={() => { setEditing(eq); setOpenForm(true); }}>
                       <Pencil className="h-4 w-4" />
                     </Button>
+                    <Button
+                      size="icon" variant="ghost"
+                      title="Duplicar (clona ficha, categorías y kit — serie vacía)"
+                      onClick={() => duplicateMut.mutate(eq.id)}
+                      disabled={duplicateMut.isPending}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
                     <Button size="icon" variant="ghost" onClick={() => setDeleting(eq)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -309,6 +331,11 @@ function EquiposPage() {
             label: "Editar",
             icon: <Pencil className="h-4 w-4" />,
             onClick: () => { setEditing(menuEquipo!); setOpenForm(true); },
+          },
+          {
+            label: "Duplicar equipo",
+            icon: <Copy className="h-4 w-4" />,
+            onClick: () => duplicateMut.mutate(menuEquipo!.id),
           },
           {
             label: "Eliminar equipo",
@@ -371,6 +398,65 @@ function EquiposPage() {
  *
  * No commitea hasta blur o Enter (evita una request por cada keystroke).
  */
+/**
+ * Editor inline del stock (cantidad). Click → input numérico → Enter/blur guarda.
+ * Esc descarta. Vacío = 0 (no permite null).
+ */
+function StockInline({
+  equipo,
+  onSaved,
+}: {
+  equipo: Equipo;
+  onSaved: () => void;
+}) {
+  const [value, setValue] = useState<string>(String(equipo.cantidad));
+  const initialRef = useRef(equipo.cantidad);
+
+  useEffect(() => {
+    setValue(String(equipo.cantidad));
+    initialRef.current = equipo.cantidad;
+  }, [equipo.id, equipo.cantidad]);
+
+  const saveMut = useMutation({
+    mutationFn: (n: number) => adminApi.updateEquipo(equipo.id, { cantidad: n }),
+    onSuccess: () => onSaved(),
+    onError: (e: Error) => {
+      toast.error(`No se pudo actualizar stock: ${e.message}`);
+      setValue(String(initialRef.current));
+    },
+  });
+
+  const commit = () => {
+    const n = Math.max(0, Math.floor(Number(value.trim() || "0")));
+    if (!Number.isFinite(n)) {
+      setValue(String(initialRef.current));
+      return;
+    }
+    if (n === initialRef.current) return;
+    saveMut.mutate(n);
+  };
+
+  return (
+    <Input
+      type="number"
+      min={0}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        else if (e.key === "Escape") {
+          setValue(String(initialRef.current));
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      disabled={saveMut.isPending}
+      className="h-7 w-14 ml-auto text-right text-xs tabular-nums px-2 py-0"
+    />
+  );
+}
+
+
 function RoiInline({
   equipo,
   onSaved,

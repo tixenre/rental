@@ -445,6 +445,81 @@ def update_equipo(id: int, data: EquipoUpdate):
         conn.close()
 
 
+@router.post("/equipos/{id}/duplicate")
+def duplicate_equipo(id: int):
+    """
+    Duplica un equipo: copia equipo + ficha + categorías + kit. La nueva fila
+    arranca con `serie` vacía (debe ser única por equipo), `ficha_completa = false`
+    (para forzar al admin a revisar) y `cantidad = 1` (default seguro).
+    Útil cuando comprás varias unidades del mismo modelo con series distintas.
+    """
+    conn = get_db()
+    try:
+        src = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
+        if not src:
+            raise HTTPException(404, "Equipo no encontrado")
+        src_d = row_to_dict(src)
+
+        cur = conn.execute("""
+            INSERT INTO equipos (
+                nombre, marca, modelo, cantidad,
+                precio_jornada, precio_usd, roi_pct,
+                valor_reposicion, foto_url, fecha_compra,
+                serie, bh_url, dueno, visible_catalogo, estado,
+                ficha_completa
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            f"{src_d['nombre']} (copia)",
+            src_d.get("marca"), src_d.get("modelo"), 1,
+            src_d.get("precio_jornada"), src_d.get("precio_usd"), src_d.get("roi_pct"),
+            src_d.get("valor_reposicion"), src_d.get("foto_url"), src_d.get("fecha_compra"),
+            None,  # serie vacía
+            src_d.get("bh_url"), src_d.get("dueno"), src_d.get("visible_catalogo", 1), src_d.get("estado", "operativo"),
+            False,  # ficha_completa false para que el admin la revise
+        ))
+        new_id = cur.lastrowid
+
+        # Copiar ficha si existe
+        ficha = conn.execute("SELECT * FROM equipo_fichas WHERE equipo_id=?", (id,)).fetchone()
+        if ficha:
+            f = row_to_dict(ficha)
+            cols = [k for k in f.keys() if k not in ("equipo_id", "created_at", "updated_at")]
+            placeholders = ", ".join(["?"] * (len(cols) + 1))
+            conn.execute(
+                f"INSERT INTO equipo_fichas (equipo_id, {', '.join(cols)}) VALUES ({placeholders})",
+                [new_id] + [f.get(c) for c in cols],
+            )
+
+        # Copiar categorías
+        cats = conn.execute(
+            "SELECT categoria_id FROM equipo_categorias WHERE equipo_id=?", (id,)
+        ).fetchall()
+        for (cat_id,) in cats:
+            conn.execute(
+                "INSERT INTO equipo_categorias (equipo_id, categoria_id) VALUES (?, ?)",
+                (new_id, cat_id),
+            )
+
+        # Copiar kit
+        kit = conn.execute(
+            "SELECT componente_id, cantidad, orden FROM kit_componentes WHERE equipo_id=?", (id,)
+        ).fetchall()
+        for (componente_id, cantidad, orden) in kit:
+            conn.execute(
+                "INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, orden) VALUES (?, ?, ?, ?)",
+                (new_id, componente_id, cantidad, orden),
+            )
+
+        conn.commit()
+        row = conn.execute("SELECT * FROM equipos WHERE id=?", (new_id,)).fetchone()
+        return attach_tags(conn, [row_to_dict(row)])[0]
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 @router.delete("/equipos/{id}", status_code=204)
 def delete_equipo(id: int):
     conn = get_db()
