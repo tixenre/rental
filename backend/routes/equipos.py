@@ -226,10 +226,26 @@ def list_equipos(
             )
             params += [key, value]
     if q:
-        # ILIKE = case-insensitive (Postgres). Permite buscar "sony" / "Sony" / "SONY".
-        base_sql += " AND (e.nombre ILIKE ? OR e.marca ILIKE ? OR e.modelo ILIKE ?)"
+        # Búsqueda fuzzy global: ILIKE case-insensitive sobre nombre/marca/modelo
+        # del equipo + serie + campos de la ficha (descripción, specs, keywords).
+        # Convierte la barra en un find-anything: buscás "log3" o "iso 25600" y
+        # aparece el equipo aunque la palabra esté en un spec, no en el nombre.
         like = f"%{q}%"
-        params += [like, like, like]
+        base_sql += """ AND (
+            e.nombre ILIKE ?
+            OR COALESCE(e.marca, '') ILIKE ?
+            OR COALESCE(e.modelo, '') ILIKE ?
+            OR COALESCE(e.serie, '') ILIKE ?
+            OR EXISTS (
+                SELECT 1 FROM equipo_fichas ef
+                WHERE ef.equipo_id = e.id AND (
+                    COALESCE(ef.descripcion, '') ILIKE ?
+                    OR COALESCE(ef.specs_json, '') ILIKE ?
+                    OR COALESCE(ef.keywords_json, '') ILIKE ?
+                )
+            )
+        )"""
+        params += [like] * 7
     if categoria:
         # Filtro recursivo: si es padre, incluye descendientes (árbol de `categorias`).
         # Acepta id numérico o nombre.
