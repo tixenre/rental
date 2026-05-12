@@ -1,7 +1,29 @@
-# Auditoría mobile — checklist + status
+# Auditoría mobile — criterio, checklist + status
 
 > Crítico para launch porque la mayoría del tráfico de un rental viene de móvil
 > (clientes consultando desde sets, productoras, etc.). Sin mobile, no hay launch.
+
+## Criterio
+
+**Cada ruta debe tener un layout mobile pensado a propósito, no solo un escalado responsive automático.**
+
+Una ruta cumple el criterio cuando:
+
+1. **Hay un patrón mobile visible en el código** — dual render
+   (`md:hidden` / `hidden md:block`), sticky bar, sheet fullscreen, lista
+   card-based, etc. *No alcanza* con un grid que colapse por default.
+2. **Pasa el checklist** de la sección "Checklist por checkpoint" abajo
+   (sin scroll horizontal, tap targets ≥ 40px, texto legible, inputs sin
+   zoom iOS, modales que entran en `h-[100dvh]`, imágenes lazy).
+3. **Está validada manualmente** en viewport **375×667 (iPhone SE)** —
+   el mínimo objetivo del proyecto.
+4. **Está marcada 🟢 OK** en las tablas de status de este documento,
+   con una nota corta del patrón usado.
+
+Este criterio aplica a **toda ruta nueva** antes de mergear, y a **toda ruta
+existente** cada vez que se la toca. El wrapper `<PublicLayout>` provee TopBar
+y Footer mobile-aware, pero **no garantiza el criterio** — el contenido de
+cada página tiene que cumplirlo por su cuenta.
 
 ## Superficie mobile
 
@@ -48,7 +70,7 @@ gh issue list --state open --label "mobile"
 
 ---
 
-## Cómo correr la auditoría
+## Cómo evaluar contra el criterio
 
 ### Manual (rápido, sin setup)
 
@@ -179,11 +201,17 @@ Fixea **todos** los inputs del proyecto sin tocar componentes. Desktop (`md+`) s
 
 ---
 
-## Re-auditar cuando
+## Re-auditar cuando (gate de merge)
 
-- **En cada PR** que toque rutas cliente o `/admin/pedidos|dashboard` (gate de merge — ver PROTOCOLO.md Fase 1.5).
-- Se agregue una página nueva → agregarla a la tabla de páginas y auditarla.
-- Se cambie el diseño de TopBar, Cart, DateModal o Footer (componentes globales).
+Esta sección define **cuándo no se puede mergear** sin haber validado mobile:
+
+- **En cada PR** que toque rutas cliente, `/admin/pedidos` o `/admin/dashboard`
+  (gate explícito de merge — ver PROTOCOLO.md Fase 1.5). Sin auditoría mobile
+  validada, el PR queda en draft.
+- Se agregue una página nueva → agregarla a la tabla de páginas, evaluarla
+  contra el criterio, marcar 🟢/🟡/🔴.
+- Se cambie el diseño de TopBar, Cart, DateModal o Footer (componentes
+  globales) — re-validar todas las rutas que los usan.
 - Se actualice Tailwind o shadcn (puede romper sizing).
 - Antes de cada deploy a producción si hubo cambios de UI.
 - Como rutina general: cada 2-4 semanas.

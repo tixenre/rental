@@ -90,9 +90,15 @@ Detalle completo del flow en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
 
 Ver [`docs/ISSUE_LABELS.md`](docs/ISSUE_LABELS.md) para la lista completa.
 
-### Mobile gate
+### Mobile como criterio
 
-Cualquier PR que toque rutas de cliente (`/`, `/equipo/*`, `/cliente/*`, `/estudio`) o admin prioritario (`/admin/pedidos`, `/admin/dashboard`) requiere mobile pass antes de mergear. Checklist en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) y detalle en [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md).
+**Cada ruta debe tener un layout mobile pensado a propósito, no solo un escalado responsive automático.** No alcanza con "se ve más o menos OK en celu" — necesitamos un patrón visible (dual render `md:hidden`/`hidden md:block`, sticky bar, sheet fullscreen, lista card-based) y validación manual en viewport 375×667 (iPhone SE).
+
+Gate de merge: cualquier PR que toque rutas de cliente (`/`, `/equipo/*`, `/cliente/*`, `/estudio`) o admin prioritario (`/admin/pedidos`, `/admin/dashboard`) requiere mobile pass antes de mergear.
+
+El wrapper [`<PublicLayout>`](src/components/rental/PublicLayout.tsx) provee TopBar + Footer mobile-aware, pero **no garantiza el criterio** — el contenido de cada ruta tiene que cumplirlo por su cuenta.
+
+Definición completa del criterio, checklist y status por ruta en [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md). Procedimiento en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
 
 ---
 
