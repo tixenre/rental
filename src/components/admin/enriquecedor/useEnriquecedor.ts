@@ -17,6 +17,7 @@ export function useEnriquecedor({
   onOpenChange: (v: boolean) => void;
 }) {
   const [loading, setLoading] = useState(false);
+  const [loadingFoto, setLoadingFoto] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<EnriquecerResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +42,6 @@ export function useEnriquecedor({
   const [photoDiag, setPhotoDiag] = useState<DiagStep[] | null>(null);
   const [fotosResult, setFotosResult] = useState<string[]>([]);
   const [searchingPhotos, setSearchingPhotos] = useState(false);
-  const [wantFotos, setWantFotos] = useState(true);
-  const [wantSpecs, setWantSpecs] = useState(false);
   const [customUrl, setCustomUrl] = useState("");
 
   useEffect(() => {
@@ -51,9 +50,8 @@ export function useEnriquecedor({
       setError(null);
       setPhotoDiag(null);
       setFotosResult([]);
-      setWantFotos(true);
-      setWantSpecs(false);
       setFotoUrl("");
+      setUploadingFotoUrl("");
       setCustomUrl("");
     }
   }, [open]);
@@ -70,102 +68,104 @@ export function useEnriquecedor({
       body: JSON.stringify(input),
     });
 
+  /** Auto-sube la foto a R2 en segundo plano y actualiza fotoUrl cuando termina. */
+  const selectFoto = async (url: string) => {
+    setFotoUrl(url);
+    setAplicarFoto(true);
+    if (isHostedUrl(url)) return;
+    setUploadingFotoUrl(url);
+    try {
+      const r2url = await uploadExternalUrlToBucket(equipo.id, url);
+      setFotoUrl(r2url);
+    } catch {
+      // Mantener URL externa — se reintentará al aplicar
+    } finally {
+      setUploadingFotoUrl("");
+    }
+  };
+
+  /** Busca solo la foto del producto a partir del link pegado. */
+  const buscarFoto = async () => {
+    setLoadingFoto(true);
+    setError(null);
+    setFotosResult([]);
+    setFotoUrl("");
+    setUploadingFotoUrl("");
+    try {
+      const r = await authedJson<{ foto_candidates: string[] }>(
+        "/api/admin/equipos/buscar-fotos",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: equipo.nombre,
+            marca: equipo.marca,
+            modelo: equipo.modelo,
+            url: customUrl.trim() || null,
+          }),
+        },
+      );
+      const cands = r.foto_candidates ?? [];
+      setFotosResult(cands);
+      if (cands.length > 0) {
+        void selectFoto(cands[0]);
+      } else {
+        toast.info("No se encontró foto. Probá con otro link.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error buscando foto");
+    } finally {
+      setLoadingFoto(false);
+    }
+  };
+
+  /** Busca specs + foto en paralelo (proceso completo). */
   const runSearch = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
     setFotosResult([]);
     setFotoUrl("");
+    setUploadingFotoUrl("");
 
-    const fetchFotos = () =>
-      authedJson<{ foto_candidates: string[] }>("/api/admin/equipos/buscar-fotos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+    const urlToUse = customUrl.trim() || null;
+
+    try {
+      const [fotosSettled, specsSettled] = await Promise.allSettled([
+        authedJson<{ foto_candidates: string[] }>("/api/admin/equipos/buscar-fotos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: equipo.nombre,
+            marca: equipo.marca,
+            modelo: equipo.modelo,
+            url: urlToUse,
+          }),
+        }),
+        enriquecer({
           nombre: equipo.nombre,
           marca: equipo.marca,
           modelo: equipo.modelo,
-          url: customUrl.trim() || null,
+          url: urlToUse,
         }),
-      });
+      ]);
 
-    const fetchSpecs = () =>
-      enriquecer({
-        nombre: equipo.nombre,
-        marca: equipo.marca,
-        modelo: equipo.modelo,
-        url: customUrl.trim() || null,
-      });
+      const allCands: string[] = [];
 
-    try {
-      if (wantFotos && wantSpecs) {
-        const [fotosSettled, specsSettled] = await Promise.allSettled([fetchFotos(), fetchSpecs()]);
-        const allCands: string[] = [];
+      if (fotosSettled.status === "fulfilled") {
+        allCands.push(...(fotosSettled.value.foto_candidates ?? []));
+      } else {
+        toast.error("Error buscando fotos: " + ((fotosSettled.reason as Error)?.message ?? "desconocido"));
+      }
 
-        if (fotosSettled.status === "fulfilled") {
-          allCands.push(...(fotosSettled.value.foto_candidates ?? []));
-        } else {
-          toast.error("Error buscando fotos: " + ((fotosSettled.reason as Error)?.message ?? "desconocido"));
-        }
-
-        if (specsSettled.status === "fulfilled") {
-          const r = specsSettled.value;
-          setResult(r);
-          setMarca(r.marca ?? "");
-          setModelo(r.modelo ?? "");
-          setBhUrl(r.fuente_url);
-          setAplicarMarca(!equipo.marca && !!r.marca);
-          setAplicarModelo(!equipo.modelo && !!r.modelo);
-          setAplicarBh(!equipo.bh_url);
-          setAplicarDescripcion(!!r.descripcion);
-          setAplicarSpecs(r.specs.length > 0);
-          setKeywords(r.keywords ?? []);
-          setAplicarKeywords((r.keywords ?? []).length > 0);
-          const tieneFichaExt = !!(
-            r.peso || r.dimensiones || r.montura || r.formato || r.resolucion || r.alimentacion ||
-            r.video_url || typeof r.precio_bh_usd === "number" ||
-            (r.incluye?.length ?? 0) > 0 || (r.conectividad?.length ?? 0) > 0 ||
-            (r.compatible_con?.length ?? 0) > 0
-          );
-          setAplicarFichaExtendida(tieneFichaExt);
-          for (const u of (r.foto_candidates ?? [])) {
-            if (!allCands.includes(u)) allCands.push(u);
-          }
-        } else {
-          toast.error("Error buscando specs: " + ((specsSettled.reason as Error)?.message ?? "desconocido"));
-        }
-
-        const preferredFoto = allCands[0] ?? "";
-        setFotoUrl(preferredFoto);
-        setAplicarFoto(!equipo.foto_url && !!preferredFoto);
-        setFotosResult(allCands);
-        if (allCands.length === 0 && fotosSettled.status !== "fulfilled" && specsSettled.status !== "fulfilled") {
-          setError("No se pudo completar ninguna búsqueda.");
-        }
-      } else if (wantFotos) {
-        const r = await fetchFotos();
-        const cands = r.foto_candidates ?? [];
-        setFotosResult(cands);
-        if (cands.length === 0) {
-          toast.info("No se encontraron fotos.");
-        } else {
-          setFotoUrl(cands[0]);
-          setAplicarFoto(true);
-          toast.success(`${cands.length} fotos encontradas`);
-        }
-      } else if (wantSpecs) {
-        const r = await fetchSpecs();
+      if (specsSettled.status === "fulfilled") {
+        const r = specsSettled.value;
         setResult(r);
         setMarca(r.marca ?? "");
         setModelo(r.modelo ?? "");
         setBhUrl(r.fuente_url);
-        const cands = r.foto_candidates ?? [];
-        const firstFoto = cands[0] ?? r.foto_url ?? "";
-        setFotoUrl(firstFoto);
-        setFotosResult(cands);
         setAplicarMarca(!equipo.marca && !!r.marca);
         setAplicarModelo(!equipo.modelo && !!r.modelo);
-        setAplicarFoto(!equipo.foto_url && !!firstFoto);
         setAplicarBh(!equipo.bh_url);
         setAplicarDescripcion(!!r.descripcion);
         setAplicarSpecs(r.specs.length > 0);
@@ -178,6 +178,23 @@ export function useEnriquecedor({
           (r.compatible_con?.length ?? 0) > 0
         );
         setAplicarFichaExtendida(tieneFichaExt);
+        for (const u of (r.foto_candidates ?? [])) {
+          if (!allCands.includes(u)) allCands.push(u);
+        }
+      } else {
+        toast.error("Error buscando specs: " + ((specsSettled.reason as Error)?.message ?? "desconocido"));
+      }
+
+      setFotosResult(allCands);
+      if (allCands.length > 0) {
+        void selectFoto(allCands[0]);
+        setAplicarFoto(!equipo.foto_url);
+      } else {
+        setAplicarFoto(false);
+      }
+
+      if (fotosSettled.status !== "fulfilled" && specsSettled.status !== "fulfilled") {
+        setError("No se pudo completar ninguna búsqueda.");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error desconocido");
@@ -404,23 +421,8 @@ export function useEnriquecedor({
     }
   };
 
-  const selectFoto = async (url: string) => {
-    setFotoUrl(url);
-    setAplicarFoto(true);
-    if (isHostedUrl(url)) return;
-    setUploadingFotoUrl(url);
-    try {
-      const r2url = await uploadExternalUrlToBucket(equipo.id, url);
-      setFotoUrl(r2url);
-    } catch {
-      // Mantener URL externa — se reintentará al aplicar
-    } finally {
-      setUploadingFotoUrl("");
-    }
-  };
-
   return {
-    loading, saving, result, error,
+    loading, loadingFoto, saving, result, error,
     marca, setMarca,
     modelo, setModelo,
     fotoUrl, setFotoUrl,
@@ -438,10 +440,8 @@ export function useEnriquecedor({
     photoDiag,
     fotosResult,
     searchingPhotos,
-    wantFotos, setWantFotos,
-    wantSpecs, setWantSpecs,
     customUrl, setCustomUrl,
     fichaExtendidaTieneDatos,
-    runSearch, aplicarSoloFoto, buscarMasFotos, addKeyword, removeKeyword, setAll, aplicar,
+    buscarFoto, runSearch, aplicarSoloFoto, buscarMasFotos, addKeyword, removeKeyword, setAll, aplicar,
   };
 }
