@@ -2461,6 +2461,29 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
 
     specs_guide = _build_specs_guide()
 
+    # ── Categorías disponibles en la DB ─────────────────────────────────────
+    # La IA elige UNA categoría sugerida de las que existen REALMENTE en la DB
+    # (raíces + hijas), no de un enum hardcoded. Así las categorías nuevas que
+    # el admin cree se aprovechan, y la IA puede sugerir subcategorías
+    # específicas (ej. "Montura E" en vez de la madre "Lente").
+    def _build_categorias_enum() -> str:
+        try:
+            conn = get_db()
+            try:
+                rows = conn.execute(
+                    "SELECT nombre FROM categorias ORDER BY parent_id NULLS FIRST, nombre"
+                ).fetchall()
+                names = [r["nombre"] for r in rows if r.get("nombre")]
+                if not names:
+                    return "'Cámara','Lente','Iluminación','Audio','Soporte','Monitor','Accesorio'"
+                return ",".join(f"'{n}'" for n in names)
+            finally:
+                conn.close()
+        except Exception:
+            return "'Cámara','Lente','Iluminación','Audio','Soporte','Monitor','Accesorio'"
+
+    categorias_enum = _build_categorias_enum()
+
     headers_fc = {
         "Authorization": f"Bearer {FIRECRAWL_API_KEY}",
         "Content-Type":  "application/json",
@@ -2524,7 +2547,9 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
             "Compatible_con: array de etiquetas de compatibilidad (montura, formato, sistemas). "
             "Precio_usd: precio listado en USD si está visible (sólo número). "
             "Video_url: URL absoluta a un video YouTube de demo si aparece linkeado. "
-            "Categoria_sugerida: una de ['Cámara','Lente','Iluminación','Audio','Soporte','Monitor','Accesorio']. "
+            f"Categoria_sugerida: UNA de [{categorias_enum}]. "
+            "Elegí la MÁS ESPECÍFICA disponible — si hay una subcategoría que aplica "
+            "(ej. 'Montura E', 'Cinema'), preferila sobre la madre genérica (ej. 'Lente', 'Cámara'). "
             "Foto_urls: array con hasta 5 URLs ABSOLUTAS (http/https) de imágenes del producto, "
             "ordenadas de MÁS A MENOS relevante para el producto principal. "
             "Incluí ángulos distintos (frente, lateral, detalle) si están disponibles. "
