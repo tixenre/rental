@@ -840,16 +840,20 @@ def bulk_action(payload: BulkActionInput, request: Request):
             ).fetchone()
             if not cat_exists:
                 raise HTTPException(404, f"Categoría {payload.categoria_id} no existe")
-            # Reemplaza las categorías existentes con la nueva
+            # Expandir a ancestros una sola vez (mismo set para todos los equipos
+            # del bulk): si "Montura E" (hija) se asigna, también va "Lente" (madre).
+            ancestor_ids = _expand_to_ancestors(conn, [payload.categoria_id])
+            # Reemplaza las categorías existentes con el set expandido
             conn.execute(
                 f"DELETE FROM equipo_categorias WHERE equipo_id IN ({placeholders})",
                 ids,
             )
             for eid in ids:
-                conn.execute(
-                    "INSERT INTO equipo_categorias (equipo_id, categoria_id) VALUES (?, ?)",
-                    (eid, payload.categoria_id),
-                )
+                for orden, cid_int in enumerate(ancestor_ids):
+                    conn.execute(
+                        "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
+                        (eid, cid_int, orden),
+                    )
                 try:
                     regenerate_auto_tags(conn, eid)
                 except Exception as e:
@@ -1271,6 +1275,51 @@ def set_etiquetas(id: int, data: EtiquetasUpdate):
 
 # ── Categorías por equipo ────────────────────────────────────────────────────
 
+def _expand_to_ancestors(conn, ids) -> list[int]:
+    """
+    Expande una lista de categoria_ids agregando todos los ancestros
+    (padres, abuelos, …) hasta la raíz.
+
+    Hoy las categorías tienen máximo 2 niveles (raíz / hija), pero la
+    implementación es recursiva por si más adelante se permite mayor
+    profundidad.
+
+    Ejemplo: si "Montura E" (id=42, parent_id=10) está en `ids` y "Lente"
+    (id=10, parent_id=None) no, devuelve [42, 10].
+
+    Issue: implementación de la regla "asigno hija → se asigna madre" del
+    sistema de categorías sugeridas (rule of the project).
+    """
+    if not ids:
+        return []
+    out: set[int] = set()
+    pending: list[int] = []
+    for raw in ids:
+        try:
+            iv = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if iv not in out:
+            out.add(iv)
+            pending.append(iv)
+
+    while pending:
+        placeholders = ",".join(["?"] * len(pending))
+        rows = conn.execute(
+            f"SELECT id, parent_id FROM categorias WHERE id IN ({placeholders})",
+            pending,
+        ).fetchall()
+        next_pending: list[int] = []
+        for row in rows:
+            pid = row["parent_id"]
+            if pid is not None and int(pid) not in out:
+                out.add(int(pid))
+                next_pending.append(int(pid))
+        pending = next_pending
+
+    return list(out)
+
+
 @router.put("/equipos/{id}/categorias", status_code=200)
 def set_categorias(id: int, data: CategoriasUpdate):
     """
@@ -1281,12 +1330,29 @@ def set_categorias(id: int, data: CategoriasUpdate):
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
-        conn.execute("DELETE FROM equipo_categorias WHERE equipo_id = ?", (id,))
-        for orden, cid in enumerate(data.categoria_ids):
+        # Expandir a ancestros: si llega "Montura E" (hija), también se asigna
+        # "Lente" (madre). Mantiene el orden original para las que ya vinieron;
+        # los ancestros agregados van al final.
+        expanded_ids = _expand_to_ancestors(conn, data.categoria_ids)
+        # Preservar el orden del input para las que ya estaban, agregar las nuevas
+        # (ancestros) al final.
+        seen: set[int] = set()
+        ordered: list[int] = []
+        for cid in data.categoria_ids:
             try:
-                cid_int = int(cid)
+                iv = int(cid)
             except (TypeError, ValueError):
                 continue
+            if iv not in seen:
+                seen.add(iv)
+                ordered.append(iv)
+        for iv in expanded_ids:
+            if iv not in seen:
+                seen.add(iv)
+                ordered.append(iv)
+
+        conn.execute("DELETE FROM equipo_categorias WHERE equipo_id = ?", (id,))
+        for orden, cid_int in enumerate(ordered):
             conn.execute("""
                 INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
                 VALUES (?, ?, ?)
@@ -2395,6 +2461,29 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
 
     specs_guide = _build_specs_guide()
 
+    # ── Categorías disponibles en la DB ─────────────────────────────────────
+    # La IA elige UNA categoría sugerida de las que existen REALMENTE en la DB
+    # (raíces + hijas), no de un enum hardcoded. Así las categorías nuevas que
+    # el admin cree se aprovechan, y la IA puede sugerir subcategorías
+    # específicas (ej. "Montura E" en vez de la madre "Lente").
+    def _build_categorias_enum() -> str:
+        try:
+            conn = get_db()
+            try:
+                rows = conn.execute(
+                    "SELECT nombre FROM categorias ORDER BY parent_id NULLS FIRST, nombre"
+                ).fetchall()
+                names = [r["nombre"] for r in rows if r.get("nombre")]
+                if not names:
+                    return "'Cámara','Lente','Iluminación','Audio','Soporte','Monitor','Accesorio'"
+                return ",".join(f"'{n}'" for n in names)
+            finally:
+                conn.close()
+        except Exception:
+            return "'Cámara','Lente','Iluminación','Audio','Soporte','Monitor','Accesorio'"
+
+    categorias_enum = _build_categorias_enum()
+
     headers_fc = {
         "Authorization": f"Bearer {FIRECRAWL_API_KEY}",
         "Content-Type":  "application/json",
@@ -2458,7 +2547,9 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
             "Compatible_con: array de etiquetas de compatibilidad (montura, formato, sistemas). "
             "Precio_usd: precio listado en USD si está visible (sólo número). "
             "Video_url: URL absoluta a un video YouTube de demo si aparece linkeado. "
-            "Categoria_sugerida: una de ['Cámara','Lente','Iluminación','Audio','Soporte','Monitor','Accesorio']. "
+            f"Categoria_sugerida: UNA de [{categorias_enum}]. "
+            "Elegí la MÁS ESPECÍFICA disponible — si hay una subcategoría que aplica "
+            "(ej. 'Montura E', 'Cinema'), preferila sobre la madre genérica (ej. 'Lente', 'Cámara'). "
             "Foto_urls: array con hasta 5 URLs ABSOLUTAS (http/https) de imágenes del producto, "
             "ordenadas de MÁS A MENOS relevante para el producto principal. "
             "Incluí ángulos distintos (frente, lateral, detalle) si están disponibles. "

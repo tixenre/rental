@@ -1,4 +1,4 @@
-import { createLazyFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wrench, History, Copy, BarChart3, RotateCcw } from "lucide-react";
@@ -33,12 +33,49 @@ export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
 });
 
+// ── Filtros en URL search params (#233) ──────────────────────────────
+// Antes vivían solo en useState — refrescar perdía el filtro. Ahora viajan
+// en la URL: shareable, sobreviven refresh, back button funciona.
+type EquiposSearch = {
+  q?: string;
+  etiqueta?: string;
+  solo_incompletos?: boolean;
+  vista_papelera?: boolean;
+};
+
 function EquiposPage() {
   const qc = useQueryClient();
-  const [q, setQ] = useState("");
-  const [etiqueta, setEtiqueta] = useState<string>("");
-  const [soloIncompletos, setSoloIncompletos] = useState(false);
-  const [vistaPapelera, setVistaPapelera] = useState(false);
+
+  const search = useSearch({ strict: false }) as EquiposSearch;
+  const navigate = useNavigate();
+
+  const q = search.q ?? "";
+  const etiqueta = search.etiqueta ?? "";
+  const soloIncompletos = search.solo_incompletos ?? false;
+  const vistaPapelera = search.vista_papelera ?? false;
+
+  function updateFilters(updates: Partial<EquiposSearch>) {
+    navigate({
+      search: (prev: Record<string, unknown>) => {
+        const next: EquiposSearch = { ...(prev as EquiposSearch), ...updates };
+        // Strip falsy values para mantener la URL limpia.
+        if (!next.q) delete next.q;
+        if (!next.etiqueta) delete next.etiqueta;
+        if (!next.solo_incompletos) delete next.solo_incompletos;
+        if (!next.vista_papelera) delete next.vista_papelera;
+        return next;
+      },
+      replace: true,
+    } as never);
+  }
+
+  const setQ = (v: string) => updateFilters({ q: v });
+  const setEtiqueta = (v: string) => updateFilters({ etiqueta: v });
+  const setSoloIncompletos = (v: boolean | ((prev: boolean) => boolean)) =>
+    updateFilters({ solo_incompletos: typeof v === "function" ? v(soloIncompletos) : v });
+  const setVistaPapelera = (v: boolean | ((prev: boolean) => boolean)) =>
+    updateFilters({ vista_papelera: typeof v === "function" ? v(vistaPapelera) : v });
+
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Equipo | null>(null);
   const [deleting, setDeleting] = useState<Equipo | null>(null);
@@ -62,6 +99,12 @@ function EquiposPage() {
   const etiquetasQ = useQuery({
     queryKey: ["admin", "etiquetas"],
     queryFn: () => adminApi.listEtiquetas(),
+  });
+  // Categorías para el selector de bulk "set categoría" (issue #231).
+  const categoriasQ = useQuery({
+    queryKey: ["admin", "categorias"],
+    queryFn: () => adminApi.listCategorias(),
+    staleTime: 60_000,
   });
   // Banner de calidad de inventario: equipos sin serie. Issue #91.
   const sinSerieQ = useQuery({
@@ -291,6 +334,33 @@ function EquiposPage() {
           >
             ☐ Pendientes
           </Button>
+          {/* Set categoría (#231): asigna categoría a los seleccionados.
+              Reemplaza las categorías existentes (backend hace DELETE + INSERT
+              + regenerate_auto_tags). */}
+          <Select
+            value=""
+            onValueChange={(v) => {
+              const categoria_id = Number(v);
+              if (!Number.isFinite(categoria_id)) return;
+              bulkMut.mutate({
+                ids: [...selectedIds],
+                action: "set_categoria",
+                categoria_id,
+              });
+            }}
+            disabled={bulkMut.isPending || !categoriasQ.data?.length}
+          >
+            <SelectTrigger className="h-8 w-44 bg-secondary text-secondary-foreground border-0">
+              <SelectValue placeholder="Asignar categoría…" />
+            </SelectTrigger>
+            <SelectContent>
+              {(categoriasQ.data ?? []).map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {c.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             size="sm" variant="destructive"
             onClick={() => {

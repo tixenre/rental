@@ -28,6 +28,10 @@ import {
 import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -737,8 +741,30 @@ export function EquipoFormDialogV2({
     );
   };
 
+  // ── Confirmación al cerrar con cambios sin guardar (#232) ──────────
+  // Detectamos cambios desde 4 fuentes: form fields (react-hook-form),
+  // specs propuestos del autocompletar, ficha externa importada, archivo
+  // de foto pendiente de upload. Cubre los casos típicos de pérdida de
+  // datos en silencio. Falsos negativos posibles: cambios SOLO en
+  // descripcion/notas/tags/specs manuales sin tocar form fields.
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const hasUnsavedChanges =
+    form.formState.isDirty ||
+    specsPropuestos.length > 0 ||
+    importedFichaExt !== null ||
+    pendingFile !== null;
+
+  const handleCloseRequest = (next: boolean) => {
+    if (!next && hasUnsavedChanges) {
+      setConfirmCloseOpen(true);
+      return;
+    }
+    onOpenChange(next);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={handleCloseRequest}>
       <DialogContent className="w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">
@@ -1004,6 +1030,17 @@ export function EquipoFormDialogV2({
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">
               Categorías {categoriaRoot && <span className="ml-1 normal-case text-ink/70">· primera = "{categoriaRoot}"</span>}
             </Label>
+            {/* Chip de sugerencia: el scrape devolvió una categoría. Match
+                case-insensitive contra DB. Click → aplica. El backend
+                auto-asigna el padre si la sugerida es hija. */}
+            <CategoriaSugeridaChip
+              categoriaSugerida={
+                importedFichaExt?.categoria_sugerida ?? cachedScrape?.categoria_sugerida ?? null
+              }
+              categorias={catsQ.data ?? []}
+              selected={selectedCats}
+              onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
+            />
             <CategoriasPicker
               categorias={catsQ.data ?? []}
               selected={selectedCats}
@@ -1143,7 +1180,7 @@ export function EquipoFormDialogV2({
               FOOTER
           ════════════════════════════════════════════════════════════════ */}
           <DialogFooter className="pt-2 border-t hairline">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="ghost" onClick={() => handleCloseRequest(false)}>
               Cancelar
             </Button>
             <Button type="submit" disabled={saving}>
@@ -1153,6 +1190,31 @@ export function EquipoFormDialogV2({
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Confirmación al cerrar con cambios sin guardar (#232) */}
+    <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Tenés cambios sin guardar</AlertDialogTitle>
+          <AlertDialogDescription>
+            Si salís ahora, los cambios que hiciste en este equipo se pierden.
+            ¿Querés salir igual?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Volver al form</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              setConfirmCloseOpen(false);
+              onOpenChange(false);
+            }}
+          >
+            Salir sin guardar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 
@@ -1340,6 +1402,50 @@ function PhotoCard({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Chip de "Categoría sugerida" que aparece arriba del CategoriasPicker
+ * cuando el scrape devolvió un `categoria_sugerida`. Match case-insensitive
+ * (sin acentos) contra la lista de categorías de DB. Click → aplica.
+ *
+ * El backend se encarga de auto-asignar la madre si la sugerencia es hija
+ * (ver `_expand_to_ancestors` en backend/routes/equipos.py).
+ */
+function CategoriaSugeridaChip({
+  categoriaSugerida,
+  categorias,
+  selected,
+  onApply,
+}: {
+  categoriaSugerida: string | null | undefined;
+  categorias: CategoriaAdmin[];
+  selected: Set<number>;
+  onApply: (id: number) => void;
+}) {
+  if (!categoriaSugerida) return null;
+
+  const norm = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  const target = norm(categoriaSugerida);
+
+  const match = categorias.find((c) => norm(c.nombre) === target);
+  if (!match) return null;
+  if (selected.has(match.id)) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onApply(match.id)}
+      className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-soft px-3 py-1 text-xs text-ink hover:bg-amber transition active:scale-95"
+      title="Aplicar la categoría sugerida por el scrape"
+    >
+      <Sparkles className="h-3 w-3 text-amber-700" />
+      <span className="text-muted-foreground">Sugerida:</span>
+      <strong>{match.nombre}</strong>
+      <span className="text-muted-foreground">· Aplicar</span>
+    </button>
   );
 }
 
