@@ -1,4 +1,4 @@
-import { createLazyFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wrench, History, Copy, BarChart3, RotateCcw } from "lucide-react";
@@ -33,12 +33,49 @@ export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
 });
 
+// ── Filtros en URL search params (#233) ──────────────────────────────
+// Antes vivían solo en useState — refrescar perdía el filtro. Ahora viajan
+// en la URL: shareable, sobreviven refresh, back button funciona.
+type EquiposSearch = {
+  q?: string;
+  etiqueta?: string;
+  solo_incompletos?: boolean;
+  vista_papelera?: boolean;
+};
+
 function EquiposPage() {
   const qc = useQueryClient();
-  const [q, setQ] = useState("");
-  const [etiqueta, setEtiqueta] = useState<string>("");
-  const [soloIncompletos, setSoloIncompletos] = useState(false);
-  const [vistaPapelera, setVistaPapelera] = useState(false);
+
+  const search = useSearch({ strict: false }) as EquiposSearch;
+  const navigate = useNavigate();
+
+  const q = search.q ?? "";
+  const etiqueta = search.etiqueta ?? "";
+  const soloIncompletos = search.solo_incompletos ?? false;
+  const vistaPapelera = search.vista_papelera ?? false;
+
+  function updateFilters(updates: Partial<EquiposSearch>) {
+    navigate({
+      search: (prev: Record<string, unknown>) => {
+        const next: EquiposSearch = { ...(prev as EquiposSearch), ...updates };
+        // Strip falsy values para mantener la URL limpia.
+        if (!next.q) delete next.q;
+        if (!next.etiqueta) delete next.etiqueta;
+        if (!next.solo_incompletos) delete next.solo_incompletos;
+        if (!next.vista_papelera) delete next.vista_papelera;
+        return next;
+      },
+      replace: true,
+    } as never);
+  }
+
+  const setQ = (v: string) => updateFilters({ q: v });
+  const setEtiqueta = (v: string) => updateFilters({ etiqueta: v });
+  const setSoloIncompletos = (v: boolean | ((prev: boolean) => boolean)) =>
+    updateFilters({ solo_incompletos: typeof v === "function" ? v(soloIncompletos) : v });
+  const setVistaPapelera = (v: boolean | ((prev: boolean) => boolean)) =>
+    updateFilters({ vista_papelera: typeof v === "function" ? v(vistaPapelera) : v });
+
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Equipo | null>(null);
   const [deleting, setDeleting] = useState<Equipo | null>(null);
