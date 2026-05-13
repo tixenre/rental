@@ -383,6 +383,9 @@ export function AutocompletarEquipoDialog({
                   {result.formato && <FichaCell label="Formato" value={result.formato} />}
                   {result.resolucion && <FichaCell label="Resolución" value={result.resolucion} />}
                   {result.alimentacion && <FichaCell label="Alimentación" value={result.alimentacion} />}
+                  {result.categoria_sugerida && (
+                    <FichaCell label="Categoría sugerida" value={result.categoria_sugerida} />
+                  )}
                   {typeof result.precio_bh_usd === "number" && (
                     <FichaCell label="Precio B&H (USD)" value={`$${result.precio_bh_usd.toLocaleString("en-US")}`} />
                   )}
