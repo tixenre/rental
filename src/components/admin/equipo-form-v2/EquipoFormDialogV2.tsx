@@ -1004,6 +1004,17 @@ export function EquipoFormDialogV2({
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">
               Categorías {categoriaRoot && <span className="ml-1 normal-case text-ink/70">· primera = "{categoriaRoot}"</span>}
             </Label>
+            {/* Chip de sugerencia: el scrape devolvió una categoría. Match
+                case-insensitive contra DB. Click → aplica. El backend
+                auto-asigna el padre si la sugerida es hija. */}
+            <CategoriaSugeridaChip
+              categoriaSugerida={
+                importedFichaExt?.categoria_sugerida ?? cachedScrape?.categoria_sugerida ?? null
+              }
+              categorias={catsQ.data ?? []}
+              selected={selectedCats}
+              onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
+            />
             <CategoriasPicker
               categorias={catsQ.data ?? []}
               selected={selectedCats}
@@ -1340,6 +1351,50 @@ function PhotoCard({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Chip de "Categoría sugerida" que aparece arriba del CategoriasPicker
+ * cuando el scrape devolvió un `categoria_sugerida`. Match case-insensitive
+ * (sin acentos) contra la lista de categorías de DB. Click → aplica.
+ *
+ * El backend se encarga de auto-asignar la madre si la sugerencia es hija
+ * (ver `_expand_to_ancestors` en backend/routes/equipos.py).
+ */
+function CategoriaSugeridaChip({
+  categoriaSugerida,
+  categorias,
+  selected,
+  onApply,
+}: {
+  categoriaSugerida: string | null | undefined;
+  categorias: CategoriaAdmin[];
+  selected: Set<number>;
+  onApply: (id: number) => void;
+}) {
+  if (!categoriaSugerida) return null;
+
+  const norm = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  const target = norm(categoriaSugerida);
+
+  const match = categorias.find((c) => norm(c.nombre) === target);
+  if (!match) return null;
+  if (selected.has(match.id)) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onApply(match.id)}
+      className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-soft px-3 py-1 text-xs text-ink hover:bg-amber transition active:scale-95"
+      title="Aplicar la categoría sugerida por el scrape"
+    >
+      <Sparkles className="h-3 w-3 text-amber-700" />
+      <span className="text-muted-foreground">Sugerida:</span>
+      <strong>{match.nombre}</strong>
+      <span className="text-muted-foreground">· Aplicar</span>
+    </button>
   );
 }
 
