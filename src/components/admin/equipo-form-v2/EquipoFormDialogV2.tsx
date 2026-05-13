@@ -28,6 +28,10 @@ import {
 import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -737,8 +741,30 @@ export function EquipoFormDialogV2({
     );
   };
 
+  // ── Confirmación al cerrar con cambios sin guardar (#232) ──────────
+  // Detectamos cambios desde 4 fuentes: form fields (react-hook-form),
+  // specs propuestos del autocompletar, ficha externa importada, archivo
+  // de foto pendiente de upload. Cubre los casos típicos de pérdida de
+  // datos en silencio. Falsos negativos posibles: cambios SOLO en
+  // descripcion/notas/tags/specs manuales sin tocar form fields.
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const hasUnsavedChanges =
+    form.formState.isDirty ||
+    specsPropuestos.length > 0 ||
+    importedFichaExt !== null ||
+    pendingFile !== null;
+
+  const handleCloseRequest = (next: boolean) => {
+    if (!next && hasUnsavedChanges) {
+      setConfirmCloseOpen(true);
+      return;
+    }
+    onOpenChange(next);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={handleCloseRequest}>
       <DialogContent className="w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">
@@ -1143,7 +1169,7 @@ export function EquipoFormDialogV2({
               FOOTER
           ════════════════════════════════════════════════════════════════ */}
           <DialogFooter className="pt-2 border-t hairline">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="ghost" onClick={() => handleCloseRequest(false)}>
               Cancelar
             </Button>
             <Button type="submit" disabled={saving}>
@@ -1153,6 +1179,31 @@ export function EquipoFormDialogV2({
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Confirmación al cerrar con cambios sin guardar (#232) */}
+    <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Tenés cambios sin guardar</AlertDialogTitle>
+          <AlertDialogDescription>
+            Si salís ahora, los cambios que hiciste en este equipo se pierden.
+            ¿Querés salir igual?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Volver al form</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              setConfirmCloseOpen(false);
+              onOpenChange(false);
+            }}
+          >
+            Salir sin guardar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 
