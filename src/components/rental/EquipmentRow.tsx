@@ -9,6 +9,7 @@ import { priceBreakdown } from "@/lib/pricing";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { EmptyImage } from "./EmptyImage";
 import { IncludedList } from "./IncludedList";
+import { KitSection } from "./KitSection";
 import { cn } from "@/lib/utils";
 
 /**
@@ -259,6 +260,7 @@ export function EquipmentRow({
 
               {/* Componentes del kit (si tiene). Es lo más útil para decidir
                * rápido si el equipo viene con lo necesario. */}
+              <KitSection item={item} />
               <IncludedList item={item} />
 
               {/* CTA: ver ficha completa */}

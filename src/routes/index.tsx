@@ -212,7 +212,7 @@ function Index() {
         {/* Toggle Modo + búsqueda sticky */}
         <div className="sticky top-14 sm:top-[69px] z-30 border-b hairline bg-background">
           {/* Mobile */}
-          <div className="sm:hidden px-3 py-2">
+          <div className="sm:hidden px-3 py-3">
             <MobileStickyBar
               allEquipos={allEquipos}
               query={query}
