@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LayoutGrid, List, ArrowRight, Search, X, Sparkles, Loader2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -19,7 +19,16 @@ import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
+type IndexSearch = {
+  /** Modo de visualización compartible por URL. `?view=grid` o `?view=list`. */
+  view?: "grid" | "list";
+};
+
 export const Route = createFileRoute("/")({
+  validateSearch: (search: Record<string, unknown>): IndexSearch => {
+    const v = search.view;
+    return { view: v === "grid" || v === "list" ? v : undefined };
+  },
   head: () => ({
     meta: [
       { title: "Rambla Rental — Alquiler de equipos de cine y foto en Mar del Plata" },
@@ -85,13 +94,23 @@ function Index() {
   }, [allEquipos, backendCats]);
   const marcas = marcasData?.items ?? [];
 
-  const [mode, setMode] = useState<Mode>("grid");
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const isMobile = window.matchMedia("(max-width: 639px)").matches;
-    setMode(isMobile ? "list" : "grid");
-  }, []);
+  // Modo de view en la URL: ?view=grid | ?view=list. Si no está, default
+  // según ancho de pantalla (mobile→list, desktop→grid). El navigate
+  // mantiene los otros search params intactos.
+  const search = useSearch({ from: "/" }) as IndexSearch;
+  const navigate = useNavigate({ from: "/" });
+  const defaultMode: Mode =
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(max-width: 639px)").matches
+      ? "list"
+      : "grid";
+  const mode: Mode = search.view ?? defaultMode;
+  const setMode = (m: Mode) => {
+    navigate({
+      search: (prev) => ({ ...prev, view: m }),
+      replace: true,
+    });
+  };
 
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [brand, setBrand] = useState<string | null>(null);
