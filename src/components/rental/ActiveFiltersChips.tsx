@@ -24,7 +24,10 @@ export function ActiveFiltersChips({
   if (total === 0) return null;
 
   return (
-    <div className="sm:hidden -mx-3 mb-3 flex items-center gap-1.5 overflow-x-auto px-3 pb-1">
+    <div className="-mx-3 mb-3 flex items-center gap-1.5 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+      <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground hidden sm:inline">
+        Filtros:
+      </span>
       {trimmed && (
         <Chip onRemove={() => onQuery("")} label={`"${trimmed}"`} icon={<Search className="h-3 w-3" />} />
       )}
