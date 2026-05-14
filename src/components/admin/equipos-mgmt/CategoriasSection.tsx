@@ -35,6 +35,7 @@ import {
 
 import { adminApi } from "@/lib/admin/api";
 import { AddEquiposToCategoriaDialog } from "./AddEquiposToCategoriaDialog";
+import { EquiposEnCategoriaList } from "./EquiposEnCategoriaList";
 import { Users } from "lucide-react";
 
 type RowItem = { id: number; nombre: string; prioridad: number; parent_id: number | null; total: number };
@@ -452,9 +453,11 @@ function SortableRootItem({
           onSave={onRename}
           className="h-8 flex-1 font-medium"
         />
-        <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
-          {root.total}
-        </span>
+        <EquiposEnCategoriaList
+          categoriaId={root.id}
+          categoriaNombre={root.nombre}
+          count={root.total}
+        />
         <Button
           size="icon"
           variant="ghost"
@@ -579,9 +582,11 @@ function SortableChildItem({
           onSave={onRename}
           className="h-8 flex-1"
         />
-        <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
-          {child.total}
-        </span>
+        <EquiposEnCategoriaList
+          categoriaId={child.id}
+          categoriaNombre={child.nombre}
+          count={child.total}
+        />
         <Select
           value={child.parent_id ? String(child.parent_id) : "none"}
           onValueChange={(v) => onChangeParent(v === "none" ? null : Number(v))}
@@ -732,9 +737,11 @@ function SortableGrandchildItem({
         onSave={onRename}
         className="h-7 flex-1"
       />
-      <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
-        {grand.total}
-      </span>
+      <EquiposEnCategoriaList
+        categoriaId={grand.id}
+        categoriaNombre={grand.nombre}
+        count={grand.total}
+      />
       {onAddEquipos && (
         <Button
           size="icon"

@@ -798,7 +798,7 @@ def restore_equipo(id: int, request: Request):
 
 class BulkActionInput(BaseModel):
     ids: list[int] = Field(..., min_length=1, max_length=500)
-    action: str   # "set_visible" | "set_ficha_completa" | "set_categoria" | "add_categoria" | "delete"
+    action: str   # "set_visible" | "set_ficha_completa" | "set_categoria" | "add_categoria" | "remove_categoria" | "delete"
     visible: Optional[bool] = None
     ficha_completa: Optional[bool] = None
     categoria_id: Optional[int] = None
@@ -894,6 +894,23 @@ def bulk_action(payload: BulkActionInput, request: Request):
                     regenerate_auto_tags(conn, eid)
                 except Exception as e:
                     logger.warning("regenerate_auto_tags falló para %s en bulk: %s", eid, e)
+
+        elif payload.action == "remove_categoria":
+            # Saca UNA categoría de cada equipo sin tocar las otras. Si la
+            # categoría es padre/abuela y los equipos tienen hijas suyas,
+            # NO borramos esas hijas — solo la categoría exacta indicada.
+            if not payload.categoria_id:
+                raise HTTPException(400, "remove_categoria requiere categoria_id: int")
+            placeholders_ids = ",".join("?" * len(ids))
+            conn.execute(
+                f"DELETE FROM equipo_categorias WHERE categoria_id = ? AND equipo_id IN ({placeholders_ids})",
+                [payload.categoria_id, *ids],
+            )
+            for eid in ids:
+                try:
+                    regenerate_auto_tags(conn, eid)
+                except Exception as e:
+                    logger.warning("regenerate_auto_tags falló para %s en bulk remove: %s", eid, e)
 
         elif payload.action == "delete":
             # Soft delete: consistente con el endpoint single DELETE (#206).
