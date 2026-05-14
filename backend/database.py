@@ -524,9 +524,17 @@ def init_db():
     """)
 
     # Seed del árbol de categorías (en la tabla `categorias`, no en etiquetas).
-    # Idempotente: ON CONFLICT (nombre). Solo pisa prioridad cuando está en
-    # default (100), así no rompe ajustes manuales del back-office.
-    SEED_TREE = [
+    # Sólo se ejecuta cuando la tabla está vacía — un install fresco arranca
+    # con el árbol sugerido, pero una DB con categorías existentes queda
+    # intacta. Antes corría en cada startup como "idempotente con ON CONFLICT",
+    # pero pisaba parent_id y resucitaba categorías borradas por el admin.
+    existing_cat_count = 0
+    try:
+        row = conn.execute("SELECT COUNT(*) AS n FROM categorias").fetchone()
+        existing_cat_count = int(row["n"] if isinstance(row, dict) else row[0])
+    except Exception:
+        existing_cat_count = 0
+    SEED_TREE = [] if existing_cat_count > 0 else [
         # (prioridad, nombre_padre, [hijos…])
         (10,  "Cámaras",              ["Video", "Foto", "Acción"]),
         (20,  "Lentes",               ["Zoom E-mount", "Zoom EF", "Fijos EF", "Especiales", "Vintage"]),
