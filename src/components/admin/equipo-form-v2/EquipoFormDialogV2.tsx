@@ -376,7 +376,8 @@ export function EquipoFormDialogV2({
       }
       sets("marca", r.marca ?? "");
       sets("modelo", r.modelo ?? "");
-      if (r.foto_url) sets("foto_url", r.foto_url);
+      // Foto NO se toca acá — para fotos está el botón "Buscar foto" aparte.
+      // Mantenemos el bh_url (fuente) para que se pueda re-usar.
       sets("bh_url", r.fuente_url);
       if (typeof r.precio_bh_usd === "number") sets("precio_usd", r.precio_bh_usd);
 
