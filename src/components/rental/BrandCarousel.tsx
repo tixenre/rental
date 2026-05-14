@@ -32,26 +32,41 @@ export function BrandCarousel({
   /** Recibe el nombre de la marca (no el id) — toggle: null deselecciona. */
   onBrandSelect: (brandName: string | null) => void;
 }) {
-  // Pre-calcular count por marca y limitar a TOP_N. Si una marca está
-  // seleccionada pero no entra en top N, la forzamos a entrar al inicio
-  // para que el visitante no la pierda visualmente al filtrar.
+  // Pre-calcular count por marca. Curación:
+  // 1. Si hay marcas con flag `destacada=true` → mostrar SOLO esas (override
+  //    manual del admin, #288).
+  // 2. Si ninguna destacada → fallback automático: top N por count.
+  // En ambos casos, si hay una marca seleccionada que no entra al set
+  // visible, la forzamos al inicio para que el visitante no la pierda.
   const destacadas = useMemo(() => {
     const counts = brands.map((b) => ({
       brand: b,
       count: allEquipos.filter((e) => (e.brand as string).toLowerCase() === b.nombre.toLowerCase()).length,
     }));
-    counts.sort((a, b) => b.count - a.count);
-    const top = counts.slice(0, TOP_N);
-    const isSelectedInTop = top.some(
+
+    const manualPicks = counts.filter((x) => x.brand.destacada);
+    let list: typeof counts;
+
+    if (manualPicks.length > 0) {
+      // Curación manual del admin: ordenar las destacadas por count desc.
+      manualPicks.sort((a, b) => b.count - a.count);
+      list = manualPicks;
+    } else {
+      // Fallback automático: top N por count.
+      counts.sort((a, b) => b.count - a.count);
+      list = counts.slice(0, TOP_N);
+    }
+
+    const isSelectedInList = list.some(
       (x) => !!selectedBrand && x.brand.nombre.toLowerCase() === selectedBrand.toLowerCase(),
     );
-    if (!isSelectedInTop && selectedBrand) {
+    if (!isSelectedInList && selectedBrand) {
       const sel = counts.find(
         (x) => x.brand.nombre.toLowerCase() === selectedBrand.toLowerCase(),
       );
-      if (sel) return [sel, ...top.slice(0, TOP_N - 1)];
+      if (sel) return [sel, ...list];
     }
-    return top;
+    return list;
   }, [brands, allEquipos, selectedBrand]);
 
   if (destacadas.length === 0) return null;

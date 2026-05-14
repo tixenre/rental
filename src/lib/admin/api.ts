@@ -203,6 +203,8 @@ export type MarcaAdmin = {
   nombre: string;
   logo_url?: string | null;
   visible: boolean;
+  /** Flag para destacar en el BrandCarousel del home. #288 */
+  destacada: boolean;
   orden: number;
   total: number;
 };

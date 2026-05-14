@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, GripVertical, X, AlertTriangle, ArrowRight } from "lucide-react";
+import { Loader2, GripVertical, X, AlertTriangle, ArrowRight, Star } from "lucide-react";
 import { toast } from "sonner";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
@@ -135,6 +135,12 @@ export function MarcasSection() {
 
   const toggleVisible = (id: number, currentVis: boolean) => {
     updateMut.mutate({ id, visible: !currentVis });
+  };
+
+  // Toggle "destacada en home". Issue #288: cuando al menos una marca tiene
+  // destacada=true, BrandCarousel muestra solo esas en vez del top automático.
+  const toggleDestacada = (id: number, currentDestacada: boolean) => {
+    updateMut.mutate({ id, destacada: !currentDestacada });
   };
 
   const sensors = useSensors(
@@ -268,6 +274,7 @@ export function MarcasSection() {
                         marca={marca}
                         onRemove={() => handleRemoveMarca(marca.id)}
                         onToggleVisible={() => toggleVisible(marca.id, marca.visible)}
+                        onToggleDestacada={() => toggleDestacada(marca.id, marca.destacada)}
                         disabled={updateMut.isPending || reorderMut.isPending}
                       />
                     ))
@@ -287,11 +294,12 @@ export function MarcasSection() {
 }
 
 function SortableMarcaItem({
-  marca, onRemove, onToggleVisible, disabled,
+  marca, onRemove, onToggleVisible, onToggleDestacada, disabled,
 }: {
   marca: MarcaAdmin;
   onRemove: () => void;
   onToggleVisible: () => void;
+  onToggleDestacada: () => void;
   disabled: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: marca.id });
@@ -325,6 +333,19 @@ function SortableMarcaItem({
         <div className="truncate text-ink">{marca.nombre}</div>
         <div className="text-[10px] text-muted-foreground">{marca.total} equipos</div>
       </div>
+
+      <button
+        onClick={onToggleDestacada}
+        disabled={disabled}
+        className={`h-5 w-5 flex-shrink-0 grid place-items-center rounded-sm transition disabled:opacity-50 ${
+          marca.destacada
+            ? "text-amber hover:text-amber/80"
+            : "text-muted-foreground/40 hover:text-muted-foreground"
+        }`}
+        title={marca.destacada ? "Quitar de destacadas" : "Destacar en home"}
+      >
+        <Star className={`h-4 w-4 ${marca.destacada ? "fill-current" : ""}`} />
+      </button>
 
       <input
         type="checkbox"
