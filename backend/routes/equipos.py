@@ -371,6 +371,7 @@ def list_equipos(
     q:                Optional[str]  = Query(None),
     etiqueta:         Optional[str]  = Query(None),
     categoria:        Optional[str]  = Query(None),
+    marca:            Optional[str]  = Query(None, description="Filtra por nombre exacto de marca"),
     solo_visibles:    Optional[bool] = Query(None),
     solo_incompletos: Optional[bool] = Query(None),
     incluir_eliminados: Optional[bool] = Query(None, description="Si true (solo admin), incluye soft-deleted"),
@@ -491,6 +492,12 @@ def list_equipos(
             WHERE LOWER(et.nombre) = LOWER(?)
           )"""
         params.append(etiqueta)
+
+    if marca:
+        # Filtro por marca exacta (case-insensitive). Usa el campo TEXT que
+        # se sincroniza con la tabla marcas en rename (#303).
+        base_sql += " AND LOWER(COALESCE(e.marca, '')) = LOWER(?)"
+        params.append(marca)
 
     # ── Sort ──
     # Default: ranking compuesto (relevancia_manual + popularidad_score).

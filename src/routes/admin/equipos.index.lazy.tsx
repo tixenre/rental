@@ -39,6 +39,10 @@ export const Route = createLazyFileRoute("/admin/equipos/")({
 type EquiposSearch = {
   q?: string;
   etiqueta?: string;
+  /** Nombre de categoría raíz (matchea descendientes vía CTE recursiva). */
+  categoria?: string;
+  /** Nombre exacto de marca. */
+  marca?: string;
   solo_incompletos?: boolean;
   vista_papelera?: boolean;
 };
@@ -51,6 +55,8 @@ function EquiposPage() {
 
   const q = search.q ?? "";
   const etiqueta = search.etiqueta ?? "";
+  const categoria = search.categoria ?? "";
+  const marca = search.marca ?? "";
   const soloIncompletos = search.solo_incompletos ?? false;
   const vistaPapelera = search.vista_papelera ?? false;
 
@@ -61,6 +67,8 @@ function EquiposPage() {
         // Strip falsy values para mantener la URL limpia.
         if (!next.q) delete next.q;
         if (!next.etiqueta) delete next.etiqueta;
+        if (!next.categoria) delete next.categoria;
+        if (!next.marca) delete next.marca;
         if (!next.solo_incompletos) delete next.solo_incompletos;
         if (!next.vista_papelera) delete next.vista_papelera;
         return next;
@@ -71,6 +79,8 @@ function EquiposPage() {
 
   const setQ = (v: string) => updateFilters({ q: v });
   const setEtiqueta = (v: string) => updateFilters({ etiqueta: v });
+  const setCategoria = (v: string) => updateFilters({ categoria: v });
+  const setMarca = (v: string) => updateFilters({ marca: v });
   const setSoloIncompletos = (v: boolean | ((prev: boolean) => boolean)) =>
     updateFilters({ solo_incompletos: typeof v === "function" ? v(soloIncompletos) : v });
   const setVistaPapelera = (v: boolean | ((prev: boolean) => boolean)) =>
@@ -88,10 +98,12 @@ function EquiposPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const equiposQ = useQuery({
-    queryKey: ["admin", "equipos", { q, etiqueta, soloIncompletos, vistaPapelera }],
+    queryKey: ["admin", "equipos", { q, etiqueta, categoria, marca, soloIncompletos, vistaPapelera }],
     queryFn: () => adminApi.listEquipos({
       q: q || undefined,
       etiqueta: etiqueta || undefined,
+      categoria: categoria || undefined,
+      marca: marca || undefined,
       solo_incompletos: soloIncompletos || undefined,
       solo_eliminados: vistaPapelera || undefined,
     }),
@@ -104,6 +116,11 @@ function EquiposPage() {
   const categoriasQ = useQuery({
     queryKey: ["admin", "categorias"],
     queryFn: () => adminApi.listCategorias(),
+    staleTime: 60_000,
+  });
+  const marcasQ = useQuery({
+    queryKey: ["admin", "marcas-list"],
+    queryFn: () => adminApi.adminListMarcas(),
     staleTime: 60_000,
   });
   // Banner de calidad de inventario: equipos sin serie. Issue #91.
@@ -209,6 +226,23 @@ function EquiposPage() {
     () => (etiquetasQ.data ?? []).filter((e) => (e.total ?? 0) > 0),
     [etiquetasQ.data],
   );
+  /** Categorías raíz para el dropdown (no incluye hijos). El backend acepta
+   *  el nombre de la raíz y matchea descendientes vía CTE recursiva. */
+  const categoriasOpts = useMemo(
+    () =>
+      [...(categoriasQ.data ?? [])]
+        .filter((c) => (c.parent_id ?? null) == null)
+        .sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    [categoriasQ.data],
+  );
+  /** Marcas con al menos un equipo para el dropdown. */
+  const marcasOpts = useMemo(
+    () =>
+      [...(marcasQ.data?.items ?? [])]
+        .filter((m) => (m.total ?? 0) > 0)
+        .sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    [marcasQ.data],
+  );
 
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-7xl mx-auto">
@@ -245,8 +279,30 @@ function EquiposPage() {
             className="pl-9 text-base sm:text-sm"
           />
         </div>
+        <Select value={categoria || "__all"} onValueChange={(v) => setCategoria(v === "__all" ? "" : v)}>
+          <SelectTrigger className="md:w-44"><SelectValue placeholder="Todas las categorías" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all">Todas las categorías</SelectItem>
+            {categoriasOpts.map((c) => (
+              <SelectItem key={c.nombre} value={c.nombre}>
+                {c.nombre} {c.total ? `(${c.total})` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={marca || "__all"} onValueChange={(v) => setMarca(v === "__all" ? "" : v)}>
+          <SelectTrigger className="md:w-40"><SelectValue placeholder="Todas las marcas" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all">Todas las marcas</SelectItem>
+            {marcasOpts.map((m) => (
+              <SelectItem key={m.id} value={m.nombre}>
+                {m.nombre} {m.total ? `(${m.total})` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={etiqueta || "__all"} onValueChange={(v) => setEtiqueta(v === "__all" ? "" : v)}>
-          <SelectTrigger className="md:w-56"><SelectValue placeholder="Todas las etiquetas" /></SelectTrigger>
+          <SelectTrigger className="md:w-44"><SelectValue placeholder="Todas las etiquetas" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all">Todas las etiquetas</SelectItem>
             {etiquetasOpts.map((e) => (
