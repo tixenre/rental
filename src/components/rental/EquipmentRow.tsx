@@ -42,6 +42,7 @@ export function EquipmentRow({
     navigate({ to: "/equipo/$slug", params: { slug: buildEquipoSlug(item) } });
 
   const [expanded, setExpanded] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
   const cap = disponible ?? item.cantidad ?? Infinity;
   const noStock = cap <= 0;
   const sinStock = noStock;
@@ -88,12 +89,13 @@ export function EquipmentRow({
         >
           {/* Thumb */}
           <div className="relative aspect-square w-14 shrink-0 overflow-hidden rounded-md sm:aspect-[4/3] sm:w-16 bg-white">
-            {item.fotoUrl ? (
+            {item.fotoUrl && !imgFailed ? (
               <img
                 src={item.fotoUrl}
                 alt={item.name}
                 className="h-full w-full object-contain p-1.5"
                 loading="lazy"
+                onError={() => setImgFailed(true)}
               />
             ) : (
               <EmptyImage category={item.category} brand={item.brand} />

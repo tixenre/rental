@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, Plus, Minus, Sparkles } from "lucide-react";
@@ -24,6 +25,7 @@ export function EquipmentCard({
 }) {
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
+  const [imgFailed, setImgFailed] = useState(false);
   const remove = useCart((s) => s.remove);
   const jornadas = useCart((s) => s.days());
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
@@ -68,13 +70,14 @@ export function EquipmentCard({
         aria-label={`Ver detalle de ${item.name}`}
         className="relative block aspect-square w-full shrink-0 overflow-hidden text-left bg-white"
       >
-        {item.fotoUrl ? (
+        {item.fotoUrl && !imgFailed ? (
           <img
             src={item.fotoUrl}
             alt={item.name}
             loading={index < 4 ? "eager" : "lazy"}
             decoding="async"
             fetchPriority={index < 4 ? "high" : "low"}
+            onError={() => setImgFailed(true)}
             className="h-full w-full object-contain p-3 transition group-hover:scale-[1.02]"
           />
         ) : (
