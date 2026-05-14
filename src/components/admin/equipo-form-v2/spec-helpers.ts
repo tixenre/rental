@@ -33,3 +33,15 @@ export const findSpecValue = (specs: Spec[], label: string): string =>
   specs.find((s) => sameLabel(s.label, label))?.value ?? "";
 
 export const uniq = <T,>(arr: T[]): T[] => Array.from(new Set(arr));
+
+/**
+ * Para un spec numérico, extrae solo la parte numérica del value persistido.
+ * Acepta "2.5", "2,5", "2.5 kg", "2,5 megapíxeles", etc. Devuelve la string
+ * del número (sin la unidad). Si no parsea, devuelve "".
+ * #291 Fase B: permite que el form renderee solo el número aunque el storage
+ * legacy tenga la unidad concatenada.
+ */
+export const extractNumericPart = (value: string): string => {
+  const m = value.trim().match(/^[-+]?\d+(?:[.,]\d+)?/);
+  return m ? m[0].replace(",", ".") : "";
+};
