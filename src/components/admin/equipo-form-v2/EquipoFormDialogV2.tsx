@@ -774,6 +774,37 @@ export function EquipoFormDialogV2({
       toast.success(isEdit ? "Equipo actualizado" : "Equipo creado");
     }
     onOpenChange(false);
+  }, (errors) => {
+    // Fallaba silencioso cuando había errores de validación zod (ej. nombre
+    // vacío, número negativo). Acá los surfaceamos como toast con el primer
+    // campo problemático para que el usuario sepa qué corregir.
+    const FIELD_LABELS: Record<string, string> = {
+      nombre: "Nombre",
+      marca: "Marca",
+      modelo: "Modelo",
+      cantidad: "Cantidad",
+      precio_jornada: "Precio jornada",
+      precio_usd: "Precio USD",
+      roi_pct: "% día",
+      valor_reposicion: "Valor reposición",
+      fecha_compra: "Fecha de compra",
+      serie: "Serie",
+      bh_url: "Link de fuente",
+      foto_url: "Foto",
+      dueno: "Dueño",
+      estado: "Estado",
+    };
+    const entries = Object.entries(errors);
+    if (entries.length === 0) {
+      toast.error("Hay errores en el formulario, revisalos.");
+      return;
+    }
+    const [field, error] = entries[0];
+    const label = FIELD_LABELS[field] ?? field;
+    const msg = (error as { message?: string } | undefined)?.message ?? "valor inválido";
+    toast.error(`${label}: ${msg}`, {
+      description: entries.length > 1 ? `Y ${entries.length - 1} campo(s) más con errores.` : undefined,
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════
