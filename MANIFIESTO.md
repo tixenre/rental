@@ -222,14 +222,21 @@ Definición completa del criterio, checklist y status por ruta en [`docs/MOBILE_
 ### Features activas
 
 - **Form V2 de equipos** con autocompletar (single + batch) + cache de scrape.
-- **Bulk actions** en lista admin.
+- **Bulk actions** en lista admin (incluye `add_categoria` masivo).
+- **Filtros admin** por categoría + marca + etiqueta (shareable via URL).
 - **Soft delete** + papelera + restore.
 - **Mantenimiento log** por equipo.
 - **Dashboard de uso** con top alquilados, sin uso, revenue por categoría, cuentas por cobrar.
 - **Historial de alquileres** por equipo.
 - **Búsqueda fuzzy global** en `q` de listEquipos.
 - **Specs normalizer** EN→ES + métrico.
-- **Catálogo público** con cart, cotización, portal cliente.
+- **Specs por categoría** como norma del form (#291): drag-drop reorder, tipo Número con unidad obligatoria, template-bound vs custom con UI distinta.
+- **Categorías** árbol de hasta 3 niveles con drag-drop reorder y cross-parent.
+- **Marcas unificadas** en una columna: logo SVG con tinting automático via CSS filter, drag-drop reorder, mini menú (subir logo, renombrar, ver productos, eliminar). Cache-bust por upload.
+- **Pestaña Diseño** (`/admin/diseno`): ordenar y ocultar secciones del catálogo público.
+- **Sidebar admin**: "Inventario" agrupando Equipos/Categorías/Marcas/Etiquetas/Specs/Validar nombres.
+- **Catálogo público** con cart, cotización, portal cliente. View grid/list compartible via `?view=` en URL. Popup intro one-time solo desktop.
+- **Detalle de equipo**: bloque "Incluye" arriba de todo con kit + fotos + cantidades en mobile.
 - **Tests E2E** del form (skipped en CI sin backend orchestrado).
 
 ### Cosas que NO existen todavía
@@ -274,4 +281,5 @@ Para ver el trabajo pendiente / activo (todo vive en GitHub Issues):
 |---|---|---|
 | **2026-05-10** | Auditoría inicial: 23 bugs trackeados y todos cerrados. Ver `docs/BUGS.md`. | PRs #26-#40 |
 | **2026-05-12** (fase 1) | V2 del form de equipos: completion workflow, autocompletar con cache, batch, bulk actions, soft delete, mantenimiento, historial, dashboard de uso, tests E2E, split del form, refactor backend. | #211-#217, #221-#224 |
-| **2026-05-12** (fase 2) | Limpieza post-fase-1, cuentas por cobrar en dashboard, manifiesto. | #225-#227, #228 (este PR) |
+| **2026-05-12** (fase 2) | Limpieza post-fase-1, cuentas por cobrar en dashboard, manifiesto. | #225-#227, #228 |
+| **2026-05-14** | Sprint largo: marcas unificadas con logos SVG (tinting CSS) + cache-bust + reorden y mini menú. Specs por categoría como norma (#291 fases A/B/C). Pestaña Diseño. Categorías a 3 niveles + drag-drop nietos + asignar equipos masivamente. Sidebar reorganizado a "Inventario", sacar Hoy/Calendario/Clasificar. Filtros admin por categoría + marca. Vista grid/list compartible. Popup intro desktop. Fotos: cache-bust al upload + filtro banners. UX detalle equipo: "Incluye" arriba con kit + fotos + cantidades. Varios fixes (serie N/A default, toast save inválido, padding pill mobile, no re-seed categorías). | #290-#323 |
