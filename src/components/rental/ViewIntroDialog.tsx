@@ -25,8 +25,17 @@ export function ViewIntroDialog({ onPick }: { onPick: (mode: "grid" | "list") =>
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (localStorage.getItem(STORAGE_KEY) === "1") return;
-    // Solo desktop — en mobile no hace falta (default ya es Lista).
-    if (window.matchMedia?.("(max-width: 639px)").matches) return;
+    // Solo desktop. Triple chequeo para cubrir:
+    //  - phones/tablets con cualquier ancho (incluso landscape).
+    //  - dispositivos principalmente táctiles.
+    //  - user agents identificables como mobile.
+    const mql = window.matchMedia;
+    if (!mql) return;
+    const isNarrow = mql("(max-width: 767px)").matches;
+    const isCoarse = mql("(pointer: coarse)").matches;
+    const ua = (navigator.userAgent || "").toLowerCase();
+    const looksMobile = /android|iphone|ipad|ipod|mobile|tablet/.test(ua);
+    if (isNarrow || isCoarse || looksMobile) return;
     // Pequeño delay para que la primera pintura cargue antes y se sienta
     // menos invasivo (la página ya existe atrás).
     const t = setTimeout(() => setOpen(true), 400);
