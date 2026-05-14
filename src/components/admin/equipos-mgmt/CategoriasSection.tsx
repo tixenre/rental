@@ -203,7 +203,7 @@ export function CategoriasSection() {
         <div>
           <h2 className="font-display text-lg text-ink">Categorías</h2>
           <p className="text-sm text-muted-foreground">
-            Árbol de 2 niveles. Arrastrá para reordenar. Una subcategoría se puede mover a otra raíz arrastrándola al área de hijas correspondiente.
+            Árbol de hasta 3 niveles. Arrastrá para reordenar las raíces y subcategorías. Una subcategoría se puede mover a otra raíz arrastrándola al área de hijas correspondiente. Los nietos (3er nivel) se crean con el botón + en cada subcategoría.
           </p>
         </div>
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none cursor-pointer shrink-0">
@@ -263,6 +263,14 @@ export function CategoriasSection() {
                     onDeleteChild={(id, name) => {
                       if (confirm(`Eliminar subcategoría "${name}"?`)) deleteMut.mutate(id);
                     }}
+                    grandchildrenOf={(childId) => childrenOfDisplay(childId)}
+                    onCreateGrandchild={(parentId, name) =>
+                      createMut.mutate({ nombre: name, parent_id: parentId })
+                    }
+                    onRenameGrandchild={(id, n) => updateMut.mutate({ id, nombre: n })}
+                    onDeleteGrandchild={(id, name) => {
+                      if (confirm(`Eliminar nieto "${name}"?`)) deleteMut.mutate(id);
+                    }}
                   />
                 );
               })}
@@ -307,6 +315,7 @@ function SortableRootItem({
   newChildFor, newChildName, setNewChildName,
   onCreateChild, onCancelChild,
   onRenameChild, onChangeParent, onDeleteChild,
+  grandchildrenOf, onCreateGrandchild, onRenameGrandchild, onDeleteGrandchild,
 }: {
   root: RowItem;
   children: RowItem[];
@@ -324,6 +333,10 @@ function SortableRootItem({
   onRenameChild: (id: number, name: string) => void;
   onChangeParent: (id: number, parentId: number | null) => void;
   onDeleteChild: (id: number, name: string) => void;
+  grandchildrenOf: (childId: number) => RowItem[];
+  onCreateGrandchild: (parentId: number, name: string) => void;
+  onRenameGrandchild: (id: number, name: string) => void;
+  onDeleteGrandchild: (id: number, name: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -402,9 +415,13 @@ function SortableRootItem({
                   key={child.id}
                   child={child}
                   parents={allRoots.filter((r) => r.id !== child.id)}
+                  grandchildren={grandchildrenOf(child.id)}
                   onRename={(n) => onRenameChild(child.id, n)}
                   onChangeParent={(pid) => onChangeParent(child.id, pid)}
                   onDelete={() => onDeleteChild(child.id, child.nombre)}
+                  onCreateGrandchild={onCreateGrandchild}
+                  onRenameGrandchild={onRenameGrandchild}
+                  onDeleteGrandchild={onDeleteGrandchild}
                 />
               ))}
               {children.length === 0 && (
@@ -440,13 +457,19 @@ function SortableRootItem({
 }
 
 function SortableChildItem({
-  child, parents, onRename, onChangeParent, onDelete,
+  child, parents, grandchildren = [],
+  onRename, onChangeParent, onDelete,
+  onCreateGrandchild, onRenameGrandchild, onDeleteGrandchild,
 }: {
   child: RowItem;
   parents: RowItem[];
+  grandchildren?: RowItem[];
   onRename: (n: string) => void;
   onChangeParent: (parentId: number | null) => void;
   onDelete: () => void;
+  onCreateGrandchild?: (parentId: number, name: string) => void;
+  onRenameGrandchild?: (id: number, name: string) => void;
+  onDeleteGrandchild?: (id: number, name: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -459,6 +482,9 @@ function SortableChildItem({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  const [addingGrand, setAddingGrand] = useState(false);
+  const [newGrandName, setNewGrandName] = useState("");
 
   return (
     <li ref={setNodeRef} style={style}>
@@ -492,10 +518,82 @@ function SortableChildItem({
             ))}
           </SelectContent>
         </Select>
+        {onCreateGrandchild && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:text-ink"
+            onClick={() => { setAddingGrand(true); setNewGrandName(""); }}
+            title="Agregar nieto"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        )}
         <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={onDelete} title="Eliminar">
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Nietos (3er nivel) — render plano indentado, sin drag-drop */}
+      {(grandchildren.length > 0 || addingGrand) && (
+        <ul className="ml-10 border-l hairline">
+          {grandchildren.map((g) => (
+            <li key={g.id} className="flex items-center gap-1.5 px-3 py-1">
+              <span className="text-muted-foreground/40 select-none">└</span>
+              <EditableNameInput
+                value={g.nombre}
+                onSave={(n) => onRenameGrandchild?.(g.id, n)}
+                className="h-7 flex-1"
+              />
+              <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
+                {g.total}
+              </span>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 text-destructive"
+                onClick={() => onDeleteGrandchild?.(g.id, g.nombre)}
+                title="Eliminar"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </li>
+          ))}
+          {addingGrand && (
+            <li className="px-3 py-1.5 flex items-center gap-2">
+              <Input
+                autoFocus
+                placeholder="Nombre del nieto (3er nivel)"
+                value={newGrandName}
+                onChange={(e) => setNewGrandName(e.target.value)}
+                className="h-7 flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newGrandName.trim() && onCreateGrandchild) {
+                    onCreateGrandchild(child.id, newGrandName.trim());
+                    setAddingGrand(false);
+                  }
+                  if (e.key === "Escape") setAddingGrand(false);
+                }}
+              />
+              <Button
+                size="sm"
+                disabled={!newGrandName.trim()}
+                onClick={() => {
+                  if (onCreateGrandchild && newGrandName.trim()) {
+                    onCreateGrandchild(child.id, newGrandName.trim());
+                    setAddingGrand(false);
+                  }
+                }}
+              >
+                Agregar
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setAddingGrand(false)}>
+                Cancelar
+              </Button>
+            </li>
+          )}
+        </ul>
+      )}
     </li>
   );
 }

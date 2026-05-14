@@ -1960,8 +1960,16 @@ def admin_create_categoria(data: CategoriaCreate, request: Request):
             ).fetchone()
             if not prow:
                 raise HTTPException(400, "parent_id no existe")
-            if prow["parent_id"] is not None:
-                raise HTTPException(400, "Solo se permiten 2 niveles")
+            # Permitimos hasta 3 niveles (depth 0, 1, 2). El padre puede
+            # estar en depth 0 (root) o depth 1 (sub). No puede estar a
+            # depth 2 — eso convertiría a esta cat en depth 3.
+            grandparent_id = prow["parent_id"]
+            if grandparent_id is not None:
+                grow = conn.execute(
+                    "SELECT parent_id FROM categorias WHERE id = ?", (grandparent_id,)
+                ).fetchone()
+                if grow and grow["parent_id"] is not None:
+                    raise HTTPException(400, "Solo se permiten 3 niveles de categorías")
         cur = conn.execute("""
             INSERT INTO categorias (nombre, prioridad, parent_id)
             VALUES (?, ?, ?)
@@ -2009,13 +2017,54 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
             ).fetchone()
             if not prow:
                 raise HTTPException(400, "parent_id no existe")
-            if prow["parent_id"] is not None:
-                raise HTTPException(400, "Solo se permiten 2 niveles")
-            chrow = conn0.execute(
-                "SELECT 1 FROM categorias WHERE parent_id = ? LIMIT 1", (cid,)
-            ).fetchone()
-            if chrow:
-                raise HTTPException(400, "Esta categoría tiene hijos")
+            # Permitimos hasta 3 niveles (depth 0/1/2).
+            # depth(new_parent) + 1 + max_descendant_depth(this) debe ser <= 2.
+            def _depth_of(node_id: int) -> int:
+                d = 0
+                cur = node_id
+                while True:
+                    r = conn0.execute(
+                        "SELECT parent_id FROM categorias WHERE id = ?", (cur,)
+                    ).fetchone()
+                    if not r or r["parent_id"] is None:
+                        return d
+                    d += 1
+                    cur = r["parent_id"]
+                    if d > 10:  # safety
+                        return d
+
+            def _max_descendant_depth(node_id: int) -> int:
+                from collections import deque
+                q = deque([(node_id, 0)])
+                m = 0
+                while q:
+                    nid, d = q.popleft()
+                    m = max(m, d)
+                    children = conn0.execute(
+                        "SELECT id FROM categorias WHERE parent_id = ?", (nid,)
+                    ).fetchall()
+                    for ch in children:
+                        q.append((ch["id"], d + 1))
+                return m
+
+            new_parent_depth = _depth_of(patch.parent_id)
+            own_max_depth = _max_descendant_depth(cid)
+            if new_parent_depth + 1 + own_max_depth > 2:
+                raise HTTPException(400, "Excede el máximo de 3 niveles")
+            # Cycle check: el patch.parent_id no debe ser descendiente de cid.
+            descendants = set()
+            from collections import deque
+            q = deque([cid])
+            while q:
+                nid = q.popleft()
+                children = conn0.execute(
+                    "SELECT id FROM categorias WHERE parent_id = ?", (nid,)
+                ).fetchall()
+                for ch in children:
+                    descendants.add(ch["id"])
+                    q.append(ch["id"])
+            if patch.parent_id in descendants:
+                raise HTTPException(400, "No se puede mover bajo un descendiente (ciclo)")
         finally:
             conn0.close()
         sets.append("parent_id = ?"); vals.append(int(patch.parent_id))
