@@ -542,6 +542,22 @@ export const adminApi = {
       "/api/admin/marcas/merge",
       { source_id: sourceId, target_id: targetId },
     ),
+  adminDeleteMarca: (id: number) =>
+    authedJson<void>(`/api/admin/marcas/${id}`, { method: "DELETE" }),
+  adminUploadMarcaLogo: async (id: number, file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await authedFetch(`/api/admin/marcas/${id}/upload-logo`, {
+      method: "POST",
+      body: fd,
+    });
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `upload-logo → ${res.status}`);
+    }
+    const data = (await res.json()) as { public_url: string };
+    return data.public_url;
+  },
 
   adminClasificarDryRun: () =>
     authedPostJson<ClasificarResult>("/api/admin/categorias/clasificar?apply=0", {}),

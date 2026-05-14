@@ -1,11 +1,24 @@
 /**
- * MarcasSection — gestión de marcas (carrusel público) con drag-drop.
- * Extraído de /admin/settings → /admin/equipos/marcas.
+ * MarcasSection — gestión unificada de marcas (#292).
+ *
+ * Una sola columna con todas las marcas. Cada fila tiene:
+ *  - Drag handle (solo activo entre destacadas — controla orden del carrusel).
+ *  - Logo (o iniciales como fallback).
+ *  - Nombre + count de equipos.
+ *  - Toggle ⭐ "destacada" (mostrar en carrusel público del home).
+ *  - Mini menú ⋯ con: subir logo, renombrar, ver productos, eliminar.
+ *
+ * Reemplaza el diseño de doble columna (Disponibles / Seleccionadas) que
+ * duplicaba acciones (checkbox + estrella + X). Ver issue #292.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, GripVertical, X, AlertTriangle, ArrowRight, Star } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import {
+  Loader2, GripVertical, AlertTriangle, ArrowRight, Star,
+  MoreHorizontal, Upload, Pencil, ExternalLink, Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
@@ -18,18 +31,35 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import { Input } from "@/components/ui/input";
-
+import { Button } from "@/components/ui/button";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { adminApi, type MarcaAdmin } from "@/lib/admin/api";
 
 export function MarcasSection() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const listQ = useQuery({
     queryKey: ["admin", "marcas"],
     queryFn: () => adminApi.adminListMarcas(),
   });
 
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<MarcaAdmin[]>([]);
+  const [onlyDestacadas, setOnlyDestacadas] = useState(false);
+  const [renaming, setRenaming] = useState<MarcaAdmin | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deleting, setDeleting] = useState<MarcaAdmin | null>(null);
+  const uploadingForId = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["admin", "marcas"] });
@@ -61,11 +91,28 @@ export function MarcasSection() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => adminApi.adminDeleteMarca(id),
+    onSuccess: () => {
+      toast.success("Marca eliminada");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const uploadLogoMut = useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) =>
+      adminApi.adminUploadMarcaLogo(id, file),
+    onSuccess: () => {
+      toast.success("Logo actualizado");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const allMarcas = listQ.data?.items ?? [];
 
-  // ── Detección de marcas duplicadas ─────────────────────────────────────
-  // Agrupa por la primera palabra normalizada (lowercase, sin acentos).
-  // Ej: "Red" + "RED DIGITAL CINEMA" → grupo "red".
+  // ── Detección de duplicadas (intacta vs versión anterior) ──────────────
   const duplicateGroups = useMemo(() => {
     const norm = (s: string) =>
       s.toLowerCase()
@@ -85,62 +132,95 @@ export function MarcasSection() {
       .sort((a, b) => b.reduce((s, m) => s + m.total, 0) - a.reduce((s, m) => s + m.total, 0));
   }, [allMarcas]);
 
-  useEffect(() => {
-    if (allMarcas.length > 0 && selected.length === 0) {
-      const visibles = allMarcas.filter((m) => m.visible).sort((a, b) => a.orden - b.orden);
-      // Si ninguna está marcada como visible, mostrar todas en "Seleccionadas"
-      // para que el usuario vea que existen y pueda ordenarlas.
-      if (visibles.length > 0) {
-        setSelected(visibles);
-      } else {
-        setSelected(allMarcas.sort((a, b) => a.nombre.localeCompare(b.nombre)));
-      }
-    }
-  }, [allMarcas, selected.length]);
+  // ── Listas: destacadas (drag-drop) y otras (alfabético por count) ─────
+  const destacadas = useMemo(() => {
+    return [...allMarcas]
+      .filter((m) => m.destacada)
+      .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre));
+  }, [allMarcas]);
 
-  const filteredAvailable = useMemo(() => {
+  const otras = useMemo(() => {
+    return [...allMarcas]
+      .filter((m) => !m.destacada)
+      .sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre));
+  }, [allMarcas]);
+
+  const filtered = (rows: MarcaAdmin[]) => {
     const f = search.trim().toLowerCase();
-    const selectedIds = new Set(selected.map((m) => m.id));
-    return allMarcas
-      .filter((m) => !selectedIds.has(m.id) && m.nombre.toLowerCase().includes(f))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [allMarcas, selected, search]);
-
-  const handleSelectMarca = (marca: MarcaAdmin) => {
-    const nextOrden = Math.max(...selected.map((m) => m.orden), 99) + 1;
-    setSelected([...selected, { ...marca, orden: nextOrden, visible: true }]);
+    if (!f) return rows;
+    return rows.filter((m) => m.nombre.toLowerCase().includes(f));
   };
 
-  const handleRemoveMarca = (id: number) => {
-    const marca = selected.find((m) => m.id === id);
-    if (marca) {
-      updateMut.mutate({ id, visible: false });
+  const destacadasShown = filtered(destacadas);
+  const otrasShown = onlyDestacadas ? [] : filtered(otras);
+
+  const totalDestacadas = destacadas.length;
+  const totalAll = allMarcas.length;
+
+  // ── Acciones ──────────────────────────────────────────────────────────
+  const toggleDestacada = (m: MarcaAdmin) => {
+    // Al destacar por primera vez, asignarle un orden al final.
+    const patch: Partial<MarcaAdmin> = { destacada: !m.destacada };
+    if (!m.destacada) {
+      patch.orden = (destacadas.at(-1)?.orden ?? 0) + 10;
     }
-    setSelected(selected.filter((m) => m.id !== id));
+    updateMut.mutate({ id: m.id, ...patch });
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = selected.findIndex((m) => m.id === active.id);
-    const newIndex = selected.findIndex((m) => m.id === over.id);
+    const oldIndex = destacadasShown.findIndex((m) => m.id === active.id);
+    const newIndex = destacadasShown.findIndex((m) => m.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
 
-    const newOrder = arrayMove(selected, oldIndex, newIndex);
-    setSelected(newOrder);
-
-    const updates = newOrder.map((m, i) => ({ id: m.id, orden: i * 10 }));
+    const next = arrayMove(destacadasShown, oldIndex, newIndex);
+    const updates = next.map((m, i) => ({ id: m.id, orden: (i + 1) * 10 }));
     reorderMut.mutate(updates);
   };
 
-  const toggleVisible = (id: number, currentVis: boolean) => {
-    updateMut.mutate({ id, visible: !currentVis });
+  const openLogoUpload = (id: number) => {
+    uploadingForId.current = id;
+    fileInputRef.current?.click();
   };
 
-  // Toggle "destacada en home". Issue #288: cuando al menos una marca tiene
-  // destacada=true, BrandCarousel muestra solo esas en vez del top automático.
-  const toggleDestacada = (id: number, currentDestacada: boolean) => {
-    updateMut.mutate({ id, destacada: !currentDestacada });
+  const onFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const id = uploadingForId.current;
+    if (file && id != null) {
+      uploadLogoMut.mutate({ id, file });
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    uploadingForId.current = null;
+  };
+
+  const startRename = (m: MarcaAdmin) => {
+    setRenaming(m);
+    setRenameValue(m.nombre);
+  };
+
+  const submitRename = () => {
+    if (!renaming) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === renaming.nombre) {
+      setRenaming(null);
+      return;
+    }
+    updateMut.mutate(
+      { id: renaming.id, nombre: trimmed },
+      {
+        onSuccess: () => {
+          toast.success(`Renombrada a "${trimmed}"`);
+          setRenaming(null);
+        },
+      },
+    );
+  };
+
+  const goToProducts = (m: MarcaAdmin) => {
+    // El listado /admin/equipos filtra por `q` que matchea nombre/marca/modelo/serie.
+    navigate({ to: "/admin/equipos", search: { q: m.nombre } as never });
   };
 
   const sensors = useSensors(
@@ -150,11 +230,36 @@ export function MarcasSection() {
 
   return (
     <section className="rounded-lg border hairline bg-background p-4 space-y-3">
-      <div>
-        <h2 className="font-display text-lg text-ink">Marcas</h2>
-        <p className="text-sm text-muted-foreground">
-          Selecciona qué marcas quieres que aparezcan en el carrusel público y ordénalas con drag-drop.
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-display text-lg text-ink">Marcas</h2>
+          <p className="text-sm text-muted-foreground">
+            Tocá la estrella para que aparezcan en el carrusel público. Arrastrá las destacadas
+            para cambiar el orden. Usá el menú ⋯ para subir logo, renombrar o eliminar.
+          </p>
+        </div>
+        <div className="text-xs text-muted-foreground tabular-nums">
+          <span className="font-medium text-ink">{totalDestacadas}</span> destacadas ·{" "}
+          <span className="font-medium text-ink">{totalAll}</span> totales
+        </div>
+      </header>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          placeholder="Buscar marca…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-9 max-w-xs"
+        />
+        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={onlyDestacadas}
+            onChange={(e) => setOnlyDestacadas(e.target.checked)}
+            className="h-4 w-4 cursor-pointer"
+          />
+          Solo destacadas
+        </label>
       </div>
 
       {listQ.isLoading && (
@@ -175,7 +280,6 @@ export function MarcasSection() {
             </span>
           </div>
           {duplicateGroups.map((group, gi) => {
-            // El target por defecto: la que tiene más equipos
             const sorted = [...group].sort((a, b) => b.total - a.total);
             const target = sorted[0];
             const sources = sorted.slice(1);
@@ -192,7 +296,11 @@ export function MarcasSection() {
                     <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
                     <button
                       onClick={() => {
-                        if (confirm(`¿Fusionar "${src.nombre}" en "${target.nombre}"? Los ${src.total} equipos pasarán a "${target.nombre}" y "${src.nombre}" se borrará.`)) {
+                        if (
+                          confirm(
+                            `¿Fusionar "${src.nombre}" en "${target.nombre}"? Los ${src.total} equipos pasarán a "${target.nombre}" y "${src.nombre}" se borrará.`,
+                          )
+                        ) {
                           mergeMut.mutate({ sourceId: src.id, targetId: target.id });
                         }
                       }}
@@ -210,160 +318,272 @@ export function MarcasSection() {
       )}
 
       {!listQ.isLoading && (
-        <div className="grid grid-cols-2 gap-4">
-          {/* Disponibles */}
-          <div className="space-y-2">
-            <div>
-              <label className="text-xs uppercase tracking-wide text-muted-foreground">
-                Disponibles
-              </label>
-              <Input
-                placeholder="Buscar marca…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-8 mt-1"
-              />
+        <div className="space-y-4">
+          {/* Destacadas con drag-drop */}
+          <div className="space-y-1">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-1">
+              Destacadas — orden del carrusel
             </div>
-            <div className="border hairline rounded-md p-2 space-y-1 max-h-96 overflow-auto">
-              {allMarcas.length === 0 ? (
-                <div className="text-xs text-muted-foreground py-4 text-center">
-                  No hay marcas aún. Se crean automáticamente cuando agregás equipos.
-                </div>
-              ) : filteredAvailable.length > 0 ? (
-                filteredAvailable.map((marca) => (
-                  <button
-                    key={marca.id}
-                    onClick={() => handleSelectMarca(marca)}
-                    className="w-full text-left flex items-center gap-2 rounded px-2 py-1.5 hover:bg-muted transition text-sm"
-                  >
-                    {marca.logo_url && (
-                      <img
-                        src={marca.logo_url}
-                        alt={marca.nombre}
-                        className="h-5 w-5 object-contain"
-                        onError={(e) => (e.currentTarget.style.display = "none")}
-                      />
-                    )}
-                    <span className="flex-1">{marca.nombre}</span>
-                    <span className="text-xs text-muted-foreground">({marca.total})</span>
-                  </button>
-                ))
-              ) : (
-                <div className="text-xs text-muted-foreground py-2 text-center">
-                  {search ? "Sin resultados" : "Todas seleccionadas"}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Seleccionadas (con drag-drop) */}
-          <div className="space-y-2">
-            <label className="text-xs uppercase tracking-wide text-muted-foreground">
-              Seleccionadas ({selected.length})
-            </label>
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
               <SortableContext
-                items={selected.map((m) => m.id)}
+                items={destacadasShown.map((m) => m.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="border hairline rounded-md p-2 space-y-1 max-h-96 overflow-auto">
-                  {selected.length > 0 ? (
-                    selected.map((marca) => (
-                      <SortableMarcaItem
-                        key={marca.id}
-                        marca={marca}
-                        onRemove={() => handleRemoveMarca(marca.id)}
-                        onToggleVisible={() => toggleVisible(marca.id, marca.visible)}
-                        onToggleDestacada={() => toggleDestacada(marca.id, marca.destacada)}
+                <div className="border hairline rounded-md divide-y divide-muted/40">
+                  {destacadasShown.length > 0 ? (
+                    destacadasShown.map((m) => (
+                      <SortableMarcaRow
+                        key={m.id}
+                        marca={m}
+                        draggable
                         disabled={updateMut.isPending || reorderMut.isPending}
+                        onToggleDestacada={() => toggleDestacada(m)}
+                        onUploadLogo={() => openLogoUpload(m.id)}
+                        onRename={() => startRename(m)}
+                        onViewProducts={() => goToProducts(m)}
+                        onDelete={() => setDeleting(m)}
                       />
                     ))
                   ) : (
-                    <div className="text-xs text-muted-foreground py-2 text-center">
-                      Sin marcas seleccionadas
+                    <div className="text-xs text-muted-foreground p-4 text-center">
+                      {search ? "Sin resultados en destacadas" : "Aún no destacaste ninguna marca."}
                     </div>
                   )}
                 </div>
               </SortableContext>
             </DndContext>
           </div>
+
+          {/* Otras marcas (no destacadas) */}
+          {otrasShown.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-1">
+                Otras marcas — no aparecen en el carrusel
+              </div>
+              <div className="border hairline rounded-md divide-y divide-muted/40">
+                {otrasShown.map((m) => (
+                  <SortableMarcaRow
+                    key={m.id}
+                    marca={m}
+                    draggable={false}
+                    disabled={updateMut.isPending}
+                    onToggleDestacada={() => toggleDestacada(m)}
+                    onUploadLogo={() => openLogoUpload(m.id)}
+                    onRename={() => startRename(m)}
+                    onViewProducts={() => goToProducts(m)}
+                    onDelete={() => setDeleting(m)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!onlyDestacadas && otras.length > 0 && otrasShown.length === 0 && search && (
+            <div className="text-xs text-muted-foreground text-center py-2">
+              Sin resultados en otras marcas
+            </div>
+          )}
+
+          {allMarcas.length === 0 && (
+            <div className="text-xs text-muted-foreground py-4 text-center">
+              No hay marcas todavía. Se crean automáticamente cuando agregás equipos.
+            </div>
+          )}
         </div>
       )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={onFileChosen}
+      />
+
+      {/* Modal de renombrar */}
+      <Dialog open={!!renaming} onOpenChange={(v) => !v && setRenaming(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renombrar marca</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => e.key === "Enter" && submitRename()}
+            />
+            {renaming && renaming.total > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Esta marca tiene <strong>{renaming.total} equipos</strong> asociados. Al cambiar
+                el nombre, los productos siguen asociados al mismo registro.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenaming(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={submitRename} disabled={updateMut.isPending}>
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm delete */}
+      <AlertDialog open={!!deleting} onOpenChange={(v) => !v && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar "{deleting?.nombre}"</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleting && deleting.total > 0
+                ? `Esta marca tiene ${deleting.total} equipos asociados y no se puede eliminar. Fusionala con otra desde el panel de duplicadas, o reasigná los equipos.`
+                : "Esta acción no se puede deshacer."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleting && deleting.total === 0) {
+                  deleteMut.mutate(deleting.id, {
+                    onSuccess: () => setDeleting(null),
+                  });
+                }
+              }}
+              disabled={!deleting || deleting.total > 0 || deleteMut.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
 
-function SortableMarcaItem({
-  marca, onRemove, onToggleVisible, onToggleDestacada, disabled,
-}: {
+// ── Fila ────────────────────────────────────────────────────────────────
+
+function MarcaAvatar({ marca }: { marca: MarcaAdmin }) {
+  if (marca.logo_url) {
+    return (
+      <img
+        src={marca.logo_url}
+        alt={marca.nombre}
+        className="h-8 w-8 rounded object-contain bg-muted/30 shrink-0"
+        onError={(e) => (e.currentTarget.style.display = "none")}
+      />
+    );
+  }
+  const initial = marca.nombre.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <div className="h-8 w-8 rounded grid place-items-center bg-muted text-[11px] font-medium text-muted-foreground shrink-0">
+      {initial}
+    </div>
+  );
+}
+
+type RowProps = {
   marca: MarcaAdmin;
-  onRemove: () => void;
-  onToggleVisible: () => void;
-  onToggleDestacada: () => void;
+  draggable: boolean;
   disabled: boolean;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: marca.id });
-  const style = { transform: CSS.Transform.toString(transform), transition };
+  onToggleDestacada: () => void;
+  onUploadLogo: () => void;
+  onRename: () => void;
+  onViewProducts: () => void;
+  onDelete: () => void;
+};
+
+function SortableMarcaRow(props: RowProps) {
+  const { marca, draggable, disabled } = props;
+  const sortable = useSortable({ id: marca.id, disabled: !draggable });
+  const style = {
+    transform: CSS.Transform.toString(sortable.transform),
+    transition: sortable.transition,
+  };
 
   return (
     <div
-      ref={setNodeRef}
+      ref={sortable.setNodeRef}
       style={style}
-      className="flex items-center gap-2 rounded px-2 py-1.5 bg-muted/50 text-sm group"
+      className="flex items-center gap-2 px-2 py-2 sm:px-3 sm:gap-3 hover:bg-muted/30 transition"
     >
-      <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing h-4 w-4 text-muted-foreground hover:text-foreground flex-shrink-0"
-        title="Arrastrar para reordenar"
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
-
-      {marca.logo_url && (
-        <img
-          src={marca.logo_url}
-          alt={marca.nombre}
-          className="h-5 w-5 object-contain flex-shrink-0"
-          onError={(e) => (e.currentTarget.style.display = "none")}
-        />
+      {draggable ? (
+        <button
+          {...sortable.attributes}
+          {...sortable.listeners}
+          className="cursor-grab active:cursor-grabbing h-5 w-5 grid place-items-center text-muted-foreground hover:text-foreground shrink-0"
+          title="Arrastrar para reordenar"
+          aria-label={`Reordenar ${marca.nombre}`}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      ) : (
+        <div className="h-5 w-5 shrink-0" aria-hidden />
       )}
 
+      <MarcaAvatar marca={marca} />
+
       <div className="flex-1 min-w-0">
-        <div className="truncate text-ink">{marca.nombre}</div>
-        <div className="text-[10px] text-muted-foreground">{marca.total} equipos</div>
+        <div className="truncate text-sm text-ink">{marca.nombre}</div>
+        <div className="text-[10px] text-muted-foreground tabular-nums">
+          {marca.total} {marca.total === 1 ? "equipo" : "equipos"}
+        </div>
       </div>
 
       <button
-        onClick={onToggleDestacada}
+        onClick={props.onToggleDestacada}
         disabled={disabled}
-        className={`h-5 w-5 flex-shrink-0 grid place-items-center rounded-sm transition disabled:opacity-50 ${
+        className={`h-8 w-8 grid place-items-center rounded-md transition disabled:opacity-50 shrink-0 ${
           marca.destacada
-            ? "text-amber hover:text-amber/80"
-            : "text-muted-foreground/40 hover:text-muted-foreground"
+            ? "text-amber hover:bg-amber-soft"
+            : "text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted"
         }`}
         title={marca.destacada ? "Quitar de destacadas" : "Destacar en home"}
+        aria-label={marca.destacada ? `Quitar ${marca.nombre} de destacadas` : `Destacar ${marca.nombre}`}
       >
         <Star className={`h-4 w-4 ${marca.destacada ? "fill-current" : ""}`} />
       </button>
 
-      <input
-        type="checkbox"
-        checked={marca.visible}
-        onChange={onToggleVisible}
-        disabled={disabled}
-        className="h-4 w-4 flex-shrink-0 cursor-pointer"
-        title={marca.visible ? "Ocultar" : "Mostrar"}
-      />
-
-      <button
-        onClick={onRemove}
-        disabled={disabled}
-        className="h-4 w-4 flex-shrink-0 text-muted-foreground hover:text-destructive transition disabled:opacity-50"
-        title="Remover"
-      >
-        <X className="h-4 w-4" />
-      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted shrink-0"
+            aria-label={`Acciones de ${marca.nombre}`}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem onClick={props.onUploadLogo}>
+            <Upload className="mr-2 h-4 w-4" />
+            Subir logo
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={props.onRename}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Renombrar
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={props.onViewProducts}>
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Ver productos
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={props.onDelete}
+            disabled={marca.total > 0}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Eliminar
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
