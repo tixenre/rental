@@ -54,8 +54,17 @@ const TIPO_LABEL: Record<SpecTipo, string> = {
   bool: "Sí/No",
 };
 
-export function SpecTemplatesSection() {
-  const [catId, setCatId] = useState<number | null>(null);
+export function SpecTemplatesSection({
+  fixedCategoriaId,
+  showHeader = true,
+}: {
+  /** Si se pasa, oculta el selector de categoría y trabaja con esta. */
+  fixedCategoriaId?: number;
+  /** Mostrar header "Specs por categoría" + descripción. False cuando se
+   *  embebe en otro contexto (ej. dialog dentro de Categorías). */
+  showHeader?: boolean;
+} = {}) {
+  const [catId, setCatId] = useState<number | null>(fixedCategoriaId ?? null);
   const [editing, setEditing] = useState<SpecTemplate | "new" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SpecTemplate | null>(null);
   const qc = useQueryClient();
@@ -156,39 +165,50 @@ export function SpecTemplatesSection() {
   };
 
   return (
-    <section className="rounded-lg border hairline bg-background p-4 space-y-4">
-      <header className="space-y-1">
-        <h2 className="font-display text-lg text-ink">Specs por categoría</h2>
-        <p className="text-xs text-muted-foreground">
-          Definí qué campos técnicos pide cada categoría al cargar un equipo. Estos
-          mismos labels guían la IA al importar desde URL.
-        </p>
-      </header>
+    <section className={showHeader ? "rounded-lg border hairline bg-background p-4 space-y-4" : "space-y-4"}>
+      {showHeader && (
+        <header className="space-y-1">
+          <h2 className="font-display text-lg text-ink">Specs por categoría</h2>
+          <p className="text-xs text-muted-foreground">
+            Definí qué campos técnicos pide cada categoría al cargar un equipo. Estos
+            mismos labels guían la IA al importar desde URL.
+          </p>
+        </header>
+      )}
 
-      {/* Selector de categoría */}
-      <div className="flex items-end gap-2">
-        <div className="flex-1 max-w-md">
-          <Label htmlFor="cat-select" className="text-xs">Categoría</Label>
-          <Select
-            value={catId != null ? String(catId) : ""}
-            onValueChange={(v) => setCatId(Number(v))}
-          >
-            <SelectTrigger id="cat-select" className="h-9">
-              <SelectValue placeholder="Elegir categoría…" />
-            </SelectTrigger>
-            <SelectContent>
-              {catsFlat.map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.path}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* Selector de categoría — oculto cuando fixedCategoriaId */}
+      {fixedCategoriaId == null && (
+        <div className="flex items-end gap-2">
+          <div className="flex-1 max-w-md">
+            <Label htmlFor="cat-select" className="text-xs">Categoría</Label>
+            <Select
+              value={catId != null ? String(catId) : ""}
+              onValueChange={(v) => setCatId(Number(v))}
+            >
+              <SelectTrigger id="cat-select" className="h-9">
+                <SelectValue placeholder="Elegir categoría…" />
+              </SelectTrigger>
+              <SelectContent>
+                {catsFlat.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.path}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {catId != null && (
+            <Button size="sm" onClick={() => setEditing("new")}>
+              <Plus className="h-4 w-4 mr-1" /> Agregar spec
+            </Button>
+          )}
         </div>
-        {catId != null && (
+      )}
+      {fixedCategoriaId != null && (
+        <div className="flex justify-end">
           <Button size="sm" onClick={() => setEditing("new")}>
             <Plus className="h-4 w-4 mr-1" /> Agregar spec
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Grid de categorías raíz como acceso rápido cuando no hay ninguna seleccionada */}
       {catId == null && (
