@@ -221,8 +221,8 @@ Definición completa del criterio, checklist y status por ruta en [`docs/MOBILE_
 
 ### Features activas
 
-- **Form V2 de equipos** con autocompletar (single + batch) + cache de scrape.
-- **Bulk actions** en lista admin (incluye `add_categoria` masivo).
+- **Form V2 de equipos** con autocompletar (single + batch) + cache de scrape. El input del autocompletar pre-carga el `bh_url` existente del equipo.
+- **Bulk actions** en lista admin: `set_visible`, `set_ficha_completa`, `set_categoria`, `add_categoria`, `remove_categoria`, `delete`, etc.
 - **Filtros admin** por categoría + marca + etiqueta (shareable via URL).
 - **Soft delete** + papelera + restore.
 - **Mantenimiento log** por equipo.
@@ -230,11 +230,12 @@ Definición completa del criterio, checklist y status por ruta en [`docs/MOBILE_
 - **Historial de alquileres** por equipo.
 - **Búsqueda fuzzy global** en `q` de listEquipos.
 - **Specs normalizer** EN→ES + métrico.
-- **Specs por categoría** como norma del form (#291): drag-drop reorder, tipo Número con unidad obligatoria, template-bound vs custom con UI distinta.
-- **Categorías** árbol de hasta 3 niveles con drag-drop reorder y cross-parent.
+- **Specs por categoría** como norma del form (#291): drag-drop reorder, tipo Número con unidad obligatoria, template-bound vs custom con UI distinta. **Editable inline desde Categorías** (botón Wrench en cada row → dialog scoped a esa categoría).
+- **Categorías** árbol de hasta 3 niveles con drag-drop reorder y cross-parent. Asignar equipos masivamente desde cada row. Disclosure que muestra los equipos asignados como sub-nivel con remove inline. Drag root → anidar bajo otra categoría.
+- **Plantilla de nombre público por categoría** (`nombre_publico_template` en `categorias`): editable desde el row con placeholders `{marca}`, `{modelo}`, `{tipo}`, `{nombre}`, `{spec:Label}`. Preview en vivo. Fallback a `nombre-publico.ts` hardcoded cuando vacío. El form de equipo usa el template DB si está definido.
 - **Marcas unificadas** en una columna: logo SVG con tinting automático via CSS filter, drag-drop reorder, mini menú (subir logo, renombrar, ver productos, eliminar). Cache-bust por upload.
 - **Pestaña Diseño** (`/admin/diseno`): ordenar y ocultar secciones del catálogo público.
-- **Sidebar admin**: "Inventario" agrupando Equipos/Categorías/Marcas/Etiquetas/Specs/Validar nombres.
+- **Sidebar admin**: "Inventario" agrupando Equipos/Categorías/Marcas/Etiquetas/Specs por categoría. Sin Hoy/Calendario/Clasificar/Validar nombres (rutas siguen accesibles, no aparecen en menú).
 - **Catálogo público** con cart, cotización, portal cliente. View grid/list compartible via `?view=` en URL. Popup intro one-time solo desktop.
 - **Detalle de equipo**: bloque "Incluye" arriba de todo con kit + fotos + cantidades en mobile.
 - **Tests E2E** del form (skipped en CI sin backend orchestrado).
