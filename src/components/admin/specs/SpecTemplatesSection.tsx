@@ -16,8 +16,17 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Pencil, X } from "lucide-react";
+import { Plus, Trash2, Pencil, X, GripVertical } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,7 +103,57 @@ export function SpecTemplatesSection() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const reorderMut = useMutation({
+    mutationFn: (items: { id: number; prioridad: number }[]) =>
+      adminApi.reorderSpecTemplates(items),
+    // Optimistic: actualizamos el cache local antes del response para que el
+    // re-orden visual sea instantáneo. Si falla, invalidamos para refetch.
+    onMutate: async (next) => {
+      await qc.cancelQueries({ queryKey: ["admin", "spec-templates", catId] });
+      const prev = qc.getQueryData<{ items: SpecTemplate[] }>([
+        "admin", "spec-templates", catId,
+      ]);
+      if (prev) {
+        const byId = new Map(next.map((n) => [n.id, n.prioridad] as const));
+        qc.setQueryData<{ items: SpecTemplate[] }>(
+          ["admin", "spec-templates", catId],
+          {
+            items: prev.items
+              .map((t) => ({ ...t, prioridad: byId.get(t.id) ?? t.prioridad }))
+              .sort((a, b) => a.prioridad - b.prioridad || a.label.localeCompare(b.label)),
+          },
+        );
+      }
+      return { prev };
+    },
+    onError: (e: Error, _next, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(["admin", "spec-templates", catId], ctx.prev);
+      }
+      toast.error(e.message);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "spec-templates", catId] });
+    },
+  });
+
   const items = templatesQ.data?.items ?? [];
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = items.findIndex((t) => t.id === active.id);
+    const newIndex = items.findIndex((t) => t.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = arrayMove(items, oldIndex, newIndex);
+    const updates = next.map((t, i) => ({ id: t.id, prioridad: (i + 1) * 10 }));
+    reorderMut.mutate(updates);
+  };
 
   return (
     <section className="rounded-lg border hairline bg-background p-4 space-y-4">
@@ -176,66 +235,41 @@ export function SpecTemplatesSection() {
 
       {items.length > 0 && (
         <div className="rounded-md border hairline overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-xs text-muted-foreground">
-              <tr>
-                <th className="text-left px-3 py-2 font-normal">Label / Key</th>
-                <th className="text-left px-3 py-2 font-normal">Tipo</th>
-                <th className="text-left px-3 py-2 font-normal hidden md:table-cell">Flags</th>
-                <th className="text-right px-3 py-2 font-normal">Prio</th>
-                <th className="w-20"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y hairline">
-              {items.map((t) => (
-                <tr key={t.id} className="hover:bg-muted/20">
-                  <td className="px-3 py-2">
-                    <div className="text-ink">{t.label}</div>
-                    <div className="font-mono text-[10px] text-muted-foreground">{t.spec_key}</div>
-                  </td>
-                  <td className="px-3 py-2 text-xs">
-                    {TIPO_LABEL[t.tipo]}
-                    {t.tipo === "number" && t.unidad ? ` · ${t.unidad}` : ""}
-                    {t.tipo === "enum" && t.enum_options ? (
-                      <div className="text-[10px] text-muted-foreground truncate max-w-[180px]">
-                        {t.enum_options.join(", ")}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2 hidden md:table-cell">
-                    <div className="flex flex-wrap gap-1 text-[10px]">
-                      {t.destacado && <Badge tone="amber">destacado</Badge>}
-                      {t.obligatorio && <Badge>obligatorio</Badge>}
-                      {t.visible_en_nombre && <Badge>en nombre</Badge>}
-                      {t.visible_en_card && <Badge>en card</Badge>}
-                      {t.visible_en_filtros && <Badge>en filtros</Badge>}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 text-right text-xs tabular-nums text-muted-foreground">
-                    {t.prioridad}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex justify-end gap-1">
-                      <button
-                        onClick={() => setEditing(t)}
-                        className="rounded p-1 text-muted-foreground hover:bg-muted/50 hover:text-ink"
-                        aria-label="Editar"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete(t)}
-                        className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        aria-label="Eliminar"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* Cabecera (alineada con las celdas — drag handle ocupa la primera columna). */}
+          <div className="grid grid-cols-[24px_1fr_140px_minmax(0,1fr)_56px_64px] items-center gap-2 bg-muted/40 px-3 py-2 text-xs text-muted-foreground md:grid-cols-[24px_1fr_140px_minmax(0,1fr)_56px_64px]">
+            <span aria-hidden />
+            <span>Label / Key</span>
+            <span>Tipo</span>
+            <span className="hidden md:block">Flags</span>
+            <span className="text-right">Prio</span>
+            <span />
+          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={items.map((t) => t.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="divide-y hairline">
+                {items.map((t) => (
+                  <SortableSpecRow
+                    key={t.id}
+                    template={t}
+                    onEdit={() => setEditing(t)}
+                    onDelete={() => setConfirmDelete(t)}
+                    disabled={reorderMut.isPending}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+          <p className="border-t hairline px-3 py-2 text-[10px] text-muted-foreground bg-muted/20">
+            Arrastrá una fila para cambiar el orden — la primera es la más prominente
+            en el form de equipo y en la card del catálogo.
+          </p>
         </div>
       )}
 
@@ -286,6 +320,89 @@ function Badge({ children, tone = "default" }: { children: React.ReactNode; tone
     : "bg-muted text-muted-foreground";
   return (
     <span className={`inline-flex items-center rounded px-1.5 py-0.5 ${cls}`}>{children}</span>
+  );
+}
+
+function SortableSpecRow({
+  template, onEdit, onDelete, disabled,
+}: {
+  template: SpecTemplate;
+  onEdit: () => void;
+  onDelete: () => void;
+  disabled: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: template.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="grid grid-cols-[24px_1fr_140px_minmax(0,1fr)_56px_64px] items-center gap-2 px-3 py-2 text-sm hover:bg-muted/20"
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        disabled={disabled}
+        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground disabled:opacity-50"
+        aria-label={`Reordenar ${template.label}`}
+        title="Arrastrar para reordenar"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+
+      <div className="min-w-0">
+        <div className="truncate text-ink">{template.label}</div>
+        <div className="font-mono text-[10px] text-muted-foreground truncate">
+          {template.spec_key}
+        </div>
+      </div>
+
+      <div className="text-xs min-w-0">
+        {TIPO_LABEL[template.tipo]}
+        {template.tipo === "number" && template.unidad ? ` · ${template.unidad}` : ""}
+        {template.tipo === "enum" && template.enum_options ? (
+          <div className="text-[10px] text-muted-foreground truncate">
+            {template.enum_options.join(", ")}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="hidden md:flex flex-wrap gap-1 text-[10px] min-w-0">
+        {template.destacado && <Badge tone="amber">destacado</Badge>}
+        {template.obligatorio && <Badge>obligatorio</Badge>}
+        {template.visible_en_nombre && <Badge>en nombre</Badge>}
+        {template.visible_en_card && <Badge>en card</Badge>}
+        {template.visible_en_filtros && <Badge>en filtros</Badge>}
+      </div>
+      <div className="md:hidden" aria-hidden />
+
+      <div className="text-right text-xs tabular-nums text-muted-foreground">
+        {template.prioridad}
+      </div>
+
+      <div className="flex justify-end gap-1">
+        <button
+          onClick={onEdit}
+          className="rounded p-1 text-muted-foreground hover:bg-muted/50 hover:text-ink"
+          aria-label="Editar"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={onDelete}
+          className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          aria-label="Eliminar"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
   );
 }
 
