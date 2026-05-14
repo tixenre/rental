@@ -304,16 +304,9 @@ export function EquipoFormDialogV2({
     });
   }, [specTemplateQ.data]);
 
-  /** #291 Fase B: mapa label→{tipo, unidad} para que SpecsDiffEditor
-   *  renderee inputs numéricos con sufijo cuando aplique. */
-  const templateByLabel = useMemo(() => {
-    const map = new Map<string, { tipo: string; unidad: string | null }>();
-    for (const t of specTemplateQ.data?.items ?? []) {
-      if (!t.label?.trim()) continue;
-      map.set(t.label.trim().toLowerCase(), { tipo: t.tipo, unidad: t.unidad });
-    }
-    return map;
-  }, [specTemplateQ.data]);
+  /** #291 Fase C: items del template (ya ordenados por prioridad ASC)
+   *  que SpecsDiffEditor consume para mostrar primero los template-bound. */
+  const templateItems = specTemplateQ.data?.items ?? [];
 
   // ── Auto-generación del nombre público ────────────────────────────
   // Cuando el toggle está ON y la categoría tiene template, regenera al
@@ -1121,7 +1114,7 @@ export function EquipoFormDialogV2({
               <SpecsDiffEditor
                 specs={specs}
                 propuestos={specsPropuestos}
-                templateByLabel={templateByLabel}
+                templateItems={templateItems}
                 onChange={setSpecs}
                 onAceptarPropuesto={(s) => {
                   setSpecs((prev) => {
