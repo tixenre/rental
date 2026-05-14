@@ -44,6 +44,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { adminApi, type MarcaAdmin } from "@/lib/admin/api";
+import { InlineSvg, isSvgUrl } from "@/components/ui/InlineSvg";
 
 export function MarcasSection() {
   const qc = useQueryClient();
@@ -472,6 +473,23 @@ export function MarcasSection() {
 
 function MarcaAvatar({ marca }: { marca: MarcaAdmin }) {
   if (marca.logo_url) {
+    if (isSvgUrl(marca.logo_url)) {
+      return (
+        <InlineSvg
+          url={marca.logo_url}
+          ariaLabel={marca.nombre}
+          className="h-8 w-8 rounded bg-muted/30 p-1 shrink-0 text-ink"
+          fallback={
+            <img
+              src={marca.logo_url}
+              alt={marca.nombre}
+              className="h-8 w-8 rounded object-contain bg-muted/30 shrink-0"
+              onError={(e) => (e.currentTarget.style.display = "none")}
+            />
+          }
+        />
+      );
+    }
     return (
       <img
         src={marca.logo_url}

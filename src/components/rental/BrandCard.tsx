@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { type Brand } from "@/types/brand";
 import { cn } from "@/lib/utils";
+import { InlineSvg, isSvgUrl } from "@/components/ui/InlineSvg";
 
 /**
  * Mapeo de marcas a slugs de simple-icons.org (CDN gratuito de logos SVG, MIT).
@@ -72,15 +73,32 @@ export function BrandCard({
           : "border-hairline bg-surface hover:border-ink hover:bg-amber-soft"
       )}
     >
-      {/* Logo / Iniciales — object-contain para que SVGs no se recorten */}
-      <div className="h-14 w-14 grid place-items-center overflow-hidden rounded bg-background">
+      {/* Logo / Iniciales — object-contain para que SVGs no se recorten.
+          SVGs inlined → herendan color del `text-ink` parent (currentColor). */}
+      <div className="h-14 w-14 grid place-items-center overflow-hidden rounded bg-background text-ink">
         {showImg ? (
-          <img
-            src={logoUrl!}
-            alt={brand.nombre}
-            className="h-full w-full object-contain p-1.5"
-            onError={() => setImgFailed(true)}
-          />
+          isSvgUrl(logoUrl) ? (
+            <InlineSvg
+              url={logoUrl!}
+              ariaLabel={brand.nombre}
+              className="h-full w-full p-1.5"
+              fallback={
+                <img
+                  src={logoUrl!}
+                  alt={brand.nombre}
+                  className="h-full w-full object-contain p-1.5"
+                  onError={() => setImgFailed(true)}
+                />
+              }
+            />
+          ) : (
+            <img
+              src={logoUrl!}
+              alt={brand.nombre}
+              className="h-full w-full object-contain p-1.5"
+              onError={() => setImgFailed(true)}
+            />
+          )
         ) : (
           <span className="font-display text-lg text-ink">
             {initials(brand.nombre)}
