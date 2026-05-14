@@ -1,20 +1,13 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
+import { FilterControls } from "./FilterControls";
 
-type Props = {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  categories: string[];
-  brands: any[];
-  selectedCategories: Set<string>;
-  onToggleCategory: (c: string) => void;
-  selectedBrand: string | null;
-  onBrand: (b: string | null) => void;
-  onClear: () => void;
-  resultCount: number;
-};
-
+/**
+ * Bottom sheet de filtros para mobile. Solo el wrapper visual (header con
+ * contador + footer con CTA "Ver N resultados"). Los controles de
+ * marca/categorías/limpiar viven en `<FilterControls />` compartido con
+ * `<ListFilters />`.
+ */
 export function MobileFiltersSheet({
   open,
   onOpenChange,
@@ -26,7 +19,18 @@ export function MobileFiltersSheet({
   onBrand,
   onClear,
   resultCount,
-}: Props) {
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  categories: string[];
+  brands: { id: number | string; nombre: string }[];
+  selectedCategories: Set<string>;
+  onToggleCategory: (c: string) => void;
+  selectedBrand: string | null;
+  onBrand: (b: string | null) => void;
+  onClear: () => void;
+  resultCount: number;
+}) {
   const activeCount = selectedCategories.size + (selectedBrand ? 1 : 0);
 
   return (
@@ -45,51 +49,18 @@ export function MobileFiltersSheet({
           </div>
         </SheetHeader>
 
-        <div className="space-y-6 px-4 py-5 pb-8">
-          {/* Marca */}
-          <section>
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-              Marca
-            </div>
-            <select
-              value={selectedBrand ?? ""}
-              onChange={(e) => onBrand(e.target.value || null)}
-              className="w-full rounded-md border hairline bg-surface px-3 py-2 text-sm focus:border-amber/40 focus:outline-none"
-            >
-              <option value="">Todas las marcas</option>
-              {brands.map((b) => (
-                <option key={b.id} value={String(b.id)}>
-                  {b.nombre}
-                </option>
-              ))}
-            </select>
-          </section>
-
-          {/* Categorías */}
-          <section>
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-              Categorías
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {categories.map((c) => {
-                const active = selectedCategories.has(c);
-                return (
-                  <button
-                    key={c}
-                    onClick={() => onToggleCategory(c)}
-                    className={cn(
-                      "rounded-full border px-3 py-1.5 text-xs transition",
-                      active
-                        ? "border-ink bg-ink text-amber"
-                        : "hairline text-foreground/70 hover:border-ink hover:text-ink",
-                    )}
-                  >
-                    {c}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+        <div className="px-4 py-5 pb-8">
+          <FilterControls
+            layout="stacked"
+            categories={categories}
+            brands={brands}
+            selectedCategories={selectedCategories}
+            onToggleCategory={onToggleCategory}
+            selectedBrand={selectedBrand}
+            onBrand={onBrand}
+            onClear={onClear}
+            showClear={false}
+          />
         </div>
 
         {/* Footer acciones */}
