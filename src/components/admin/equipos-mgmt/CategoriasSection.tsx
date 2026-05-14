@@ -41,7 +41,9 @@ type RowItem = { id: number; nombre: string; prioridad: number; parent_id: numbe
 type DragData =
   | { type: "root"; rootId: number }
   | { type: "child"; childId: number; parentId: number }
-  | { type: "root-zone"; rootId: number };
+  | { type: "root-zone"; rootId: number }
+  | { type: "grandchild"; grandchildId: number; parentChildId: number }
+  | { type: "child-zone"; childId: number };
 
 export function CategoriasSection() {
   const qc = useQueryClient();
@@ -193,6 +195,53 @@ export function CategoriasSection() {
             onSuccess: () => toast.success(`Movida a "${displayRoots.find((r) => r.id === targetParentId)?.nombre ?? "otra raíz"}"`),
           },
         );
+      }
+    }
+
+    // ── Movimiento de nieto (3er nivel) ───────────────────────────────
+    if (activeData.type === "grandchild") {
+      const activeGrandId = activeData.grandchildId;
+      const activeParentId = activeData.parentChildId;
+
+      // Target parent del nieto:
+      //  - over es otro nieto → mismo padre que ese nieto
+      //  - over es child-zone → el child padre de esa zona
+      //  - over es el child header → ese child como nuevo padre
+      let targetParentId: number | null = null;
+      if (overData?.type === "grandchild") {
+        targetParentId = overData.parentChildId;
+      } else if (overData?.type === "child-zone") {
+        targetParentId = overData.childId;
+      } else if (overData?.type === "child") {
+        targetParentId = overData.childId;
+      } else {
+        return;
+      }
+
+      if (activeParentId === targetParentId) {
+        // Reorder de nietos dentro del mismo padre.
+        if (active.id === over.id) return;
+        const siblings = childrenOfDisplay(activeParentId);
+        const oldIndex = siblings.findIndex((g) => g.id === activeGrandId);
+        const newIndex = siblings.findIndex((g) => g.id === Number(over.id));
+        if (oldIndex < 0 || newIndex < 0) return;
+        const reordered = arrayMove(siblings, oldIndex, newIndex);
+        setLocalChildrenMap((m) => ({ ...m, [activeParentId]: reordered }));
+        reorderMut.mutate(reordered.map((g) => g.id));
+      } else {
+        // Cross-parent: mover nieto a otro child (también nivel 2).
+        const oldSiblings = childrenOfDisplay(activeParentId);
+        const newSiblings = childrenOfDisplay(targetParentId);
+        const moved = oldSiblings.find((g) => g.id === activeGrandId);
+        if (!moved) return;
+        const newOldSiblings = oldSiblings.filter((g) => g.id !== activeGrandId);
+        const newNewSiblings = [...newSiblings, { ...moved, parent_id: targetParentId }];
+        setLocalChildrenMap((m) => ({
+          ...m,
+          [activeParentId]: newOldSiblings,
+          [targetParentId]: newNewSiblings,
+        }));
+        updateMut.mutate({ id: activeGrandId, parent_id: targetParentId });
       }
     }
   };
@@ -534,32 +583,27 @@ function SortableChildItem({
         </Button>
       </div>
 
-      {/* Nietos (3er nivel) — render plano indentado, sin drag-drop */}
+      {/* Nietos (3er nivel) — drag-drop reorder + cross-parent.
+       *  SortableContext anida bajo el DndContext top-level del componente.
+       *  La zona droppable de cada child (`child-zone-{id}`) recibe nietos
+       *  arrastrados desde otro child. */}
       {(grandchildren.length > 0 || addingGrand) && (
-        <ul className="ml-10 border-l hairline">
-          {grandchildren.map((g) => (
-            <li key={g.id} className="flex items-center gap-1.5 px-3 py-1">
-              <span className="text-muted-foreground/40 select-none">└</span>
-              <EditableNameInput
-                value={g.nombre}
-                onSave={(n) => onRenameGrandchild?.(g.id, n)}
-                className="h-7 flex-1"
-              />
-              <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
-                {g.total}
-              </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 text-destructive"
-                onClick={() => onDeleteGrandchild?.(g.id, g.nombre)}
-                title="Eliminar"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </li>
-          ))}
-          {addingGrand && (
+        <ChildZone childId={child.id}>
+          <SortableContext
+            items={grandchildren.map((g) => g.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ul className="ml-10 border-l hairline">
+              {grandchildren.map((g) => (
+                <SortableGrandchildItem
+                  key={g.id}
+                  grand={g}
+                  parentChildId={child.id}
+                  onRename={(n) => onRenameGrandchild?.(g.id, n)}
+                  onDelete={() => onDeleteGrandchild?.(g.id, g.nombre)}
+                />
+              ))}
+              {addingGrand && (
             <li className="px-3 py-1.5 flex items-center gap-2">
               <Input
                 autoFocus
@@ -592,8 +636,74 @@ function SortableChildItem({
               </Button>
             </li>
           )}
-        </ul>
+            </ul>
+          </SortableContext>
+        </ChildZone>
       )}
+    </li>
+  );
+}
+
+function ChildZone({ childId, children }: { childId: number; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `child-zone-${childId}`,
+    data: { type: "child-zone", childId } satisfies DragData,
+  });
+  return (
+    <div ref={setNodeRef} className={isOver ? "bg-amber-soft/30" : undefined}>
+      {children}
+    </div>
+  );
+}
+
+function SortableGrandchildItem({
+  grand, parentChildId, onRename, onDelete,
+}: {
+  grand: RowItem;
+  parentChildId: number;
+  onRename: (n: string) => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: grand.id,
+      data: { type: "grandchild", grandchildId: grand.id, parentChildId } satisfies DragData,
+    });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <li ref={setNodeRef} style={style} className="flex items-center gap-1.5 px-3 py-1">
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="h-5 w-5 grid place-items-center text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
+        aria-label="Arrastrar nieto"
+      >
+        <GripVertical className="h-3 w-3" />
+      </button>
+      <EditableNameInput
+        value={grand.nombre}
+        onSave={onRename}
+        className="h-7 flex-1"
+      />
+      <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
+        {grand.total}
+      </span>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-7 w-7 text-destructive"
+        onClick={onDelete}
+        title="Eliminar"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
     </li>
   );
 }
