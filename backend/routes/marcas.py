@@ -2,6 +2,8 @@
 routes/marcas.py — CRUD de marcas (brands).
 """
 
+import re
+import unicodedata
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -9,6 +11,14 @@ from database import get_db, row_to_dict
 from admin_guard import require_admin
 
 router = APIRouter()
+
+
+def _logo_path(marca_id: int, nombre: str, ext: str) -> str:
+    """Genera path R2 para el logo: marcas/{id}_{slug}/logo.{ext}."""
+    slug = unicodedata.normalize("NFKD", nombre or "").encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug.lower()).strip("-")[:50]
+    folder = f"{marca_id}_{slug}" if slug else str(marca_id)
+    return f"marcas/{folder}/logo.{ext}"
 
 
 # ── Pydantic Models ──────────────────────────────────────────────────────────
@@ -215,3 +225,92 @@ def admin_reorder_marcas(req: MarcasReorderRequest, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
+
+
+@router.delete("/admin/marcas/{marca_id}", status_code=204)
+def admin_delete_marca(marca_id: int, request: Request):
+    """Borra una marca. Rechaza si tiene equipos asociados — primero hay que
+    fusionar (POST /admin/marcas/merge) o reasignar los equipos."""
+    require_admin(request)
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT id, nombre FROM marcas WHERE id = %s", (marca_id,)
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Marca no encontrada")
+
+        count_row = conn.execute(
+            "SELECT COUNT(*) AS n FROM equipos WHERE brand_id = %s", (marca_id,)
+        ).fetchone()
+        n = int(count_row["n"] if isinstance(count_row, dict) else count_row[0])
+        if n > 0:
+            raise HTTPException(
+                409,
+                f"La marca tiene {n} equipos asociados. Fusionala con otra o reasigná los equipos antes de borrar.",
+            )
+
+        conn.execute("DELETE FROM marcas WHERE id = %s", (marca_id,))
+        conn.commit()
+    except HTTPException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.post("/admin/marcas/{marca_id}/upload-logo")
+async def admin_upload_marca_logo(marca_id: int, request: Request):
+    """Sube un logo (multipart/form-data, campo `file`) a R2, lo optimiza y
+    persiste `logo_url` en la marca. Reusa los helpers de equipos.py."""
+    require_admin(request)
+
+    # Import lazy para evitar ciclo entre marcas.py ↔ equipos.py
+    from routes.equipos import _optimize_image, _ext_from_ctype, _upload_to_r2
+
+    conn = get_db()
+    try:
+        marca = conn.execute(
+            "SELECT id, nombre FROM marcas WHERE id = %s", (marca_id,)
+        ).fetchone()
+        if not marca:
+            raise HTTPException(404, "Marca no encontrada")
+        nombre = marca["nombre"] if isinstance(marca, dict) else marca[1]
+    finally:
+        conn.close()
+
+    form = await request.form()
+    file = form.get("file")
+    if file is None or not hasattr(file, "read"):
+        raise HTTPException(400, "Falta el campo 'file' en el form-data")
+
+    raw_content = await file.read()
+    if not raw_content:
+        raise HTTPException(400, "Archivo vacío")
+    if len(raw_content) > 5 * 1024 * 1024:
+        raise HTTPException(413, "Logo muy grande (máx 5MB)")
+
+    content, ctype, w, h = _optimize_image(raw_content)
+    ext = _ext_from_ctype(ctype)
+    path = _logo_path(marca_id, nombre, ext)
+    public_url = _upload_to_r2(path, content, ctype)
+
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE marcas SET logo_url = %s, updated_at = NOW() WHERE id = %s",
+            (public_url, marca_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "public_url": public_url,
+        "path": path,
+        "size": len(content),
+        "size_original": len(raw_content),
+        "content_type": ctype,
+        "width": w or None,
+        "height": h or None,
+    }

@@ -30,8 +30,8 @@ import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
 import { Route as AdminEquiposEtiquetasRouteImport } from './routes/admin/equipos.etiquetas'
 
 const AdminIndexLazyRouteImport = createFileRoute('/admin/')()
-const AdminHoyLazyRouteImport = createFileRoute('/admin/hoy')()
 const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
+const AdminHoyLazyRouteImport = createFileRoute('/admin/hoy')()
 const AdminEstadisticasLazyRouteImport = createFileRoute(
   '/admin/estadisticas',
 )()
@@ -104,11 +104,6 @@ const ClienteIndexRoute = ClienteIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ClienteRoute,
 } as any)
-const AdminHoyLazyRoute = AdminHoyLazyRouteImport.update({
-  id: '/hoy',
-  path: '/hoy',
-  getParentRoute: () => AdminRoute,
-} as any).lazy(() => import('./routes/admin/hoy.lazy').then((d) => d.Route))
 const AdminSettingsLazyRoute = AdminSettingsLazyRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -116,6 +111,11 @@ const AdminSettingsLazyRoute = AdminSettingsLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/settings.lazy').then((d) => d.Route),
 )
+const AdminHoyLazyRoute = AdminHoyLazyRouteImport.update({
+  id: '/hoy',
+  path: '/hoy',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() => import('./routes/admin/hoy.lazy').then((d) => d.Route))
 const AdminEstadisticasLazyRoute = AdminEstadisticasLazyRouteImport.update({
   id: '/estadisticas',
   path: '/estadisticas',
@@ -265,10 +265,10 @@ export interface FileRoutesByFullPath {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/equipo/$slug': typeof EquipoSlugRoute
-  '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/calendario': typeof AdminCalendarioLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/cliente/': typeof ClienteIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
@@ -296,10 +296,10 @@ export interface FileRoutesByTo {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/equipo/$slug': typeof EquipoSlugRoute
-  '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/calendario': typeof AdminCalendarioLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/cliente': typeof ClienteIndexRoute
   '/admin': typeof AdminIndexLazyRoute
@@ -331,10 +331,10 @@ export interface FileRoutesById {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/equipo/$slug': typeof EquipoSlugRoute
-  '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/calendario': typeof AdminCalendarioLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/cliente/': typeof ClienteIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
@@ -367,10 +367,10 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/equipo/$slug'
-    | '/admin/hoy'
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/estadisticas'
+    | '/admin/hoy'
     | '/admin/settings'
     | '/cliente/'
     | '/admin/'
@@ -398,10 +398,10 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/equipo/$slug'
-    | '/admin/hoy'
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/estadisticas'
+    | '/admin/hoy'
     | '/admin/settings'
     | '/cliente'
     | '/admin'
@@ -432,10 +432,10 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/equipo/$slug'
-    | '/admin/hoy'
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/estadisticas'
+    | '/admin/hoy'
     | '/admin/settings'
     | '/cliente/'
     | '/admin/'
@@ -534,6 +534,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsLazyRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/hoy': {
+      id: '/admin/hoy'
+      path: '/hoy'
+      fullPath: '/admin/hoy'
+      preLoaderRoute: typeof AdminHoyLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/estadisticas': {
       id: '/admin/estadisticas'
       path: '/estadisticas'
@@ -589,13 +596,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/cliente/login'
       preLoaderRoute: typeof ClienteLoginRouteImport
       parentRoute: typeof ClienteRoute
-    }
-    '/admin/hoy': {
-      id: '/admin/hoy'
-      path: '/hoy'
-      fullPath: '/admin/hoy'
-      preLoaderRoute: typeof AdminHoyLazyRouteImport
-      parentRoute: typeof AdminRoute
     }
     '/admin/novedades': {
       id: '/admin/novedades'
@@ -719,10 +719,10 @@ interface AdminRouteChildren {
   AdminEquiposRoute: typeof AdminEquiposRouteWithChildren
   AdminLoginRoute: typeof AdminLoginRoute
   AdminNovedadesRoute: typeof AdminNovedadesRoute
-  AdminHoyLazyRoute: typeof AdminHoyLazyRoute
   AdminCalendarioLazyRoute: typeof AdminCalendarioLazyRoute
   AdminClientesLazyRoute: typeof AdminClientesLazyRoute
   AdminEstadisticasLazyRoute: typeof AdminEstadisticasLazyRoute
+  AdminHoyLazyRoute: typeof AdminHoyLazyRoute
   AdminSettingsLazyRoute: typeof AdminSettingsLazyRoute
   AdminIndexLazyRoute: typeof AdminIndexLazyRoute
   AdminPedidosIdLazyRoute: typeof AdminPedidosIdLazyRoute
@@ -734,10 +734,10 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEquiposRoute: AdminEquiposRouteWithChildren,
   AdminLoginRoute: AdminLoginRoute,
   AdminNovedadesRoute: AdminNovedadesRoute,
-  AdminHoyLazyRoute: AdminHoyLazyRoute,
   AdminCalendarioLazyRoute: AdminCalendarioLazyRoute,
   AdminClientesLazyRoute: AdminClientesLazyRoute,
   AdminEstadisticasLazyRoute: AdminEstadisticasLazyRoute,
+  AdminHoyLazyRoute: AdminHoyLazyRoute,
   AdminSettingsLazyRoute: AdminSettingsLazyRoute,
   AdminIndexLazyRoute: AdminIndexLazyRoute,
   AdminPedidosIdLazyRoute: AdminPedidosIdLazyRoute,
