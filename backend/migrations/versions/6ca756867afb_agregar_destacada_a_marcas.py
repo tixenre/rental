@@ -12,7 +12,7 @@ Comportamiento del frontend:
 - Si ninguna está marcada → fallback al algoritmo automático (top N).
 
 Revision ID: 6ca756867afb
-Revises: d4f8a2b1e6c3
+Revises: a1b2c3d4e5f6
 Create Date: 2026-05-14
 """
 from typing import Sequence, Union
@@ -20,7 +20,7 @@ from typing import Sequence, Union
 from alembic import op
 
 revision: str = "6ca756867afb"
-down_revision: Union[str, Sequence[str], None] = "d4f8a2b1e6c3"
+down_revision: Union[str, Sequence[str], None] = "a1b2c3d4e5f6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
