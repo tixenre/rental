@@ -36,7 +36,7 @@ export function ListFilters({
           >
             <option value="">Todas las marcas</option>
             {brandList.map((b) => (
-              <option key={b.id} value={String(b.id)}>
+              <option key={b.id} value={b.nombre}>
                 {b.nombre}
               </option>
             ))}
