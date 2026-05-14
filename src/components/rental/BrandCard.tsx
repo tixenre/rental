@@ -89,28 +89,31 @@ export function BrandCard({
       )}
     >
       {showImg ? (
-        isSvgUrl(logoUrl) ? (
-          <InlineSvg
-            url={logoUrl!}
-            ariaLabel={brand.nombre}
-            className="h-full w-full"
-            fallback={
-              <img
-                src={logoUrl!}
-                alt={brand.nombre}
-                className="h-full w-full object-contain"
-                onError={() => setImgFailed(true)}
-              />
-            }
-          />
-        ) : (
-          <img
-            src={logoUrl!}
-            alt={brand.nombre}
-            className="h-full w-full object-contain"
-            onError={() => setImgFailed(true)}
-          />
-        )
+        // `brightness-0` colapsa todo el logo a un silueta sólida negra,
+        // sin importar si vino en SVG con fills, PNG a color, gradient, etc.
+        // Resultado uniforme con el resto del tema. Si en el futuro hay
+        // dark mode, agregar `dark:invert` acá para que se vea en blanco.
+        <span className="h-full w-full grid place-items-center [&>img]:max-h-full [&>img]:max-w-full [&>img]:object-contain [&>span]:h-full [&>span]:w-full brightness-0">
+          {isSvgUrl(logoUrl) ? (
+            <InlineSvg
+              url={logoUrl!}
+              ariaLabel={brand.nombre}
+              fallback={
+                <img
+                  src={logoUrl!}
+                  alt={brand.nombre}
+                  onError={() => setImgFailed(true)}
+                />
+              }
+            />
+          ) : (
+            <img
+              src={logoUrl!}
+              alt={brand.nombre}
+              onError={() => setImgFailed(true)}
+            />
+          )}
+        </span>
       ) : (
         <span className="font-display text-3xl leading-none">
           {initials(brand.nombre)}

@@ -371,15 +371,22 @@ function GridMode({
   getDisponible: (item: Equipment) => number | undefined;
 }) {
   const q = query.trim().toLowerCase();
-  const matches = (e: Equipment) =>
-    !q ||
-    (e.name ?? "").toLowerCase().includes(q) ||
-    (e.brand ?? "").toLowerCase().includes(q) ||
-    (e.category ?? "").toLowerCase().includes(q);
+  const matches = (e: Equipment) => {
+    if (selectedBrand && e.brand !== selectedBrand) return false;
+    if (!q) return true;
+    return (
+      (e.name ?? "").toLowerCase().includes(q) ||
+      (e.brand ?? "").toLowerCase().includes(q) ||
+      (e.category ?? "").toLowerCase().includes(q)
+    );
+  };
 
-  const isFiltered = selectedCats.size > 0;
+  const isFiltered = selectedCats.size > 0 || !!selectedBrand;
   const isSearching = q.length > 0;
-  const visibleCategories = isFiltered
+  // Si hay categorías seleccionadas, limitamos a esas. Si solo está el
+  // filtro de marca o búsqueda, mostramos todas las categorías (matches()
+  // hace el resto del filtrado por marca/query).
+  const visibleCategories = selectedCats.size > 0
     ? apiCategories.filter((c) => selectedCats.has(c))
     : apiCategories;
 
@@ -399,6 +406,15 @@ function GridMode({
             <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
               Filtrando por
             </span>
+            {selectedBrand && (
+              <button
+                onClick={() => onBrandSelect(null)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs text-amber hover:opacity-90"
+                aria-label={`Quitar filtro ${selectedBrand}`}
+              >
+                {selectedBrand} ×
+              </button>
+            )}
             {[...selectedCats].map((c) => (
               <span
                 key={c}
@@ -408,7 +424,7 @@ function GridMode({
               </span>
             ))}
             <button
-              onClick={onClearCats}
+              onClick={() => { onClearCats(); onBrandSelect(null); }}
               className="ml-1 rounded-full border hairline px-3 py-1 text-xs text-muted-foreground hover:border-ink hover:text-ink"
             >
               Ver todo
