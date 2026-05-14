@@ -34,6 +34,8 @@ import {
 } from "@/components/ui/select";
 
 import { adminApi } from "@/lib/admin/api";
+import { AddEquiposToCategoriaDialog } from "./AddEquiposToCategoriaDialog";
+import { Users } from "lucide-react";
 
 type RowItem = { id: number; nombre: string; prioridad: number; parent_id: number | null; total: number };
 
@@ -57,6 +59,7 @@ export function CategoriasSection() {
   const [newChildName, setNewChildName] = useState("");
   const [newRoot, setNewRoot] = useState("");
   const [hideEmpty, setHideEmpty] = useState(false);
+  const [addingEquiposTo, setAddingEquiposTo] = useState<{ id: number; nombre: string } | null>(null);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["admin", "categorias"] });
@@ -297,6 +300,7 @@ export function CategoriasSection() {
                       }
                     }}
                     onAddChild={() => { setNewChildFor(root.id); setNewChildName(""); }}
+                    onAddEquipos={(id, nombre) => setAddingEquiposTo({ id, nombre })}
                     newChildFor={newChildFor}
                     newChildName={newChildName}
                     setNewChildName={setNewChildName}
@@ -352,6 +356,15 @@ export function CategoriasSection() {
           <Plus className="h-4 w-4 mr-1" /> Agregar raíz
         </Button>
       </div>
+
+      {addingEquiposTo && (
+        <AddEquiposToCategoriaDialog
+          open={true}
+          onOpenChange={(v) => { if (!v) setAddingEquiposTo(null); }}
+          categoriaId={addingEquiposTo.id}
+          categoriaNombre={addingEquiposTo.nombre}
+        />
+      )}
     </section>
   );
 }
@@ -365,6 +378,7 @@ function SortableRootItem({
   onCreateChild, onCancelChild,
   onRenameChild, onChangeParent, onDeleteChild,
   grandchildrenOf, onCreateGrandchild, onRenameGrandchild, onDeleteGrandchild,
+  onAddEquipos,
 }: {
   root: RowItem;
   children: RowItem[];
@@ -386,6 +400,7 @@ function SortableRootItem({
   onCreateGrandchild: (parentId: number, name: string) => void;
   onRenameGrandchild: (id: number, name: string) => void;
   onDeleteGrandchild: (id: number, name: string) => void;
+  onAddEquipos: (id: number, nombre: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -440,6 +455,15 @@ function SortableRootItem({
         <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
           {root.total}
         </span>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 text-muted-foreground hover:text-ink"
+          onClick={() => onAddEquipos(root.id, root.nombre)}
+          title="Asignar equipos a esta categoría"
+        >
+          <Users className="h-4 w-4" />
+        </Button>
         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onAddChild} title="Agregar subcategoría">
           <Plus className="h-4 w-4" />
         </Button>
@@ -471,6 +495,7 @@ function SortableRootItem({
                   onCreateGrandchild={onCreateGrandchild}
                   onRenameGrandchild={onRenameGrandchild}
                   onDeleteGrandchild={onDeleteGrandchild}
+                  onAddEquipos={onAddEquipos}
                 />
               ))}
               {children.length === 0 && (
@@ -509,6 +534,7 @@ function SortableChildItem({
   child, parents, grandchildren = [],
   onRename, onChangeParent, onDelete,
   onCreateGrandchild, onRenameGrandchild, onDeleteGrandchild,
+  onAddEquipos,
 }: {
   child: RowItem;
   parents: RowItem[];
@@ -519,6 +545,7 @@ function SortableChildItem({
   onCreateGrandchild?: (parentId: number, name: string) => void;
   onRenameGrandchild?: (id: number, name: string) => void;
   onDeleteGrandchild?: (id: number, name: string) => void;
+  onAddEquipos?: (id: number, nombre: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -567,6 +594,17 @@ function SortableChildItem({
             ))}
           </SelectContent>
         </Select>
+        {onAddEquipos && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:text-ink"
+            onClick={() => onAddEquipos(child.id, child.nombre)}
+            title="Asignar equipos a esta subcategoría"
+          >
+            <Users className="h-4 w-4" />
+          </Button>
+        )}
         {onCreateGrandchild && (
           <Button
             size="icon"
@@ -601,6 +639,7 @@ function SortableChildItem({
                   parentChildId={child.id}
                   onRename={(n) => onRenameGrandchild?.(g.id, n)}
                   onDelete={() => onDeleteGrandchild?.(g.id, g.nombre)}
+                  onAddEquipos={onAddEquipos}
                 />
               ))}
               {addingGrand && (
@@ -657,12 +696,13 @@ function ChildZone({ childId, children }: { childId: number; children: React.Rea
 }
 
 function SortableGrandchildItem({
-  grand, parentChildId, onRename, onDelete,
+  grand, parentChildId, onRename, onDelete, onAddEquipos,
 }: {
   grand: RowItem;
   parentChildId: number;
   onRename: (n: string) => void;
   onDelete: () => void;
+  onAddEquipos?: (id: number, nombre: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -695,6 +735,17 @@ function SortableGrandchildItem({
       <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
         {grand.total}
       </span>
+      {onAddEquipos && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 text-muted-foreground hover:text-ink"
+          onClick={() => onAddEquipos(grand.id, grand.nombre)}
+          title="Asignar equipos a esta categoría"
+        >
+          <Users className="h-3.5 w-3.5" />
+        </Button>
+      )}
       <Button
         size="icon"
         variant="ghost"
