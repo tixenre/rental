@@ -54,7 +54,7 @@ Excepciones:
 
 - **Cambios triviales** (typo, dead import) → PR directo, sin issue.
 - **Decisiones de arquitectura / diseño** → docs en `docs/` (ej. `DISEÑO_SPECS.md`).
-- **Ideas tempranas sin compromiso** → este manifiesto, sección "Pendientes / Ideas".
+- **Ideas tempranas sin compromiso** → issue con `priority:low` (o conversación con el dueño antes de abrirlo).
 
 ### Planes multi-fase → issues
 
@@ -74,18 +74,7 @@ Cada issue describe la fase con: contexto, scope (checklist accionable), cómo (
 
 Por qué: minimiza el costo de review + merge + deploy. Una iniciativa = 1 review, 1 merge, 1 deploy — no N.
 
-Pattern del commit history adentro de la rama:
-
-```
-feat(ui): wrappers chrome (Logo, PublicLayout, TopBar variant)
-refactor(ui): rutas con drift a PublicLayout
-refactor(ui): rutas restantes a PublicLayout
-docs(mobile): criterio mobile en MOBILE_AUDIT
-fix(mobile): tap targets en PedidoPage
-...
-```
-
-Cada commit es atómico y revertible. La PR los publica en bloque.
+Cada commit dentro de la rama es atómico y revertible. La PR los publica en bloque.
 
 **Excepción explícita**: para algo chico y aislado (typo, una decisión de label puntual, un bug fix de 5 líneas que no está atado a una iniciativa más grande), pedir abrir una **PR separada** de forma explícita. Sin esa indicación, default es agregar al branch en curso.
 
@@ -104,8 +93,6 @@ Estilo `tipo(scope): descripción en español, lowercase, sin punto final`.
 Tipos: `feat`, `fix`, `refactor`, `chore`, `docs`, `perf`, `test`.
 
 Body explica el **por qué**, no el **qué**. Bullets si hay varios efectos.
-
-`Co-Authored-By: Claude <noreply@anthropic.com>` al final si fue trabajo colaborativo. (Hoy ya no se usa con frecuencia, pero queda como convención.)
 
 ### PRs
 
@@ -145,7 +132,37 @@ Definición completa del criterio, checklist y status por ruta en [`docs/MOBILE_
 
 ---
 
-## 4. Decisiones del proyecto
+## 4. Glossary
+
+Cuatro nociones que se cruzan a lo largo del producto. Distinguirlas evita confusión:
+
+- **Categoría** — árbol jerárquico de hasta 3 niveles (ej. Cámara → Cinema → FX3). Cada equipo pertenece a una o más. Determina el filtro principal del catálogo público y dispara el spec template + plantilla de nombre.
+- **Etiqueta** — tag libre, plano (sin jerarquía). Atraviesa categorías (ej. "Sony E mount" puede aplicar a cámaras y a lentes). Filtro secundario.
+- **Spec** — fila clave-valor adjunta a un equipo (`Sensor: Full Frame`). Lo técnico que se ve en la ficha. Tipo `text` o `number` (con unidad).
+- **Spec Template** — norma de specs **por categoría**. Define qué labels deben existir en cada equipo de esa categoría, en qué orden, con qué tipo y unidad. Heredan automáticamente al crear un equipo nuevo. "AI sugiere, humano cura" → el autocompletar respeta el template como hint.
+
+---
+
+## 5. Mapa del código
+
+Puntos de entrada para no grepear:
+
+| Qué | Dónde |
+|---|---|
+| Rutas frontend (file-based) | `src/routes/` |
+| Componentes admin | `src/components/admin/` |
+| Form V2 de equipos | `src/components/admin/equipo-form-v2/` |
+| Lógica reusable / utilities UI | `src/lib/` |
+| Endpoints backend | `backend/routes/` (`equipos.py`, `clientes.py`, `dashboard.py`, etc.) |
+| Schema base + pool DB | `backend/database.py` |
+| Migrations Alembic | `backend/migrations/versions/` |
+| Auth admin | `backend/admin_guard.py` |
+| Auth cliente | `backend/routes/auth.py` |
+| Storage R2 + scrape + optimize foto | dentro de `backend/routes/equipos.py` |
+
+---
+
+## 6. Decisiones del proyecto
 
 > Lecciones aprendidas y elecciones arquitectónicas. Útil para no re-discutir cosas.
 
@@ -169,13 +186,8 @@ Definición completa del criterio, checklist y status por ruta en [`docs/MOBILE_
 
 ### Form de equipos
 
-- **EquipoFormDialogV2** es EL form. El form viejo (`EquipoFormDialog.tsx`) fue borrado.
-- Sin tabs, scroll lineal con secciones colapsables (Identificación, Ficha técnica, Kit, Avanzado).
-- Mismo flow CREATE / EDIT.
-- Drag-and-drop en specs y kit con `@dnd-kit`.
-- Cmd/Ctrl+S guarda. Esc cierra.
-- Status switches en el top: Visible en catálogo + Ficha completa.
-- Sub-componentes extraídos: `KitEditor.tsx`, `SpecsDiffEditor.tsx`, `spec-helpers.ts`. El resto (`PhotoCard`, `CategoriasPicker`, `LinkInput`, `Field`, `CollapsibleSection`) sigue inline.
+- **EquipoFormDialogV2** es EL form. Sin tabs, scroll lineal con secciones colapsables. Mismo flow CREATE / EDIT.
+- El form viejo (`EquipoFormDialog.tsx`) fue borrado — no resucitar.
 
 ### Autocompletar de specs
 
@@ -187,9 +199,8 @@ Definición completa del criterio, checklist y status por ruta en [`docs/MOBILE_
 
 ### Bulk actions en lista admin
 
-- Checkbox por fila + barra flotante con: Mostrar/Ocultar, Marcar completas/pendientes, Eliminar (soft).
-- En vista papelera: el botón "Eliminar permanente" hace hard delete (`action: delete_permanent`).
-- Hasta 500 ids por request (defensivo).
+- En vista normal: las bulk actions son soft (`delete` → marca `eliminado_at`).
+- En vista papelera: `delete_permanent` hace hard delete. Es la única forma de borrar irreversible.
 
 ### Búsqueda fuzzy
 
@@ -198,15 +209,12 @@ Definición completa del criterio, checklist y status por ruta en [`docs/MOBILE_
 
 ### Mantenimiento
 
-- Tabla `equipo_mantenimiento` con `fecha`, `tipo` (revision/reparacion/limpieza/otro), `descripcion`, `costo` (ARS), `proxima_revision`.
-- Modal CRUD desde la lista admin (botón Wrench por fila).
-- Badge rojo si `proxima_revision` está vencida.
+- Log por equipo (`equipo_mantenimiento`) con tipo, costo y `proxima_revision`. Vencidas se marcan visualmente en la lista admin.
 
 ### Dashboard de uso
 
-- `GET /admin/dashboard/uso`: top alquilados, sin uso (>90 días), revenue por categoría, cuentas por cobrar.
-- Implementado como Dialog desde la lista admin (botón "Uso"), no como ruta separada — evita tocar `routeTree.gen.ts` auto-generado.
-- "Por cobrar" suma `monto_total - monto_pagado` para pedidos en estados `confirmado`, `retirado`, `devuelto`, `finalizado` que todavía tienen saldo.
+- Dialog desde la lista admin, no ruta separada — evita ediciones de `routeTree.gen.ts` auto-generado.
+- "Por cobrar" excluye `cancelado` y `borrador`. Solo cuenta pedidos con compromiso real de pago.
 
 ### Naming conventions
 
@@ -217,64 +225,36 @@ Definición completa del criterio, checklist y status por ruta en [`docs/MOBILE_
 
 ---
 
-## 5. Estado actual
+## 7. Dónde encontrar cosas
 
-### Dónde se ve qué está hecho
+### Backlog, changelog, decisiones puntuales
 
-Este manifiesto **no lleva el changelog**. El registro de qué se construyó, cuándo y con qué PR vive en **GitHub Issues cerrados**:
+**Todo vive en GitHub Issues.** Este manifiesto no duplica el contenido — solo apunta.
 
-```
-gh issue list --state closed --label feature   # features entregadas
-gh issue list --state closed --label bug       # bugs cerrados
-gh issue list --state closed                   # todo el histórico
-```
+| Querés saber… | Comando |
+|---|---|
+| Qué hay pendiente | `gh issue list --state open` |
+| Qué features están en curso | `gh issue list --state open --label feature` |
+| Qué bugs hay reportados | `gh issue list --state open --label bug` |
+| Qué se entregó (changelog) | `gh issue list --state closed --sort created --order desc` |
+| Por qué algo está como está | abrir el issue cerrado de esa iniciativa |
 
-Cada iniciativa tiene su issue con contexto, scope, PRs incluidos y verificación. Si querés saber por qué algo está como está, el issue es la fuente — no este archivo.
+Si una funcionalidad existe en código y no en issues, es un gap → crear el issue retroactivo. Excepción documental: `docs/BUGS.md` conserva la auditoría inicial del 2026-05-10 (precede la convención).
 
-Para una idea rápida de qué hay en producción, el código manda: rutas activas en `src/routes/`, endpoints en `backend/routes/`. Si una funcionalidad existe en código y no en issues, es un gap que hay que cerrar (crear el issue retroactivo).
+### Docs auxiliares
+
+| Archivo | Cuándo |
+|---|---|
+| [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Workflow de PRs, auditoría, mobile gate |
+| [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md) | Deploy y rollback |
+| [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md) | Checklist mobile + status por ruta |
+| [`docs/DISEÑO_SPECS.md`](docs/DISEÑO_SPECS.md) | Sistema de specs / templates |
+| [`docs/ISSUE_LABELS.md`](docs/ISSUE_LABELS.md) | Convención de labels |
 
 ### Cosas que NO existen todavía
 
-Aclaración para no buscarlas en vano:
+Aclaración para no buscarlas en vano: pagos online (Stripe/MercadoPago), notificaciones por email, multi-tenant, dark mode, app mobile nativa.
 
-- Pagos online (Stripe, MercadoPago) — pagos manuales por fuera.
-- Notificaciones email a clientes / admin.
-- Multi-tenant.
-- Dark mode.
-- App mobile nativa.
+### Sesión nueva pierde el rumbo
 
----
-
-## 6. Cómo arrancar una sesión nueva con Claude
-
-Este manifiesto se carga al inicio. Si Claude se pierde, decirle:
-
-```
-Releé MANIFIESTO.md y los issues abiertos en https://github.com/tixenre/rental/issues.
-```
-
-Otros docs que puede tener que abrir según la tarea:
-
-- `docs/PROTOCOLO.md` — workflow de PRs / auditoría.
-- `docs/DEPLOY_RAILWAY.md` — deploy.
-- `docs/MOBILE_AUDIT.md` — checklist mobile.
-- `docs/DISEÑO_SPECS.md` — diseño del sistema de specs.
-
-Para ver el trabajo pendiente / activo (todo vive en GitHub Issues):
-
-- `gh issue list --state open --label feature` — features abiertas.
-- `gh issue list --state open --label bug` — bugs reportados.
-- `gh issue list --state open --label design` — decisiones de diseño / UX.
-- `gh issue list --state open` — todo el backlog.
-
----
-
-## 7. Histórico
-
-El histórico no vive acá. Cada sesión / iniciativa cierra su issue cuando termina, y la lista de issues cerrados (en orden cronológico) **es** el changelog del proyecto:
-
-```
-gh issue list --state closed --sort created --order desc
-```
-
-Excepción documental: `docs/BUGS.md` conserva la auditoría inicial del 2026-05-10 (23 bugs históricos) porque precede a la convención de issues.
+Si Claude se pierde a mitad de sesión: `Releé MANIFIESTO.md y los issues abiertos en https://github.com/tixenre/rental/issues`.
