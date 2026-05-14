@@ -22,16 +22,24 @@ import { CSS } from "@dnd-kit/utilities";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-import { type Spec, newSpec, sameLabel } from "./spec-helpers";
+import { type Spec, newSpec, sameLabel, extractNumericPart } from "./spec-helpers";
+
+/** Metadata mínima del template para guiar el render del input.
+ *  Mapa case-insensitive por label (normalizado a lower+trim por el padre). */
+export type TemplateMetaByLabel = Map<string, { tipo: string; unidad: string | null }>;
 
 export function SpecsDiffEditor({
   specs, propuestos, onChange, onAceptarPropuesto, onDescartarPropuesto,
+  templateByLabel,
 }: {
   specs: Spec[];
   propuestos: Spec[];
   onChange: (s: Spec[]) => void;
   onAceptarPropuesto: (s: Spec) => void;
   onDescartarPropuesto: (s: Spec) => void;
+  /** #291 Fase B: si el label match con un template tipo=number,
+   *  renderiza input numérico + sufijo con la unidad. */
+  templateByLabel?: TemplateMetaByLabel;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -111,6 +119,7 @@ export function SpecsDiffEditor({
                 <SortableSpec
                   key={s.id}
                   spec={s}
+                  templateMeta={templateByLabel?.get(s.label.trim().toLowerCase())}
                   onUpdate={(patch) => updateSpec(s.id, patch)}
                   onRemove={() => removeSpec(s.id)}
                 />
@@ -128,9 +137,10 @@ export function SpecsDiffEditor({
 }
 
 function SortableSpec({
-  spec, onUpdate, onRemove,
+  spec, templateMeta, onUpdate, onRemove,
 }: {
   spec: Spec;
+  templateMeta?: { tipo: string; unidad: string | null };
   onUpdate: (patch: Partial<Spec>) => void;
   onRemove: () => void;
 }) {
@@ -142,6 +152,8 @@ function SortableSpec({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  const isNumericTemplate = templateMeta?.tipo === "number" && !!templateMeta.unidad;
 
   return (
     <div ref={setNodeRef} style={style} className="flex gap-1 items-center bg-background">
@@ -160,15 +172,60 @@ function SortableSpec({
         placeholder="Spec"
         className="text-xs"
       />
-      <Input
-        value={spec.value}
-        onChange={(e) => onUpdate({ value: e.target.value })}
-        placeholder="Valor"
-        className="text-xs"
-      />
+      {isNumericTemplate ? (
+        <NumericValueInput
+          value={spec.value}
+          unidad={templateMeta!.unidad!}
+          onChange={(v) => onUpdate({ value: v })}
+        />
+      ) : (
+        <Input
+          value={spec.value}
+          onChange={(e) => onUpdate({ value: e.target.value })}
+          placeholder="Valor"
+          className="text-xs"
+        />
+      )}
       <Button type="button" size="icon" variant="ghost" onClick={onRemove}>
         <Trash2 className="h-3.5 w-3.5" />
       </Button>
+    </div>
+  );
+}
+
+/**
+ * Input numérico con sufijo de unidad. El value persistido es
+ * `${numero} ${unidad}` para que el catálogo público lo muestre completo
+ * sin cambios. Al editar, parseamos solo la parte numérica.
+ */
+function NumericValueInput({
+  value, unidad, onChange,
+}: {
+  value: string;
+  unidad: string;
+  onChange: (v: string) => void;
+}) {
+  const numericPart = extractNumericPart(value);
+  return (
+    <div className="relative flex-1">
+      <Input
+        type="number"
+        inputMode="decimal"
+        step="any"
+        value={numericPart}
+        onChange={(e) => {
+          const num = e.target.value;
+          onChange(num.trim() ? `${num} ${unidad}` : "");
+        }}
+        placeholder="0"
+        className="text-xs pr-12"
+      />
+      <span
+        className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] uppercase tracking-wider text-muted-foreground"
+        aria-hidden
+      >
+        {unidad}
+      </span>
     </div>
   );
 }

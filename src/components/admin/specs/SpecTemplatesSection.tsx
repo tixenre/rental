@@ -358,6 +358,11 @@ function SpecTemplateFormModal({
       toast.error("Para tipo enum tenés que listar al menos una opción");
       return;
     }
+    // #291 Fase B: unidad obligatoria para tipo número.
+    if (form.tipo === "number" && !(form.unidad ?? "").trim()) {
+      toast.error("Para tipo Número tenés que indicar la unidad (kg, MP, mm, W…).");
+      return;
+    }
     const payload: SpecTemplateInput = {
       ...form,
       spec_key: trimmedKey,
@@ -450,12 +455,18 @@ function SpecTemplateFormModal({
 
           {form.tipo === "number" && (
             <div>
-              <Label className="text-xs">Unidad (opcional)</Label>
+              <Label className="text-xs">
+                Unidad <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.unidad ?? ""}
                 onChange={(e) => setForm({ ...form, unidad: e.target.value })}
-                placeholder="ej. mm, W, kg, fps"
+                placeholder="ej. kg, MP, mm, W, fps, ISO"
+                required
               />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Al cargar un equipo se escribe solo el número y aparece esta unidad como sufijo.
+              </p>
             </div>
           )}
 
