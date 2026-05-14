@@ -136,8 +136,27 @@ export function CategoriasSection() {
     const overData = over.data.current as DragData | undefined;
     if (!activeData) return;
 
-    // ── Reorder de raíces ─────────────────────────────────────────────
+    // ── Reorder de raíces o nest de root bajo otra ───────────────────
     if (activeData.type === "root") {
+      // Si se suelta sobre una root-zone (área de hijas) de otra raíz,
+      // mover este root para que sea hijo (nivel 2) de esa raíz.
+      if (overData?.type === "root-zone" && overData.rootId !== activeData.rootId) {
+        updateMut.mutate(
+          { id: activeData.rootId, parent_id: overData.rootId },
+          { onSuccess: () => toast.success("Movida bajo otra categoría") },
+        );
+        return;
+      }
+      // Si se suelta sobre una child-zone (área de nietos de un child),
+      // mover este root para que sea nieto (nivel 3) de ese child.
+      if (overData?.type === "child-zone") {
+        updateMut.mutate(
+          { id: activeData.rootId, parent_id: overData.childId },
+          { onSuccess: () => toast.success("Movida como sub-subcategoría") },
+        );
+        return;
+      }
+      // Default: reorder entre roots.
       if (active.id === over.id) return;
       const oldIndex = displayRoots.findIndex((r) => r.id === activeData.rootId);
       const newIndex = displayRoots.findIndex((r) => r.id === Number(over.id));
@@ -457,6 +476,7 @@ function SortableRootItem({
           categoriaId={root.id}
           categoriaNombre={root.nombre}
           count={root.total}
+          onAddEquipos={onAddEquipos}
         />
         <Button
           size="icon"
@@ -586,19 +606,8 @@ function SortableChildItem({
           categoriaId={child.id}
           categoriaNombre={child.nombre}
           count={child.total}
+          onAddEquipos={onAddEquipos}
         />
-        <Select
-          value={child.parent_id ? String(child.parent_id) : "none"}
-          onValueChange={(v) => onChangeParent(v === "none" ? null : Number(v))}
-        >
-          <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Sin padre</SelectItem>
-            {parents.map((p) => (
-              <SelectItem key={p.id} value={String(p.id)}>{p.nombre}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         {onAddEquipos && (
           <Button
             size="icon"
@@ -741,6 +750,7 @@ function SortableGrandchildItem({
         categoriaId={grand.id}
         categoriaNombre={grand.nombre}
         count={grand.total}
+        onAddEquipos={onAddEquipos}
       />
       {onAddEquipos && (
         <Button
