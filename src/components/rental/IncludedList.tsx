@@ -1,23 +1,21 @@
-import { Package } from "lucide-react";
-import { equipment, type Equipment } from "@/data/equipment";
-import { EmptyImage } from "./EmptyImage";
+import { type Equipment } from "@/data/equipment";
 import { KeywordChips } from "./KeywordChips";
 import { pickHighlightSpecs } from "@/lib/equipment/specs";
 
+/**
+ * IncludedList — keywords + specs highlights de la ficha del equipo.
+ *
+ * NOTA: los kit components (item.includes) NO se rendean acá; viven en
+ * `KitSection` que se mounta arriba del todo en la página de detalle.
+ */
 export function IncludedList({ item }: { item: Equipment }) {
-  const includes = item.includes ?? [];
-  const hasIncludes = includes.length > 0;
   const specs = item.specs ?? [];
   const hasSpecs = specs.length > 0;
   const keywords = item.keywords ?? [];
   const hasKeywords = keywords.length > 0;
 
-  if (!hasIncludes && !hasSpecs && !hasKeywords) {
-    return (
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-        Sin información adicional
-      </div>
-    );
+  if (!hasSpecs && !hasKeywords) {
+    return null;
   }
 
   const { highlights, rest } = pickHighlightSpecs(item.category, specs, 6);
@@ -27,7 +25,7 @@ export function IncludedList({ item }: { item: Equipment }) {
     <div className="space-y-3">
       {hasKeywords && <KeywordChips keywords={keywords} />}
       {hasSpecs && (
-        <>
+        <div>
           {/* Mobile (#144): grilla 2-columnas label-arriba / valor-abajo, más
            * denso y alineado que los chips. */}
           <dl className="grid grid-cols-2 gap-x-3 gap-y-2 sm:hidden">
@@ -68,62 +66,6 @@ export function IncludedList({ item }: { item: Equipment }) {
                 +{moreSpecs} más
               </li>
             )}
-          </ul>
-        </>
-      )}
-
-      {hasIncludes && (
-        <div>
-          <div className="mb-2 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-ink">
-            <Package className="h-3 w-3" /> Incluye
-          </div>
-          <ul className="grid gap-1.5 sm:grid-cols-2">
-            {includes.map((inc, i) => {
-              const ref: Equipment | undefined = inc.id
-                ? equipment.find((eq) => eq.id === inc.id)
-                : undefined;
-              const qty = inc.qty ?? 1;
-              return (
-                <li
-                  key={`${inc.id ?? inc.name}-${i}`}
-                  className="flex items-center gap-2.5 rounded-md border hairline bg-background/60 p-2"
-                >
-                  <div className="relative aspect-square w-10 shrink-0 overflow-hidden rounded bg-muted/40">
-                    {inc.fotoUrl ? (
-                      <img
-                        src={inc.fotoUrl}
-                        alt={inc.name}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0"; }}
-                      />
-                    ) : ref ? (
-                      <EmptyImage category={ref.category} brand={ref.brand} />
-                    ) : (
-                      <div className="grid h-full w-full place-items-center">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    {ref && (
-                      <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
-                        {ref.brand} · {ref.category}
-                      </div>
-                    )}
-                    <div className="truncate text-sm text-ink">{inc.name}</div>
-                    {inc.note && (
-                      <div className="text-[11px] text-muted-foreground">{inc.note}</div>
-                    )}
-                  </div>
-                  {qty > 1 && (
-                    <span className="shrink-0 rounded-full bg-ink px-2 py-0.5 font-mono text-[10px] tabular text-amber">
-                      ×{qty}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
           </ul>
         </div>
       )}
