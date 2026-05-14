@@ -80,6 +80,7 @@ export function IncludedList({ item }: { item: Equipment }) {
         <div className="order-1 sm:order-none">
           <div className="mb-2 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-ink">
             <Package className="h-3 w-3" /> Incluye
+            <span className="ml-1 text-muted-foreground">({includes.length})</span>
           </div>
           <ul className="grid gap-1.5 sm:grid-cols-2">
             {includes.map((inc, i) => {
@@ -92,7 +93,20 @@ export function IncludedList({ item }: { item: Equipment }) {
                   key={`${inc.id ?? inc.name}-${i}`}
                   className="flex items-center gap-2.5 rounded-md border hairline bg-background/60 p-2"
                 >
-                  <div className="relative aspect-square w-10 shrink-0 overflow-hidden rounded bg-muted/40">
+                  {/* Badge de cantidad: siempre visible en mobile (incluso ×1)
+                   *  para que el cliente vea claramente cuántos vienen.
+                   *  En desktop solo cuando >1 (menos ruido en grid 2-col). */}
+                  <span
+                    className={`shrink-0 grid h-9 min-w-9 place-items-center rounded-md px-1.5 font-mono text-xs tabular ${
+                      qty > 1
+                        ? "bg-ink text-amber font-bold"
+                        : "bg-muted text-ink/70 sm:hidden"
+                    }`}
+                    aria-label={`Cantidad: ${qty}`}
+                  >
+                    ×{qty}
+                  </span>
+                  <div className="relative aspect-square w-12 sm:w-10 shrink-0 overflow-hidden rounded bg-muted/40">
                     {inc.fotoUrl ? (
                       <img
                         src={inc.fotoUrl}
@@ -115,16 +129,11 @@ export function IncludedList({ item }: { item: Equipment }) {
                         {ref.brand} · {ref.category}
                       </div>
                     )}
-                    <div className="truncate text-sm text-ink">{inc.name}</div>
+                    <div className="text-sm leading-snug text-ink">{inc.name}</div>
                     {inc.note && (
                       <div className="text-[11px] text-muted-foreground">{inc.note}</div>
                     )}
                   </div>
-                  {qty > 1 && (
-                    <span className="shrink-0 rounded-full bg-ink px-2 py-0.5 font-mono text-[10px] tabular text-amber">
-                      ×{qty}
-                    </span>
-                  )}
                 </li>
               );
             })}
