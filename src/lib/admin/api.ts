@@ -146,6 +146,8 @@ export type CategoriaAdmin = {
   nombre: string;
   prioridad: number;
   parent_id: number | null;
+  /** Si false, la categoría no se muestra en el catálogo público. */
+  visible: boolean;
   total: number;
 };
 
@@ -486,7 +488,13 @@ export const adminApi = {
     authedPostJson<CategoriaAdmin>("/api/admin/categorias", data),
   adminUpdateCategoria: (
     id: number,
-    patch: { nombre?: string; prioridad?: number; parent_id?: number | null; set_parent_null?: boolean },
+    patch: {
+      nombre?: string;
+      prioridad?: number;
+      parent_id?: number | null;
+      set_parent_null?: boolean;
+      visible?: boolean;
+    },
   ) =>
     authedJson<{ ok: true }>(`/api/admin/categorias/${id}`, {
       method: "PATCH",

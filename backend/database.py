@@ -494,6 +494,10 @@ def init_db():
             parent_id INTEGER REFERENCES categorias(id) ON DELETE SET NULL
         )
     """)
+    # Idempotente: agregar `visible` para installs viejos sin migration aplicada.
+    conn.execute("""
+        ALTER TABLE categorias ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT TRUE
+    """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_cat_prioridad ON categorias(prioridad, nombre)
     """)

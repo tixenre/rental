@@ -1424,6 +1424,7 @@ def get_categorias(flat: int = Query(0)):
         cats = conn.execute("""
             SELECT id, nombre, prioridad, parent_id, popularidad_score
             FROM categorias
+            WHERE COALESCE(visible, TRUE) = TRUE
             ORDER BY prioridad ASC, popularidad_score DESC, LOWER(nombre) ASC
         """).fetchall()
 
@@ -1907,6 +1908,7 @@ class CategoriaPatch(BaseModel):
     prioridad: Optional[int] = None
     parent_id: Optional[int] = None
     set_parent_null: Optional[bool] = False
+    visible:   Optional[bool] = None
 
 
 class CategoriasReorder(BaseModel):
@@ -1920,15 +1922,17 @@ def admin_list_categorias(request: Request):
     try:
         rows = conn.execute("""
             SELECT c.id, c.nombre, c.prioridad, c.parent_id,
+                   COALESCE(c.visible, TRUE) AS visible,
                    COUNT(ec.equipo_id) AS total
             FROM categorias c
             LEFT JOIN equipo_categorias ec ON ec.categoria_id = c.id
-            GROUP BY c.id, c.nombre, c.prioridad, c.parent_id
+            GROUP BY c.id, c.nombre, c.prioridad, c.parent_id, c.visible
             ORDER BY c.prioridad ASC, LOWER(c.nombre) ASC
         """).fetchall()
         return [
             {"id": r["id"], "nombre": r["nombre"], "prioridad": r["prioridad"],
-             "parent_id": r["parent_id"], "total": r["total"]}
+             "parent_id": r["parent_id"], "visible": bool(r["visible"]),
+             "total": r["total"]}
             for r in rows
         ]
     finally:
@@ -1984,6 +1988,8 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
         sets.append("nombre = ?"); vals.append(nuevo_nombre)
     if patch.prioridad is not None:
         sets.append("prioridad = ?"); vals.append(int(patch.prioridad))
+    if patch.visible is not None:
+        sets.append("visible = ?"); vals.append(bool(patch.visible))
     if patch.set_parent_null:
         sets.append("parent_id = NULL")
     elif patch.parent_id is not None:
