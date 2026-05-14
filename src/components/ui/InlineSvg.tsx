@@ -31,7 +31,7 @@ export function InlineSvg({
       const res = await fetch(url);
       if (!res.ok) throw new Error(`SVG fetch ${res.status}`);
       const text = await res.text();
-      return sanitizeSvg(text);
+      return tintSvg(sanitizeSvg(text));
     },
     staleTime: Infinity,
     gcTime: Infinity,
@@ -71,4 +71,26 @@ function sanitizeSvg(text: string): string {
     .replace(/\son\w+\s*=\s*(["'])[\s\S]*?\1/gi, "")
     .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
     .replace(/<foreignObject\b[^>]*>[\s\S]*?<\/foreignObject>/gi, "");
+}
+
+/**
+ * Forzar el color del SVG al `currentColor` del parent. Reemplaza:
+ *  - atributos `fill="..."` y `stroke="..."` (excepto `none`)
+ *  - estilos inline `fill: ...;` y `stroke: ...;` dentro de `style="..."`
+ *  - declaraciones equivalentes dentro de `<style>...</style>`
+ * Mantiene `none` (no fill) para preservar las áreas vacías intencionales.
+ *
+ * Esto convierte cualquier logo a monocromo siguiendo el tema. Si el admin
+ * subió un logo a color (Sony rojo), también se uniforma — esa es la
+ * decisión: que el catálogo se vea consistente. Si quieren color, suben
+ * PNG.
+ */
+function tintSvg(text: string): string {
+  return text
+    // fill="hex/named/rgb" → fill="currentColor", excepto "none"
+    .replace(/fill\s*=\s*(["'])(?!none\1)[^"']*\1/gi, 'fill="currentColor"')
+    .replace(/stroke\s*=\s*(["'])(?!none\1)[^"']*\1/gi, 'stroke="currentColor"')
+    // style="...fill: red; stroke: blue..." → reemplaza las props
+    .replace(/(\bfill\s*:\s*)(?!none\b)[^;"']+/gi, "$1currentColor")
+    .replace(/(\bstroke\s*:\s*)(?!none\b)[^;"']+/gi, "$1currentColor");
 }

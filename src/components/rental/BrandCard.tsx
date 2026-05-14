@@ -37,8 +37,9 @@ function brandToSlug(nombre: string): string {
 function fallbackLogoUrl(nombre: string): string | null {
   const slug = SIMPLE_ICONS_SLUGS[brandToSlug(nombre)];
   if (!slug) return null;
-  // Color "111" = casi negro. Sirve sobre fondos claros (bg-surface, amber-soft).
-  return `https://cdn.simpleicons.org/${slug}/111`;
+  // simpleicons CDN devuelve SVG monocromo — InlineSvg lo tiñe al
+  // currentColor del card, así que pedimos negro y el cliente decide.
+  return `https://cdn.simpleicons.org/${slug}/000`;
 }
 
 function initials(nombre: string): string {
@@ -48,6 +49,15 @@ function initials(nombre: string): string {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
+/**
+ * Card del carrusel "Marcas destacadas". Cuadrado, solo logo (sin nombre
+ * ni count visible — el nombre va en `aria-label` y el count se sirve en
+ * tooltip nativo via `title`).
+ *
+ * Diseño: el logo SVG se tiñe al `text-ink` del card (currentColor),
+ * unificando todos los logos al color del tema. Para preservar el color
+ * original de un logo, subí PNG en lugar de SVG.
+ */
 export function BrandCard({
   brand,
   count,
@@ -63,58 +73,49 @@ export function BrandCard({
   const logoUrl = brand.logo_url || fallbackLogoUrl(brand.nombre);
   const showImg = !!logoUrl && !imgFailed;
 
+  const label = `${brand.nombre} · ${count} ${count === 1 ? "equipo" : "equipos"}`;
+
   return (
     <button
       onClick={onClick}
+      title={label}
+      aria-label={isSelected ? `Quitar filtro ${brand.nombre}` : `Filtrar por ${brand.nombre}`}
+      aria-pressed={isSelected}
       className={cn(
-        "group relative flex h-32 w-32 flex-shrink-0 flex-col items-center justify-center gap-2 rounded-lg border transition",
+        "group relative grid h-32 w-32 flex-shrink-0 place-items-center rounded-lg border p-5 transition text-ink",
         isSelected
           ? "border-amber bg-amber-soft"
-          : "border-hairline bg-surface hover:border-ink hover:bg-amber-soft"
+          : "border-hairline bg-surface hover:border-ink hover:bg-amber-soft",
       )}
     >
-      {/* Logo / Iniciales — object-contain para que SVGs no se recorten.
-          SVGs inlined → herendan color del `text-ink` parent (currentColor). */}
-      <div className="h-14 w-14 grid place-items-center overflow-hidden rounded bg-background text-ink">
-        {showImg ? (
-          isSvgUrl(logoUrl) ? (
-            <InlineSvg
-              url={logoUrl!}
-              ariaLabel={brand.nombre}
-              className="h-full w-full p-1.5"
-              fallback={
-                <img
-                  src={logoUrl!}
-                  alt={brand.nombre}
-                  className="h-full w-full object-contain p-1.5"
-                  onError={() => setImgFailed(true)}
-                />
-              }
-            />
-          ) : (
-            <img
-              src={logoUrl!}
-              alt={brand.nombre}
-              className="h-full w-full object-contain p-1.5"
-              onError={() => setImgFailed(true)}
-            />
-          )
+      {showImg ? (
+        isSvgUrl(logoUrl) ? (
+          <InlineSvg
+            url={logoUrl!}
+            ariaLabel={brand.nombre}
+            className="h-full w-full"
+            fallback={
+              <img
+                src={logoUrl!}
+                alt={brand.nombre}
+                className="h-full w-full object-contain"
+                onError={() => setImgFailed(true)}
+              />
+            }
+          />
         ) : (
-          <span className="font-display text-lg text-ink">
-            {initials(brand.nombre)}
-          </span>
-        )}
-      </div>
-
-      {/* Nombre + contador */}
-      <div className="flex flex-col items-center gap-1 text-center px-1">
-        <span className="text-sm font-display leading-tight text-ink line-clamp-2">
-          {brand.nombre}
+          <img
+            src={logoUrl!}
+            alt={brand.nombre}
+            className="h-full w-full object-contain"
+            onError={() => setImgFailed(true)}
+          />
+        )
+      ) : (
+        <span className="font-display text-3xl leading-none">
+          {initials(brand.nombre)}
         </span>
-        <span className="font-mono text-[10px] tabular text-muted-foreground">
-          {count}
-        </span>
-      </div>
+      )}
     </button>
   );
 }
