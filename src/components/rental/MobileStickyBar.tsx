@@ -5,15 +5,14 @@ import { Calendar as CalendarIcon, Search, SlidersHorizontal } from "lucide-reac
 import { useCart } from "@/lib/cart-store";
 import type { Equipment } from "@/data/equipment";
 import { RentalDateModal } from "./RentalDateModal";
-import { MobileFiltersSheet } from "./MobileFiltersSheet";
-import { MobileSearchSheet } from "./MobileSearchSheet";
+import { DiscoverySheet } from "./DiscoverySheet";
 
 type Props = {
   allEquipos: Equipment[];
   query: string;
   setQuery: (q: string) => void;
   categories: string[];
-  brands: any[];
+  brands: { id: number | string; nombre: string }[];
   selectedCategories: Set<string>;
   onToggleCategory: (c: string) => void;
   selectedBrand: string | null;
@@ -37,8 +36,14 @@ export function MobileStickyBar({
 }: Props) {
   const { startDate, endDate, startTime, endTime, days } = useCart();
   const [dateModalOpen, setDateModalOpen] = useState(false);
-  const [searchSheetOpen, setSearchSheetOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Un solo state — el DiscoverySheet maneja search y filters como tabs (#286).
+  const [discoveryOpen, setDiscoveryOpen] = useState(false);
+  const [discoveryDefaultTab, setDiscoveryDefaultTab] = useState<"search" | "filters">("search");
+
+  const openDiscovery = (tab: "search" | "filters") => {
+    setDiscoveryDefaultTab(tab);
+    setDiscoveryOpen(true);
+  };
 
   const hasDates = !!(startDate && endDate);
   const jornadas = days();
@@ -70,7 +75,7 @@ export function MobileStickyBar({
         </button>
 
         <button
-          onClick={() => setSearchSheetOpen(true)}
+          onClick={() => openDiscovery("search")}
           className="grid h-10 w-10 shrink-0 place-items-center rounded-full border hairline bg-surface hover:border-amber relative"
           aria-label="Buscar"
         >
@@ -81,7 +86,7 @@ export function MobileStickyBar({
         </button>
 
         <button
-          onClick={() => setFiltersOpen(true)}
+          onClick={() => openDiscovery("filters")}
           className="grid h-10 w-10 shrink-0 place-items-center rounded-full border hairline bg-surface hover:border-amber relative"
           aria-label="Filtros"
         >
@@ -94,19 +99,14 @@ export function MobileStickyBar({
         </button>
       </div>
 
-      <MobileSearchSheet
-        open={searchSheetOpen}
-        onOpenChange={setSearchSheetOpen}
+      <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
+      <DiscoverySheet
+        open={discoveryOpen}
+        onOpenChange={setDiscoveryOpen}
+        defaultTab={discoveryDefaultTab}
         query={query}
         setQuery={setQuery}
         allEquipos={allEquipos}
-        categories={categories}
-        onToggleCategory={onToggleCategory}
-      />
-      <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
-      <MobileFiltersSheet
-        open={filtersOpen}
-        onOpenChange={setFiltersOpen}
         categories={categories}
         brands={brands}
         selectedCategories={selectedCategories}

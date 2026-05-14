@@ -18,6 +18,7 @@ class MarcaAdmin(BaseModel):
     nombre: str
     logo_url: Optional[str] = None
     visible: bool
+    destacada: bool = False
     orden: int
     total: int
 
@@ -26,6 +27,7 @@ class MarcaPatch(BaseModel):
     nombre: Optional[str] = None
     logo_url: Optional[str] = None
     visible: Optional[bool] = None
+    destacada: Optional[bool] = None
     orden: Optional[int] = None
 
 
@@ -48,11 +50,15 @@ def list_marcas():
     El `orden` manual (default 100) sigue siendo override — el admin
     puede forzar marcas específicas arriba bajándole el número. Si
     todas tienen orden=100, gana la popularidad real (cant_pedidos +
-    ingreso, calculado por el ranking service)."""
+    ingreso, calculado por el ranking service).
+
+    El campo `destacada` (issue #288) lo lee el frontend para curar el
+    BrandCarousel del home: si hay marcas con destacada=true las muestra,
+    sino fallback al algoritmo automático de top N por count."""
     conn = get_db()
     try:
         rows = conn.execute("""
-            SELECT id, nombre, logo_url, popularidad_score, created_at, updated_at
+            SELECT id, nombre, logo_url, destacada, popularidad_score, created_at, updated_at
             FROM marcas
             WHERE visible = TRUE
             ORDER BY orden ASC, popularidad_score DESC, nombre ASC
@@ -67,17 +73,17 @@ def list_marcas():
 
 @router.get("/admin/marcas")
 def admin_list_marcas(request: Request):
-    """Lista todas las marcas (visible/invisible) con count de equipos."""
+    """Lista todas las marcas (visible/invisible) con count de equipos y flag `destacada`."""
     require_admin(request)
     conn = get_db()
     try:
         rows = conn.execute("""
             SELECT
-                m.id, m.nombre, m.logo_url, m.visible, m.orden,
+                m.id, m.nombre, m.logo_url, m.visible, m.destacada, m.orden,
                 COUNT(e.id) as total
             FROM marcas m
             LEFT JOIN equipos e ON e.brand_id = m.id
-            GROUP BY m.id, m.nombre, m.logo_url, m.visible, m.orden
+            GROUP BY m.id, m.nombre, m.logo_url, m.visible, m.destacada, m.orden
             ORDER BY m.orden ASC, m.nombre ASC
         """).fetchall()
         marcas = [dict(row) for row in rows]
@@ -105,6 +111,8 @@ def admin_update_marca(marca_id: int, patch: MarcaPatch, request: Request):
             updates["logo_url"] = patch.logo_url
         if patch.visible is not None:
             updates["visible"] = patch.visible
+        if patch.destacada is not None:
+            updates["destacada"] = patch.destacada
         if patch.orden is not None:
             updates["orden"] = patch.orden
 
@@ -124,12 +132,12 @@ def admin_update_marca(marca_id: int, patch: MarcaPatch, request: Request):
         # Devolver la marca actualizada
         row = conn.execute("""
             SELECT
-                m.id, m.nombre, m.logo_url, m.visible, m.orden,
+                m.id, m.nombre, m.logo_url, m.visible, m.destacada, m.orden,
                 COUNT(e.id) as total
             FROM marcas m
             LEFT JOIN equipos e ON e.brand_id = m.id
             WHERE m.id = %s
-            GROUP BY m.id, m.nombre, m.logo_url, m.visible, m.orden
+            GROUP BY m.id, m.nombre, m.logo_url, m.visible, m.destacada, m.orden
         """, (marca_id,)).fetchone()
 
         conn.commit()

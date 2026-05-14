@@ -567,8 +567,6 @@ function ListMode({
   return (
     <>
       <ListFilters
-        query={query}
-        onQuery={setQuery}
         categories={apiCategories}
         brands={marcas}
         selectedCategories={selectedCats}
