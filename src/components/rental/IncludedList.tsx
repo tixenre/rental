@@ -24,10 +24,14 @@ export function IncludedList({ item }: { item: Equipment }) {
   const moreSpecs = rest.length;
 
   return (
-    <div className="space-y-3">
-      {hasKeywords && <KeywordChips keywords={keywords} />}
+    <div className="flex flex-col gap-3 sm:space-y-3">
+      {hasKeywords && (
+        <div className="order-2 sm:order-none">
+          <KeywordChips keywords={keywords} />
+        </div>
+      )}
       {hasSpecs && (
-        <>
+        <div className="order-3 sm:order-none">
           {/* Mobile (#144): grilla 2-columnas label-arriba / valor-abajo, más
            * denso y alineado que los chips. */}
           <dl className="grid grid-cols-2 gap-x-3 gap-y-2 sm:hidden">
@@ -69,11 +73,11 @@ export function IncludedList({ item }: { item: Equipment }) {
               </li>
             )}
           </ul>
-        </>
+        </div>
       )}
 
       {hasIncludes && (
-        <div>
+        <div className="order-1 sm:order-none">
           <div className="mb-2 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-ink">
             <Package className="h-3 w-3" /> Incluye
           </div>
