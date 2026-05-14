@@ -3,8 +3,7 @@ import { X } from "lucide-react";
 
 /**
  * Controles de filtros compartidos entre el sticky bar desktop (ListFilters)
- * y el bottom sheet mobile (MobileFiltersSheet). Antes esos dos componentes
- * tenían dos JSX/clases distintos para hacer exactamente lo mismo.
+ * y la tab "Filtros" del DiscoverySheet mobile.
  *
  * Dos layouts:
  * - "inline" — todo en una línea con flex-wrap. Pensado para sticky bar.

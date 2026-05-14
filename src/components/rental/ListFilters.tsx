@@ -3,9 +3,9 @@ import { FilterControls } from "./FilterControls";
 /**
  * Sticky bar de filtros para desktop modo lista. Solo el wrapper visual —
  * los controles de marca/categorías/limpiar viven en `<FilterControls />`
- * compartido con `<MobileFiltersSheet />`.
+ * compartido con el `<DiscoverySheet />` mobile.
  *
- * Se renderiza solo en `md+` (en mobile, `MobileStickyBar` abre el sheet).
+ * Se renderiza solo en `md+` (en mobile, `MobileStickyBar` abre el discovery sheet).
  */
 export function ListFilters({
   categories,
