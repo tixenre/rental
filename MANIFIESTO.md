@@ -219,26 +219,19 @@ Definición completa del criterio, checklist y status por ruta en [`docs/MOBILE_
 
 ## 5. Estado actual
 
-### Features activas
+### Dónde se ve qué está hecho
 
-- **Form V2 de equipos** con autocompletar (single + batch) + cache de scrape. El input del autocompletar pre-carga el `bh_url` existente del equipo.
-- **Bulk actions** en lista admin: `set_visible`, `set_ficha_completa`, `set_categoria`, `add_categoria`, `remove_categoria`, `delete`, etc.
-- **Filtros admin** por categoría + marca + etiqueta (shareable via URL).
-- **Soft delete** + papelera + restore.
-- **Mantenimiento log** por equipo.
-- **Dashboard de uso** con top alquilados, sin uso, revenue por categoría, cuentas por cobrar.
-- **Historial de alquileres** por equipo.
-- **Búsqueda fuzzy global** en `q` de listEquipos.
-- **Specs normalizer** EN→ES + métrico.
-- **Specs por categoría** como norma del form (#291): drag-drop reorder, tipo Número con unidad obligatoria, template-bound vs custom con UI distinta. **Editable inline desde Categorías** (botón Wrench en cada row → dialog scoped a esa categoría).
-- **Categorías** árbol de hasta 3 niveles con drag-drop reorder y cross-parent. Asignar equipos masivamente desde cada row. Disclosure que muestra los equipos asignados como sub-nivel con remove inline. Drag root → anidar bajo otra categoría.
-- **Plantilla de nombre público por categoría** (`nombre_publico_template` en `categorias`): editable desde el row con placeholders `{marca}`, `{modelo}`, `{tipo}`, `{nombre}`, `{spec:Label}`. Preview en vivo. Fallback a `nombre-publico.ts` hardcoded cuando vacío. El form de equipo usa el template DB si está definido.
-- **Marcas unificadas** en una columna: logo SVG con tinting automático via CSS filter, drag-drop reorder, mini menú (subir logo, renombrar, ver productos, eliminar). Cache-bust por upload.
-- **Pestaña Diseño** (`/admin/diseno`): ordenar y ocultar secciones del catálogo público.
-- **Sidebar admin**: "Inventario" agrupando Equipos/Categorías/Marcas/Etiquetas/Specs por categoría. Sin Hoy/Calendario/Clasificar/Validar nombres (rutas siguen accesibles, no aparecen en menú).
-- **Catálogo público** con cart, cotización, portal cliente. View grid/list compartible via `?view=` en URL. Popup intro one-time solo desktop.
-- **Detalle de equipo**: bloque "Incluye" arriba de todo con kit + fotos + cantidades en mobile.
-- **Tests E2E** del form (skipped en CI sin backend orchestrado).
+Este manifiesto **no lleva el changelog**. El registro de qué se construyó, cuándo y con qué PR vive en **GitHub Issues cerrados**:
+
+```
+gh issue list --state closed --label feature   # features entregadas
+gh issue list --state closed --label bug       # bugs cerrados
+gh issue list --state closed                   # todo el histórico
+```
+
+Cada iniciativa tiene su issue con contexto, scope, PRs incluidos y verificación. Si querés saber por qué algo está como está, el issue es la fuente — no este archivo.
+
+Para una idea rápida de qué hay en producción, el código manda: rutas activas en `src/routes/`, endpoints en `backend/routes/`. Si una funcionalidad existe en código y no en issues, es un gap que hay que cerrar (crear el issue retroactivo).
 
 ### Cosas que NO existen todavía
 
@@ -276,12 +269,12 @@ Para ver el trabajo pendiente / activo (todo vive en GitHub Issues):
 
 ---
 
-## 7. Histórico — sesiones grandes
+## 7. Histórico
 
-| Sesión | Resumen | PRs |
-|---|---|---|
-| **2026-05-10** | Auditoría inicial: 23 bugs trackeados y todos cerrados. Ver `docs/BUGS.md`. | PRs #26-#40 |
-| **2026-05-12** (fase 1) | V2 del form de equipos: completion workflow, autocompletar con cache, batch, bulk actions, soft delete, mantenimiento, historial, dashboard de uso, tests E2E, split del form, refactor backend. | #211-#217, #221-#224 |
-| **2026-05-12** (fase 2) | Limpieza post-fase-1, cuentas por cobrar en dashboard, manifiesto. | #225-#227, #228 |
-| **2026-05-14** | Sprint largo: marcas unificadas con logos SVG (tinting CSS) + cache-bust + reorden y mini menú. Specs por categoría como norma (#291 fases A/B/C). Pestaña Diseño. Categorías a 3 niveles + drag-drop nietos + asignar equipos masivamente. Sidebar reorganizado a "Inventario", sacar Hoy/Calendario/Clasificar/Validar nombres. Filtros admin por categoría + marca. Vista grid/list compartible. Popup intro desktop. Fotos: cache-bust al upload + filtro banners. UX detalle equipo: "Incluye" arriba con kit + fotos + cantidades. Varios fixes (serie N/A default, toast save inválido, padding pill mobile, no re-seed categorías). | #290-#323 |
-| **2026-05-14** (tarde) | Refinement de categorías: asignar equipos masivos desde cada row + disclosure que muestra equipos asignados como sub-nivel (con remove inline). Drag root → anidar bajo otra cat. Specs por categoría editable inline desde Categorías (botón Wrench dentro del row). Plantilla de nombre público por categoría (DB + UI editor con placeholders y preview en vivo) — reemplaza el hardcoded `nombre-publico.ts` cuando hay template. UX fixes: autocompletar pre-carga `bh_url` existente, panel anidado de equipos no rompe la row, padding mobile pill, "+ equipos" inline cuando count=0. | #325-#332 |
+El histórico no vive acá. Cada sesión / iniciativa cierra su issue cuando termina, y la lista de issues cerrados (en orden cronológico) **es** el changelog del proyecto:
+
+```
+gh issue list --state closed --sort created --order desc
+```
+
+Excepción documental: `docs/BUGS.md` conserva la auditoría inicial del 2026-05-10 (23 bugs históricos) porque precede a la convención de issues.
