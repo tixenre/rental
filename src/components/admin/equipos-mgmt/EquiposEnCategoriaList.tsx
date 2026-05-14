@@ -10,7 +10,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, X, ChevronRight } from "lucide-react";
+import { Loader2, X, ChevronRight, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { Button } from "@/components/ui/button";
@@ -20,10 +20,12 @@ export function EquiposEnCategoriaList({
   categoriaId,
   categoriaNombre,
   count,
+  onAddEquipos,
 }: {
   categoriaId: number;
   categoriaNombre: string;
   count: number;
+  onAddEquipos?: (id: number, nombre: string) => void;
 }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -65,7 +67,21 @@ export function EquiposEnCategoriaList({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (count === 0) return null;
+  // Si no hay equipos asignados pero podemos agregar, mostramos un CTA
+  // chiquito en lugar del disclosure (más visible que el botón 👥).
+  if (count === 0) {
+    if (!onAddEquipos) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => onAddEquipos(categoriaId, categoriaNombre)}
+        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink transition shrink-0 underline-offset-2 hover:underline"
+        title="Agregar equipos a esta categoría"
+      >
+        <Plus className="h-3 w-3" /> equipos
+      </button>
+    );
+  }
 
   return (
     <>
@@ -85,7 +101,17 @@ export function EquiposEnCategoriaList({
       </button>
 
       {open && (
-        <div className="basis-full ml-10 mt-1 border-l hairline pl-2">
+        <div className="basis-full ml-10 mt-1 border-l hairline pl-2 space-y-1">
+          {onAddEquipos && (
+            <button
+              type="button"
+              onClick={() => onAddEquipos(categoriaId, categoriaNombre)}
+              className="inline-flex items-center gap-1 text-[11px] text-ink hover:text-amber transition py-1"
+              title="Agregar más equipos a esta categoría"
+            >
+              <Plus className="h-3 w-3" /> Agregar equipos
+            </button>
+          )}
           {equiposQ.isLoading && (
             <div className="flex items-center gap-2 py-2 text-[11px] text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
