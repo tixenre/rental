@@ -13,6 +13,7 @@ import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { BrandCarousel } from "@/components/rental/BrandCarousel";
 import { ListFilters } from "@/components/rental/ListFilters";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
+import { ViewIntroDialog } from "@/components/rental/ViewIntroDialog";
 import { useEquipos, useDisponibilidad, useCategorias, useMarcas } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
@@ -167,6 +168,7 @@ function Index() {
 
   return (
     <PublicLayout>
+        <ViewIntroDialog onPick={(m) => setMode(m)} />
         {/* Hero amarillo brand */}
         <section className="relative overflow-hidden border-b hairline bg-amber text-ink">
           <div className="absolute inset-0 grain opacity-40" />
