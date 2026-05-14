@@ -315,6 +315,8 @@ export const adminApi = {
   listEquipos: (params: {
     q?: string;
     etiqueta?: string;
+    categoria?: string;
+    marca?: string;
     per_page?: number;
     solo_incompletos?: boolean;
     solo_eliminados?: boolean;
@@ -323,6 +325,8 @@ export const adminApi = {
     const sp = new URLSearchParams();
     if (params.q) sp.set("q", params.q);
     if (params.etiqueta) sp.set("etiqueta", params.etiqueta);
+    if (params.categoria) sp.set("categoria", params.categoria);
+    if (params.marca) sp.set("marca", params.marca);
     if (params.solo_incompletos) sp.set("solo_incompletos", "true");
     if (params.solo_eliminados) sp.set("solo_eliminados", "true");
     if (params.incluir_eliminados) sp.set("incluir_eliminados", "true");
