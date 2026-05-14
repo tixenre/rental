@@ -114,7 +114,9 @@ export function EquipoFormDialogV2({
       roi_pct: initial?.roi_pct ?? (initial ? undefined : roiDefault),
       valor_reposicion: initial?.valor_reposicion ?? undefined,
       fecha_compra: initial?.fecha_compra ?? "",
-      serie: initial?.serie ?? "",
+      // Default "N/A" en CREATE — equipos sin serie real comparten este
+      // placeholder y el preflight de duplicados lo ignora.
+      serie: initial ? (initial.serie ?? "") : "N/A",
       bh_url: initial?.bh_url ?? "",
       foto_url: initial?.foto_url ?? "",
       dueno: initial?.dueno ?? "Rambla",
@@ -608,8 +610,12 @@ export function EquipoFormDialogV2({
     // Pre-flight: validación de duplicados por serie. La serie es lo más
     // único; si ya hay otro equipo con la misma, le pedimos confirmación al
     // user antes de seguir (puede ser legítimo en kits, pero conviene avisar).
+    // EXCEPCIÓN: "N/A" es un placeholder común — los equipos sin serie real
+    // comparten ese valor por design, así que no avisamos.
     const serieTrim = values.serie?.trim();
-    if (serieTrim) {
+    const isPlaceholderSerie =
+      !!serieTrim && /^(n\/?a|n\/?d|sin\s*serie|-+)$/i.test(serieTrim);
+    if (serieTrim && !isPlaceholderSerie) {
       try {
         const r = await adminApi.listEquipos({ q: serieTrim });
         const dups = r.items.filter(
@@ -1264,7 +1270,10 @@ export function EquipoFormDialogV2({
                   />
                 </Field>
                 <Field label="N° de serie">
-                  <Input {...form.register("serie")} />
+                  <Input
+                    {...form.register("serie")}
+                    placeholder="N/A si no tenés"
+                  />
                 </Field>
               </div>
 
