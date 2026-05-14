@@ -27,50 +27,47 @@ export function ListFilters({
 
   return (
     <div className="hidden md:block sticky top-[124px] z-20 border-b hairline bg-background/90 backdrop-blur-xl">
-      <div className="flex flex-col gap-3 px-4 py-3 lg:px-12">
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={selectedBrand ?? ""}
-            onChange={(e) => onBrand(e.target.value || null)}
-            className="rounded-md border hairline bg-surface px-3 py-1.5 text-xs focus:border-amber/40 focus:outline-none"
-          >
-            <option value="">Todas las marcas</option>
-            {brandList.map((b) => (
-              <option key={b.id} value={b.nombre}>
-                {b.nombre}
-              </option>
-            ))}
-          </select>
-          {hasFilters && (
-            <button
-              onClick={onClear}
-              className="flex items-center gap-1.5 rounded-full border hairline px-3 py-1 text-xs uppercase tracking-wider text-muted-foreground hover:border-ink hover:text-ink"
-            >
-              <X className="h-3 w-3" /> Limpiar
-            </button>
-          )}
-        </div>
+      {/* Una sola línea: marca + categorías + limpiar, con flex-wrap si no entra. */}
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3 lg:px-12">
+        <select
+          value={selectedBrand ?? ""}
+          onChange={(e) => onBrand(e.target.value || null)}
+          className="shrink-0 rounded-md border hairline bg-surface px-3 py-1.5 text-xs focus:border-amber/40 focus:outline-none"
+        >
+          <option value="">Todas las marcas</option>
+          {brandList.map((b) => (
+            <option key={b.id} value={b.nombre}>
+              {b.nombre}
+            </option>
+          ))}
+        </select>
 
-        {/* Chips de categorías — scroll horizontal en mobile */}
-        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:px-0 lg:overflow-visible lg:pb-0">
-          {cats.map((c) => {
-            const active = selectedCategories.has(c);
-            return (
-              <button
-                key={c}
-                onClick={() => onToggleCategory(c)}
-                className={cn(
-                  "shrink-0 rounded-full border px-3 py-1 text-xs transition",
-                  active
-                    ? "border-ink bg-ink text-amber"
-                    : "hairline text-foreground/70 hover:border-ink hover:text-ink",
-                )}
-              >
-                {c}
-              </button>
-            );
-          })}
-        </div>
+        {cats.map((c) => {
+          const active = selectedCategories.has(c);
+          return (
+            <button
+              key={c}
+              onClick={() => onToggleCategory(c)}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1 text-xs transition",
+                active
+                  ? "border-ink bg-ink text-amber"
+                  : "hairline text-foreground/70 hover:border-ink hover:text-ink",
+              )}
+            >
+              {c}
+            </button>
+          );
+        })}
+
+        {hasFilters && (
+          <button
+            onClick={onClear}
+            className="ml-auto shrink-0 flex items-center gap-1.5 rounded-full border hairline px-3 py-1 text-xs uppercase tracking-wider text-muted-foreground hover:border-ink hover:text-ink"
+          >
+            <X className="h-3 w-3" /> Limpiar
+          </button>
+        )}
       </div>
     </div>
   );
