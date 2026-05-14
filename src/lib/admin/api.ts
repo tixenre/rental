@@ -148,6 +148,9 @@ export type CategoriaAdmin = {
   parent_id: number | null;
   /** Si false, la categoría no se muestra en el catálogo público. */
   visible: boolean;
+  /** Plantilla para generar nombre público de equipos en esta categoría.
+   *  Sintaxis: {marca} {modelo} {tipo} {spec:Label}. NULL = sin template. */
+  nombre_publico_template?: string | null;
   total: number;
 };
 
@@ -498,6 +501,7 @@ export const adminApi = {
       parent_id?: number | null;
       set_parent_null?: boolean;
       visible?: boolean;
+      nombre_publico_template?: string | null;
     },
   ) =>
     authedJson<{ ok: true }>(`/api/admin/categorias/${id}`, {

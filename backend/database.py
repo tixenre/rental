@@ -498,6 +498,10 @@ def init_db():
     conn.execute("""
         ALTER TABLE categorias ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT TRUE
     """)
+    # Idempotente: plantilla de nombre público por categoría (PR #333).
+    conn.execute("""
+        ALTER TABLE categorias ADD COLUMN IF NOT EXISTS nombre_publico_template TEXT
+    """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_cat_prioridad ON categorias(prioridad, nombre)
     """)

@@ -41,8 +41,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { SpecTemplatesSection } from "@/components/admin/specs/SpecTemplatesSection";
+import { NombreTemplateDialog } from "./NombreTemplateDialog";
+import { Type } from "lucide-react";
 
-type RowItem = { id: number; nombre: string; prioridad: number; parent_id: number | null; total: number };
+type RowItem = { id: number; nombre: string; prioridad: number; parent_id: number | null; total: number; nombre_publico_template?: string | null };
 
 /** Tipos de elemento draggable. Va en `data` del useSortable / useDroppable. */
 type DragData =
@@ -66,6 +68,7 @@ export function CategoriasSection() {
   const [hideEmpty, setHideEmpty] = useState(false);
   const [addingEquiposTo, setAddingEquiposTo] = useState<{ id: number; nombre: string } | null>(null);
   const [editingSpecsFor, setEditingSpecsFor] = useState<{ id: number; nombre: string } | null>(null);
+  const [editingTemplateFor, setEditingTemplateFor] = useState<{ id: number; nombre: string; template: string | null } | null>(null);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["admin", "categorias"] });
@@ -327,6 +330,7 @@ export function CategoriasSection() {
                     onAddChild={() => { setNewChildFor(root.id); setNewChildName(""); }}
                     onAddEquipos={(id, nombre) => setAddingEquiposTo({ id, nombre })}
                     onEditSpecs={(id, nombre) => setEditingSpecsFor({ id, nombre })}
+                    onEditTemplate={(id, nombre, template) => setEditingTemplateFor({ id, nombre, template })}
                     newChildFor={newChildFor}
                     newChildName={newChildName}
                     setNewChildName={setNewChildName}
@@ -410,6 +414,16 @@ export function CategoriasSection() {
           )}
         </DialogContent>
       </Dialog>
+
+      {editingTemplateFor && (
+        <NombreTemplateDialog
+          open={true}
+          onOpenChange={(v) => { if (!v) setEditingTemplateFor(null); }}
+          categoriaId={editingTemplateFor.id}
+          categoriaNombre={editingTemplateFor.nombre}
+          initialTemplate={editingTemplateFor.template}
+        />
+      )}
     </section>
   );
 }
@@ -423,7 +437,7 @@ function SortableRootItem({
   onCreateChild, onCancelChild,
   onRenameChild, onChangeParent, onDeleteChild,
   grandchildrenOf, onCreateGrandchild, onRenameGrandchild, onDeleteGrandchild,
-  onAddEquipos, onEditSpecs,
+  onAddEquipos, onEditSpecs, onEditTemplate,
 }: {
   root: RowItem;
   children: RowItem[];
@@ -447,6 +461,7 @@ function SortableRootItem({
   onDeleteGrandchild: (id: number, name: string) => void;
   onAddEquipos: (id: number, nombre: string) => void;
   onEditSpecs: (id: number, nombre: string) => void;
+  onEditTemplate: (id: number, nombre: string, template: string | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -524,6 +539,15 @@ function SortableRootItem({
         >
           <Wrench className="h-4 w-4" />
         </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 text-muted-foreground hover:text-ink"
+          onClick={() => onEditTemplate(root.id, root.nombre, root.nombre_publico_template ?? null)}
+          title="Plantilla de nombre público"
+        >
+          <Type className="h-4 w-4" />
+        </Button>
         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onAddChild} title="Agregar subcategoría">
           <Plus className="h-4 w-4" />
         </Button>
@@ -566,6 +590,7 @@ function SortableRootItem({
                   onDeleteGrandchild={onDeleteGrandchild}
                   onAddEquipos={onAddEquipos}
                   onEditSpecs={onEditSpecs}
+                  onEditTemplate={onEditTemplate}
                 />
               ))}
               {children.length === 0 && (
@@ -604,7 +629,7 @@ function SortableChildItem({
   child, parents, grandchildren = [],
   onRename, onChangeParent, onDelete,
   onCreateGrandchild, onRenameGrandchild, onDeleteGrandchild,
-  onAddEquipos, onEditSpecs,
+  onAddEquipos, onEditSpecs, onEditTemplate,
 }: {
   child: RowItem;
   parents: RowItem[];
@@ -617,6 +642,7 @@ function SortableChildItem({
   onDeleteGrandchild?: (id: number, name: string) => void;
   onAddEquipos?: (id: number, nombre: string) => void;
   onEditSpecs?: (id: number, nombre: string) => void;
+  onEditTemplate?: (id: number, nombre: string, template: string | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -679,6 +705,17 @@ function SortableChildItem({
             <Wrench className="h-4 w-4" />
           </Button>
         )}
+        {onEditTemplate && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:text-ink"
+            onClick={() => onEditTemplate(child.id, child.nombre, child.nombre_publico_template ?? null)}
+            title="Plantilla de nombre público"
+          >
+            <Type className="h-4 w-4" />
+          </Button>
+        )}
         {onCreateGrandchild && (
           <Button
             size="icon"
@@ -724,6 +761,7 @@ function SortableChildItem({
                   onDelete={() => onDeleteGrandchild?.(g.id, g.nombre)}
                   onAddEquipos={onAddEquipos}
                   onEditSpecs={onEditSpecs}
+                  onEditTemplate={onEditTemplate}
                 />
               ))}
               {addingGrand && (
@@ -780,7 +818,7 @@ function ChildZone({ childId, children }: { childId: number; children: React.Rea
 }
 
 function SortableGrandchildItem({
-  grand, parentChildId, onRename, onDelete, onAddEquipos, onEditSpecs,
+  grand, parentChildId, onRename, onDelete, onAddEquipos, onEditSpecs, onEditTemplate,
 }: {
   grand: RowItem;
   parentChildId: number;
@@ -788,6 +826,7 @@ function SortableGrandchildItem({
   onDelete: () => void;
   onAddEquipos?: (id: number, nombre: string) => void;
   onEditSpecs?: (id: number, nombre: string) => void;
+  onEditTemplate?: (id: number, nombre: string, template: string | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
@@ -846,6 +885,17 @@ function SortableGrandchildItem({
           title="Editar specs de esta categoría"
         >
           <Wrench className="h-3.5 w-3.5" />
+        </Button>
+      )}
+      {onEditTemplate && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 text-muted-foreground hover:text-ink"
+          onClick={() => onEditTemplate(grand.id, grand.nombre, grand.nombre_publico_template ?? null)}
+          title="Plantilla de nombre público"
+        >
+          <Type className="h-3.5 w-3.5" />
         </Button>
       )}
       <Button
