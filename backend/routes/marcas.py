@@ -3,6 +3,7 @@ routes/marcas.py — CRUD de marcas (brands).
 """
 
 import re
+import time
 import unicodedata
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
@@ -14,11 +15,19 @@ router = APIRouter()
 
 
 def _logo_path(marca_id: int, nombre: str, ext: str) -> str:
-    """Genera path R2 para el logo: marcas/{id}_{slug}/logo.{ext}."""
+    """Genera path R2 para el logo: marcas/{id}_{slug}/logo-{ts}.{ext}.
+
+    El timestamp en el nombre del archivo evita el problema del cache
+    inmutable: R2 sirve los assets con `Cache-Control: immutable max-age=1y`,
+    así que si dos uploads usan el mismo path el navegador sigue mostrando
+    el viejo durante un año. Con timestamp cada upload tiene URL nueva.
+    El archivo anterior queda como huérfano en R2 (cleanup futuro si pesa).
+    """
     slug = unicodedata.normalize("NFKD", nombre or "").encode("ascii", "ignore").decode()
     slug = re.sub(r"[^a-z0-9]+", "-", slug.lower()).strip("-")[:50]
     folder = f"{marca_id}_{slug}" if slug else str(marca_id)
-    return f"marcas/{folder}/logo.{ext}"
+    ts = int(time.time())
+    return f"marcas/{folder}/logo-{ts}.{ext}"
 
 
 # ── Pydantic Models ──────────────────────────────────────────────────────────
