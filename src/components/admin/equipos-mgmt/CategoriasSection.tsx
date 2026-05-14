@@ -1,9 +1,14 @@
 /**
  * CategoriasSection — gestión del árbol de categorías con drag-and-drop.
  *
- * - Raíces y sub-categorías se reordenan arrastrando (GripVertical).
- * - Reorder llama a POST /admin/categorias/reorder (asigna prioridad × 10).
- * - El input de prioridad manual desaparece.
+ * Drag-and-drop:
+ * - Raíces: reorder con drag (mismo padre).
+ * - Subcategorías: reorder dentro del mismo padre, O **moverse a otro padre**
+ *   arrastrando hacia el área de hijas de otro root (#283).
+ *
+ * Implementación: un único `DndContext` top-level. Cada root tiene un
+ * `useDroppable` zone que detecta cuando una hija de otro padre se suelta
+ * encima — en ese caso se llama `adminUpdateCategoria` con el nuevo parent_id.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -12,6 +17,7 @@ import { Loader2, Plus, Trash2, ChevronRight, ChevronDown, GripVertical, Check, 
 import { toast } from "sonner";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  useDroppable,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
@@ -19,6 +25,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +36,12 @@ import {
 import { adminApi } from "@/lib/admin/api";
 
 type RowItem = { id: number; nombre: string; prioridad: number; parent_id: number | null; total: number };
+
+/** Tipos de elemento draggable. Va en `data` del useSortable / useDroppable. */
+type DragData =
+  | { type: "root"; rootId: number }
+  | { type: "child"; childId: number; parentId: number }
+  | { type: "root-zone"; rootId: number };
 
 export function CategoriasSection() {
   const qc = useQueryClient();
@@ -41,6 +54,7 @@ export function CategoriasSection() {
   const [newChildFor, setNewChildFor] = useState<number | null>(null);
   const [newChildName, setNewChildName] = useState("");
   const [newRoot, setNewRoot] = useState("");
+  const [hideEmpty, setHideEmpty] = useState(false);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["admin", "categorias"] });
@@ -51,7 +65,7 @@ export function CategoriasSection() {
   const updateMut = useMutation({
     mutationFn: ({ id, ...patch }: { id: number; nombre?: string; prioridad?: number; parent_id?: number | null; set_parent_null?: boolean }) =>
       adminApi.adminUpdateCategoria(id, patch),
-    onSuccess: () => { invalidate(); toast.success("Categoría actualizada"); },
+    onSuccess: () => { invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -70,51 +84,137 @@ export function CategoriasSection() {
 
   const reorderMut = useMutation({
     mutationFn: (ids: number[]) => adminApi.adminReorderCategorias(ids),
-    onSuccess: () => { invalidate(); toast.success("Orden actualizado"); },
+    onSuccess: () => { invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const tree = useMemo(() => {
     const all = listQ.data ?? [];
-    const roots = all
+    let roots = all
       .filter((e) => e.parent_id == null)
       .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
-    const childrenOf = (pid: number) =>
+    const childrenOfAll = (pid: number) =>
       all
         .filter((e) => e.parent_id === pid)
         .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
+
+    let childrenOf = childrenOfAll;
+    if (hideEmpty) {
+      childrenOf = (pid: number) => childrenOfAll(pid).filter((c) => c.total > 0);
+      roots = roots.filter((r) => r.total > 0 || childrenOfAll(r.id).some((c) => c.total > 0));
+    }
+
     return { roots, childrenOf, all };
-  }, [listQ.data]);
+  }, [listQ.data, hideEmpty]);
 
-  // Local state for optimistic reorder (roots)
+  // Local state para drag optimistic. Mantiene una versión completa del árbol
+  // que se actualiza al arrastrar. Se reinicia a null cuando llega nueva data
+  // del server (que ya incluye los cambios).
   const [localRoots, setLocalRoots] = useState<RowItem[] | null>(null);
+  const [localChildrenMap, setLocalChildrenMap] = useState<Record<number, RowItem[]>>({});
   const displayRoots = localRoots ?? tree.roots;
+  const childrenOfDisplay = (pid: number): RowItem[] =>
+    localChildrenMap[pid] ?? tree.childrenOf(pid);
 
-  // Sync local roots when server data changes
-  useMemo(() => { setLocalRoots(null); }, [tree.roots]);
+  useEffect(() => { setLocalRoots(null); setLocalChildrenMap({}); }, [tree.roots, tree.all]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const handleRootDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = displayRoots.findIndex((r) => r.id === active.id);
-    const newIndex = displayRoots.findIndex((r) => r.id === over.id);
-    const reordered = arrayMove(displayRoots, oldIndex, newIndex);
-    setLocalRoots(reordered);
-    reorderMut.mutate(reordered.map((r) => r.id));
+    if (!over) return;
+    const activeData = active.data.current as DragData | undefined;
+    const overData = over.data.current as DragData | undefined;
+    if (!activeData) return;
+
+    // ── Reorder de raíces ─────────────────────────────────────────────
+    if (activeData.type === "root") {
+      if (active.id === over.id) return;
+      const oldIndex = displayRoots.findIndex((r) => r.id === activeData.rootId);
+      const newIndex = displayRoots.findIndex((r) => r.id === Number(over.id));
+      if (oldIndex < 0 || newIndex < 0) return;
+      const reordered = arrayMove(displayRoots, oldIndex, newIndex);
+      setLocalRoots(reordered);
+      reorderMut.mutate(reordered.map((r) => r.id));
+      return;
+    }
+
+    // ── Movimiento de hija ────────────────────────────────────────────
+    if (activeData.type === "child") {
+      const activeChildId = activeData.childId;
+      const activeParentId = activeData.parentId;
+
+      // Determinar el target parent:
+      // - over es otra hija → mismo padre que esa hija
+      // - over es una root-zone (área de hijas de un root) → ese root
+      // - over es un root (header) → ese root
+      let targetParentId: number | null = null;
+      if (overData?.type === "child") {
+        targetParentId = overData.parentId;
+      } else if (overData?.type === "root-zone") {
+        targetParentId = overData.rootId;
+      } else if (overData?.type === "root") {
+        targetParentId = overData.rootId;
+      } else {
+        return;
+      }
+
+      if (activeParentId === targetParentId) {
+        // ── Reorder dentro del mismo padre ────────────────────────────
+        if (active.id === over.id) return;
+        const siblings = childrenOfDisplay(activeParentId);
+        const oldIndex = siblings.findIndex((c) => c.id === activeChildId);
+        const newIndex = siblings.findIndex((c) => c.id === Number(over.id));
+        if (oldIndex < 0 || newIndex < 0) return;
+        const reordered = arrayMove(siblings, oldIndex, newIndex);
+        setLocalChildrenMap((m) => ({ ...m, [activeParentId]: reordered }));
+        reorderMut.mutate(reordered.map((c) => c.id));
+      } else {
+        // ── Cross-parent: mover hija a otro padre (#283) ──────────────
+        // Optimistic: sacar de la lista del padre actual, agregar al final
+        // del nuevo padre.
+        const oldSiblings = childrenOfDisplay(activeParentId);
+        const newSiblings = childrenOfDisplay(targetParentId);
+        const moved = oldSiblings.find((c) => c.id === activeChildId);
+        if (!moved) return;
+        const newOldSiblings = oldSiblings.filter((c) => c.id !== activeChildId);
+        const newNewSiblings = [...newSiblings, { ...moved, parent_id: targetParentId }];
+        setLocalChildrenMap((m) => ({
+          ...m,
+          [activeParentId]: newOldSiblings,
+          [targetParentId]: newNewSiblings,
+        }));
+        updateMut.mutate(
+          { id: activeChildId, parent_id: targetParentId },
+          {
+            onSuccess: () => toast.success(`Movida a "${displayRoots.find((r) => r.id === targetParentId)?.nombre ?? "otra raíz"}"`),
+          },
+        );
+      }
+    }
   };
 
   return (
     <section className="rounded-lg border hairline bg-background p-4 space-y-3">
-      <div>
-        <h2 className="font-display text-lg text-ink">Categorías</h2>
-        <p className="text-sm text-muted-foreground">
-          Árbol de 2 niveles. Arrastrá para reordenar. Las subcategorías heredan al padre.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-display text-lg text-ink">Categorías</h2>
+          <p className="text-sm text-muted-foreground">
+            Árbol de 2 niveles. Arrastrá para reordenar. Una subcategoría se puede mover a otra raíz arrastrándola al área de hijas correspondiente.
+          </p>
+        </div>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none cursor-pointer shrink-0">
+          <input
+            type="checkbox"
+            checked={hideEmpty}
+            onChange={(e) => setHideEmpty(e.target.checked)}
+            className="h-3.5 w-3.5"
+          />
+          Ocultar vacías
+        </label>
       </div>
 
       {listQ.isLoading && (
@@ -127,11 +227,11 @@ export function CategoriasSection() {
       )}
 
       {displayRoots.length > 0 && (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRootDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={displayRoots.map((r) => r.id)} strategy={verticalListSortingStrategy}>
             <ul className="divide-y hairline border hairline rounded-md">
               {displayRoots.map((root) => {
-                const children = tree.childrenOf(root.id);
+                const children = childrenOfDisplay(root.id);
                 const isOpen = expanded[root.id] ?? true;
                 return (
                   <SortableRootItem
@@ -140,7 +240,6 @@ export function CategoriasSection() {
                     children={children}
                     allRoots={displayRoots}
                     isOpen={isOpen}
-                    sensors={sensors}
                     onToggle={() => setExpanded((s) => ({ ...s, [root.id]: !isOpen }))}
                     onRename={(n) => updateMut.mutate({ id: root.id, nombre: n })}
                     onDelete={() => {
@@ -157,7 +256,6 @@ export function CategoriasSection() {
                       setNewChildFor(null);
                     }}
                     onCancelChild={() => setNewChildFor(null)}
-                    onReorderChildren={(ids) => reorderMut.mutate(ids)}
                     onRenameChild={(id, n) => updateMut.mutate({ id, nombre: n })}
                     onChangeParent={(id, pid) =>
                       updateMut.mutate(pid === null ? { id, set_parent_null: true } : { id, parent_id: pid })
@@ -201,20 +299,19 @@ export function CategoriasSection() {
   );
 }
 
-// ── Sortable root item (con su propio DndContext para los hijos) ─────────────
+// ── Sortable root item ──────────────────────────────────────────────────────
 
 function SortableRootItem({
-  root, children, allRoots, isOpen, sensors,
+  root, children, allRoots, isOpen,
   onToggle, onRename, onDelete, onAddChild,
   newChildFor, newChildName, setNewChildName,
   onCreateChild, onCancelChild,
-  onReorderChildren, onRenameChild, onChangeParent, onDeleteChild,
+  onRenameChild, onChangeParent, onDeleteChild,
 }: {
   root: RowItem;
   children: RowItem[];
   allRoots: RowItem[];
   isOpen: boolean;
-  sensors: ReturnType<typeof useSensors>;
   onToggle: () => void;
   onRename: (n: string) => void;
   onDelete: () => void;
@@ -224,34 +321,27 @@ function SortableRootItem({
   setNewChildName: (v: string) => void;
   onCreateChild: (name: string) => void;
   onCancelChild: () => void;
-  onReorderChildren: (ids: number[]) => void;
   onRenameChild: (id: number, name: string) => void;
   onChangeParent: (id: number, parentId: number | null) => void;
   onDeleteChild: (id: number, name: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: root.id });
+    useSortable({
+      id: root.id,
+      data: { type: "root", rootId: root.id } satisfies DragData,
+    });
+
+  // Droppable zone para recibir hijas de otros padres (cross-parent move).
+  const dropZone = useDroppable({
+    id: `root-zone-${root.id}`,
+    data: { type: "root-zone", rootId: root.id } satisfies DragData,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 10 : undefined,
-  };
-
-  // Local state for children optimistic reorder
-  const [localChildren, setLocalChildren] = useState<RowItem[] | null>(null);
-  const displayChildren = localChildren ?? children;
-  useMemo(() => { setLocalChildren(null); }, [children]);
-
-  const handleChildDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = displayChildren.findIndex((c) => c.id === active.id);
-    const newIndex = displayChildren.findIndex((c) => c.id === over.id);
-    const reordered = arrayMove(displayChildren, oldIndex, newIndex);
-    setLocalChildren(reordered);
-    onReorderChildren(reordered.map((c) => c.id));
   };
 
   return (
@@ -297,10 +387,17 @@ function SortableRootItem({
       </div>
 
       {isOpen && (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleChildDragEnd}>
-          <SortableContext items={displayChildren.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-            <ul className="pl-8">
-              {displayChildren.map((child) => (
+        <div
+          ref={dropZone.setNodeRef}
+          className={cn(
+            "pl-8 transition rounded-md",
+            // Resalte cuando una hija de otro padre está sobre esta zone.
+            dropZone.isOver && "ring-2 ring-amber bg-amber/5",
+          )}
+        >
+          <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+            <ul>
+              {children.map((child) => (
                 <SortableChildItem
                   key={child.id}
                   child={child}
@@ -310,6 +407,11 @@ function SortableRootItem({
                   onDelete={() => onDeleteChild(child.id, child.nombre)}
                 />
               ))}
+              {children.length === 0 && (
+                <li className="px-3 py-3 text-[11px] text-muted-foreground/60 italic">
+                  Sin subcategorías. Arrastrá una de otra raíz acá, o creá nueva con el +.
+                </li>
+              )}
               {newChildFor === root.id && (
                 <li className="px-3 py-2 flex items-center gap-2">
                   <Input
@@ -331,7 +433,7 @@ function SortableRootItem({
               )}
             </ul>
           </SortableContext>
-        </DndContext>
+        </div>
       )}
     </li>
   );
@@ -347,7 +449,10 @@ function SortableChildItem({
   onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: child.id });
+    useSortable({
+      id: child.id,
+      data: { type: "child", childId: child.id, parentId: child.parent_id ?? 0 } satisfies DragData,
+    });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -419,8 +524,6 @@ function EditableNameInput({
 }) {
   const [draft, setDraft] = useState(value);
 
-  // Sincronizar cuando el valor del server cambia (después de un save exitoso,
-  // o si otra tab editó). Solo sincroniza si NO hay edición pendiente local.
   useEffect(() => {
     setDraft(value);
   }, [value]);
