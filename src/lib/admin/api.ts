@@ -672,6 +672,11 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }),
+  reorderSpecTemplates: (items: { id: number; prioridad: number }[]) =>
+    authedPostJson<{ ok: true; count: number }>(
+      "/api/admin/spec-templates/reorder",
+      { items },
+    ),
   deleteSpecTemplate: async (templateId: number) => {
     const res = await authedFetch(`/api/admin/spec-templates/${templateId}`, { method: "DELETE" });
     if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);

@@ -244,6 +244,39 @@ def borrar_template(template_id: int, request: Request):
         conn.close()
 
 
+@router.post("/admin/spec-templates/reorder")
+def reordenar_templates(payload: dict, request: Request):
+    """Actualiza la prioridad de múltiples templates en un solo request.
+    Body: {"items": [{"id": 1, "prioridad": 10}, {"id": 2, "prioridad": 20}, …]}.
+    Menor prioridad = aparece antes (el listado y el form ordenan ASC).
+    """
+    _require_admin(request)
+    items = payload.get("items") if isinstance(payload, dict) else None
+    if not isinstance(items, list) or not items:
+        raise HTTPException(400, "Falta 'items' (lista de {id, prioridad})")
+    conn = get_db()
+    try:
+        for item in items:
+            tid = item.get("id")
+            prio = item.get("prioridad")
+            if tid is None or prio is None:
+                raise HTTPException(400, "Cada item necesita 'id' y 'prioridad'")
+            conn.execute(
+                "UPDATE categoria_spec_templates SET prioridad = ? WHERE id = ?",
+                (int(prio), int(tid)),
+            )
+        conn.commit()
+        return {"ok": True, "count": len(items)}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(500, f"Error reordenando: {e}")
+    finally:
+        conn.close()
+
+
 # ── Specs por equipo ────────────────────────────────────────────────────
 
 @router.get("/admin/equipos/{equipo_id}/specs")
