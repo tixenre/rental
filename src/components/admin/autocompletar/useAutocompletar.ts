@@ -45,7 +45,10 @@ export function useAutocompletar({
   const [customUrl, setCustomUrl] = useState("");
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      // Pre-cargar el link del equipo si lo tiene, sino quedar en blanco.
+      setCustomUrl(equipo?.bh_url ?? "");
+    } else {
       setResult(null);
       setError(null);
       setPhotoDiag(null);
@@ -54,7 +57,7 @@ export function useAutocompletar({
       setUploadingFotoUrl("");
       setCustomUrl("");
     }
-  }, [open]);
+  }, [open, equipo?.bh_url]);
 
   const solicitarAutocompletado = (input: {
     nombre?: string | null;
