@@ -3,11 +3,9 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   LayoutDashboard,
-  Sun,
   Package,
   ClipboardList,
   Users,
-  CalendarDays,
   BarChart3,
   Settings,
   LogOut,
@@ -50,13 +48,12 @@ type NavItem = {
 
 const items: NavItem[] = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard, exact: true },
-  { title: "Hoy",       url: "/admin/hoy",      icon: Sun },
   {
-    title: "Equipos",
+    title: "Inventario",
     url: "/admin/equipos",
     icon: Package,
     children: [
-      { title: "Listado",            url: "/admin/equipos",            icon: List },
+      { title: "Equipos",             url: "/admin/equipos",            icon: List },
       { title: "Categorías",          url: "/admin/equipos/categorias", icon: FolderTree },
       { title: "Marcas",              url: "/admin/equipos/marcas",     icon: Building2 },
       { title: "Etiquetas",           url: "/admin/equipos/etiquetas",  icon: Tag },
@@ -67,7 +64,6 @@ const items: NavItem[] = [
   },
   { title: "Pedidos",     url: "/admin/pedidos",     icon: ClipboardList },
   { title: "Clientes",    url: "/admin/clientes",    icon: Users },
-  { title: "Calendario",  url: "/admin/calendario",  icon: CalendarDays },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
   { title: "Novedades",   url: "/admin/novedades",   icon: Sparkles },
   { title: "Settings",    url: "/admin/settings",    icon: Settings },
