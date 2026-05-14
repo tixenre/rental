@@ -48,8 +48,12 @@ export function BrandCarousel({
     let list: typeof counts;
 
     if (manualPicks.length > 0) {
-      // Curación manual del admin: ordenar las destacadas por count desc.
-      manualPicks.sort((a, b) => b.count - a.count);
+      // Curación manual del admin: respetar el `orden` (drag-drop del
+      // back office). Si dos tienen el mismo orden, desempata por count.
+      manualPicks.sort(
+        (a, b) =>
+          (a.brand.orden ?? 100) - (b.brand.orden ?? 100) || b.count - a.count,
+      );
       list = manualPicks;
     } else {
       // Fallback automático: top N por count.

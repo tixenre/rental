@@ -26,7 +26,8 @@ export function InlineSvg({
   fallback?: React.ReactNode;
 }) {
   const q = useQuery({
-    queryKey: ["inline-svg", url],
+    // queryKey v2: cambiar al actualizar tintSvg → invalida caches viejos.
+    queryKey: ["inline-svg-v2", url],
     queryFn: async (): Promise<string> => {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`SVG fetch ${res.status}`);
@@ -74,23 +75,37 @@ function sanitizeSvg(text: string): string {
 }
 
 /**
- * Forzar el color del SVG al `currentColor` del parent. Reemplaza:
- *  - atributos `fill="..."` y `stroke="..."` (excepto `none`)
- *  - estilos inline `fill: ...;` y `stroke: ...;` dentro de `style="..."`
- *  - declaraciones equivalentes dentro de `<style>...</style>`
- * Mantiene `none` (no fill) para preservar las áreas vacías intencionales.
+ * Forzar el color del SVG al `currentColor` del parent.
  *
- * Esto convierte cualquier logo a monocromo siguiendo el tema. Si el admin
- * subió un logo a color (Sony rojo), también se uniforma — esa es la
- * decisión: que el catálogo se vea consistente. Si quieren color, suben
- * PNG.
+ * Reemplazos:
+ *  - atributos `fill="..."` y `stroke="..."` (excepto `none`)
+ *  - estilos inline `fill: ...;` y `stroke: ...;`
+ *  - declaraciones equivalentes dentro de `<style>...</style>`
+ *
+ * Mantiene `none` (no fill) para preservar áreas vacías intencionales.
+ *
+ * Además inyecta `fill="currentColor"` en el `<svg>` root si no tiene
+ * uno explícito — para que los hijos sin fill (que por default serían
+ * negros) hereden el color del tema.
+ *
+ * Resultado: cualquier logo SVG, sin importar cómo está pintado (atributo,
+ * estilo inline, clase CSS, gradient, sin fill), termina monocromo en el
+ * color del `text-*` del parent. Si el admin quiere conservar el color
+ * original, sube PNG.
  */
 function tintSvg(text: string): string {
-  return text
-    // fill="hex/named/rgb" → fill="currentColor", excepto "none"
-    .replace(/fill\s*=\s*(["'])(?!none\1)[^"']*\1/gi, 'fill="currentColor"')
-    .replace(/stroke\s*=\s*(["'])(?!none\1)[^"']*\1/gi, 'stroke="currentColor"')
-    // style="...fill: red; stroke: blue..." → reemplaza las props
-    .replace(/(\bfill\s*:\s*)(?!none\b)[^;"']+/gi, "$1currentColor")
-    .replace(/(\bstroke\s*:\s*)(?!none\b)[^;"']+/gi, "$1currentColor");
+  let out = text;
+  // fill="hex/named/rgb" → fill="currentColor", excepto "none"
+  out = out.replace(/fill\s*=\s*(["'])(?!none\1)[^"']*\1/gi, 'fill="currentColor"');
+  out = out.replace(/stroke\s*=\s*(["'])(?!none\1)[^"']*\1/gi, 'stroke="currentColor"');
+  // style="...fill: red; stroke: blue..." y <style>.cls{fill:red}</style>
+  out = out.replace(/(\bfill\s*:\s*)(?!none\b)[^;"']+/gi, "$1currentColor");
+  out = out.replace(/(\bstroke\s*:\s*)(?!none\b)[^;"']+/gi, "$1currentColor");
+  // Si el <svg> root no tiene fill, inyectamos uno → descendientes sin
+  // fill explícito heredan currentColor (por default heredarían "black").
+  out = out.replace(/<svg\b([^>]*)>/i, (match, attrs: string) => {
+    if (/\bfill\s*=/i.test(attrs)) return match;
+    return `<svg${attrs} fill="currentColor">`;
+  });
+  return out;
 }

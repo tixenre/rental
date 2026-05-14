@@ -4,6 +4,9 @@ export interface Brand {
   logo_url?: string | null;
   /** Si true, el frontend público destaca esta marca en el BrandCarousel del home. #288 */
   destacada?: boolean;
+  /** Orden manual del admin (ASC). Determina el orden del BrandCarousel
+   *  cuando hay destacadas. Default 100. */
+  orden?: number;
 }
 
 export interface MarcaAdmin {

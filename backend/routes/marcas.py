@@ -68,7 +68,8 @@ def list_marcas():
     conn = get_db()
     try:
         rows = conn.execute("""
-            SELECT id, nombre, logo_url, destacada, popularidad_score, created_at, updated_at
+            SELECT id, nombre, logo_url, destacada, orden,
+                   popularidad_score, created_at, updated_at
             FROM marcas
             WHERE visible = TRUE
             ORDER BY orden ASC, popularidad_score DESC, nombre ASC
