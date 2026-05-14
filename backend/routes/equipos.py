@@ -3053,6 +3053,21 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
                 "/avatar", "_avatar", "-avatar",
                 "/sprite", "spacer.gif", "pixel.gif",
                 "_sm.", "-sm.", "_small.", "-small.",
+                # Ads, banners, promos, campaign creatives (B&H/Sony/etc.
+                # incrustan estos en las páginas de producto; no son la
+                # foto del equipo en sí).
+                "/banner", "_banner", "-banner",
+                "/promo", "_promo", "-promo",
+                "/campaign", "_campaign", "-campaign",
+                "/ads/", "/ad-", "_ad-", "adservice",
+                "/marketing", "_marketing",
+                "doubleclick", "googleads", "googlesyndication",
+                "amazon-adsystem", "scorecardresearch",
+                "/billboard", "_billboard",
+                "/hero-banner", "homepage-banner",
+                "watch-now", "/events/", "/event-",
+                "in-residence", "panel-",
+                "newsroom", "press-release", "press/",
             )
             if any(p in lo for p in LOW_QUALITY_PATTERNS):
                 return
@@ -3106,22 +3121,36 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
                 "Accept": "image/avif,image/webp,image/*,*/*;q=0.8",
                 "Referer": f"https://{host}/" if host else "",
             }
-            try:
-                rh = client.head(url, headers=hdrs, follow_redirects=True, timeout=8.0)
-                if rh.status_code == 200:
-                    ct = rh.headers.get("content-type", "")
-                    cl = int(rh.headers.get("content-length", "0") or "0")
-                    if ct.startswith("image/") and (cl == 0 or cl > 1024):
-                        return True
-            except httpx.HTTPError:
-                pass
-            # Fallback con Range
-            hdrs["Range"] = "bytes=0-2048"
+            # Bajamos los primeros 16KB para chequear:
+            #   1. Que sea una imagen (content-type)
+            #   2. Que las dimensiones no sean de banner (relación ancho/alto
+            #      muy extrema descarta banners promo tipo 728x90, 970x250).
+            hdrs["Range"] = "bytes=0-16384"
             rg = client.get(url, headers=hdrs, follow_redirects=True, timeout=8.0)
-            if rg.status_code in (200, 206):
-                ct = rg.headers.get("content-type", "")
-                if ct.startswith("image/"):
-                    return True
+            if rg.status_code not in (200, 206):
+                return False
+            ct = rg.headers.get("content-type", "")
+            if not ct.startswith("image/"):
+                return False
+            # Intentar parsear el header para sacar dimensiones (PIL solo
+            # necesita la cabecera). Si falla, asumimos válida.
+            try:
+                from PIL import Image as _PILImage
+                from io import BytesIO as _BIO
+                img = _PILImage.open(_BIO(rg.content))
+                w, h = img.size
+                if w > 0 and h > 0:
+                    ratio = max(w, h) / max(1, min(w, h))
+                    # Banners típicos: 8:1+ (728x90 ≈ 8.1, 970x250 ≈ 3.88).
+                    # Cualquier cosa > 3.5:1 muy probable que sea banner/strip.
+                    if ratio > 3.5:
+                        return False
+                    # Imágenes muy chicas no sirven como hero del producto.
+                    if min(w, h) < 240:
+                        return False
+            except Exception:
+                pass
+            return True
         except httpx.HTTPError:
             pass
         return False
@@ -3710,8 +3739,15 @@ def _get_r2_client(cfg: dict) -> object:
 
 
 def _foto_path(equipo_id: int, ext: str) -> str:
-    """Genera path R2: equipos/{id}_{slug}/{id}_{slug}.{ext}
-    Busca el nombre del equipo en la BD; si falla usa solo el id."""
+    """Genera path R2: equipos/{id}_{slug}/{id}_{slug}-{ts}.{ext}
+
+    El timestamp en el nombre del archivo evita el problema del cache
+    inmutable: R2 sirve los assets con Cache-Control: max-age=1año
+    immutable, así que dos uploads al mismo path harían que el navegador
+    siga mostrando el viejo durante un año. Con timestamp cada upload
+    tiene URL nueva. El archivo anterior queda como huérfano en R2.
+    """
+    import time as _time
     try:
         conn = get_db()
         row = conn.execute("SELECT nombre FROM equipos WHERE id = %s", (equipo_id,)).fetchone()
@@ -3726,12 +3762,13 @@ def _foto_path(equipo_id: int, ext: str) -> str:
     else:
         slug = ""
 
+    ts = int(_time.time())
     if slug:
         folder   = f"{equipo_id}_{slug}"
-        filename = f"{equipo_id}_{slug}.{ext}"
+        filename = f"{equipo_id}_{slug}-{ts}.{ext}"
     else:
         folder   = f"{equipo_id}"
-        filename = f"{equipo_id}.{ext}"
+        filename = f"{equipo_id}-{ts}.{ext}"
     return f"equipos/{folder}/{filename}"
 
 
