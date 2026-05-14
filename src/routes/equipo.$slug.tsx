@@ -25,6 +25,7 @@ import {
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { EmptyImage } from "@/components/rental/EmptyImage";
 import { IncludedList } from "@/components/rental/IncludedList";
+import { KitSection } from "@/components/rental/KitSection";
 import { KeywordChips } from "@/components/rental/KeywordChips";
 import { backendToEquipment } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
@@ -297,6 +298,15 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
         )}
       </div>
 
+      {/* "Incluye" arriba de todo (foto → incluye → descripción → specs).
+       *  Lo más útil para el cliente al decidir el alquiler: ver qué kit
+       *  viene incluido con fotos y cantidades. Solo si hay items con
+       *  data rica (kit components); el componente IncludedList se sigue
+       *  renderando abajo para keywords + spec highlights. */}
+      {item.includes && item.includes.length > 0 && (
+        <KitSection item={item} />
+      )}
+
       {/* Precio + agregar al carrito (sticky en mobile) */}
       <div className="md:hidden sticky bottom-0 -mx-4 z-10 bg-background border-t hairline px-4 py-3 flex items-center justify-between gap-3">
         <PriceBlock price={price} item={item} showPeriodTotal={showPeriodTotal} />
@@ -381,7 +391,10 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
 
       {item.videoUrl && <YouTubeEmbed url={item.videoUrl} />}
 
+      {/* IncludedList: keywords + specs highlights. El kit ya se rendereó
+       *  arriba via KitSection si hay items. */}
       <IncludedList item={item} />
+
 
       {/* Precio + agregar al carrito (desktop) */}
       <div className="hidden md:flex items-end justify-between gap-3 border-t hairline pt-6">
