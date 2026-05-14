@@ -54,6 +54,7 @@ import {
 } from "./spec-helpers";
 import type { AutocompletarResult } from "../autocompletar";
 import { generarNombrePublico, categoriaSoportaAutoGen } from "./nombre-publico";
+import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 
 // ════════════════════════════════════════════════════════════════════
 // Schema
@@ -293,6 +294,13 @@ export function EquipoFormDialogV2({
     return null;
   }, [catsQ.data, selectedCats]);
 
+  /** Template de nombre público de la categoría raíz (NULL si no hay). */
+  const categoriaTemplate = useMemo(() => {
+    if (!catsQ.data || categoriaRootId == null) return null;
+    const cat = catsQ.data.find((x) => x.id === categoriaRootId);
+    return cat?.nombre_publico_template ?? null;
+  }, [catsQ.data, categoriaRootId]);
+
   // ── Spec template auto-aplicado por categoría (#263 Opción B) ─────
   // Cuando cambia la categoría raíz, traemos el template y agregamos
   // sus labels al final de `specs` con value vacío. Si el usuario no
@@ -330,6 +338,19 @@ export function EquipoFormDialogV2({
   const watchedModelo = form.watch("modelo");
   useEffect(() => {
     if (!nombrePublicoAuto) return;
+    // Prioridad 1: template definido por el admin en la categoría (DB).
+    const fromTemplate = renderNombrePublicoTemplate(categoriaTemplate, {
+      marca: watchedMarca ?? "",
+      modelo: watchedModelo ?? "",
+      tipo: categoriaRoot ?? "",
+      nombre: initial?.nombre ?? "",
+      specs: specs.map((s) => ({ label: s.label, value: s.value })),
+    });
+    if (fromTemplate) {
+      setNombrePublico(fromTemplate);
+      return;
+    }
+    // Prioridad 2: template hardcoded (nombre-publico.ts) por categoría conocida.
     const gen = generarNombrePublico(categoriaRoot, {
       marca: watchedMarca ?? "",
       modelo: watchedModelo ?? "",
@@ -338,9 +359,10 @@ export function EquipoFormDialogV2({
       resolucion: findSpecValue(specs, "Resolución"),
     });
     if (gen) setNombrePublico(gen);
-  }, [nombrePublicoAuto, categoriaRoot, watchedMarca, watchedModelo, specs]);
+  }, [nombrePublicoAuto, categoriaRoot, categoriaTemplate, watchedMarca, watchedModelo, specs, initial?.nombre]);
 
-  const autoGenDisponible = categoriaSoportaAutoGen(categoriaRoot);
+  /** Hay alguna fuente de auto-gen disponible? Template DB o hardcoded. */
+  const autoGenDisponible = !!categoriaTemplate || categoriaSoportaAutoGen(categoriaRoot);
 
   // ════════════════════════════════════════════════════════════════════
   // Autocompletar — llama al backend con la URL y rellena el form.

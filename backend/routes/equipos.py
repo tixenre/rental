@@ -1962,6 +1962,7 @@ class CategoriaPatch(BaseModel):
     parent_id: Optional[int] = None
     set_parent_null: Optional[bool] = False
     visible:   Optional[bool] = None
+    nombre_publico_template: Optional[str] = None
 
 
 class CategoriasReorder(BaseModel):
@@ -1976,15 +1977,17 @@ def admin_list_categorias(request: Request):
         rows = conn.execute("""
             SELECT c.id, c.nombre, c.prioridad, c.parent_id,
                    COALESCE(c.visible, TRUE) AS visible,
+                   c.nombre_publico_template,
                    COUNT(ec.equipo_id) AS total
             FROM categorias c
             LEFT JOIN equipo_categorias ec ON ec.categoria_id = c.id
-            GROUP BY c.id, c.nombre, c.prioridad, c.parent_id, c.visible
+            GROUP BY c.id, c.nombre, c.prioridad, c.parent_id, c.visible, c.nombre_publico_template
             ORDER BY c.prioridad ASC, LOWER(c.nombre) ASC
         """).fetchall()
         return [
             {"id": r["id"], "nombre": r["nombre"], "prioridad": r["prioridad"],
              "parent_id": r["parent_id"], "visible": bool(r["visible"]),
+             "nombre_publico_template": r["nombre_publico_template"],
              "total": r["total"]}
             for r in rows
         ]
@@ -2051,6 +2054,10 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
         sets.append("prioridad = ?"); vals.append(int(patch.prioridad))
     if patch.visible is not None:
         sets.append("visible = ?"); vals.append(bool(patch.visible))
+    if patch.nombre_publico_template is not None:
+        # String vacío se guarda como NULL para distinguir "sin template".
+        tpl = patch.nombre_publico_template.strip()
+        sets.append("nombre_publico_template = ?"); vals.append(tpl or None)
     if patch.set_parent_null:
         sets.append("parent_id = NULL")
     elif patch.parent_id is not None:
