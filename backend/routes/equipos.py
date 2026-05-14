@@ -798,7 +798,7 @@ def restore_equipo(id: int, request: Request):
 
 class BulkActionInput(BaseModel):
     ids: list[int] = Field(..., min_length=1, max_length=500)
-    action: str   # "set_visible" | "set_ficha_completa" | "set_categoria" | "delete"
+    action: str   # "set_visible" | "set_ficha_completa" | "set_categoria" | "add_categoria" | "delete"
     visible: Optional[bool] = None
     ficha_completa: Optional[bool] = None
     categoria_id: Optional[int] = None
@@ -859,6 +859,35 @@ def bulk_action(payload: BulkActionInput, request: Request):
                 for orden, cid_int in enumerate(ancestor_ids):
                     conn.execute(
                         "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
+                        (eid, cid_int, orden),
+                    )
+                try:
+                    regenerate_auto_tags(conn, eid)
+                except Exception as e:
+                    logger.warning("regenerate_auto_tags falló para %s en bulk: %s", eid, e)
+
+        elif payload.action == "add_categoria":
+            # Igual que set_categoria pero NO borra las existentes — sólo
+            # AGREGA. Útil para asignar masivamente una categoría desde
+            # la vista de categorías sin perder las otras categorías que
+            # cada equipo ya tenía.
+            if not payload.categoria_id:
+                raise HTTPException(400, "add_categoria requiere categoria_id: int")
+            cat_exists = conn.execute(
+                "SELECT id FROM categorias WHERE id = ?", (payload.categoria_id,)
+            ).fetchone()
+            if not cat_exists:
+                raise HTTPException(404, f"Categoría {payload.categoria_id} no existe")
+            # Expandimos a ancestros una sola vez para todos los equipos.
+            ancestor_ids = _expand_to_ancestors(conn, [payload.categoria_id])
+            for eid in ids:
+                for orden, cid_int in enumerate(ancestor_ids):
+                    conn.execute(
+                        """
+                        INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT (equipo_id, categoria_id) DO NOTHING
+                        """,
                         (eid, cid_int, orden),
                     )
                 try:
