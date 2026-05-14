@@ -241,6 +241,18 @@ export function EquipoFormDialogV2({
     queryFn: () => adminApi.adminListCategorias(),
     enabled: open,
   });
+  // Lista de marcas para el dropdown del campo Marca. Source-of-truth:
+  // tabla `marcas`. El admin elige una existente o escribe una nueva
+  // (autocomplete via <datalist>, free text permitido).
+  const marcasQ = useQuery({
+    queryKey: ["admin", "marcas-list"],
+    queryFn: () => adminApi.adminListMarcas(),
+    enabled: open,
+  });
+  const marcasOptions = useMemo(
+    () => [...(marcasQ.data?.items ?? [])].sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    [marcasQ.data],
+  );
   const [selectedCats, setSelectedCats] = useState<Set<number>>(new Set());
   useEffect(() => {
     if (initial?.categorias) {
@@ -953,7 +965,17 @@ export function EquipoFormDialogV2({
 
                 <div className="grid grid-cols-2 gap-2">
                   <Field label="Marca">
-                    <Input {...form.register("marca")} placeholder="Sony" />
+                    <Input
+                      {...form.register("marca")}
+                      placeholder="Sony"
+                      list="marca-options"
+                      autoComplete="off"
+                    />
+                    <datalist id="marca-options">
+                      {marcasOptions.map((m) => (
+                        <option key={m.id} value={m.nombre} />
+                      ))}
+                    </datalist>
                   </Field>
                   <Field label="Modelo">
                     <Input {...form.register("modelo")} placeholder="FX30" />
