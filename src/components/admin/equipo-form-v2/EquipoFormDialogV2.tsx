@@ -265,6 +265,45 @@ export function EquipoFormDialogV2({
     return null;
   }, [catsQ.data, selectedCats]);
 
+  /** Id de la categoría raíz, para fetchear el spec template. */
+  const categoriaRootId = useMemo(() => {
+    if (!catsQ.data) return null;
+    const cats = catsQ.data;
+    for (const id of selectedCats) {
+      const c = cats.find((x) => x.id === id);
+      if (!c) continue;
+      if (c.parent_id == null) return c.id;
+      const parent = cats.find((x) => x.id === c.parent_id);
+      if (parent) return parent.id;
+    }
+    return null;
+  }, [catsQ.data, selectedCats]);
+
+  // ── Spec template auto-aplicado por categoría (#263 Opción B) ─────
+  // Cuando cambia la categoría raíz, traemos el template y agregamos
+  // sus labels al final de `specs` con value vacío. Si el usuario no
+  // los llena, `specsCleaned` ya los filtra al guardar (line ~644).
+  const specTemplateQ = useQuery({
+    queryKey: ["admin", "spec-template", categoriaRootId],
+    queryFn: () => adminApi.listSpecTemplates(categoriaRootId!),
+    enabled: open && !!categoriaRootId,
+  });
+  useEffect(() => {
+    const items = specTemplateQ.data?.items;
+    if (!items || items.length === 0) return;
+    setSpecs((prev) => {
+      const existing = new Set(prev.map((s) => s.label.trim().toLowerCase()));
+      const additions: Spec[] = [];
+      for (const t of items) {
+        if (!t.label?.trim()) continue;
+        if (existing.has(t.label.trim().toLowerCase())) continue;
+        additions.push(newSpec(t.label, ""));
+        existing.add(t.label.trim().toLowerCase());
+      }
+      return additions.length ? [...prev, ...additions] : prev;
+    });
+  }, [specTemplateQ.data]);
+
   // ── Auto-generación del nombre público ────────────────────────────
   // Cuando el toggle está ON y la categoría tiene template, regenera al
   // tocar cualquier campo relevante. Montura/Formato/Resolución se leen
