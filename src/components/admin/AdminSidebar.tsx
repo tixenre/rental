@@ -15,7 +15,6 @@ import {
   Tag,
   Wrench,
   Sparkles,
-  CheckCircle2,
   Building2,
   Palette,
 } from "lucide-react";
@@ -59,7 +58,6 @@ const items: NavItem[] = [
       { title: "Marcas",              url: "/admin/equipos/marcas",     icon: Building2 },
       { title: "Etiquetas",           url: "/admin/equipos/etiquetas",  icon: Tag },
       { title: "Specs por categoría", url: "/admin/equipos/specs",      icon: Wrench },
-      { title: "Validar nombres",     url: "/admin/equipos/validacion", icon: CheckCircle2 },
     ],
   },
   { title: "Pedidos",     url: "/admin/pedidos",     icon: ClipboardList },
