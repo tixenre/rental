@@ -35,7 +35,7 @@ import {
 
 import { adminApi } from "@/lib/admin/api";
 import { AddEquiposToCategoriaDialog } from "./AddEquiposToCategoriaDialog";
-import { EquiposEnCategoriaList } from "./EquiposEnCategoriaList";
+import { EquiposCountToggle, EquiposPanel } from "./EquiposEnCategoriaList";
 import { Users } from "lucide-react";
 
 type RowItem = { id: number; nombre: string; prioridad: number; parent_id: number | null; total: number };
@@ -434,6 +434,8 @@ function SortableRootItem({
     data: { type: "root-zone", rootId: root.id } satisfies DragData,
   });
 
+  const [equiposOpen, setEquiposOpen] = useState(false);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -472,11 +474,11 @@ function SortableRootItem({
           onSave={onRename}
           className="h-8 flex-1 font-medium"
         />
-        <EquiposEnCategoriaList
-          categoriaId={root.id}
-          categoriaNombre={root.nombre}
+        <EquiposCountToggle
           count={root.total}
-          onAddEquipos={onAddEquipos}
+          isOpen={equiposOpen}
+          onToggle={() => setEquiposOpen((v) => !v)}
+          onAddWhenEmpty={() => onAddEquipos(root.id, root.nombre)}
         />
         <Button
           size="icon"
@@ -494,6 +496,15 @@ function SortableRootItem({
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
+
+      {equiposOpen && (
+        <EquiposPanel
+          categoriaId={root.id}
+          categoriaNombre={root.nombre}
+          indentLevel={1}
+          onAddEquipos={onAddEquipos}
+        />
+      )}
 
       {isOpen && (
         <div
@@ -584,6 +595,7 @@ function SortableChildItem({
 
   const [addingGrand, setAddingGrand] = useState(false);
   const [newGrandName, setNewGrandName] = useState("");
+  const [equiposOpen, setEquiposOpen] = useState(false);
 
   return (
     <li ref={setNodeRef} style={style}>
@@ -602,11 +614,11 @@ function SortableChildItem({
           onSave={onRename}
           className="h-8 flex-1"
         />
-        <EquiposEnCategoriaList
-          categoriaId={child.id}
-          categoriaNombre={child.nombre}
+        <EquiposCountToggle
           count={child.total}
-          onAddEquipos={onAddEquipos}
+          isOpen={equiposOpen}
+          onToggle={() => setEquiposOpen((v) => !v)}
+          onAddWhenEmpty={onAddEquipos ? () => onAddEquipos(child.id, child.nombre) : undefined}
         />
         {onAddEquipos && (
           <Button
@@ -634,6 +646,15 @@ function SortableChildItem({
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
+
+      {equiposOpen && (
+        <EquiposPanel
+          categoriaId={child.id}
+          categoriaNombre={child.nombre}
+          indentLevel={2}
+          onAddEquipos={onAddEquipos}
+        />
+      )}
 
       {/* Nietos (3er nivel) — drag-drop reorder + cross-parent.
        *  SortableContext anida bajo el DndContext top-level del componente.
@@ -724,6 +745,8 @@ function SortableGrandchildItem({
       data: { type: "grandchild", grandchildId: grand.id, parentChildId } satisfies DragData,
     });
 
+  const [equiposOpen, setEquiposOpen] = useState(false);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -731,7 +754,8 @@ function SortableGrandchildItem({
   };
 
   return (
-    <li ref={setNodeRef} style={style} className="flex items-center gap-1.5 px-3 py-1">
+    <li ref={setNodeRef} style={style}>
+      <div className="flex items-center gap-1.5 px-3 py-1">
       <button
         type="button"
         {...attributes}
@@ -746,11 +770,11 @@ function SortableGrandchildItem({
         onSave={onRename}
         className="h-7 flex-1"
       />
-      <EquiposEnCategoriaList
-        categoriaId={grand.id}
-        categoriaNombre={grand.nombre}
+      <EquiposCountToggle
         count={grand.total}
-        onAddEquipos={onAddEquipos}
+        isOpen={equiposOpen}
+        onToggle={() => setEquiposOpen((v) => !v)}
+        onAddWhenEmpty={onAddEquipos ? () => onAddEquipos(grand.id, grand.nombre) : undefined}
       />
       {onAddEquipos && (
         <Button
@@ -772,6 +796,15 @@ function SortableGrandchildItem({
       >
         <Trash2 className="h-3.5 w-3.5" />
       </Button>
+      </div>
+      {equiposOpen && (
+        <EquiposPanel
+          categoriaId={grand.id}
+          categoriaNombre={grand.nombre}
+          indentLevel={3}
+          onAddEquipos={onAddEquipos}
+        />
+      )}
     </li>
   );
 }

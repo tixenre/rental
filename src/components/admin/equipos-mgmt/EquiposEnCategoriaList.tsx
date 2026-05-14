@@ -1,14 +1,17 @@
 /**
- * EquiposEnCategoriaList — lista expandible de equipos asignados a una
- * categoría. Se renderea anidada en el árbol de CategoriasSection cuando
- * el usuario abre el disclosure.
+ * Equipos dentro de una categoría — toggle + panel separados.
  *
- * Backend: usa `/api/equipos?categoria=<nombre>` que matchea recursivamente
- * (incluye descendientes). Para mostrar SOLO los equipos asignados
- * directamente a esta categoría, filtramos client-side por categorias[].
+ * Antes era un solo componente que renderizaba todo inline, lo que rompía
+ * la row al expandirse. Ahora:
+ *  - `EquiposCountToggle` se renderea EN la row (botón "▶ N" o "+ equipos").
+ *  - `EquiposPanel` se renderea BAJO la row con indent, mimicando cómo se
+ *    ven las subcategorías al expandir su padre.
+ *
+ * El estado `open` lo posee el parent row para poder decidir DÓNDE
+ * renderizar el panel (fuera del flex container de la row).
  */
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, X, ChevronRight, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -16,34 +19,69 @@ import { adminApi, type Equipo } from "@/lib/admin/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export function EquiposEnCategoriaList({
-  categoriaId,
-  categoriaNombre,
-  count,
-  onAddEquipos,
+// ── Toggle ─────────────────────────────────────────────────────────────
+
+export function EquiposCountToggle({
+  count, isOpen, onToggle, onAddWhenEmpty,
+}: {
+  count: number;
+  isOpen: boolean;
+  onToggle: () => void;
+  /** Si la categoría no tiene equipos, mostrar un CTA "+ equipos"
+   *  en lugar del count. */
+  onAddWhenEmpty?: () => void;
+}) {
+  if (count === 0) {
+    if (!onAddWhenEmpty) return null;
+    return (
+      <button
+        type="button"
+        onClick={onAddWhenEmpty}
+        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink transition shrink-0 underline-offset-2 hover:underline"
+        title="Agregar equipos a esta categoría"
+      >
+        <Plus className="h-3 w-3" /> equipos
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink transition shrink-0"
+      title={isOpen ? "Ocultar equipos" : "Ver equipos asignados directamente"}
+    >
+      <ChevronRight
+        className={cn("h-3 w-3 transition-transform", isOpen && "rotate-90")}
+      />
+      <span className="tabular-nums">{count}</span>
+    </button>
+  );
+}
+
+// ── Panel ──────────────────────────────────────────────────────────────
+
+export function EquiposPanel({
+  categoriaId, categoriaNombre, indentLevel = 1, onAddEquipos,
 }: {
   categoriaId: number;
   categoriaNombre: string;
-  count: number;
+  /** 1 = hijo de root (indent ml-10), 2 = nieto (ml-16). */
+  indentLevel?: 1 | 2 | 3;
   onAddEquipos?: (id: number, nombre: string) => void;
 }) {
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos-en-categoria", categoriaId],
     queryFn: () =>
-      adminApi.listEquipos({
-        categoria: categoriaNombre,
-        per_page: 500,
-      }),
-    enabled: open,
+      adminApi.listEquipos({ categoria: categoriaNombre, per_page: 500 }),
     staleTime: 30_000,
   });
 
-  // Filtrar solo equipos DIRECTAMENTE asignados a esta categoría
-  // (no descendientes). El backend usa CTE recursivo, así que la lista
-  // viene con todos los de la rama.
+  // El backend usa CTE recursivo: trae equipos de la categoría Y de
+  // sus descendientes. Filtramos client-side por categorias[].id para
+  // mostrar SOLO los asignados directamente.
   const equiposDirectos = useMemo(() => {
     if (!equiposQ.data) return [];
     return equiposQ.data.items.filter((e) =>
@@ -67,77 +105,46 @@ export function EquiposEnCategoriaList({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Si no hay equipos asignados pero podemos agregar, mostramos un CTA
-  // chiquito en lugar del disclosure (más visible que el botón 👥).
-  if (count === 0) {
-    if (!onAddEquipos) return null;
-    return (
-      <button
-        type="button"
-        onClick={() => onAddEquipos(categoriaId, categoriaNombre)}
-        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink transition shrink-0 underline-offset-2 hover:underline"
-        title="Agregar equipos a esta categoría"
-      >
-        <Plus className="h-3 w-3" /> equipos
-      </button>
-    );
-  }
+  const indentClass =
+    indentLevel === 1 ? "ml-10"
+    : indentLevel === 2 ? "ml-16"
+    : "ml-20";
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink transition shrink-0"
-        title={open ? "Ocultar equipos" : "Ver equipos asignados directamente"}
-      >
-        <ChevronRight
-          className={cn(
-            "h-3 w-3 transition-transform",
-            open && "rotate-90",
-          )}
-        />
-        <span className="tabular-nums">{count}</span>
-      </button>
-
-      {open && (
-        <div className="basis-full ml-10 mt-1 border-l hairline pl-2 space-y-1">
-          {onAddEquipos && (
-            <button
-              type="button"
-              onClick={() => onAddEquipos(categoriaId, categoriaNombre)}
-              className="inline-flex items-center gap-1 text-[11px] text-ink hover:text-amber transition py-1"
-              title="Agregar más equipos a esta categoría"
-            >
-              <Plus className="h-3 w-3" /> Agregar equipos
-            </button>
-          )}
-          {equiposQ.isLoading && (
-            <div className="flex items-center gap-2 py-2 text-[11px] text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
-            </div>
-          )}
-          {equiposQ.isSuccess && equiposDirectos.length === 0 && (
-            <div className="py-2 text-[11px] text-muted-foreground italic">
-              No hay equipos asignados directamente acá. Los {count} que cuenta
-              esta categoría son de sus subcategorías.
-            </div>
-          )}
-          {equiposDirectos.length > 0 && (
-            <ul className="space-y-0.5">
-              {equiposDirectos.map((eq) => (
-                <EquipoRow
-                  key={eq.id}
-                  equipo={eq}
-                  onRemove={() => removeMut.mutate(eq.id)}
-                  disabled={removeMut.isPending}
-                />
-              ))}
-            </ul>
-          )}
+    <div className={cn(indentClass, "border-l hairline pl-3 py-1 space-y-1")}>
+      {onAddEquipos && (
+        <button
+          type="button"
+          onClick={() => onAddEquipos(categoriaId, categoriaNombre)}
+          className="inline-flex items-center gap-1 text-[11px] text-ink hover:text-amber transition py-0.5"
+          title="Agregar más equipos a esta categoría"
+        >
+          <Plus className="h-3 w-3" /> Agregar equipos
+        </button>
+      )}
+      {equiposQ.isLoading && (
+        <div className="flex items-center gap-2 py-1 text-[11px] text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
         </div>
       )}
-    </>
+      {equiposQ.isSuccess && equiposDirectos.length === 0 && (
+        <div className="py-1 text-[11px] text-muted-foreground italic">
+          Sin equipos directos. Los que cuenta esta categoría vienen de sus subcategorías.
+        </div>
+      )}
+      {equiposDirectos.length > 0 && (
+        <ul className="space-y-0.5">
+          {equiposDirectos.map((eq) => (
+            <EquipoRow
+              key={eq.id}
+              equipo={eq}
+              onRemove={() => removeMut.mutate(eq.id)}
+              disabled={removeMut.isPending}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
