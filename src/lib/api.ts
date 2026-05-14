@@ -67,6 +67,10 @@ export type BackendMarca = {
   id: number;
   nombre: string;
   logo_url?: string | null;
+  /** Curación manual del admin para BrandCarousel del home. #288 */
+  destacada?: boolean;
+  /** Orden manual del admin (drag-drop en /admin/equipos/marcas). */
+  orden?: number;
   /** Score automático calculado por el ranking service (#131). */
   popularidad_score?: number;
 };
