@@ -371,7 +371,7 @@ export const adminApi = {
   /** Bulk action sobre múltiples equipos. */
   bulkAction: (payload: {
     ids: number[];
-    action: "set_visible" | "set_ficha_completa" | "set_categoria" | "add_categoria" | "delete" | "delete_permanent";
+    action: "set_visible" | "set_ficha_completa" | "set_categoria" | "add_categoria" | "remove_categoria" | "delete" | "delete_permanent";
     visible?: boolean;
     ficha_completa?: boolean;
     categoria_id?: number;
