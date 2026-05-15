@@ -316,8 +316,15 @@ TEMPLATES: dict[str, list[dict]] = {
 
 
 def seed_spec_templates(conn) -> int:
-    """Inserta los templates iniciales en la DB. Idempotente: si ya existe
-    el par (categoria_id, spec_key), no lo pisa.
+    """Inserta los templates iniciales en la DB SOLO para categorías nuevas
+    (que no tienen ningún spec configurado todavía). Si el dueño ya empezó
+    a configurar specs en una categoría desde el back-office, el seed
+    respeta esa configuración y no agrega más — la fuente de verdad es lo
+    que el dueño dejó en la DB.
+
+    Esto evita que specs borradas a mano reaparezcan en el próximo arranque.
+    Para forzar el reseed de una categoría: borrá TODAS sus specs en la UI
+    y reiniciá; el seed la repuebla. Sino, queda intacta.
 
     Devuelve la cantidad de specs insertados/actualizados."""
     inserted = 0
@@ -332,6 +339,15 @@ def seed_spec_templates(conn) -> int:
             # Skipeamos en silencio en lugar de romper el init.
             continue
         cat_id = row["id"]
+
+        # Si la categoría ya tiene CUALQUIER spec configurada, asumimos que el
+        # dueño la administra desde el back-office y no inyectamos más.
+        existing = conn.execute(
+            "SELECT COUNT(*) AS n FROM categoria_spec_templates WHERE categoria_id = %s",
+            (cat_id,),
+        ).fetchone()
+        if existing and existing["n"] > 0:
+            continue
 
         for prio_idx, spec in enumerate(specs):
             enum_opts_json = (
