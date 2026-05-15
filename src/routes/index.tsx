@@ -14,7 +14,7 @@ import { BrandCarousel } from "@/components/rental/BrandCarousel";
 import { ListFilters } from "@/components/rental/ListFilters";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { ViewIntroDialog } from "@/components/rental/ViewIntroDialog";
-import { useEquipos, useDisponibilidad, useCategorias, useMarcas } from "@/hooks/useEquipos";
+import { useEquipos, useCategorias, useMarcas } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
@@ -65,11 +65,10 @@ type Mode = "grid" | "list";
 
 function Index() {
   // Datos de la API
-  const { data: allEquipos = [], isLoading, isError } = useEquipos();
+  const { startDate, endDate } = useCart();
+  const { data: allEquipos = [], isLoading, isError } = useEquipos(startDate, endDate);
   const { data: backendCats = [] } = useCategorias();
   const { data: marcasData } = useMarcas();
-  const { startDate, endDate } = useCart();
-  const { data: disponibilidad } = useDisponibilidad(startDate, endDate);
 
   // Categorías derivadas, ordenadas por prioridad del backend.
   // Las que no aparecen en /api/categorias quedan al final, alfabéticas.
@@ -161,10 +160,7 @@ function Index() {
     });
   };
 
-  const getDisponible = (item: Equipment) =>
-    disponibilidad
-      ? (disponibilidad[String(item._backendId)] ?? item.cantidad ?? 1)
-      : undefined;
+  const getDisponible = (item: Equipment) => item.disponible;
 
   return (
     <PublicLayout>

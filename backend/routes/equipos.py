@@ -365,6 +365,50 @@ def equipos_afuera():
 
 # ── Rutas de equipos ─────────────────────────────────────────────────────────
 
+ESTADOS_RESERVADO = "('presupuesto','confirmado','retirado')"
+
+
+def _attach_disponibilidad(conn, equipos: list, desde: str, hasta: str) -> list:
+    """Calcula disponibilidad real por equipo e inyecta el campo `disponible`."""
+    directas = conn.execute(f"""
+        SELECT e.id, e.cantidad,
+               COALESCE(SUM(CASE
+                 WHEN p.estado IN {ESTADOS_RESERVADO}
+                      AND p.fecha_desde < ?
+                      AND p.fecha_hasta > ?
+                 THEN pi.cantidad ELSE 0
+               END), 0) AS reservado
+        FROM equipos e
+        LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
+        LEFT JOIN alquileres p ON p.id = pi.pedido_id
+        GROUP BY e.id
+    """, (hasta, desde)).fetchall()
+
+    reservado = {r["id"]: r["reservado"] for r in directas}
+    cantidad  = {r["id"]: r["cantidad"]  for r in directas}
+
+    via_kit = conn.execute(f"""
+        SELECT kc.componente_id,
+               SUM(pi.cantidad * kc.cantidad) AS extra
+        FROM kit_componentes kc
+        JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
+        JOIN alquileres p ON p.id = pi.pedido_id
+        WHERE p.estado IN {ESTADOS_RESERVADO}
+          AND p.fecha_desde < ?
+          AND p.fecha_hasta > ?
+        GROUP BY kc.componente_id
+    """, (hasta, desde)).fetchall()
+
+    for r in via_kit:
+        reservado[r["componente_id"]] = reservado.get(r["componente_id"], 0) + r["extra"]
+
+    for eq in equipos:
+        eid = eq["id"]
+        eq["disponible"] = max(0, cantidad.get(eid, eq.get("cantidad", 0)) - reservado.get(eid, 0))
+
+    return equipos
+
+
 @router.get("/equipos")
 def list_equipos(
     request:       Request,
@@ -380,6 +424,8 @@ def list_equipos(
     spec:          Optional[list[str]] = Query(None, description="Filtros por specs: spec=key:valor"),
     page:          int = Query(1, ge=1),
     per_page:      int = Query(200, ge=1, le=500),
+    desde:         Optional[str]  = Query(None, description="Fecha inicio (YYYY-MM-DD) para calcular disponibilidad"),
+    hasta:         Optional[str]  = Query(None, description="Fecha fin (YYYY-MM-DD) para calcular disponibilidad"),
 ):
     """Lista equipos con sort y filtros.
 
@@ -536,6 +582,10 @@ def list_equipos(
         equipos = attach_categorias(conn, equipos)
         equipos = attach_ficha(conn, equipos)
         equipos = attach_specs_destacados(conn, equipos)
+
+        if desde and hasta:
+            equipos = _attach_disponibilidad(conn, equipos, desde, hasta)
+
         return {"total": total, "page": page, "per_page": per_page, "items": equipos}
     finally:
         conn.close()
