@@ -27,5 +27,8 @@ SQLAlchemy>=2.0.0
 # cambiar storage_uri en main.py a "redis://...".
 slowapi>=0.1.9
 
+# Error tracking en producción. Solo activo si SENTRY_DSN está seteado.
+sentry-sdk[fastapi]>=2.0.0
+
 # Tests (no se instalan en prod; el CI corre `pip install -r requirements-dev.txt`).
 # Mantener acá los runtime deps; los test deps van en requirements-dev.txt.
