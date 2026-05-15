@@ -7,6 +7,8 @@
 
 ### ✨ Novedades
 
+- **Dashboard de calidad del inventario — qué equipos tienen datos faltantes** *(15 de mayo de 2026)*
+  Nueva sección en /admin/equipos/calidad que muestra de un vistazo cuántos equipos están al 100% y cuántos tienen datos faltantes por campo (foto, categoría, nombre público, descripción, serie, valor de reposición). Es solo lectura — los botones para completar directamente desde acá llegan en una segunda iteración. Sirve para saber dónde poner el foco al limpiar el inventario.
 - **Microinteracción "+1" volando al carrito al agregar un equipo** *(15 de mayo de 2026)*
   Al tocar 'Agregar' en una tarjeta del catálogo, ahora aparece un chip '+1' amarillo que sale del botón con una curva animada hacia el ícono del carrito en la barra inferior. Cuando llega, el ícono hace un pequeño pop (escala) que refuerza visualmente que el item se sumó. Es feedback inmediato típico de e-commerce mobile — sirve para no perderse el cambio del contador cuando estás scrolleando rápido.
 - **Calendario embebido en el dashboard + vista semanal** *(11 de mayo de 2026)*

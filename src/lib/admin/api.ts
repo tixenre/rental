@@ -10,6 +10,19 @@ import { authedFetch, authedJson, authedPostJson } from "@/lib/authedFetch";
 
 // ── Dashboard ────────────────────────────────────────────────────────────
 
+export type CalidadInventario = {
+  total: number;
+  completos_pct: number;
+  faltantes: {
+    serie: number;
+    valor_reposicion: number;
+    foto: number;
+    descripcion: number;
+    nombre_publico: number;
+    categoria: number;
+  };
+};
+
 export type DashboardData = {
   pendientes: number;
   activos: number;
@@ -339,6 +352,9 @@ export const adminApi = {
   restoreEquipo: (id: number) =>
     authedPostJson<{ ok: true; message?: string }>(`/api/equipos/${id}/restore`, {}),
   getEquipo: (id: number) => authedJson<Equipo>(`/api/equipos/${id}`),
+  /** Calidad del inventario — métricas + breakdown por campo faltante. Issue #349. */
+  getCalidadInventario: () =>
+    authedJson<CalidadInventario>("/api/admin/inventario/calidad"),
   /** Equipos sin número de serie cargado (NULL o vacío). Issue #91. */
   getEquiposSinSerie: () =>
     authedJson<{

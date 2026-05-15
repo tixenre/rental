@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 143,
+    date: "2026-05-15",
+    type: "feat",
+    title: "Dashboard de calidad del inventario — qué equipos tienen datos faltantes",
+    body: "Nueva sección en /admin/equipos/calidad que muestra de un vistazo cuántos equipos están al 100% y cuántos tienen datos faltantes por campo (foto, categoría, nombre público, descripción, serie, valor de reposición). Es solo lectura — los botones para completar directamente desde acá llegan en una segunda iteración. Sirve para saber dónde poner el foco al limpiar el inventario.",
+    labels: ["admin", "calidad-datos"],
+  },
+  {
     number: 142,
     date: "2026-05-15",
     type: "feat",

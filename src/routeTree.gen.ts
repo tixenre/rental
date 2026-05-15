@@ -59,6 +59,9 @@ const AdminEquiposClasificarLazyRouteImport = createFileRoute(
 const AdminEquiposCategoriasLazyRouteImport = createFileRoute(
   '/admin/equipos/categorias',
 )()
+const AdminEquiposCalidadLazyRouteImport = createFileRoute(
+  '/admin/equipos/calidad',
+)()
 
 const TerminosRoute = TerminosRouteImport.update({
   id: '/terminos',
@@ -249,6 +252,13 @@ const AdminEquiposCategoriasLazyRoute =
   } as any).lazy(() =>
     import('./routes/admin/equipos.categorias.lazy').then((d) => d.Route),
   )
+const AdminEquiposCalidadLazyRoute = AdminEquiposCalidadLazyRouteImport.update({
+  id: '/calidad',
+  path: '/calidad',
+  getParentRoute: () => AdminEquiposRoute,
+} as any).lazy(() =>
+  import('./routes/admin/equipos.calidad.lazy').then((d) => d.Route),
+)
 const AdminEquiposEtiquetasRoute = AdminEquiposEtiquetasRouteImport.update({
   id: '/etiquetas',
   path: '/etiquetas',
@@ -280,6 +290,7 @@ export interface FileRoutesByFullPath {
   '/cliente/': typeof ClienteIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
   '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
+  '/admin/equipos/calidad': typeof AdminEquiposCalidadLazyRoute
   '/admin/equipos/categorias': typeof AdminEquiposCategoriasLazyRoute
   '/admin/equipos/clasificar': typeof AdminEquiposClasificarLazyRoute
   '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
@@ -312,6 +323,7 @@ export interface FileRoutesByTo {
   '/cliente': typeof ClienteIndexRoute
   '/admin': typeof AdminIndexLazyRoute
   '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
+  '/admin/equipos/calidad': typeof AdminEquiposCalidadLazyRoute
   '/admin/equipos/categorias': typeof AdminEquiposCategoriasLazyRoute
   '/admin/equipos/clasificar': typeof AdminEquiposClasificarLazyRoute
   '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
@@ -348,6 +360,7 @@ export interface FileRoutesById {
   '/cliente/': typeof ClienteIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
   '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
+  '/admin/equipos/calidad': typeof AdminEquiposCalidadLazyRoute
   '/admin/equipos/categorias': typeof AdminEquiposCategoriasLazyRoute
   '/admin/equipos/clasificar': typeof AdminEquiposClasificarLazyRoute
   '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
@@ -385,6 +398,7 @@ export interface FileRouteTypes {
     | '/cliente/'
     | '/admin/'
     | '/admin/equipos/etiquetas'
+    | '/admin/equipos/calidad'
     | '/admin/equipos/categorias'
     | '/admin/equipos/clasificar'
     | '/admin/equipos/marcas'
@@ -417,6 +431,7 @@ export interface FileRouteTypes {
     | '/cliente'
     | '/admin'
     | '/admin/equipos/etiquetas'
+    | '/admin/equipos/calidad'
     | '/admin/equipos/categorias'
     | '/admin/equipos/clasificar'
     | '/admin/equipos/marcas'
@@ -452,6 +467,7 @@ export interface FileRouteTypes {
     | '/cliente/'
     | '/admin/'
     | '/admin/equipos/etiquetas'
+    | '/admin/equipos/calidad'
     | '/admin/equipos/categorias'
     | '/admin/equipos/clasificar'
     | '/admin/equipos/marcas'
@@ -700,6 +716,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEquiposCategoriasLazyRouteImport
       parentRoute: typeof AdminEquiposRoute
     }
+    '/admin/equipos/calidad': {
+      id: '/admin/equipos/calidad'
+      path: '/calidad'
+      fullPath: '/admin/equipos/calidad'
+      preLoaderRoute: typeof AdminEquiposCalidadLazyRouteImport
+      parentRoute: typeof AdminEquiposRoute
+    }
     '/admin/equipos/etiquetas': {
       id: '/admin/equipos/etiquetas'
       path: '/etiquetas'
@@ -712,6 +735,7 @@ declare module '@tanstack/react-router' {
 
 interface AdminEquiposRouteChildren {
   AdminEquiposEtiquetasRoute: typeof AdminEquiposEtiquetasRoute
+  AdminEquiposCalidadLazyRoute: typeof AdminEquiposCalidadLazyRoute
   AdminEquiposCategoriasLazyRoute: typeof AdminEquiposCategoriasLazyRoute
   AdminEquiposClasificarLazyRoute: typeof AdminEquiposClasificarLazyRoute
   AdminEquiposMarcasLazyRoute: typeof AdminEquiposMarcasLazyRoute
@@ -722,6 +746,7 @@ interface AdminEquiposRouteChildren {
 
 const AdminEquiposRouteChildren: AdminEquiposRouteChildren = {
   AdminEquiposEtiquetasRoute: AdminEquiposEtiquetasRoute,
+  AdminEquiposCalidadLazyRoute: AdminEquiposCalidadLazyRoute,
   AdminEquiposCategoriasLazyRoute: AdminEquiposCategoriasLazyRoute,
   AdminEquiposClasificarLazyRoute: AdminEquiposClasificarLazyRoute,
   AdminEquiposMarcasLazyRoute: AdminEquiposMarcasLazyRoute,
