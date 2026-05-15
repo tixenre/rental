@@ -859,8 +859,15 @@ export function EquipoFormDialogV2({
             formato: formatoSpec,
             resolucion: resolucionSpec,
             keywords_json: tags.length ? JSON.stringify(tags) : null,
-            // En V2 ya no hay template con tokens — el nombre público es literal.
-            nombre_publico_template: nombrePublico.trim() || null,
+            // Si el toggle "auto" está ON y tenemos un template de categoría,
+            // persistimos el TEMPLATE con tokens ("{marca} {modelo} ...").
+            // Al re-abrir el form, hasTokens detectará tokens → toggle queda ON.
+            // Cuando está OFF, guardamos el literal escrito por el dueño
+            // (override fijo, no se regenera).
+            nombre_publico_template:
+              nombrePublicoAuto && categoriaTemplate
+                ? categoriaTemplate
+                : (nombrePublico.trim() || null),
           });
         } catch (e) {
           fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
