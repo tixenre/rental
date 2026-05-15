@@ -349,7 +349,7 @@ def create_pedido(data: PedidoCreate):
             items_rows.append((it.equipo_id, it.cantidad, it.precio_jornada, subtotal))
 
         descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
-        descuento_total = descuento_pct + descuento_jornadas_pct
+        descuento_total = max(descuento_pct, descuento_jornadas_pct)
         monto_total = _aplicar_descuento(bruto, descuento_total)
 
         estado_inicial = data.estado if data.estado in {"borrador", "presupuesto"} else "presupuesto"
@@ -794,7 +794,7 @@ def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
                     conn.execute("UPDATE alquiler_items SET subtotal=? WHERE id=?", (sub, it["id"]))
                     bruto += sub
                 descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
-                descuento_total = (p2["descuento_pct"] or 0) + descuento_jornadas_pct
+                descuento_total = max(p2["descuento_pct"] or 0, descuento_jornadas_pct)
                 monto_total = _aplicar_descuento(bruto, descuento_total)
                 conn.execute(
                     "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
