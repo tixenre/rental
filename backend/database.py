@@ -729,6 +729,19 @@ def init_db():
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_unidades_dimension ON unidades(dimension)"
     )
+    # FK al catálogo unidades. El `unidad` VARCHAR de spec_definitions se
+    # mantiene como cache denormalizado para evitar JOINs en el hot path
+    # (render, listing). El sync `unidad ↔ unidad_id` lo cuida el endpoint
+    # PATCH/POST en routes/specs.py.
+    conn.execute(
+        "ALTER TABLE spec_definitions "
+        "ADD COLUMN IF NOT EXISTS unidad_id INTEGER "
+        "REFERENCES unidades(id) ON DELETE SET NULL"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spec_def_unidad_id "
+        "ON spec_definitions(unidad_id) WHERE unidad_id IS NOT NULL"
+    )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
         "ON spec_definitions(es_compatibilidad) WHERE es_compatibilidad"

@@ -312,6 +312,9 @@ export type SpecDefinition = {
   label: string;
   tipo: SpecTipo;
   unidad: string | null;
+  /** FK al catálogo `unidades` (sync con el string `unidad` por el backend).
+   *  null si la spec no tiene unidad asociada. */
+  unidad_id: number | null;
   enum_options: string[] | null;
   ayuda: string | null;
   es_compatibilidad: boolean;
@@ -371,6 +374,7 @@ export type SpecTemplate = {
   label: string;
   tipo: SpecTipo;
   unidad: string | null;
+  unidad_id: number | null;
   enum_options: string[] | null;
   tabla_columnas: SpecTablaColumna[] | null;
   output_config: SpecOutputConfig | null;

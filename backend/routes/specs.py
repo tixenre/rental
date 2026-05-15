@@ -191,7 +191,7 @@ def listar_spec_definitions(request: Request):
     try:
         rows = conn.execute("""
             SELECT
-              sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
+              sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id,
               sd.enum_options, sd.ayuda, sd.tabla_columnas, sd.output_config,
               COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
               COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
@@ -222,6 +222,33 @@ def listar_spec_definitions(request: Request):
 _VALID_SPEC_TIPOS = {"string", "number", "enum", "bool", "rango", "wxh", "wxhxd", "multi_enum", "tabla"}
 _VALID_COL_TIPOS = {"string", "number", "enum", "bool", "valor_unidad"}
 _VALID_ROW_STRATEGIES = {"all", "first", "last"}
+
+
+def _resolve_unidad_id(conn, simbolo: Optional[str]) -> Optional[int]:
+    """Lookup `unidades.id` por `simbolo`. Si no existe la entry y el
+    símbolo no está vacío, la crea (idempotent, dimension=NULL).
+    Devuelve `None` si simbolo es vacío/None."""
+    if simbolo is None:
+        return None
+    s = (simbolo or "").strip()
+    if not s:
+        return None
+    row = conn.execute(
+        "SELECT id FROM unidades WHERE simbolo = ?", (s,)
+    ).fetchone()
+    if row:
+        return row["id"] if isinstance(row, dict) or hasattr(row, "keys") else row[0]
+    conn.execute(
+        "INSERT INTO unidades (simbolo, nombre, dimension) "
+        "VALUES (?, ?, NULL) ON CONFLICT (simbolo) DO NOTHING",
+        (s, s),
+    )
+    row = conn.execute(
+        "SELECT id FROM unidades WHERE simbolo = ?", (s,)
+    ).fetchone()
+    if row is None:
+        return None
+    return row["id"] if isinstance(row, dict) or hasattr(row, "keys") else row[0]
 
 
 def _validate_output_config(oc: Optional[dict], tipo: str) -> None:
@@ -294,13 +321,14 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
     conn = get_db()
     try:
         try:
+            unidad_id = _resolve_unidad_id(conn, payload.unidad)
             cur = conn.execute(
                 """
                 INSERT INTO spec_definitions
-                  (spec_key, label, tipo, unidad, enum_options, ayuda,
+                  (spec_key, label, tipo, unidad, unidad_id, enum_options, ayuda,
                    es_compatibilidad, compatibilidad_modo, validado,
                    tabla_columnas, output_config)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """,
                 (
@@ -308,6 +336,7 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
                     payload.label,
                     payload.tipo,
                     payload.unidad,
+                    unidad_id,
                     json.dumps(payload.enum_options) if payload.enum_options else None,
                     payload.ayuda,
                     payload.es_compatibilidad,
@@ -364,6 +393,9 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
         # contra existing_dict + final_tipo. Acá solo serializamos.
         oc_val = updates["output_config"]
         updates["output_config"] = json.dumps(oc_val) if oc_val else None
+    # Sync unidad ↔ unidad_id: si el caller cambia `unidad`, recomputamos
+    # `unidad_id` desde el catálogo (creándolo si no existe).
+    sync_unidad_id: Optional[bool] = "unidad" in updates
     conn = get_db()
     try:
         existing = conn.execute(
@@ -386,6 +418,9 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
         # cambios pendientes). Usamos el payload sin serializar de Pydantic.
         if payload.output_config is not None:
             _validate_output_config(payload.output_config, final_tipo)
+        # Sync unidad_id desde el catálogo cuando se cambia `unidad`.
+        if sync_unidad_id:
+            updates["unidad_id"] = _resolve_unidad_id(conn, updates.get("unidad"))
         # Si está cambiando el tipo y hay valores ya cargados, bloqueamos —
         # el cambio podría invalidar todos los formatos guardados.
         if "tipo" in updates and updates["tipo"] != existing_dict.get("tipo"):
@@ -491,7 +526,7 @@ def listar_templates(categoria_id: int, request: Request):
             """
             SELECT
               t.id, t.categoria_id, t.spec_def_id,
-              sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.enum_options,
+              sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id, sd.enum_options,
               sd.tabla_columnas, sd.output_config,
               t.prioridad,
               COALESCE(t.visible_en_card, FALSE) AS visible_en_card,
@@ -743,7 +778,7 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
             SELECT DISTINCT ON (t.spec_def_id)
                 t.id AS template_id,
                 t.spec_def_id,
-                sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.enum_options,
+                sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id, sd.enum_options,
                 sd.tabla_columnas, sd.output_config,
                 t.prioridad,
                 t.visible_en_card, t.visible_en_filtros, t.visible_en_nombre,
