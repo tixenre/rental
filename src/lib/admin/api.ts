@@ -960,6 +960,47 @@ export const adminApi = {
       },
     ),
 
+  // ── Observatorio de specs (relevamiento de scrapes reales) ─────────
+  recomputeObservatorio: () =>
+    authedJson<{
+      equipos_procesados: number;
+      observaciones_insertadas: number;
+      labels_unicos: number;
+      sin_raw_json: number;
+    }>("/api/admin/specs/observatorio/recompute", { method: "POST" }),
+  observatorioStats: () =>
+    authedJson<{
+      total_obs: number;
+      equipos_cubiertos: number;
+      labels_unicos: number;
+      matched_count: number;
+      unmatched_count: number;
+      equipos_con_raw_json: number;
+      last_observed_at: string | null;
+    }>("/api/admin/specs/observatorio/stats"),
+  observatorioAgregado: (params: {
+    categoria?: string | null;
+    solo_unmapped?: boolean;
+    top_values?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.categoria) qs.set("categoria", params.categoria);
+    if (params.solo_unmapped) qs.set("solo_unmapped", "true");
+    if (params.top_values) qs.set("top_values", String(params.top_values));
+    return authedJson<{
+      total: number;
+      items: Array<{
+        categoria_raiz: string | null;
+        label_observado: string;
+        label_normalizado: string;
+        equipos_count: number;
+        matched_template: boolean;
+        spec_def_id: number | null;
+        top_values: Array<{ value: string; count: number }>;
+      }>;
+    }>(`/api/admin/specs/observatorio/agregado?${qs.toString()}`);
+  },
+
   // ── Catálogo global de spec_definitions ────────────────────────────
   listSpecDefinitions: () =>
     authedJson<{ items: SpecDefinition[] }>("/api/admin/spec-definitions"),
