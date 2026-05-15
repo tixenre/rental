@@ -555,49 +555,30 @@ function SpecTemplateFormModal({
   const inferredLabel = prefillKey
     ? prefillKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : "";
-  const [form, setForm] = useState<SpecTemplateInput>({
+  // Form unifica los campos globales (spec_definition) + los flags de
+  // asignación (categoria_spec_templates). Al guardar, se separan en dos
+  // calls — ver handleSave.
+  const [form, setForm] = useState({
+    // Globales (spec_definitions):
     spec_key: template?.spec_key ?? prefillKey ?? "",
     label: template?.label ?? inferredLabel,
-    tipo: template?.tipo ?? "string",
+    tipo: (template?.tipo ?? "string") as SpecTipo,
     unidad: template?.unidad ?? "",
-    enum_options: template?.enum_options ?? [],
-    prioridad: template?.prioridad ?? 100,
-    visible_en_card: template?.visible_en_card ?? false,
-    // visible_en_filtros: por design, todos los specs generan filtro en el
-    // catálogo público — ya no exponemos el toggle. Default true para nuevos
-    // y forzado true al guardar (ver handleSave).
-    visible_en_filtros: true,
-    visible_en_nombre: template?.visible_en_nombre ?? false,
-    // obligatorio: oculto del UI por feedback del dueño (#calidad).
-    // Default false; respeta el valor existente si lo había.
-    obligatorio: template?.obligatorio ?? false,
+    enum_options: template?.enum_options ?? [] as string[],
     ayuda: template?.ayuda ?? "",
+    // Per-categoría (asignación):
+    prioridad: template?.prioridad ?? 100,
     destacado: template?.destacado ?? false,
+    obligatorio: template?.obligatorio ?? false,
+    visible_en_card: template?.visible_en_card ?? false,
+    visible_en_nombre: template?.visible_en_nombre ?? false,
   });
   const [enumInput, setEnumInput] = useState((template?.enum_options ?? []).join(", "));
+  const [busy, setBusy] = useState(false);
 
-  const createMut = useMutation({
-    mutationFn: (input: SpecTemplateInput) => adminApi.createSpecTemplate(categoriaId, input),
-    onSuccess: () => {
-      toast.success("Spec creada");
-      onSaved();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const qcInner = useQueryClient();
 
-  const updateMut = useMutation({
-    mutationFn: (input: Partial<SpecTemplateInput>) =>
-      adminApi.updateSpecTemplate(template!.id, input),
-    onSuccess: () => {
-      toast.success("Spec actualizada");
-      onSaved();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const busy = createMut.isPending || updateMut.isPending;
-
-  function handleSave() {
+  async function handleSave() {
     const trimmedKey = form.spec_key.trim();
     const trimmedLabel = form.label.trim();
     if (!trimmedKey || !trimmedLabel) {
@@ -621,16 +602,73 @@ function SpecTemplateFormModal({
       toast.error("Para este tipo la unidad es obligatoria (mm, px, °, kg…).");
       return;
     }
-    const payload: SpecTemplateInput = {
-      ...form,
-      spec_key: trimmedKey,
-      label: trimmedLabel,
-      unidad: form.unidad?.trim() || null,
-      ayuda: form.ayuda?.trim() || null,
-      enum_options: enumArr,
-    };
-    if (isNew) createMut.mutate(payload);
-    else updateMut.mutate(payload);
+
+    setBusy(true);
+    try {
+      if (isNew) {
+        // 1. Crear (o re-usar) la spec_definition global.
+        let specDefId: number;
+        try {
+          const created = await adminApi.createSpecDefinition({
+            spec_key: trimmedKey,
+            label: trimmedLabel,
+            tipo: form.tipo,
+            unidad: form.unidad?.trim() || null,
+            enum_options: enumArr,
+            ayuda: form.ayuda?.trim() || null,
+          });
+          specDefId = created.id;
+        } catch (e) {
+          // 409: ya existe — la buscamos.
+          if (e instanceof Error && e.message.includes("ya existe")) {
+            const list = await adminApi.listSpecDefinitions();
+            const existing = list.items.find((d) => d.spec_key === trimmedKey);
+            if (!existing) throw e;
+            specDefId = existing.id;
+          } else {
+            throw e;
+          }
+        }
+        // 2. Asignar a la categoría con sus flags propios.
+        await adminApi.assignSpecToCategoria(categoriaId, {
+          spec_def_id: specDefId,
+          prioridad: form.prioridad,
+          destacado: form.destacado,
+          obligatorio: form.obligatorio,
+          visible_en_card: form.visible_en_card,
+          visible_en_filtros: true,
+          visible_en_nombre: form.visible_en_nombre,
+          ayuda: form.ayuda?.trim() || null,
+        });
+        toast.success("Spec creada y asignada");
+      } else {
+        // Edit: separar global vs per-categoría.
+        // Global (spec_definitions):
+        await adminApi.updateSpecDefinition(template!.spec_def_id, {
+          label: trimmedLabel,
+          tipo: form.tipo,
+          unidad: form.unidad?.trim() || null,
+          enum_options: enumArr,
+          ayuda: form.ayuda?.trim() || null,
+        });
+        // Per-categoría (assignment flags):
+        await adminApi.updateSpecTemplate(template!.id, {
+          prioridad: form.prioridad,
+          destacado: form.destacado,
+          obligatorio: form.obligatorio,
+          visible_en_card: form.visible_en_card,
+          visible_en_nombre: form.visible_en_nombre,
+        });
+        toast.success("Spec actualizada");
+      }
+      qcInner.invalidateQueries({ queryKey: ["admin", "spec-definitions"] });
+      onSaved();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

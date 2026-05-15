@@ -1,29 +1,33 @@
 """
 seeds/spec_templates.py — Templates iniciales de specs por categoría.
 
-Cada categoría raíz tiene un template que define qué specs van a tener
-sus equipos. Cuando el admin asigna una categoría a un equipo, el form
-muestra los inputs según este template.
+Post refactor unificar_specs_definitions:
+  - El seed genera dos cosas en dos pasadas:
+    1. `spec_definitions` — catálogo global. Cada `spec_key` único en TEMPLATES
+       se inserta una sola vez. Si el mismo spec_key aparece en varias
+       categorías (ej. montura, formato), su tipo/unidad se toman de la
+       primera ocurrencia y los `enum_options` se UNEN.
+    2. `categoria_spec_templates` — asigna cada categoría a sus specs con sus
+       flags propios (prioridad, destacado, visible_en_*, obligatorio).
 
-Diseño completo en docs/DISEÑO_SPECS.md sección 3.
+Comportamiento idempotente y respeto al back-office:
+  - `spec_definitions`: ON CONFLICT (spec_key) DO NOTHING. Una vez creada,
+    no se pisa por seed. El admin puede editarla desde el catálogo global.
+  - `categoria_spec_templates`: SOLO se pobla si la categoría no tiene ninguna
+    asignación. Si el admin ya configuró algo, el seed no toca nada.
+
+Para forzar reseed de una categoría: borrar TODAS sus asignaciones desde la
+UI y reiniciar el backend; el seed la repuebla.
 
 Convenciones del campo `tipo`:
-    string  →  texto libre (ej. "Full-frame CMOS 12.1MP")
-    number  →  numérico, con `unidad` opcional
-    enum    →  valor de una lista cerrada en `enum_options`
-    bool    →  sí/no
-
-Flags:
-    visible_en_card     → aparece en la card del catálogo
-    visible_en_filtros  → genera filtro en el catálogo
-    visible_en_nombre   → entra en el nombre público auto-generado
-    obligatorio         → required al crear el equipo
-
-`prioridad` ordena la spec en la ficha (más bajo = más arriba). Default 100.
-
-El seed es idempotente: usa ON CONFLICT (categoria_id, spec_key) DO NOTHING.
-Si ya existe el template, NO se pisa (permite que el admin lo edite sin
-que el seed lo revierta en cada arranque).
+    string     → texto libre (ej. "Full-frame CMOS 12.1MP")
+    number     → numérico, con `unidad` opcional
+    enum       → valor único de lista cerrada (enum_options)
+    multi_enum → varios valores de lista cerrada
+    bool       → sí/no
+    rango      → un valor o dos separados por `-` (ej. "24-70"), unidad requerida
+    wxh        → dos medidas separadas por `×` (ej. "6144×3240"), unidad requerida
+    wxhxd      → tres medidas separadas por `×` (ej. "129.7×84.5×77.8"), unidad requerida
 """
 
 import json
@@ -360,33 +364,99 @@ TEMPLATES: dict[str, list[dict]] = {
 }
 
 
+def _collect_spec_definitions() -> dict[str, dict]:
+    """Itera TEMPLATES y agrupa por spec_key, unificando metadata.
+
+    Si el mismo spec_key aparece en varias categorías:
+      - tipo / unidad / ayuda: se toma de la PRIMERA ocurrencia.
+      - enum_options: UNION (preservando orden) de todas las variantes.
+      - destacado / flags per-categoría: NO se mergean acá — esos quedan
+        en categoria_spec_templates.
+    """
+    by_key: dict[str, dict] = {}
+    for cat_specs in TEMPLATES.values():
+        for spec in cat_specs:
+            key = spec["key"]
+            if key not in by_key:
+                by_key[key] = {
+                    "label": spec["label"],
+                    "tipo": spec["tipo"],
+                    "unidad": spec.get("unidad"),
+                    "enum_options": list(spec.get("enum_options") or []),
+                    "ayuda": spec.get("ayuda"),
+                }
+            elif spec.get("enum_options"):
+                existing = by_key[key]
+                seen = set(existing["enum_options"])
+                for opt in spec["enum_options"]:
+                    if opt not in seen:
+                        existing["enum_options"].append(opt)
+                        seen.add(opt)
+    return by_key
+
+
 def seed_spec_templates(conn) -> int:
-    """Inserta los templates iniciales en la DB SOLO para categorías nuevas
-    (que no tienen ningún spec configurado todavía). Si el dueño ya empezó
-    a configurar specs en una categoría desde el back-office, el seed
-    respeta esa configuración y no agrega más — la fuente de verdad es lo
-    que el dueño dejó en la DB.
+    """Pasada 1: upsert spec_definitions desde TEMPLATES.
+    Pasada 2: asignar a categorías SOLO si la categoría no tiene asignaciones
+              configuradas (respeta el back-office como source of truth).
 
-    Esto evita que specs borradas a mano reaparezcan en el próximo arranque.
-    Para forzar el reseed de una categoría: borrá TODAS sus specs en la UI
-    y reiniciá; el seed la repuebla. Sino, queda intacta.
-
-    Devuelve la cantidad de specs insertados/actualizados."""
+    Devuelve la cantidad de asignaciones nuevas insertadas."""
     inserted = 0
+
+    # Pasada 1 — catálogo global. Idempotente vía ON CONFLICT.
+    defs = _collect_spec_definitions()
+    spec_def_ids: dict[str, int] = {}
+    for key, info in defs.items():
+        # ¿Ya existe la definición? Si sí, traemos su id sin pisar.
+        row = conn.execute(
+            "SELECT id FROM spec_definitions WHERE spec_key = ?", (key,)
+        ).fetchone()
+        if row:
+            spec_def_ids[key] = row["id"]
+            continue
+        enum_opts_json = (
+            json.dumps(info["enum_options"]) if info["enum_options"] else None
+        )
+        cur = conn.execute(
+            """
+            INSERT INTO spec_definitions
+              (spec_key, label, tipo, unidad, enum_options, ayuda)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (spec_key) DO NOTHING
+            RETURNING id
+            """,
+            (
+                key,
+                info["label"],
+                info["tipo"],
+                info["unidad"],
+                enum_opts_json,
+                info["ayuda"],
+            ),
+        )
+        new_row = cur.fetchone()
+        if new_row:
+            spec_def_ids[key] = new_row[0]
+        else:
+            # Race: alguien la insertó en paralelo. Re-fetch.
+            row = conn.execute(
+                "SELECT id FROM spec_definitions WHERE spec_key = ?", (key,)
+            ).fetchone()
+            if row:
+                spec_def_ids[key] = row["id"]
+
+    # Pasada 2 — asignaciones por categoría. Solo en categorías vírgenes.
     for cat_nombre, specs in TEMPLATES.items():
-        # Resolver el id de la categoría raíz por nombre.
         row = conn.execute(
             "SELECT id FROM categorias WHERE nombre = %s AND parent_id IS NULL",
             (cat_nombre,),
         ).fetchone()
         if not row:
-            # La categoría no existe (puede pasar si el seed del árbol cambió).
-            # Skipeamos en silencio en lugar de romper el init.
             continue
         cat_id = row["id"]
 
-        # Si la categoría ya tiene CUALQUIER spec configurada, asumimos que el
-        # dueño la administra desde el back-office y no inyectamos más.
+        # Si la categoría ya tiene CUALQUIER asignación, el dueño la administra
+        # desde el back-office — no inyectamos más.
         existing = conn.execute(
             "SELECT COUNT(*) AS n FROM categoria_spec_templates WHERE categoria_id = %s",
             (cat_id,),
@@ -394,32 +464,28 @@ def seed_spec_templates(conn) -> int:
         if existing and existing["n"] > 0:
             continue
 
-        for prio_idx, spec in enumerate(specs):
-            enum_opts_json = (
-                json.dumps(spec["enum_options"]) if spec.get("enum_options") else None
-            )
+        for spec in specs:
+            spec_def_id = spec_def_ids.get(spec["key"])
+            if not spec_def_id:
+                continue
             cur = conn.execute(
                 """
                 INSERT INTO categoria_spec_templates
-                  (categoria_id, spec_key, label, tipo, unidad, enum_options,
-                   prioridad, visible_en_card, visible_en_filtros,
-                   visible_en_nombre, obligatorio, ayuda)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (categoria_id, spec_key) DO NOTHING
+                  (categoria_id, spec_def_id, prioridad, destacado, obligatorio,
+                   visible_en_card, visible_en_filtros, visible_en_nombre, ayuda)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (categoria_id, spec_def_id) DO NOTHING
                 RETURNING id
                 """,
                 (
                     cat_id,
-                    spec["key"],
-                    spec["label"],
-                    spec["tipo"],
-                    spec.get("unidad"),
-                    enum_opts_json,
+                    spec_def_id,
                     spec.get("prioridad", 100),
+                    spec.get("destacado", False),
+                    spec.get("obligatorio", False),
                     spec.get("en_card", False),
                     spec.get("en_filtros", False),
                     spec.get("en_nombre", False),
-                    spec.get("obligatorio", False),
                     spec.get("ayuda"),
                 ),
             )

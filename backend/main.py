@@ -232,6 +232,23 @@ def init_db_bg():
     except Exception as e:
         logger.error("Falló alembic upgrade: %s. La app sigue arrancando — revisar manualmente.", e, exc_info=True)
 
+    # Seed de spec_templates DESPUÉS de alembic — la migración
+    # `unificar_specs_definitions` necesita haber corrido antes para que las
+    # tablas tengan spec_def_id.
+    try:
+        from database import get_db
+        from seeds.spec_templates import seed_spec_templates
+        conn = get_db()
+        try:
+            n = seed_spec_templates(conn)
+            conn.commit()
+            if n > 0:
+                logger.info("%d asignaciones de specs seedeadas", n)
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning("Seed de spec_templates falló (no crítico): %s", e)
+
     # Auto-run del ranking si nunca corrió (popularidad_score=0 en todos
     # los equipos). Después de eso, queda en manos del admin desde
     # /admin/settings. Issue #131.

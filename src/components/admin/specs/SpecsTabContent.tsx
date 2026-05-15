@@ -34,6 +34,8 @@ import { adminApi } from "@/lib/admin/api";
 
 
 type SpecTemplate = {
+  template_id: number;
+  spec_def_id: number;
   spec_key: string;
   label: string;
   tipo: string;
@@ -45,6 +47,7 @@ type SpecTemplate = {
   visible_en_nombre: boolean;
   obligatorio: boolean;
   ayuda: string | null;
+  destacado: boolean;
   categoria_nombre: string;
 };
 
@@ -58,19 +61,23 @@ export function SpecsTabContent({ equipoId }: { equipoId: number }) {
   });
 
   // Valores locales que el usuario edita. Se inicializa desde specsQ.data.
+  // Post refactor unificar_specs_definitions: las keys son spec_def_id
+  // stringificados ("123": "valor"), no spec_key.
   const [values, setValues] = useState<Record<string, string>>({});
-  // Extras: keys que no están en el template pero existen en specs.
+  // Extras: spec_def_ids que tienen value en el equipo pero NO están en el
+  // template actual (la asignación se borró, o la categoría cambió). Se
+  // muestran read-only; el dueño los puede borrar pero no editarlos
+  // libremente — para eso, asignar la spec a la categoría desde
+  // /admin/equipos/specs.
   const [extras, setExtras] = useState<Record<string, string>>({});
-  const [newExtraKey, setNewExtraKey] = useState("");
-  const [newExtraValue, setNewExtraValue] = useState("");
 
   useEffect(() => {
     if (!specsQ.data) return;
-    const templateKeys = new Set(specsQ.data.template.map((t) => t.spec_key));
+    const templateDefIds = new Set(specsQ.data.template.map((t) => String(t.spec_def_id)));
     const valsTemplate: Record<string, string> = {};
     const valsExtras: Record<string, string> = {};
     for (const [key, val] of Object.entries(specsQ.data.specs)) {
-      if (templateKeys.has(key)) {
+      if (templateDefIds.has(key)) {
         valsTemplate[key] = val;
       } else {
         valsExtras[key] = val;
@@ -86,6 +93,8 @@ export function SpecsTabContent({ equipoId }: { equipoId: number }) {
       for (const [k, v] of Object.entries(values)) {
         if (v !== "" && v !== null && v !== undefined) combined[k] = String(v);
       }
+      // Conservamos los extras tal cual están — el usuario puede haberlos
+      // dejado vacíos para que se borren en el save.
       for (const [k, v] of Object.entries(extras)) {
         if (v !== "" && v !== null && v !== undefined) combined[k] = String(v);
       }
@@ -98,15 +107,6 @@ export function SpecsTabContent({ equipoId }: { equipoId: number }) {
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
-  const agregarExtra = () => {
-    const k = newExtraKey.trim().toLowerCase().replace(/\s+/g, "_");
-    const v = newExtraValue.trim();
-    if (!k || !v) return;
-    setExtras((prev) => ({ ...prev, [k]: v }));
-    setNewExtraKey("");
-    setNewExtraValue("");
-  };
 
   // Agrupar el template por categoría_nombre cuando hay specs de varias
   // categorías (un equipo puede estar en más de una).
@@ -162,76 +162,67 @@ export function SpecsTabContent({ equipoId }: { equipoId: number }) {
             </Label>
           </div>
           <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-            {specs.map((t) => (
-              <SpecInput
-                key={t.spec_key}
-                template={t}
-                value={values[t.spec_key] ?? ""}
-                onChange={(v) => setValues((prev) => ({ ...prev, [t.spec_key]: v }))}
-              />
-            ))}
+            {specs.map((t) => {
+              const key = String(t.spec_def_id);
+              return (
+                <SpecInput
+                  key={key}
+                  template={t}
+                  value={values[key] ?? ""}
+                  onChange={(v) => setValues((prev) => ({ ...prev, [key]: v }))}
+                />
+              );
+            })}
           </div>
         </div>
       ))}
 
-      {/* Extras */}
-      <div className="rounded-md border hairline bg-background">
-        <div className="px-3 py-2 border-b hairline bg-muted/20 flex items-center justify-between">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            Extras (campos fuera del template)
-          </Label>
-        </div>
-        <div className="p-3 space-y-2">
-          {Object.keys(extras).length === 0 && (
-            <p className="text-xs text-muted-foreground italic">Sin extras.</p>
-          )}
-          {Object.entries(extras).map(([k, v]) => (
-            <div key={k} className="flex gap-2 items-center">
-              <span className="text-xs font-mono text-muted-foreground w-40 truncate" title={k}>{k}</span>
-              <Input
-                value={v}
-                onChange={(e) =>
-                  setExtras((prev) => ({ ...prev, [k]: e.target.value }))
-                }
-                className="flex-1 h-8 text-xs"
-              />
-              <Button
-                type="button" size="icon" variant="ghost"
-                onClick={() =>
-                  setExtras((prev) => {
-                    const next = { ...prev }; delete next[k]; return next;
-                  })
-                }
-                className="h-7 w-7"
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
-          <div className="flex gap-2 items-center pt-2 border-t hairline">
-            <Input
-              placeholder="key (ej. garantia)"
-              value={newExtraKey}
-              onChange={(e) => setNewExtraKey(e.target.value)}
-              className="w-40 h-8 text-xs"
-            />
-            <Input
-              placeholder="valor"
-              value={newExtraValue}
-              onChange={(e) => setNewExtraValue(e.target.value)}
-              className="flex-1 h-8 text-xs"
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); agregarExtra(); } }}
-            />
-            <Button
-              type="button" size="sm" variant="outline"
-              onClick={agregarExtra}
-              disabled={!newExtraKey.trim() || !newExtraValue.trim()}
-            >
-              <Plus className="h-3 w-3 mr-1" /> Agregar
-            </Button>
+      {/* Extras — specs huérfanas (sin asignación a la categoría actual).
+          Post refactor unificar_specs_definitions: ya no se pueden crear
+          extras inline. Para agregar una spec nueva: ir a /admin/equipos/specs
+          y crearla en la categoría correspondiente. */}
+      {Object.keys(extras).length > 0 && (
+        <div className="rounded-md border hairline bg-background">
+          <div className="px-3 py-2 border-b hairline bg-muted/20">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+              Specs huérfanas (no están en el template de esta categoría)
+            </Label>
+          </div>
+          <div className="p-3 space-y-2">
+            {Object.entries(extras).map(([k, v]) => (
+              <div key={k} className="flex gap-2 items-center">
+                <span className="text-xs font-mono text-muted-foreground w-40 truncate" title={`spec_def_id: ${k}`}>
+                  def #{k}
+                </span>
+                <Input
+                  value={v}
+                  onChange={(e) =>
+                    setExtras((prev) => ({ ...prev, [k]: e.target.value }))
+                  }
+                  className="flex-1 h-8 text-xs"
+                />
+                <Button
+                  type="button" size="icon" variant="ghost"
+                  onClick={() =>
+                    setExtras((prev) => {
+                      const next = { ...prev }; delete next[k]; return next;
+                    })
+                  }
+                  className="h-7 w-7"
+                  title="Borrar este value (la spec_definition queda)"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+            <p className="text-[10px] text-muted-foreground italic mt-2">
+              Estos valores existen pero la spec no está asignada a esta categoría.
+              Para verla con su label/tipo correcto, asignala desde
+              <code className="font-mono mx-1">/admin/equipos/specs</code>.
+            </p>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Guardar */}
       <div className="flex justify-end gap-2">

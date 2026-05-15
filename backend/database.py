@@ -627,51 +627,76 @@ def init_db():
 
     # ── Specs estructurados por categoría (rediseño docs/DISEÑO_SPECS.md - PR A) ──
     #
-    # Hoy `equipo_fichas.specs_json` guarda specs como [{label, value}] sin
-    # validación ni schema. Eso hace imposible filtrar el catálogo por specs
-    # ("cámaras montura E con video 4K") o comparar dos productos lado a lado.
+    # Modelo de specs (refactor unificar_specs_definitions):
     #
-    # Modelo nuevo: cada categoría define un TEMPLATE (categoria_spec_templates)
-    # con las keys que sus equipos van a tener (sensor, montura, cri, etc.),
-    # y los valores reales viven en EQUIPO_SPECS (key/value tipados).
+    # 1) `spec_definitions` — catálogo global de specs. Cada spec_key existe
+    #    UNA sola vez en el sistema (montura, formato, distancia_focal, etc.).
+    #    El tipo, unidad, enum_options y el flag `es_compatibilidad` viven acá.
     #
-    # Migración: las tablas se crean acá. El form admin sigue editando el
-    # specs_json viejo hasta que las PRs B/D del rediseño migren la UI.
+    # 2) `categoria_spec_templates` — asigna una spec_definition a una
+    #    categoría con flags propios (prioridad, destacado, obligatorio,
+    #    visible_en_card/filtros/nombre, ayuda override).
+    #
+    # 3) `equipo_specs` — los valores concretos por equipo, referenciados
+    #    por spec_def_id (no por spec_key string).
+    #
+    # Beneficios: compartir "montura" entre Cámaras y Lentes con consistencia
+    # de tipo y opciones; setea la base para compatibilidad auto.
+
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS categoria_spec_templates (
+        CREATE TABLE IF NOT EXISTS spec_definitions (
             id                  SERIAL PRIMARY KEY,
-            categoria_id        INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
-            spec_key            VARCHAR(64) NOT NULL,
+            spec_key            VARCHAR(64) UNIQUE NOT NULL,
             label               VARCHAR(120) NOT NULL,
             tipo                VARCHAR(16) NOT NULL,
             unidad              VARCHAR(32),
             enum_options        JSONB,
-            prioridad           INTEGER DEFAULT 100,
-            visible_en_card     BOOLEAN DEFAULT FALSE,
-            visible_en_filtros  BOOLEAN DEFAULT FALSE,
-            visible_en_nombre   BOOLEAN DEFAULT FALSE,
-            obligatorio         BOOLEAN DEFAULT FALSE,
             ayuda               TEXT,
-            destacado           BOOLEAN DEFAULT FALSE,
-            UNIQUE (categoria_id, spec_key)
+            es_compatibilidad   BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_spec_templates_cat "
+        "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
+        "ON spec_definitions(es_compatibilidad) WHERE es_compatibilidad"
+    )
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS categoria_spec_templates (
+            id                  SERIAL PRIMARY KEY,
+            categoria_id        INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+            spec_def_id         INTEGER NOT NULL REFERENCES spec_definitions(id) ON DELETE RESTRICT,
+            prioridad           INTEGER DEFAULT 100,
+            destacado           BOOLEAN DEFAULT FALSE,
+            obligatorio         BOOLEAN DEFAULT FALSE,
+            visible_en_card     BOOLEAN DEFAULT FALSE,
+            visible_en_filtros  BOOLEAN DEFAULT FALSE,
+            visible_en_nombre   BOOLEAN DEFAULT FALSE,
+            ayuda               TEXT,
+            UNIQUE (categoria_id, spec_def_id)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_cst_categoria "
         "ON categoria_spec_templates(categoria_id, prioridad)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_cst_def "
+        "ON categoria_spec_templates(spec_def_id)"
     )
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_specs (
             equipo_id   INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
-            spec_key    VARCHAR(64) NOT NULL,
+            spec_def_id INTEGER NOT NULL REFERENCES spec_definitions(id) ON DELETE RESTRICT,
             value       TEXT NOT NULL,
-            PRIMARY KEY (equipo_id, spec_key)
+            PRIMARY KEY (equipo_id, spec_def_id)
         )
     """)
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_equipo_specs_key "
-        "ON equipo_specs(spec_key, value)"
+        "CREATE INDEX IF NOT EXISTS idx_equipo_specs_def_value "
+        "ON equipo_specs(spec_def_id, value)"
     )
 
     # ── Mantenimiento log por equipo ─────────────────────────────────────
@@ -736,15 +761,12 @@ def init_db():
         "ON equipos(relevancia_manual ASC, popularidad_score DESC, nombre ASC)"
     )
 
-    # ── Seed de los 12 templates iniciales (idempotente) ──
-    # Importado dinámicamente para mantener este archivo manejable.
-    try:
-        from seeds.spec_templates import seed_spec_templates
-        n = seed_spec_templates(conn)
-        if n > 0:
-            logger.info("%d templates de specs seedeados/actualizados", n)
-    except Exception as ex:
-        logger.warning("No se pudieron seedear los templates de specs: %s", ex)
+    # NOTA: el seed de spec_templates se movió a `seed_spec_templates_after_migrations`
+    # invocado desde main.py después de alembic upgrade. El motivo: la migración
+    # `unificar_specs_definitions` dropea categoria_spec_templates y equipo_specs
+    # y los recrea con un schema nuevo (con spec_def_id). Si el seed corriera
+    # antes de alembic en una BD con schema viejo, fallaría con "column
+    # spec_def_id does not exist".
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_precio_historial (
@@ -1038,19 +1060,20 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
     # Una spec "Macro: No" no aporta como quick fact en la card — destacar
     # solo cuando el lente ES macro, no cuando no lo es.
     cur.execute(f"""
-        SELECT es.equipo_id, t.label, t.tipo, es.value, t.prioridad
+        SELECT es.equipo_id, sd.label, sd.tipo, es.value, t.prioridad
         FROM equipo_specs es
         JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
+        JOIN spec_definitions sd ON sd.id = es.spec_def_id
         JOIN categoria_spec_templates t
-            ON t.spec_key = es.spec_key
+            ON t.spec_def_id = es.spec_def_id
            AND t.categoria_id = ec.categoria_id
         WHERE t.destacado = TRUE
           AND es.equipo_id IN ({placeholders})
           AND (
-            t.tipo != 'bool'
+            sd.tipo != 'bool'
             OR LOWER(TRIM(es.value)) IN ('sí', 'si', 'yes', 'true', '1')
           )
-        ORDER BY es.equipo_id, t.prioridad, t.label
+        ORDER BY es.equipo_id, t.prioridad, sd.label
     """, ids)
     rows = cur.fetchall()
     cur.close()

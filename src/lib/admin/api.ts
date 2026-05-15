@@ -260,14 +260,50 @@ export type MarcaAdmin = {
 
 export type SpecTipo = "string" | "number" | "enum" | "bool" | "rango" | "wxh" | "wxhxd" | "multi_enum";
 
-export type SpecTemplate = {
+/** Definición global de una spec (post refactor unificar_specs_definitions).
+ *  Cada spec_key existe UNA sola vez en el sistema. Sus categorías la
+ *  referencian via spec_def_id en la asignación. */
+export type SpecDefinition = {
   id: number;
-  categoria_id: number;
   spec_key: string;
   label: string;
   tipo: SpecTipo;
   unidad: string | null;
   enum_options: string[] | null;
+  ayuda: string | null;
+  es_compatibilidad: boolean;
+  /** Solo en GET /admin/spec-definitions: cuántas categorías la asignaron. */
+  uso_categorias?: number;
+  /** Solo en GET /admin/spec-definitions: cuántos equipos tienen value. */
+  uso_equipos?: number;
+};
+
+export type SpecDefinitionInput = {
+  spec_key: string;
+  label: string;
+  tipo: SpecTipo;
+  unidad?: string | null;
+  enum_options?: string[] | null;
+  ayuda?: string | null;
+  es_compatibilidad?: boolean;
+};
+
+/** Asignación de una spec_def a una categoría + flags propios. El backend
+ *  hace JOIN con spec_definitions y proyecta los campos descriptivos
+ *  (spec_key/label/tipo/unidad/enum_options) acá para que el frontend
+ *  los use sin un fetch extra. */
+export type SpecTemplate = {
+  id: number;
+  categoria_id: number;
+  spec_def_id: number;
+  // Proyectados desde spec_definitions:
+  spec_key: string;
+  label: string;
+  tipo: SpecTipo;
+  unidad: string | null;
+  enum_options: string[] | null;
+  es_compatibilidad: boolean;
+  // Per-categoría:
   prioridad: number;
   visible_en_card: boolean;
   visible_en_filtros: boolean;
@@ -277,20 +313,33 @@ export type SpecTemplate = {
   destacado: boolean;
 };
 
-export type SpecTemplateInput = {
-  spec_key: string;
-  label: string;
-  tipo: SpecTipo;
-  unidad?: string | null;
-  enum_options?: string[] | null;
+/** Body para asignar una spec ya existente a una categoría. */
+export type SpecAssignmentInput = {
+  spec_def_id: number;
   prioridad?: number;
+  destacado?: boolean;
+  obligatorio?: boolean;
   visible_en_card?: boolean;
   visible_en_filtros?: boolean;
   visible_en_nombre?: boolean;
-  obligatorio?: boolean;
   ayuda?: string | null;
-  destacado?: boolean;
 };
+
+/** Body para editar los flags de una asignación. */
+export type SpecAssignmentUpdate = {
+  prioridad?: number;
+  destacado?: boolean;
+  obligatorio?: boolean;
+  visible_en_card?: boolean;
+  visible_en_filtros?: boolean;
+  visible_en_nombre?: boolean;
+  ayuda?: string | null;
+};
+
+/** Compat alias: el SpecTemplatesSection viejo usaba SpecTemplateInput. Lo
+ *  mantengo como alias para no romper imports — pero los nuevos callers
+ *  deben usar SpecAssignmentInput o SpecDefinitionInput según contexto. */
+export type SpecTemplateInput = SpecAssignmentInput;
 
 // Dashboard de uso (#205)
 export type DashboardUsoEquipo = {
@@ -352,7 +401,9 @@ export type DashboardUso = {
 };
 
 export type OrphanSpec = {
+  spec_def_id: number;
   spec_key: string;
+  label: string;
   count_equipos: number;
   sample_values: string[];
 };
@@ -713,20 +764,29 @@ export const adminApi = {
     }>("/api/admin/equipos/aplicar-clasificacion", { asignaciones }),
   contarSinCategoria: () => authedJson<{ total: number }>("/api/admin/equipos/sin-categoria"),
 
-  // ── Specs por equipo (PR D) ────────────────────────────────────────
+  // ── Specs por equipo ───────────────────────────────────────────────
+  // Post refactor: specs keyed por spec_def_id (string del int). El backend
+  // proyecta los campos descriptivos (spec_key/label/tipo/...) desde
+  // spec_definitions vía JOIN.
   getEquipoSpecs: (id: number) =>
     authedJson<{
       equipo_id: number;
+      /** Keys son spec_def_id stringificados ("123": "valor"). */
       specs: Record<string, string>;
       template: Array<{
+        template_id: number;
+        spec_def_id: number;
         spec_key: string; label: string; tipo: string;
         unidad: string | null; enum_options: string[] | null;
         prioridad: number;
         visible_en_card: boolean; visible_en_filtros: boolean; visible_en_nombre: boolean;
         obligatorio: boolean; ayuda: string | null;
+        destacado: boolean;
         categoria_nombre: string;
       }>;
     }>(`/api/admin/equipos/${id}/specs`),
+  /** Reemplaza TODAS las specs del equipo. Las keys son spec_def_id como
+   *  strings (JSON no permite int keys). */
   putEquipoSpecs: (id: number, specs: Record<string, string>) =>
     authedJson<{ ok: true; equipo_id: number; specs_count: number }>(
       `/api/admin/equipos/${id}/specs`,
@@ -737,20 +797,54 @@ export const adminApi = {
       },
     ),
 
-  // ── CRUD templates de specs por categoría ──────────────────────────
+  // ── Catálogo global de spec_definitions ────────────────────────────
+  listSpecDefinitions: () =>
+    authedJson<{ items: SpecDefinition[] }>("/api/admin/spec-definitions"),
+  createSpecDefinition: (input: SpecDefinitionInput) =>
+    authedJson<SpecDefinition>("/api/admin/spec-definitions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  updateSpecDefinition: (defId: number, input: Partial<SpecDefinitionInput>) =>
+    authedJson<{ ok: true; id: number }>(`/api/admin/spec-definitions/${defId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteSpecDefinition: async (defId: number) => {
+    const res = await authedFetch(`/api/admin/spec-definitions/${defId}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const body = await res.text();
+      throw new Error(body || `HTTP ${res.status}`);
+    }
+  },
+
+  // ── CRUD asignaciones de spec_def a categorías ─────────────────────
   specTemplatesResumen: () =>
     authedJson<Record<number, number>>("/api/admin/spec-templates/resumen"),
   listSpecTemplates: (categoriaId: number) =>
     authedJson<{ items: SpecTemplate[] }>(`/api/admin/categorias/${categoriaId}/spec-templates`),
   listOrphanSpecs: (categoriaId: number) =>
     authedJson<OrphanSpec[]>(`/api/admin/categorias/${categoriaId}/spec-templates/orphans`),
-  createSpecTemplate: (categoriaId: number, input: SpecTemplateInput) =>
+  /** Asigna una spec_definition existente a una categoría. Para crear una
+   *  spec nueva globalmente usar createSpecDefinition primero. */
+  assignSpecToCategoria: (categoriaId: number, input: SpecAssignmentInput) =>
     authedJson<SpecTemplate>(`/api/admin/categorias/${categoriaId}/spec-templates`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }),
-  updateSpecTemplate: (templateId: number, input: Partial<SpecTemplateInput>) =>
+  /** Alias retro-compat: createSpecTemplate ahora redirige a assign. Los
+   *  callers viejos que pasaban SpecTemplateInput (~ SpecAssignmentInput)
+   *  siguen funcionando. */
+  createSpecTemplate: (categoriaId: number, input: SpecAssignmentInput) =>
+    authedJson<SpecTemplate>(`/api/admin/categorias/${categoriaId}/spec-templates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  updateSpecTemplate: (templateId: number, input: SpecAssignmentUpdate) =>
     authedJson<{ ok: true; id: number }>(`/api/admin/spec-templates/${templateId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

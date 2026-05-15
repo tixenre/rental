@@ -484,6 +484,9 @@ def list_equipos(
 
     # ── Filtros por specs estructurados (PR E) ──
     # Cada `spec=key:valor` agrega un AND EXISTS sobre equipo_specs.
+    # Post refactor unificar_specs_definitions: el key del query string sigue
+    # siendo el spec_key humano (montura, formato, etc.); resolvemos a
+    # spec_def_id vía JOIN.
     if spec:
         for s in spec:
             if ":" not in s:
@@ -494,9 +497,11 @@ def list_equipos(
             if not key or not value:
                 continue
             base_sql += (
-                " AND EXISTS (SELECT 1 FROM equipo_specs es "
-                "WHERE es.equipo_id = e.id AND es.spec_key = ? "
-                "AND LOWER(es.value) = LOWER(?))"
+                " AND EXISTS ("
+                " SELECT 1 FROM equipo_specs es"
+                " JOIN spec_definitions sd ON sd.id = es.spec_def_id"
+                " WHERE es.equipo_id = e.id AND LOWER(sd.spec_key) = ?"
+                " AND LOWER(es.value) = LOWER(?))"
             )
             params += [key, value]
     if q:
@@ -2622,20 +2627,22 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
                             SELECT c.id, c.parent_id FROM categorias c
                               JOIN chain ON c.id = chain.parent_id
                         )
-                        SELECT c.nombre AS categoria, t.label, t.tipo, t.unidad,
-                               t.enum_options, t.prioridad
+                        SELECT c.nombre AS categoria, sd.label, sd.tipo, sd.unidad,
+                               sd.enum_options, t.prioridad
                         FROM categoria_spec_templates t
                         JOIN categorias c ON c.id = t.categoria_id
+                        JOIN spec_definitions sd ON sd.id = t.spec_def_id
                         WHERE c.id IN (SELECT id FROM chain)
                         ORDER BY c.prioridad NULLS LAST, c.nombre,
-                                 t.prioridad NULLS LAST, t.label
+                                 t.prioridad NULLS LAST, sd.label
                     """, payload.categoria_ids).fetchall()
                 else:
                     rows = conn.execute("""
-                        SELECT c.nombre AS categoria, t.label, t.tipo, t.unidad, t.enum_options, t.prioridad
+                        SELECT c.nombre AS categoria, sd.label, sd.tipo, sd.unidad, sd.enum_options, t.prioridad
                         FROM categoria_spec_templates t
                         JOIN categorias c ON c.id = t.categoria_id
-                        ORDER BY c.prioridad NULLS LAST, c.nombre, t.prioridad NULLS LAST, t.label
+                        JOIN spec_definitions sd ON sd.id = t.spec_def_id
+                        ORDER BY c.prioridad NULLS LAST, c.nombre, t.prioridad NULLS LAST, sd.label
                     """).fetchall()
             finally:
                 conn.close()

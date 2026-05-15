@@ -41,38 +41,60 @@ def _require_admin(request: Request) -> dict:
 
 
 # ── Models Pydantic ────────────────────────────────────────────────────
+#
+# Refactor unificar_specs_definitions:
+# - spec_definitions: catálogo global. Cada spec_key existe UNA vez.
+# - categoria_spec_templates: ASIGNACIÓN de una def a una categoría + flags
+#   propios de visibilidad/prioridad/destacado.
+# - equipo_specs: valor por equipo, referenciado por spec_def_id.
 
-class SpecTemplateInput(BaseModel):
+
+# Definición global (creación / update del catálogo).
+class SpecDefinitionInput(BaseModel):
     spec_key: str
     label: str
-    tipo: str   # "string" | "number" | "enum" | "bool" | "rango"
+    tipo: str   # "string" | "number" | "enum" | "bool" | "rango" | "wxh" | "wxhxd" | "multi_enum"
     unidad: Optional[str] = None
     enum_options: Optional[list[str]] = None
-    prioridad: int = 100
-    visible_en_card: bool = False
-    visible_en_filtros: bool = False
-    visible_en_nombre: bool = False
-    obligatorio: bool = False
     ayuda: Optional[str] = None
-    destacado: bool = False
+    es_compatibilidad: bool = False
 
 
-class SpecTemplateUpdate(BaseModel):
+class SpecDefinitionUpdate(BaseModel):
     label: Optional[str] = None
     tipo: Optional[str] = None
     unidad: Optional[str] = None
     enum_options: Optional[list[str]] = None
+    ayuda: Optional[str] = None
+    es_compatibilidad: Optional[bool] = None
+
+
+# Asignación de una spec_def a una categoría con flags propios.
+class SpecAssignmentInput(BaseModel):
+    spec_def_id: int
+    prioridad: int = 100
+    destacado: bool = False
+    obligatorio: bool = False
+    visible_en_card: bool = False
+    visible_en_filtros: bool = False
+    visible_en_nombre: bool = False
+    ayuda: Optional[str] = None   # override de ayuda por categoría
+
+
+class SpecAssignmentUpdate(BaseModel):
     prioridad: Optional[int] = None
+    destacado: Optional[bool] = None
+    obligatorio: Optional[bool] = None
     visible_en_card: Optional[bool] = None
     visible_en_filtros: Optional[bool] = None
     visible_en_nombre: Optional[bool] = None
-    obligatorio: Optional[bool] = None
     ayuda: Optional[str] = None
-    destacado: Optional[bool] = None
 
 
 class EquipoSpecsInput(BaseModel):
-    """Diccionario `{spec_key: value}`. Reemplaza TODAS las specs del equipo."""
+    """Diccionario `{spec_def_id (str): value}`. Reemplaza TODAS las specs
+    del equipo. Las keys del dict son strings (JSON) pero se interpretan
+    como int en el backend."""
     specs: dict[str, str]
 
 
@@ -103,7 +125,155 @@ class AprobarNombreInput(BaseModel):
     revisado: bool = True             # Si False, vuelve a "pendiente".
 
 
-# ── CRUD: Spec templates por categoría ─────────────────────────────────
+# ── Catálogo global de spec_definitions ────────────────────────────────
+
+@router.get("/admin/spec-definitions")
+def listar_spec_definitions(request: Request):
+    """Catálogo global de specs disponibles, con uso_count (cuántas
+    categorías la usan + cuántos equipos tienen value cargado)."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT
+              sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
+              sd.enum_options, sd.ayuda,
+              COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
+              (SELECT COUNT(*) FROM categoria_spec_templates t WHERE t.spec_def_id = sd.id) AS uso_categorias,
+              (SELECT COUNT(*) FROM equipo_specs es WHERE es.spec_def_id = sd.id) AS uso_equipos
+            FROM spec_definitions sd
+            ORDER BY sd.label
+        """).fetchall()
+        return {"items": [row_to_dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.post("/admin/spec-definitions", status_code=201)
+def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
+    _require_admin(request)
+    if payload.tipo in ("rango", "wxh", "wxhxd") and not (payload.unidad and payload.unidad.strip()):
+        raise HTTPException(400, "Para este tipo la unidad es obligatoria (mm, px, °, kg…).")
+    if payload.tipo in ("enum", "multi_enum") and not payload.enum_options:
+        raise HTTPException(400, "Para tipo enum / multi_enum hay que listar al menos una opción.")
+    conn = get_db()
+    try:
+        try:
+            cur = conn.execute(
+                """
+                INSERT INTO spec_definitions
+                  (spec_key, label, tipo, unidad, enum_options, ayuda, es_compatibilidad)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                RETURNING id
+                """,
+                (
+                    payload.spec_key,
+                    payload.label,
+                    payload.tipo,
+                    payload.unidad,
+                    json.dumps(payload.enum_options) if payload.enum_options else None,
+                    payload.ayuda,
+                    payload.es_compatibilidad,
+                ),
+            )
+            new_id = cur.fetchone()[0]
+            conn.commit()
+            return {"id": new_id, **payload.model_dump()}
+        except Exception as e:
+            conn.rollback()
+            if "duplicate key" in str(e).lower() or "unique" in str(e).lower():
+                raise HTTPException(409, f"La spec '{payload.spec_key}' ya existe globalmente.")
+            raise
+    finally:
+        conn.close()
+
+
+@router.patch("/admin/spec-definitions/{def_id}")
+def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, request: Request):
+    _require_admin(request)
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(400, "Nada para actualizar")
+    if "enum_options" in updates:
+        updates["enum_options"] = (
+            json.dumps(updates["enum_options"]) if updates["enum_options"] else None
+        )
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT id, tipo, unidad FROM spec_definitions WHERE id = ?", (def_id,)
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Definición no existe")
+        existing_dict = row_to_dict(existing) if not isinstance(existing, dict) else existing
+        final_tipo = updates.get("tipo", existing_dict.get("tipo"))
+        final_unidad = updates.get("unidad", existing_dict.get("unidad"))
+        if final_tipo in ("rango", "wxh", "wxhxd") and not (final_unidad and str(final_unidad).strip()):
+            raise HTTPException(400, "Para este tipo la unidad es obligatoria (mm, px, °, kg…).")
+        # Si está cambiando el tipo y hay valores ya cargados, bloqueamos —
+        # el cambio podría invalidar todos los formatos guardados.
+        if "tipo" in updates and updates["tipo"] != existing_dict.get("tipo"):
+            count = conn.execute(
+                "SELECT COUNT(*) AS n FROM equipo_specs WHERE spec_def_id = ?", (def_id,)
+            ).fetchone()
+            if count and count["n"] > 0:
+                raise HTTPException(
+                    409,
+                    f"No se puede cambiar el tipo: hay {count['n']} equipos con valores cargados. "
+                    "Borralos primero o creá una spec nueva.",
+                )
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        conn.execute(
+            f"UPDATE spec_definitions SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            list(updates.values()) + [def_id],
+        )
+        conn.commit()
+        return {"ok": True, "id": def_id, **updates}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.delete("/admin/spec-definitions/{def_id}", status_code=204)
+def borrar_spec_definition(def_id: int, request: Request):
+    _require_admin(request)
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM spec_definitions WHERE id = ?", (def_id,)
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Definición no existe")
+        usos = conn.execute(
+            "SELECT COUNT(*) AS n FROM categoria_spec_templates WHERE spec_def_id = ?", (def_id,)
+        ).fetchone()
+        if usos and usos["n"] > 0:
+            raise HTTPException(
+                409,
+                f"La spec está asignada a {usos['n']} categoría(s). "
+                "Desasignala primero antes de borrar la definición.",
+            )
+        equip = conn.execute(
+            "SELECT COUNT(*) AS n FROM equipo_specs WHERE spec_def_id = ?", (def_id,)
+        ).fetchone()
+        if equip and equip["n"] > 0:
+            raise HTTPException(
+                409,
+                f"Hay {equip['n']} equipos con valores cargados en esta spec. "
+                "Borralos primero.",
+            )
+        conn.execute("DELETE FROM spec_definitions WHERE id = ?", (def_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# ── CRUD: Asignaciones de spec_definitions a categorías ────────────────
 
 @router.get("/admin/spec-templates/resumen")
 def resumen_templates(request: Request):
@@ -125,18 +295,29 @@ def resumen_templates(request: Request):
 
 @router.get("/admin/categorias/{categoria_id}/spec-templates")
 def listar_templates(categoria_id: int, request: Request):
+    """Lista asignaciones de la categoría, JOIN con spec_definitions para
+    devolver los campos planos (label, tipo, unidad, enum_options) que el
+    frontend usa para renderear inputs."""
     _require_admin(request)
     conn = get_db()
     try:
         rows = conn.execute(
             """
-            SELECT id, categoria_id, spec_key, label, tipo, unidad,
-                   enum_options, prioridad, visible_en_card,
-                   visible_en_filtros, visible_en_nombre, obligatorio, ayuda,
-                   COALESCE(destacado, FALSE) AS destacado
-            FROM categoria_spec_templates
-            WHERE categoria_id = ?
-            ORDER BY prioridad, label
+            SELECT
+              t.id, t.categoria_id, t.spec_def_id,
+              sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.enum_options,
+              t.prioridad,
+              COALESCE(t.visible_en_card, FALSE) AS visible_en_card,
+              COALESCE(t.visible_en_filtros, FALSE) AS visible_en_filtros,
+              COALESCE(t.visible_en_nombre, FALSE) AS visible_en_nombre,
+              COALESCE(t.obligatorio, FALSE) AS obligatorio,
+              COALESCE(t.ayuda, sd.ayuda) AS ayuda,
+              COALESCE(t.destacado, FALSE) AS destacado,
+              COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad
+            FROM categoria_spec_templates t
+            JOIN spec_definitions sd ON sd.id = t.spec_def_id
+            WHERE t.categoria_id = ?
+            ORDER BY t.prioridad, sd.label
             """,
             (categoria_id,),
         ).fetchall()
@@ -147,99 +328,98 @@ def listar_templates(categoria_id: int, request: Request):
 
 @router.get("/admin/categorias/{categoria_id}/spec-templates/orphans")
 def listar_orphan_specs(categoria_id: int, request: Request):
-    """Devuelve spec_keys que aparecen en equipo_specs de equipos asignados a
-    esta categoría pero que NO están definidos en el template de la categoría.
+    """Devuelve spec_definitions cargadas en equipo_specs de equipos de
+    esta categoría que NO están asignadas al template de la categoría.
 
-    Útil para sugerir al admin formalizar specs que vienen del autocompletar
-    pero quedaron como "custom" en cada equipo, en lugar de auto-extender el
-    template silenciosamente (#calidad-datos).
+    Útil para sugerir al admin formalizar specs custom (que ya tienen
+    valores en equipos pero no están en el template oficial).
 
-    Devuelve: [{spec_key, count_equipos, sample_values[≤3]}].
+    Devuelve: [{spec_def_id, spec_key, label, count_equipos, sample_values[≤3]}].
     """
     _require_admin(request)
     conn = get_db()
     try:
-        # spec_keys que ya están en el template (los excluimos).
-        defined = {
-            r["spec_key"]
-            for r in conn.execute(
-                "SELECT spec_key FROM categoria_spec_templates WHERE categoria_id = ?",
-                (categoria_id,),
-            ).fetchall()
-        }
-
-        # equipo_specs de equipos asignados a esta categoría (o descendiente),
-        # excluyendo soft-deleted.
         rows = conn.execute("""
-            SELECT es.spec_key, es.value
+            SELECT
+              es.spec_def_id,
+              sd.spec_key,
+              sd.label,
+              COUNT(*) AS count_equipos,
+              (
+                SELECT array_agg(DISTINCT inner_es.value)
+                FROM equipo_specs inner_es
+                JOIN equipos inner_e ON inner_e.id = inner_es.equipo_id
+                JOIN equipo_categorias inner_ec ON inner_ec.equipo_id = inner_e.id
+                WHERE inner_es.spec_def_id = es.spec_def_id
+                  AND inner_ec.categoria_id = ?
+                  AND inner_e.eliminado_at IS NULL
+                LIMIT 3
+              ) AS sample_values
             FROM equipo_specs es
             JOIN equipos e ON e.id = es.equipo_id
             JOIN equipo_categorias ec ON ec.equipo_id = e.id
+            JOIN spec_definitions sd ON sd.id = es.spec_def_id
             WHERE ec.categoria_id = ?
               AND e.eliminado_at IS NULL
-        """, (categoria_id,)).fetchall()
-
-        from collections import defaultdict
-        by_key: dict[str, list[str]] = defaultdict(list)
-        for r in rows:
-            k = r["spec_key"]
-            if k in defined:
-                continue
-            by_key[k].append(r["value"])
-
-        out = [
+              AND NOT EXISTS (
+                SELECT 1 FROM categoria_spec_templates t
+                WHERE t.categoria_id = ec.categoria_id
+                  AND t.spec_def_id = es.spec_def_id
+              )
+            GROUP BY es.spec_def_id, sd.spec_key, sd.label
+            ORDER BY COUNT(*) DESC
+        """, (categoria_id, categoria_id)).fetchall()
+        return [
             {
-                "spec_key": k,
-                "count_equipos": len(values),
-                "sample_values": list(dict.fromkeys(values))[:3],  # dedupe + top 3
+                "spec_def_id": r["spec_def_id"],
+                "spec_key": r["spec_key"],
+                "label": r["label"],
+                "count_equipos": r["count_equipos"],
+                "sample_values": [str(v) for v in (r["sample_values"] or [])][:3],
             }
-            for k, values in sorted(by_key.items(), key=lambda kv: -len(kv[1]))
+            for r in rows
         ]
-        return out
     finally:
         conn.close()
 
 
 @router.post("/admin/categorias/{categoria_id}/spec-templates", status_code=201)
-def crear_template(categoria_id: int, payload: SpecTemplateInput, request: Request):
+def asignar_spec_a_categoria(categoria_id: int, payload: SpecAssignmentInput, request: Request):
+    """Asigna una spec_definition existente a una categoría con flags propios.
+    Para crear una spec nueva globalmente usar POST /admin/spec-definitions
+    y después asignar acá."""
     _require_admin(request)
-    # rango / wxh / wxhxd requieren unidad (siempre son medidas con dimensiones).
-    # number puede no tenerla — algunos números son dimensionless (cant de
-    # hojas de diafragma, elementos ópticos, etc.).
-    if payload.tipo in ("rango", "wxh", "wxhxd") and not (payload.unidad and payload.unidad.strip()):
-        raise HTTPException(400, "Para este tipo la unidad es obligatoria (mm, px, °, kg…).")
     conn = get_db()
     try:
-        # Verificar que la categoría existe
         cat = conn.execute(
             "SELECT id FROM categorias WHERE id = ?", (categoria_id,)
         ).fetchone()
         if not cat:
             raise HTTPException(404, f"Categoría {categoria_id} no existe")
+        sd = conn.execute(
+            "SELECT id, label FROM spec_definitions WHERE id = ?", (payload.spec_def_id,)
+        ).fetchone()
+        if not sd:
+            raise HTTPException(404, f"Spec definition {payload.spec_def_id} no existe")
         try:
             cur = conn.execute(
                 """
                 INSERT INTO categoria_spec_templates
-                  (categoria_id, spec_key, label, tipo, unidad, enum_options,
-                   prioridad, visible_en_card, visible_en_filtros,
-                   visible_en_nombre, obligatorio, ayuda, destacado)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  (categoria_id, spec_def_id, prioridad, destacado, obligatorio,
+                   visible_en_card, visible_en_filtros, visible_en_nombre, ayuda)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """,
                 (
                     categoria_id,
-                    payload.spec_key,
-                    payload.label,
-                    payload.tipo,
-                    payload.unidad,
-                    json.dumps(payload.enum_options) if payload.enum_options else None,
+                    payload.spec_def_id,
                     payload.prioridad,
+                    payload.destacado,
+                    payload.obligatorio,
                     payload.visible_en_card,
                     payload.visible_en_filtros,
                     payload.visible_en_nombre,
-                    payload.obligatorio,
                     payload.ayuda,
-                    payload.destacado,
                 ),
             )
             new_id = cur.fetchone()[0]
@@ -250,7 +430,7 @@ def crear_template(categoria_id: int, payload: SpecTemplateInput, request: Reque
             if "duplicate key" in str(e).lower() or "unique" in str(e).lower():
                 raise HTTPException(
                     409,
-                    f"La spec '{payload.spec_key}' ya existe para esta categoría",
+                    f"La spec '{sd['label']}' ya está asignada a esta categoría.",
                 )
             raise
     finally:
@@ -258,29 +438,21 @@ def crear_template(categoria_id: int, payload: SpecTemplateInput, request: Reque
 
 
 @router.patch("/admin/spec-templates/{template_id}")
-def actualizar_template(template_id: int, payload: SpecTemplateUpdate, request: Request):
+def actualizar_asignacion(template_id: int, payload: SpecAssignmentUpdate, request: Request):
+    """Actualiza los flags de una asignación (prioridad, destacado, visible_*,
+    obligatorio, ayuda). Para cambiar tipo/unidad/options usar PATCH
+    /admin/spec-definitions/{id} (afecta a todas las categorías)."""
     _require_admin(request)
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(400, "Nada para actualizar")
-    # enum_options viene como list, hay que serializarlo a JSON
-    if "enum_options" in updates:
-        updates["enum_options"] = (
-            json.dumps(updates["enum_options"]) if updates["enum_options"] else None
-        )
     conn = get_db()
     try:
         existing = conn.execute(
-            "SELECT id, tipo, unidad FROM categoria_spec_templates WHERE id = ?", (template_id,)
+            "SELECT id FROM categoria_spec_templates WHERE id = ?", (template_id,)
         ).fetchone()
         if not existing:
-            raise HTTPException(404, "Template no existe")
-        # #291 Fase B: validar que el estado final tenga unidad si tipo=number.
-        existing_dict = row_to_dict(existing) if not isinstance(existing, dict) else existing
-        final_tipo = updates.get("tipo", existing_dict.get("tipo"))
-        final_unidad = updates.get("unidad", existing_dict.get("unidad"))
-        if final_tipo in ("rango", "wxh", "wxhxd") and not (final_unidad and str(final_unidad).strip()):
-            raise HTTPException(400, "Para tipo Número la unidad es obligatoria (ej. kg, MP, mm, W).")
+            raise HTTPException(404, "Asignación no existe")
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         conn.execute(
             f"UPDATE categoria_spec_templates SET {set_clause} WHERE id = ?",
@@ -296,16 +468,17 @@ def actualizar_template(template_id: int, payload: SpecTemplateUpdate, request: 
 
 
 @router.delete("/admin/spec-templates/{template_id}", status_code=204)
-def borrar_template(template_id: int, request: Request):
+def borrar_asignacion(template_id: int, request: Request):
+    """Desasigna la spec de la categoría (no toca la spec_definition global)."""
     _require_admin(request)
     conn = get_db()
     try:
-        cur = conn.execute(
+        conn.execute(
             "DELETE FROM categoria_spec_templates WHERE id = ?", (template_id,)
         )
         conn.commit()
-        # NOTA: equipo_specs NO se borra automáticamente al borrar el template,
-        # quedan como "extras" sin schema. Es intencional para no perder data.
+        # NOTA: equipo_specs NO se borra al desasignar — los valores cargados
+        # quedan como "huérfanos" hasta que el dueño los borre desde la UI.
     finally:
         conn.close()
 
@@ -348,12 +521,12 @@ def reordenar_templates(payload: dict, request: Request):
 @router.get("/admin/equipos/{equipo_id}/specs")
 def obtener_specs_equipo(equipo_id: int, request: Request):
     """Devuelve las specs estructuradas del equipo + el template aplicable
-    (si tiene categoría asignada). Útil para que el form sepa qué inputs
-    renderear y con qué valores actuales."""
+    (todas las categorías del equipo unidas, con dedup por spec_def). Las
+    keys del dict `specs` son strings stringificadas del spec_def_id (JSON
+    no soporta int keys)."""
     _require_admin(request)
     conn = get_db()
     try:
-        # Verificar equipo
         eq = conn.execute(
             "SELECT id FROM equipos WHERE id = ?", (equipo_id,)
         ).fetchone()
@@ -362,31 +535,36 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
 
         # Specs ya cargadas
         spec_rows = conn.execute(
-            "SELECT spec_key, value FROM equipo_specs WHERE equipo_id = ?",
+            "SELECT spec_def_id, value FROM equipo_specs WHERE equipo_id = ?",
             (equipo_id,),
         ).fetchall()
-        specs = {r["spec_key"]: r["value"] for r in spec_rows}
+        specs = {str(r["spec_def_id"]): r["value"] for r in spec_rows}
 
-        # Template aplicable: las categorías del equipo (cualquier nivel) +
-        # sus templates. Mergeados con dedup por spec_key (la primera gana).
+        # Template aplicable: las categorías del equipo + sus asignaciones.
+        # Mergeados con dedup por spec_def_id (la primera asignación gana en
+        # caso de conflicto entre categorías).
         template_rows = conn.execute(
             """
-            SELECT DISTINCT ON (t.spec_key)
-                t.spec_key, t.label, t.tipo, t.unidad,
-                t.enum_options, t.prioridad,
+            SELECT DISTINCT ON (t.spec_def_id)
+                t.id AS template_id,
+                t.spec_def_id,
+                sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.enum_options,
+                t.prioridad,
                 t.visible_en_card, t.visible_en_filtros, t.visible_en_nombre,
-                t.obligatorio, t.ayuda,
+                t.obligatorio,
+                COALESCE(t.ayuda, sd.ayuda) AS ayuda,
+                COALESCE(t.destacado, FALSE) AS destacado,
                 c.nombre AS categoria_nombre
             FROM equipo_categorias ec
             JOIN categoria_spec_templates t ON t.categoria_id = ec.categoria_id
+            JOIN spec_definitions sd ON sd.id = t.spec_def_id
             JOIN categorias c ON c.id = ec.categoria_id
             WHERE ec.equipo_id = ?
-            ORDER BY t.spec_key, t.prioridad
+            ORDER BY t.spec_def_id, t.prioridad
             """,
             (equipo_id,),
         ).fetchall()
         template = [row_to_dict(r) for r in template_rows]
-        # Ordenar por prioridad (DISTINCT ON rompió el ORDER lógico)
         template.sort(key=lambda t: (t["prioridad"], t["label"]))
 
         return {
@@ -400,8 +578,8 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
 
 @router.put("/admin/equipos/{equipo_id}/specs")
 def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: Request):
-    """Reemplaza TODAS las specs del equipo por las del payload. Las que
-    no estén en el payload se borran."""
+    """Reemplaza TODAS las specs del equipo. Body shape:
+    {specs: { "<spec_def_id>": "value" }}. Las keys son ints stringificados."""
     _require_admin(request)
     conn = get_db()
     try:
@@ -411,31 +589,37 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
         if not eq:
             raise HTTPException(404, "Equipo no existe")
 
-        # Borrar las viejas y meter las nuevas en una transacción.
         conn.execute("DELETE FROM equipo_specs WHERE equipo_id = ?", (equipo_id,))
         for key, value in payload.specs.items():
             if value is None or value == "":
                 continue
+            try:
+                spec_def_id = int(key)
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    400,
+                    f"spec_def_id inválido en payload.specs: '{key}'. Las keys deben ser IDs numéricos.",
+                )
             conn.execute(
                 """
-                INSERT INTO equipo_specs (equipo_id, spec_key, value)
+                INSERT INTO equipo_specs (equipo_id, spec_def_id, value)
                 VALUES (?, ?, ?)
-                ON CONFLICT (equipo_id, spec_key) DO UPDATE
+                ON CONFLICT (equipo_id, spec_def_id) DO UPDATE
                     SET value = EXCLUDED.value
                 """,
-                (equipo_id, key, str(value)),
+                (equipo_id, spec_def_id, str(value)),
             )
 
-        # Recalcular nombre público (ahora que las specs cambiaron, puede
-        # cambiar el nombre auto-generado).
         try:
             actualizar_nombres_de(conn, equipo_id, commit=False)
         except Exception:
-            # Si el recálculo falla, no abortamos el guardado de specs.
             pass
 
         conn.commit()
         return {"ok": True, "equipo_id": equipo_id, "specs_count": len(payload.specs)}
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception:
         conn.rollback()
         raise
@@ -811,31 +995,20 @@ def aprobar_o_editar_nombre(equipo_id: int, payload: AprobarNombreInput, request
         conn.close()
 
 
-@router.post("/admin/equipos/migrar-specs-json")
+@router.post("/admin/equipos/migrar-specs-json", deprecated=True)
 def migrar_specs_json(payload: dict, request: Request):
-    """Migra specs_json (formato legacy) a equipo_specs (formato estructurado).
-
-    Body:
-      - dry_run: bool — si True, devuelve preview sin escribir.
-
-    Después de migrar, hay que correr regenerar-nombres para que los
-    nombres públicos reflejen los specs nuevos."""
+    """DEPRECATED post unificar_specs_definitions: el migrador legacy
+    asumía el schema (categoria_id, spec_key) que ya no existe. Si necesitás
+    re-importar specs_json viejos, hay que reescribir el service para que
+    cree spec_definitions sobre la marcha. Para el dueño esto es no-op
+    porque los specs_json viejos ya fueron migrados antes del refactor."""
     _require_admin(request)
-    dry_run = bool(payload.get("dry_run"))
-    conn = get_db()
-    try:
-        result = migrar_specs_todos(conn, dry_run=dry_run)
-        # Si no es dry_run, regenerar nombres masivamente para que reflejen
-        # los specs recién migrados.
-        if not dry_run:
-            try:
-                nombres = regenerar_nombres_todos(conn, dry_run=False)
-                result["nombres_actualizados"] = len(nombres["cambios"])
-            except Exception as e:
-                result["nombres_error"] = str(e)
-        return result
-    finally:
-        conn.close()
+    raise HTTPException(
+        410,
+        "Endpoint obsoleto. El refactor unificar_specs_definitions cambió "
+        "el schema. Si necesitás migrar specs_json legacy, reescribí el "
+        "service migracion_specs.py para que use spec_def_id.",
+    )
 
 
 @router.get("/admin/equipos/nombres-validacion")
