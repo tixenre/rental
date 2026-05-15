@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiGetEquipos, apiGetCategorias, apiGetDisponibilidad, apiGetMarcs, type BackendEquipo, type BackendMarca } from "@/lib/api";
+import { apiGetEquipos, apiGetCategorias, apiGetMarcs, type BackendEquipo, type BackendMarca } from "@/lib/api";
 import { type Equipment, type Category, equipment as MOCK_EQUIPMENT } from "@/data/equipment";
 import { format } from "date-fns";
+
 
 /* ─── Inferencia de categoría desde nombre/marca/etiquetas ────────────── */
 //
@@ -270,6 +271,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     compatibleCon:  parsedCompatibleCon,
     videoUrl:       ficha?.video_url     ?? null,
     precioBhUsd:    ficha?.precio_bh_usd ?? null,
+    disponible:     e.disponible,
   };
 }
 
@@ -277,15 +279,18 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
 
 type EquiposQueryResult = { items: Equipment[]; usingFallback: boolean };
 
-export function useEquipos() {
+export function useEquipos(startDate?: Date, endDate?: Date) {
+  const desde = startDate ? format(startDate, "yyyy-MM-dd") : undefined;
+  const hasta  = endDate   ? format(endDate,   "yyyy-MM-dd") : undefined;
+
   const q = useQuery<EquiposQueryResult>({
-    queryKey: ["equipos"],
+    queryKey: ["equipos", desde, hasta],
     queryFn: async () => {
-      const data = await apiGetEquipos();
+      const data = await apiGetEquipos({ desde, hasta });
       const items = (data?.items ?? []).map(backendToEquipment);
       return { items, usingFallback: false };
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: desde && hasta ? 2 * 60 * 1000 : 5 * 60 * 1000,
     retry: 1,
   });
 
@@ -301,26 +306,6 @@ export function useCategorias() {
     queryKey: ["categorias"],
     queryFn: apiGetCategorias,
     staleTime: 10 * 60 * 1000,
-  });
-}
-
-export function useDisponibilidad(startDate?: Date, endDate?: Date) {
-  const desde = startDate ? format(startDate, "yyyy-MM-dd") : "";
-  const hasta = endDate   ? format(endDate,   "yyyy-MM-dd") : "";
-
-  return useQuery({
-    queryKey: ["disponibilidad", desde, hasta],
-    queryFn: async () => {
-      try {
-        return await apiGetDisponibilidad(desde, hasta);
-      } catch (err) {
-        console.warn("[useDisponibilidad] backend no responde:", err);
-        return {} as Record<string, number>;
-      }
-    },
-    enabled: !!(desde && hasta),
-    staleTime: 2 * 60 * 1000,
-    retry: 1,
   });
 }
 

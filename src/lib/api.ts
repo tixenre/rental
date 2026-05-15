@@ -93,6 +93,8 @@ export type BackendEquipo = {
   categorias?: BackendCategoriaRef[];
   ficha?: BackendFicha;
   specs_destacados?: { label: string; value: string }[];
+  /** Unidades disponibles para el rango desde/hasta. Solo presente si se pasan fechas. */
+  disponible?: number;
 };
 
 export type BackendCategoria = {
@@ -108,27 +110,19 @@ export type BackendCategoria = {
   subtags?: { nombre: string; total: number }[];
 };
 
-export type Disponibilidad = Record<string, number>; // equipo_id (string) → unidades disponibles
-
 /* ─── Endpoints ─────────────────────────────────────────────────────── */
 
-export function apiGetEquipos() {
+export function apiGetEquipos(opts?: { desde?: string; hasta?: string }) {
   return get<{ total: number; items: BackendEquipo[] }>("/api/equipos", {
     per_page: "500",
     solo_visibles: "true",
     sort: "ranking",
+    ...(opts?.desde && opts?.hasta ? { desde: opts.desde, hasta: opts.hasta } : {}),
   });
 }
 
 export function apiGetCategorias() {
   return get<BackendCategoria[]>("/api/categorias");
-}
-
-export function apiGetDisponibilidad(fechaDesde: string, fechaHasta: string) {
-  return get<Disponibilidad>("/api/disponibilidad", {
-    fecha_desde: fechaDesde,
-    fecha_hasta: fechaHasta,
-  });
 }
 
 export function apiGetMarcs() {

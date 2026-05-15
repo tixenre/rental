@@ -69,6 +69,8 @@ export type Equipment = {
   compatibleCon?: string[];
   videoUrl?: string | null;
   precioBhUsd?: number | null;
+  /** Unidades disponibles para el rango de fechas pedido. Solo presente cuando se consulta con fechas. */
+  disponible?: number;
 };
 
 const e = (
