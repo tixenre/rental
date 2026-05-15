@@ -100,13 +100,27 @@ export function NombreTemplateBuilder({
 
   const previewSpecs = (() => {
     if (!previewSpecsQ.data) {
-      return templateSpecs.map((t) => ({ label: t.label, value: `<${t.label}>` }));
+      return templateSpecs.map((t) => ({
+        label: t.label,
+        value: `<${t.label}>`,
+        output_config: null,
+      }));
     }
     const { specs: values, template: tmpl } = previewSpecsQ.data;
-    return tmpl.map((t) => ({
-      label: t.label,
-      value: values[t.spec_key] ?? "",
-    }));
+    return tmpl.map((t) => {
+      const raw = values[t.spec_key] ?? "";
+      // Para specs tabla, el backend guarda el JSON crudo en equipo_specs.
+      // Lo pasamos como value_raw para que el placeholder `{spec:Label.col}`
+      // pueda extraer celdas. El value queda igual al raw (no se pre-formatea
+      // acá; el preview en este editor es best-effort).
+      const isTabla = t.tipo === "tabla";
+      return {
+        label: t.label,
+        value: raw,
+        ...(isTabla && raw ? { value_raw: raw } : {}),
+        output_config: t.output_config ?? null,
+      };
+    });
   })();
 
   const preview = renderNombrePublicoTemplate(template, {

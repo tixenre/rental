@@ -23,6 +23,10 @@ from database import (
 from routes.auth import get_session
 from admin_guard import require_admin
 from services.nombre_service import actualizar_nombres_de
+from services.spec_render import (
+    format_tabla_value,
+    norm_spec_label,
+)
 
 router = APIRouter()
 
@@ -633,68 +637,13 @@ def list_equipos(
         conn.close()
 
 
-def _norm_spec_label(s: str) -> str:
-    """Normaliza un label para lookup contra spec_definitions: lowercase + sin tildes."""
-    s = unicodedata.normalize("NFD", s or "")
-    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
-    return s.lower().strip()
-
-
-def _format_tabla_value_with_columns(value_json: str, columnas: list) -> str:
-    """Formatea el JSON serializado de una spec tabla a texto legible.
-    Usa las columnas (con prefijo/unidad) para construir la oración:
-    "10000 lm a 5700 K". Múltiples filas se separan con \\n.
-    Si el formato falla, devuelve el value original."""
-    import json as _json
-    try:
-        rows = _json.loads(value_json)
-    except Exception:
-        return value_json
-    if not isinstance(rows, list) or not rows:
-        return value_json
-    cols = columnas or []
-    lines: list[str] = []
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        parts: list[str] = []
-        for i, c in enumerate(cols):
-            key = c.get("key") if isinstance(c, dict) else None
-            if not key:
-                continue
-            cell = row.get(key)
-            if cell is None or cell == "":
-                continue
-            # Conector con la columna anterior (prefijo).
-            prefijo = c.get("prefijo") if isinstance(c, dict) else None
-            if i > 0 and prefijo:
-                parts.append(str(prefijo))
-            # Render del valor.
-            if isinstance(cell, dict) and "valor" in cell:
-                v = cell.get("valor")
-                u = cell.get("unidad") or ""
-                txt = str(v) if v is not None else ""
-                if u:
-                    txt = f"{txt} {u}".strip()
-            else:
-                txt = str(cell)
-                # Si la columna tiene unidad fija definida en el header, sufijarla.
-                fixed_unit = c.get("unidad") if isinstance(c, dict) else None
-                if fixed_unit and c.get("tipo") != "valor_unidad":
-                    txt = f"{txt} {fixed_unit}".strip()
-            if txt.strip():
-                parts.append(txt.strip())
-        if parts:
-            lines.append(" ".join(parts))
-    return "\n".join(lines) if lines else value_json
-
-
 def _load_tabla_defs_by_label(conn) -> dict[str, dict]:
     """Carga TODAS las spec_definitions tipo 'tabla' y las indexa por label
     normalizado. Devuelve {} si no hay specs tabla en el catálogo."""
     import json as _json
     defs_rows = conn.execute(
-        "SELECT label, tipo, tabla_columnas FROM spec_definitions WHERE tipo = 'tabla'"
+        "SELECT label, tipo, tabla_columnas, output_config "
+        "FROM spec_definitions WHERE tipo = 'tabla'"
     ).fetchall()
     out: dict[str, dict] = {}
     for r in defs_rows:
@@ -705,9 +654,16 @@ def _load_tabla_defs_by_label(conn) -> dict[str, dict]:
                 cols = _json.loads(cols)
             except Exception:
                 cols = None
-        out[_norm_spec_label(d.get("label") or "")] = {
+        oc = d.get("output_config")
+        if isinstance(oc, str):
+            try:
+                oc = _json.loads(oc)
+            except Exception:
+                oc = None
+        out[norm_spec_label(d.get("label") or "")] = {
             "tipo": d.get("tipo"),
             "tabla_columnas": cols,
+            "output_config": oc,
         }
     return out
 
@@ -741,14 +697,20 @@ def _apply_tabla_defs_to_specs_json(
         if not isinstance(value, str):
             out.append(item)
             continue
-        sd = defs_by_label.get(_norm_spec_label(label))
+        sd = defs_by_label.get(norm_spec_label(label))
         if sd and sd.get("tipo") == "tabla":
             cols = sd.get("tabla_columnas") or []
-            formatted = _format_tabla_value_with_columns(value, cols)
+            output_config = sd.get("output_config")
+            formatted = format_tabla_value(value, cols, output_config)
             if formatted != value:
                 # Mantenemos `value_raw` con el JSON original para que el
                 # frontend pueda extraer celdas via `{spec:Label.colKey}`.
-                out.append({**item, "value": formatted, "value_raw": value})
+                # Adjuntamos output_config para que el front aplique la
+                # misma row_strategy en el preview live del editor.
+                extra = {"value": formatted, "value_raw": value}
+                if output_config:
+                    extra["output_config"] = output_config
+                out.append({**item, **extra})
                 changed = True
                 continue
         out.append(item)

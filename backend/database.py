@@ -675,6 +675,13 @@ def init_db():
         "ALTER TABLE spec_definitions "
         "ADD COLUMN IF NOT EXISTS tabla_columnas JSONB"
     )
+    # Config declarativa de cómo se rinde la spec en un placeholder
+    # {spec:Label}. Ej. {"row_strategy": "first"} en una tabla rinde solo
+    # la primera fila. NULL = defaults (row_strategy=all).
+    conn.execute(
+        "ALTER TABLE spec_definitions "
+        "ADD COLUMN IF NOT EXISTS output_config JSONB"
+    )
     # Catálogo global de unidades (lm, K, V, A, W…). Referenciado por specs
     # tabla con columnas `valor_unidad` para listas cerradas de opciones.
     conn.execute("""

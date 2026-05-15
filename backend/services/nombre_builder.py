@@ -26,8 +26,12 @@ sigue funcionando — gana sobre el auto-build.
 """
 
 import re
-import unicodedata
 from typing import Optional
+
+from services.spec_render import (
+    norm_spec_label,
+    render_spec_placeholder,
+)
 
 
 # ── Mapeo de subcategoría → tipo legible (editable) ─────────────────────
@@ -247,121 +251,6 @@ def _specs_dict(specs_en_nombre: list[tuple[str, str]]) -> dict[str, str]:
 _TPL_SEP = r"[\s\-–—,/|·]"
 
 
-def _norm_label(s: str) -> str:
-    """Normaliza un label para lookup de specs: lowercase + sin tildes + trim.
-    Tiene que matchear el approach del frontend en `nombre-template.ts`."""
-    s = unicodedata.normalize("NFD", s or "")
-    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
-    return s.lower().strip()
-
-
-def _format_tabla_cell_for_template(cell) -> str:
-    """Formatea una celda de spec tabla a texto. Soporta valor_unidad
-    (`{valor, unidad}` → "19389 lm") y escalares. Matchea el approach del
-    frontend en nombre-template.ts → formatTablaCell()."""
-    if cell is None or cell == "":
-        return ""
-    if isinstance(cell, dict) and "valor" in cell:
-        valor = cell.get("valor")
-        unidad = cell.get("unidad") or ""
-        txt = str(valor) if valor is not None else ""
-        if unidad:
-            txt = f"{txt} {str(unidad).strip()}".strip()
-        return txt.strip()
-    return str(cell).strip()
-
-
-def _resolve_spec_placeholder(
-    key: str,
-    spec_map: dict[str, dict],
-) -> str:
-    """Resuelve `Label` o `Label.colKey[i]` contra `spec_map`. Cada item del
-    map es {value, tipo, tabla_columnas?}.
-
-    - `Label` (sin colKey): si es tabla, formatea con conectores usando
-      tabla_columnas. Si no, devuelve value tal cual.
-    - `Label.colKey[i]`: parsea value como JSON tabla, extrae celda colKey
-      en fila i (default 0).
-    """
-    # Importado al top: usar el del módulo.
-    label = key
-    col_key: Optional[str] = None
-    row_idx = 0
-    dot_idx = key.find(".")
-    if dot_idx != -1:
-        label = key[:dot_idx]
-        rest = key[dot_idx + 1:]
-        m = re.match(r"^(.+?)\[(\d+)\]$", rest)
-        if m:
-            col_key = m.group(1)
-            row_idx = int(m.group(2))
-        else:
-            col_key = rest
-    info = spec_map.get(_norm_label(label))
-    if not info:
-        return ""
-    value = info.get("value", "")
-    if not col_key:
-        # Sin selector: si es tabla, formatear con conectores.
-        if info.get("tipo") == "tabla":
-            cols = info.get("tabla_columnas") or []
-            return _format_tabla_value_with_columns_safe(value, cols)
-        return value
-    # Con selector: parsear y extraer celda.
-    if not value or not (value.startswith("[") or value.startswith("{")):
-        return ""
-    import json as _json
-    try:
-        parsed = _json.loads(value)
-    except Exception:
-        return ""
-    if not isinstance(parsed, list) or row_idx >= len(parsed):
-        return ""
-    row = parsed[row_idx]
-    if not isinstance(row, dict):
-        return ""
-    return _format_tabla_cell_for_template(row.get(col_key))
-
-
-def _format_tabla_value_with_columns_safe(value: str, columnas: list) -> str:
-    """Wrapper de `_format_tabla_value_with_columns` (que vive en routes/equipos)
-    para uso interno acá. Replica el algoritmo: para cada fila formatea celdas
-    con conectores. Si falla, devuelve el value original."""
-    import json as _json
-    try:
-        rows = _json.loads(value)
-    except Exception:
-        return value
-    if not isinstance(rows, list) or not rows:
-        return value
-    cols = columnas or []
-    lines: list[str] = []
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        parts: list[str] = []
-        for i, c in enumerate(cols):
-            key = c.get("key") if isinstance(c, dict) else None
-            if not key:
-                continue
-            cell = row.get(key)
-            if cell is None or cell == "":
-                continue
-            prefijo = c.get("prefijo") if isinstance(c, dict) else None
-            if i > 0 and prefijo:
-                parts.append(str(prefijo))
-            txt = _format_tabla_cell_for_template(cell)
-            # Si la columna tiene unidad fija (no valor_unidad), sufijarla.
-            fixed_unit = c.get("unidad") if isinstance(c, dict) else None
-            if fixed_unit and c.get("tipo") != "valor_unidad" and not isinstance(cell, dict):
-                txt = f"{txt} {fixed_unit}".strip()
-            if txt:
-                parts.append(txt)
-        if parts:
-            lines.append(" ".join(parts))
-    return "\n".join(lines) if lines else value
-
-
 def _render_template(
     tpl: str,
     vars: dict[str, str],
@@ -377,23 +266,40 @@ def _render_template(
         de la primera fila y la formatea como texto (valor + unidad). Para
         elegir otra fila: `{spec:Label.colKey[1]}`.
 
-    `specs` es una lista de dicts {label, value, tipo, tabla_columnas}.
+    `specs` es una lista de dicts {label, value, tipo, tabla_columnas, output_config?}.
     """
     lower = {k.lower(): (v or "").strip() for k, v in vars.items()}
     spec_map: dict[str, dict] = {}
     if specs:
         for s in specs:
-            spec_map[_norm_label(s.get("label") or "")] = {
+            spec_map[norm_spec_label(s.get("label") or "")] = {
                 "value": (s.get("value") or "").strip(),
                 "tipo": s.get("tipo"),
                 "tabla_columnas": s.get("tabla_columnas"),
+                "output_config": s.get("output_config"),
             }
 
     def replace_token(m: re.Match) -> str:
         before, key, after = m.group(1), m.group(2), m.group(3)
         key_stripped = key.strip()
         if key_stripped.lower().startswith("spec:"):
-            val = _resolve_spec_placeholder(key_stripped[len("spec:"):], spec_map)
+            raw_key = key_stripped[len("spec:"):]
+            # Parsear "Label" o "Label.colPath" — el módulo canónico resuelve
+            # el path; acá solo separamos label de path.
+            dot_idx = raw_key.find(".")
+            label = raw_key if dot_idx == -1 else raw_key[:dot_idx]
+            path = "" if dot_idx == -1 else raw_key[dot_idx + 1:]
+            info = spec_map.get(norm_spec_label(label))
+            if info:
+                val = render_spec_placeholder(
+                    info.get("value", "") or "",
+                    info.get("tipo"),
+                    info.get("tabla_columnas"),
+                    info.get("output_config"),
+                    path,
+                )
+            else:
+                val = ""
         else:
             val = lower.get(key_stripped.lower(), "")
         if val:

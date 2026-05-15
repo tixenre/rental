@@ -228,20 +228,28 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
   const name = publicName || fallbackName;
 
   const ficha = e.ficha;
-  let parsedSpecs: { label: string; value: string; value_raw?: string }[] = [];
+  type ParsedSpec = {
+    label: string;
+    value: string;
+    value_raw?: string;
+    output_config?: { row_strategy?: "all" | "first" | "last" } | null;
+  };
+  let parsedSpecs: ParsedSpec[] = [];
   if (ficha?.specs_json) {
     try {
       const arr = JSON.parse(ficha.specs_json);
       if (Array.isArray(arr)) {
         parsedSpecs = arr
           .filter((s) => s && typeof s === "object" && s.label && s.value != null && s.value !== "")
-          .map((s: { label: string; value: string; value_raw?: string }) => ({
+          .map((s: { label: string; value: string; value_raw?: string; output_config?: ParsedSpec["output_config"] }) => ({
             label: String(s.label),
             value: formatSpecValueForDisplay(s.value),
-            // value_raw lo agrega el backend para specs tipo tabla — lo
-            // preservamos para que el placeholder {spec:Label.colKey} pueda
-            // parsear el JSON crudo y extraer celdas específicas.
+            // value_raw + output_config los agrega el backend para specs tipo
+            // tabla — los preservamos para que el placeholder
+            // {spec:Label.colKey} pueda parsear el JSON crudo y aplicar la
+            // row_strategy correcta al extraer celdas.
             ...(s.value_raw ? { value_raw: String(s.value_raw) } : {}),
+            ...(s.output_config ? { output_config: s.output_config } : {}),
           }));
       }
     } catch {

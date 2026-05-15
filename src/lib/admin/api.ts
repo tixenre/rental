@@ -289,6 +289,15 @@ export type SpecTablaColumna = {
 export type CompatibilidadModo = "exacta" | "jerarquia";
 export type RolCompatibilidad = "contenedor" | "contenido" | null;
 
+/** Config declarativa de cómo se rinde la spec en un placeholder {spec:Label}.
+ *  Aplicada por backend/services/spec_render.py y mirroreada en
+ *  src/lib/equipment/nombre-template.ts. */
+export type SpecRowStrategy = "all" | "first" | "last";
+export type SpecOutputConfig = {
+  /** Solo aplica a tipo='tabla'. Default 'all'. */
+  row_strategy?: SpecRowStrategy;
+};
+
 /** Asignación de una spec a una categoría (con su template_id para poder
  *  desasignar desde el modal de edición). */
 export type SpecDefinitionCategoriaAsign = {
@@ -311,6 +320,8 @@ export type SpecDefinition = {
   validado: boolean;
   /** Solo para tipo='tabla': shape de las columnas. */
   tabla_columnas: SpecTablaColumna[] | null;
+  /** Config declarativa de render del placeholder. Solo `row_strategy` por ahora. */
+  output_config: SpecOutputConfig | null;
   /** Solo en GET /admin/spec-definitions: cuántas categorías la asignaron. */
   uso_categorias?: number;
   /** Solo en GET /admin/spec-definitions: cuántos equipos tienen value. */
@@ -344,6 +355,7 @@ export type SpecDefinitionInput = {
   compatibilidad_modo?: CompatibilidadModo;
   validado?: boolean;
   tabla_columnas?: SpecTablaColumna[] | null;
+  output_config?: SpecOutputConfig | null;
 };
 
 /** Asignación de una spec_def a una categoría + flags propios. El backend
@@ -361,9 +373,10 @@ export type SpecTemplate = {
   unidad: string | null;
   enum_options: string[] | null;
   tabla_columnas: SpecTablaColumna[] | null;
+  output_config: SpecOutputConfig | null;
   es_compatibilidad: boolean;
   compatibilidad_modo: CompatibilidadModo;
-  // Per-categoría:
+  // Per-categoría: (los flags aplicados por la asignación)
   prioridad: number;
   visible_en_card: boolean;
   visible_en_filtros: boolean;
@@ -927,6 +940,7 @@ export const adminApi = {
         spec_key: string; label: string; tipo: string;
         unidad: string | null; enum_options: string[] | null;
         tabla_columnas: SpecTablaColumna[] | null;
+        output_config: SpecOutputConfig | null;
         prioridad: number;
         visible_en_card: boolean; visible_en_filtros: boolean; visible_en_nombre: boolean;
         obligatorio: boolean; ayuda: string | null;

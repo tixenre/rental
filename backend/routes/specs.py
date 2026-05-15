@@ -64,6 +64,10 @@ class SpecDefinitionInput(BaseModel):
     #   {key, label, tipo, options?, unidad?}
     # `tipo` interno de la columna: "string" | "number" | "enum" | "bool".
     tabla_columnas: Optional[list[dict]] = None
+    # Config declarativa de render del placeholder {spec:Label}.
+    # Por ahora solo soporta `row_strategy: "all" | "first" | "last"` para
+    # specs tipo tabla. NULL = defaults (all).
+    output_config: Optional[dict] = None
 
 
 class SpecDefinitionUpdate(BaseModel):
@@ -77,6 +81,7 @@ class SpecDefinitionUpdate(BaseModel):
     compatibilidad_modo: Optional[str] = None
     validado: Optional[bool] = None
     tabla_columnas: Optional[list[dict]] = None
+    output_config: Optional[dict] = None
 
 
 # Asignación de una spec_def a una categoría con flags propios.
@@ -187,7 +192,7 @@ def listar_spec_definitions(request: Request):
         rows = conn.execute("""
             SELECT
               sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
-              sd.enum_options, sd.ayuda, sd.tabla_columnas,
+              sd.enum_options, sd.ayuda, sd.tabla_columnas, sd.output_config,
               COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
               COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
               COALESCE(sd.validado, FALSE) AS validado,
@@ -216,6 +221,28 @@ def listar_spec_definitions(request: Request):
 
 _VALID_SPEC_TIPOS = {"string", "number", "enum", "bool", "rango", "wxh", "wxhxd", "multi_enum", "tabla"}
 _VALID_COL_TIPOS = {"string", "number", "enum", "bool", "valor_unidad"}
+_VALID_ROW_STRATEGIES = {"all", "first", "last"}
+
+
+def _validate_output_config(oc: Optional[dict], tipo: str) -> None:
+    """Verifica shape de `output_config`. Solo soporta `row_strategy` por ahora,
+    y solo aplica a specs tipo tabla."""
+    if oc is None or oc == {}:
+        return
+    if not isinstance(oc, dict):
+        raise HTTPException(400, "output_config debe ser un objeto JSON.")
+    rs = oc.get("row_strategy")
+    if rs is not None:
+        if tipo != "tabla":
+            raise HTTPException(
+                400, "output_config.row_strategy solo aplica a specs tipo 'tabla'."
+            )
+        if rs not in _VALID_ROW_STRATEGIES:
+            raise HTTPException(
+                400,
+                f"output_config.row_strategy inválido: '{rs}'. "
+                f"Permitidos: {sorted(_VALID_ROW_STRATEGIES)}.",
+            )
 
 
 def _validate_tabla_columnas(cols: Optional[list[dict]]) -> None:
@@ -255,6 +282,7 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
         raise HTTPException(400, "Para tipo enum / multi_enum hay que listar al menos una opción.")
     if payload.tipo == "tabla":
         _validate_tabla_columnas(payload.tabla_columnas)
+    _validate_output_config(payload.output_config, payload.tipo)
     if payload.compatibilidad_modo not in ("exacta", "jerarquia"):
         raise HTTPException(400, "compatibilidad_modo debe ser 'exacta' o 'jerarquia'.")
     if payload.compatibilidad_modo == "jerarquia" and payload.tipo != "enum":
@@ -270,8 +298,9 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
                 """
                 INSERT INTO spec_definitions
                   (spec_key, label, tipo, unidad, enum_options, ayuda,
-                   es_compatibilidad, compatibilidad_modo, validado, tabla_columnas)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   es_compatibilidad, compatibilidad_modo, validado,
+                   tabla_columnas, output_config)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """,
                 (
@@ -285,6 +314,7 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
                     payload.compatibilidad_modo,
                     payload.validado,
                     json.dumps(payload.tabla_columnas) if payload.tabla_columnas else None,
+                    json.dumps(payload.output_config) if payload.output_config else None,
                 ),
             )
             new_id = cur.fetchone()[0]
@@ -329,6 +359,11 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
             updates["tabla_columnas"] = None
     if "compatibilidad_modo" in updates and updates["compatibilidad_modo"] not in ("exacta", "jerarquia"):
         raise HTTPException(400, "compatibilidad_modo debe ser 'exacta' o 'jerarquia'.")
+    if "output_config" in updates:
+        # Necesita conocer el tipo final para validar — lo chequea más abajo
+        # contra existing_dict + final_tipo. Acá solo serializamos.
+        oc_val = updates["output_config"]
+        updates["output_config"] = json.dumps(oc_val) if oc_val else None
     conn = get_db()
     try:
         existing = conn.execute(
@@ -347,6 +382,10 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
                 400,
                 "Modo jerárquico solo aplica a tipo 'enum' — cambiá el tipo o el modo.",
             )
+        # Validar output_config contra el tipo final (después de aplicar
+        # cambios pendientes). Usamos el payload sin serializar de Pydantic.
+        if payload.output_config is not None:
+            _validate_output_config(payload.output_config, final_tipo)
         # Si está cambiando el tipo y hay valores ya cargados, bloqueamos —
         # el cambio podría invalidar todos los formatos guardados.
         if "tipo" in updates and updates["tipo"] != existing_dict.get("tipo"):
@@ -453,7 +492,7 @@ def listar_templates(categoria_id: int, request: Request):
             SELECT
               t.id, t.categoria_id, t.spec_def_id,
               sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.enum_options,
-              sd.tabla_columnas,
+              sd.tabla_columnas, sd.output_config,
               t.prioridad,
               COALESCE(t.visible_en_card, FALSE) AS visible_en_card,
               COALESCE(t.visible_en_filtros, FALSE) AS visible_en_filtros,
@@ -705,7 +744,7 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
                 t.id AS template_id,
                 t.spec_def_id,
                 sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.enum_options,
-                sd.tabla_columnas,
+                sd.tabla_columnas, sd.output_config,
                 t.prioridad,
                 t.visible_en_card, t.visible_en_filtros, t.visible_en_nombre,
                 t.obligatorio,
