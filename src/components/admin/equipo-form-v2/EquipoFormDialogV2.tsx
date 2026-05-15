@@ -418,7 +418,13 @@ export function EquipoFormDialogV2({
       const r = await authedJson<AutocompletarResult>("/api/admin/equipos/autocompletar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: u }),
+        // Pasamos las categorías ya seleccionadas para que el LLM use los
+        // labels canónicos del template de esa categoría. Si todavía no
+        // se eligió ninguna, el backend cae a guía general.
+        body: JSON.stringify({
+          url: u,
+          categoria_ids: selectedCats.size > 0 ? [...selectedCats] : undefined,
+        }),
       });
       const sets = (k: keyof FormValues, v: string | number | null | undefined) => {
         if (v !== null && v !== undefined && v !== "") {
@@ -1223,32 +1229,10 @@ export function EquipoFormDialogV2({
           </section>
 
           {/* ════════════════════════════════════════════════════════════════
-              CATEGORÍAS
-          ════════════════════════════════════════════════════════════════ */}
-          <section className="pt-2 border-t hairline">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-              Categorías {categoriaRoot && <span className="ml-1 normal-case text-ink/70">· primera = "{categoriaRoot}"</span>}
-            </Label>
-            {/* Chip de sugerencia: el scrape devolvió una categoría. Match
-                case-insensitive contra DB. Click → aplica. El backend
-                auto-asigna el padre si la sugerida es hija. */}
-            <CategoriaSugeridaChip
-              categoriaSugerida={
-                importedFichaExt?.categoria_sugerida ?? cachedScrape?.categoria_sugerida ?? null
-              }
-              categorias={catsQ.data ?? []}
-              selected={selectedCats}
-              onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
-            />
-            <CategoriasPicker
-              categorias={catsQ.data ?? []}
-              selected={selectedCats}
-              onChange={setSelectedCats}
-            />
-          </section>
-
-          {/* ════════════════════════════════════════════════════════════════
-              FICHA TÉCNICA — colapsable
+              FICHA TÉCNICA — colapsable. Va antes que categorías por feedback
+              del dueño: en edición, los specs son lo que más se toca y las
+              categorías ya están seteadas. El template-aware está abajo via
+              templateItems.
           ════════════════════════════════════════════════════════════════ */}
           <CollapsibleSection
             title="Ficha técnica"
@@ -1324,6 +1308,28 @@ export function EquipoFormDialogV2({
               </Field>
             </div>
           </CollapsibleSection>
+
+          {/* ════════════════════════════════════════════════════════════════
+              CATEGORÍAS — después de ficha técnica (ver comentario arriba)
+          ════════════════════════════════════════════════════════════════ */}
+          <section className="pt-2 border-t hairline">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+              Categorías {categoriaRoot && <span className="ml-1 normal-case text-ink/70">· primera = "{categoriaRoot}"</span>}
+            </Label>
+            <CategoriaSugeridaChip
+              categoriaSugerida={
+                importedFichaExt?.categoria_sugerida ?? cachedScrape?.categoria_sugerida ?? null
+              }
+              categorias={catsQ.data ?? []}
+              selected={selectedCats}
+              onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
+            />
+            <CategoriasPicker
+              categorias={catsQ.data ?? []}
+              selected={selectedCats}
+              onChange={setSelectedCats}
+            />
+          </section>
 
           {/* ════════════════════════════════════════════════════════════════
               KIT — colapsable, solo en EDIT (necesita id del equipo)

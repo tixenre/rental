@@ -68,7 +68,12 @@ export function useAutocompletar({
     authedJson<AutocompletarResult>("/api/admin/equipos/autocompletar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
+      // Pasamos las categorías del equipo para que el LLM use los labels
+      // canónicos del template — más relevante que la guía global.
+      body: JSON.stringify({
+        ...input,
+        categoria_ids: (equipo?.categorias ?? []).map((c) => c.id),
+      }),
     });
 
   /** Auto-sube la foto a R2 en segundo plano y actualiza fotoUrl cuando termina. */

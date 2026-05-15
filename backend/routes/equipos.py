@@ -2440,6 +2440,10 @@ class EnriquecerInput(BaseModel):
     marca:  Optional[str] = None
     modelo: Optional[str] = None
     url:    Optional[str] = None   # Si está presente, salta la búsqueda y scrapea esa URL directo
+    # categoria_ids: si vienen, el specs_guide se filtra a sólo esas categorías
+    # (incluyendo padres en el árbol). Permite que la IA se enfoque en los
+    # labels esperados para ese equipo. Si está vacío, guía con todas las cats. (#calidad)
+    categoria_ids: Optional[list[int]] = None
 
 
 class BatchEnriquecerInput(BaseModel):
@@ -2605,12 +2609,34 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         try:
             conn = get_db()
             try:
-                rows = conn.execute("""
-                    SELECT c.nombre AS categoria, t.label, t.tipo, t.unidad, t.enum_options, t.prioridad
-                    FROM categoria_spec_templates t
-                    JOIN categorias c ON c.id = t.categoria_id
-                    ORDER BY c.prioridad NULLS LAST, c.nombre, t.prioridad NULLS LAST, t.label
-                """).fetchall()
+                # Si vienen categoria_ids, filtramos la guía a esas categorías
+                # más sus ancestros (para que las specs de los padres también
+                # aparezcan en el prompt). Sino, mostramos todas las
+                # categorías (comportamiento legacy).
+                if payload.categoria_ids:
+                    placeholders = ",".join(["%s"] * len(payload.categoria_ids))
+                    rows = conn.execute(f"""
+                        WITH RECURSIVE chain AS (
+                            SELECT id, parent_id FROM categorias WHERE id IN ({placeholders})
+                            UNION
+                            SELECT c.id, c.parent_id FROM categorias c
+                              JOIN chain ON c.id = chain.parent_id
+                        )
+                        SELECT c.nombre AS categoria, t.label, t.tipo, t.unidad,
+                               t.enum_options, t.prioridad
+                        FROM categoria_spec_templates t
+                        JOIN categorias c ON c.id = t.categoria_id
+                        WHERE c.id IN (SELECT id FROM chain)
+                        ORDER BY c.prioridad NULLS LAST, c.nombre,
+                                 t.prioridad NULLS LAST, t.label
+                    """, payload.categoria_ids).fetchall()
+                else:
+                    rows = conn.execute("""
+                        SELECT c.nombre AS categoria, t.label, t.tipo, t.unidad, t.enum_options, t.prioridad
+                        FROM categoria_spec_templates t
+                        JOIN categorias c ON c.id = t.categoria_id
+                        ORDER BY c.prioridad NULLS LAST, c.nombre, t.prioridad NULLS LAST, t.label
+                    """).fetchall()
             finally:
                 conn.close()
         except Exception:
@@ -2639,16 +2665,30 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
                     pass
             elif tipo == "number" and unidad:
                 hint = f"{label} (numérico en {unidad})"
+            elif tipo == "number":
+                hint = f"{label} (numérico, sin unidad — ej. cantidad)"
+            elif tipo == "rango" and unidad:
+                hint = f"{label} (un valor o rango con guión en {unidad} — ej. '50' o '24-70')"
             elif tipo == "bool":
                 hint = f"{label} (sí/no)"
             by_cat[r["categoria"]].append(hint)
 
-        lines = ["LABELS CANÓNICOS DE SPECS POR CATEGORÍA — usá estos labels exactos cuando aplique:"]
+        if payload.categoria_ids:
+            header = (
+                "LABELS CANÓNICOS DE LA CATEGORÍA SELECCIONADA — usá EXACTAMENTE "
+                "estos labels y formatos. Si la página dice algo similar, "
+                "normalizalo al label de acá:"
+            )
+        else:
+            header = "LABELS CANÓNICOS DE SPECS POR CATEGORÍA — usá estos labels exactos cuando aplique:"
+        lines = [header]
         for cat, specs in by_cat.items():
             lines.append(f"  • {cat}: {' / '.join(specs)}.")
         lines.append(
-            "Si el equipo no encaja en ninguna categoría, usá los labels más naturales. "
-            "Para enums, devolvé exactamente uno de los valores listados (case-sensitive)."
+            "Para enums, devolvé exactamente uno de los valores listados (case-sensitive). "
+            "Para rangos, devolvé un solo valor (fijo) o dos separados por guión "
+            "(zoom/range). Si el equipo no encaja en ninguna categoría, "
+            "usá los labels más naturales."
         )
         return "\n".join(lines)
 
