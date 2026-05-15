@@ -72,21 +72,37 @@ function SugerenciasSection() {
     queryFn: () => adminApi.getSugerenciasInventario(),
     staleTime: 60_000,
   });
-  const [applying, setApplying] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["admin", "inventario", "sugerencias"] });
+    qc.invalidateQueries({ queryKey: ["admin", "inventario", "calidad"] });
+    qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
+    qc.invalidateQueries({ queryKey: ["admin", "marcas-list"] });
+  };
 
   const aplicar = useMutation({
     mutationFn: ({ tipo, ref }: { tipo: Sugerencia["tipo"]; ref: string }) =>
       adminApi.aplicarSugerencia(tipo, ref),
-    onMutate: ({ tipo, ref }) => setApplying(`${tipo}:${ref}`),
+    onMutate: ({ tipo, ref }) => setBusy(`apply:${tipo}:${ref}`),
     onSuccess: (resp) => {
       toast.success(resp.message);
-      qc.invalidateQueries({ queryKey: ["admin", "inventario", "sugerencias"] });
-      qc.invalidateQueries({ queryKey: ["admin", "inventario", "calidad"] });
-      qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
-      qc.invalidateQueries({ queryKey: ["admin", "marcas-list"] });
+      invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
-    onSettled: () => setApplying(null),
+    onSettled: () => setBusy(null),
+  });
+
+  const ignorar = useMutation({
+    mutationFn: ({ tipo, ref }: { tipo: Sugerencia["tipo"]; ref: string }) =>
+      adminApi.ignorarSugerencia(tipo, ref),
+    onMutate: ({ tipo, ref }) => setBusy(`ignore:${tipo}:${ref}`),
+    onSuccess: () => {
+      toast.success("Sugerencia descartada");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+    onSettled: () => setBusy(null),
   });
 
   if (isLoading || isError) return null;
@@ -103,7 +119,9 @@ function SugerenciasSection() {
       <ul className="divide-y hairline">
         {data.items.map((s, i) => {
           const key = `${s.tipo}:${s.ref}`;
-          const isApplying = applying === key;
+          const isApplying = busy === `apply:${key}`;
+          const isIgnoring = busy === `ignore:${key}`;
+          const isNavigate = s.accion === "navegar_equipo";
           return (
             <li key={`${key}:${i}`} className="px-5 py-4 space-y-2">
               <div className="flex items-start gap-3">
@@ -111,19 +129,38 @@ function SugerenciasSection() {
                   <div className="text-sm font-medium text-ink">{s.titulo}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{s.detalle}</div>
                 </div>
-                <Button
-                  size="sm"
-                  disabled={isApplying}
-                  onClick={() => aplicar.mutate({ tipo: s.tipo, ref: s.ref })}
-                >
-                  {isApplying ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Aplicando…
-                    </>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={isIgnoring || isApplying}
+                    onClick={() => ignorar.mutate({ tipo: s.tipo, ref: s.ref })}
+                    title="Descartar — no volverá a aparecer"
+                  >
+                    {isIgnoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Ignorar"}
+                  </Button>
+                  {isNavigate && s.equipo_id ? (
+                    <Button asChild size="sm">
+                      <Link to="/admin/equipos" search={{ q: String(s.equipo_id) }}>
+                        {s.accion_label}
+                      </Link>
+                    </Button>
                   ) : (
-                    s.accion_label
+                    <Button
+                      size="sm"
+                      disabled={isApplying || isIgnoring}
+                      onClick={() => aplicar.mutate({ tipo: s.tipo, ref: s.ref })}
+                    >
+                      {isApplying ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Aplicando…
+                        </>
+                      ) : (
+                        s.accion_label
+                      )}
+                    </Button>
                   )}
-                </Button>
+                </div>
               </div>
               {s.marcas && s.marcas.length > 0 && (
                 <ul className="ml-1 mt-2 text-[11px] text-muted-foreground space-y-0.5">

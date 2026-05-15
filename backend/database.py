@@ -836,6 +836,17 @@ def init_db():
         ON CONFLICT (key) DO NOTHING
     """)
 
+    # Sugerencias automáticas ignoradas (#352). Cuando el admin descarta una
+    # sugerencia, la persistimos por (tipo, ref) para no volver a mostrarla.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sugerencias_ignoradas (
+            tipo       TEXT NOT NULL,
+            ref        TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (tipo, ref)
+        )
+    """)
+
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
 
     # Seed the sequence to the current max so nextval never collides with existing data.

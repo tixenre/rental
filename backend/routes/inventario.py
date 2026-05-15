@@ -89,6 +89,11 @@ def get_calidad_inventario(_admin: dict = Depends(require_admin)):
 # y precio AR sin USD. Más detectores landean en iteraciones siguientes.
 
 
+class AplicarSugerenciaBody(BaseModel):
+    tipo: str
+    ref: str
+
+
 def _detect_marcas_duplicadas(conn) -> list[dict]:
     """Detecta marcas con mismo nombre normalizado (lowercase + trim) pero
     distinto registro en la tabla. Ej. 'Sony', 'sony', 'SONY' — fragmentan
@@ -126,6 +131,66 @@ def _detect_marcas_duplicadas(conn) -> list[dict]:
     return out
 
 
+# Heurística de categoría sospechosa: keywords de equipo → categoría esperada.
+# Si el equipo tiene keyword fuerte en nombre/marca pero su categoría no matchea
+# (ni es ancestro), lo flagueamos. Conservador en los keywords para no generar
+# falsos positivos masivos — preferimos no detectar que detectar mal.
+_CATEGORIA_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "cámara":     ("cam", "cámara", "camara", "camera"),
+    "lente":      ("lens", "lente"),
+    "luz":        ("led", "luz", "light", "panel", "softbox", "reflector"),
+    "micrófono":  ("mic", "micrófono", "microfono", "microphone"),
+    "audio":      ("recorder", "grabador", "preamp", "mixer", "mezcladora"),
+    "trípode":    ("tripod", "trípode", "tripode", "monopod"),
+    "estabilizador": ("gimbal", "estabilizador", "ronin", "stabilizer"),
+    "batería":    ("v-mount", "vmount", "battery", "batería", "bateria", "ac"),
+    "monitor":    ("monitor", "feelworld", "atomos"),
+    "almacenamiento": ("ssd", "cf", "card", "sd ", "memoria"),
+}
+
+
+def _detect_categoria_sospechosa(conn) -> list[dict]:
+    """Detecta equipos donde el nombre contiene un keyword fuerte que sugiere
+    una categoría pero la categoría asignada no matchea. Conservador para
+    minimizar falsos positivos."""
+    rows = conn.execute("""
+        SELECT
+          e.id, e.nombre, e.marca,
+          (SELECT COALESCE(string_agg(c.nombre, ', '), '(sin categoría)')
+             FROM equipo_categorias ec
+             JOIN categorias c ON c.id = ec.categoria_id
+             WHERE ec.equipo_id = e.id) AS categorias_actuales
+        FROM equipos e
+        WHERE e.eliminado_at IS NULL
+        ORDER BY e.id
+    """).fetchall()
+    out = []
+    for r in rows:
+        nombre_lower = (r["nombre"] or "").lower()
+        cats_lower = (r["categorias_actuales"] or "").lower()
+        # Para cada bucket de keywords, si el nombre lo matchea y la categoría
+        # actual no incluye ningún sinónimo, marcamos sospecha.
+        for cat_expected, kws in _CATEGORIA_KEYWORDS.items():
+            if any(kw in nombre_lower for kw in kws):
+                # ¿La categoría actual ya cubre esto?
+                if cat_expected not in cats_lower and not any(kw in cats_lower for kw in kws):
+                    out.append({
+                        "tipo": "categoria_sospechosa",
+                        "ref": str(r["id"]),
+                        "titulo": f"'{r['marca'] or ''} {r['nombre']}' parece {cat_expected} pero no lo tiene",
+                        "detalle": (
+                            f"Categoría actual: {r['categorias_actuales']}. "
+                            f"El nombre contiene un keyword que sugiere '{cat_expected}'."
+                        ),
+                        "equipo_id": r["id"],
+                        "categoria_sugerida": cat_expected,
+                        "accion": "navegar_equipo",
+                        "accion_label": "Editar equipo →",
+                    })
+                    break  # 1 sospecha por equipo es suficiente
+    return out
+
+
 def _detect_precio_sin_usd(conn) -> list[dict]:
     """Detecta equipos con precio_jornada cargado pero precio_usd vacío.
     Apply = computar precio_usd usando usd_rate de app_settings."""
@@ -159,22 +224,44 @@ def _detect_precio_sin_usd(conn) -> list[dict]:
     }]
 
 
+def _load_ignoradas(conn) -> set[tuple[str, str]]:
+    """Devuelve el set de (tipo, ref) descartados por el admin."""
+    rows = conn.execute("SELECT tipo, ref FROM sugerencias_ignoradas").fetchall()
+    return {(r["tipo"], r["ref"]) for r in rows}
+
+
 @router.get("/inventario/sugerencias")
 def get_sugerencias(_admin: dict = Depends(require_admin)):
-    """Devuelve la lista de sugerencias detectadas. No muta nada."""
+    """Devuelve la lista de sugerencias detectadas, filtrando las ignoradas
+    persistidas en sugerencias_ignoradas. No muta nada."""
     conn = get_db()
     try:
-        items = []
+        items: list[dict] = []
         items += _detect_marcas_duplicadas(conn)
         items += _detect_precio_sin_usd(conn)
+        items += _detect_categoria_sospechosa(conn)
+        ignoradas = _load_ignoradas(conn)
+        items = [s for s in items if (s["tipo"], s["ref"]) not in ignoradas]
         return {"items": items, "total": len(items)}
     finally:
         conn.close()
 
 
-class AplicarSugerenciaBody(BaseModel):
-    tipo: str
-    ref: str
+@router.post("/inventario/sugerencias/ignorar")
+def ignorar_sugerencia(body: AplicarSugerenciaBody, _admin: dict = Depends(require_admin)):
+    """Persiste un (tipo, ref) en sugerencias_ignoradas para que no
+    vuelva a aparecer en GET /sugerencias."""
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT INTO sugerencias_ignoradas (tipo, ref)
+            VALUES (?, ?)
+            ON CONFLICT (tipo, ref) DO NOTHING
+        """, (body.tipo, body.ref))
+        conn.commit()
+        return {"ok": True, "message": "Sugerencia ignorada."}
+    finally:
+        conn.close()
 
 
 @router.post("/inventario/sugerencias/aplicar")

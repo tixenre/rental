@@ -21,15 +21,17 @@ export type FaltaField =
 
 /** Sugerencia automática del sistema (#352). */
 export type Sugerencia = {
-  tipo: "marcas_duplicadas" | "precio_sin_usd";
+  tipo: "marcas_duplicadas" | "precio_sin_usd" | "categoria_sospechosa";
   ref: string;
   titulo: string;
   detalle: string;
-  accion: string;
+  accion: "fusionar" | "calcular_usd" | "navegar_equipo" | string;
   accion_label: string;
-  // Payloads específicos por tipo (cualquiera de los dos puede estar presente).
+  // Payloads específicos por tipo.
   marcas?: Array<{ id: number; nombre: string; cant_pedidos: number; equipos: number }>;
   equipos?: Array<{ id: number; nombre: string; marca: string | null; precio_jornada: number }>;
+  equipo_id?: number;
+  categoria_sugerida?: string;
 };
 
 export type SugerenciasResp = {
@@ -390,6 +392,11 @@ export const adminApi = {
   aplicarSugerencia: (tipo: Sugerencia["tipo"], ref: string) =>
     authedPostJson<{ ok: true; message: string }>(
       "/api/admin/inventario/sugerencias/aplicar",
+      { tipo, ref },
+    ),
+  ignorarSugerencia: (tipo: Sugerencia["tipo"], ref: string) =>
+    authedPostJson<{ ok: true; message: string }>(
+      "/api/admin/inventario/sugerencias/ignorar",
       { tipo, ref },
     ),
   /** Equipos sin número de serie cargado (NULL o vacío). Issue #91. */
