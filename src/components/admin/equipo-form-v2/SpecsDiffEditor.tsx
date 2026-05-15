@@ -356,6 +356,15 @@ function parseRango(raw: string): { min: string; max: string } {
   };
 }
 
+/** Algunas unidades se escriben antes del número (f/, $, €) en lugar de
+ *  después (mm, kg, °). Detección por convención: termina en "/" o
+ *  empieza con un símbolo monetario. */
+function isPrefixUnit(unidad: string): boolean {
+  const u = unidad.trim();
+  if (!u) return false;
+  return u.endsWith("/") || /^[$€£¥]/.test(u);
+}
+
 function RangoValueInput({
   value, unidad, onChange,
 }: {
@@ -364,6 +373,7 @@ function RangoValueInput({
   onChange: (v: string) => void;
 }) {
   const { min, max } = parseRango(value);
+  const prefix = isPrefixUnit(unidad);
 
   const commit = (nextMin: string, nextMax: string) => {
     const cleanMin = nextMin.trim();
@@ -373,11 +383,18 @@ function RangoValueInput({
       return;
     }
     const rango = cleanMax ? `${cleanMin}-${cleanMax}` : cleanMin;
-    onChange(`${rango} ${unidad}`);
+    onChange(prefix ? `${unidad}${rango}` : `${rango} ${unidad}`);
   };
+
+  const unitSpan = (
+    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+      {unidad}
+    </span>
+  );
 
   return (
     <div className="flex items-center gap-1.5">
+      {prefix && unitSpan}
       <Input
         type="number"
         inputMode="decimal"
@@ -398,9 +415,7 @@ function RangoValueInput({
         placeholder="vacío si es fijo"
         aria-label="Valor máximo (vacío si es fijo)"
       />
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        {unidad}
-      </span>
+      {!prefix && unitSpan}
     </div>
   );
 }
@@ -415,6 +430,7 @@ function NumericValueInput({
 }) {
   const numericPart = extractNumericPart(value);
   const hasUnidad = !!unidad.trim();
+  const prefix = hasUnidad && isPrefixUnit(unidad);
   return (
     <div className="relative">
       <Input
@@ -428,14 +444,20 @@ function NumericValueInput({
             onChange("");
             return;
           }
-          onChange(hasUnidad ? `${num} ${unidad}` : num);
+          if (!hasUnidad) {
+            onChange(num);
+            return;
+          }
+          onChange(prefix ? `${unidad}${num}` : `${num} ${unidad}`);
         }}
         placeholder="0"
-        className={`text-xs ${hasUnidad ? "pr-12" : ""}`}
+        className={`text-xs ${hasUnidad ? (prefix ? "pl-10" : "pr-12") : ""}`}
       />
       {hasUnidad && (
         <span
-          className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] uppercase tracking-wider text-muted-foreground"
+          className={`pointer-events-none absolute inset-y-0 flex items-center text-[10px] uppercase tracking-wider text-muted-foreground ${
+            prefix ? "left-2" : "right-2"
+          }`}
           aria-hidden
         >
           {unidad}
