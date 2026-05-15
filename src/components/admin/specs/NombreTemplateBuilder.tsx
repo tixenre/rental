@@ -28,7 +28,6 @@ import { toast } from "sonner";
 import { GripVertical, X, Plus, Tag } from "lucide-react";
 
 import { adminApi, type SpecTemplate } from "@/lib/admin/api";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -44,26 +43,19 @@ const nextId = () => `t-${++_tokenCounter}-${Date.now().toString(36)}`;
 
 /** Parsea un template string a tokens (placeholders + literales entre ellos).
  *  Los literales preservan los espacios y la puntuación exacta — el dueño
- *  puede meter "-", "(", "f/", etc. entre placeholders. */
-function parseTemplate(tpl: string): { prefix: string; tokens: Token[] } {
-  if (!tpl.trim()) return { prefix: "", tokens: [] };
+ *  puede meter "-", "(", "f/", etc. en cualquier posición. */
+function parseTemplate(tpl: string): { tokens: Token[] } {
+  if (!tpl.trim()) return { tokens: [] };
   const re = /\{([^}]+)\}/g;
   const tokens: Token[] = [];
-  let prefix = "";
-  let firstMatch = true;
   let lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(tpl)) !== null) {
     const literalBefore = tpl.slice(lastIndex, m.index);
-    if (firstMatch) {
-      // El primer literal va al prefijo si es algo "limpio" (sin caracteres
-      // raros); sino lo dejamos como literal token para no perderlo.
-      prefix = literalBefore.trim();
-      firstMatch = false;
-    } else if (literalBefore && literalBefore !== " ") {
-      // Literal real entre placeholders — preservar como token literal.
-      // El espacio simple lo ignoramos (es el separador default cuando no
-      // hay literal explícito).
+    if (literalBefore && literalBefore !== " ") {
+      // Literal antes del placeholder — preservar como token. El espacio
+      // simple lo ignoramos (es el separador default cuando no hay literal
+      // explícito).
       tokens.push({ id: nextId(), kind: "literal", text: literalBefore });
     }
     tokens.push({
@@ -74,12 +66,11 @@ function parseTemplate(tpl: string): { prefix: string; tokens: Token[] } {
     });
     lastIndex = m.index + m[0].length;
   }
-  // Literal final (después del último placeholder).
   const trailing = tpl.slice(lastIndex);
   if (trailing && trailing !== " ") {
     tokens.push({ id: nextId(), kind: "literal", text: trailing });
   }
-  return { prefix, tokens };
+  return { tokens };
 }
 
 function prettyLabel(placeholder: string): string {
@@ -92,7 +83,7 @@ function prettyLabel(placeholder: string): string {
   return inner;
 }
 
-function buildTemplate(prefix: string, tokens: Token[]): string {
+function buildTemplate(tokens: Token[]): string {
   // Compose token-by-token. Si tokens consecutivos no tienen un literal entre
   // medio, ponemos un espacio. Si hay literal explícito, se respeta tal cual.
   let out = "";
@@ -100,14 +91,13 @@ function buildTemplate(prefix: string, tokens: Token[]): string {
     const t = tokens[i];
     const prev = tokens[i - 1];
     if (t.kind === "placeholder") {
-      // Espacio de separación si el anterior fue placeholder (sin literal entre medio).
       if (prev && prev.kind === "placeholder") out += " ";
       out += t.placeholder;
     } else {
       out += t.text;
     }
   }
-  return prefix.trim() ? `${prefix.trim()} ${out}`.trim() : out.trim();
+  return out.trim();
 }
 
 export function NombreTemplateBuilder({
@@ -123,13 +113,11 @@ export function NombreTemplateBuilder({
 }) {
   const qc = useQueryClient();
   const parsed = useMemo(() => parseTemplate(initialTemplate ?? ""), [initialTemplate]);
-  const [prefix, setPrefix] = useState(parsed.prefix);
   const [tokens, setTokens] = useState<Token[]>(parsed.tokens);
 
   useEffect(() => {
-    setPrefix(parsed.prefix);
     setTokens(parsed.tokens);
-  }, [parsed.prefix, parsed.tokens]);
+  }, [parsed.tokens]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -152,11 +140,20 @@ export function NombreTemplateBuilder({
     ]);
   };
 
-  const addLiteral = (initial = " - ") => {
-    setTokens((cur) => [
-      ...cur,
-      { id: nextId(), kind: "literal", text: initial },
-    ]);
+  /** Inserta un literal vacío en el índice dado (entre chips). Se autoenfoca
+   *  para que el dueño tipee sin clicks extra. */
+  const insertLiteralAt = (index: number) => {
+    const newId = nextId();
+    setTokens((cur) => {
+      const next = [...cur];
+      next.splice(index, 0, { id: newId, kind: "literal", text: "" });
+      return next;
+    });
+    // Esperar al render para enfocar el input recién montado.
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLInputElement>(`[data-literal-id="${newId}"]`);
+      el?.focus();
+    });
   };
 
   const removeToken = (id: string) => setTokens((cur) => cur.filter((t) => t.id !== id));
@@ -167,7 +164,7 @@ export function NombreTemplateBuilder({
     );
   };
 
-  const currentTemplate = buildTemplate(prefix, tokens);
+  const currentTemplate = buildTemplate(tokens);
 
   // Detectar qué placeholders ya están usados, para no duplicar en la paleta.
   const usedPlaceholders = new Set(
@@ -243,20 +240,8 @@ export function NombreTemplateBuilder({
 
       <div className="p-3 space-y-3">
         <div>
-          <label className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider">
-            Prefijo literal (opcional)
-          </label>
-          <Input
-            value={prefix}
-            onChange={(e) => setPrefix(e.target.value)}
-            placeholder="ej. Cámara, Lente, Luz…"
-            className="text-sm h-8 mt-0.5"
-          />
-        </div>
-
-        <div>
           <div className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider mb-1">
-            Tokens (arrastrá para reordenar)
+            Tokens — arrastrá para reordenar, click en "+" entre chips para insertar texto
           </div>
           {tokens.length === 0 ? (
             <div className="rounded-md border hairline border-dashed bg-muted/20 px-3 py-3 text-[11px] text-muted-foreground italic">
@@ -269,19 +254,17 @@ export function NombreTemplateBuilder({
               onDragEnd={handleDragEnd}
             >
               <SortableContext items={tokens.map((t) => t.id)} strategy={horizontalListSortingStrategy}>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {prefix.trim() && (
-                    <span className="rounded bg-ink/5 px-2 py-1 text-xs text-muted-foreground font-mono">
-                      {prefix.trim()}
-                    </span>
-                  )}
-                  {tokens.map((t) => (
-                    <TokenChip
-                      key={t.id}
-                      token={t}
-                      onRemove={() => removeToken(t.id)}
-                      onChangeLiteral={(v) => updateLiteral(t.id, v)}
-                    />
+                <div className="flex flex-wrap items-center gap-0.5">
+                  <InsertHere onClick={() => insertLiteralAt(0)} />
+                  {tokens.map((t, i) => (
+                    <div key={t.id} className="flex items-center gap-0.5">
+                      <TokenChip
+                        token={t}
+                        onRemove={() => removeToken(t.id)}
+                        onChangeLiteral={(v) => updateLiteral(t.id, v)}
+                      />
+                      <InsertHere onClick={() => insertLiteralAt(i + 1)} />
+                    </div>
                   ))}
                 </div>
               </SortableContext>
@@ -322,14 +305,6 @@ export function NombreTemplateBuilder({
                 </button>
               );
             })}
-            <button
-              type="button"
-              onClick={() => addLiteral(" - ")}
-              className="inline-flex items-center gap-1 rounded border hairline border-dashed px-2 py-0.5 font-mono text-[11px] text-muted-foreground hover:bg-muted/40 transition"
-              title="Agregar texto literal entre tokens (ej. '-', '(', ')', 'f/')"
-            >
-              <Plus className="h-3 w-3" /> Texto
-            </button>
           </div>
         </div>
 
@@ -391,6 +366,20 @@ export function NombreTemplateBuilder({
   );
 }
 
+function InsertHere({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group inline-flex items-center justify-center h-6 w-3 hover:w-6 transition-all text-muted-foreground/40 hover:text-ink"
+      title="Insertar texto acá"
+      aria-label="Insertar texto acá"
+    >
+      <span className="opacity-0 group-hover:opacity-100 transition-opacity font-mono text-[10px]">+</span>
+    </button>
+  );
+}
+
 function TokenChip({
   token, onRemove, onChangeLiteral,
 }: {
@@ -425,6 +414,7 @@ function TokenChip({
           value={token.text}
           onChange={(e) => onChangeLiteral(e.target.value)}
           placeholder="texto"
+          data-literal-id={token.id}
           className="bg-transparent border-0 outline-none focus:outline-none focus:ring-0 px-0.5 font-mono text-[11px] text-ink text-center"
           style={{ width: `${Math.max(2, token.text.length + 1)}ch` }}
         />
