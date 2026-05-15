@@ -172,8 +172,13 @@ export function EquipoFormDialogV2({
 
   // ── Nombre público ─────────────────────────────────────────────────
   // Input libre + toggle "generar automático desde categoría" (ver nombre-publico.ts).
+  // El toggle arranca ON: si la categoría tiene template, el form regenera el
+  // nombre desde los specs. El usuario puede toggle OFF para editar a mano,
+  // pero por design queda enganchado al template — si el dueño modifica el
+  // template en /admin/equipos/specs, la próxima vez que abra el equipo el
+  // nombre se actualiza automáticamente (#calidad-datos).
   const [nombrePublico, setNombrePublico] = useState("");
-  const [nombrePublicoAuto, setNombrePublicoAuto] = useState(false);
+  const [nombrePublicoAuto, setNombrePublicoAuto] = useState(true);
 
   // ── Autocompletar (URL importer) ───────────────────────────────────
   // El URL del autocompletar es el mismo bh_url del form — un único link
@@ -1079,10 +1084,7 @@ export function EquipoFormDialogV2({
                   <div className="space-y-1.5">
                     <Input
                       value={nombrePublico}
-                      onChange={(e) => {
-                        setNombrePublico(e.target.value);
-                        if (nombrePublicoAuto) setNombrePublicoAuto(false);
-                      }}
+                      onChange={(e) => setNombrePublico(e.target.value)}
                       placeholder={autoGenDisponible ? "Generado automático según la categoría" : "Ej: Cable HDMI 2.0 50cm"}
                     />
                     {autoGenDisponible && (
@@ -1092,8 +1094,13 @@ export function EquipoFormDialogV2({
                           onCheckedChange={setNombrePublicoAuto}
                         />
                         Generar automático desde {categoriaRoot?.toLowerCase()}
-                        {!nombrePublicoAuto && <span className="opacity-60">(off)</span>}
+                        {!nombrePublicoAuto && <span className="opacity-60">(off — el valor escrito se guarda como override fijo)</span>}
                       </label>
+                    )}
+                    {autoGenDisponible && nombrePublicoAuto && (
+                      <p className="text-[10px] text-muted-foreground italic">
+                        Tu edición se mantiene en esta sesión. Si cambia el template o los specs, el campo se regenera (toggle OFF para fijarlo).
+                      </p>
                     )}
                     {!autoGenDisponible && categoriaRoot && (
                       <p className="text-[11px] text-muted-foreground italic">
