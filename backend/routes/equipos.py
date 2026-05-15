@@ -2746,6 +2746,43 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
 
     specs_guide = _build_specs_guide()
 
+    # ── Labels canónicos del template (para enum del JSON schema) ──────
+    # Si tenemos categoría, recolectamos los labels EXACTOS de las specs
+    # asignadas. Lo pasamos como enum dinámico en specs[].label así el LLM
+    # se ve OBLIGADO a usar el label canónico (ej. "Formato de sensor")
+    # en lugar de inventar variaciones ("Formato", "Sensor format", etc).
+    def _build_template_labels() -> list[str]:
+        try:
+            conn = get_db()
+            try:
+                if payload.categoria_ids:
+                    placeholders = ",".join(["%s"] * len(payload.categoria_ids))
+                    rows = conn.execute(
+                        f"""
+                        WITH RECURSIVE chain AS (
+                            SELECT id, parent_id FROM categorias WHERE id IN ({placeholders})
+                            UNION
+                            SELECT c.id, c.parent_id FROM categorias c
+                              JOIN chain ON c.id = chain.parent_id
+                        )
+                        SELECT DISTINCT sd.label
+                        FROM categoria_spec_templates t
+                        JOIN spec_definitions sd ON sd.id = t.spec_def_id
+                        WHERE t.categoria_id IN (SELECT id FROM chain)
+                        ORDER BY sd.label
+                        """,
+                        payload.categoria_ids,
+                    ).fetchall()
+                else:
+                    rows = []
+                return [r["label"] for r in rows if r["label"]]
+            finally:
+                conn.close()
+        except Exception:
+            return []
+
+    template_labels = _build_template_labels()
+
     # ── Categorías disponibles en la DB ─────────────────────────────────────
     # La IA elige UNA categoría sugerida de las que existen REALMENTE en la DB
     # (raíces + hijas), no de un enum hardcoded. Así las categorías nuevas que
@@ -2857,7 +2894,14 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
                     "items": {
                         "type": "object",
                         "properties": {
-                            "label": {"type": "string"},
+                            # Si hay template para la categoría, FORZAMOS al LLM
+                            # a usar uno de esos labels canónicos via enum.
+                            # Sin template (autocompletar genérico), free-text.
+                            "label": (
+                                {"type": "string", "enum": template_labels}
+                                if template_labels
+                                else {"type": "string"}
+                            ),
                             "value": {"type": "string"},
                         },
                         "required": ["label", "value"],
