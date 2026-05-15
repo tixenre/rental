@@ -1,104 +1,29 @@
 /**
- * Builder visual del template de nombre público por categoría.
+ * Builder del template de nombre público por categoría.
  *
- * Reemplaza al NombreTemplateDialog viejo. Vive embebido en SpecTemplatesSection
- * (debajo de la tabla de specs) para que el dueño componga el nombre tirando
- * de las mismas specs que está editando.
+ * Diseño simple: el dueño escribe el template directo como texto, e inserta
+ * placeholders desde una paleta. Cero drag-and-drop, cero chips — todo es
+ * un string editable.
  *
- * Modelo de tokens:
- *  - El template se parsea en una lista de chips (placeholders) + un literal
- *    inicial opcional (prefijo).
- *  - Cada chip se puede arrastrar para reordenar o sacar con la X.
- *  - Para agregar más, el dueño clickea en los chips de la "paleta" abajo
- *    (marca, modelo, tipo, o cualquier spec de la categoría).
+ * Sintaxis del template:
+ *   Camara {marca} {modelo} ({spec:Lens mount}) {spec:Formato de sensor}
+ *
+ * Placeholders soportados: {marca}, {modelo}, {tipo}, {nombre} + {spec:Label}
+ * para cualquier spec del template de la categoría.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { GripVertical, X, Plus, Tag } from "lucide-react";
+import { Tag, Plus } from "lucide-react";
 
 import { adminApi, type SpecTemplate } from "@/lib/admin/api";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
-
-type Token =
-  | { id: string; kind: "placeholder"; placeholder: string; label: string }
-  | { id: string; kind: "literal"; text: string };
-
-let _tokenCounter = 0;
-const nextId = () => `t-${++_tokenCounter}-${Date.now().toString(36)}`;
-
-/** Parsea un template string a tokens (placeholders + literales entre ellos).
- *  Los literales preservan los espacios y la puntuación exacta — el dueño
- *  puede meter "-", "(", "f/", etc. en cualquier posición. */
-function parseTemplate(tpl: string): { tokens: Token[] } {
-  if (!tpl.trim()) return { tokens: [] };
-  const re = /\{([^}]+)\}/g;
-  const tokens: Token[] = [];
-  let lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(tpl)) !== null) {
-    const literalBefore = tpl.slice(lastIndex, m.index);
-    if (literalBefore && literalBefore !== " ") {
-      // Literal antes del placeholder — preservar como token. El espacio
-      // simple lo ignoramos (es el separador default cuando no hay literal
-      // explícito).
-      tokens.push({ id: nextId(), kind: "literal", text: literalBefore });
-    }
-    tokens.push({
-      id: nextId(),
-      kind: "placeholder",
-      placeholder: m[0],
-      label: prettyLabel(m[0]),
-    });
-    lastIndex = m.index + m[0].length;
-  }
-  const trailing = tpl.slice(lastIndex);
-  if (trailing && trailing !== " ") {
-    tokens.push({ id: nextId(), kind: "literal", text: trailing });
-  }
-  return { tokens };
-}
-
-function prettyLabel(placeholder: string): string {
-  const inner = placeholder.replace(/^\{|\}$/g, "").trim();
-  if (inner.startsWith("spec:")) return inner.slice("spec:".length);
-  if (inner === "marca") return "Marca";
-  if (inner === "modelo") return "Modelo";
-  if (inner === "tipo") return "Tipo (categoría)";
-  if (inner === "nombre") return "Nombre interno";
-  return inner;
-}
-
-function buildTemplate(tokens: Token[]): string {
-  // Compose token-by-token. Si tokens consecutivos no tienen un literal entre
-  // medio, ponemos un espacio. Si hay literal explícito, se respeta tal cual.
-  let out = "";
-  for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i];
-    const prev = tokens[i - 1];
-    if (t.kind === "placeholder") {
-      if (prev && prev.kind === "placeholder") out += " ";
-      out += t.placeholder;
-    } else {
-      out += t.text;
-    }
-  }
-  return out.trim();
-}
 
 export function NombreTemplateBuilder({
   categoriaId,
@@ -112,68 +37,39 @@ export function NombreTemplateBuilder({
   templateSpecs: SpecTemplate[];
 }) {
   const qc = useQueryClient();
-  const parsed = useMemo(() => parseTemplate(initialTemplate ?? ""), [initialTemplate]);
-  const [tokens, setTokens] = useState<Token[]>(parsed.tokens);
+  const [template, setTemplate] = useState<string>(initialTemplate ?? "");
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // Si el initialTemplate cambia (después de un save o navegación), sincronizar.
   useEffect(() => {
-    setTokens(parsed.tokens);
-  }, [parsed.tokens]);
+    setTemplate(initialTemplate ?? "");
+  }, [initialTemplate]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-
-  const handleDragEnd = (e: DragEndEvent) => {
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const oldIdx = tokens.findIndex((t) => t.id === active.id);
-    const newIdx = tokens.findIndex((t) => t.id === over.id);
-    if (oldIdx < 0 || newIdx < 0) return;
-    setTokens((items) => arrayMove(items, oldIdx, newIdx));
-  };
-
-  const addPlaceholder = (placeholder: string) => {
-    setTokens((cur) => [
-      ...cur,
-      { id: nextId(), kind: "placeholder", placeholder, label: prettyLabel(placeholder) },
-    ]);
-  };
-
-  /** Inserta un literal vacío en el índice dado (entre chips). Se autoenfoca
-   *  para que el dueño tipee sin clicks extra. */
-  const insertLiteralAt = (index: number) => {
-    const newId = nextId();
-    setTokens((cur) => {
-      const next = [...cur];
-      next.splice(index, 0, { id: newId, kind: "literal", text: "" });
-      return next;
-    });
-    // Esperar al render para enfocar el input recién montado.
+  /** Inserta un placeholder en la posición del cursor (o al final si no hay
+   *  selección activa). Agrega espacio antes/después si no hay para que no se
+   *  pegue al texto adyacente. */
+  function insertPlaceholder(placeholder: string) {
+    const ta = textareaRef.current;
+    const cursor = ta?.selectionStart ?? template.length;
+    const before = template.slice(0, cursor);
+    const after = template.slice(cursor);
+    const needsSpaceBefore = before.length > 0 && !before.endsWith(" ") && !before.endsWith("(");
+    const needsSpaceAfter = after.length > 0 && !after.startsWith(" ") && !after.startsWith(")");
+    const insertion = `${needsSpaceBefore ? " " : ""}${placeholder}${needsSpaceAfter ? " " : ""}`;
+    const next = before + insertion + after;
+    setTemplate(next);
+    // Re-foco y mover cursor justo después de lo insertado
     requestAnimationFrame(() => {
-      const el = document.querySelector<HTMLInputElement>(`[data-literal-id="${newId}"]`);
-      el?.focus();
+      if (!ta) return;
+      ta.focus();
+      const pos = cursor + insertion.length;
+      ta.setSelectionRange(pos, pos);
     });
-  };
-
-  const removeToken = (id: string) => setTokens((cur) => cur.filter((t) => t.id !== id));
-
-  const updateLiteral = (id: string, text: string) => {
-    setTokens((cur) =>
-      cur.map((t) => (t.id === id && t.kind === "literal" ? { ...t, text } : t)),
-    );
-  };
-
-  const currentTemplate = buildTemplate(tokens);
-
-  // Detectar qué placeholders ya están usados, para no duplicar en la paleta.
-  const usedPlaceholders = new Set(
-    tokens.filter((t) => t.kind === "placeholder").map((t) => (t as Extract<Token, { kind: "placeholder" }>).placeholder),
-  );
+  }
 
   const saveMut = useMutation({
-    mutationFn: (template: string) =>
-      adminApi.adminUpdateCategoria(categoriaId, { nombre_publico_template: template }),
+    mutationFn: (tpl: string) =>
+      adminApi.adminUpdateCategoria(categoriaId, { nombre_publico_template: tpl.trim() || null }),
     onSuccess: () => {
       toast.success("Plantilla de nombre guardada");
       qc.invalidateQueries({ queryKey: ["admin", "categorias"] });
@@ -182,7 +78,7 @@ export function NombreTemplateBuilder({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Selector opcional de equipo real para preview con datos vivos.
+  // Preview con datos vivos (selector de equipo real opcional).
   const [previewEquipoId, setPreviewEquipoId] = useState<number | null>(null);
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", "preview", categoriaNombre],
@@ -198,23 +94,22 @@ export function NombreTemplateBuilder({
     staleTime: 30_000,
   });
 
-  // Variables para el preview: si hay equipo elegido, usar sus datos reales;
-  // sino caer a dummy "Sony FX3" + labels <Foo>.
   const previewEquipo = previewEquipoId
     ? equiposOpts.find((e) => e.id === previewEquipoId)
     : null;
-  const previewSpecs = useMemo(() => {
+
+  const previewSpecs = (() => {
     if (!previewSpecsQ.data) {
       return templateSpecs.map((t) => ({ label: t.label, value: `<${t.label}>` }));
     }
-    const { specs: values, template } = previewSpecsQ.data;
-    return template.map((t) => ({
+    const { specs: values, template: tmpl } = previewSpecsQ.data;
+    return tmpl.map((t) => ({
       label: t.label,
       value: values[t.spec_key] ?? "",
     }));
-  }, [previewSpecsQ.data, templateSpecs]);
+  })();
 
-  const preview = renderNombrePublicoTemplate(currentTemplate, {
+  const preview = renderNombrePublicoTemplate(template, {
     marca: previewEquipo?.marca ?? "Sony",
     modelo: previewEquipo?.modelo ?? "FX3",
     tipo: categoriaNombre,
@@ -222,14 +117,14 @@ export function NombreTemplateBuilder({
     specs: previewSpecs,
   });
 
-  const fixedPlaceholders: { placeholder: string; label: string }[] = [
-    { placeholder: "{marca}", label: "Marca" },
-    { placeholder: "{modelo}", label: "Modelo" },
-    { placeholder: "{tipo}", label: "Tipo (categoría)" },
-    { placeholder: "{nombre}", label: "Nombre interno" },
+  const fixedPlaceholders = [
+    { placeholder: "{marca}", label: "marca" },
+    { placeholder: "{modelo}", label: "modelo" },
+    { placeholder: "{tipo}", label: "tipo" },
+    { placeholder: "{nombre}", label: "nombre interno" },
   ];
 
-  const isDirty = currentTemplate !== (initialTemplate ?? "").trim();
+  const isDirty = template.trim() !== (initialTemplate ?? "").trim();
 
   return (
     <div className="rounded-md border hairline overflow-hidden">
@@ -241,65 +136,46 @@ export function NombreTemplateBuilder({
       <div className="p-3 space-y-3">
         <div>
           <div className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider mb-1">
-            Tokens — arrastrá para reordenar, click en "+" entre chips para insertar texto
+            Template — escribí libre, insertá placeholders donde quieras
           </div>
-          {tokens.length === 0 ? (
-            <div className="rounded-md border hairline border-dashed bg-muted/20 px-3 py-3 text-[11px] text-muted-foreground italic">
-              Sin tokens — clickeá en la paleta de abajo para agregar.
-            </div>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext items={tokens.map((t) => t.id)} strategy={horizontalListSortingStrategy}>
-                <div className="flex flex-wrap items-center gap-0.5">
-                  <InsertHere onClick={() => insertLiteralAt(0)} />
-                  {tokens.map((t, i) => (
-                    <div key={t.id} className="flex items-center gap-0.5">
-                      <TokenChip
-                        token={t}
-                        onRemove={() => removeToken(t.id)}
-                        onChangeLiteral={(v) => updateLiteral(t.id, v)}
-                      />
-                      <InsertHere onClick={() => insertLiteralAt(i + 1)} />
-                    </div>
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          )}
+          <Textarea
+            ref={textareaRef}
+            value={template}
+            onChange={(e) => setTemplate(e.target.value)}
+            placeholder="Ej: Camara {marca} {modelo} ({spec:Lens mount}) {spec:Formato de sensor}"
+            rows={2}
+            className="font-mono text-sm"
+          />
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Sintaxis: <code className="font-mono">{"{marca}"}</code>, <code className="font-mono">{"{modelo}"}</code>, <code className="font-mono">{"{tipo}"}</code>, <code className="font-mono">{"{nombre}"}</code> y <code className="font-mono">{"{spec:Label}"}</code> para specs de la categoría.
+          </p>
         </div>
 
         <div>
           <div className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider mb-1">
-            Paleta — click para agregar
+            Insertar — click para agregar en la posición del cursor
           </div>
           <div className="flex flex-wrap gap-1.5">
             {fixedPlaceholders.map((p) => (
               <button
                 key={p.placeholder}
                 type="button"
-                disabled={usedPlaceholders.has(p.placeholder)}
-                onClick={() => addPlaceholder(p.placeholder)}
-                className="inline-flex items-center gap-1 rounded border hairline px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-amber-soft transition disabled:opacity-40 disabled:cursor-not-allowed"
-                title={usedPlaceholders.has(p.placeholder) ? "Ya está en el template" : "Agregar al template"}
+                onClick={() => insertPlaceholder(p.placeholder)}
+                className="inline-flex items-center gap-1 rounded border hairline px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-amber-soft transition"
+                title={`Insertar ${p.placeholder}`}
               >
                 <Plus className="h-3 w-3" /> {p.label}
               </button>
             ))}
             {templateSpecs.map((t) => {
               const ph = `{spec:${t.label}}`;
-              const used = usedPlaceholders.has(ph);
               return (
                 <button
                   key={t.id}
                   type="button"
-                  disabled={used}
-                  onClick={() => addPlaceholder(ph)}
-                  className="inline-flex items-center gap-1 rounded border hairline border-amber/40 bg-amber-soft/30 px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-amber-soft transition disabled:opacity-40 disabled:cursor-not-allowed"
-                  title={used ? "Ya está en el template" : `Agregar spec "${t.label}"`}
+                  onClick={() => insertPlaceholder(ph)}
+                  className="inline-flex items-center gap-1 rounded border hairline border-amber/40 bg-amber-soft/30 px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-amber-soft transition"
+                  title={`Insertar ${ph}`}
                 >
                   <Plus className="h-3 w-3" /> {t.label}
                 </button>
@@ -351,7 +227,7 @@ export function NombreTemplateBuilder({
           <Button
             size="sm"
             disabled={!isDirty || saveMut.isPending}
-            onClick={() => saveMut.mutate(currentTemplate)}
+            onClick={() => saveMut.mutate(template)}
           >
             {saveMut.isPending ? "Guardando…" : "Guardar plantilla"}
           </Button>
@@ -362,101 +238,6 @@ export function NombreTemplateBuilder({
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function InsertHere({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group inline-flex items-center justify-center h-6 w-3 hover:w-6 transition-all text-muted-foreground/40 hover:text-ink"
-      title="Insertar texto acá"
-      aria-label="Insertar texto acá"
-    >
-      <span className="opacity-0 group-hover:opacity-100 transition-opacity font-mono text-[10px]">+</span>
-    </button>
-  );
-}
-
-function TokenChip({
-  token, onRemove, onChangeLiteral,
-}: {
-  token: Token;
-  onRemove: () => void;
-  onChangeLiteral: (v: string) => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: token.id });
-  const style = { transform: CSS.Transform.toString(transform), transition };
-
-  if (token.kind === "literal") {
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        className={`inline-flex items-center gap-1 rounded border border-dashed border-muted-foreground/40 bg-muted/30 px-1.5 py-0.5 font-mono text-[11px] text-ink ${
-          isDragging ? "opacity-60" : ""
-        }`}
-        title="Texto literal — editá inline, los espacios cuentan"
-      >
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-ink"
-          aria-label="Arrastrar"
-        >
-          <GripVertical className="h-3 w-3" />
-        </button>
-        <input
-          type="text"
-          value={token.text}
-          onChange={(e) => onChangeLiteral(e.target.value)}
-          placeholder="texto"
-          data-literal-id={token.id}
-          className="bg-transparent border-0 outline-none focus:outline-none focus:ring-0 px-0.5 font-mono text-[11px] text-ink text-center"
-          style={{ width: `${Math.max(2, token.text.length + 1)}ch` }}
-        />
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-muted-foreground hover:text-destructive"
-          aria-label="Quitar"
-        >
-          <X className="h-3 w-3" />
-        </button>
-      </div>
-    );
-  }
-
-  const isSpec = token.placeholder.startsWith("{spec:");
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[11px] text-ink ${
-        isSpec ? "border-amber/40 bg-amber-soft/40" : "border-ink/15 bg-ink/5"
-      } ${isDragging ? "opacity-60" : ""}`}
-    >
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-ink"
-        aria-label="Arrastrar"
-      >
-        <GripVertical className="h-3 w-3" />
-      </button>
-      <span>{token.label}</span>
-      <button
-        type="button"
-        onClick={onRemove}
-        className="text-muted-foreground hover:text-destructive"
-        aria-label="Quitar"
-      >
-        <X className="h-3 w-3" />
-      </button>
     </div>
   );
 }
