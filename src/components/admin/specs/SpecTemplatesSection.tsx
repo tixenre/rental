@@ -46,6 +46,7 @@ import {
   type SpecTemplateInput,
   type SpecTipo,
 } from "@/lib/admin/api";
+import { NombreTemplateBuilder } from "./NombreTemplateBuilder";
 
 const TIPO_LABEL: Record<SpecTipo, string> = {
   string: "Texto",
@@ -320,6 +321,17 @@ export function SpecTemplatesSection({
             setPrefillFromOrphan({ key: o.spec_key, sampleValues: o.sample_values });
             setEditing("new");
           }}
+        />
+      )}
+
+      {/* Builder visual del template de nombre público — usa las specs de
+          arriba como paleta. */}
+      {catId != null && (
+        <NombreTemplateBuilder
+          categoriaId={catId}
+          categoriaNombre={catsFlat.find((c) => c.id === catId)?.nombre ?? "Categoría"}
+          initialTemplate={catsQ.data?.find((c) => c.id === catId)?.nombre_publico_template ?? null}
+          templateSpecs={items}
         />
       )}
 
