@@ -1031,8 +1031,14 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
     ids = [e["id"] for e in equipos]
     placeholders = ",".join(["%s"] * len(ids))
     cur = conn.cursor()
+    # Para destacadas de tipo bool, solo emitir cuando el valor es "Sí"/true.
+    # Una spec "Macro: No" no aporta como quick fact en la card — destacar
+    # solo cuando el lente ES macro, no cuando no lo es.
+    # Para destacadas de tipo bool, solo emitir cuando el valor es "Sí"/true.
+    # Una spec "Macro: No" no aporta como quick fact en la card — destacar
+    # solo cuando el lente ES macro, no cuando no lo es.
     cur.execute(f"""
-        SELECT es.equipo_id, t.label, es.value, t.prioridad
+        SELECT es.equipo_id, t.label, t.tipo, es.value, t.prioridad
         FROM equipo_specs es
         JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
         JOIN categoria_spec_templates t
@@ -1040,6 +1046,10 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
            AND t.categoria_id = ec.categoria_id
         WHERE t.destacado = TRUE
           AND es.equipo_id IN ({placeholders})
+          AND (
+            t.tipo != 'bool'
+            OR LOWER(TRIM(es.value)) IN ('sí', 'si', 'yes', 'true', '1')
+          )
         ORDER BY es.equipo_id, t.prioridad, t.label
     """, ids)
     rows = cur.fetchall()
@@ -1051,7 +1061,10 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
         eid = r["equipo_id"]
         key = r["label"]
         if key not in seen[eid]:
-            dest_map[eid].append({"label": r["label"], "value": r["value"]})
+            # Para bool, el value queda vacío — el frontend muestra solo el
+            # label como badge (ej. "MACRO" en lugar de "MACRO Sí").
+            value = "" if r["tipo"] == "bool" else r["value"]
+            dest_map[eid].append({"label": r["label"], "value": value})
             seen[eid].add(key)
 
     for e in equipos:
