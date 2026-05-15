@@ -2432,3 +2432,80 @@ def descartar_propuesta(propuesta_id: int, request: Request):
         return {"ok": True, "id": propuesta_id}
     finally:
         conn.close()
+
+
+class PropuestasBulkActionInput(BaseModel):
+    """Body del endpoint bulk. `ids` puede tener 1..N propuestas.
+    `accion` es 'apply' o 'discard'. `min_confianza` es opcional: si está
+    set, solo procesa propuestas con `confianza >= min_confianza` (útil
+    para "aplicar todas las que confianza ≥ 80%")."""
+    ids: list[int]
+    accion: str  # "apply" | "discard"
+    min_confianza: Optional[float] = None
+
+
+@router.post("/admin/specs/propuestas/bulk")
+def bulk_propuestas(payload: PropuestasBulkActionInput, request: Request):
+    """Aplica o descarta varias propuestas de una vez.
+
+    No es all-or-nothing — cada propuesta se procesa de forma independiente.
+    Las que fallan se reportan en `failed` con su error, las que pasan en
+    `ok_ids`. Permite resolver "aplicar las 12 que matchean" y dejar las
+    que requieren revisión manual.
+
+    Si una propuesta ya fue aplicada/descartada, se cuenta como ok
+    (idempotente)."""
+    _require_admin(request)
+    if not payload.ids:
+        return {"ok_count": 0, "ok_ids": [], "failed": []}
+    if payload.accion not in ("apply", "discard"):
+        raise HTTPException(400, "accion debe ser 'apply' o 'discard'.")
+
+    # Filtrar por confianza si se pidió.
+    ids_a_procesar = list(payload.ids)
+    if payload.min_confianza is not None:
+        conn = get_db()
+        try:
+            placeholders = ",".join(["?"] * len(payload.ids))
+            rows = conn.execute(
+                f"""
+                SELECT id, confianza FROM spec_propuestas_pendientes
+                WHERE id IN ({placeholders})
+                """,
+                tuple(payload.ids),
+            ).fetchall()
+            ids_a_procesar = [
+                r["id"] for r in rows
+                if (r["confianza"] or 0) >= payload.min_confianza
+            ]
+        finally:
+            conn.close()
+
+    ok_ids: list[int] = []
+    failed: list[dict] = []
+    for pid in ids_a_procesar:
+        try:
+            if payload.accion == "apply":
+                aplicar_propuesta(pid, request)
+            else:
+                descartar_propuesta(pid, request)
+            ok_ids.append(pid)
+        except HTTPException as he:
+            # Propuesta ya aplicada/descartada = ok (idempotente).
+            detail = str(he.detail).lower()
+            if "ya fue" in detail or he.status_code == 404:
+                ok_ids.append(pid)
+            else:
+                failed.append({"id": pid, "error": str(he.detail)[:200]})
+        except Exception as e:
+            failed.append({
+                "id": pid,
+                "error": f"Error inesperado ({type(e).__name__})",
+            })
+
+    return {
+        "ok_count": len(ok_ids),
+        "ok_ids": ok_ids,
+        "failed": failed,
+        "skipped_by_confianza": len(payload.ids) - len(ids_a_procesar),
+    }

@@ -1159,6 +1159,17 @@ export const adminApi = {
       `/api/admin/specs/propuestas/${propuestaId}/descartar`,
       {},
     ),
+  bulkPropuestas: (input: {
+    ids: number[];
+    accion: "apply" | "discard";
+    min_confianza?: number;
+  }) =>
+    authedPostJson<{
+      ok_count: number;
+      ok_ids: number[];
+      failed: Array<{ id: number; error: string }>;
+      skipped_by_confianza: number;
+    }>("/api/admin/specs/propuestas/bulk", input),
 
   // ── Nombres públicos / validación ──────────────────────────────────
   regenerarNombres: (dry_run = true) =>
