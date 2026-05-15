@@ -254,6 +254,10 @@ export function SpecTemplatesSection({
       )}
 
       {items.length > 0 && (
+        <DestacadasCounter items={items} />
+      )}
+
+      {items.length > 0 && (
         <div className="rounded-md border hairline overflow-hidden">
           {/* Cabecera (alineada con las celdas — drag handle ocupa la primera columna). */}
           <div className="grid grid-cols-[24px_1fr_140px_minmax(0,1fr)_64px] items-center gap-2 bg-muted/40 px-3 py-2 text-xs text-muted-foreground md:grid-cols-[24px_1fr_140px_minmax(0,1fr)_64px]">
@@ -333,6 +337,28 @@ export function SpecTemplatesSection({
   );
 }
 
+/** Pequeño indicador en la cabecera de la tabla mostrando cuántas specs
+ *  están marcadas como ficha técnica destacada. La idea es mantener el
+ *  conjunto chico (≤4) — son los quick facts del catálogo público y si
+ *  son demasiados la card se satura. Soft warning, no enforcement. */
+function DestacadasCounter({ items }: { items: SpecTemplate[] }) {
+  const total = items.filter((t) => t.destacado).length;
+  const max = 4;
+  const over = total > max;
+  return (
+    <div className={`flex items-center gap-2 text-xs ${over ? "text-amber-700" : "text-muted-foreground"}`}>
+      <span className="font-mono uppercase tracking-widest">
+        Ficha técnica destacada: {total}/{max}
+      </span>
+      {over && (
+        <span>
+          — recomendado {max} máx para no saturar la card del catálogo público.
+        </span>
+      )}
+    </div>
+  );
+}
+
 function Badge({ children, tone = "default" }: { children: React.ReactNode; tone?: "default" | "amber" }) {
   const cls = tone === "amber"
     ? "bg-amber/15 text-ink"
@@ -393,7 +419,7 @@ function SortableSpecRow({
       </div>
 
       <div className="hidden md:flex flex-wrap gap-1 text-[10px] min-w-0">
-        {template.destacado && <Badge tone="amber">destacado</Badge>}
+        {template.destacado && <Badge tone="amber">★ ficha destacada</Badge>}
         {template.visible_en_nombre && <Badge>en nombre</Badge>}
         {template.visible_en_card && <Badge>en card</Badge>}
       </div>
@@ -620,7 +646,7 @@ function SpecTemplateFormModal({
           <fieldset className="border hairline rounded-md p-3 space-y-2">
             <legend className="px-1 text-xs text-muted-foreground">Visibilidad</legend>
             <Toggle
-              label="Spec destacada — aparece como quick fact en la fila del catálogo"
+              label="Ficha técnica destacada — aparece como quick fact en la card del catálogo público (recomendado máx 4 por categoría)"
               checked={!!form.destacado}
               onChange={(v) => setForm({ ...form, destacado: v })}
             />
