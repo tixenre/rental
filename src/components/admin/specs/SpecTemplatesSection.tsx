@@ -67,6 +67,9 @@ export function SpecTemplatesSection({
 } = {}) {
   const [catId, setCatId] = useState<number | null>(fixedCategoriaId ?? null);
   const [editing, setEditing] = useState<SpecTemplate | "new" | null>(null);
+  // Si abrimos "new" desde una sugerencia de orphan, este state pre-llena
+  // el key + label en el modal. Null = creación desde cero.
+  const [prefillFromOrphan, setPrefillFromOrphan] = useState<{ key: string; sampleValues: string[] } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SpecTemplate | null>(null);
   const qc = useQueryClient();
 
@@ -101,6 +104,17 @@ export function SpecTemplatesSection({
     queryKey: ["admin", "spec-templates", catId],
     queryFn: () => adminApi.listSpecTemplates(catId!),
     enabled: catId != null,
+  });
+
+  // Specs huérfanas — keys que están en equipo_specs de equipos de esta
+  // categoría pero no en el template. Las mostramos como sugerencias para
+  // que el dueño las formalice manualmente en lugar de auto-extender el
+  // template (#calidad-datos).
+  const orphansQ = useQuery({
+    queryKey: ["admin", "spec-templates-orphans", catId],
+    queryFn: () => adminApi.listOrphanSpecs(catId!),
+    enabled: catId != null,
+    staleTime: 30_000,
   });
 
   const deleteMut = useMutation({
@@ -297,16 +311,35 @@ export function SpecTemplatesSection({
         </div>
       )}
 
+      {/* Sugerencias de orphans — specs cargados en equipos que no están en
+          el template. el dueño decide si las formaliza o no. */}
+      {catId != null && (orphansQ.data?.length ?? 0) > 0 && (
+        <OrphansPanel
+          orphans={orphansQ.data ?? []}
+          onConvert={(o) => {
+            setPrefillFromOrphan({ key: o.spec_key, sampleValues: o.sample_values });
+            setEditing("new");
+          }}
+        />
+      )}
+
       {/* Modal crear/editar */}
       {editing && catId != null && (
         <SpecTemplateFormModal
           categoriaId={catId}
           template={editing === "new" ? null : editing}
+          prefillKey={editing === "new" ? prefillFromOrphan?.key : undefined}
+          prefillSampleValues={editing === "new" ? prefillFromOrphan?.sampleValues : undefined}
           categoriaPath={catsFlat.find((c) => c.id === catId)?.path ?? "Categoría"}
-          onClose={() => setEditing(null)}
+          onClose={() => {
+            setEditing(null);
+            setPrefillFromOrphan(null);
+          }}
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ["admin", "spec-templates", catId] });
+            qc.invalidateQueries({ queryKey: ["admin", "spec-templates-orphans", catId] });
             setEditing(null);
+            setPrefillFromOrphan(null);
           }}
         />
       )}
@@ -335,6 +368,46 @@ export function SpecTemplatesSection({
         </AlertDialogContent>
       </AlertDialog>
     </section>
+  );
+}
+
+/** Panel con specs huérfanas — valores cargados en equipos cuyo spec_key no
+ *  está en el template de la categoría. El dueño decide si formalizarlos.
+ *  Evita que el sistema auto-extienda el template silenciosamente. */
+function OrphansPanel({
+  orphans,
+  onConvert,
+}: {
+  orphans: { spec_key: string; count_equipos: number; sample_values: string[] }[];
+  onConvert: (o: { spec_key: string; sample_values: string[] }) => void;
+}) {
+  return (
+    <div className="rounded-md border hairline border-amber/30 bg-amber-soft/30 overflow-hidden">
+      <header className="px-3 py-2 text-xs font-mono uppercase tracking-widest text-muted-foreground border-b hairline">
+        Sugerencias del autocompletar — {orphans.length} {orphans.length === 1 ? "spec" : "specs"} cargadas en equipos que no están en el template
+      </header>
+      <ul className="divide-y hairline">
+        {orphans.map((o) => (
+          <li key={o.spec_key} className="flex items-center gap-3 px-3 py-2 text-sm">
+            <div className="flex-1 min-w-0">
+              <div className="font-mono text-xs text-ink">{o.spec_key}</div>
+              <div className="text-[11px] text-muted-foreground">
+                {o.count_equipos} {o.count_equipos === 1 ? "equipo" : "equipos"} ·
+                {" "}ejemplos: {o.sample_values.slice(0, 3).map((v) => `"${v}"`).join(", ")}
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => onConvert(o)}>
+              Agregar al template
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <p className="px-3 py-2 text-[10px] text-muted-foreground bg-amber-soft/50">
+        Estos specs vinieron del autocompletar o de cargas anteriores y quedaron como "custom"
+        en cada equipo. Si querés que aparezcan formateados en todos los equipos de esta categoría,
+        agregalos al template con el tipo y unidad correctos.
+      </p>
+    </div>
   );
 }
 
@@ -450,18 +523,27 @@ function SortableSpecRow({
 // ─────────────────────────────────────────────────────────────────────
 
 function SpecTemplateFormModal({
-  categoriaId, template, categoriaPath, onClose, onSaved,
+  categoriaId, template, prefillKey, prefillSampleValues, categoriaPath, onClose, onSaved,
 }: {
   categoriaId: number;
   template: SpecTemplate | null;
+  /** Si se abre desde una sugerencia orphan, pre-llena el spec_key y label. */
+  prefillKey?: string;
+  /** Valores de ejemplo del orphan — útiles para que el dueño los vea
+   *  mientras decide el tipo/unidad. */
+  prefillSampleValues?: string[];
   categoriaPath: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const isNew = template == null;
+  // El label se infiere desde el key si vino prefill: snake_case → Title Case.
+  const inferredLabel = prefillKey
+    ? prefillKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : "";
   const [form, setForm] = useState<SpecTemplateInput>({
-    spec_key: template?.spec_key ?? "",
-    label: template?.label ?? "",
+    spec_key: template?.spec_key ?? prefillKey ?? "",
+    label: template?.label ?? inferredLabel,
     tipo: template?.tipo ?? "string",
     unidad: template?.unidad ?? "",
     enum_options: template?.enum_options ?? [],
@@ -564,6 +646,19 @@ function SpecTemplateFormModal({
         </header>
 
         <div className="p-4 space-y-3">
+          {prefillKey && prefillSampleValues && prefillSampleValues.length > 0 && (
+            <div className="rounded-md border hairline border-amber/30 bg-amber-soft/30 px-3 py-2 text-[11px]">
+              <div className="font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
+                Valores actuales en equipos
+              </div>
+              <div className="text-ink">
+                {prefillSampleValues.map((v) => `"${v}"`).join(", ")}
+              </div>
+              <p className="text-muted-foreground mt-1 text-[10px]">
+                Mirá los formatos para elegir el tipo correcto (texto, número, enum, rango…).
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Spec key (interno)</Label>

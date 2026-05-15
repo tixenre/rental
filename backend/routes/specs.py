@@ -145,6 +145,61 @@ def listar_templates(categoria_id: int, request: Request):
         conn.close()
 
 
+@router.get("/admin/categorias/{categoria_id}/spec-templates/orphans")
+def listar_orphan_specs(categoria_id: int, request: Request):
+    """Devuelve spec_keys que aparecen en equipo_specs de equipos asignados a
+    esta categoría pero que NO están definidos en el template de la categoría.
+
+    Útil para sugerir al admin formalizar specs que vienen del autocompletar
+    pero quedaron como "custom" en cada equipo, en lugar de auto-extender el
+    template silenciosamente (#calidad-datos).
+
+    Devuelve: [{spec_key, count_equipos, sample_values[≤3]}].
+    """
+    _require_admin(request)
+    conn = get_db()
+    try:
+        # spec_keys que ya están en el template (los excluimos).
+        defined = {
+            r["spec_key"]
+            for r in conn.execute(
+                "SELECT spec_key FROM categoria_spec_templates WHERE categoria_id = ?",
+                (categoria_id,),
+            ).fetchall()
+        }
+
+        # equipo_specs de equipos asignados a esta categoría (o descendiente),
+        # excluyendo soft-deleted.
+        rows = conn.execute("""
+            SELECT es.spec_key, es.value
+            FROM equipo_specs es
+            JOIN equipos e ON e.id = es.equipo_id
+            JOIN equipo_categorias ec ON ec.equipo_id = e.id
+            WHERE ec.categoria_id = ?
+              AND e.eliminado_at IS NULL
+        """, (categoria_id,)).fetchall()
+
+        from collections import defaultdict
+        by_key: dict[str, list[str]] = defaultdict(list)
+        for r in rows:
+            k = r["spec_key"]
+            if k in defined:
+                continue
+            by_key[k].append(r["value"])
+
+        out = [
+            {
+                "spec_key": k,
+                "count_equipos": len(values),
+                "sample_values": list(dict.fromkeys(values))[:3],  # dedupe + top 3
+            }
+            for k, values in sorted(by_key.items(), key=lambda kv: -len(kv[1]))
+        ]
+        return out
+    finally:
+        conn.close()
+
+
 @router.post("/admin/categorias/{categoria_id}/spec-templates", status_code=201)
 def crear_template(categoria_id: int, payload: SpecTemplateInput, request: Request):
     _require_admin(request)

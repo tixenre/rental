@@ -351,6 +351,12 @@ export type DashboardUso = {
   dias_sin_uso_threshold: number;
 };
 
+export type OrphanSpec = {
+  spec_key: string;
+  count_equipos: number;
+  sample_values: string[];
+};
+
 export const adminApi = {
   dashboard: () => authedJson<DashboardData>("/api/dashboard"),
   dashboardUso: (dias_sin_uso = 90) =>
@@ -736,6 +742,8 @@ export const adminApi = {
     authedJson<Record<number, number>>("/api/admin/spec-templates/resumen"),
   listSpecTemplates: (categoriaId: number) =>
     authedJson<{ items: SpecTemplate[] }>(`/api/admin/categorias/${categoriaId}/spec-templates`),
+  listOrphanSpecs: (categoriaId: number) =>
+    authedJson<OrphanSpec[]>(`/api/admin/categorias/${categoriaId}/spec-templates/orphans`),
   createSpecTemplate: (categoriaId: number, input: SpecTemplateInput) =>
     authedJson<SpecTemplate>(`/api/admin/categorias/${categoriaId}/spec-templates`, {
       method: "POST",
