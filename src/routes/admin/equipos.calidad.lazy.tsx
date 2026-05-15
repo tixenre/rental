@@ -1,4 +1,4 @@
-import { createLazyFileRoute } from "@tanstack/react-router";
+import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Sparkles,
@@ -9,10 +9,11 @@ import {
   Tag,
   Folder,
   AlertCircle,
+  ArrowRight,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { adminApi, type CalidadInventario } from "@/lib/admin/api";
+import { adminApi, type CalidadInventario, type FaltaField } from "@/lib/admin/api";
 
 export const Route = createLazyFileRoute("/admin/equipos/calidad")({
   component: CalidadPage,
@@ -58,7 +59,7 @@ function CalidadPage() {
 }
 
 function CalidadView({ data }: { data: CalidadInventario }) {
-  const filas: Array<{ key: keyof CalidadInventario["faltantes"]; label: string; icon: LucideIcon }> = [
+  const filas: Array<{ key: FaltaField; label: string; icon: LucideIcon }> = [
     { key: "foto",             label: "sin foto principal",           icon: Camera },
     { key: "categoria",        label: "sin categoría asignada",       icon: Folder },
     { key: "nombre_publico",   label: "sin nombre público",           icon: Tag },
@@ -96,25 +97,29 @@ function CalidadView({ data }: { data: CalidadInventario }) {
               if (n === 0) return null;
               const pct = data.total === 0 ? 0 : Math.round((n / data.total) * 100);
               return (
-                <li
-                  key={key}
-                  className="flex items-center gap-3 px-5 py-3 border-b hairline last:border-b-0"
-                >
-                  <div className="grid h-8 w-8 place-items-center rounded-full bg-amber-soft text-ink/80">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-ink">
-                      <span className="font-display text-base tabular text-ink">{n}</span>{" "}
-                      <span className="text-muted-foreground">{label}</span>
+                <li key={key}>
+                  <Link
+                    to="/admin/equipos"
+                    search={{ falta: key }}
+                    className="group flex items-center gap-3 px-5 py-3 border-b hairline last:border-b-0 transition hover:bg-amber-soft/50"
+                  >
+                    <div className="grid h-8 w-8 place-items-center rounded-full bg-amber-soft text-ink/80 transition group-hover:bg-amber group-hover:text-ink">
+                      <Icon className="h-4 w-4" />
                     </div>
-                    <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-                      {pct}% del inventario
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-ink">
+                        <span className="font-display text-base tabular text-ink">{n}</span>{" "}
+                        <span className="text-muted-foreground">{label}</span>
+                      </div>
+                      <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                        {pct}% del inventario
+                      </div>
                     </div>
-                  </div>
-                  <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">
-                    pendiente
-                  </span>
+                    <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition group-hover:text-ink">
+                      Completar
+                      <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
+                    </span>
+                  </Link>
                 </li>
               );
             })}

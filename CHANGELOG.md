@@ -7,6 +7,8 @@
 
 ### ✨ Novedades
 
+- **Dashboard de calidad: cada fila es ahora un CTA que filtra equipos directamente** *(15 de mayo de 2026)*
+  Las filas del dashboard /admin/equipos/calidad pasaron de ser solo lectura a ser links. Click en "5 sin foto principal" → te lleva a /admin/equipos filtrado a esos 5 equipos, con un banner ámbar arriba que dice "Filtrando equipos sin foto principal · 5 resultados · Quitar filtro". Cada campo faltante (foto, categoría, nombre público, descripción, serie, valor de reposición) tiene su filtro propio compartible vía URL.
 - **Dashboard de calidad del inventario — qué equipos tienen datos faltantes** *(15 de mayo de 2026)*
   Nueva sección en /admin/equipos/calidad que muestra de un vistazo cuántos equipos están al 100% y cuántos tienen datos faltantes por campo (foto, categoría, nombre público, descripción, serie, valor de reposición). Es solo lectura — los botones para completar directamente desde acá llegan en una segunda iteración. Sirve para saber dónde poner el foco al limpiar el inventario.
 - **Microinteracción "+1" volando al carrito al agregar un equipo** *(15 de mayo de 2026)*

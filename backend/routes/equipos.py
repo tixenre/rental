@@ -418,6 +418,7 @@ def list_equipos(
     marca:            Optional[str]  = Query(None, description="Filtra por nombre exacto de marca"),
     solo_visibles:    Optional[bool] = Query(None),
     solo_incompletos: Optional[bool] = Query(None),
+    falta: Optional[str] = Query(None, description="Filtra equipos sin un campo: foto|categoria|nombre_publico|descripcion|serie|valor_reposicion (#350)"),
     incluir_eliminados: Optional[bool] = Query(None, description="Si true (solo admin), incluye soft-deleted"),
     solo_eliminados:  Optional[bool] = Query(None, description="Si true (solo admin), SOLO soft-deleted (vista papelera)"),
     sort:          Optional[str]  = Query(None, description="ranking | nombre | precio_asc | precio_desc | id"),
@@ -449,6 +450,28 @@ def list_equipos(
     # Filtro admin: equipos cuya ficha el admin aún no marcó como completa.
     if solo_incompletos and is_admin:
         base_sql += " AND e.ficha_completa = FALSE"
+
+    # Filtro por campo faltante (#350) — alimenta los CTAs del dashboard de calidad.
+    # Mismos criterios que /api/admin/inventario/calidad para consistencia.
+    if falta and is_admin:
+        FALTA_SQL = {
+            "foto":              " AND NULLIF(TRIM(COALESCE(e.foto_url, '')), '') IS NULL",
+            "nombre_publico":    " AND NULLIF(TRIM(COALESCE(e.nombre_publico, '')), '') IS NULL",
+            "serie":             " AND NULLIF(TRIM(COALESCE(e.serie, '')), '') IS NULL",
+            "valor_reposicion":  " AND (e.valor_reposicion IS NULL OR e.valor_reposicion = 0)",
+            "descripcion": (
+                " AND NOT EXISTS ("
+                " SELECT 1 FROM equipo_fichas f"
+                " WHERE f.equipo_id = e.id"
+                " AND NULLIF(TRIM(COALESCE(f.descripcion, '')), '') IS NOT NULL)"
+            ),
+            "categoria": (
+                " AND NOT EXISTS ("
+                " SELECT 1 FROM equipo_categorias ec WHERE ec.equipo_id = e.id)"
+            ),
+        }
+        if falta in FALTA_SQL:
+            base_sql += FALTA_SQL[falta]
 
     # Soft delete (#206): por default solo activos. Admin puede pedir ver
     # eliminados (papelera) o todos.

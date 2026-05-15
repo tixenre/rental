@@ -10,6 +10,15 @@ import { authedFetch, authedJson, authedPostJson } from "@/lib/authedFetch";
 
 // ── Dashboard ────────────────────────────────────────────────────────────
 
+/** Campos que el dashboard de calidad sabe detectar como faltantes (#349, #350). */
+export type FaltaField =
+  | "foto"
+  | "categoria"
+  | "nombre_publico"
+  | "descripcion"
+  | "serie"
+  | "valor_reposicion";
+
 export type CalidadInventario = {
   total: number;
   completos_pct: number;
@@ -337,6 +346,7 @@ export const adminApi = {
     solo_incompletos?: boolean;
     solo_eliminados?: boolean;
     incluir_eliminados?: boolean;
+    falta?: FaltaField;
   } = {}) => {
     const sp = new URLSearchParams();
     if (params.q) sp.set("q", params.q);
@@ -346,6 +356,7 @@ export const adminApi = {
     if (params.solo_incompletos) sp.set("solo_incompletos", "true");
     if (params.solo_eliminados) sp.set("solo_eliminados", "true");
     if (params.incluir_eliminados) sp.set("incluir_eliminados", "true");
+    if (params.falta) sp.set("falta", params.falta);
     sp.set("per_page", String(params.per_page ?? 500));
     return authedJson<EquiposListResp>(`/api/equipos?${sp.toString()}`);
   },

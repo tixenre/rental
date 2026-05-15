@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 144,
+    date: "2026-05-15",
+    type: "feat",
+    title: "Dashboard de calidad: cada fila es ahora un CTA que filtra equipos directamente",
+    body: "Las filas del dashboard /admin/equipos/calidad pasaron de ser solo lectura a ser links. Click en \"5 sin foto principal\" → te lleva a /admin/equipos filtrado a esos 5 equipos, con un banner ámbar arriba que dice \"Filtrando equipos sin foto principal · 5 resultados · Quitar filtro\". Cada campo faltante (foto, categoría, nombre público, descripción, serie, valor de reposición) tiene su filtro propio compartible vía URL.",
+    labels: ["admin", "calidad-datos", "ux"],
+  },
+  {
     number: 143,
     date: "2026-05-15",
     type: "feat",

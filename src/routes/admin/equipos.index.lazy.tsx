@@ -20,7 +20,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
-import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
+import { adminApi, type Equipo, type EquipoInput, type FaltaField } from "@/lib/admin/api";
 import { ActionMenu } from "@/components/mobile";
 import { EquipoFormDialogV2 as EquipoFormDialog } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
 import { AutocompletarEquipoDialog } from "@/components/admin/autocompletar";
@@ -45,6 +45,8 @@ type EquiposSearch = {
   marca?: string;
   solo_incompletos?: boolean;
   vista_papelera?: boolean;
+  /** Filtra equipos sin un campo dado (#350 — CTA desde dashboard de calidad). */
+  falta?: FaltaField;
 };
 
 function EquiposPage() {
@@ -59,6 +61,7 @@ function EquiposPage() {
   const marca = search.marca ?? "";
   const soloIncompletos = search.solo_incompletos ?? false;
   const vistaPapelera = search.vista_papelera ?? false;
+  const falta = search.falta;
 
   function updateFilters(updates: Partial<EquiposSearch>) {
     navigate({
@@ -71,6 +74,7 @@ function EquiposPage() {
         if (!next.marca) delete next.marca;
         if (!next.solo_incompletos) delete next.solo_incompletos;
         if (!next.vista_papelera) delete next.vista_papelera;
+        if (!next.falta) delete next.falta;
         return next;
       },
       replace: true,
@@ -98,7 +102,7 @@ function EquiposPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const equiposQ = useQuery({
-    queryKey: ["admin", "equipos", { q, etiqueta, categoria, marca, soloIncompletos, vistaPapelera }],
+    queryKey: ["admin", "equipos", { q, etiqueta, categoria, marca, soloIncompletos, vistaPapelera, falta }],
     queryFn: () => adminApi.listEquipos({
       q: q || undefined,
       etiqueta: etiqueta || undefined,
@@ -106,6 +110,7 @@ function EquiposPage() {
       marca: marca || undefined,
       solo_incompletos: soloIncompletos || undefined,
       solo_eliminados: vistaPapelera || undefined,
+      falta,
     }),
   });
   const etiquetasQ = useQuery({
@@ -268,6 +273,14 @@ function EquiposPage() {
           </Button>
         </div>
       </header>
+
+      {falta && (
+        <FaltaBanner
+          falta={falta}
+          total={total}
+          onClear={() => updateFilters({ falta: undefined })}
+        />
+      )}
 
       <div className="flex flex-col md:flex-row gap-2">
         <div className="relative flex-1">
@@ -994,6 +1007,36 @@ function PrecioJornadaInline({
           M
         </span>
       )}
+    </div>
+  );
+}
+
+const FALTA_LABELS: Record<FaltaField, string> = {
+  foto:             "sin foto principal",
+  categoria:        "sin categoría asignada",
+  nombre_publico:   "sin nombre público",
+  descripcion:      "sin descripción extendida",
+  serie:            "sin número de serie",
+  valor_reposicion: "sin valor de reposición",
+};
+
+function FaltaBanner({
+  falta,
+  total,
+  onClear,
+}: {
+  falta: FaltaField;
+  total: number;
+  onClear: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-amber/40 bg-amber-soft px-4 py-2.5">
+      <AlertCircle className="h-4 w-4 shrink-0 text-amber-700" />
+      <div className="flex-1 min-w-0 text-sm">
+        <span className="font-medium text-ink">Filtrando equipos {FALTA_LABELS[falta]}</span>
+        <span className="text-muted-foreground"> · {total} {total === 1 ? "resultado" : "resultados"}</span>
+      </div>
+      <Button variant="ghost" size="sm" onClick={onClear}>Quitar filtro</Button>
     </div>
   );
 }
