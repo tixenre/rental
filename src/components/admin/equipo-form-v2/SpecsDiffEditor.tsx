@@ -251,6 +251,15 @@ function TypedValueInput({
     return <RangoValueInput value={value} unidad={tmpl.unidad} onChange={onChange} />;
   }
 
+  if ((tmpl.tipo === "wxh" || tmpl.tipo === "wxhxd") && tmpl.unidad) {
+    const axes = tmpl.tipo === "wxh" ? 2 : 3;
+    return <MedidasValueInput value={value} unidad={tmpl.unidad} axes={axes} onChange={onChange} />;
+  }
+
+  if (tmpl.tipo === "multi_enum" && tmpl.enum_options && tmpl.enum_options.length > 0) {
+    return <MultiEnumValueInput value={value} options={tmpl.enum_options} onChange={onChange} />;
+  }
+
   if (tmpl.tipo === "enum" && tmpl.enum_options && tmpl.enum_options.length > 0) {
     return (
       <Select value={value || undefined} onValueChange={onChange}>
@@ -419,6 +428,130 @@ function RangoValueInput({
         aria-label="Valor máximo (vacío si es fijo)"
       />
       {!prefix && unitSpan}
+    </div>
+  );
+}
+
+// ── MedidasValueInput (wxh / wxhxd) ─────────────────────────────────────
+// 2 o 3 inputs numéricos separados por "×" con la unidad al final (o al
+// inicio si es unidad prefijo). Storage: "6144×3240 px" o "129.7×84.5×77.8 mm".
+
+function parseMedidas(raw: string, axes: 2 | 3): string[] {
+  const matches = raw.match(/\d+(?:\.\d+)?/g) ?? [];
+  const out = matches.slice(0, axes);
+  while (out.length < axes) out.push("");
+  return out;
+}
+
+function MedidasValueInput({
+  value, unidad, axes, onChange,
+}: {
+  value: string;
+  unidad: string;
+  axes: 2 | 3;
+  onChange: (v: string) => void;
+}) {
+  const parts = parseMedidas(value, axes);
+  const prefix = isPrefixUnit(unidad);
+
+  const commit = (idx: number, next: string) => {
+    const updated = [...parts];
+    updated[idx] = next.trim();
+    // Si ningún input tiene valor, limpiamos.
+    if (updated.every((p) => !p)) {
+      onChange("");
+      return;
+    }
+    // Si algún input está vacío, lo dejamos vacío en el join (queda como "×")
+    // — usuario tiene que completar los que faltan para que se vea bien.
+    const joined = updated.join("×");
+    onChange(prefix ? `${unidad}${joined}` : `${joined} ${unidad}`);
+  };
+
+  const unitChip = (
+    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{unidad}</span>
+  );
+
+  return (
+    <div className="flex items-center gap-1">
+      {prefix && unitChip}
+      {parts.map((p, i) => (
+        <div key={i} className="flex items-center gap-1">
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="any"
+            value={p}
+            onChange={(e) => commit(i, e.target.value)}
+            className="text-xs w-16 text-center"
+            aria-label={`Medida ${i + 1} de ${axes}`}
+          />
+          {i < axes - 1 && (
+            <span className="text-[11px] text-muted-foreground select-none">×</span>
+          )}
+        </div>
+      ))}
+      {!prefix && unitChip}
+    </div>
+  );
+}
+
+// ── MultiEnumValueInput ─────────────────────────────────────────────────
+// Lista de checkboxes (toggleable chips) — el equipo puede tener varios.
+// Storage: JSON array como string ("[\"Wi-Fi\",\"USB-C\"]") o coma-separado.
+// Acá usamos coma-separado para mantenerlo legible en BD.
+
+function parseMultiEnum(raw: string): Set<string> {
+  if (!raw.trim()) return new Set();
+  // Soporta tanto JSON array como coma-separado (legacy / migración).
+  if (raw.trim().startsWith("[")) {
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr.map(String));
+    } catch {
+      /* fall through */
+    }
+  }
+  return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
+}
+
+function MultiEnumValueInput({
+  value, options, onChange,
+}: {
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  const selected = parseMultiEnum(value);
+
+  const toggle = (opt: string) => {
+    const next = new Set(selected);
+    if (next.has(opt)) next.delete(opt);
+    else next.add(opt);
+    const arr = options.filter((o) => next.has(o)); // preserva el orden del template
+    onChange(arr.join(", "));
+  };
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {options.map((opt) => {
+        const isSelected = selected.has(opt);
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => toggle(opt)}
+            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] transition ${
+              isSelected
+                ? "border-amber bg-amber-soft text-ink"
+                : "border-ink/15 bg-background text-muted-foreground hover:border-ink/30"
+            }`}
+            aria-pressed={isSelected}
+          >
+            {opt}
+          </button>
+        );
+      })}
     </div>
   );
 }

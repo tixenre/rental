@@ -203,11 +203,11 @@ def listar_orphan_specs(categoria_id: int, request: Request):
 @router.post("/admin/categorias/{categoria_id}/spec-templates", status_code=201)
 def crear_template(categoria_id: int, payload: SpecTemplateInput, request: Request):
     _require_admin(request)
-    # rango requiere unidad (siempre es una medida con dimensiones).
+    # rango / wxh / wxhxd requieren unidad (siempre son medidas con dimensiones).
     # number puede no tenerla — algunos números son dimensionless (cant de
     # hojas de diafragma, elementos ópticos, etc.).
-    if payload.tipo == "rango" and not (payload.unidad and payload.unidad.strip()):
-        raise HTTPException(400, "Para tipo Rango la unidad es obligatoria (ej. mm, °, kg).")
+    if payload.tipo in ("rango", "wxh", "wxhxd") and not (payload.unidad and payload.unidad.strip()):
+        raise HTTPException(400, "Para este tipo la unidad es obligatoria (mm, px, °, kg…).")
     conn = get_db()
     try:
         # Verificar que la categoría existe
@@ -279,7 +279,7 @@ def actualizar_template(template_id: int, payload: SpecTemplateUpdate, request: 
         existing_dict = row_to_dict(existing) if not isinstance(existing, dict) else existing
         final_tipo = updates.get("tipo", existing_dict.get("tipo"))
         final_unidad = updates.get("unidad", existing_dict.get("unidad"))
-        if final_tipo == "rango" and not (final_unidad and str(final_unidad).strip()):
+        if final_tipo in ("rango", "wxh", "wxhxd") and not (final_unidad and str(final_unidad).strip()):
             raise HTTPException(400, "Para tipo Número la unidad es obligatoria (ej. kg, MP, mm, W).")
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         conn.execute(

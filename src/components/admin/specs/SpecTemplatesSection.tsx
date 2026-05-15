@@ -51,7 +51,10 @@ import { NombreTemplateBuilder } from "./NombreTemplateBuilder";
 const TIPO_LABEL: Record<SpecTipo, string> = {
   string: "Texto",
   number: "Número",
-  rango: "Rango (un valor o dos)",
+  rango: "Rango (un valor o dos, separados por '-')",
+  wxh: "Dos medidas (ancho × alto, ej. 6144×3240)",
+  wxhxd: "Tres medidas (ancho × alto × prof, ej. 130×85×78)",
+  multi_enum: "Lista de opciones (varios valores, ej. Wi-Fi, USB-C, SDI)",
   enum: "Opciones (enum)",
   bool: "Sí/No",
 };
@@ -496,7 +499,7 @@ function SortableSpecRow({
 
       <div className="text-xs min-w-0">
         {TIPO_LABEL[template.tipo]}
-        {(template.tipo === "number" || template.tipo === "rango") && template.unidad ? ` · ${template.unidad}` : ""}
+        {(template.tipo === "number" || template.tipo === "rango" || template.tipo === "wxh" || template.tipo === "wxhxd") && template.unidad ? ` · ${template.unidad}` : ""}
         {template.tipo === "enum" && template.enum_options ? (
           <div className="text-[10px] text-muted-foreground truncate">
             {template.enum_options.join(", ")}
@@ -605,16 +608,17 @@ function SpecTemplateFormModal({
       toast.error("Spec key: solo minúsculas, números y _ (debe empezar con letra)");
       return;
     }
-    const enumArr = form.tipo === "enum"
+    const wantsEnum = form.tipo === "enum" || form.tipo === "multi_enum";
+    const enumArr = wantsEnum
       ? enumInput.split(",").map((s) => s.trim()).filter(Boolean)
       : null;
-    if (form.tipo === "enum" && (!enumArr || enumArr.length === 0)) {
-      toast.error("Para tipo enum tenés que listar al menos una opción");
+    if (wantsEnum && (!enumArr || enumArr.length === 0)) {
+      toast.error("Para tipo enum / lista tenés que listar al menos una opción");
       return;
     }
-    // #291 Fase B: unidad obligatoria para tipo número.
-    if (form.tipo === "rango" && !(form.unidad ?? "").trim()) {
-      toast.error("Para tipo Número tenés que indicar la unidad (kg, MP, mm, W…).");
+    const wantsUnidad = form.tipo === "rango" || form.tipo === "wxh" || form.tipo === "wxhxd";
+    if (wantsUnidad && !(form.unidad ?? "").trim()) {
+      toast.error("Para este tipo la unidad es obligatoria (mm, px, °, kg…).");
       return;
     }
     const payload: SpecTemplateInput = {
@@ -702,17 +706,17 @@ function SpecTemplateFormModal({
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(["string", "number", "rango", "enum", "bool"] as SpecTipo[]).map((t) => (
+                {(["string", "number", "rango", "wxh", "wxhxd", "enum", "multi_enum", "bool"] as SpecTipo[]).map((t) => (
                   <SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {(form.tipo === "number" || form.tipo === "rango") && (
+          {(form.tipo === "number" || form.tipo === "rango" || form.tipo === "wxh" || form.tipo === "wxhxd") && (
             <div>
               <Label className="text-xs">
-                Unidad {form.tipo === "rango" && <span className="text-destructive">*</span>}
+                Unidad {form.tipo !== "number" && <span className="text-destructive">*</span>}
                 {form.tipo === "number" && (
                   <span className="text-muted-foreground font-normal"> (opcional)</span>
                 )}
@@ -720,27 +724,37 @@ function SpecTemplateFormModal({
               <Input
                 value={form.unidad ?? ""}
                 onChange={(e) => setForm({ ...form, unidad: e.target.value })}
-                placeholder={form.tipo === "rango" ? "ej. mm, °, kg" : "ej. kg, MP, mm, W — dejar vacío si es dimensionless"}
-                required={form.tipo === "rango"}
+                placeholder={
+                  form.tipo === "wxh" || form.tipo === "wxhxd" ? "ej. px, mm, cm" :
+                  form.tipo === "rango" ? "ej. mm, °, kg" :
+                  "ej. kg, MP, mm, W — dejar vacío si es dimensionless"
+                }
+                required={form.tipo !== "number"}
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                {form.tipo === "rango"
+                {form.tipo === "wxh"
+                  ? "Dos casilleros separados por ×. Se guarda como '6144×3240 px'."
+                  : form.tipo === "wxhxd"
+                  ? "Tres casilleros separados por ×. Se guarda como '129.7×84.5×77.8 mm'."
+                  : form.tipo === "rango"
                   ? "Al cargar un equipo se escribe '50' (fijo) o '24-70' (rango). La unidad aparece como sufijo: '50 mm' / '24-70 mm'."
                   : "Si la dejás vacía (ej. cantidad de hojas, cantidad de elementos), el número se guarda sin sufijo."}
               </p>
             </div>
           )}
 
-          {form.tipo === "enum" && (
+          {(form.tipo === "enum" || form.tipo === "multi_enum") && (
             <div>
               <Label className="text-xs">Opciones (separadas por coma)</Label>
               <Input
                 value={enumInput}
                 onChange={(e) => setEnumInput(e.target.value)}
-                placeholder="ej. E, RF, EF, MFT, PL"
+                placeholder={form.tipo === "multi_enum" ? "ej. Wi-Fi, USB-C, SDI, HDMI, Bluetooth" : "ej. E, RF, EF, MFT, PL"}
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                Valores que aparecen en el dropdown del equipo. Case-sensitive.
+                {form.tipo === "multi_enum"
+                  ? "Lista de opciones del que el equipo puede tener varios. Case-sensitive."
+                  : "Valores que aparecen en el dropdown del equipo. Case-sensitive."}
               </p>
             </div>
           )}
