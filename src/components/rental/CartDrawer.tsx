@@ -328,6 +328,9 @@ export function CartDrawer({
                         {list.map(({ it, qty }) => {
                           const cap = getDisponible?.(it) ?? it.cantidad ?? Infinity;
                           const reachedMax = qty >= cap;
+                          const lineaBruta = it.pricePerDay * qty * (d || 1);
+                          const lineaDto   = descuentoPct > 0 ? Math.round(lineaBruta * descuentoPct / 100) : 0;
+                          const lineaNeta  = lineaBruta - lineaDto;
                           return (
                             <li
                               key={it.id}
@@ -381,9 +384,21 @@ export function CartDrawer({
                                       <Plus className="h-3.5 w-3.5" />
                                     </button>
                                   </div>
-                                  <div className="text-xs tabular text-ink">
-                                    {formatARS(it.pricePerDay * qty)}
-                                    <span className="text-muted-foreground"> /día</span>
+                                  <div className="text-right">
+                                    <div className="text-xs tabular text-ink">
+                                      {formatARS(it.pricePerDay * qty)}
+                                      <span className="text-muted-foreground"> /día</span>
+                                    </div>
+                                    {d > 0 && (
+                                      <div className="hidden sm:flex items-center justify-end gap-1 mt-0.5 text-[11px] tabular">
+                                        {lineaDto > 0 && (
+                                          <span className="line-through text-muted-foreground/60">{formatARS(lineaBruta)}</span>
+                                        )}
+                                        <span className={lineaDto > 0 ? "text-emerald-600 font-medium" : "text-muted-foreground"}>
+                                          {formatARS(lineaNeta)}
+                                        </span>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </div>
