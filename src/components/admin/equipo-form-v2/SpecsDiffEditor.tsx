@@ -243,8 +243,8 @@ function TypedValueInput({
   value: string;
   onChange: (v: string) => void;
 }) {
-  if (tmpl.tipo === "number" && tmpl.unidad) {
-    return <NumericValueInput value={value} unidad={tmpl.unidad} onChange={onChange} />;
+  if (tmpl.tipo === "number") {
+    return <NumericValueInput value={value} unidad={tmpl.unidad ?? ""} onChange={onChange} />;
   }
 
   if (tmpl.tipo === "rango" && tmpl.unidad) {
@@ -386,10 +386,12 @@ function NumericValueInput({
   value, unidad, onChange,
 }: {
   value: string;
+  /** Unidad opcional — si está vacía, no se concatena ningún sufijo. */
   unidad: string;
   onChange: (v: string) => void;
 }) {
   const numericPart = extractNumericPart(value);
+  const hasUnidad = !!unidad.trim();
   return (
     <div className="relative">
       <Input
@@ -399,17 +401,23 @@ function NumericValueInput({
         value={numericPart}
         onChange={(e) => {
           const num = e.target.value;
-          onChange(num.trim() ? `${num} ${unidad}` : "");
+          if (!num.trim()) {
+            onChange("");
+            return;
+          }
+          onChange(hasUnidad ? `${num} ${unidad}` : num);
         }}
         placeholder="0"
-        className="text-xs pr-12"
+        className={`text-xs ${hasUnidad ? "pr-12" : ""}`}
       />
-      <span
-        className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] uppercase tracking-wider text-muted-foreground"
-        aria-hidden
-      >
-        {unidad}
-      </span>
+      {hasUnidad && (
+        <span
+          className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] uppercase tracking-wider text-muted-foreground"
+          aria-hidden
+        >
+          {unidad}
+        </span>
+      )}
     </div>
   );
 }

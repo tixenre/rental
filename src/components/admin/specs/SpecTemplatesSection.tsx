@@ -520,7 +520,7 @@ function SpecTemplateFormModal({
       return;
     }
     // #291 Fase B: unidad obligatoria para tipo número.
-    if ((form.tipo === "number" || form.tipo === "rango") && !(form.unidad ?? "").trim()) {
+    if (form.tipo === "rango" && !(form.unidad ?? "").trim()) {
       toast.error("Para tipo Número tenés que indicar la unidad (kg, MP, mm, W…).");
       return;
     }
@@ -606,18 +606,21 @@ function SpecTemplateFormModal({
           {(form.tipo === "number" || form.tipo === "rango") && (
             <div>
               <Label className="text-xs">
-                Unidad <span className="text-destructive">*</span>
+                Unidad {form.tipo === "rango" && <span className="text-destructive">*</span>}
+                {form.tipo === "number" && (
+                  <span className="text-muted-foreground font-normal"> (opcional)</span>
+                )}
               </Label>
               <Input
                 value={form.unidad ?? ""}
                 onChange={(e) => setForm({ ...form, unidad: e.target.value })}
-                placeholder="ej. kg, MP, mm, W, fps, ISO"
-                required
+                placeholder={form.tipo === "rango" ? "ej. mm, °, kg" : "ej. kg, MP, mm, W — dejar vacío si es dimensionless"}
+                required={form.tipo === "rango"}
               />
               <p className="text-[10px] text-muted-foreground mt-1">
                 {form.tipo === "rango"
                   ? "Al cargar un equipo se escribe '50' (fijo) o '24-70' (rango). La unidad aparece como sufijo: '50 mm' / '24-70 mm'."
-                  : "Al cargar un equipo se escribe solo el número y aparece esta unidad como sufijo."}
+                  : "Si la dejás vacía (ej. cantidad de hojas, cantidad de elementos), el número se guarda sin sufijo."}
               </p>
             </div>
           )}
