@@ -6,6 +6,8 @@ Parte del epic #93. Incluye:
 - #352 Sugerencias automáticas (detectores + apply para inconsistencias).
 """
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -132,21 +134,28 @@ def _detect_marcas_duplicadas(conn) -> list[dict]:
 
 
 # Heurística de categoría sospechosa: keywords de equipo → categoría esperada.
-# Si el equipo tiene keyword fuerte en nombre/marca pero su categoría no matchea
-# (ni es ancestro), lo flagueamos. Conservador en los keywords para no generar
-# falsos positivos masivos — preferimos no detectar que detectar mal.
+# Conservador en los keywords — sólo tokens claros, con detección por palabra
+# completa (no substring) para evitar falsos positivos como "Black" matcheando
+# "ac" (batería).
 _CATEGORIA_KEYWORDS: dict[str, tuple[str, ...]] = {
     "cámara":     ("cam", "cámara", "camara", "camera"),
     "lente":      ("lens", "lente"),
-    "luz":        ("led", "luz", "light", "panel", "softbox", "reflector"),
+    "luz":        ("led", "luz", "light", "softbox", "reflector"),
     "micrófono":  ("mic", "micrófono", "microfono", "microphone"),
     "audio":      ("recorder", "grabador", "preamp", "mixer", "mezcladora"),
     "trípode":    ("tripod", "trípode", "tripode", "monopod"),
     "estabilizador": ("gimbal", "estabilizador", "ronin", "stabilizer"),
-    "batería":    ("v-mount", "vmount", "battery", "batería", "bateria", "ac"),
+    "batería":    ("v-mount", "vmount", "battery", "batería", "bateria"),
     "monitor":    ("monitor", "feelworld", "atomos"),
-    "almacenamiento": ("ssd", "cf", "card", "sd ", "memoria"),
+    "almacenamiento": ("ssd", "memoria"),
 }
+
+
+def _matches_keyword(text: str, kw: str) -> bool:
+    """True si `kw` aparece como palabra completa en `text` (lower). Usa
+    lookarounds en ASCII para evitar que "ac" matchee "black"."""
+    pattern = r"(?<![a-z0-9])" + re.escape(kw.lower()) + r"(?![a-z0-9])"
+    return bool(re.search(pattern, text))
 
 
 def _detect_categoria_sospechosa(conn) -> list[dict]:
@@ -168,26 +177,30 @@ def _detect_categoria_sospechosa(conn) -> list[dict]:
     for r in rows:
         nombre_lower = (r["nombre"] or "").lower()
         cats_lower = (r["categorias_actuales"] or "").lower()
-        # Para cada bucket de keywords, si el nombre lo matchea y la categoría
-        # actual no incluye ningún sinónimo, marcamos sospecha.
         for cat_expected, kws in _CATEGORIA_KEYWORDS.items():
-            if any(kw in nombre_lower for kw in kws):
-                # ¿La categoría actual ya cubre esto?
-                if cat_expected not in cats_lower and not any(kw in cats_lower for kw in kws):
-                    out.append({
-                        "tipo": "categoria_sospechosa",
-                        "ref": str(r["id"]),
-                        "titulo": f"'{r['marca'] or ''} {r['nombre']}' parece {cat_expected} pero no lo tiene",
-                        "detalle": (
-                            f"Categoría actual: {r['categorias_actuales']}. "
-                            f"El nombre contiene un keyword que sugiere '{cat_expected}'."
-                        ),
-                        "equipo_id": r["id"],
-                        "categoria_sugerida": cat_expected,
-                        "accion": "navegar_equipo",
-                        "accion_label": "Editar equipo →",
-                    })
-                    break  # 1 sospecha por equipo es suficiente
+            if not any(_matches_keyword(nombre_lower, kw) for kw in kws):
+                continue
+            # ¿La categoría actual ya cubre esto? (chequeo laxo intencional
+            # para no flaggear cuando el equipo está en una categoría con
+            # nombre relacionado, aunque no exacto).
+            if cat_expected in cats_lower:
+                continue
+            if any(_matches_keyword(cats_lower, kw) for kw in kws):
+                continue
+            out.append({
+                "tipo": "categoria_sospechosa",
+                "ref": str(r["id"]),
+                "titulo": f"'{r['marca'] or ''} {r['nombre']}' parece {cat_expected} pero no lo tiene",
+                "detalle": (
+                    f"Categoría actual: {r['categorias_actuales']}. "
+                    f"El nombre contiene un keyword que sugiere '{cat_expected}'."
+                ),
+                "equipo_id": r["id"],
+                "categoria_sugerida": cat_expected,
+                "accion": "asignar_categoria",
+                "accion_label": f"Asignar '{cat_expected}'",
+            })
+            break  # 1 sospecha por equipo es suficiente
     return out
 
 
@@ -273,6 +286,8 @@ def aplicar_sugerencia(body: AplicarSugerenciaBody, _admin: dict = Depends(requi
             return _apply_fusionar_marcas(conn, clave=body.ref)
         if body.tipo == "precio_sin_usd":
             return _apply_calcular_usd(conn)
+        if body.tipo == "categoria_sospechosa":
+            return _apply_asignar_categoria(conn, equipo_id=int(body.ref))
         raise HTTPException(400, f"Tipo de sugerencia desconocido: {body.tipo}")
     finally:
         conn.close()
@@ -310,6 +325,57 @@ def _apply_fusionar_marcas(conn, clave: str) -> dict:
             f"Fusionadas {len(duplicados_ids)} marcas duplicadas en '{canonical_nombre}'."
         ),
     }
+
+
+def _apply_asignar_categoria(conn, equipo_id: int) -> dict:
+    """Re-detecta la categoría sugerida para `equipo_id` y la asigna. La
+    re-detección es por consistencia: el frontend manda solo el equipo_id,
+    el match al expected se computa server-side desde el nombre actual del
+    equipo (en caso de que haya cambiado entre detect y apply)."""
+    eq = conn.execute(
+        "SELECT id, nombre FROM equipos WHERE id = ? AND eliminado_at IS NULL",
+        (equipo_id,),
+    ).fetchone()
+    if not eq:
+        raise HTTPException(404, "Equipo no encontrado.")
+    nombre_lower = (eq["nombre"] or "").lower()
+    cat_expected: str | None = None
+    for cat_key, kws in _CATEGORIA_KEYWORDS.items():
+        if any(_matches_keyword(nombre_lower, kw) for kw in kws):
+            cat_expected = cat_key
+            break
+    if not cat_expected:
+        raise HTTPException(
+            400,
+            "Ya no se detecta categoría sospechosa — el nombre del equipo cambió.",
+        )
+    # Buscar la categoría existente cuyo nombre matchee el bucket. Preferimos
+    # match exacto (LOWER(nombre) = keyword), después un LIKE laxo.
+    row = conn.execute(
+        "SELECT id, nombre FROM categorias WHERE LOWER(nombre) = LOWER(?) LIMIT 1",
+        (cat_expected,),
+    ).fetchone()
+    if not row:
+        row = conn.execute(
+            "SELECT id, nombre FROM categorias WHERE LOWER(nombre) LIKE ? OR LOWER(nombre) LIKE ? ORDER BY id LIMIT 1",
+            (f"%{cat_expected.lower()}%", f"{cat_expected.lower()}%"),
+        ).fetchone()
+    if not row:
+        raise HTTPException(
+            400,
+            f"No existe una categoría llamada '{cat_expected}'. Creala primero o usá 'Editar equipo' para elegir manualmente.",
+        )
+    categoria_id = row["id"]
+    conn.execute(
+        """
+        INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
+        VALUES (?, ?, 0)
+        ON CONFLICT (equipo_id, categoria_id) DO NOTHING
+        """,
+        (equipo_id, categoria_id),
+    )
+    conn.commit()
+    return {"ok": True, "message": f"Categoría '{row['nombre']}' asignada al equipo."}
 
 
 def _apply_calcular_usd(conn) -> dict:

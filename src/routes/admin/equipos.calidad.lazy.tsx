@@ -121,7 +121,6 @@ function SugerenciasSection() {
           const key = `${s.tipo}:${s.ref}`;
           const isApplying = busy === `apply:${key}`;
           const isIgnoring = busy === `ignore:${key}`;
-          const isNavigate = s.accion === "navegar_equipo";
           return (
             <li key={`${key}:${i}`} className="px-5 py-4 space-y-2">
               <div className="flex items-start gap-3">
@@ -139,27 +138,26 @@ function SugerenciasSection() {
                   >
                     {isIgnoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Ignorar"}
                   </Button>
-                  {isNavigate && s.equipo_id ? (
-                    <Button asChild size="sm">
+                  {s.equipo_id && (
+                    <Button asChild size="sm" variant="outline" title="Abrir el equipo para revisar manualmente">
                       <Link to="/admin/equipos" search={{ q: String(s.equipo_id) }}>
-                        {s.accion_label}
+                        Editar →
                       </Link>
                     </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      disabled={isApplying || isIgnoring}
-                      onClick={() => aplicar.mutate({ tipo: s.tipo, ref: s.ref })}
-                    >
-                      {isApplying ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Aplicando…
-                        </>
-                      ) : (
-                        s.accion_label
-                      )}
-                    </Button>
                   )}
+                  <Button
+                    size="sm"
+                    disabled={isApplying || isIgnoring}
+                    onClick={() => aplicar.mutate({ tipo: s.tipo, ref: s.ref })}
+                  >
+                    {isApplying ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Aplicando…
+                      </>
+                    ) : (
+                      s.accion_label
+                    )}
+                  </Button>
                 </div>
               </div>
               {s.marcas && s.marcas.length > 0 && (

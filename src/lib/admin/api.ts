@@ -25,7 +25,7 @@ export type Sugerencia = {
   ref: string;
   titulo: string;
   detalle: string;
-  accion: "fusionar" | "calcular_usd" | "navegar_equipo" | string;
+  accion: "fusionar" | "calcular_usd" | "asignar_categoria" | string;
   accion_label: string;
   // Payloads específicos por tipo.
   marcas?: Array<{ id: number; nombre: string; cant_pedidos: number; equipos: number }>;
