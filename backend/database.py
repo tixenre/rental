@@ -682,6 +682,38 @@ def init_db():
         "ALTER TABLE spec_definitions "
         "ADD COLUMN IF NOT EXISTS output_config JSONB"
     )
+
+    # Observatorio de specs: relevamiento desnormalizado de los specs que
+    # el scrape B&H/Adorama detecta en `equipo_fichas.raw_json`. Sirve
+    # para detectar gaps del template, calibrar enum_options y familias
+    # jerárquicas. Se repopula con `POST /admin/specs/observatorio/recompute`.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS spec_observacion (
+            id                  SERIAL PRIMARY KEY,
+            equipo_id           INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            categoria_raiz      VARCHAR(64),
+            label_observado     VARCHAR(255) NOT NULL,
+            label_normalizado   VARCHAR(255) NOT NULL,
+            value_observado     TEXT NOT NULL,
+            spec_def_id         INTEGER REFERENCES spec_definitions(id) ON DELETE SET NULL,
+            matched_template    BOOLEAN NOT NULL DEFAULT FALSE,
+            source              VARCHAR(64),
+            observed_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (equipo_id, label_normalizado)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_obs_categoria_label "
+        "ON spec_observacion (categoria_raiz, label_normalizado)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_obs_matched "
+        "ON spec_observacion (matched_template) WHERE matched_template = FALSE"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_obs_spec_def "
+        "ON spec_observacion (spec_def_id) WHERE spec_def_id IS NOT NULL"
+    )
     # Catálogo global de unidades (lm, K, V, A, W…). Referenciado por specs
     # tabla con columnas `valor_unidad` para listas cerradas de opciones.
     conn.execute("""
