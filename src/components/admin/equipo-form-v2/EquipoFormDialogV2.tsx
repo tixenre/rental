@@ -50,7 +50,7 @@ import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/use
 import { KitEditor } from "./KitEditor";
 import { SpecsDiffEditor } from "./SpecsDiffEditor";
 import {
-  type Spec, newSpec, withIds, sameLabel, mergeSpecs, findSpecValue, uniq,
+  type Spec, newSpec, withIds, sameLabel, fuzzySameLabel, mergeSpecs, findSpecValue, uniq,
 } from "./spec-helpers";
 import type { AutocompletarResult } from "../autocompletar";
 import { generarNombrePublico, categoriaSoportaAutoGen } from "./nombre-publico";
@@ -469,23 +469,30 @@ export function EquipoFormDialogV2({
       // (label normalizado): el usuario no debería tener que clickear ✓ uno
       // por uno cuando ya hay un campo definido para ese spec. Solo quedan
       // como "propuestos pendientes" los que NO matchean — esos sí necesitan
-      // decisión (¿agregar al catálogo? ¿ignorar?).
-      const tmplLabels = new Set(
-        (templateItems ?? []).map((t) => t.label.trim().toLowerCase()),
-      );
-      const autoAplicables = propuestos.filter((p) =>
-        tmplLabels.has(p.label.trim().toLowerCase()),
-      );
-      const requierenRevision = propuestos.filter((p) =>
-        !tmplLabels.has(p.label.trim().toLowerCase()),
-      );
+      // decisión (¿agregar al catálogo? ¿ignorar?). El match es fuzzy
+      // (sin tildes, sin paréntesis, sub-string) para tolerar variaciones
+      // típicas del LLM: "FPS max" ↔ "FPS máx", "Sensor" ↔ "Tipo de sensor".
+      const tmpls = templateItems ?? [];
+      const autoAplicables: Spec[] = [];
+      const requierenRevision: Spec[] = [];
+      const labelDelTemplate = new Map<string, string>();  // id propuesto → label canónico del template
+      for (const p of propuestos) {
+        const matched = tmpls.find((t) => fuzzySameLabel(t.label, p.label));
+        if (matched) {
+          autoAplicables.push(p);
+          labelDelTemplate.set(p.id, matched.label);   // usar el label canónico
+        } else {
+          requierenRevision.push(p);
+        }
+      }
       if (autoAplicables.length > 0) {
         setSpecs((prev) => {
           const next = [...prev];
           for (const p of autoAplicables) {
-            const idx = next.findIndex((x) => sameLabel(x.label, p.label));
+            const canonical = labelDelTemplate.get(p.id) ?? p.label;
+            const idx = next.findIndex((x) => sameLabel(x.label, canonical));
             if (idx >= 0) next[idx] = { ...next[idx], value: p.value };
-            else next.push(newSpec(p.label, p.value));
+            else next.push(newSpec(canonical, p.value));
           }
           return next;
         });
@@ -675,24 +682,29 @@ export function EquipoFormDialogV2({
         if (r.montura) propuestos.unshift(newSpec("Montura", r.montura));
         if (r.formato) propuestos.unshift(newSpec("Formato", r.formato));
         if (r.resolucion) propuestos.unshift(newSpec("Resolución", r.resolucion));
-        // Misma partición que en el callback del scrape: matcheables al
-        // template van directo a specs, el resto a pendientes de revisar.
-        const tmplLabels = new Set(
-          (templateItems ?? []).map((t) => t.label.trim().toLowerCase()),
-        );
-        const autoAplicables = propuestos.filter((p) =>
-          tmplLabels.has(p.label.trim().toLowerCase()),
-        );
-        const requierenRevision = propuestos.filter((p) =>
-          !tmplLabels.has(p.label.trim().toLowerCase()),
-        );
+        // Misma partición que el callback del scrape (fuzzy match para
+        // tolerar variaciones de label del LLM).
+        const tmpls = templateItems ?? [];
+        const autoAplicables: Spec[] = [];
+        const requierenRevision: Spec[] = [];
+        const labelDelTemplate = new Map<string, string>();
+        for (const p of propuestos) {
+          const matched = tmpls.find((t) => fuzzySameLabel(t.label, p.label));
+          if (matched) {
+            autoAplicables.push(p);
+            labelDelTemplate.set(p.id, matched.label);
+          } else {
+            requierenRevision.push(p);
+          }
+        }
         if (autoAplicables.length > 0) {
           setSpecs((prev) => {
             const next = [...prev];
             for (const p of autoAplicables) {
-              const idx = next.findIndex((x) => sameLabel(x.label, p.label));
+              const canonical = labelDelTemplate.get(p.id) ?? p.label;
+              const idx = next.findIndex((x) => sameLabel(x.label, canonical));
               if (idx >= 0) next[idx] = { ...next[idx], value: p.value };
-              else next.push(newSpec(p.label, p.value));
+              else next.push(newSpec(canonical, p.value));
             }
             return next;
           });

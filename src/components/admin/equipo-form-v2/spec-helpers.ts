@@ -17,6 +17,37 @@ export const withIds = (raw: Array<{ label: string; value: string }>): Spec[] =>
 export const sameLabel = (a: string, b: string) =>
   a.trim().toLowerCase() === b.trim().toLowerCase();
 
+/** Normalización agresiva para match fuzzy: lowercase, sin tildes, sin
+ *  paréntesis ni contenido, sin espacios extra. Útil cuando el LLM trae
+ *  "FPS max" y el template tiene "FPS máx", o "Megapixels" vs
+ *  "Megapixels (efectivos)". */
+const normalize = (s: string): string =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")  // saca tildes/diacríticos
+    .replace(/\s*\([^)]*\)\s*/g, " ")  // saca "(...)" y contenido
+    .replace(/[._\-\/]/g, " ")          // separadores → espacio
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** Match fuzzy entre labels: igualdad exacta normalizada, o uno contiene
+ *  al otro como palabra (sub-string normalizado). Soporta los típicos
+ *  del LLM: "FPS max" ↔ "FPS máx", "Sensor" ↔ "Tipo de sensor",
+ *  "Resolucion" ↔ "Resolución máx. de grabación". */
+export const fuzzySameLabel = (a: string, b: string): boolean => {
+  const na = normalize(a);
+  const nb = normalize(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  // Sub-string solo si la versión "corta" tiene al menos 4 chars (evita
+  // que "no" matchee con "nombre" o cosas así). El LLM suele traer labels
+  // más cortos que el template (ej. "Formato" vs "Formato de sensor").
+  const [short, long] = na.length <= nb.length ? [na, nb] : [nb, na];
+  if (short.length < 4) return false;
+  return long.includes(short);
+};
+
 /** Une dos listas de specs por label (case-insensitive). Si ya existe, no pisa. */
 export const mergeSpecs = (existing: Spec[], extras: Spec[]): Spec[] => {
   const result = [...existing];
