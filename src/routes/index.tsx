@@ -8,6 +8,7 @@ import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
 import { CartDrawer } from "@/components/rental/CartDrawer";
 import { CartMiniBar } from "@/components/rental/CartMiniBar";
+import { FlyToCartLayer } from "@/components/rental/FlyToCartLayer";
 import { CarouselRow } from "@/components/rental/CarouselRow";
 import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { BrandCarousel } from "@/components/rental/BrandCarousel";
@@ -654,6 +655,7 @@ function ListMode({
         )}
       </div>
       <CartMiniBar allEquipos={allEquipos} />
+      <FlyToCartLayer />
     </>
   );
 }
