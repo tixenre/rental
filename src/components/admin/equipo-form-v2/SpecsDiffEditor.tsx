@@ -344,13 +344,16 @@ function CustomSortableRow({
 // ── NumericValueInput (Fase B) ──────────────────────────────────────────
 
 // ── RangoValueInput (#calidad-datos) ────────────────────────────────────
-// Acepta un valor único ("50") o rango ("24-70"). Almacena el string crudo
-// SIN unidad — el catálogo agrega el sufijo al renderizar. Esto mantiene
-// la BD ordenable (el min y max se parsean al sortear).
+// Dos inputs separados: min y max. Si max queda vacío, se guarda como valor
+// fijo (ej. "50 mm"). Si los dos están, se guarda como rango ("24-70 mm").
+// La BD almacena el string final con unidad como sufijo.
 
-function extractRangoPart(raw: string): string {
-  const match = /(\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?)/.exec(raw);
-  return match?.[1]?.replace(/\s+/g, "") ?? "";
+function parseRango(raw: string): { min: string; max: string } {
+  const match = /(\d+(?:\.\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?/.exec(raw);
+  return {
+    min: match?.[1] ?? "",
+    max: match?.[2] ?? "",
+  };
 }
 
 function RangoValueInput({
@@ -360,22 +363,43 @@ function RangoValueInput({
   unidad: string;
   onChange: (v: string) => void;
 }) {
-  const rangoPart = extractRangoPart(value);
+  const { min, max } = parseRango(value);
+
+  const commit = (nextMin: string, nextMax: string) => {
+    const cleanMin = nextMin.trim();
+    const cleanMax = nextMax.trim();
+    if (!cleanMin) {
+      onChange("");
+      return;
+    }
+    const rango = cleanMax ? `${cleanMin}-${cleanMax}` : cleanMin;
+    onChange(`${rango} ${unidad}`);
+  };
+
   return (
-    <div className="relative">
+    <div className="flex items-center gap-1.5">
       <Input
-        value={rangoPart}
-        onChange={(e) => {
-          const raw = e.target.value.trim();
-          onChange(raw ? `${raw} ${unidad}` : "");
-        }}
-        placeholder="50 ó 24-70"
-        className="text-xs pr-12"
+        type="number"
+        inputMode="decimal"
+        step="any"
+        value={min}
+        onChange={(e) => commit(e.target.value, max)}
+        placeholder="50"
+        className="text-xs w-16"
+        aria-label="Valor mínimo (o único si es fijo)"
       />
-      <span
-        className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] uppercase tracking-wider text-muted-foreground"
-        aria-hidden
-      >
+      <span className="text-[11px] text-muted-foreground select-none">–</span>
+      <Input
+        type="number"
+        inputMode="decimal"
+        step="any"
+        value={max}
+        onChange={(e) => commit(min, e.target.value)}
+        placeholder="70"
+        className="text-xs w-16"
+        aria-label="Valor máximo (vacío si es fijo)"
+      />
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
         {unidad}
       </span>
     </div>
