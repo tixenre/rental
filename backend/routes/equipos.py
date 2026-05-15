@@ -2055,9 +2055,10 @@ def admin_list_categorias(request: Request):
             SELECT c.id, c.nombre, c.prioridad, c.parent_id,
                    COALESCE(c.visible, TRUE) AS visible,
                    c.nombre_publico_template,
-                   COUNT(ec.equipo_id) AS total
+                   COUNT(e.id) AS total
             FROM categorias c
             LEFT JOIN equipo_categorias ec ON ec.categoria_id = c.id
+            LEFT JOIN equipos e ON e.id = ec.equipo_id AND e.eliminado_at IS NULL
             GROUP BY c.id, c.nombre, c.prioridad, c.parent_id, c.visible, c.nombre_publico_template
             ORDER BY c.prioridad ASC, LOWER(c.nombre) ASC
         """).fetchall()
