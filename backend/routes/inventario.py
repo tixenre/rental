@@ -158,13 +158,63 @@ def _matches_keyword(text: str, kw: str) -> bool:
     return bool(re.search(pattern, text))
 
 
+def _build_keyword_to_cats(conn) -> dict[str, list[dict]]:
+    """Para cada bucket de _CATEGORIA_KEYWORDS, encuentra qué categorías
+    reales de la BD matchean (por palabra completa en su nombre). Devuelve
+    map bucket → [{id, nombre, depth, ancestors: set[int]}], ordenadas por
+    depth desc (las más específicas primero)."""
+    cats = conn.execute("SELECT id, nombre, parent_id FROM categorias").fetchall()
+    by_id: dict[int, dict] = {c["id"]: dict(c) for c in cats}
+
+    def ancestors_of(cat: dict) -> set[int]:
+        out: set[int] = set()
+        cur = cat
+        while cur.get("parent_id"):
+            pid = cur["parent_id"]
+            if pid in out:
+                break  # protección contra ciclos
+            out.add(pid)
+            cur = by_id.get(pid) or {}
+        return out
+
+    def depth_of(cat: dict) -> int:
+        return len(ancestors_of(cat))
+
+    result: dict[str, list[dict]] = {}
+    for bucket, kws in _CATEGORIA_KEYWORDS.items():
+        matches = []
+        for cid, c in by_id.items():
+            nombre_lower = (c["nombre"] or "").lower()
+            if any(_matches_keyword(nombre_lower, kw) for kw in kws):
+                matches.append({
+                    "id": cid,
+                    "nombre": c["nombre"],
+                    "depth": depth_of(c),
+                    "ancestors": ancestors_of(c),
+                })
+        # Más profundas primero (más específicas).
+        matches.sort(key=lambda m: (-m["depth"], m["nombre"]))
+        result[bucket] = matches
+    return result
+
+
 def _detect_categoria_sospechosa(conn) -> list[dict]:
-    """Detecta equipos donde el nombre contiene un keyword fuerte que sugiere
-    una categoría pero la categoría asignada no matchea. Conservador para
-    minimizar falsos positivos."""
+    """Detecta equipos donde el nombre tiene un keyword que sugiere una
+    categoría existente en la BD que el equipo no tiene. Usa el árbol de
+    categorías: sugiere la más profunda (específica) disponible, y no
+    flaggea si el equipo ya tiene una categoría del mismo bucket o un
+    descendiente de la sugerida."""
+    keyword_to_cats = _build_keyword_to_cats(conn)
+    if not any(keyword_to_cats.values()):
+        return []  # no hay categorías matcheables en la BD
+
     rows = conn.execute("""
         SELECT
           e.id, e.nombre, e.marca,
+          COALESCE(
+            (SELECT array_agg(ec.categoria_id) FROM equipo_categorias ec WHERE ec.equipo_id = e.id),
+            ARRAY[]::int[]
+          ) AS categoria_ids,
           (SELECT COALESCE(string_agg(c.nombre, ', '), '(sin categoría)')
              FROM equipo_categorias ec
              JOIN categorias c ON c.id = ec.categoria_id
@@ -173,34 +223,46 @@ def _detect_categoria_sospechosa(conn) -> list[dict]:
         WHERE e.eliminado_at IS NULL
         ORDER BY e.id
     """).fetchall()
+
     out = []
     for r in rows:
         nombre_lower = (r["nombre"] or "").lower()
-        cats_lower = (r["categorias_actuales"] or "").lower()
-        for cat_expected, kws in _CATEGORIA_KEYWORDS.items():
+        equipo_cat_ids: set[int] = set(r["categoria_ids"] or [])
+
+        for bucket, kws in _CATEGORIA_KEYWORDS.items():
             if not any(_matches_keyword(nombre_lower, kw) for kw in kws):
                 continue
-            # ¿La categoría actual ya cubre esto? (chequeo laxo intencional
-            # para no flaggear cuando el equipo está en una categoría con
-            # nombre relacionado, aunque no exacto).
-            if cat_expected in cats_lower:
+            candidates = keyword_to_cats.get(bucket, [])
+            if not candidates:
                 continue
-            if any(_matches_keyword(cats_lower, kw) for kw in kws):
+            # ¿El equipo ya tiene alguna categoría de este bucket? Saltamos.
+            already_in_bucket = any(c["id"] in equipo_cat_ids for c in candidates)
+            if already_in_bucket:
+                continue
+            # ¿Tiene un descendiente de alguna candidata? También saltamos
+            # (no queremos sugerir un padre cuando el hijo ya está).
+            best = None
+            for c in candidates:
+                if equipo_cat_ids & {c["id"], *c.get("ancestors", set())}:
+                    continue
+                best = c
+                break
+            if not best:
                 continue
             out.append({
                 "tipo": "categoria_sospechosa",
-                "ref": str(r["id"]),
-                "titulo": f"'{r['marca'] or ''} {r['nombre']}' parece {cat_expected} pero no lo tiene",
+                "ref": f"{r['id']}:{best['id']}",  # equipo_id:categoria_id
+                "titulo": f"'{r['marca'] or ''} {r['nombre']}' no tiene la categoría '{best['nombre']}'",
                 "detalle": (
                     f"Categoría actual: {r['categorias_actuales']}. "
-                    f"El nombre contiene un keyword que sugiere '{cat_expected}'."
+                    f"El nombre sugiere '{bucket}' — match real en la BD: '{best['nombre']}'."
                 ),
                 "equipo_id": r["id"],
-                "categoria_sugerida": cat_expected,
+                "categoria_sugerida": best["nombre"],
                 "accion": "asignar_categoria",
-                "accion_label": f"Asignar '{cat_expected}'",
+                "accion_label": f"Asignar '{best['nombre']}'",
             })
-            break  # 1 sospecha por equipo es suficiente
+            break  # una sospecha por equipo
     return out
 
 
@@ -287,7 +349,16 @@ def aplicar_sugerencia(body: AplicarSugerenciaBody, _admin: dict = Depends(requi
         if body.tipo == "precio_sin_usd":
             return _apply_calcular_usd(conn)
         if body.tipo == "categoria_sospechosa":
-            return _apply_asignar_categoria(conn, equipo_id=int(body.ref))
+            # ref viene como "equipo_id:categoria_id"
+            try:
+                equipo_id_str, categoria_id_str = body.ref.split(":")
+                return _apply_asignar_categoria(
+                    conn,
+                    equipo_id=int(equipo_id_str),
+                    categoria_id=int(categoria_id_str),
+                )
+            except (ValueError, AttributeError):
+                raise HTTPException(400, "ref inválido para categoria_sospechosa.")
         raise HTTPException(400, f"Tipo de sugerencia desconocido: {body.tipo}")
     finally:
         conn.close()
@@ -327,45 +398,22 @@ def _apply_fusionar_marcas(conn, clave: str) -> dict:
     }
 
 
-def _apply_asignar_categoria(conn, equipo_id: int) -> dict:
-    """Re-detecta la categoría sugerida para `equipo_id` y la asigna. La
-    re-detección es por consistencia: el frontend manda solo el equipo_id,
-    el match al expected se computa server-side desde el nombre actual del
-    equipo (en caso de que haya cambiado entre detect y apply)."""
+def _apply_asignar_categoria(conn, equipo_id: int, categoria_id: int) -> dict:
+    """Asigna `categoria_id` al `equipo_id`. La categoría viene resuelta
+    desde el detector (que ya elige la más específica disponible en la BD)
+    así que acá solo verificamos que ambos existan e insertamos."""
     eq = conn.execute(
-        "SELECT id, nombre FROM equipos WHERE id = ? AND eliminado_at IS NULL",
+        "SELECT id FROM equipos WHERE id = ? AND eliminado_at IS NULL",
         (equipo_id,),
     ).fetchone()
     if not eq:
         raise HTTPException(404, "Equipo no encontrado.")
-    nombre_lower = (eq["nombre"] or "").lower()
-    cat_expected: str | None = None
-    for cat_key, kws in _CATEGORIA_KEYWORDS.items():
-        if any(_matches_keyword(nombre_lower, kw) for kw in kws):
-            cat_expected = cat_key
-            break
-    if not cat_expected:
-        raise HTTPException(
-            400,
-            "Ya no se detecta categoría sospechosa — el nombre del equipo cambió.",
-        )
-    # Buscar la categoría existente cuyo nombre matchee el bucket. Preferimos
-    # match exacto (LOWER(nombre) = keyword), después un LIKE laxo.
-    row = conn.execute(
-        "SELECT id, nombre FROM categorias WHERE LOWER(nombre) = LOWER(?) LIMIT 1",
-        (cat_expected,),
+    cat = conn.execute(
+        "SELECT id, nombre FROM categorias WHERE id = ?",
+        (categoria_id,),
     ).fetchone()
-    if not row:
-        row = conn.execute(
-            "SELECT id, nombre FROM categorias WHERE LOWER(nombre) LIKE ? OR LOWER(nombre) LIKE ? ORDER BY id LIMIT 1",
-            (f"%{cat_expected.lower()}%", f"{cat_expected.lower()}%"),
-        ).fetchone()
-    if not row:
-        raise HTTPException(
-            400,
-            f"No existe una categoría llamada '{cat_expected}'. Creala primero o usá 'Editar equipo' para elegir manualmente.",
-        )
-    categoria_id = row["id"]
+    if not cat:
+        raise HTTPException(404, "Categoría no encontrada.")
     conn.execute(
         """
         INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
@@ -375,7 +423,7 @@ def _apply_asignar_categoria(conn, equipo_id: int) -> dict:
         (equipo_id, categoria_id),
     )
     conn.commit()
-    return {"ok": True, "message": f"Categoría '{row['nombre']}' asignada al equipo."}
+    return {"ok": True, "message": f"Categoría '{cat['nombre']}' asignada al equipo."}
 
 
 def _apply_calcular_usd(conn) -> dict:
