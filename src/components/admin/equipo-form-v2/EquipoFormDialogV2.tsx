@@ -60,26 +60,51 @@ import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 // Schema
 // ════════════════════════════════════════════════════════════════════
 
-const schema = z.object({
-  nombre: z.string().min(1, "Nombre requerido"),
-  marca: z.string().optional().nullable(),
-  modelo: z.string().optional().nullable(),
-  cantidad: z.coerce.number().int().min(0).default(1),
-  precio_jornada: z.coerce.number().int().min(0).optional().nullable(),
-  precio_usd: z.coerce.number().min(0).optional().nullable(),
-  roi_pct: z.coerce.number().min(0).optional().nullable(),
-  valor_reposicion: z.coerce.number().min(0).optional().nullable(),
-  fecha_compra: z.string().optional().nullable(),
-  serie: z.string().optional().nullable(),
-  bh_url: z.string().optional().nullable(),
-  foto_url: z.string().optional().nullable(),
-  dueno: z.string().optional().nullable(),
-  estado: z.enum(["operativo", "en_mantenimiento", "fuera_servicio"]).default("operativo"),
-  visible_catalogo: z.boolean().default(true),
-  ficha_completa: z.boolean().default(false),
-});
+// Schema dinámico: en creación validamos campos mínimos obligatorios
+// (#351). En edición todo queda opcional para no romper flujos de
+// completado parcial — el dashboard de calidad ya visibiliza los huecos.
+function buildSchema(isEdit: boolean) {
+  const requiredStr = (name: string) =>
+    isEdit
+      ? z.string().optional().nullable()
+      : z.string().min(1, `${name} requerido`);
+  const requiredNum = (name: string) =>
+    isEdit
+      ? z.coerce.number().min(0).optional().nullable()
+      : z.coerce.number().min(1, `${name} requerido`);
 
-type FormValues = z.infer<typeof schema>;
+  return z.object({
+    nombre:           z.string().min(1, "Nombre requerido"),
+    marca:            requiredStr("Marca"),
+    modelo:           z.string().optional().nullable(),
+    cantidad:         z.coerce.number().int().min(1, "Cantidad requerida").default(1),
+    precio_jornada:   requiredNum("Precio/jornada"),
+    precio_usd:       z.coerce.number().min(0).optional().nullable(),
+    roi_pct:          z.coerce.number().min(0).optional().nullable(),
+    valor_reposicion: z.coerce.number().min(0).optional().nullable(),
+    fecha_compra:     z.string().optional().nullable(),
+    serie:            z.string().optional().nullable(),
+    bh_url:           z.string().optional().nullable(),
+    foto_url:         z.string().optional().nullable(),
+    dueno:            requiredStr("Dueño"),
+    estado:           z.enum(["operativo", "en_mantenimiento", "fuera_servicio"]).default("operativo"),
+    visible_catalogo: z.boolean().default(true),
+    ficha_completa:   z.boolean().default(false),
+  });
+}
+
+type FormValues = z.infer<ReturnType<typeof buildSchema>>;
+
+/** Campos "recomendados" para un equipo (#351). Después del create, si
+ *  alguno está vacío, mostramos un toast con CTA para completar. */
+const RECOMMENDED_FIELDS = ["foto", "descripcion", "serie", "valor_reposicion"] as const;
+type RecommendedField = typeof RECOMMENDED_FIELDS[number];
+const RECOMMENDED_LABELS: Record<RecommendedField, string> = {
+  foto:             "foto",
+  descripcion:      "descripción",
+  serie:            "número de serie",
+  valor_reposicion: "valor de reposición",
+};
 
 // ════════════════════════════════════════════════════════════════════
 // Componente principal
@@ -91,18 +116,23 @@ export function EquipoFormDialogV2({
   initial,
   onSubmit,
   saving,
+  onCreatedWithMissingRecommended,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial?: Equipo | null;
   onSubmit: (data: EquipoInput, etiquetas: string[]) => Promise<Equipo>;
   saving?: boolean;
+  /** Si el equipo se creó pero le faltan recomendados, el parent decide
+   *  qué hacer (ej. reabrir el form en modo edit). #351 */
+  onCreatedWithMissingRecommended?: (equipo: Equipo, missing: RecommendedField[]) => void;
 }) {
   const isEdit = !!initial;
   const { rate: usdRate } = useUsdRate();
   const roiDefault = useRoiPctDefault();
 
   // ── Estado del form (react-hook-form) ──────────────────────────────
+  const schema = useMemo(() => buildSchema(isEdit), [isEdit]);
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as never,
     defaultValues: {
@@ -629,6 +659,16 @@ export function EquipoFormDialogV2({
   }, [open, saving]);
 
   const submit = form.handleSubmit(async (values) => {
+    // Validación de creación: al menos una categoría seleccionada (#351).
+    // Las categorías viven en estado separado del schema zod, así que las
+    // chequeamos acá. En edit dejamos pasar por compat con equipos legacy.
+    if (!isEdit && selectedCats.size === 0) {
+      toast.error("Categoría requerida", {
+        description: "Elegí al menos una categoría antes de guardar.",
+      });
+      return;
+    }
+
     // Pre-flight: validación de duplicados por serie. La serie es lo más
     // único; si ya hay otro equipo con la misma, le pedimos confirmación al
     // user antes de seguir (puede ser legítimo en kits, pero conviene avisar).
@@ -800,6 +840,40 @@ export function EquipoFormDialogV2({
         duration: 7000,
       });
     } else {
+      // En creación, si faltan campos recomendados, ofrecemos completarlos
+      // ahora antes de cerrar — el equipo ya está creado, esto es opcional. #351
+      if (!isEdit && equipoId) {
+        // Para foto consideramos tanto foto_url ya seteada como pendingFile
+        // recién subido (que ya se aplicó arriba con setValue).
+        const missing: RecommendedField[] = [];
+        const fotoTras = form.getValues("foto_url") || pendingFile;
+        if (!fotoTras) missing.push("foto");
+        if (!descripcion?.trim()) missing.push("descripcion");
+        const serieClean = values.serie?.trim();
+        if (!serieClean) missing.push("serie");
+        if (!values.valor_reposicion || values.valor_reposicion === 0) missing.push("valor_reposicion");
+
+        if (missing.length > 0 && onCreatedWithMissingRecommended) {
+          const labels = missing.map((m) => RECOMMENDED_LABELS[m]).join(", ");
+          toast.success("Equipo creado", {
+            description: `Faltan datos recomendados: ${labels}`,
+            action: {
+              label: "Completar →",
+              onClick: () => {
+                // Reabrimos el form en edit mode con el equipo recién creado.
+                // El form vuelve a abrirse con todos los datos cargados y los
+                // campos faltantes resaltados implícitamente vía el dashboard
+                // de calidad (#349).
+                const savedEquipo = { ...(initial ?? {}), ...payload, id: equipoId } as Equipo;
+                onCreatedWithMissingRecommended(savedEquipo, missing);
+              },
+            },
+            duration: 12000,
+          });
+          onOpenChange(false);
+          return;
+        }
+      }
       toast.success(isEdit ? "Equipo actualizado" : "Equipo creado");
     }
     onOpenChange(false);

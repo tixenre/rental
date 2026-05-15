@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 145,
+    date: "2026-05-15",
+    type: "feat",
+    title: "Crear equipo: campos mínimos obligatorios + invitación a completar lo recomendado",
+    body: "Al crear un equipo nuevo, ahora son obligatorios: nombre, marca, categoría, cantidad, precio por jornada y dueño. Si falta alguno, el form no deja guardar. Cuando el equipo se crea OK, si quedaron campos recomendados vacíos (foto, descripción, número de serie, valor de reposición), aparece un toast diciendo cuáles faltan con un botón \"Completar →\" que reabre el form en modo edición. En edición los campos siguen siendo todos opcionales — no romper flujos legacy.",
+    labels: ["admin", "calidad-datos", "ux"],
+  },
+  {
     number: 144,
     date: "2026-05-15",
     type: "feat",

@@ -7,6 +7,8 @@
 
 ### ✨ Novedades
 
+- **Crear equipo: campos mínimos obligatorios + invitación a completar lo recomendado** *(15 de mayo de 2026)*
+  Al crear un equipo nuevo, ahora son obligatorios: nombre, marca, categoría, cantidad, precio por jornada y dueño. Si falta alguno, el form no deja guardar. Cuando el equipo se crea OK, si quedaron campos recomendados vacíos (foto, descripción, número de serie, valor de reposición), aparece un toast diciendo cuáles faltan con un botón "Completar →" que reabre el form en modo edición. En edición los campos siguen siendo todos opcionales — no romper flujos legacy.
 - **Dashboard de calidad: cada fila es ahora un CTA que filtra equipos directamente** *(15 de mayo de 2026)*
   Las filas del dashboard /admin/equipos/calidad pasaron de ser solo lectura a ser links. Click en "5 sin foto principal" → te lleva a /admin/equipos filtrado a esos 5 equipos, con un banner ámbar arriba que dice "Filtrando equipos sin foto principal · 5 resultados · Quitar filtro". Cada campo faltante (foto, categoría, nombre público, descripción, serie, valor de reposición) tiene su filtro propio compartible vía URL.
 - **Dashboard de calidad del inventario — qué equipos tienen datos faltantes** *(15 de mayo de 2026)*

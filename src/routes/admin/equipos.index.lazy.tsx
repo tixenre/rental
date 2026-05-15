@@ -663,6 +663,13 @@ function EquiposPage() {
           initial={editing}
           saving={saveMut.isPending}
           onSubmit={(data, etiquetas) => saveMut.mutateAsync({ data, etiquetas })}
+          onCreatedWithMissingRecommended={(equipo) => {
+            // Reabrimos el form en modo edit con el equipo recién creado
+            // para que el admin pueda completar foto / descripción / etc.
+            // sin tener que buscar el equipo en la lista. #351
+            setEditing(equipo);
+            setOpenForm(true);
+          }}
         />
       )}
 
