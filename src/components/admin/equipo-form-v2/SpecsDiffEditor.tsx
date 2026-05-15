@@ -19,7 +19,7 @@
  * categoría, no a uno solo.
  */
 
-import { Plus, Trash2, GripVertical, BookmarkCheck } from "lucide-react";
+import { Trash2, GripVertical, BookmarkCheck } from "lucide-react";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
   type DragEndEvent,
@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/select";
 import type { SpecTemplate } from "@/lib/admin/api";
 
-import { type Spec, newSpec, sameLabel, extractNumericPart } from "./spec-helpers";
+import { type Spec, sameLabel, extractNumericPart } from "./spec-helpers";
 
 const lower = (s: string) => s.trim().toLowerCase();
 
@@ -83,7 +83,8 @@ export function SpecsDiffEditor({
     onChange(specs.map((s) => s.id === id ? { ...s, ...patch } : s));
   };
   const removeSpec = (id: string) => onChange(specs.filter((s) => s.id !== id));
-  const addSpec = () => onChange([...specs, newSpec()]);
+  // addSpec removido: las specs se administran desde Gear Compatibility.
+  // Acá solo se cargan valores para las del template.
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -115,15 +116,19 @@ export function SpecsDiffEditor({
               {totalCount} {totalCount === 1 ? "ítem" : "ítems"}
               {templateBound.length > 0 && custom.length > 0 && (
                 <span className="ml-1.5 opacity-60">
-                  · {templateBound.length} del template + {custom.length} custom
+                  · {templateBound.length} del template + {custom.length} legacy
                 </span>
               )}
             </>
           )}
         </span>
-        <Button type="button" size="sm" variant="ghost" onClick={addSpec}>
-          <Plus className="h-3 w-3 mr-1" /> Agregar
-        </Button>
+        <a
+          href="/admin/gear-compatibility"
+          className="text-[11px] text-muted-foreground hover:text-ink underline"
+          title="Las specs se administran desde Gear Compatibility. Acá solo cargás valores."
+        >
+          ¿Falta una spec? Gestionala en Gear Compatibility →
+        </a>
       </div>
 
       {/* Propuestos (del autocompletar) */}
