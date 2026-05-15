@@ -24,6 +24,21 @@ from slowapi.errors import RateLimitExceeded
 from logging_config import setup_logging, request_id_var
 setup_logging()
 
+# ── Sentry (error tracking) ──────────────────────────────────────────────────
+# Solo activo si SENTRY_DSN está seteado — dev/CI no lo necesitan.
+_sentry_dsn = os.environ.get("SENTRY_DSN")
+if _sentry_dsn:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=0.1,
+        environment=os.environ.get("RAILWAY_ENVIRONMENT", "production"),
+        send_default_pii=False,
+    )
+
 from database import init_db, FRONT, FRONT_NEW
 from routes.equipos          import router as equipos_router
 from routes.alquileres       import router as alquileres_router
