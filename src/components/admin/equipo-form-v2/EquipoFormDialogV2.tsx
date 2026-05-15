@@ -1585,6 +1585,7 @@ function CategoriasPicker({
   selected: Set<number>;
   onChange: (s: Set<number>) => void;
 }) {
+  const [q, setQ] = useState("");
   const toggle = (id: number) => {
     const next = new Set(selected);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -1593,29 +1594,61 @@ function CategoriasPicker({
   const roots = categorias.filter((c) => c.parent_id == null);
   const childrenOf = (pid: number) => categorias.filter((c) => c.parent_id === pid);
 
+  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const nq = norm(q.trim());
+  const matchesName = (nombre: string) => !nq || norm(nombre).includes(nq);
+
+  const visibleRoots = roots.filter((r) => {
+    if (matchesName(r.nombre)) return true;
+    return childrenOf(r.id).some((c) => matchesName(c.nombre));
+  });
+
   return (
-    <div className="space-y-2 max-h-60 overflow-y-auto rounded-md border hairline p-2 mt-1">
-      {roots.map((root) => (
-        <div key={root.id}>
-          <button type="button" onClick={() => toggle(root.id)}>
-            <Badge variant={selected.has(root.id) ? "default" : "outline"} className="cursor-pointer">
-              {root.nombre}
-            </Badge>
+    <div className="space-y-2 mt-1">
+      <div className="relative">
+        <input
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar categoría…"
+          className="w-full text-sm rounded-md border hairline px-3 py-1.5 pr-7 outline-none focus:ring-1 focus:ring-ring bg-background"
+        />
+        {q && (
+          <button type="button" onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            <X className="w-3.5 h-3.5" />
           </button>
-          <div className="flex flex-wrap gap-1 mt-1 ml-3">
-            {childrenOf(root.id).map((c) => (
-              <button key={c.id} type="button" onClick={() => toggle(c.id)}>
-                <Badge variant={selected.has(c.id) ? "default" : "secondary"} className="cursor-pointer text-[10px]">
-                  {c.nombre}
+        )}
+      </div>
+      <div className="space-y-2 max-h-60 overflow-y-auto rounded-md border hairline p-2">
+        {visibleRoots.map((root) => {
+          const visibleChildren = childrenOf(root.id).filter((c) => matchesName(c.nombre) || matchesName(root.nombre));
+          return (
+            <div key={root.id}>
+              <button type="button" onClick={() => toggle(root.id)}>
+                <Badge variant={selected.has(root.id) ? "default" : "outline"} className="cursor-pointer">
+                  {root.nombre}
                 </Badge>
               </button>
-            ))}
-          </div>
-        </div>
-      ))}
-      {roots.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">Sin categorías. Creá algunas en /admin/settings.</p>
-      )}
+              {visibleChildren.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1 ml-3">
+                  {visibleChildren.map((c) => (
+                    <button key={c.id} type="button" onClick={() => toggle(c.id)}>
+                      <Badge variant={selected.has(c.id) ? "default" : "secondary"} className="cursor-pointer text-[10px]">
+                        {c.nombre}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {visibleRoots.length === 0 && (
+          <p className="text-xs text-muted-foreground italic">
+            {q ? "Sin resultados." : "Sin categorías. Creá algunas en /admin/settings."}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
