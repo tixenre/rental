@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, Plus, Minus, Sparkles } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
+import { useFlyToCart } from "@/lib/fly-to-cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { priceBreakdown } from "@/lib/pricing";
@@ -25,8 +26,19 @@ export function EquipmentCard({
 }) {
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
+  const triggerFly = useFlyToCart((s) => s.triggerFly);
   const [imgFailed, setImgFailed] = useState(false);
   const remove = useCart((s) => s.remove);
+
+  const handleAdd = (e: MouseEvent<HTMLButtonElement>) => {
+    if (sinStock || reachedMax) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    triggerFly({
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    });
+    add(item.id);
+  };
   const jornadas = useCart((s) => s.days());
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
   const selected = qty > 0;
@@ -159,7 +171,7 @@ export function EquipmentCard({
         {/* Columna derecha: agregar / cantidad */}
         {qty === 0 ? (
           <button
-            onClick={() => !sinStock && add(item.id)}
+            onClick={handleAdd}
             disabled={sinStock}
             aria-label="Agregar al carrito"
             className="grid h-10 w-10 sm:h-9 sm:w-9 shrink-0 place-items-center rounded-md border hairline transition hover:border-amber hover:bg-amber hover:text-ink active:bg-amber active:border-amber active:text-ink active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
@@ -177,9 +189,7 @@ export function EquipmentCard({
             </button>
             <span className="w-5 text-center text-sm tabular">{qty}</span>
             <button
-              onClick={() => {
-                if (!reachedMax) add(item.id);
-              }}
+              onClick={handleAdd}
               disabled={reachedMax}
               className="grid h-9 w-9 place-items-center rounded text-amber hover:bg-amber/20 active:bg-amber/30 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Sumar uno"

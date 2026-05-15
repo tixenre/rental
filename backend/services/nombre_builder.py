@@ -287,8 +287,9 @@ def _fmt_camara(*, marca, modelo, subcat, specs, raiz, specs_ordered=None) -> tu
         if v.lower() in ("false", "0", "no"):
             continue
         label_lc = label.strip().lower()
-        # Formato especial por key conocida
-        if label_lc.startswith("montura"):
+        # Formato especial por key conocida.
+        # "lens mount" es el label canónico nuevo; "montura" es legacy.
+        if label_lc.startswith("lens mount") or label_lc.startswith("montura"):
             entry = f"Montura {v}"
         elif label_lc.startswith("video"):
             # "UHD 4K hasta 120p" → en el largo tal cual, en el corto
@@ -378,10 +379,11 @@ def _fmt_lente(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], l
             v = f"f/{v}"
         extras_corto.append(v)
 
-    # Montura
-    if specs.get("montura") and "montura" not in modelo_lc:
-        extras_corto.append(f"Montura {specs['montura']}")
-        extras_largo.append(f"Montura {specs['montura']}")
+    # Montura (lens_mount canónico, con fallback a montura legacy).
+    mount_val = specs.get("lens_mount") or specs.get("montura")
+    if mount_val and "montura" not in modelo_lc and "mount" not in modelo_lc:
+        extras_corto.append(f"Montura {mount_val}")
+        extras_largo.append(f"Montura {mount_val}")
 
     # Formato solo en el largo
     if specs.get("formato"):

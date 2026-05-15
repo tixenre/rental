@@ -44,15 +44,29 @@ Detalles de setup en [`README.md`](README.md). Detalles de Railway en [`docs/DEP
 
 ### Workflow
 
-Toda mejora / bug / feature se trackea como **GitHub Issue → PR contra `main` → review → merge → cleanup branch**. No hay listas informales en archivos markdown que sean "el roadmap real".
+**Modo default: desarrollo local-first sobre `main`.**
+
+Claude trabaja directamente en `/Users/tincho/rental` (sin worktree, sin branch intermedia), commiteando atómico a `main` local. El dev server refleja los cambios al instante en localhost. Cada tanto, cuando hay un chunk listo, se pushea `main` a GitHub.
 
 ```
-Idea → Issue → Branch → PR (draft) → CI verde → ready for review → merge → branch deleted
+Edit → commit atómico en main local → ver en localhost → (N veces) → push main a GitHub
 ```
 
-Excepciones:
+**La memoria del proyecto vive en GitHub vía:**
 
-- **Cambios triviales** (typo, dead import) → PR directo, sin issue.
+- **Commit history**: cada commit es Conventional Commits en español (`fix(scope):`, `feat(scope):`). `git log --grep="^fix"` ya es el registro de bugs; `git log --grep="^feat"` el de features. GitHub lo renderiza buscable y permanente.
+- **GitHub Issues**: para trabajo planeado o bugs con discusión / contexto largo. No es obligatorio para cada commit — solo cuando hace falta tracking explícito.
+
+**Cuándo abrir PR en vez de pushear directo a `main`:**
+
+- Cambio sensible que quiere review humana antes de mergear.
+- Iniciativa grande con múltiples commits que quiero revisar como bloque.
+- Cambio arquitectónico / decisión de diseño que deja registro discutible.
+
+Para esos casos, sí: branch dedicada + PR contra `main` (workflow histórico, descrito abajo).
+
+Excepciones al local-first:
+
 - **Decisiones de arquitectura / diseño** → docs en `docs/` (ej. `DISEÑO_SPECS.md`).
 - **Ideas tempranas sin compromiso** → issue con `priority:low` (o conversación con el dueño antes de abrirlo).
 

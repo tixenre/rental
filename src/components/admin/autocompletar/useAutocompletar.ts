@@ -68,7 +68,12 @@ export function useAutocompletar({
     authedJson<AutocompletarResult>("/api/admin/equipos/autocompletar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
+      // Pasamos las categorías del equipo para que el LLM use los labels
+      // canónicos del template — más relevante que la guía global.
+      body: JSON.stringify({
+        ...input,
+        categoria_ids: (equipo?.categorias ?? []).map((c) => c.id),
+      }),
     });
 
   /** Auto-sube la foto a R2 en segundo plano y actualiza fotoUrl cuando termina. */
@@ -387,13 +392,24 @@ export function useAutocompletar({
 
       if (Object.keys(body).length > 0) {
         try {
-          await adminApi.aplicarEnriquecimiento(equipo.id, body);
+          const resp = await adminApi.aplicarEnriquecimiento(equipo.id, body);
           if (body.marca) aplicados.push(`marca: ${body.marca as string}`);
           if (body.modelo) aplicados.push(`modelo: ${body.modelo as string}`);
           if (body.foto_url) aplicados.push("foto");
           if (body.bh_url) aplicados.push("link fuente");
           if (body.descripcion) aplicados.push("descripción");
-          if (body.specs) aplicados.push(`${(body.specs as unknown[]).length} specs`);
+          if (body.specs) {
+            // Si el backend nos dio matching estructurado, reportarlo con detalle.
+            const m = resp.specs_matching;
+            if (m) {
+              aplicados.push(`${m.aplicadas} specs cargadas`);
+              if (m.propuestas_creadas > 0) {
+                aplicados.push(`${m.propuestas_creadas} sugerencias en Gear Compatibility`);
+              }
+            } else {
+              aplicados.push(`${(body.specs as unknown[]).length} specs`);
+            }
+          }
           if (body.keywords) aplicados.push(`${(body.keywords as string[]).length} keywords`);
           if (aplicarFichaExtendida && fichaExtendidaTieneDatos) aplicados.push("ficha técnica");
         } catch (e) {

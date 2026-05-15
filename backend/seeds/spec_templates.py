@@ -1,29 +1,33 @@
 """
 seeds/spec_templates.py — Templates iniciales de specs por categoría.
 
-Cada categoría raíz tiene un template que define qué specs van a tener
-sus equipos. Cuando el admin asigna una categoría a un equipo, el form
-muestra los inputs según este template.
+Post refactor unificar_specs_definitions:
+  - El seed genera dos cosas en dos pasadas:
+    1. `spec_definitions` — catálogo global. Cada `spec_key` único en TEMPLATES
+       se inserta una sola vez. Si el mismo spec_key aparece en varias
+       categorías (ej. montura, formato), su tipo/unidad se toman de la
+       primera ocurrencia y los `enum_options` se UNEN.
+    2. `categoria_spec_templates` — asigna cada categoría a sus specs con sus
+       flags propios (prioridad, destacado, visible_en_*, obligatorio).
 
-Diseño completo en docs/DISEÑO_SPECS.md sección 3.
+Comportamiento idempotente y respeto al back-office:
+  - `spec_definitions`: ON CONFLICT (spec_key) DO NOTHING. Una vez creada,
+    no se pisa por seed. El admin puede editarla desde el catálogo global.
+  - `categoria_spec_templates`: SOLO se pobla si la categoría no tiene ninguna
+    asignación. Si el admin ya configuró algo, el seed no toca nada.
+
+Para forzar reseed de una categoría: borrar TODAS sus asignaciones desde la
+UI y reiniciar el backend; el seed la repuebla.
 
 Convenciones del campo `tipo`:
-    string  →  texto libre (ej. "Full-frame CMOS 12.1MP")
-    number  →  numérico, con `unidad` opcional
-    enum    →  valor de una lista cerrada en `enum_options`
-    bool    →  sí/no
-
-Flags:
-    visible_en_card     → aparece en la card del catálogo
-    visible_en_filtros  → genera filtro en el catálogo
-    visible_en_nombre   → entra en el nombre público auto-generado
-    obligatorio         → required al crear el equipo
-
-`prioridad` ordena la spec en la ficha (más bajo = más arriba). Default 100.
-
-El seed es idempotente: usa ON CONFLICT (categoria_id, spec_key) DO NOTHING.
-Si ya existe el template, NO se pisa (permite que el admin lo edite sin
-que el seed lo revierta en cada arranque).
+    string     → texto libre (ej. "Full-frame CMOS 12.1MP")
+    number     → numérico, con `unidad` opcional
+    enum       → valor único de lista cerrada (enum_options)
+    multi_enum → varios valores de lista cerrada
+    bool       → sí/no
+    rango      → un valor o dos separados por `-` (ej. "24-70"), unidad requerida
+    wxh        → dos medidas separadas por `×` (ej. "6144×3240"), unidad requerida
+    wxhxd      → tres medidas separadas por `×` (ej. "129.7×84.5×77.8"), unidad requerida
 """
 
 import json
@@ -36,59 +40,126 @@ import json
 
 TEMPLATES: dict[str, list[dict]] = {
     # 1. Cámaras
+    # 1. Cámaras — alineado a las specs que B&H lista para cuerpos cinema/foto.
+    # Las 4 destacadas (★) son las que aparecen como quick fact en la card del
+    # catálogo. El orden de la prioridad refleja qué es lo primero que mira un
+    # DP/fotógrafo cuando elige cámara para rentar.
     "Cámaras": [
-        {"key": "sensor", "label": "Sensor", "tipo": "string",
-         "prioridad": 10, "en_card": True, "en_nombre": True,
-         "ayuda": "Ej: Full-frame CMOS 12.1MP"},
-        {"key": "montura", "label": "Montura", "tipo": "enum",
-         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "BMD"],
-         "prioridad": 20, "en_card": True, "en_filtros": True, "en_nombre": True},
+        {"key": "lens_mount", "label": "Lens mount", "tipo": "enum",
+         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "BMD", "B4", "M42"],
+         "prioridad": 10, "en_card": True, "en_filtros": True, "en_nombre": True,
+         "destacado": True},
         {"key": "formato", "label": "Formato", "tipo": "enum",
          "enum_options": ["Full-frame", "Super 35", "APS-C", "MFT", "M4/3", "1\""],
-         "prioridad": 30, "en_filtros": True},
-        {"key": "video_max", "label": "Video máx", "tipo": "enum",
-         "enum_options": ["4K", "6K", "8K", "12K", "FHD"],
-         "prioridad": 40, "en_card": True, "en_filtros": True, "en_nombre": True},
+         "prioridad": 20, "en_card": True, "en_filtros": True, "en_nombre": True,
+         "destacado": True},
+        {"key": "resolucion_max", "label": "Resolución máxima", "tipo": "enum",
+         "enum_options": ["FHD", "2K", "4K", "5.7K", "6K", "8K", "12K"],
+         "prioridad": 30, "en_card": True, "en_filtros": True, "en_nombre": True,
+         "destacado": True},
         {"key": "fps_max", "label": "FPS máx", "tipo": "number", "unidad": "fps",
-         "prioridad": 50},
-        {"key": "iso_max", "label": "ISO máx", "tipo": "number", "unidad": "ISO",
-         "prioridad": 60},
-        {"key": "estabilizacion", "label": "Estabilización", "tipo": "bool",
-         "prioridad": 70, "en_filtros": True},
+         "prioridad": 40, "destacado": True,
+         "ayuda": "Frame rate máximo en la resolución más alta"},
+        {"key": "sensor", "label": "Sensor", "tipo": "string",
+         "prioridad": 50,
+         "ayuda": "Ej: Full-frame CMOS 12.1MP"},
+        {"key": "megapixels", "label": "Megapixels (efectivos)", "tipo": "number",
+         "unidad": "MP", "prioridad": 55},
+        {"key": "codecs", "label": "Codecs principales", "tipo": "string",
+         "prioridad": 60,
+         "ayuda": "Ej: RAW 16-bit, ProRes RAW, XAVC S-I 4:2:2 10-bit"},
+        {"key": "iso_nativo", "label": "ISO nativo", "tipo": "rango",
+         "unidad": "ISO", "prioridad": 65,
+         "ayuda": "Rango nativo del sensor. Ej: 80-102400"},
+        {"key": "iso_extendido", "label": "ISO extendido", "tipo": "rango",
+         "unidad": "ISO", "prioridad": 67,
+         "ayuda": "Rango con boost activado. Ej: 80-409600"},
+        {"key": "rango_dinamico", "label": "Rango dinámico", "tipo": "number",
+         "unidad": "stops", "prioridad": 70,
+         "ayuda": "Stops de latitud (declarados por el fabricante)"},
+        {"key": "estabilizacion", "label": "Estabilización óptica", "tipo": "bool",
+         "prioridad": 75},
+        {"key": "tipo_estabilizacion", "label": "Tipo de estabilización", "tipo": "string",
+         "prioridad": 76,
+         "ayuda": "Ej: Sensor-Shift 5-Axis"},
         {"key": "autofocus", "label": "Autofocus", "tipo": "bool",
          "prioridad": 80},
-        {"key": "peso", "label": "Peso", "tipo": "string",
-         "prioridad": 90, "ayuda": "Ej: 640 g"},
-        {"key": "incluye", "label": "Incluye", "tipo": "string",
-         "prioridad": 100, "ayuda": "Ej: cuerpo, batería, cargador"},
+        {"key": "af_puntos", "label": "Puntos AF", "tipo": "number",
+         "prioridad": 82, "ayuda": "Cant. de puntos de detección"},
+        {"key": "memoria_tipo", "label": "Tipo de memoria", "tipo": "string",
+         "prioridad": 85,
+         "ayuda": "Ej: CFexpress Type A / SDXC dual slot"},
+        {"key": "salida_video", "label": "Salida video", "tipo": "string",
+         "prioridad": 88,
+         "ayuda": "Ej: HDMI Type-A, SDI BNC, USB-C"},
+        {"key": "audio_canales", "label": "Canales de audio", "tipo": "number",
+         "prioridad": 90},
+        {"key": "visor_evf", "label": "Visor (EVF)", "tipo": "bool",
+         "prioridad": 92},
+        {"key": "pantalla", "label": "Pantalla", "tipo": "string",
+         "prioridad": 94,
+         "ayuda": "Ej: 3\" touchscreen tilting"},
+        {"key": "bateria", "label": "Batería", "tipo": "string",
+         "prioridad": 96, "ayuda": "Ej: NP-FZ100, V-mount, AB-mount"},
+        {"key": "consumo_w", "label": "Consumo", "tipo": "number", "unidad": "W",
+         "prioridad": 97},
+        {"key": "netflix_approved", "label": "Netflix approved", "tipo": "bool",
+         "prioridad": 98},
+        {"key": "peso", "label": "Peso", "tipo": "number", "unidad": "g",
+         "prioridad": 100,
+         "ayuda": "Cuerpo solo (sin batería ni media)"},
+        {"key": "dimensiones", "label": "Dimensiones", "tipo": "string",
+         "prioridad": 105, "ayuda": "Ej: 129.7 × 84.5 × 77.8 mm"},
     ],
 
-    # 2. Lentes
+    # 2. Lentes — alineado a la tabla de specs de B&H (lo más rico para
+    # cinematografía y foto). Las destacadas (★) marcan lo que aparece como
+    # quick fact en la fila del catálogo.
+    #
+    # NOTA: focal_min/focal_max/apertura_max/apertura_min se SACARON del seed
+    # — quedaron reemplazados por distancia_focal y apertura (ambos tipo rango)
+    # que cubren fijo y zoom en un solo campo. Si tu DB ya tiene los legacy,
+    # podés borrarlos desde /admin/equipos/specs sin que el seed los reinserte.
     "Lentes": [
-        {"key": "montura", "label": "Montura", "tipo": "enum",
-         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "M42"],
-         "prioridad": 10, "obligatorio": True, "en_card": True,
-         "en_filtros": True, "en_nombre": True},
-        {"key": "focal_min", "label": "Focal mín", "tipo": "number", "unidad": "mm",
-         "prioridad": 20, "en_card": True, "en_nombre": True},
-        {"key": "focal_max", "label": "Focal máx", "tipo": "number", "unidad": "mm",
-         "prioridad": 30, "en_card": True, "en_nombre": True,
-         "ayuda": "Vacío si es lente fijo"},
-        {"key": "apertura_max", "label": "Apertura máx", "tipo": "string",
-         "prioridad": 40, "en_card": True, "en_nombre": True,
-         "ayuda": "Ej: f/1.4 o f/2.8-4"},
+        {"key": "lens_mount", "label": "Lens mount", "tipo": "enum",
+         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "BMD", "B4", "M42"],
+         "prioridad": 10, "en_card": True, "en_filtros": True, "en_nombre": True,
+         "destacado": True},
+        {"key": "distancia_focal", "label": "Distancia focal", "tipo": "rango",
+         "unidad": "mm", "prioridad": 15, "en_card": True, "en_nombre": True,
+         "destacado": True,
+         "ayuda": "Un valor (ej. 50) si es fijo, dos (ej. 24-70) si es zoom"},
+        {"key": "apertura", "label": "Apertura", "tipo": "rango",
+         "unidad": "f/", "prioridad": 20, "en_card": True, "en_nombre": True,
+         "destacado": True,
+         "ayuda": "Un valor (ej. 2.8) si es fija, dos (ej. 2.8-4) si es variable"},
         {"key": "formato", "label": "Formato", "tipo": "enum",
-         "enum_options": ["Full-frame", "APS-C", "MFT", "S35"],
-         "prioridad": 50, "en_filtros": True},
+         "enum_options": ["Full-frame", "APS-C", "MFT", "Super 35", "Medium Format"],
+         "prioridad": 50, "en_filtros": True, "destacado": True},
+        {"key": "diametro_filtro", "label": "Diámetro de filtro", "tipo": "number",
+         "unidad": "mm", "prioridad": 55,
+         "ayuda": "Diámetro de la rosca del filtro frontal (ej. 67, 77, 82)"},
         {"key": "linea", "label": "Línea", "tipo": "string",
          "prioridad": 60, "ayuda": "Ej: Art, GM, Cinema, Master Prime"},
-        {"key": "distancia_minima_m", "label": "Distancia mínima", "tipo": "number",
-         "unidad": "m", "prioridad": 70},
-        {"key": "estabilizacion", "label": "Estabilización", "tipo": "bool",
+        {"key": "angulo_vision", "label": "Ángulo de visión", "tipo": "rango",
+         "unidad": "°", "prioridad": 65,
+         "ayuda": "Un valor si es fijo (ej. 75), dos si es zoom (ej. 84-34)"},
+        {"key": "distancia_minima_m", "label": "Distancia mínima de foco", "tipo": "number",
+         "unidad": "cm", "prioridad": 70},
+        {"key": "magnificacion", "label": "Magnificación máxima", "tipo": "string",
+         "prioridad": 75, "ayuda": "Ej: 0.32x"},
+        {"key": "hojas_diafragma", "label": "Hojas de diafragma", "tipo": "number",
+         "prioridad": 78},
+        {"key": "estabilizacion", "label": "Estabilización óptica", "tipo": "bool",
          "prioridad": 80},
         {"key": "autofocus", "label": "Autofocus", "tipo": "bool",
          "prioridad": 90},
-        {"key": "peso", "label": "Peso", "tipo": "string", "prioridad": 100},
+        {"key": "construccion_optica", "label": "Construcción óptica", "tipo": "string",
+         "prioridad": 95, "ayuda": "Ej: 20 elementos / 15 grupos"},
+        {"key": "peso", "label": "Peso", "tipo": "number", "unidad": "g",
+         "prioridad": 100, "ayuda": "Ej: 695"},
+        {"key": "dimensiones", "label": "Dimensiones", "tipo": "string",
+         "prioridad": 105, "ayuda": "Ej: Ø87.8 × 119.9 mm"},
     ],
 
     # 3. Iluminación
@@ -129,8 +200,8 @@ TEMPLATES: dict[str, list[dict]] = {
         {"key": "material", "label": "Material", "tipo": "enum",
          "enum_options": ["Difusor", "Negro", "Plata", "Oro", "Blanco", "Mixto"],
          "prioridad": 30},
-        {"key": "montura", "label": "Montura", "tipo": "string",
-         "prioridad": 40, "ayuda": "Ej: Bowens, varillas, libre"},
+        {"key": "modificador_montura", "label": "Sistema de montaje", "tipo": "string",
+         "prioridad": 40, "ayuda": "Ej: Bowens, Profoto, varillas, libre"},
         {"key": "plegable", "label": "Plegable", "tipo": "bool", "prioridad": 50},
     ],
 
@@ -235,12 +306,14 @@ TEMPLATES: dict[str, list[dict]] = {
                           "Filtro polarizador", "Filtro UV", "Filtro variable",
                           "Macro tube"],
          "prioridad": 10, "obligatorio": True, "en_card": True, "en_nombre": True},
-        {"key": "montura_in", "label": "Montura entrada", "tipo": "enum",
-         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "M42"],
-         "prioridad": 20, "en_card": True},
-        {"key": "montura_out", "label": "Montura salida", "tipo": "enum",
-         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL"],
-         "prioridad": 30, "en_card": True},
+        {"key": "lens_mount", "label": "Lens mount", "tipo": "enum",
+         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "BMD", "B4", "M42"],
+         "prioridad": 20, "en_card": True,
+         "ayuda": "Lado body (la rosca que se enchufa a la cámara)"},
+        {"key": "lens_mount_out", "label": "Lens mount — lado salida (adaptador)", "tipo": "enum",
+         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "BMD", "B4", "M42"],
+         "prioridad": 30, "en_card": True,
+         "ayuda": "Solo adaptadores: rosca que recibe el lente del otro sistema"},
         {"key": "diametro_mm", "label": "Diámetro", "tipo": "number", "unidad": "mm",
          "prioridad": 40, "ayuda": "Solo para filtros"},
         {"key": "densidad", "label": "Densidad ND", "tipo": "string",
@@ -293,50 +366,128 @@ TEMPLATES: dict[str, list[dict]] = {
 }
 
 
-def seed_spec_templates(conn) -> int:
-    """Inserta los templates iniciales en la DB. Idempotente: si ya existe
-    el par (categoria_id, spec_key), no lo pisa.
+def _collect_spec_definitions() -> dict[str, dict]:
+    """Itera TEMPLATES y agrupa por spec_key, unificando metadata.
 
-    Devuelve la cantidad de specs insertados/actualizados."""
+    Si el mismo spec_key aparece en varias categorías:
+      - tipo / unidad / ayuda: se toma de la PRIMERA ocurrencia.
+      - enum_options: UNION (preservando orden) de todas las variantes.
+      - destacado / flags per-categoría: NO se mergean acá — esos quedan
+        en categoria_spec_templates.
+    """
+    by_key: dict[str, dict] = {}
+    for cat_specs in TEMPLATES.values():
+        for spec in cat_specs:
+            key = spec["key"]
+            if key not in by_key:
+                by_key[key] = {
+                    "label": spec["label"],
+                    "tipo": spec["tipo"],
+                    "unidad": spec.get("unidad"),
+                    "enum_options": list(spec.get("enum_options") or []),
+                    "ayuda": spec.get("ayuda"),
+                }
+            elif spec.get("enum_options"):
+                existing = by_key[key]
+                seen = set(existing["enum_options"])
+                for opt in spec["enum_options"]:
+                    if opt not in seen:
+                        existing["enum_options"].append(opt)
+                        seen.add(opt)
+    return by_key
+
+
+def seed_spec_templates(conn) -> int:
+    """Pasada 1: upsert spec_definitions desde TEMPLATES.
+    Pasada 2: asignar a categorías SOLO si la categoría no tiene asignaciones
+              configuradas (respeta el back-office como source of truth).
+
+    Devuelve la cantidad de asignaciones nuevas insertadas."""
     inserted = 0
+
+    # Pasada 1 — catálogo global. Idempotente vía ON CONFLICT.
+    defs = _collect_spec_definitions()
+    spec_def_ids: dict[str, int] = {}
+    for key, info in defs.items():
+        # ¿Ya existe la definición? Si sí, traemos su id sin pisar.
+        row = conn.execute(
+            "SELECT id FROM spec_definitions WHERE spec_key = ?", (key,)
+        ).fetchone()
+        if row:
+            spec_def_ids[key] = row["id"]
+            continue
+        enum_opts_json = (
+            json.dumps(info["enum_options"]) if info["enum_options"] else None
+        )
+        cur = conn.execute(
+            """
+            INSERT INTO spec_definitions
+              (spec_key, label, tipo, unidad, enum_options, ayuda)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (spec_key) DO NOTHING
+            RETURNING id
+            """,
+            (
+                key,
+                info["label"],
+                info["tipo"],
+                info["unidad"],
+                enum_opts_json,
+                info["ayuda"],
+            ),
+        )
+        new_row = cur.fetchone()
+        if new_row:
+            spec_def_ids[key] = new_row[0]
+        else:
+            # Race: alguien la insertó en paralelo. Re-fetch.
+            row = conn.execute(
+                "SELECT id FROM spec_definitions WHERE spec_key = ?", (key,)
+            ).fetchone()
+            if row:
+                spec_def_ids[key] = row["id"]
+
+    # Pasada 2 — asignaciones por categoría. Solo en categorías vírgenes.
     for cat_nombre, specs in TEMPLATES.items():
-        # Resolver el id de la categoría raíz por nombre.
         row = conn.execute(
             "SELECT id FROM categorias WHERE nombre = %s AND parent_id IS NULL",
             (cat_nombre,),
         ).fetchone()
         if not row:
-            # La categoría no existe (puede pasar si el seed del árbol cambió).
-            # Skipeamos en silencio en lugar de romper el init.
             continue
         cat_id = row["id"]
 
-        for prio_idx, spec in enumerate(specs):
-            enum_opts_json = (
-                json.dumps(spec["enum_options"]) if spec.get("enum_options") else None
-            )
+        # Si la categoría ya tiene CUALQUIER asignación, el dueño la administra
+        # desde el back-office — no inyectamos más.
+        existing = conn.execute(
+            "SELECT COUNT(*) AS n FROM categoria_spec_templates WHERE categoria_id = %s",
+            (cat_id,),
+        ).fetchone()
+        if existing and existing["n"] > 0:
+            continue
+
+        for spec in specs:
+            spec_def_id = spec_def_ids.get(spec["key"])
+            if not spec_def_id:
+                continue
             cur = conn.execute(
                 """
                 INSERT INTO categoria_spec_templates
-                  (categoria_id, spec_key, label, tipo, unidad, enum_options,
-                   prioridad, visible_en_card, visible_en_filtros,
-                   visible_en_nombre, obligatorio, ayuda)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (categoria_id, spec_key) DO NOTHING
+                  (categoria_id, spec_def_id, prioridad, destacado, obligatorio,
+                   visible_en_card, visible_en_filtros, visible_en_nombre, ayuda)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (categoria_id, spec_def_id) DO NOTHING
                 RETURNING id
                 """,
                 (
                     cat_id,
-                    spec["key"],
-                    spec["label"],
-                    spec["tipo"],
-                    spec.get("unidad"),
-                    enum_opts_json,
+                    spec_def_id,
                     spec.get("prioridad", 100),
+                    spec.get("destacado", False),
+                    spec.get("obligatorio", False),
                     spec.get("en_card", False),
                     spec.get("en_filtros", False),
                     spec.get("en_nombre", False),
-                    spec.get("obligatorio", False),
                     spec.get("ayuda"),
                 ),
             )

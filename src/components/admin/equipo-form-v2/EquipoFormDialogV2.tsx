@@ -60,26 +60,51 @@ import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 // Schema
 // ════════════════════════════════════════════════════════════════════
 
-const schema = z.object({
-  nombre: z.string().min(1, "Nombre requerido"),
-  marca: z.string().optional().nullable(),
-  modelo: z.string().optional().nullable(),
-  cantidad: z.coerce.number().int().min(0).default(1),
-  precio_jornada: z.coerce.number().int().min(0).optional().nullable(),
-  precio_usd: z.coerce.number().min(0).optional().nullable(),
-  roi_pct: z.coerce.number().min(0).optional().nullable(),
-  valor_reposicion: z.coerce.number().min(0).optional().nullable(),
-  fecha_compra: z.string().optional().nullable(),
-  serie: z.string().optional().nullable(),
-  bh_url: z.string().optional().nullable(),
-  foto_url: z.string().optional().nullable(),
-  dueno: z.string().optional().nullable(),
-  estado: z.enum(["operativo", "en_mantenimiento", "fuera_servicio"]).default("operativo"),
-  visible_catalogo: z.boolean().default(true),
-  ficha_completa: z.boolean().default(false),
-});
+// Schema dinámico: en creación validamos campos mínimos obligatorios
+// (#351). En edición todo queda opcional para no romper flujos de
+// completado parcial — el dashboard de calidad ya visibiliza los huecos.
+function buildSchema(isEdit: boolean) {
+  const requiredStr = (name: string) =>
+    isEdit
+      ? z.string().optional().nullable()
+      : z.string().min(1, `${name} requerido`);
+  const requiredNum = (name: string) =>
+    isEdit
+      ? z.coerce.number().min(0).optional().nullable()
+      : z.coerce.number().min(1, `${name} requerido`);
 
-type FormValues = z.infer<typeof schema>;
+  return z.object({
+    nombre:           z.string().min(1, "Nombre requerido"),
+    marca:            requiredStr("Marca"),
+    modelo:           z.string().optional().nullable(),
+    cantidad:         z.coerce.number().int().min(1, "Cantidad requerida").default(1),
+    precio_jornada:   requiredNum("Precio/jornada"),
+    precio_usd:       z.coerce.number().min(0).optional().nullable(),
+    roi_pct:          z.coerce.number().min(0).optional().nullable(),
+    valor_reposicion: z.coerce.number().min(0).optional().nullable(),
+    fecha_compra:     z.string().optional().nullable(),
+    serie:            z.string().optional().nullable(),
+    bh_url:           z.string().optional().nullable(),
+    foto_url:         z.string().optional().nullable(),
+    dueno:            requiredStr("Dueño"),
+    estado:           z.enum(["operativo", "en_mantenimiento", "fuera_servicio"]).default("operativo"),
+    visible_catalogo: z.boolean().default(true),
+    ficha_completa:   z.boolean().default(false),
+  });
+}
+
+type FormValues = z.infer<ReturnType<typeof buildSchema>>;
+
+/** Campos "recomendados" para un equipo (#351). Después del create, si
+ *  alguno está vacío, mostramos un toast con CTA para completar. */
+const RECOMMENDED_FIELDS = ["foto", "descripcion", "serie", "valor_reposicion"] as const;
+type RecommendedField = typeof RECOMMENDED_FIELDS[number];
+const RECOMMENDED_LABELS: Record<RecommendedField, string> = {
+  foto:             "foto",
+  descripcion:      "descripción",
+  serie:            "número de serie",
+  valor_reposicion: "valor de reposición",
+};
 
 // ════════════════════════════════════════════════════════════════════
 // Componente principal
@@ -91,18 +116,23 @@ export function EquipoFormDialogV2({
   initial,
   onSubmit,
   saving,
+  onCreatedWithMissingRecommended,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial?: Equipo | null;
   onSubmit: (data: EquipoInput, etiquetas: string[]) => Promise<Equipo>;
   saving?: boolean;
+  /** Si el equipo se creó pero le faltan recomendados, el parent decide
+   *  qué hacer (ej. reabrir el form en modo edit). #351 */
+  onCreatedWithMissingRecommended?: (equipo: Equipo, missing: RecommendedField[]) => void;
 }) {
   const isEdit = !!initial;
   const { rate: usdRate } = useUsdRate();
   const roiDefault = useRoiPctDefault();
 
   // ── Estado del form (react-hook-form) ──────────────────────────────
+  const schema = useMemo(() => buildSchema(isEdit), [isEdit]);
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as never,
     defaultValues: {
@@ -142,8 +172,13 @@ export function EquipoFormDialogV2({
 
   // ── Nombre público ─────────────────────────────────────────────────
   // Input libre + toggle "generar automático desde categoría" (ver nombre-publico.ts).
+  // El toggle arranca ON: si la categoría tiene template, el form regenera el
+  // nombre desde los specs. El usuario puede toggle OFF para editar a mano,
+  // pero por design queda enganchado al template — si el dueño modifica el
+  // template en /admin/equipos/specs, la próxima vez que abra el equipo el
+  // nombre se actualiza automáticamente (#calidad-datos).
   const [nombrePublico, setNombrePublico] = useState("");
-  const [nombrePublicoAuto, setNombrePublicoAuto] = useState(false);
+  const [nombrePublicoAuto, setNombrePublicoAuto] = useState(true);
 
   // ── Autocompletar (URL importer) ───────────────────────────────────
   // El URL del autocompletar es el mismo bh_url del form — un único link
@@ -202,7 +237,16 @@ export function EquipoFormDialogV2({
       // Si el nombre público guardado no tiene tokens, lo usamos como literal.
       // Si tiene tokens ({...}), lo dejamos vacío — el usuario regenera con auto.
       const tpl = (f.nombre_publico_template ?? "").trim();
-      setNombrePublico(/\{[^}]+\}/.test(tpl) ? "" : tpl);
+      const hasTokens = /\{[^}]+\}/.test(tpl);
+      setNombrePublico(hasTokens ? "" : tpl);
+      // Detectar override manual: si hay texto literal sin tokens, asumimos
+      // que el dueño puso un nombre a mano y no queremos que auto-gen lo
+      // pise al abrir (issue de auditoría). toggle OFF en ese caso.
+      if (tpl && !hasTokens) {
+        setNombrePublicoAuto(false);
+      } else {
+        setNombrePublicoAuto(true);
+      }
 
       let parsedSpecs: Spec[] = [];
       try {
@@ -388,7 +432,13 @@ export function EquipoFormDialogV2({
       const r = await authedJson<AutocompletarResult>("/api/admin/equipos/autocompletar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: u }),
+        // Pasamos las categorías ya seleccionadas para que el LLM use los
+        // labels canónicos del template de esa categoría. Si todavía no
+        // se eligió ninguna, el backend cae a guía general.
+        body: JSON.stringify({
+          url: u,
+          categoria_ids: selectedCats.size > 0 ? [...selectedCats] : undefined,
+        }),
       });
       const sets = (k: keyof FormValues, v: string | number | null | undefined) => {
         if (v !== null && v !== undefined && v !== "") {
@@ -629,6 +679,16 @@ export function EquipoFormDialogV2({
   }, [open, saving]);
 
   const submit = form.handleSubmit(async (values) => {
+    // Validación de creación: al menos una categoría seleccionada (#351).
+    // Las categorías viven en estado separado del schema zod, así que las
+    // chequeamos acá. En edit dejamos pasar por compat con equipos legacy.
+    if (!isEdit && selectedCats.size === 0) {
+      toast.error("Categoría requerida", {
+        description: "Elegí al menos una categoría antes de guardar.",
+      });
+      return;
+    }
+
     // Pre-flight: validación de duplicados por serie. La serie es lo más
     // único; si ya hay otro equipo con la misma, le pedimos confirmación al
     // user antes de seguir (puede ser legítimo en kits, pero conviene avisar).
@@ -800,6 +860,40 @@ export function EquipoFormDialogV2({
         duration: 7000,
       });
     } else {
+      // En creación, si faltan campos recomendados, ofrecemos completarlos
+      // ahora antes de cerrar — el equipo ya está creado, esto es opcional. #351
+      if (!isEdit && equipoId) {
+        // Para foto consideramos tanto foto_url ya seteada como pendingFile
+        // recién subido (que ya se aplicó arriba con setValue).
+        const missing: RecommendedField[] = [];
+        const fotoTras = form.getValues("foto_url") || pendingFile;
+        if (!fotoTras) missing.push("foto");
+        if (!descripcion?.trim()) missing.push("descripcion");
+        const serieClean = values.serie?.trim();
+        if (!serieClean) missing.push("serie");
+        if (!values.valor_reposicion || values.valor_reposicion === 0) missing.push("valor_reposicion");
+
+        if (missing.length > 0 && onCreatedWithMissingRecommended) {
+          const labels = missing.map((m) => RECOMMENDED_LABELS[m]).join(", ");
+          toast.success("Equipo creado", {
+            description: `Faltan datos recomendados: ${labels}`,
+            action: {
+              label: "Completar →",
+              onClick: () => {
+                // Reabrimos el form en edit mode con el equipo recién creado.
+                // El form vuelve a abrirse con todos los datos cargados y los
+                // campos faltantes resaltados implícitamente vía el dashboard
+                // de calidad (#349).
+                const savedEquipo = { ...(initial ?? {}), ...payload, id: equipoId } as Equipo;
+                onCreatedWithMissingRecommended(savedEquipo, missing);
+              },
+            },
+            duration: 12000,
+          });
+          onOpenChange(false);
+          return;
+        }
+      }
       toast.success(isEdit ? "Equipo actualizado" : "Equipo creado");
     }
     onOpenChange(false);
@@ -999,10 +1093,7 @@ export function EquipoFormDialogV2({
                   <div className="space-y-1.5">
                     <Input
                       value={nombrePublico}
-                      onChange={(e) => {
-                        setNombrePublico(e.target.value);
-                        if (nombrePublicoAuto) setNombrePublicoAuto(false);
-                      }}
+                      onChange={(e) => setNombrePublico(e.target.value)}
                       placeholder={autoGenDisponible ? "Generado automático según la categoría" : "Ej: Cable HDMI 2.0 50cm"}
                     />
                     {autoGenDisponible && (
@@ -1012,8 +1103,13 @@ export function EquipoFormDialogV2({
                           onCheckedChange={setNombrePublicoAuto}
                         />
                         Generar automático desde {categoriaRoot?.toLowerCase()}
-                        {!nombrePublicoAuto && <span className="opacity-60">(off)</span>}
+                        {!nombrePublicoAuto && <span className="opacity-60">(off — el valor escrito se guarda como override fijo)</span>}
                       </label>
+                    )}
+                    {autoGenDisponible && nombrePublicoAuto && (
+                      <p className="text-[10px] text-muted-foreground italic">
+                        Tu edición se mantiene en esta sesión. Si cambia el template o los specs, el campo se regenera (toggle OFF para fijarlo).
+                      </p>
                     )}
                     {!autoGenDisponible && categoriaRoot && (
                       <p className="text-[11px] text-muted-foreground italic">
@@ -1149,32 +1245,28 @@ export function EquipoFormDialogV2({
           </section>
 
           {/* ════════════════════════════════════════════════════════════════
-              CATEGORÍAS
+              DESCRIPCIÓN — campo de marketing/catálogo, separado de la
+              ficha técnica. Va en una sección propia para evitar confusión
+              con specs.
           ════════════════════════════════════════════════════════════════ */}
-          <section className="pt-2 border-t hairline">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-              Categorías {categoriaRoot && <span className="ml-1 normal-case text-ink/70">· primera = "{categoriaRoot}"</span>}
-            </Label>
-            {/* Chip de sugerencia: el scrape devolvió una categoría. Match
-                case-insensitive contra DB. Click → aplica. El backend
-                auto-asigna el padre si la sugerida es hija. */}
-            <CategoriaSugeridaChip
-              categoriaSugerida={
-                importedFichaExt?.categoria_sugerida ?? cachedScrape?.categoria_sugerida ?? null
-              }
-              categorias={catsQ.data ?? []}
-              selected={selectedCats}
-              onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
-            />
-            <CategoriasPicker
-              categorias={catsQ.data ?? []}
-              selected={selectedCats}
-              onChange={setSelectedCats}
-            />
-          </section>
+          <CollapsibleSection
+            title="Descripción (catálogo público)"
+            defaultOpen={!!descripcion}
+            actions={<CacheBtn section="descripcion" />}
+          >
+            <Field label="Texto descriptivo">
+              <Textarea
+                rows={3}
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
+                placeholder="Texto de marketing visible en la ficha del catálogo. Ej: ventajas, casos de uso típicos, diferenciales."
+              />
+            </Field>
+          </CollapsibleSection>
 
           {/* ════════════════════════════════════════════════════════════════
-              FICHA TÉCNICA — colapsable
+              FICHA TÉCNICA — colapsable. Solo specs estructuradas (template
+              + custom). La descripción está separada en su propia sección.
           ════════════════════════════════════════════════════════════════ */}
           <CollapsibleSection
             title="Ficha técnica"
@@ -1182,17 +1274,6 @@ export function EquipoFormDialogV2({
             actions={<CacheBtn section="ficha" />}
           >
             <div className="space-y-3">
-              <Field
-                label="Descripción (visible en el catálogo)"
-                actions={<CacheBtn section="descripcion" />}
-              >
-                <Textarea
-                  rows={3}
-                  value={descripcion}
-                  onChange={(e) => setDescripcion(e.target.value)}
-                />
-              </Field>
-
               <SpecsDiffEditor
                 specs={specs}
                 propuestos={specsPropuestos}
@@ -1250,6 +1331,28 @@ export function EquipoFormDialogV2({
               </Field>
             </div>
           </CollapsibleSection>
+
+          {/* ════════════════════════════════════════════════════════════════
+              CATEGORÍAS — después de ficha técnica (ver comentario arriba)
+          ════════════════════════════════════════════════════════════════ */}
+          <section className="pt-2 border-t hairline">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+              Categorías {categoriaRoot && <span className="ml-1 normal-case text-ink/70">· primera = "{categoriaRoot}"</span>}
+            </Label>
+            <CategoriaSugeridaChip
+              categoriaSugerida={
+                importedFichaExt?.categoria_sugerida ?? cachedScrape?.categoria_sugerida ?? null
+              }
+              categorias={catsQ.data ?? []}
+              selected={selectedCats}
+              onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
+            />
+            <CategoriasPicker
+              categorias={catsQ.data ?? []}
+              selected={selectedCats}
+              onChange={setSelectedCats}
+            />
+          </section>
 
           {/* ════════════════════════════════════════════════════════════════
               KIT — colapsable, solo en EDIT (necesita id del equipo)

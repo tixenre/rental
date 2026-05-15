@@ -53,18 +53,20 @@ def _categorias_de(conn, equipo_id: int) -> tuple[Optional[str], Optional[str]]:
 
 def _specs_en_nombre_de(conn, equipo_id: int) -> list[tuple[str, str]]:
     """Devuelve las specs marcadas `visible_en_nombre` para este equipo,
-    ordenadas por prioridad. Cruza el template de la categoría con los
-    valores de `equipo_specs`."""
+    ordenadas por prioridad. Post refactor unificar_specs_definitions:
+    JOIN va sobre spec_def_id y los campos descriptivos vienen de
+    spec_definitions."""
     rows = conn.execute(
         """
-        SELECT t.label, t.spec_key, es.value, t.prioridad
+        SELECT sd.label, sd.spec_key, es.value, t.prioridad
         FROM equipo_specs es
         JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
         JOIN categoria_spec_templates t
-          ON t.categoria_id = ec.categoria_id AND t.spec_key = es.spec_key
+          ON t.categoria_id = ec.categoria_id AND t.spec_def_id = es.spec_def_id
+        JOIN spec_definitions sd ON sd.id = es.spec_def_id
         WHERE es.equipo_id = ?
           AND t.visible_en_nombre = TRUE
-        ORDER BY t.prioridad, t.label
+        ORDER BY t.prioridad, sd.label
         """,
         (equipo_id,),
     ).fetchall()

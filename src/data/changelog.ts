@@ -9,6 +9,46 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 146,
+    date: "2026-05-15",
+    type: "feat",
+    title: "Sugerencias automáticas en el dashboard de calidad",
+    body: "Nueva sección al pie de /admin/equipos/calidad con sugerencias del sistema. Tres detectores: (1) Marcas duplicadas case-insensitive — si tenés 'Sony', 'sony' y 'SONY' como marcas separadas, ofrece fusionarlas en una sola (canonical = la que tiene más pedidos). (2) Equipos con precio en pesos pero sin USD — lista los afectados y calcula USD usando la cotización configurada. (3) Categoría sospechosa — heurística que detecta equipos cuyo nombre sugiere una categoría que no tienen asignada (ej. 'Sony A7' sin 'cámara' en sus categorías), con link para editarlo. Cada sugerencia se puede aplicar, o ignorar para que no vuelva a aparecer (se persiste en BD).",
+    labels: ["admin", "calidad-datos"],
+  },
+  {
+    number: 145,
+    date: "2026-05-15",
+    type: "feat",
+    title: "Crear equipo: campos mínimos obligatorios + invitación a completar lo recomendado",
+    body: "Al crear un equipo nuevo, ahora son obligatorios: nombre, marca, categoría, cantidad, precio por jornada y dueño. Si falta alguno, el form no deja guardar. Cuando el equipo se crea OK, si quedaron campos recomendados vacíos (foto, descripción, número de serie, valor de reposición), aparece un toast diciendo cuáles faltan con un botón \"Completar →\" que reabre el form en modo edición. En edición los campos siguen siendo todos opcionales — no romper flujos legacy.",
+    labels: ["admin", "calidad-datos", "ux"],
+  },
+  {
+    number: 144,
+    date: "2026-05-15",
+    type: "feat",
+    title: "Dashboard de calidad: cada fila es ahora un CTA que filtra equipos directamente",
+    body: "Las filas del dashboard /admin/equipos/calidad pasaron de ser solo lectura a ser links. Click en \"5 sin foto principal\" → te lleva a /admin/equipos filtrado a esos 5 equipos, con un banner ámbar arriba que dice \"Filtrando equipos sin foto principal · 5 resultados · Quitar filtro\". Cada campo faltante (foto, categoría, nombre público, descripción, serie, valor de reposición) tiene su filtro propio compartible vía URL.",
+    labels: ["admin", "calidad-datos", "ux"],
+  },
+  {
+    number: 143,
+    date: "2026-05-15",
+    type: "feat",
+    title: "Dashboard de calidad del inventario — qué equipos tienen datos faltantes",
+    body: "Nueva sección en /admin/equipos/calidad que muestra de un vistazo cuántos equipos están al 100% y cuántos tienen datos faltantes por campo (foto, categoría, nombre público, descripción, serie, valor de reposición). Es solo lectura — los botones para completar directamente desde acá llegan en una segunda iteración. Sirve para saber dónde poner el foco al limpiar el inventario.",
+    labels: ["admin", "calidad-datos"],
+  },
+  {
+    number: 142,
+    date: "2026-05-15",
+    type: "feat",
+    title: "Microinteracción \"+1\" volando al carrito al agregar un equipo",
+    body: "Al tocar 'Agregar' en una tarjeta del catálogo, ahora aparece un chip '+1' amarillo que sale del botón con una curva animada hacia el ícono del carrito en la barra inferior. Cuando llega, el ícono hace un pequeño pop (escala) que refuerza visualmente que el item se sumó. Es feedback inmediato típico de e-commerce mobile — sirve para no perderse el cambio del contador cuando estás scrolleando rápido.",
+    labels: ["público", "ux", "mobile"],
+  },
+  {
     number: 141,
     date: "2026-05-11",
     type: "feat",

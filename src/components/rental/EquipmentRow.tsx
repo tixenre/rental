@@ -244,17 +244,23 @@ export function EquipmentRow({
                * completa via QuickFactsRow. */}
               {quickFacts.length > 0 && (
                 <div className="hidden flex-wrap gap-1.5 sm:flex">
-                  {quickFacts.map((f) => (
-                    <span
-                      key={f.label}
-                      className="inline-flex items-center gap-1.5 rounded-full border hairline bg-background px-2 py-0.5 text-[11px]"
-                    >
-                      <span className="font-mono uppercase tracking-wider text-muted-foreground">
-                        {f.label}
+                  {quickFacts.map((f) => {
+                    // value vacío = badge solo-label (bool destacadas que son Sí).
+                    const hasValue = !!f.value?.trim();
+                    return (
+                      <span
+                        key={f.label}
+                        className="inline-flex items-center gap-1.5 rounded-full border hairline bg-background px-2 py-0.5 text-[11px]"
+                      >
+                        <span className="font-mono uppercase tracking-wider text-muted-foreground">
+                          {f.label}
+                        </span>
+                        {hasValue && (
+                          <span className="font-medium text-ink">{f.value}</span>
+                        )}
                       </span>
-                      <span className="font-medium text-ink">{f.value}</span>
-                    </span>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

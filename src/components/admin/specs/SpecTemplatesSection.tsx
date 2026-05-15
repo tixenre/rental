@@ -42,14 +42,20 @@ import {
 import {
   adminApi,
   type CategoriaAdmin,
+  type RolCompatibilidad,
+  type SpecDefinition,
   type SpecTemplate,
-  type SpecTemplateInput,
   type SpecTipo,
 } from "@/lib/admin/api";
+import { NombreTemplateBuilder } from "./NombreTemplateBuilder";
 
 const TIPO_LABEL: Record<SpecTipo, string> = {
   string: "Texto",
   number: "Número",
+  rango: "Rango (un valor o dos, separados por '-')",
+  wxh: "Dos medidas (ancho × alto, ej. 6144×3240)",
+  wxhxd: "Tres medidas (ancho × alto × prof, ej. 130×85×78)",
+  multi_enum: "Lista de opciones (varios valores, ej. Wi-Fi, USB-C, SDI)",
   enum: "Opciones (enum)",
   bool: "Sí/No",
 };
@@ -66,6 +72,9 @@ export function SpecTemplatesSection({
 } = {}) {
   const [catId, setCatId] = useState<number | null>(fixedCategoriaId ?? null);
   const [editing, setEditing] = useState<SpecTemplate | "new" | null>(null);
+  // Si abrimos "new" desde una sugerencia de orphan, este state pre-llena
+  // el key + label en el modal. Null = creación desde cero.
+  const [prefillFromOrphan, setPrefillFromOrphan] = useState<{ key: string; sampleValues: string[] } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SpecTemplate | null>(null);
   const qc = useQueryClient();
 
@@ -100,6 +109,17 @@ export function SpecTemplatesSection({
     queryKey: ["admin", "spec-templates", catId],
     queryFn: () => adminApi.listSpecTemplates(catId!),
     enabled: catId != null,
+  });
+
+  // Specs huérfanas — keys que están en equipo_specs de equipos de esta
+  // categoría pero no en el template. Las mostramos como sugerencias para
+  // que el dueño las formalice manualmente en lugar de auto-extender el
+  // template (#calidad-datos).
+  const orphansQ = useQuery({
+    queryKey: ["admin", "spec-templates-orphans", catId],
+    queryFn: () => adminApi.listOrphanSpecs(catId!),
+    enabled: catId != null,
+    staleTime: 30_000,
   });
 
   const deleteMut = useMutation({
@@ -254,14 +274,17 @@ export function SpecTemplatesSection({
       )}
 
       {items.length > 0 && (
+        <DestacadasCounter items={items} />
+      )}
+
+      {items.length > 0 && (
         <div className="rounded-md border hairline overflow-hidden">
           {/* Cabecera (alineada con las celdas — drag handle ocupa la primera columna). */}
-          <div className="grid grid-cols-[24px_1fr_140px_minmax(0,1fr)_56px_64px] items-center gap-2 bg-muted/40 px-3 py-2 text-xs text-muted-foreground md:grid-cols-[24px_1fr_140px_minmax(0,1fr)_56px_64px]">
+          <div className="grid grid-cols-[24px_1fr_140px_minmax(0,1fr)_64px] items-center gap-2 bg-muted/40 px-3 py-2 text-xs text-muted-foreground md:grid-cols-[24px_1fr_140px_minmax(0,1fr)_64px]">
             <span aria-hidden />
             <span>Label / Key</span>
             <span>Tipo</span>
             <span className="hidden md:block">Flags</span>
-            <span className="text-right">Prio</span>
             <span />
           </div>
           <DndContext
@@ -293,16 +316,46 @@ export function SpecTemplatesSection({
         </div>
       )}
 
+      {/* Sugerencias de orphans — specs cargados en equipos que no están en
+          el template. el dueño decide si las formaliza o no. */}
+      {catId != null && (orphansQ.data?.length ?? 0) > 0 && (
+        <OrphansPanel
+          orphans={orphansQ.data ?? []}
+          onConvert={(o) => {
+            setPrefillFromOrphan({ key: o.spec_key, sampleValues: o.sample_values });
+            setEditing("new");
+          }}
+        />
+      )}
+
+      {/* Builder visual del template de nombre público — usa las specs de
+          arriba como paleta. */}
+      {catId != null && (
+        <NombreTemplateBuilder
+          categoriaId={catId}
+          categoriaNombre={catsFlat.find((c) => c.id === catId)?.nombre ?? "Categoría"}
+          initialTemplate={catsQ.data?.find((c) => c.id === catId)?.nombre_publico_template ?? null}
+          templateSpecs={items}
+        />
+      )}
+
       {/* Modal crear/editar */}
       {editing && catId != null && (
         <SpecTemplateFormModal
           categoriaId={catId}
           template={editing === "new" ? null : editing}
+          prefillKey={editing === "new" ? prefillFromOrphan?.key : undefined}
+          prefillSampleValues={editing === "new" ? prefillFromOrphan?.sampleValues : undefined}
           categoriaPath={catsFlat.find((c) => c.id === catId)?.path ?? "Categoría"}
-          onClose={() => setEditing(null)}
+          onClose={() => {
+            setEditing(null);
+            setPrefillFromOrphan(null);
+          }}
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ["admin", "spec-templates", catId] });
+            qc.invalidateQueries({ queryKey: ["admin", "spec-templates-orphans", catId] });
             setEditing(null);
+            setPrefillFromOrphan(null);
           }}
         />
       )}
@@ -331,6 +384,68 @@ export function SpecTemplatesSection({
         </AlertDialogContent>
       </AlertDialog>
     </section>
+  );
+}
+
+/** Panel con specs huérfanas — valores cargados en equipos cuyo spec_key no
+ *  está en el template de la categoría. El dueño decide si formalizarlos.
+ *  Evita que el sistema auto-extienda el template silenciosamente. */
+function OrphansPanel({
+  orphans,
+  onConvert,
+}: {
+  orphans: { spec_key: string; count_equipos: number; sample_values: string[] }[];
+  onConvert: (o: { spec_key: string; sample_values: string[] }) => void;
+}) {
+  return (
+    <div className="rounded-md border hairline border-amber/30 bg-amber-soft/30 overflow-hidden">
+      <header className="px-3 py-2 text-xs font-mono uppercase tracking-widest text-muted-foreground border-b hairline">
+        Sugerencias del autocompletar — {orphans.length} {orphans.length === 1 ? "spec" : "specs"} cargadas en equipos que no están en el template
+      </header>
+      <ul className="divide-y hairline">
+        {orphans.map((o) => (
+          <li key={o.spec_key} className="flex items-center gap-3 px-3 py-2 text-sm">
+            <div className="flex-1 min-w-0">
+              <div className="font-mono text-xs text-ink">{o.spec_key}</div>
+              <div className="text-[11px] text-muted-foreground">
+                {o.count_equipos} {o.count_equipos === 1 ? "equipo" : "equipos"} ·
+                {" "}ejemplos: {o.sample_values.slice(0, 3).map((v) => `"${v}"`).join(", ")}
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => onConvert(o)}>
+              Agregar al template
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <p className="px-3 py-2 text-[10px] text-muted-foreground bg-amber-soft/50">
+        Estos specs vinieron del autocompletar o de cargas anteriores y quedaron como "custom"
+        en cada equipo. Si querés que aparezcan formateados en todos los equipos de esta categoría,
+        agregalos al template con el tipo y unidad correctos.
+      </p>
+    </div>
+  );
+}
+
+/** Pequeño indicador en la cabecera de la tabla mostrando cuántas specs
+ *  están marcadas como ficha técnica destacada. La idea es mantener el
+ *  conjunto chico (≤4) — son los quick facts del catálogo público y si
+ *  son demasiados la card se satura. Soft warning, no enforcement. */
+function DestacadasCounter({ items }: { items: SpecTemplate[] }) {
+  const total = items.filter((t) => t.destacado).length;
+  const max = 4;
+  const over = total > max;
+  return (
+    <div className={`flex items-center gap-2 text-xs ${over ? "text-amber-700" : "text-muted-foreground"}`}>
+      <span className="font-mono uppercase tracking-widest">
+        Ficha técnica destacada: {total}/{max}
+      </span>
+      {over && (
+        <span>
+          — recomendado {max} máx para no saturar la card del catálogo público.
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -363,7 +478,7 @@ function SortableSpecRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="grid grid-cols-[24px_1fr_140px_minmax(0,1fr)_56px_64px] items-center gap-2 px-3 py-2 text-sm hover:bg-muted/20"
+      className="grid grid-cols-[24px_1fr_140px_minmax(0,1fr)_64px] items-center gap-2 px-3 py-2 text-sm hover:bg-muted/20"
     >
       <button
         {...attributes}
@@ -385,7 +500,7 @@ function SortableSpecRow({
 
       <div className="text-xs min-w-0">
         {TIPO_LABEL[template.tipo]}
-        {template.tipo === "number" && template.unidad ? ` · ${template.unidad}` : ""}
+        {(template.tipo === "number" || template.tipo === "rango" || template.tipo === "wxh" || template.tipo === "wxhxd") && template.unidad ? ` · ${template.unidad}` : ""}
         {template.tipo === "enum" && template.enum_options ? (
           <div className="text-[10px] text-muted-foreground truncate">
             {template.enum_options.join(", ")}
@@ -394,17 +509,9 @@ function SortableSpecRow({
       </div>
 
       <div className="hidden md:flex flex-wrap gap-1 text-[10px] min-w-0">
-        {template.destacado && <Badge tone="amber">destacado</Badge>}
-        {template.obligatorio && <Badge>obligatorio</Badge>}
-        {template.visible_en_nombre && <Badge>en nombre</Badge>}
-        {template.visible_en_card && <Badge>en card</Badge>}
-        {template.visible_en_filtros && <Badge>en filtros</Badge>}
+        {template.destacado && <Badge tone="amber">★ ficha destacada</Badge>}
       </div>
       <div className="md:hidden" aria-hidden />
-
-      <div className="text-right text-xs tabular-nums text-muted-foreground">
-        {template.prioridad}
-      </div>
 
       <div className="flex justify-end gap-1">
         <button
@@ -431,85 +538,155 @@ function SortableSpecRow({
 // ─────────────────────────────────────────────────────────────────────
 
 function SpecTemplateFormModal({
-  categoriaId, template, categoriaPath, onClose, onSaved,
+  categoriaId, template, prefillKey, prefillSampleValues, categoriaPath, onClose, onSaved,
 }: {
   categoriaId: number;
   template: SpecTemplate | null;
+  /** Si se abre desde una sugerencia orphan, pre-llena la búsqueda con
+   *  ese key para que sea fácil encontrar la spec correspondiente. */
+  prefillKey?: string;
+  /** Valores de ejemplo del orphan — útiles para que el dueño los vea
+   *  mientras decide qué spec asignar. */
+  prefillSampleValues?: string[];
   categoriaPath: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const isNew = template == null;
-  const [form, setForm] = useState<SpecTemplateInput>({
-    spec_key: template?.spec_key ?? "",
-    label: template?.label ?? "",
-    tipo: template?.tipo ?? "string",
-    unidad: template?.unidad ?? "",
-    enum_options: template?.enum_options ?? [],
+  const qcInner = useQueryClient();
+
+  // Modo ASIGNAR (isNew): el user elige una spec del catálogo global y
+  // setea los flags por categoría. NO crea specs nuevas — ese flujo vive en
+  // Gear Compatibility → Definiciones (fuente de verdad).
+  // Modo EDITAR (!isNew): solo flags de la asignación; los campos globales
+  // (label/tipo/unidad/enum_options/compat) se editan en Gear Compat.
+
+  // Catálogo global de specs (para el picker en modo asignar).
+  const defsQ = useQuery({
+    queryKey: ["admin", "spec-definitions"],
+    queryFn: () => adminApi.listSpecDefinitions(),
+    enabled: isNew,
+    staleTime: 30_000,
+  });
+
+  // En modo asignar: spec seleccionada del catálogo. Si vino prefillKey,
+  // intentamos pre-seleccionarla automáticamente cuando carga la lista.
+  const [selectedDefId, setSelectedDefId] = useState<number | null>(null);
+  const [search, setSearch] = useState(prefillKey ?? "");
+
+  // Si vino prefillKey y el catálogo cargó, pre-seleccionar la spec exacta.
+  // (No deps en setSelectedDefId para evitar loops.)
+  if (isNew && prefillKey && defsQ.data && selectedDefId == null) {
+    const match = defsQ.data.items.find(
+      (d) => d.spec_key === prefillKey || d.label.toLowerCase() === prefillKey.toLowerCase(),
+    );
+    if (match) setSelectedDefId(match.id);
+  }
+
+  // Flags de la asignación (per-categoría).
+  const [flags, setFlags] = useState({
     prioridad: template?.prioridad ?? 100,
-    visible_en_card: template?.visible_en_card ?? false,
-    visible_en_filtros: template?.visible_en_filtros ?? false,
-    visible_en_nombre: template?.visible_en_nombre ?? false,
-    obligatorio: template?.obligatorio ?? false,
-    ayuda: template?.ayuda ?? "",
     destacado: template?.destacado ?? false,
+    obligatorio: template?.obligatorio ?? false,
+    visible_en_card: template?.visible_en_card ?? false,
+    visible_en_nombre: template?.visible_en_nombre ?? false,
+    rol_compatibilidad: (template?.rol_compatibilidad ?? null) as RolCompatibilidad,
   });
-  const [enumInput, setEnumInput] = useState((template?.enum_options ?? []).join(", "));
+  const [busy, setBusy] = useState(false);
 
-  const createMut = useMutation({
-    mutationFn: (input: SpecTemplateInput) => adminApi.createSpecTemplate(categoriaId, input),
-    onSuccess: () => {
-      toast.success("Spec creada");
-      onSaved();
+  // Specs disponibles para asignar = catálogo global - las que ya están
+  // asignadas a esta categoría (vienen como hermanas de `template` en el
+  // GET listSpecTemplates, pero acá filtramos client-side).
+  const yaAsignadasIds = useQuery({
+    queryKey: ["admin", "spec-templates", categoriaId, "ids-only"],
+    queryFn: async () => {
+      const r = await adminApi.listSpecTemplates(categoriaId);
+      return new Set(r.items.map((t) => t.spec_def_id));
     },
-    onError: (e: Error) => toast.error(e.message),
+    enabled: isNew,
+    staleTime: 10_000,
   });
 
-  const updateMut = useMutation({
-    mutationFn: (input: Partial<SpecTemplateInput>) =>
-      adminApi.updateSpecTemplate(template!.id, input),
-    onSuccess: () => {
-      toast.success("Spec actualizada");
+  const candidatas = useMemo(() => {
+    const all = defsQ.data?.items ?? [];
+    const ya = yaAsignadasIds.data ?? new Set<number>();
+    const q = search.trim().toLowerCase();
+    return all
+      .filter((d) => !ya.has(d.id))
+      .filter((d) => {
+        if (!q) return true;
+        return (
+          d.label.toLowerCase().includes(q) ||
+          d.spec_key.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) =>
+        a.validado === b.validado
+          ? a.label.localeCompare(b.label)
+          : a.validado ? -1 : 1,
+      );
+  }, [defsQ.data, yaAsignadasIds.data, search]);
+
+  // Spec del catálogo seleccionada (modo asignar) o derivada del template (edit).
+  const specInfo: SpecDefinition | undefined = isNew
+    ? defsQ.data?.items.find((d) => d.id === selectedDefId)
+    : defsQ.data?.items.find((d) => d.id === template?.spec_def_id) ?? (template ? {
+        id: template.spec_def_id,
+        spec_key: template.spec_key,
+        label: template.label,
+        tipo: template.tipo,
+        unidad: template.unidad,
+        enum_options: template.enum_options,
+        ayuda: template.ayuda,
+        es_compatibilidad: template.es_compatibilidad,
+        compatibilidad_modo: template.compatibilidad_modo,
+        validado: false,
+      } as SpecDefinition : undefined);
+
+  const showRolField =
+    specInfo?.es_compatibilidad &&
+    specInfo?.compatibilidad_modo === "jerarquia" &&
+    specInfo?.tipo === "enum";
+
+  async function handleSave() {
+    if (isNew && !selectedDefId) {
+      toast.error("Seleccioná una spec del catálogo para asignar.");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (isNew && selectedDefId) {
+        await adminApi.assignSpecToCategoria(categoriaId, {
+          spec_def_id: selectedDefId,
+          prioridad: flags.prioridad,
+          destacado: flags.destacado,
+          obligatorio: flags.obligatorio,
+          visible_en_card: flags.visible_en_card,
+          visible_en_filtros: true,
+          visible_en_nombre: flags.visible_en_nombre,
+          ayuda: null,
+          rol_compatibilidad: showRolField ? flags.rol_compatibilidad : null,
+        });
+        toast.success("Spec asignada a la categoría");
+      } else if (template) {
+        await adminApi.updateSpecTemplate(template.id, {
+          prioridad: flags.prioridad,
+          destacado: flags.destacado,
+          obligatorio: flags.obligatorio,
+          visible_en_card: flags.visible_en_card,
+          visible_en_nombre: flags.visible_en_nombre,
+          rol_compatibilidad: showRolField ? flags.rol_compatibilidad : null,
+        });
+        toast.success("Asignación actualizada");
+      }
+      qcInner.invalidateQueries({ queryKey: ["admin", "spec-templates"] });
+      qcInner.invalidateQueries({ queryKey: ["admin", "spec-definitions"] });
       onSaved();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const busy = createMut.isPending || updateMut.isPending;
-
-  function handleSave() {
-    const trimmedKey = form.spec_key.trim();
-    const trimmedLabel = form.label.trim();
-    if (!trimmedKey || !trimmedLabel) {
-      toast.error("Spec key y label son obligatorios");
-      return;
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
     }
-    if (!/^[a-z][a-z0-9_]*$/.test(trimmedKey)) {
-      toast.error("Spec key: solo minúsculas, números y _ (debe empezar con letra)");
-      return;
-    }
-    const enumArr = form.tipo === "enum"
-      ? enumInput.split(",").map((s) => s.trim()).filter(Boolean)
-      : null;
-    if (form.tipo === "enum" && (!enumArr || enumArr.length === 0)) {
-      toast.error("Para tipo enum tenés que listar al menos una opción");
-      return;
-    }
-    // #291 Fase B: unidad obligatoria para tipo número.
-    if (form.tipo === "number" && !(form.unidad ?? "").trim()) {
-      toast.error("Para tipo Número tenés que indicar la unidad (kg, MP, mm, W…).");
-      return;
-    }
-    const payload: SpecTemplateInput = {
-      ...form,
-      spec_key: trimmedKey,
-      label: trimmedLabel,
-      unidad: form.unidad?.trim() || null,
-      ayuda: form.ayuda?.trim() || null,
-      enum_options: enumArr,
-    };
-    if (isNew) createMut.mutate(payload);
-    else updateMut.mutate(payload);
   }
 
   return (
@@ -526,7 +703,7 @@ function SpecTemplateFormModal({
         <header className="flex items-center justify-between border-b hairline px-4 py-3">
           <div className="min-w-0">
             <div className="font-display text-base text-ink">
-              {isNew ? "Nueva spec" : "Editar spec"}
+              {isNew ? "Asignar spec a categoría" : "Editar asignación"}
             </div>
             <div className="text-[11px] text-muted-foreground truncate">{categoriaPath}</div>
           </div>
@@ -540,130 +717,160 @@ function SpecTemplateFormModal({
         </header>
 
         <div className="p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Spec key (interno)</Label>
-              <Input
-                value={form.spec_key}
-                onChange={(e) => setForm({ ...form, spec_key: e.target.value })}
-                placeholder="ej. montura"
-                disabled={!isNew}
-                className="font-mono"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">
-                {isNew ? "Inmutable después. Solo a-z 0-9 _" : "No se puede cambiar después de creado"}
+          {prefillKey && prefillSampleValues && prefillSampleValues.length > 0 && (
+            <div className="rounded-md border hairline border-amber/30 bg-amber-soft/30 px-3 py-2 text-[11px]">
+              <div className="font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
+                Sugerencia desde "{prefillKey}"
+              </div>
+              <div className="text-ink">
+                Valores en equipos: {prefillSampleValues.map((v) => `"${v}"`).join(", ")}
+              </div>
+              <p className="text-muted-foreground mt-1 text-[10px]">
+                Buscá una spec del catálogo que matchee, o creala en Gear Compatibility si no existe.
               </p>
             </div>
-            <div>
-              <Label className="text-xs">Label visible</Label>
-              <Input
-                value={form.label}
-                onChange={(e) => setForm({ ...form, label: e.target.value })}
-                placeholder="ej. Montura"
-              />
-            </div>
-          </div>
+          )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Tipo</Label>
-              <Select
-                value={form.tipo}
-                onValueChange={(v: SpecTipo) => setForm({ ...form, tipo: v })}
+          {/* ── Modo ASIGNAR: picker del catálogo ───────────────────────── */}
+          {isNew && (
+            <>
+              <div>
+                <Label className="text-xs">Buscar spec en el catálogo</Label>
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar por label o spec_key…"
+                  className="font-mono"
+                  autoFocus
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Las specs validadas aparecen arriba. Si no encontrás la que buscás,
+                  {" "}<a href="/admin/gear-compatibility" className="text-amber underline">creala en Gear Compatibility →</a>
+                </p>
+              </div>
+              <div className="border hairline rounded-md max-h-64 overflow-y-auto divide-y hairline">
+                {defsQ.isLoading && (
+                  <div className="px-3 py-2 text-[11px] text-muted-foreground">Cargando…</div>
+                )}
+                {!defsQ.isLoading && candidatas.length === 0 && (
+                  <div className="px-3 py-2 text-[11px] text-muted-foreground italic">
+                    {search
+                      ? "Ninguna spec disponible matchea la búsqueda."
+                      : "Todas las specs del catálogo ya están asignadas a esta categoría."}
+                  </div>
+                )}
+                {candidatas.map((d) => (
+                  <button
+                    type="button"
+                    key={d.id}
+                    onClick={() => setSelectedDefId(d.id)}
+                    className={
+                      "w-full text-left px-3 py-1.5 text-xs hover:bg-muted/30 " +
+                      (selectedDefId === d.id ? "bg-amber-soft/40" : "")
+                    }
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {d.validado && <span className="text-emerald-600">✓</span>}
+                      <span className="text-ink font-medium">{d.label}</span>
+                      <span className="font-mono text-[9px] text-muted-foreground">{d.spec_key}</span>
+                      <span className="text-[9px] text-muted-foreground ml-auto">
+                        {TIPO_LABEL[d.tipo]}{d.unidad ? ` · ${d.unidad}` : ""}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ── Spec seleccionada (info read-only) ──────────────────────── */}
+          {specInfo && (
+            <div className="rounded-md border hairline bg-muted/20 px-3 py-2 space-y-0.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-medium text-ink">{specInfo.label}</span>
+                <span className="font-mono text-[9px] text-muted-foreground">{specInfo.spec_key}</span>
+                <span className="text-[9px] text-muted-foreground">
+                  · {TIPO_LABEL[specInfo.tipo]}{specInfo.unidad ? ` · ${specInfo.unidad}` : ""}
+                </span>
+                {specInfo.es_compatibilidad && (
+                  <span className="text-[9px] bg-amber-soft/60 text-amber-800 px-1 rounded">
+                    compat {specInfo.compatibilidad_modo}
+                  </span>
+                )}
+              </div>
+              {specInfo.tipo === "enum" || specInfo.tipo === "multi_enum" ? (
+                <div className="text-[10px] text-muted-foreground">
+                  Opciones: {(specInfo.enum_options ?? []).join(", ") || "—"}
+                </div>
+              ) : null}
+              {specInfo.ayuda && (
+                <div className="text-[10px] text-muted-foreground italic">{specInfo.ayuda}</div>
+              )}
+              <a
+                href="/admin/gear-compatibility"
+                className="text-[10px] text-amber underline inline-block"
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(["string", "number", "enum", "bool"] as SpecTipo[]).map((t) => (
-                    <SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Prioridad</Label>
-              <Input
-                type="number"
-                value={form.prioridad ?? 100}
-                onChange={(e) => setForm({ ...form, prioridad: parseInt(e.target.value) || 100 })}
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">Menor = aparece antes</p>
-            </div>
-          </div>
-
-          {form.tipo === "number" && (
-            <div>
-              <Label className="text-xs">
-                Unidad <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={form.unidad ?? ""}
-                onChange={(e) => setForm({ ...form, unidad: e.target.value })}
-                placeholder="ej. kg, MP, mm, W, fps, ISO"
-                required
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Al cargar un equipo se escribe solo el número y aparece esta unidad como sufijo.
-              </p>
+                Editar la definición global →
+              </a>
             </div>
           )}
 
-          {form.tipo === "enum" && (
-            <div>
-              <Label className="text-xs">Opciones (separadas por coma)</Label>
-              <Input
-                value={enumInput}
-                onChange={(e) => setEnumInput(e.target.value)}
-                placeholder="ej. E, RF, EF, MFT, PL"
+          {/* ── Flags de la asignación (per-categoría) ─────────────────── */}
+          {(specInfo || !isNew) && (
+            <fieldset className="border hairline rounded-md p-3 space-y-2">
+              <legend className="px-1 text-xs text-muted-foreground">
+                Flags para esta categoría
+              </legend>
+              <Toggle
+                label="Ficha técnica destacada — aparece como quick fact en la card del catálogo público (recomendado máx 4 por categoría)"
+                checked={flags.destacado}
+                onChange={(v) => setFlags({ ...flags, destacado: v })}
               />
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Valores que aparecen en el dropdown del equipo. Case-sensitive.
-              </p>
-            </div>
+              <Toggle
+                label="Visible en card del catálogo"
+                checked={flags.visible_en_card}
+                onChange={(v) => setFlags({ ...flags, visible_en_card: v })}
+              />
+              <Toggle
+                label="Obligatorio al cargar el equipo"
+                checked={flags.obligatorio}
+                onChange={(v) => setFlags({ ...flags, obligatorio: v })}
+              />
+              {showRolField && (
+                <div>
+                  <Label className="text-xs">
+                    Rol en compatibilidad jerárquica
+                  </Label>
+                  <Select
+                    value={flags.rol_compatibilidad ?? "ninguno"}
+                    onValueChange={(v) =>
+                      setFlags({
+                        ...flags,
+                        rol_compatibilidad: v === "ninguno" ? null : (v as "contenedor" | "contenido"),
+                      })
+                    }
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ninguno">No participa</SelectItem>
+                      <SelectItem value="contenedor">Contenedor (proyecta — ej. lente)</SelectItem>
+                      <SelectItem value="contenido">Contenido (recibe — ej. sensor)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    El modo jerárquico de la spec global decide; acá solo definís
+                    cómo participa esta categoría.
+                  </p>
+                </div>
+              )}
+            </fieldset>
           )}
-
-          <div>
-            <Label className="text-xs">Ayuda (opcional)</Label>
-            <Input
-              value={form.ayuda ?? ""}
-              onChange={(e) => setForm({ ...form, ayuda: e.target.value })}
-              placeholder="Texto que aparece bajo el input al cargar un equipo"
-            />
-          </div>
-
-          <fieldset className="border hairline rounded-md p-3 space-y-2">
-            <legend className="px-1 text-xs text-muted-foreground">Visibilidad</legend>
-            <Toggle
-              label="Spec destacada — aparece como quick fact en la fila del catálogo"
-              checked={!!form.destacado}
-              onChange={(v) => setForm({ ...form, destacado: v })}
-            />
-            <Toggle
-              label="Obligatorio al crear equipo"
-              checked={!!form.obligatorio}
-              onChange={(v) => setForm({ ...form, obligatorio: v })}
-            />
-            <Toggle
-              label="Aparece en el nombre público (Cámara Sony FX3 Montura E…)"
-              checked={!!form.visible_en_nombre}
-              onChange={(v) => setForm({ ...form, visible_en_nombre: v })}
-            />
-            <Toggle
-              label="Aparece en la card del catálogo público"
-              checked={!!form.visible_en_card}
-              onChange={(v) => setForm({ ...form, visible_en_card: v })}
-            />
-            <Toggle
-              label="Genera filtro en el catálogo público"
-              checked={!!form.visible_en_filtros}
-              onChange={(v) => setForm({ ...form, visible_en_filtros: v })}
-            />
-          </fieldset>
         </div>
 
         <footer className="border-t hairline px-4 py-3 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={busy}>
-            {busy ? "Guardando…" : isNew ? "Crear" : "Guardar"}
+          <Button onClick={handleSave} disabled={busy || (isNew && !selectedDefId)}>
+            {busy ? "Guardando…" : isNew ? "Asignar" : "Guardar"}
           </Button>
         </footer>
       </div>

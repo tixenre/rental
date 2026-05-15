@@ -52,6 +52,7 @@ from routes.marcas           import router as marcas_router
 from routes.specs            import router as specs_router
 from routes.changelog        import router as changelog_router
 from routes.seo              import router as seo_router
+from routes.inventario       import router as inventario_router
 from middleware          import auth_middleware
 
 logger = logging.getLogger(__name__)
@@ -129,6 +130,7 @@ app.include_router(settings_router,       prefix="/api")
 app.include_router(marcas_router,         prefix="/api")
 app.include_router(specs_router,          prefix="/api")
 app.include_router(changelog_router,      prefix="/api")
+app.include_router(inventario_router,     prefix="/api/admin")
 app.include_router(seo_router)  # /sitemap.xml (sin prefijo /api — debe estar en root)
 app.include_router(cliente_portal_router)
 
@@ -229,6 +231,23 @@ def init_db_bg():
         logger.info("Migraciones Alembic al día")
     except Exception as e:
         logger.error("Falló alembic upgrade: %s. La app sigue arrancando — revisar manualmente.", e, exc_info=True)
+
+    # Seed de spec_templates DESPUÉS de alembic — la migración
+    # `unificar_specs_definitions` necesita haber corrido antes para que las
+    # tablas tengan spec_def_id.
+    try:
+        from database import get_db
+        from seeds.spec_templates import seed_spec_templates
+        conn = get_db()
+        try:
+            n = seed_spec_templates(conn)
+            conn.commit()
+            if n > 0:
+                logger.info("%d asignaciones de specs seedeadas", n)
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning("Seed de spec_templates falló (no crítico): %s", e)
 
     # Auto-run del ranking si nunca corrió (popularidad_score=0 en todos
     # los equipos). Después de eso, queda en manos del admin desde

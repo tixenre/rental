@@ -627,51 +627,94 @@ def init_db():
 
     # ── Specs estructurados por categoría (rediseño docs/DISEÑO_SPECS.md - PR A) ──
     #
-    # Hoy `equipo_fichas.specs_json` guarda specs como [{label, value}] sin
-    # validación ni schema. Eso hace imposible filtrar el catálogo por specs
-    # ("cámaras montura E con video 4K") o comparar dos productos lado a lado.
+    # Modelo de specs (refactor unificar_specs_definitions):
     #
-    # Modelo nuevo: cada categoría define un TEMPLATE (categoria_spec_templates)
-    # con las keys que sus equipos van a tener (sensor, montura, cri, etc.),
-    # y los valores reales viven en EQUIPO_SPECS (key/value tipados).
+    # 1) `spec_definitions` — catálogo global de specs. Cada spec_key existe
+    #    UNA sola vez en el sistema (montura, formato, distancia_focal, etc.).
+    #    El tipo, unidad, enum_options y el flag `es_compatibilidad` viven acá.
     #
-    # Migración: las tablas se crean acá. El form admin sigue editando el
-    # specs_json viejo hasta que las PRs B/D del rediseño migren la UI.
+    # 2) `categoria_spec_templates` — asigna una spec_definition a una
+    #    categoría con flags propios (prioridad, destacado, obligatorio,
+    #    visible_en_card/filtros/nombre, ayuda override).
+    #
+    # 3) `equipo_specs` — los valores concretos por equipo, referenciados
+    #    por spec_def_id (no por spec_key string).
+    #
+    # Beneficios: compartir "montura" entre Cámaras y Lentes con consistencia
+    # de tipo y opciones; setea la base para compatibilidad auto.
+
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS categoria_spec_templates (
+        CREATE TABLE IF NOT EXISTS spec_definitions (
             id                  SERIAL PRIMARY KEY,
-            categoria_id        INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
-            spec_key            VARCHAR(64) NOT NULL,
+            spec_key            VARCHAR(64) UNIQUE NOT NULL,
             label               VARCHAR(120) NOT NULL,
             tipo                VARCHAR(16) NOT NULL,
             unidad              VARCHAR(32),
             enum_options        JSONB,
+            ayuda               TEXT,
+            es_compatibilidad   BOOLEAN NOT NULL DEFAULT FALSE,
+            compatibilidad_modo VARCHAR(16) NOT NULL DEFAULT 'exacta',
+            created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # Migration idempotente: agrega columna si fresh install vino sin ella.
+    conn.execute(
+        "ALTER TABLE spec_definitions "
+        "ADD COLUMN IF NOT EXISTS compatibilidad_modo VARCHAR(16) NOT NULL DEFAULT 'exacta'"
+    )
+    # Flag manual que el dueño marca cuando confirmó que la spec está bien
+    # curada. Las validadas se muestran arriba en /admin/gear-compatibility.
+    conn.execute(
+        "ALTER TABLE spec_definitions "
+        "ADD COLUMN IF NOT EXISTS validado BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
+        "ON spec_definitions(es_compatibilidad) WHERE es_compatibilidad"
+    )
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS categoria_spec_templates (
+            id                  SERIAL PRIMARY KEY,
+            categoria_id        INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+            spec_def_id         INTEGER NOT NULL REFERENCES spec_definitions(id) ON DELETE RESTRICT,
             prioridad           INTEGER DEFAULT 100,
+            destacado           BOOLEAN DEFAULT FALSE,
+            obligatorio         BOOLEAN DEFAULT FALSE,
             visible_en_card     BOOLEAN DEFAULT FALSE,
             visible_en_filtros  BOOLEAN DEFAULT FALSE,
             visible_en_nombre   BOOLEAN DEFAULT FALSE,
-            obligatorio         BOOLEAN DEFAULT FALSE,
             ayuda               TEXT,
-            destacado           BOOLEAN DEFAULT FALSE,
-            UNIQUE (categoria_id, spec_key)
+            rol_compatibilidad  VARCHAR(16),
+            UNIQUE (categoria_id, spec_def_id)
         )
     """)
+    # Migration idempotente.
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_spec_templates_cat "
+        "ALTER TABLE categoria_spec_templates "
+        "ADD COLUMN IF NOT EXISTS rol_compatibilidad VARCHAR(16)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_cst_categoria "
         "ON categoria_spec_templates(categoria_id, prioridad)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_cst_def "
+        "ON categoria_spec_templates(spec_def_id)"
     )
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_specs (
             equipo_id   INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
-            spec_key    VARCHAR(64) NOT NULL,
+            spec_def_id INTEGER NOT NULL REFERENCES spec_definitions(id) ON DELETE RESTRICT,
             value       TEXT NOT NULL,
-            PRIMARY KEY (equipo_id, spec_key)
+            PRIMARY KEY (equipo_id, spec_def_id)
         )
     """)
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_equipo_specs_key "
-        "ON equipo_specs(spec_key, value)"
+        "CREATE INDEX IF NOT EXISTS idx_equipo_specs_def_value "
+        "ON equipo_specs(spec_def_id, value)"
     )
 
     # ── Mantenimiento log por equipo ─────────────────────────────────────
@@ -715,6 +758,45 @@ def init_db():
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_compat_b ON equipo_compatibilidad(equipo_b_id)"
     )
+    # Metadata para distinguir compat generadas por el skill IA vs manuales
+    # del dueño. Las auto se borran/reemplazan en cada regen; manuales nunca.
+    conn.execute("ALTER TABLE equipo_compatibilidad ADD COLUMN IF NOT EXISTS auto_generado BOOLEAN NOT NULL DEFAULT FALSE")
+    conn.execute("ALTER TABLE equipo_compatibilidad ADD COLUMN IF NOT EXISTS razon_ia TEXT")
+    conn.execute("ALTER TABLE equipo_compatibilidad ADD COLUMN IF NOT EXISTS confianza REAL")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_compat_auto "
+        "ON equipo_compatibilidad(auto_generado) WHERE auto_generado = TRUE"
+    )
+    # Timestamp de última pasada del skill por equipo (para encolar pendientes).
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS compat_analizado_at TIMESTAMP")
+
+    # Propuestas IA generadas por el skill gear-compatibility. NUNCA se aplican
+    # automáticamente — el dueño las aprueba/descarta desde la UI.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS spec_propuestas_pendientes (
+            id            SERIAL PRIMARY KEY,
+            tipo          VARCHAR(20) NOT NULL,
+            payload       JSONB       NOT NULL,
+            origen        VARCHAR(64),
+            confianza     REAL,
+            created_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            aplicado_at   TIMESTAMP,
+            descartado_at TIMESTAMP,
+            CHECK (tipo IN ('enum_option', 'spec_nueva', 'merge_specs', 'assign_spec'))
+        )
+    """)
+    # Migration idempotente: si la tabla existe con el CHECK viejo, lo
+    # reemplazamos por uno que incluye 'assign_spec'.
+    conn.execute("ALTER TABLE spec_propuestas_pendientes DROP CONSTRAINT IF EXISTS spec_propuestas_pendientes_tipo_check")
+    conn.execute(
+        "ALTER TABLE spec_propuestas_pendientes ADD CONSTRAINT spec_propuestas_pendientes_tipo_check "
+        "CHECK (tipo IN ('enum_option', 'spec_nueva', 'merge_specs', 'assign_spec'))"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_propuestas_pendientes "
+        "ON spec_propuestas_pendientes(created_at DESC) "
+        "WHERE aplicado_at IS NULL AND descartado_at IS NULL"
+    )
 
     # ── Relevancia + ranking + nombre público calculado ────────────────
     # `relevancia_manual`: lo que el admin pone a mano (10=flagship, 100=default).
@@ -736,15 +818,12 @@ def init_db():
         "ON equipos(relevancia_manual ASC, popularidad_score DESC, nombre ASC)"
     )
 
-    # ── Seed de los 12 templates iniciales (idempotente) ──
-    # Importado dinámicamente para mantener este archivo manejable.
-    try:
-        from seeds.spec_templates import seed_spec_templates
-        n = seed_spec_templates(conn)
-        if n > 0:
-            logger.info("%d templates de specs seedeados/actualizados", n)
-    except Exception as ex:
-        logger.warning("No se pudieron seedear los templates de specs: %s", ex)
+    # NOTA: el seed de spec_templates se movió a `seed_spec_templates_after_migrations`
+    # invocado desde main.py después de alembic upgrade. El motivo: la migración
+    # `unificar_specs_definitions` dropea categoria_spec_templates y equipo_specs
+    # y los recrea con un schema nuevo (con spec_def_id). Si el seed corriera
+    # antes de alembic en una BD con schema viejo, fallaría con "column
+    # spec_def_id does not exist".
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_precio_historial (
@@ -834,6 +913,17 @@ def init_db():
         INSERT INTO app_settings (key, value, updated_by)
         VALUES ('usd_rate', '1000', 'system-seed')
         ON CONFLICT (key) DO NOTHING
+    """)
+
+    # Sugerencias automáticas ignoradas (#352). Cuando el admin descarta una
+    # sugerencia, la persistimos por (tipo, ref) para no volver a mostrarla.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sugerencias_ignoradas (
+            tipo       TEXT NOT NULL,
+            ref        TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (tipo, ref)
+        )
     """)
 
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
@@ -1020,16 +1110,27 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
     ids = [e["id"] for e in equipos]
     placeholders = ",".join(["%s"] * len(ids))
     cur = conn.cursor()
+    # Para destacadas de tipo bool, solo emitir cuando el valor es "Sí"/true.
+    # Una spec "Macro: No" no aporta como quick fact en la card — destacar
+    # solo cuando el lente ES macro, no cuando no lo es.
+    # Para destacadas de tipo bool, solo emitir cuando el valor es "Sí"/true.
+    # Una spec "Macro: No" no aporta como quick fact en la card — destacar
+    # solo cuando el lente ES macro, no cuando no lo es.
     cur.execute(f"""
-        SELECT es.equipo_id, t.label, es.value, t.prioridad
+        SELECT es.equipo_id, sd.label, sd.tipo, es.value, t.prioridad
         FROM equipo_specs es
         JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
+        JOIN spec_definitions sd ON sd.id = es.spec_def_id
         JOIN categoria_spec_templates t
-            ON t.spec_key = es.spec_key
+            ON t.spec_def_id = es.spec_def_id
            AND t.categoria_id = ec.categoria_id
         WHERE t.destacado = TRUE
           AND es.equipo_id IN ({placeholders})
-        ORDER BY es.equipo_id, t.prioridad, t.label
+          AND (
+            sd.tipo != 'bool'
+            OR LOWER(TRIM(es.value)) IN ('sí', 'si', 'yes', 'true', '1')
+          )
+        ORDER BY es.equipo_id, t.prioridad, sd.label
     """, ids)
     rows = cur.fetchall()
     cur.close()
@@ -1040,7 +1141,10 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
         eid = r["equipo_id"]
         key = r["label"]
         if key not in seen[eid]:
-            dest_map[eid].append({"label": r["label"], "value": r["value"]})
+            # Para bool, el value queda vacío — el frontend muestra solo el
+            # label como badge (ej. "MACRO" en lugar de "MACRO Sí").
+            value = "" if r["tipo"] == "bool" else r["value"]
+            dest_map[eid].append({"label": r["label"], "value": value})
             seen[eid].add(key)
 
     for e in equipos:

@@ -17,6 +17,7 @@ import {
   Sparkles,
   Building2,
   Palette,
+  ShieldCheck,
 } from "lucide-react";
 
 import {
@@ -54,10 +55,12 @@ const items: NavItem[] = [
     icon: Package,
     children: [
       { title: "Equipos",             url: "/admin/equipos",            icon: List },
+      { title: "Calidad",             url: "/admin/equipos/calidad",    icon: ShieldCheck },
       { title: "Categorías",          url: "/admin/equipos/categorias", icon: FolderTree },
       { title: "Marcas",              url: "/admin/equipos/marcas",     icon: Building2 },
       { title: "Etiquetas",           url: "/admin/equipos/etiquetas",  icon: Tag },
       { title: "Specs por categoría", url: "/admin/equipos/specs",      icon: Wrench },
+      { title: "Gear Compatibility",  url: "/admin/gear-compatibility", icon: Sparkles },
     ],
   },
   { title: "Pedidos",     url: "/admin/pedidos",     icon: ClipboardList },

@@ -42,6 +42,8 @@ export const uniq = <T,>(arr: T[]): T[] => Array.from(new Set(arr));
  * legacy tenga la unidad concatenada.
  */
 export const extractNumericPart = (value: string): string => {
-  const m = value.trim().match(/^[-+]?\d+(?:[.,]\d+)?/);
+  // El número puede venir al principio ("2.8 kg") o después de un prefijo
+  // ("f/2.8", "$1500"). Buscamos el primer match en cualquier posición.
+  const m = value.trim().match(/[-+]?\d+(?:[.,]\d+)?/);
   return m ? m[0].replace(",", ".") : "";
 };

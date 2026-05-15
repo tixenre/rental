@@ -175,7 +175,9 @@ export function SpecsDiffEditor({
         </div>
       )}
 
-      {/* Sección custom (drag-drop) */}
+      {/* Sección custom (drag-drop). Mostramos warning si un custom colide
+          con una spec oficial del catálogo global (mismo label normalizado
+          o spec_key parecido) — sugiere usar la spec del template. */}
       {custom.length > 0 && (
         <div className="space-y-1">
           {templateBound.length > 0 && (
@@ -186,14 +188,23 @@ export function SpecsDiffEditor({
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={custom.map((s) => s.id)} strategy={verticalListSortingStrategy}>
               <div className="space-y-1">
-                {custom.map((s) => (
-                  <CustomSortableRow
-                    key={s.id}
-                    spec={s}
-                    onUpdate={(patch) => updateSpec(s.id, patch)}
-                    onRemove={() => removeSpec(s.id)}
-                  />
-                ))}
+                {custom.map((s) => {
+                  // ¿Colide con una spec oficial del template? (label match
+                  // case-insensitive ignorando paréntesis y "/" extras).
+                  const norm = normalizeForCollision(s.label);
+                  const tmplCollision = (templateItems ?? []).find(
+                    (t) => normalizeForCollision(t.label) === norm,
+                  );
+                  return (
+                    <CustomSortableRow
+                      key={s.id}
+                      spec={s}
+                      onUpdate={(patch) => updateSpec(s.id, patch)}
+                      onRemove={() => removeSpec(s.id)}
+                      tmplCollision={tmplCollision ?? null}
+                    />
+                  );
+                })}
               </div>
             </SortableContext>
           </DndContext>
@@ -243,8 +254,21 @@ function TypedValueInput({
   value: string;
   onChange: (v: string) => void;
 }) {
-  if (tmpl.tipo === "number" && tmpl.unidad) {
-    return <NumericValueInput value={value} unidad={tmpl.unidad} onChange={onChange} />;
+  if (tmpl.tipo === "number") {
+    return <NumericValueInput value={value} unidad={tmpl.unidad ?? ""} onChange={onChange} />;
+  }
+
+  if (tmpl.tipo === "rango" && tmpl.unidad) {
+    return <RangoValueInput value={value} unidad={tmpl.unidad} onChange={onChange} />;
+  }
+
+  if ((tmpl.tipo === "wxh" || tmpl.tipo === "wxhxd") && tmpl.unidad) {
+    const axes = tmpl.tipo === "wxh" ? 2 : 3;
+    return <MedidasValueInput value={value} unidad={tmpl.unidad} axes={axes} onChange={onChange} />;
+  }
+
+  if (tmpl.tipo === "multi_enum" && tmpl.enum_options && tmpl.enum_options.length > 0) {
+    return <MultiEnumValueInput value={value} options={tmpl.enum_options} onChange={onChange} />;
   }
 
   if (tmpl.tipo === "enum" && tmpl.enum_options && tmpl.enum_options.length > 0) {
@@ -263,19 +287,7 @@ function TypedValueInput({
   }
 
   if (tmpl.tipo === "bool") {
-    const isYes = value.trim().toLowerCase() === "sí" || value.trim().toLowerCase() === "si"
-      || value.trim().toLowerCase() === "true" || value.trim() === "1";
-    return (
-      <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={isYes}
-          onChange={(e) => onChange(e.target.checked ? "Sí" : "")}
-          className="h-4 w-4 cursor-pointer"
-        />
-        <span className="text-muted-foreground">{isYes ? "Sí" : "No"}</span>
-      </label>
-    );
+    return <BoolValueInput value={value} onChange={onChange} />;
   }
 
   // string (default)
@@ -291,12 +303,29 @@ function TypedValueInput({
 
 // ── Custom row (drag-drop + label/value libres) ─────────────────────────
 
+/** Normaliza un label para detectar colisión: lowercase, sin paréntesis
+ *  finales, sin separadores "/" o "-", colapsa espacios. Ej:
+ *    "Línea / serie" → "linea serie"
+ *    "Formato de sensor" → "formato de sensor"
+ *    "Peso (g)" → "peso" */
+function normalizeForCollision(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/\s*\([^)]*\)\s*$/, "")
+    .replace(/[\/\-_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function CustomSortableRow({
-  spec, onUpdate, onRemove,
+  spec, onUpdate, onRemove, tmplCollision,
 }: {
   spec: Spec;
   onUpdate: (patch: Partial<Spec>) => void;
   onRemove: () => void;
+  /** Si esta spec custom colide con una del template, viene seteado. */
+  tmplCollision: SpecTemplate | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: spec.id });
@@ -308,45 +337,261 @@ function CustomSortableRow({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex gap-1 items-center bg-background">
-      <button
-        type="button"
-        className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground touch-none px-0.5"
-        {...attributes}
-        {...listeners}
-        tabIndex={-1}
-      >
-        <GripVertical className="h-3.5 w-3.5" />
-      </button>
-      <Input
-        value={spec.label}
-        onChange={(e) => onUpdate({ label: e.target.value })}
-        placeholder="Spec"
-        className="text-xs"
-      />
-      <Input
-        value={spec.value}
-        onChange={(e) => onUpdate({ value: e.target.value })}
-        placeholder="Valor"
-        className="text-xs"
-      />
-      <Button type="button" size="icon" variant="ghost" onClick={onRemove}>
-        <Trash2 className="h-3.5 w-3.5" />
-      </Button>
+    <div ref={setNodeRef} style={style} className="space-y-0.5">
+      <div className="flex gap-1 items-center bg-background">
+        <button
+          type="button"
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground touch-none px-0.5"
+          {...attributes}
+          {...listeners}
+          tabIndex={-1}
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+        <Input
+          value={spec.label}
+          onChange={(e) => onUpdate({ label: e.target.value })}
+          placeholder="Spec"
+          className={"text-xs " + (tmplCollision ? "border-amber/60" : "")}
+        />
+        <Input
+          value={spec.value}
+          onChange={(e) => onUpdate({ value: e.target.value })}
+          placeholder="Valor"
+          className="text-xs"
+        />
+        <Button type="button" size="icon" variant="ghost" onClick={onRemove}>
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      {tmplCollision && (
+        <div className="ml-6 text-[10px] text-amber-700 italic">
+          ⚠ Existe la spec oficial <strong>"{tmplCollision.label}"</strong> en
+          el template — eliminala y usá la del template para que entre al
+          sistema estructurado.
+        </div>
+      )}
     </div>
   );
 }
 
 // ── NumericValueInput (Fase B) ──────────────────────────────────────────
 
-function NumericValueInput({
+// ── RangoValueInput (#calidad-datos) ────────────────────────────────────
+// Dos inputs separados: min y max. Si max queda vacío, se guarda como valor
+// fijo (ej. "50 mm"). Si los dos están, se guarda como rango ("24-70 mm").
+// La BD almacena el string final con unidad como sufijo.
+
+function parseRango(raw: string): { min: string; max: string } {
+  // Acepta tanto sufijo ("24-70 mm") como prefijo ("f/24-70"). El regex
+  // encuentra el primer par de números en el string, ignorando la unidad
+  // antes/después.
+  const match = /(\d+(?:\.\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?/.exec(raw);
+  return {
+    min: match?.[1] ?? "",
+    max: match?.[2] ?? "",
+  };
+}
+
+/** Algunas unidades se escriben antes del número (f/, $, €) en lugar de
+ *  después (mm, kg, °). Detección por convención: termina en "/" o
+ *  empieza con un símbolo monetario. */
+function isPrefixUnit(unidad: string): boolean {
+  const u = unidad.trim();
+  if (!u) return false;
+  return u.endsWith("/") || /^[$€£¥]/.test(u);
+}
+
+function RangoValueInput({
   value, unidad, onChange,
 }: {
   value: string;
   unidad: string;
   onChange: (v: string) => void;
 }) {
+  const { min, max } = parseRango(value);
+  const prefix = isPrefixUnit(unidad);
+
+  const commit = (nextMin: string, nextMax: string) => {
+    const cleanMin = nextMin.trim();
+    const cleanMax = nextMax.trim();
+    if (!cleanMin) {
+      onChange("");
+      return;
+    }
+    const rango = cleanMax ? `${cleanMin}-${cleanMax}` : cleanMin;
+    onChange(prefix ? `${unidad}${rango}` : `${rango} ${unidad}`);
+  };
+
+  const unitSpan = (
+    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+      {unidad}
+    </span>
+  );
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {prefix && unitSpan}
+      <Input
+        type="number"
+        inputMode="decimal"
+        step="any"
+        value={min}
+        onChange={(e) => commit(e.target.value, max)}
+        className="text-xs w-16"
+        aria-label="Valor (o mínimo si es rango)"
+      />
+      <span className="text-[11px] text-muted-foreground select-none">–</span>
+      <Input
+        type="number"
+        inputMode="decimal"
+        step="any"
+        value={max}
+        onChange={(e) => commit(min, e.target.value)}
+        className="text-xs w-24 placeholder:text-muted-foreground/40 placeholder:italic placeholder:text-[10px]"
+        placeholder="vacío si es fijo"
+        aria-label="Valor máximo (vacío si es fijo)"
+      />
+      {!prefix && unitSpan}
+    </div>
+  );
+}
+
+// ── MedidasValueInput (wxh / wxhxd) ─────────────────────────────────────
+// 2 o 3 inputs numéricos separados por "×" con la unidad al final (o al
+// inicio si es unidad prefijo). Storage: "6144×3240 px" o "129.7×84.5×77.8 mm".
+
+function parseMedidas(raw: string, axes: 2 | 3): string[] {
+  const matches = raw.match(/\d+(?:\.\d+)?/g) ?? [];
+  const out = matches.slice(0, axes);
+  while (out.length < axes) out.push("");
+  return out;
+}
+
+function MedidasValueInput({
+  value, unidad, axes, onChange,
+}: {
+  value: string;
+  unidad: string;
+  axes: 2 | 3;
+  onChange: (v: string) => void;
+}) {
+  const parts = parseMedidas(value, axes);
+  const prefix = isPrefixUnit(unidad);
+
+  const commit = (idx: number, next: string) => {
+    const updated = [...parts];
+    updated[idx] = next.trim();
+    // Si ningún input tiene valor, limpiamos.
+    if (updated.every((p) => !p)) {
+      onChange("");
+      return;
+    }
+    // Si algún input está vacío, lo dejamos vacío en el join (queda como "×")
+    // — usuario tiene que completar los que faltan para que se vea bien.
+    const joined = updated.join("×");
+    onChange(prefix ? `${unidad}${joined}` : `${joined} ${unidad}`);
+  };
+
+  const unitChip = (
+    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{unidad}</span>
+  );
+
+  return (
+    <div className="flex items-center gap-1">
+      {prefix && unitChip}
+      {parts.map((p, i) => (
+        <div key={i} className="flex items-center gap-1">
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="any"
+            value={p}
+            onChange={(e) => commit(i, e.target.value)}
+            className="text-xs w-16 text-center"
+            aria-label={`Medida ${i + 1} de ${axes}`}
+          />
+          {i < axes - 1 && (
+            <span className="text-[11px] text-muted-foreground select-none">×</span>
+          )}
+        </div>
+      ))}
+      {!prefix && unitChip}
+    </div>
+  );
+}
+
+// ── MultiEnumValueInput ─────────────────────────────────────────────────
+// Lista de checkboxes (toggleable chips) — el equipo puede tener varios.
+// Storage: JSON array como string ("[\"Wi-Fi\",\"USB-C\"]") o coma-separado.
+// Acá usamos coma-separado para mantenerlo legible en BD.
+
+function parseMultiEnum(raw: string): Set<string> {
+  if (!raw.trim()) return new Set();
+  // Soporta tanto JSON array como coma-separado (legacy / migración).
+  if (raw.trim().startsWith("[")) {
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr.map(String));
+    } catch {
+      /* fall through */
+    }
+  }
+  return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
+}
+
+function MultiEnumValueInput({
+  value, options, onChange,
+}: {
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  const selected = parseMultiEnum(value);
+
+  const toggle = (opt: string) => {
+    const next = new Set(selected);
+    if (next.has(opt)) next.delete(opt);
+    else next.add(opt);
+    const arr = options.filter((o) => next.has(o)); // preserva el orden del template
+    onChange(arr.join(", "));
+  };
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {options.map((opt) => {
+        const isSelected = selected.has(opt);
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => toggle(opt)}
+            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] transition ${
+              isSelected
+                ? "border-amber bg-amber-soft text-ink"
+                : "border-ink/15 bg-background text-muted-foreground hover:border-ink/30"
+            }`}
+            aria-pressed={isSelected}
+          >
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function NumericValueInput({
+  value, unidad, onChange,
+}: {
+  value: string;
+  /** Unidad opcional — si está vacía, no se concatena ningún sufijo. */
+  unidad: string;
+  onChange: (v: string) => void;
+}) {
   const numericPart = extractNumericPart(value);
+  const hasUnidad = !!unidad.trim();
+  const prefix = hasUnidad && isPrefixUnit(unidad);
   return (
     <div className="relative">
       <Input
@@ -356,17 +601,84 @@ function NumericValueInput({
         value={numericPart}
         onChange={(e) => {
           const num = e.target.value;
-          onChange(num.trim() ? `${num} ${unidad}` : "");
+          if (!num.trim()) {
+            onChange("");
+            return;
+          }
+          if (!hasUnidad) {
+            onChange(num);
+            return;
+          }
+          onChange(prefix ? `${unidad}${num}` : `${num} ${unidad}`);
         }}
         placeholder="0"
-        className="text-xs pr-12"
+        className={`text-xs ${hasUnidad ? (prefix ? "pl-10" : "pr-12") : ""}`}
       />
-      <span
-        className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] uppercase tracking-wider text-muted-foreground"
-        aria-hidden
+      {hasUnidad && (
+        <span
+          className={`pointer-events-none absolute inset-y-0 flex items-center text-[10px] uppercase tracking-wider text-muted-foreground ${
+            prefix ? "left-2" : "right-2"
+          }`}
+          aria-hidden
+        >
+          {unidad}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── BoolValueInput ─────────────────────────────────────────────────────
+// Toggle segmentado Sí/No en lugar de checkbox — la casilla vacía leía
+// como "no determinado" cuando en realidad significaba "No". Acá ambas
+// opciones son visualmente explícitas; cuando ninguna está activa el
+// valor está realmente sin determinar.
+
+function isBoolYes(v: string): boolean {
+  const t = v.trim().toLowerCase();
+  return t === "sí" || t === "si" || t === "true" || t === "1";
+}
+function isBoolNo(v: string): boolean {
+  const t = v.trim().toLowerCase();
+  return t === "no" || t === "false" || t === "0";
+}
+
+function BoolValueInput({
+  value, onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const yes = isBoolYes(value);
+  const no = isBoolNo(value);
+  return (
+    <div className="inline-flex rounded-md border hairline overflow-hidden text-xs">
+      <button
+        type="button"
+        onClick={() => onChange(yes ? "" : "Sí")}
+        className={
+          "px-3 py-1 transition border-r hairline " +
+          (yes
+            ? "bg-emerald-100 text-emerald-800 font-medium"
+            : "bg-background text-muted-foreground hover:bg-muted/40")
+        }
+        aria-pressed={yes}
       >
-        {unidad}
-      </span>
+        Sí
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(no ? "" : "No")}
+        className={
+          "px-3 py-1 transition " +
+          (no
+            ? "bg-muted text-ink font-medium"
+            : "bg-background text-muted-foreground hover:bg-muted/40")
+        }
+        aria-pressed={no}
+      >
+        No
+      </button>
     </div>
   );
 }

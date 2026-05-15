@@ -8,6 +8,7 @@
     "build:dev": "vite build",
     "preview": "vite preview",
     "changelog:draft": "./scripts/changelog-draft.sh",
+    "changelog:build": "bun run scripts/build-changelog.ts",
     "test:mobile": "playwright test",
     "test:admin": "PLAYWRIGHT_ADMIN=1 playwright test admin-"
   },
