@@ -6,7 +6,7 @@ export function EmptyImage({
   brand,
   className = "",
 }: {
-  category: Category;
+  category: string;
   brand: string;
   className?: string;
 }) {

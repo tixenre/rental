@@ -246,7 +246,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
       .replace(/^-|-$/g, "") || `equipo-${e.id}`,
     name,
     brand: marca || "—",
-    category: resolveCategory(e.etiquetas ?? [], nombre, marca),
+    category: e.categorias?.[0]?.nombre ?? resolveCategory(e.etiquetas ?? [], nombre, marca),
     pricePerDay: e.precio_jornada ?? 0,
     fotoUrl: e.foto_url ?? null,
     cantidad: e.cantidad ?? 1,

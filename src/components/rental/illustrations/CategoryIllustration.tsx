@@ -120,7 +120,7 @@ function Cable(props: IllProps) {
   );
 }
 
-const map: Partial<Record<Category, (p: IllProps) => React.ReactElement>> = {
+const map: Record<string, (p: IllProps) => React.ReactElement> = {
   Cámaras: Camara,
   Lentes: Lente,
   Iluminación: Iluminacion,
@@ -134,7 +134,7 @@ export function CategoryIllustration({
   category,
   className,
   ...rest
-}: { category: Category } & IllProps) {
+}: { category: string } & IllProps) {
   const Component = map[category] ?? Camara;
   return <Component className={className} {...rest} />;
 }
