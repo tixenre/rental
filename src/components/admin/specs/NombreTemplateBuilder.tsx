@@ -23,13 +23,16 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { GripVertical, X, Plus, Tag } from "lucide-react";
 
 import { adminApi, type SpecTemplate } from "@/lib/admin/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 
 type Token =
@@ -182,14 +185,44 @@ export function NombreTemplateBuilder({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Preview con datos de ejemplo. Si el dueño le pone {spec:Foo} y Foo no
-  // existe como label, el render devuelve "" para ese spec.
+  // Selector opcional de equipo real para preview con datos vivos.
+  const [previewEquipoId, setPreviewEquipoId] = useState<number | null>(null);
+  const equiposQ = useQuery({
+    queryKey: ["admin", "equipos", "preview", categoriaNombre],
+    queryFn: () => adminApi.listEquipos({ categoria: categoriaNombre, per_page: 100 }),
+    staleTime: 60_000,
+  });
+  const equiposOpts = equiposQ.data?.items ?? [];
+
+  const previewSpecsQ = useQuery({
+    queryKey: ["admin", "equipo-specs", previewEquipoId],
+    queryFn: () => adminApi.getEquipoSpecs(previewEquipoId!),
+    enabled: previewEquipoId != null,
+    staleTime: 30_000,
+  });
+
+  // Variables para el preview: si hay equipo elegido, usar sus datos reales;
+  // sino caer a dummy "Sony FX3" + labels <Foo>.
+  const previewEquipo = previewEquipoId
+    ? equiposOpts.find((e) => e.id === previewEquipoId)
+    : null;
+  const previewSpecs = useMemo(() => {
+    if (!previewSpecsQ.data) {
+      return templateSpecs.map((t) => ({ label: t.label, value: `<${t.label}>` }));
+    }
+    const { specs: values, template } = previewSpecsQ.data;
+    return template.map((t) => ({
+      label: t.label,
+      value: values[t.spec_key] ?? "",
+    }));
+  }, [previewSpecsQ.data, templateSpecs]);
+
   const preview = renderNombrePublicoTemplate(currentTemplate, {
-    marca: "Sony",
-    modelo: "FX3",
+    marca: previewEquipo?.marca ?? "Sony",
+    modelo: previewEquipo?.modelo ?? "FX3",
     tipo: categoriaNombre,
-    nombre: `Ejemplo ${categoriaNombre}`,
-    specs: templateSpecs.map((t) => ({ label: t.label, value: `<${t.label}>` })),
+    nombre: previewEquipo?.nombre ?? `Ejemplo ${categoriaNombre}`,
+    specs: previewSpecs,
   });
 
   const fixedPlaceholders: { placeholder: string; label: string }[] = [
@@ -301,8 +334,29 @@ export function NombreTemplateBuilder({
         </div>
 
         <div>
-          <div className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider mb-1">
-            Vista previa
+          <div className="flex items-baseline justify-between gap-2 mb-1">
+            <div className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider">
+              Vista previa
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground">Equipo:</span>
+              <Select
+                value={previewEquipoId != null ? String(previewEquipoId) : "__dummy"}
+                onValueChange={(v) => setPreviewEquipoId(v === "__dummy" ? null : Number(v))}
+              >
+                <SelectTrigger className="h-7 text-xs w-56">
+                  <SelectValue placeholder="Ejemplo Sony FX3" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__dummy">Ejemplo (Sony FX3 dummy)</SelectItem>
+                  {equiposOpts.map((e) => (
+                    <SelectItem key={e.id} value={String(e.id)}>
+                      {e.marca} {e.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="rounded-md border hairline bg-muted/20 px-3 py-2 text-sm text-ink min-h-[2rem] flex items-center">
             {preview ?? (
@@ -312,8 +366,9 @@ export function NombreTemplateBuilder({
             )}
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">
-            Ejemplo simulado con marca "Sony", modelo "FX3", tipo "{categoriaNombre}". Los specs
-            muestran su label entre &lt;…&gt;.
+            {previewEquipo
+              ? `Datos reales del equipo "${previewEquipo.nombre}". Los specs vacíos quedan como "".`
+              : `Ejemplo simulado con marca "Sony", modelo "FX3", tipo "${categoriaNombre}". Los specs muestran su label entre <…>.`}
           </p>
         </div>
 
