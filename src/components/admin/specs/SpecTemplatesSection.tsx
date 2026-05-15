@@ -256,12 +256,11 @@ export function SpecTemplatesSection({
       {items.length > 0 && (
         <div className="rounded-md border hairline overflow-hidden">
           {/* Cabecera (alineada con las celdas — drag handle ocupa la primera columna). */}
-          <div className="grid grid-cols-[24px_1fr_140px_minmax(0,1fr)_56px_64px] items-center gap-2 bg-muted/40 px-3 py-2 text-xs text-muted-foreground md:grid-cols-[24px_1fr_140px_minmax(0,1fr)_56px_64px]">
+          <div className="grid grid-cols-[24px_1fr_140px_minmax(0,1fr)_64px] items-center gap-2 bg-muted/40 px-3 py-2 text-xs text-muted-foreground md:grid-cols-[24px_1fr_140px_minmax(0,1fr)_64px]">
             <span aria-hidden />
             <span>Label / Key</span>
             <span>Tipo</span>
             <span className="hidden md:block">Flags</span>
-            <span className="text-right">Prio</span>
             <span />
           </div>
           <DndContext
@@ -363,7 +362,7 @@ function SortableSpecRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="grid grid-cols-[24px_1fr_140px_minmax(0,1fr)_56px_64px] items-center gap-2 px-3 py-2 text-sm hover:bg-muted/20"
+      className="grid grid-cols-[24px_1fr_140px_minmax(0,1fr)_64px] items-center gap-2 px-3 py-2 text-sm hover:bg-muted/20"
     >
       <button
         {...attributes}
@@ -395,16 +394,10 @@ function SortableSpecRow({
 
       <div className="hidden md:flex flex-wrap gap-1 text-[10px] min-w-0">
         {template.destacado && <Badge tone="amber">destacado</Badge>}
-        {template.obligatorio && <Badge>obligatorio</Badge>}
         {template.visible_en_nombre && <Badge>en nombre</Badge>}
         {template.visible_en_card && <Badge>en card</Badge>}
-        {template.visible_en_filtros && <Badge>en filtros</Badge>}
       </div>
       <div className="md:hidden" aria-hidden />
-
-      <div className="text-right text-xs tabular-nums text-muted-foreground">
-        {template.prioridad}
-      </div>
 
       <div className="flex justify-end gap-1">
         <button
@@ -448,8 +441,13 @@ function SpecTemplateFormModal({
     enum_options: template?.enum_options ?? [],
     prioridad: template?.prioridad ?? 100,
     visible_en_card: template?.visible_en_card ?? false,
-    visible_en_filtros: template?.visible_en_filtros ?? false,
+    // visible_en_filtros: por design, todos los specs generan filtro en el
+    // catálogo público — ya no exponemos el toggle. Default true para nuevos
+    // y forzado true al guardar (ver handleSave).
+    visible_en_filtros: true,
     visible_en_nombre: template?.visible_en_nombre ?? false,
+    // obligatorio: oculto del UI por feedback del dueño (#calidad).
+    // Default false; respeta el valor existente si lo había.
     obligatorio: template?.obligatorio ?? false,
     ayuda: template?.ayuda ?? "",
     destacado: template?.destacado ?? false,
@@ -564,30 +562,19 @@ function SpecTemplateFormModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Tipo</Label>
-              <Select
-                value={form.tipo}
-                onValueChange={(v: SpecTipo) => setForm({ ...form, tipo: v })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(["string", "number", "enum", "bool"] as SpecTipo[]).map((t) => (
-                    <SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Prioridad</Label>
-              <Input
-                type="number"
-                value={form.prioridad ?? 100}
-                onChange={(e) => setForm({ ...form, prioridad: parseInt(e.target.value) || 100 })}
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">Menor = aparece antes</p>
-            </div>
+          <div>
+            <Label className="text-xs">Tipo</Label>
+            <Select
+              value={form.tipo}
+              onValueChange={(v: SpecTipo) => setForm({ ...form, tipo: v })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(["string", "number", "enum", "bool"] as SpecTipo[]).map((t) => (
+                  <SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {form.tipo === "number" && (
@@ -638,12 +625,7 @@ function SpecTemplateFormModal({
               onChange={(v) => setForm({ ...form, destacado: v })}
             />
             <Toggle
-              label="Obligatorio al crear equipo"
-              checked={!!form.obligatorio}
-              onChange={(v) => setForm({ ...form, obligatorio: v })}
-            />
-            <Toggle
-              label="Aparece en el nombre público (Cámara Sony FX3 Montura E…)"
+              label="Se usa como placeholder en el nombre público (ej. 'Cámara Sony FX3 Montura {montura}')"
               checked={!!form.visible_en_nombre}
               onChange={(v) => setForm({ ...form, visible_en_nombre: v })}
             />
@@ -651,11 +633,6 @@ function SpecTemplateFormModal({
               label="Aparece en la card del catálogo público"
               checked={!!form.visible_en_card}
               onChange={(v) => setForm({ ...form, visible_en_card: v })}
-            />
-            <Toggle
-              label="Genera filtro en el catálogo público"
-              checked={!!form.visible_en_filtros}
-              onChange={(v) => setForm({ ...form, visible_en_filtros: v })}
             />
           </fieldset>
         </div>
