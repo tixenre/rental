@@ -588,17 +588,21 @@ def list_equipos(
         ).fetchall()
         equipos = [row_to_dict(r) for r in rows]
 
-        # Attach brand object (id, nombre, logo_url)
+        # Attach brand object (id, nombre, logo_url) — batched (#350 perf).
+        # Antes era 1 query por equipo (N+1). Con 168 equipos sobre Railway
+        # eso significaba 60s+ de latencia. Ahora una sola query.
+        brand_ids = {e['brand_id'] for e in equipos if e.get('brand_id')}
+        brands_map: dict = {}
+        if brand_ids:
+            placeholders = ",".join(["%s"] * len(brand_ids))
+            brand_rows = conn.execute(
+                f"SELECT id, nombre, logo_url FROM marcas WHERE id IN ({placeholders})",
+                tuple(brand_ids),
+            ).fetchall()
+            brands_map = {r["id"]: row_to_dict(r) for r in brand_rows}
         for equipo in equipos:
-            if equipo.get('brand_id'):
-                brand_row = conn.execute(
-                    "SELECT id, nombre, logo_url FROM marcas WHERE id = ?",
-                    (equipo['brand_id'],)
-                ).fetchone()
-                if brand_row:
-                    equipo['brand'] = row_to_dict(brand_row)
-            else:
-                equipo['brand'] = None
+            bid = equipo.get('brand_id')
+            equipo['brand'] = brands_map.get(bid) if bid else None
 
         equipos = attach_tags(conn, equipos)
         equipos = attach_kit(conn, equipos)
