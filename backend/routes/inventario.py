@@ -19,62 +19,62 @@ def get_calidad_inventario(_admin: dict = Depends(require_admin)):
     Devuelve métricas de completitud del inventario.
 
     Solo cuenta equipos activos (eliminado_at IS NULL). Un equipo se considera
-    "faltante" en un campo si está NULL, vacío, o (para serie) marcado N/A
-    no cuenta como faltante porque es una marca explícita del admin.
+    "faltante" en un campo si está NULL o vacío.
     """
     conn = get_db()
+    try:
+        # Total de equipos activos.
+        total = conn.execute(
+            "SELECT COUNT(*) FROM equipos WHERE eliminado_at IS NULL"
+        ).fetchone()[0]
 
-    # Total de equipos activos.
-    total = conn.execute(
-        "SELECT COUNT(*) FROM equipos WHERE eliminado_at IS NULL"
-    ).fetchone()[0]
+        # Campos faltantes — una query con COUNT FILTER por cada campo.
+        # NULLIF + COALESCE para tratar string vacío y NULL igual.
+        row = conn.execute("""
+            SELECT
+              COUNT(*) FILTER (WHERE NULLIF(TRIM(COALESCE(e.serie, '')), '') IS NULL)        AS sin_serie,
+              COUNT(*) FILTER (WHERE e.valor_reposicion IS NULL OR e.valor_reposicion = 0)   AS sin_valor_reposicion,
+              COUNT(*) FILTER (WHERE NULLIF(TRIM(COALESCE(e.foto_url, '')), '') IS NULL)     AS sin_foto,
+              COUNT(*) FILTER (WHERE NULLIF(TRIM(COALESCE(f.descripcion, '')), '') IS NULL)  AS sin_descripcion,
+              COUNT(*) FILTER (WHERE NULLIF(TRIM(COALESCE(e.nombre_publico, '')), '') IS NULL) AS sin_nombre_publico
+            FROM equipos e
+            LEFT JOIN equipo_fichas f ON f.equipo_id = e.id
+            WHERE e.eliminado_at IS NULL
+        """).fetchone()
 
-    # Campos faltantes — una query con COUNT condicional por cada campo.
-    # NULLIF + COALESCE para tratar string vacío y NULL igual.
-    row = conn.execute("""
-        SELECT
-          COUNT(*) FILTER (WHERE NULLIF(TRIM(COALESCE(e.serie, '')), '') IS NULL)        AS sin_serie,
-          COUNT(*) FILTER (WHERE e.valor_reposicion IS NULL OR e.valor_reposicion = 0)   AS sin_valor_reposicion,
-          COUNT(*) FILTER (WHERE NULLIF(TRIM(COALESCE(e.foto_url, '')), '') IS NULL)     AS sin_foto,
-          COUNT(*) FILTER (WHERE NULLIF(TRIM(COALESCE(f.descripcion, '')), '') IS NULL)  AS sin_descripcion,
-          COUNT(*) FILTER (WHERE NULLIF(TRIM(COALESCE(e.nombre_publico, '')), '') IS NULL) AS sin_nombre_publico,
-          COUNT(*) FILTER (WHERE e.valor_reposicion IS NULL OR e.precio_jornada IS NULL) AS sin_precio_o_valor
-        FROM equipos e
-        LEFT JOIN equipo_fichas f ON f.equipo_id = e.id
-        WHERE e.eliminado_at IS NULL
-    """).fetchone()
+        # Equipos sin categoría: no aparecen en equipo_categorias.
+        sin_categoria = conn.execute("""
+            SELECT COUNT(*)
+            FROM equipos e
+            WHERE e.eliminado_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM equipo_categorias ec WHERE ec.equipo_id = e.id
+              )
+        """).fetchone()[0]
 
-    # Equipos sin categoría: no aparecen en equipo_categorias.
-    sin_categoria = conn.execute("""
-        SELECT COUNT(*)
-        FROM equipos e
-        WHERE e.eliminado_at IS NULL
-          AND NOT EXISTS (
-            SELECT 1 FROM equipo_categorias ec WHERE ec.equipo_id = e.id
-          )
-    """).fetchone()[0]
+        faltantes = {
+            "serie":              row["sin_serie"],
+            "valor_reposicion":   row["sin_valor_reposicion"],
+            "foto":               row["sin_foto"],
+            "descripcion":        row["sin_descripcion"],
+            "nombre_publico":     row["sin_nombre_publico"],
+            "categoria":          sin_categoria,
+        }
 
-    faltantes = {
-        "serie":              row["sin_serie"],
-        "valor_reposicion":   row["sin_valor_reposicion"],
-        "foto":               row["sin_foto"],
-        "descripcion":        row["sin_descripcion"],
-        "nombre_publico":     row["sin_nombre_publico"],
-        "categoria":          sin_categoria,
-    }
+        # Score de completitud: cada equipo tiene 6 "slots" (serie, valor,
+        # foto, descripción, nombre público, categoría). Slot lleno = +1.
+        # Total posible = total * 6. Porcentaje = slots llenos / total posible.
+        if total == 0:
+            completos_pct = 100
+        else:
+            slots_totales = total * len(faltantes)
+            slots_faltantes = sum(faltantes.values())
+            completos_pct = round(100 * (slots_totales - slots_faltantes) / slots_totales)
 
-    # Score de completitud: cada equipo tiene 6 "slots" (serie, valor, foto,
-    # descripción, nombre público, categoría). Slot lleno = +1. Total posible
-    # = total * 6. Porcentaje = slots llenos / total posible.
-    if total == 0:
-        completos_pct = 100
-    else:
-        slots_totales = total * len(faltantes)
-        slots_faltantes = sum(faltantes.values())
-        completos_pct = round(100 * (slots_totales - slots_faltantes) / slots_totales)
-
-    return {
-        "total": total,
-        "completos_pct": completos_pct,
-        "faltantes": faltantes,
-    }
+        return {
+            "total": total,
+            "completos_pct": completos_pct,
+            "faltantes": faltantes,
+        }
+    finally:
+        conn.close()
