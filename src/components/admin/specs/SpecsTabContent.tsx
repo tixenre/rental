@@ -266,9 +266,6 @@ function SpecInput({
     <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
       {template.label}
       {template.obligatorio && <span className="text-destructive">*</span>}
-      {template.visible_en_nombre && (
-        <span className="text-[8px] text-amber font-mono">EN NOMBRE</span>
-      )}
     </Label>
   );
 
