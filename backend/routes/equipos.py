@@ -613,6 +613,16 @@ def list_equipos(
         equipos = attach_kit(conn, equipos)
         equipos = attach_categorias(conn, equipos)
         equipos = attach_ficha(conn, equipos)
+        # Formatear specs_json values tipo tabla con conectores legibles.
+        # Cargamos las defs UNA vez (no por equipo) para evitar N queries.
+        tabla_defs_by_label = _load_tabla_defs_by_label(conn)
+        if tabla_defs_by_label:
+            for eq in equipos:
+                ficha = eq.get("ficha") or {}
+                if ficha.get("specs_json"):
+                    ficha["specs_json"] = _apply_tabla_defs_to_specs_json(
+                        ficha["specs_json"], tabla_defs_by_label
+                    )
         equipos = attach_specs_destacados(conn, equipos)
 
         if desde and hasta:
@@ -621,6 +631,136 @@ def list_equipos(
         return {"total": total, "page": page, "per_page": per_page, "items": equipos}
     finally:
         conn.close()
+
+
+def _norm_spec_label(s: str) -> str:
+    """Normaliza un label para lookup contra spec_definitions: lowercase + sin tildes."""
+    s = unicodedata.normalize("NFD", s or "")
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return s.lower().strip()
+
+
+def _format_tabla_value_with_columns(value_json: str, columnas: list) -> str:
+    """Formatea el JSON serializado de una spec tabla a texto legible.
+    Usa las columnas (con prefijo/unidad) para construir la oración:
+    "10000 lm a 5700 K". Múltiples filas se separan con \\n.
+    Si el formato falla, devuelve el value original."""
+    import json as _json
+    try:
+        rows = _json.loads(value_json)
+    except Exception:
+        return value_json
+    if not isinstance(rows, list) or not rows:
+        return value_json
+    cols = columnas or []
+    lines: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        parts: list[str] = []
+        for i, c in enumerate(cols):
+            key = c.get("key") if isinstance(c, dict) else None
+            if not key:
+                continue
+            cell = row.get(key)
+            if cell is None or cell == "":
+                continue
+            # Conector con la columna anterior (prefijo).
+            prefijo = c.get("prefijo") if isinstance(c, dict) else None
+            if i > 0 and prefijo:
+                parts.append(str(prefijo))
+            # Render del valor.
+            if isinstance(cell, dict) and "valor" in cell:
+                v = cell.get("valor")
+                u = cell.get("unidad") or ""
+                txt = str(v) if v is not None else ""
+                if u:
+                    txt = f"{txt} {u}".strip()
+            else:
+                txt = str(cell)
+                # Si la columna tiene unidad fija definida en el header, sufijarla.
+                fixed_unit = c.get("unidad") if isinstance(c, dict) else None
+                if fixed_unit and c.get("tipo") != "valor_unidad":
+                    txt = f"{txt} {fixed_unit}".strip()
+            if txt.strip():
+                parts.append(txt.strip())
+        if parts:
+            lines.append(" ".join(parts))
+    return "\n".join(lines) if lines else value_json
+
+
+def _load_tabla_defs_by_label(conn) -> dict[str, dict]:
+    """Carga TODAS las spec_definitions tipo 'tabla' y las indexa por label
+    normalizado. Devuelve {} si no hay specs tabla en el catálogo."""
+    import json as _json
+    defs_rows = conn.execute(
+        "SELECT label, tipo, tabla_columnas FROM spec_definitions WHERE tipo = 'tabla'"
+    ).fetchall()
+    out: dict[str, dict] = {}
+    for r in defs_rows:
+        d = row_to_dict(r) if not isinstance(r, dict) else r
+        cols = d.get("tabla_columnas")
+        if isinstance(cols, str):
+            try:
+                cols = _json.loads(cols)
+            except Exception:
+                cols = None
+        out[_norm_spec_label(d.get("label") or "")] = {
+            "tipo": d.get("tipo"),
+            "tabla_columnas": cols,
+        }
+    return out
+
+
+def _apply_tabla_defs_to_specs_json(
+    raw_specs_json: Optional[str],
+    defs_by_label: dict[str, dict],
+) -> Optional[str]:
+    """Post-procesa `specs_json` del ficha: para items cuyo label matchea
+    una spec_definition tipo tabla, formatea el value crudo (JSON) a texto
+    legible con conectores y agrega `value_raw` con el JSON original (sirve
+    para placeholders tipo `{spec:Label.colKey}` que extraen celdas
+    específicas en lugar del texto completo). El resto queda intacto."""
+    import json as _json
+    if not raw_specs_json or not defs_by_label:
+        return raw_specs_json
+    try:
+        arr = _json.loads(raw_specs_json)
+    except Exception:
+        return raw_specs_json
+    if not isinstance(arr, list):
+        return raw_specs_json
+    changed = False
+    out: list[dict] = []
+    for item in arr:
+        if not isinstance(item, dict) or "label" not in item or "value" not in item:
+            out.append(item)
+            continue
+        label = item.get("label") or ""
+        value = item.get("value")
+        if not isinstance(value, str):
+            out.append(item)
+            continue
+        sd = defs_by_label.get(_norm_spec_label(label))
+        if sd and sd.get("tipo") == "tabla":
+            cols = sd.get("tabla_columnas") or []
+            formatted = _format_tabla_value_with_columns(value, cols)
+            if formatted != value:
+                # Mantenemos `value_raw` con el JSON original para que el
+                # frontend pueda extraer celdas via `{spec:Label.colKey}`.
+                out.append({**item, "value": formatted, "value_raw": value})
+                changed = True
+                continue
+        out.append(item)
+    return _json.dumps(out, ensure_ascii=False) if changed else raw_specs_json
+
+
+def _format_specs_json_with_definitions(conn, raw_specs_json: Optional[str]) -> Optional[str]:
+    """Versión single-equipo: carga defs internamente. Usar para endpoints
+    que sirven 1 equipo (detalle). Para listas, usar load_tabla_defs +
+    apply_tabla_defs separados para evitar N queries."""
+    defs = _load_tabla_defs_by_label(conn)
+    return _apply_tabla_defs_to_specs_json(raw_specs_json, defs)
 
 
 @router.get("/equipos/{id_or_slug}")
@@ -654,6 +794,13 @@ def get_equipo(id_or_slug: str):
             raise HTTPException(404, "Equipo no encontrado")
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         equipo = attach_ficha(conn, [equipo])[0]
+        # Post-procesar `specs_json` para formatear values tipo tabla con
+        # sus conectores. El frontend recibe texto legible directo.
+        ficha = equipo.get("ficha") or {}
+        if ficha.get("specs_json"):
+            ficha["specs_json"] = _format_specs_json_with_definitions(
+                conn, ficha["specs_json"]
+            )
         kit = conn.execute("""
             SELECT kc.componente_id, kc.cantidad, e.nombre, e.marca, e.foto_url
             FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id

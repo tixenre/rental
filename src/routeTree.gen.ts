@@ -30,6 +30,7 @@ import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
 import { Route as AdminEquiposEtiquetasRouteImport } from './routes/admin/equipos.etiquetas'
 
 const AdminIndexLazyRouteImport = createFileRoute('/admin/')()
+const AdminUnidadesLazyRouteImport = createFileRoute('/admin/unidades')()
 const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
 const AdminHoyLazyRouteImport = createFileRoute('/admin/hoy')()
 const AdminGearCompatibilityLazyRouteImport = createFileRoute(
@@ -117,6 +118,13 @@ const ClienteIndexRoute = ClienteIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ClienteRoute,
 } as any)
+const AdminUnidadesLazyRoute = AdminUnidadesLazyRouteImport.update({
+  id: '/unidades',
+  path: '/unidades',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/unidades.lazy').then((d) => d.Route),
+)
 const AdminSettingsLazyRoute = AdminSettingsLazyRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -321,6 +329,7 @@ export interface FileRoutesByFullPath {
   '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
   '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
+  '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente/': typeof ClienteIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
   '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
@@ -357,6 +366,7 @@ export interface FileRoutesByTo {
   '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
   '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
+  '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente': typeof ClienteIndexRoute
   '/admin': typeof AdminIndexLazyRoute
   '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
@@ -397,6 +407,7 @@ export interface FileRoutesById {
   '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
   '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
+  '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente/': typeof ClienteIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
   '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
@@ -438,6 +449,7 @@ export interface FileRouteTypes {
     | '/admin/gear-compatibility'
     | '/admin/hoy'
     | '/admin/settings'
+    | '/admin/unidades'
     | '/cliente/'
     | '/admin/'
     | '/admin/equipos/etiquetas'
@@ -474,6 +486,7 @@ export interface FileRouteTypes {
     | '/admin/gear-compatibility'
     | '/admin/hoy'
     | '/admin/settings'
+    | '/admin/unidades'
     | '/cliente'
     | '/admin'
     | '/admin/equipos/etiquetas'
@@ -513,6 +526,7 @@ export interface FileRouteTypes {
     | '/admin/gear-compatibility'
     | '/admin/hoy'
     | '/admin/settings'
+    | '/admin/unidades'
     | '/cliente/'
     | '/admin/'
     | '/admin/equipos/etiquetas'
@@ -605,6 +619,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/cliente/'
       preLoaderRoute: typeof ClienteIndexRouteImport
       parentRoute: typeof ClienteRoute
+    }
+    '/admin/unidades': {
+      id: '/admin/unidades'
+      path: '/unidades'
+      fullPath: '/admin/unidades'
+      preLoaderRoute: typeof AdminUnidadesLazyRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/settings': {
       id: '/admin/settings'
@@ -842,6 +863,7 @@ interface AdminRouteChildren {
   AdminGearCompatibilityLazyRoute: typeof AdminGearCompatibilityLazyRoute
   AdminHoyLazyRoute: typeof AdminHoyLazyRoute
   AdminSettingsLazyRoute: typeof AdminSettingsLazyRoute
+  AdminUnidadesLazyRoute: typeof AdminUnidadesLazyRoute
   AdminIndexLazyRoute: typeof AdminIndexLazyRoute
   AdminPedidosIdLazyRoute: typeof AdminPedidosIdLazyRoute
   AdminPedidosNuevoLazyRoute: typeof AdminPedidosNuevoLazyRoute
@@ -861,6 +883,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminGearCompatibilityLazyRoute: AdminGearCompatibilityLazyRoute,
   AdminHoyLazyRoute: AdminHoyLazyRoute,
   AdminSettingsLazyRoute: AdminSettingsLazyRoute,
+  AdminUnidadesLazyRoute: AdminUnidadesLazyRoute,
   AdminIndexLazyRoute: AdminIndexLazyRoute,
   AdminPedidosIdLazyRoute: AdminPedidosIdLazyRoute,
   AdminPedidosNuevoLazyRoute: AdminPedidosNuevoLazyRoute,

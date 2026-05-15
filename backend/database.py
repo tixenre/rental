@@ -669,6 +669,27 @@ def init_db():
         "ALTER TABLE spec_definitions "
         "ADD COLUMN IF NOT EXISTS validado BOOLEAN NOT NULL DEFAULT FALSE"
     )
+    # Para specs tipo 'tabla': shape de columnas (key, label, tipo, options?, unidad?).
+    # El value en equipo_specs se persiste como JSON array de rows.
+    conn.execute(
+        "ALTER TABLE spec_definitions "
+        "ADD COLUMN IF NOT EXISTS tabla_columnas JSONB"
+    )
+    # Catálogo global de unidades (lm, K, V, A, W…). Referenciado por specs
+    # tabla con columnas `valor_unidad` para listas cerradas de opciones.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS unidades (
+            id          SERIAL PRIMARY KEY,
+            simbolo     VARCHAR(16) UNIQUE NOT NULL,
+            nombre      VARCHAR(64) NOT NULL,
+            dimension   VARCHAR(32),
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_unidades_dimension ON unidades(dimension)"
+    )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
         "ON spec_definitions(es_compatibilidad) WHERE es_compatibilidad"
