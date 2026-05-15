@@ -26,6 +26,7 @@ sigue funcionando — gana sobre el auto-build.
 """
 
 import re
+import unicodedata
 from typing import Optional
 
 
@@ -246,13 +247,40 @@ def _specs_dict(specs_en_nombre: list[tuple[str, str]]) -> dict[str, str]:
 _TPL_SEP = r"[\s\-–—,/|·]"
 
 
-def _render_template(tpl: str, vars: dict[str, str]) -> str:
-    """Renderiza `{marca} {modelo} — {montura}` con los vars dados."""
+def _norm_label(s: str) -> str:
+    """Normaliza un label para lookup de specs: lowercase + sin tildes + trim.
+    Tiene que matchear el approach del frontend en `nombre-template.ts`."""
+    s = unicodedata.normalize("NFD", s or "")
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return s.lower().strip()
+
+
+def _render_template(
+    tpl: str,
+    vars: dict[str, str],
+    specs: Optional[list[tuple[str, str]]] = None,
+) -> str:
+    """Renderiza `{marca} {modelo} {spec:Lens mount}` con los vars dados.
+
+    Tokens soportados:
+      - `{marca}`, `{modelo}`, `{tipo}`, `{nombre}` → resueltos vía `vars`.
+      - `{spec:Label}` → busca en `specs` por label normalizado (case+tilde
+        insensitive).
+    """
     lower = {k.lower(): (v or "").strip() for k, v in vars.items()}
+    spec_map: dict[str, str] = {}
+    if specs:
+        for label, value in specs:
+            spec_map[_norm_label(label)] = (value or "").strip()
 
     def replace_token(m: re.Match) -> str:
         before, key, after = m.group(1), m.group(2), m.group(3)
-        val = lower.get(key.lower(), "")
+        key_stripped = key.strip()
+        if key_stripped.lower().startswith("spec:"):
+            spec_label = key_stripped[len("spec:"):]
+            val = spec_map.get(_norm_label(spec_label), "")
+        else:
+            val = lower.get(key_stripped.lower(), "")
         if val:
             return f"{before or ''}{val}{after or ''}"
         if after:
@@ -261,7 +289,9 @@ def _render_template(tpl: str, vars: dict[str, str]) -> str:
             return ""
         return ""
 
-    pattern = "(" + _TPL_SEP + "+)?" + r"\{([a-zA-Z_]+)\}" + "(" + _TPL_SEP + "+)?"
+    # Regex: cualquier token `{...}` que NO contenga `}` adentro. Esto permite
+    # `{spec:Formato de sensor}` (con espacios, dos puntos, etc.).
+    pattern = "(" + _TPL_SEP + "+)?" + r"\{([^}]+)\}" + "(" + _TPL_SEP + "+)?"
     out = re.sub(pattern, replace_token, tpl)
     out = re.sub(r"\s+", " ", out).strip()
     out = re.sub(rf"^{_TPL_SEP}+|{_TPL_SEP}+$", "", out).strip()
@@ -631,11 +661,7 @@ def construir_nombre_publico(
             "modelo": modelo_s,
             "nombre": nombre_s,
         }
-        for label, value in specs_en_nombre:
-            slug = re.sub(r"[^a-z0-9_]", "_", label.lower())
-            vars_dict[label.lower()] = (value or "").strip()
-            vars_dict[slug] = (value or "").strip()
-        rendered = _render_template(template_override, vars_dict)
+        rendered = _render_template(template_override, vars_dict, specs=specs_en_nombre)
         if rendered:
             return rendered, rendered
 

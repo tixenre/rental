@@ -52,10 +52,14 @@ def _categorias_de(conn, equipo_id: int) -> tuple[Optional[str], Optional[str]]:
 
 
 def _specs_en_nombre_de(conn, equipo_id: int) -> list[tuple[str, str]]:
-    """Devuelve las specs marcadas `visible_en_nombre` para este equipo,
-    ordenadas por prioridad. Post refactor unificar_specs_definitions:
-    JOIN va sobre spec_def_id y los campos descriptivos vienen de
-    spec_definitions."""
+    """Devuelve TODAS las specs del equipo (con label desde spec_definitions),
+    ordenadas por prioridad de la asignación a la categoría. El builder de
+    nombres decide cuáles usar:
+      - Path template: el `{spec:Label}` busca por label exacto.
+      - Path formatter: cada formatter filtra por las que le interesan.
+
+    Ya no usamos el flag `visible_en_nombre` — está deprecado y removido del UI;
+    el template (en `categoria.nombre_publico_template`) es source of truth."""
     rows = conn.execute(
         """
         SELECT sd.label, sd.spec_key, es.value, t.prioridad
@@ -65,7 +69,6 @@ def _specs_en_nombre_de(conn, equipo_id: int) -> list[tuple[str, str]]:
           ON t.categoria_id = ec.categoria_id AND t.spec_def_id = es.spec_def_id
         JOIN spec_definitions sd ON sd.id = es.spec_def_id
         WHERE es.equipo_id = ?
-          AND t.visible_en_nombre = TRUE
         ORDER BY t.prioridad, sd.label
         """,
         (equipo_id,),
