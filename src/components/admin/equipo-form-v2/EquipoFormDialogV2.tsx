@@ -464,7 +464,33 @@ export function EquipoFormDialogV2({
       if (r.montura) propuestos.unshift(newSpec("Montura", r.montura));
       if (r.formato) propuestos.unshift(newSpec("Formato", r.formato));
       if (r.resolucion) propuestos.unshift(newSpec("Resolución", r.resolucion));
-      if (propuestos.length) setSpecsPropuestos(propuestos);
+
+      // Auto-aplicar los propuestos que matchean con el template del equipo
+      // (label normalizado): el usuario no debería tener que clickear ✓ uno
+      // por uno cuando ya hay un campo definido para ese spec. Solo quedan
+      // como "propuestos pendientes" los que NO matchean — esos sí necesitan
+      // decisión (¿agregar al catálogo? ¿ignorar?).
+      const tmplLabels = new Set(
+        (templateItems ?? []).map((t) => t.label.trim().toLowerCase()),
+      );
+      const autoAplicables = propuestos.filter((p) =>
+        tmplLabels.has(p.label.trim().toLowerCase()),
+      );
+      const requierenRevision = propuestos.filter((p) =>
+        !tmplLabels.has(p.label.trim().toLowerCase()),
+      );
+      if (autoAplicables.length > 0) {
+        setSpecs((prev) => {
+          const next = [...prev];
+          for (const p of autoAplicables) {
+            const idx = next.findIndex((x) => sameLabel(x.label, p.label));
+            if (idx >= 0) next[idx] = { ...next[idx], value: p.value };
+            else next.push(newSpec(p.label, p.value));
+          }
+          return next;
+        });
+      }
+      if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
 
       setImportedFichaExt(r);
       // Actualizar cache del scrape: habilita los botones ✨ por sección
@@ -472,7 +498,8 @@ export function EquipoFormDialogV2({
       setCachedScrape(r);
 
       const parts: string[] = [];
-      if (propuestos.length) parts.push(`${propuestos.length} specs propuestos`);
+      if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
+      if (requierenRevision.length) parts.push(`${requierenRevision.length} pendientes de revisar`);
       if (r.keywords?.length) parts.push(`${r.keywords.length} etiquetas`);
       if (r.descripcion) parts.push("descripción");
       toast.success("Specs importados", { description: parts.join(" · ") || "datos básicos" });
@@ -648,8 +675,33 @@ export function EquipoFormDialogV2({
         if (r.montura) propuestos.unshift(newSpec("Montura", r.montura));
         if (r.formato) propuestos.unshift(newSpec("Formato", r.formato));
         if (r.resolucion) propuestos.unshift(newSpec("Resolución", r.resolucion));
-        setSpecsPropuestos(propuestos);
-        toast.success(`${propuestos.length} specs propuestos desde cache`);
+        // Misma partición que en el callback del scrape: matcheables al
+        // template van directo a specs, el resto a pendientes de revisar.
+        const tmplLabels = new Set(
+          (templateItems ?? []).map((t) => t.label.trim().toLowerCase()),
+        );
+        const autoAplicables = propuestos.filter((p) =>
+          tmplLabels.has(p.label.trim().toLowerCase()),
+        );
+        const requierenRevision = propuestos.filter((p) =>
+          !tmplLabels.has(p.label.trim().toLowerCase()),
+        );
+        if (autoAplicables.length > 0) {
+          setSpecs((prev) => {
+            const next = [...prev];
+            for (const p of autoAplicables) {
+              const idx = next.findIndex((x) => sameLabel(x.label, p.label));
+              if (idx >= 0) next[idx] = { ...next[idx], value: p.value };
+              else next.push(newSpec(p.label, p.value));
+            }
+            return next;
+          });
+        }
+        setSpecsPropuestos(requierenRevision);
+        const partes: string[] = [];
+        if (autoAplicables.length) partes.push(`${autoAplicables.length} aplicados`);
+        if (requierenRevision.length) partes.push(`${requierenRevision.length} pendientes`);
+        toast.success(`Recargado desde cache${partes.length ? `: ${partes.join(" · ")}` : ""}`);
         break;
       }
       case "etiquetas": {
