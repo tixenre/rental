@@ -258,7 +258,7 @@ export type MarcaAdmin = {
 
 // ── Templates de specs por categoría (CRUD admin) ────────────────────────
 
-export type SpecTipo = "string" | "number" | "enum" | "bool";
+export type SpecTipo = "string" | "number" | "enum" | "bool" | "rango";
 
 export type SpecTemplate = {
   id: number;

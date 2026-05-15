@@ -50,6 +50,7 @@ import {
 const TIPO_LABEL: Record<SpecTipo, string> = {
   string: "Texto",
   number: "Número",
+  rango: "Rango (un valor o dos)",
   enum: "Opciones (enum)",
   bool: "Sí/No",
 };
@@ -410,7 +411,7 @@ function SortableSpecRow({
 
       <div className="text-xs min-w-0">
         {TIPO_LABEL[template.tipo]}
-        {template.tipo === "number" && template.unidad ? ` · ${template.unidad}` : ""}
+        {(template.tipo === "number" || template.tipo === "rango") && template.unidad ? ` · ${template.unidad}` : ""}
         {template.tipo === "enum" && template.enum_options ? (
           <div className="text-[10px] text-muted-foreground truncate">
             {template.enum_options.join(", ")}
@@ -519,7 +520,7 @@ function SpecTemplateFormModal({
       return;
     }
     // #291 Fase B: unidad obligatoria para tipo número.
-    if (form.tipo === "number" && !(form.unidad ?? "").trim()) {
+    if ((form.tipo === "number" || form.tipo === "rango") && !(form.unidad ?? "").trim()) {
       toast.error("Para tipo Número tenés que indicar la unidad (kg, MP, mm, W…).");
       return;
     }
@@ -595,14 +596,14 @@ function SpecTemplateFormModal({
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(["string", "number", "enum", "bool"] as SpecTipo[]).map((t) => (
+                {(["string", "number", "rango", "enum", "bool"] as SpecTipo[]).map((t) => (
                   <SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {form.tipo === "number" && (
+          {(form.tipo === "number" || form.tipo === "rango") && (
             <div>
               <Label className="text-xs">
                 Unidad <span className="text-destructive">*</span>
@@ -614,7 +615,9 @@ function SpecTemplateFormModal({
                 required
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                Al cargar un equipo se escribe solo el número y aparece esta unidad como sufijo.
+                {form.tipo === "rango"
+                  ? "Al cargar un equipo se escribe '50' (fijo) o '24-70' (rango). La unidad aparece como sufijo: '50 mm' / '24-70 mm'."
+                  : "Al cargar un equipo se escribe solo el número y aparece esta unidad como sufijo."}
               </p>
             </div>
           )}

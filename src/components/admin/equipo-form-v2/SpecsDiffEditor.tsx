@@ -247,6 +247,10 @@ function TypedValueInput({
     return <NumericValueInput value={value} unidad={tmpl.unidad} onChange={onChange} />;
   }
 
+  if (tmpl.tipo === "rango" && tmpl.unidad) {
+    return <RangoValueInput value={value} unidad={tmpl.unidad} onChange={onChange} />;
+  }
+
   if (tmpl.tipo === "enum" && tmpl.enum_options && tmpl.enum_options.length > 0) {
     return (
       <Select value={value || undefined} onValueChange={onChange}>
@@ -338,6 +342,45 @@ function CustomSortableRow({
 }
 
 // ── NumericValueInput (Fase B) ──────────────────────────────────────────
+
+// ── RangoValueInput (#calidad-datos) ────────────────────────────────────
+// Acepta un valor único ("50") o rango ("24-70"). Almacena el string crudo
+// SIN unidad — el catálogo agrega el sufijo al renderizar. Esto mantiene
+// la BD ordenable (el min y max se parsean al sortear).
+
+function extractRangoPart(raw: string): string {
+  const match = /(\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?)/.exec(raw);
+  return match?.[1]?.replace(/\s+/g, "") ?? "";
+}
+
+function RangoValueInput({
+  value, unidad, onChange,
+}: {
+  value: string;
+  unidad: string;
+  onChange: (v: string) => void;
+}) {
+  const rangoPart = extractRangoPart(value);
+  return (
+    <div className="relative">
+      <Input
+        value={rangoPart}
+        onChange={(e) => {
+          const raw = e.target.value.trim();
+          onChange(raw ? `${raw} ${unidad}` : "");
+        }}
+        placeholder="50 ó 24-70"
+        className="text-xs pr-12"
+      />
+      <span
+        className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] uppercase tracking-wider text-muted-foreground"
+        aria-hidden
+      >
+        {unidad}
+      </span>
+    </div>
+  );
+}
 
 function NumericValueInput({
   value, unidad, onChange,
