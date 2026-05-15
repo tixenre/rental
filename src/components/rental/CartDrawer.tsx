@@ -3,6 +3,7 @@ import { X, Trash2, Plus, Minus, Loader2, AlertCircle, Calendar as CalendarIcon 
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
@@ -12,6 +13,7 @@ import { authedFetch } from "@/lib/authedFetch";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { RentalDateModal } from "./RentalDateModal";
+import { apiGetDescuentosJornada, interpolarDescuento } from "@/lib/api";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -66,7 +68,16 @@ export function CartDrawer({
 
   const d = days();
   const subtotal = list.reduce((s, { it, qty }) => s + it.pricePerDay * qty, 0);
-  const total = subtotal * d;
+  const subtotalTotal = subtotal * d;
+
+  const { data: descuentosPuntos = [] } = useQuery({
+    queryKey: ["descuentos-jornada"],
+    queryFn: apiGetDescuentosJornada,
+    staleTime: 10 * 60 * 1000,
+  });
+  const descuentoPct = d > 0 ? interpolarDescuento(descuentosPuntos, d) : 0;
+  const descuentoMonto = Math.round(subtotalTotal * descuentoPct / 100);
+  const total = subtotalTotal - descuentoMonto;
 
   // Lock scroll del body + guardar foco al abrir, restaurar al cerrar
   useEffect(() => {
@@ -407,12 +418,18 @@ export function CartDrawer({
                   style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
                 >
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal por jornada</span>
-                    <span className="tabular">{formatARS(subtotal)}</span>
+                    <span className="text-muted-foreground">Subtotal · {d} {d === 1 ? "jornada" : "jornadas"}</span>
+                    <span className="tabular">{formatARS(subtotalTotal)}</span>
                   </div>
+                  {descuentoPct > 0 && (
+                    <div className="flex items-center justify-between text-sm text-emerald-600">
+                      <span>Descuento {descuentoPct}% ({d} {d === 1 ? "jornada" : "jornadas"})</span>
+                      <span className="tabular">−{formatARS(descuentoMonto)}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                      Total · {d} {d === 1 ? "jornada" : "jornadas"}
+                      Total
                     </span>
                     <span className="font-display text-3xl tabular text-ink">
                       {formatARS(total)}

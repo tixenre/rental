@@ -1102,3 +1102,15 @@ export const ESTADO_LABEL: Record<PedidoEstado, string> = {
   cancelado: "Cancelado",
 };
 
+// ── Descuentos por jornadas ──────────────────────────────────────────────────
+
+export type DescuentoJornada = { id: number; jornadas: number; pct: number };
+
+export const descuentosJornadaApi = {
+  list: () => authedJson<DescuentoJornada[]>("/api/descuentos-jornada"),
+  create: (data: { jornadas: number; pct: number }) =>
+    authedPostJson<DescuentoJornada>("/api/admin/descuentos-jornada", data),
+  delete: (id: number) =>
+    authedFetch(`/api/admin/descuentos-jornada/${id}`, { method: "DELETE" }),
+};
+

@@ -75,6 +75,32 @@ def _aplicar_descuento(bruto: float, pct: float) -> int:
     return int(round(bruto * (1 - pct / 100)))
 
 
+def _get_descuento_jornadas(conn, jornadas: int) -> float:
+    """Interpolación lineal entre los puntos ancla de descuentos_jornada.
+
+    Con puntos (1, 0%), (2, 3%), (7, 10%):
+      - 4 jornadas → interpola entre (2,3%) y (7,10%) → 5.8%
+      - 7+ jornadas → 10% (se queda en el último punto)
+    """
+    rows = conn.execute(
+        "SELECT jornadas, pct FROM descuentos_jornada ORDER BY jornadas ASC"
+    ).fetchall()
+    if not rows:
+        return 0.0
+    puntos = [(r["jornadas"], r["pct"]) for r in rows]
+    if jornadas <= puntos[0][0]:
+        return float(puntos[0][1])
+    if jornadas >= puntos[-1][0]:
+        return float(puntos[-1][1])
+    for i in range(len(puntos) - 1):
+        j0, p0 = puntos[i]
+        j1, p1 = puntos[i + 1]
+        if j0 <= jornadas <= j1:
+            t = (jornadas - j0) / (j1 - j0)
+            return round(p0 + t * (p1 - p0), 2)
+    return 0.0
+
+
 def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dict]]:
     """Trae items de múltiples pedidos en 2 queries en lugar de N+1.
 
@@ -321,18 +347,23 @@ def create_pedido(data: PedidoCreate):
             subtotal = it.precio_jornada * it.cantidad * jornadas
             bruto += subtotal
             items_rows.append((it.equipo_id, it.cantidad, it.precio_jornada, subtotal))
-        monto_total = _aplicar_descuento(bruto, descuento_pct)
+
+        descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+        descuento_total = descuento_pct + descuento_jornadas_pct
+        monto_total = _aplicar_descuento(bruto, descuento_total)
 
         estado_inicial = data.estado if data.estado in {"borrador", "presupuesto"} else "presupuesto"
         next_num = _next_numero_pedido(conn)
         cur = conn.execute("""
             INSERT INTO alquileres (cliente_nombre, cliente_email, cliente_telefono,
                                  cliente_id, notas, fecha_desde, fecha_hasta,
-                                 monto_total, estado, numero_pedido, numero_remito, descuento_pct)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                                 monto_total, estado, numero_pedido, numero_remito,
+                                 descuento_pct, descuento_jornadas_pct)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (cliente_nombre, cliente_email, cliente_telefono,
               data.cliente_id, data.notas, data.fecha_desde, data.fecha_hasta,
-              monto_total, estado_inicial, next_num, str(next_num), descuento_pct))
+              monto_total, estado_inicial, next_num, str(next_num),
+              descuento_pct, descuento_jornadas_pct))
         pedido_id = cur.lastrowid
 
         conn.executemany("""
@@ -762,8 +793,13 @@ def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
                     sub = it["precio_jornada"] * it["cantidad"] * jornadas
                     conn.execute("UPDATE alquiler_items SET subtotal=? WHERE id=?", (sub, it["id"]))
                     bruto += sub
-                monto_total = _aplicar_descuento(bruto, p2["descuento_pct"] or 0)
-                conn.execute("UPDATE alquileres SET monto_total=? WHERE id=?", (monto_total, id))
+                descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+                descuento_total = (p2["descuento_pct"] or 0) + descuento_jornadas_pct
+                monto_total = _aplicar_descuento(bruto, descuento_total)
+                conn.execute(
+                    "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
+                    (monto_total, descuento_jornadas_pct, id)
+                )
 
             conn.commit()
 
@@ -930,3 +966,58 @@ async def pedido_contrato(id: int, request: Request, format: str = "pdf"):
         media_type = "application/pdf",
         headers    = {"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ── Descuentos por jornadas ───────────────────────────────────────────────────
+
+class DescuentoJornadaIn(BaseModel):
+    jornadas: int
+    pct: float
+
+
+@router.get("/descuentos-jornada")
+def get_descuentos_jornada():
+    """Devuelve los puntos ancla de descuentos por jornadas (público — lo usa el carrito)."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, jornadas, pct FROM descuentos_jornada ORDER BY jornadas ASC"
+        ).fetchall()
+        return [row_to_dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+@router.post("/admin/descuentos-jornada", status_code=201)
+def create_descuento_jornada(data: DescuentoJornadaIn, request: Request):
+    require_admin(request)
+    if data.jornadas < 1:
+        raise HTTPException(400, "jornadas debe ser >= 1")
+    if not (0 <= data.pct <= 100):
+        raise HTTPException(400, "pct debe estar entre 0 y 100")
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO descuentos_jornada (jornadas, pct) VALUES (?, ?) "
+            "ON CONFLICT (jornadas) DO UPDATE SET pct = EXCLUDED.pct",
+            (data.jornadas, data.pct)
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT id, jornadas, pct FROM descuentos_jornada WHERE jornadas = ?",
+            (data.jornadas,)
+        ).fetchone()
+        return row_to_dict(row)
+    finally:
+        conn.close()
+
+
+@router.delete("/admin/descuentos-jornada/{id}", status_code=204)
+def delete_descuento_jornada(id: int, request: Request):
+    require_admin(request)
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM descuentos_jornada WHERE id = ?", (id,))
+        conn.commit()
+    finally:
+        conn.close()
