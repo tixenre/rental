@@ -132,11 +132,21 @@ export function CartDrawer({
   async function handleSubmit() {
     if (list.length === 0) return;
 
-    // #28 — Validación de fechas explícita con toast (antes el botón quedaba
-    // disabled silencioso y el user no sabía qué le faltaba)
+    // #28 — Validación de fechas explícita con toast
     if (!startDate || !endDate) {
       toast.error("Seleccioná fechas de retiro y devolución antes de confirmar", {
         duration: 4000,
+      });
+      return;
+    }
+
+    // Fechas guardadas de sesiones anteriores pueden quedar en el pasado
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (startDate < hoy) {
+      toast.error("La fecha de retiro ya pasó — elegí nuevas fechas", {
+        duration: 5000,
+        action: { label: "Cambiar fechas", onClick: () => setDateModalOpen(true) },
       });
       return;
     }
@@ -182,7 +192,9 @@ export function CartDrawer({
       setSubmitted(true);
       clear();
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : "Error al enviar el pedido");
+      const msg = err instanceof Error ? err.message : "Error al enviar el pedido";
+      setSubmitError(msg);
+      toast.error(msg, { duration: 6000 });
     } finally {
       setSubmitting(false);
     }
@@ -404,9 +416,10 @@ export function CartDrawer({
                         </div>
                       )}
                       {submitError && (
-                        <p role="alert" className="mt-3 text-xs text-destructive">
-                          {submitError}
-                        </p>
+                        <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>{submitError}</span>
+                        </div>
                       )}
                     </>
                   )}
