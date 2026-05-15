@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 146,
+    date: "2026-05-15",
+    type: "feat",
+    title: "Sugerencias automáticas en el dashboard de calidad",
+    body: "Nueva sección al pie de /admin/equipos/calidad con sugerencias del sistema. MVP con dos detectores: (1) Marcas duplicadas case-insensitive — si tenés 'Sony', 'sony' y 'SONY' como marcas separadas, el sistema las detecta y ofrece un botón para fusionarlas en una sola (la canonical es la que tiene más pedidos, las demás se borran y sus equipos se reapuntan). (2) Equipos con precio en pesos pero sin USD — el sistema lista los equipos afectados y ofrece calcular el USD usando la cotización configurada en settings. Más detectores (categoría sospechosa, foto candidata) vienen en iteraciones.",
+    labels: ["admin", "calidad-datos"],
+  },
+  {
     number: 145,
     date: "2026-05-15",
     type: "feat",

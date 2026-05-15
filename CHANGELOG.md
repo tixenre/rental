@@ -7,6 +7,8 @@
 
 ### ✨ Novedades
 
+- **Sugerencias automáticas en el dashboard de calidad** *(15 de mayo de 2026)*
+  Nueva sección al pie de /admin/equipos/calidad con sugerencias del sistema. MVP con dos detectores: (1) Marcas duplicadas case-insensitive — si tenés 'Sony', 'sony' y 'SONY' como marcas separadas, el sistema las detecta y ofrece un botón para fusionarlas en una sola (la canonical es la que tiene más pedidos, las demás se borran y sus equipos se reapuntan). (2) Equipos con precio en pesos pero sin USD — el sistema lista los equipos afectados y ofrece calcular el USD usando la cotización configurada en settings. Más detectores (categoría sospechosa, foto candidata) vienen en iteraciones.
 - **Crear equipo: campos mínimos obligatorios + invitación a completar lo recomendado** *(15 de mayo de 2026)*
   Al crear un equipo nuevo, ahora son obligatorios: nombre, marca, categoría, cantidad, precio por jornada y dueño. Si falta alguno, el form no deja guardar. Cuando el equipo se crea OK, si quedaron campos recomendados vacíos (foto, descripción, número de serie, valor de reposición), aparece un toast diciendo cuáles faltan con un botón "Completar →" que reabre el form en modo edición. En edición los campos siguen siendo todos opcionales — no romper flujos legacy.
 - **Dashboard de calidad: cada fila es ahora un CTA que filtra equipos directamente** *(15 de mayo de 2026)*

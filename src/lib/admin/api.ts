@@ -19,6 +19,24 @@ export type FaltaField =
   | "serie"
   | "valor_reposicion";
 
+/** Sugerencia automática del sistema (#352). */
+export type Sugerencia = {
+  tipo: "marcas_duplicadas" | "precio_sin_usd";
+  ref: string;
+  titulo: string;
+  detalle: string;
+  accion: string;
+  accion_label: string;
+  // Payloads específicos por tipo (cualquiera de los dos puede estar presente).
+  marcas?: Array<{ id: number; nombre: string; cant_pedidos: number; equipos: number }>;
+  equipos?: Array<{ id: number; nombre: string; marca: string | null; precio_jornada: number }>;
+};
+
+export type SugerenciasResp = {
+  items: Sugerencia[];
+  total: number;
+};
+
 export type CalidadInventario = {
   total: number;
   completos_pct: number;
@@ -366,6 +384,14 @@ export const adminApi = {
   /** Calidad del inventario — métricas + breakdown por campo faltante. Issue #349. */
   getCalidadInventario: () =>
     authedJson<CalidadInventario>("/api/admin/inventario/calidad"),
+  /** Sugerencias automáticas para mejorar el inventario. Issue #352. */
+  getSugerenciasInventario: () =>
+    authedJson<SugerenciasResp>("/api/admin/inventario/sugerencias"),
+  aplicarSugerencia: (tipo: Sugerencia["tipo"], ref: string) =>
+    authedPostJson<{ ok: true; message: string }>(
+      "/api/admin/inventario/sugerencias/aplicar",
+      { tipo, ref },
+    ),
   /** Equipos sin número de serie cargado (NULL o vacío). Issue #91. */
   getEquiposSinSerie: () =>
     authedJson<{

@@ -1,5 +1,6 @@
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   Sparkles,
   Hash,
@@ -10,10 +11,14 @@ import {
   Folder,
   AlertCircle,
   ArrowRight,
+  Lightbulb,
+  Loader2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { toast } from "sonner";
 
-import { adminApi, type CalidadInventario, type FaltaField } from "@/lib/admin/api";
+import { Button } from "@/components/ui/button";
+import { adminApi, type CalidadInventario, type FaltaField, type Sugerencia } from "@/lib/admin/api";
 
 export const Route = createLazyFileRoute("/admin/equipos/calidad")({
   component: CalidadPage,
@@ -54,7 +59,106 @@ function CalidadPage() {
       )}
 
       {data && <CalidadView data={data} />}
+
+      <SugerenciasSection />
     </div>
+  );
+}
+
+function SugerenciasSection() {
+  const qc = useQueryClient();
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["admin", "inventario", "sugerencias"],
+    queryFn: () => adminApi.getSugerenciasInventario(),
+    staleTime: 60_000,
+  });
+  const [applying, setApplying] = useState<string | null>(null);
+
+  const aplicar = useMutation({
+    mutationFn: ({ tipo, ref }: { tipo: Sugerencia["tipo"]; ref: string }) =>
+      adminApi.aplicarSugerencia(tipo, ref),
+    onMutate: ({ tipo, ref }) => setApplying(`${tipo}:${ref}`),
+    onSuccess: (resp) => {
+      toast.success(resp.message);
+      qc.invalidateQueries({ queryKey: ["admin", "inventario", "sugerencias"] });
+      qc.invalidateQueries({ queryKey: ["admin", "inventario", "calidad"] });
+      qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
+      qc.invalidateQueries({ queryKey: ["admin", "marcas-list"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+    onSettled: () => setApplying(null),
+  });
+
+  if (isLoading || isError) return null;
+  if (!data || data.items.length === 0) return null;
+
+  return (
+    <section className="mt-8 rounded-2xl border hairline bg-surface">
+      <header className="flex items-center gap-2 px-5 pt-4 pb-3 border-b hairline">
+        <Lightbulb className="h-4 w-4 text-amber" />
+        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          Sugerencias del sistema · {data.total}
+        </span>
+      </header>
+      <ul className="divide-y hairline">
+        {data.items.map((s, i) => {
+          const key = `${s.tipo}:${s.ref}`;
+          const isApplying = applying === key;
+          return (
+            <li key={`${key}:${i}`} className="px-5 py-4 space-y-2">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-ink">{s.titulo}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{s.detalle}</div>
+                </div>
+                <Button
+                  size="sm"
+                  disabled={isApplying}
+                  onClick={() => aplicar.mutate({ tipo: s.tipo, ref: s.ref })}
+                >
+                  {isApplying ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Aplicando…
+                    </>
+                  ) : (
+                    s.accion_label
+                  )}
+                </Button>
+              </div>
+              {s.marcas && s.marcas.length > 0 && (
+                <ul className="ml-1 mt-2 text-[11px] text-muted-foreground space-y-0.5">
+                  {s.marcas.map((m, idx) => (
+                    <li key={m.id} className="font-mono tabular">
+                      {idx === 0 ? "→ " : "   "}
+                      <span className={idx === 0 ? "text-ink font-medium" : ""}>{m.nombre}</span>
+                      <span className="opacity-70"> · id={m.id} · {m.equipos} equipos · {m.cant_pedidos} pedidos</span>
+                      {idx === 0 && <span className="ml-2 text-amber">(canonical)</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {s.equipos && s.equipos.length > 0 && (
+                <details className="text-[11px] text-muted-foreground">
+                  <summary className="cursor-pointer hover:text-ink">
+                    Ver equipos ({s.equipos.length})
+                  </summary>
+                  <ul className="ml-3 mt-1 space-y-0.5">
+                    {s.equipos.slice(0, 10).map((e) => (
+                      <li key={e.id} className="font-mono tabular">
+                        {e.marca} {e.nombre} · ${e.precio_jornada.toLocaleString("es-AR")}/jornada
+                      </li>
+                    ))}
+                    {s.equipos.length > 10 && (
+                      <li className="opacity-60">… y {s.equipos.length - 10} más</li>
+                    )}
+                  </ul>
+                </details>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
