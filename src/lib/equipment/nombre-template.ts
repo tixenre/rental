@@ -17,7 +17,15 @@
  *   output:   "Cámara Sony FX3 E"
  */
 
-export type SpecLike = { label: string; value: string };
+export type SpecLike = {
+  label: string;
+  /** Value formateado para mostrar (texto legible). */
+  value: string;
+  /** Solo presente para specs tipo tabla: JSON crudo del array de filas.
+   *  Sirve para placeholders `{spec:Label.colKey}` que extraen celdas
+   *  específicas en lugar del texto completo. */
+  value_raw?: string;
+};
 
 export type NombreTemplateVars = {
   marca?: string | null;
@@ -52,12 +60,63 @@ function normalizePrefixUnitValue(raw: string): string {
   return isPrefix ? `${unit}${num}` : trimmed;
 }
 
-function lookupSpec(specs: SpecLike[] | undefined, label: string): string {
+/** Formatea una celda de spec tabla a texto. Soporta valor_unidad
+ *  (`{valor, unidad}` → "19389 lm") y escalares ("4K", true, etc). */
+function formatTablaCell(cell: unknown): string {
+  if (cell == null || cell === "") return "";
+  if (typeof cell === "object" && "valor" in (cell as object)) {
+    const c = cell as { valor: unknown; unidad?: unknown };
+    const valor = c.valor == null ? "" : String(c.valor);
+    const unidad = c.unidad ? String(c.unidad).trim() : "";
+    return unidad ? `${valor} ${unidad}`.trim() : valor;
+  }
+  return String(cell).trim();
+}
+
+/** Resuelve un placeholder `spec:Label` o `spec:Label.colKey[i]`.
+ *  - Sin `.colKey`: si el value es un JSON tabla, ya viene pre-formateado por
+ *    backend; lo devolvemos tal cual. Si no, value crudo.
+ *  - Con `.colKey`: parsea el value como JSON array y extrae la celda de la
+ *    columna `colKey` en la fila `i` (default 0).  */
+function lookupSpec(specs: SpecLike[] | undefined, key: string): string {
   if (!specs) return "";
+  // Parsear "Label.colKey[i]" o "Label.colKey" o "Label".
+  let label = key;
+  let colKey: string | null = null;
+  let rowIdx = 0;
+  const dotIdx = key.indexOf(".");
+  if (dotIdx !== -1) {
+    label = key.slice(0, dotIdx);
+    let rest = key.slice(dotIdx + 1);
+    const m = rest.match(/^(.+?)\[(\d+)\]$/);
+    if (m) {
+      colKey = m[1];
+      rowIdx = parseInt(m[2], 10) || 0;
+    } else {
+      colKey = rest;
+    }
+  }
   const target = normalizeLabel(label);
   const found = specs.find((s) => normalizeLabel(s.label) === target);
   if (!found) return "";
-  return normalizePrefixUnitValue((found.value ?? "").trim());
+  if (!colKey) {
+    // Sin selector de columna: value tal cual (ya viene legible).
+    return normalizePrefixUnitValue((found.value ?? "").trim());
+  }
+  // Con selector de columna: usar value_raw (JSON crudo) si está, o
+  // fallback al value si parece JSON. Extraer la celda colKey de la fila i.
+  const rawSource = found.value_raw ?? found.value ?? "";
+  const raw = rawSource.trim();
+  if (!raw.startsWith("[") && !raw.startsWith("{")) return "";
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || rowIdx >= parsed.length) return "";
+    const row = parsed[rowIdx];
+    if (!row || typeof row !== "object") return "";
+    return formatTablaCell((row as Record<string, unknown>)[colKey]);
+  } catch {
+    return "";
+  }
 }
 
 /**
