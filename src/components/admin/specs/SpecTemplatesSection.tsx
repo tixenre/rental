@@ -421,7 +421,6 @@ function SortableSpecRow({
       <div className="hidden md:flex flex-wrap gap-1 text-[10px] min-w-0">
         {template.destacado && <Badge tone="amber">★ ficha destacada</Badge>}
         {template.visible_en_nombre && <Badge>en nombre</Badge>}
-        {template.visible_en_card && <Badge>en card</Badge>}
       </div>
       <div className="md:hidden" aria-hidden />
 
@@ -654,11 +653,6 @@ function SpecTemplateFormModal({
               label="Se usa como placeholder en el nombre público (ej. 'Cámara Sony FX3 Montura {montura}')"
               checked={!!form.visible_en_nombre}
               onChange={(v) => setForm({ ...form, visible_en_nombre: v })}
-            />
-            <Toggle
-              label="Aparece en la card del catálogo público"
-              checked={!!form.visible_en_card}
-              onChange={(v) => setForm({ ...form, visible_en_card: v })}
             />
           </fieldset>
         </div>
