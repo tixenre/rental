@@ -384,9 +384,8 @@ function RangoValueInput({
         step="any"
         value={min}
         onChange={(e) => commit(e.target.value, max)}
-        placeholder="50"
         className="text-xs w-16"
-        aria-label="Valor mínimo (o único si es fijo)"
+        aria-label="Valor (o mínimo si es rango)"
       />
       <span className="text-[11px] text-muted-foreground select-none">–</span>
       <Input
@@ -395,8 +394,8 @@ function RangoValueInput({
         step="any"
         value={max}
         onChange={(e) => commit(min, e.target.value)}
-        placeholder="70"
-        className="text-xs w-16"
+        className="text-xs w-24 placeholder:text-muted-foreground/40 placeholder:italic placeholder:text-[10px]"
+        placeholder="vacío si es fijo"
         aria-label="Valor máximo (vacío si es fijo)"
       />
       <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
