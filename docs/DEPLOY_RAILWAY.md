@@ -327,9 +327,49 @@ Antes de considerar "listo para producción":
 Después de estar live:
 
 1. **Monitorear**: Ver logs regularmente
-2. **Backups**: Railway Pro tiene backups automáticos
-3. **Escalar**: Si crece mucho, considerar PostgreSQL en lugar de SQLite
+2. **Backups**: Ver sección abajo
+3. **Escalar**: Si crece mucho, considerar escalar el plan de Railway
 4. **Analytics**: Agregar Google Analytics para tracking de uso
+
+---
+
+## 🗄️ BACKUPS
+
+Los backups corren como un Cron Job separado en Railway: `pg_dump` → gzip → R2.
+
+### Activar (cuando estén en producción con datos reales)
+
+1. En el servicio principal, agregar variable: `BACKUP_ENABLED=true`
+2. Crear un nuevo servicio en Railway → **Cron Job**:
+   - **Comando**: `cd /app && python backend/backup_cron.py`
+   - **Schedule**: `0 3 * * *` (3am UTC todos los días)
+   - **Variables**: copiar las mismas de producción (`DATABASE_URL`, `R2_*`, `BACKUP_ENABLED=true`, `SENTRY_DSN`)
+3. Listo — los backups se guardan en R2 bajo `backups/YYYY/MM/` y se limpian automáticamente a los 30 días.
+
+### Backup on-demand
+
+Desde el panel admin o con curl (requiere sesión admin activa):
+```bash
+curl -X POST https://tu-proyecto.up.railway.app/api/admin/backup-manual \
+  -H "Cookie: tu-session-cookie"
+```
+
+### Restore manual
+
+```bash
+# Descargar el backup de R2
+aws s3 cp s3://equipos-fotos/backups/YYYY/MM/backup_FECHA.sql.gz . \
+  --endpoint-url https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com
+
+# Descomprimir y restaurar
+gunzip backup_FECHA.sql.gz
+psql $DATABASE_URL < backup_FECHA.sql
+```
+
+### Railway Hobby — backups built-in
+
+Railway Hobby incluye snapshots automáticos de Postgres (retención ~7 días).
+Estos son adicionales a los backups en R2 — doble cobertura.
 
 ---
 

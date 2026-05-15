@@ -753,3 +753,23 @@ async def upload_logo(request: Request):
         return {"ok": True, "url": versioned_url}
     finally:
         conn.close()
+
+
+# ── Backup manual ─────────────────────────────────────────────────────────────
+
+@router.post("/admin/backup-manual")
+def trigger_backup_manual(request: Request):
+    """Dispara un pg_dump → R2 on-demand.
+
+    Requiere BACKUP_ENABLED=true y las credenciales R2 configuradas.
+    Útil para hacer un backup antes de una migración o cambio importante.
+    """
+    require_admin(request)
+    from services.backup_service import run_backup, BACKUP_ENABLED
+    if not BACKUP_ENABLED:
+        raise HTTPException(503, "Backup no habilitado. Setear BACKUP_ENABLED=true en Railway cuando estén en producción.")
+    try:
+        result = run_backup()
+        return result
+    except Exception as e:
+        raise HTTPException(500, f"Backup falló: {e}")
