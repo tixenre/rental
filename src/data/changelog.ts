@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 142,
+    date: "2026-05-15",
+    type: "feat",
+    title: "Microinteracción \"+1\" volando al carrito al agregar un equipo",
+    body: "Al tocar 'Agregar' en una tarjeta del catálogo, ahora aparece un chip '+1' amarillo que sale del botón con una curva animada hacia el ícono del carrito en la barra inferior. Cuando llega, el ícono hace un pequeño pop (escala) que refuerza visualmente que el item se sumó. Es feedback inmediato típico de e-commerce mobile — sirve para no perderse el cambio del contador cuando estás scrolleando rápido.",
+    labels: ["público", "ux", "mobile"],
+  },
+  {
     number: 141,
     date: "2026-05-11",
     type: "feat",
