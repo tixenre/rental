@@ -653,10 +653,22 @@ def init_db():
             enum_options        JSONB,
             ayuda               TEXT,
             es_compatibilidad   BOOLEAN NOT NULL DEFAULT FALSE,
+            compatibilidad_modo VARCHAR(16) NOT NULL DEFAULT 'exacta',
             created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Migration idempotente: agrega columna si fresh install vino sin ella.
+    conn.execute(
+        "ALTER TABLE spec_definitions "
+        "ADD COLUMN IF NOT EXISTS compatibilidad_modo VARCHAR(16) NOT NULL DEFAULT 'exacta'"
+    )
+    # Flag manual que el dueño marca cuando confirmó que la spec está bien
+    # curada. Las validadas se muestran arriba en /admin/gear-compatibility.
+    conn.execute(
+        "ALTER TABLE spec_definitions "
+        "ADD COLUMN IF NOT EXISTS validado BOOLEAN NOT NULL DEFAULT FALSE"
+    )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
         "ON spec_definitions(es_compatibilidad) WHERE es_compatibilidad"
@@ -674,9 +686,15 @@ def init_db():
             visible_en_filtros  BOOLEAN DEFAULT FALSE,
             visible_en_nombre   BOOLEAN DEFAULT FALSE,
             ayuda               TEXT,
+            rol_compatibilidad  VARCHAR(16),
             UNIQUE (categoria_id, spec_def_id)
         )
     """)
+    # Migration idempotente.
+    conn.execute(
+        "ALTER TABLE categoria_spec_templates "
+        "ADD COLUMN IF NOT EXISTS rol_compatibilidad VARCHAR(16)"
+    )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_cst_categoria "
         "ON categoria_spec_templates(categoria_id, prioridad)"
@@ -739,6 +757,45 @@ def init_db():
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_compat_b ON equipo_compatibilidad(equipo_b_id)"
+    )
+    # Metadata para distinguir compat generadas por el skill IA vs manuales
+    # del dueño. Las auto se borran/reemplazan en cada regen; manuales nunca.
+    conn.execute("ALTER TABLE equipo_compatibilidad ADD COLUMN IF NOT EXISTS auto_generado BOOLEAN NOT NULL DEFAULT FALSE")
+    conn.execute("ALTER TABLE equipo_compatibilidad ADD COLUMN IF NOT EXISTS razon_ia TEXT")
+    conn.execute("ALTER TABLE equipo_compatibilidad ADD COLUMN IF NOT EXISTS confianza REAL")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_compat_auto "
+        "ON equipo_compatibilidad(auto_generado) WHERE auto_generado = TRUE"
+    )
+    # Timestamp de última pasada del skill por equipo (para encolar pendientes).
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS compat_analizado_at TIMESTAMP")
+
+    # Propuestas IA generadas por el skill gear-compatibility. NUNCA se aplican
+    # automáticamente — el dueño las aprueba/descarta desde la UI.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS spec_propuestas_pendientes (
+            id            SERIAL PRIMARY KEY,
+            tipo          VARCHAR(20) NOT NULL,
+            payload       JSONB       NOT NULL,
+            origen        VARCHAR(64),
+            confianza     REAL,
+            created_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            aplicado_at   TIMESTAMP,
+            descartado_at TIMESTAMP,
+            CHECK (tipo IN ('enum_option', 'spec_nueva', 'merge_specs', 'assign_spec'))
+        )
+    """)
+    # Migration idempotente: si la tabla existe con el CHECK viejo, lo
+    # reemplazamos por uno que incluye 'assign_spec'.
+    conn.execute("ALTER TABLE spec_propuestas_pendientes DROP CONSTRAINT IF EXISTS spec_propuestas_pendientes_tipo_check")
+    conn.execute(
+        "ALTER TABLE spec_propuestas_pendientes ADD CONSTRAINT spec_propuestas_pendientes_tipo_check "
+        "CHECK (tipo IN ('enum_option', 'spec_nueva', 'merge_specs', 'assign_spec'))"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_propuestas_pendientes "
+        "ON spec_propuestas_pendientes(created_at DESC) "
+        "WHERE aplicado_at IS NULL AND descartado_at IS NULL"
     )
 
     # ── Relevancia + ranking + nombre público calculado ────────────────

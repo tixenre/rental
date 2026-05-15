@@ -32,6 +32,9 @@ import { Route as AdminEquiposEtiquetasRouteImport } from './routes/admin/equipo
 const AdminIndexLazyRouteImport = createFileRoute('/admin/')()
 const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
 const AdminHoyLazyRouteImport = createFileRoute('/admin/hoy')()
+const AdminGearCompatibilityLazyRouteImport = createFileRoute(
+  '/admin/gear-compatibility',
+)()
 const AdminEstadisticasLazyRouteImport = createFileRoute(
   '/admin/estadisticas',
 )()
@@ -40,6 +43,9 @@ const AdminClientesLazyRouteImport = createFileRoute('/admin/clientes')()
 const AdminCalendarioLazyRouteImport = createFileRoute('/admin/calendario')()
 const AdminPedidosIndexLazyRouteImport = createFileRoute('/admin/pedidos/')()
 const AdminEquiposIndexLazyRouteImport = createFileRoute('/admin/equipos/')()
+const AdminSpecsPropuestasLazyRouteImport = createFileRoute(
+  '/admin/specs/propuestas',
+)()
 const AdminSpecsDefinitionsLazyRouteImport = createFileRoute(
   '/admin/specs/definitions',
 )()
@@ -123,6 +129,14 @@ const AdminHoyLazyRoute = AdminHoyLazyRouteImport.update({
   path: '/hoy',
   getParentRoute: () => AdminRoute,
 } as any).lazy(() => import('./routes/admin/hoy.lazy').then((d) => d.Route))
+const AdminGearCompatibilityLazyRoute =
+  AdminGearCompatibilityLazyRouteImport.update({
+    id: '/gear-compatibility',
+    path: '/gear-compatibility',
+    getParentRoute: () => AdminRoute,
+  } as any).lazy(() =>
+    import('./routes/admin/gear-compatibility.lazy').then((d) => d.Route),
+  )
 const AdminEstadisticasLazyRoute = AdminEstadisticasLazyRouteImport.update({
   id: '/estadisticas',
   path: '/estadisticas',
@@ -203,6 +217,14 @@ const AdminEquiposIndexLazyRoute = AdminEquiposIndexLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/equipos.index.lazy').then((d) => d.Route),
 )
+const AdminSpecsPropuestasLazyRoute =
+  AdminSpecsPropuestasLazyRouteImport.update({
+    id: '/specs/propuestas',
+    path: '/specs/propuestas',
+    getParentRoute: () => AdminRoute,
+  } as any).lazy(() =>
+    import('./routes/admin/specs.propuestas.lazy').then((d) => d.Route),
+  )
 const AdminSpecsDefinitionsLazyRoute =
   AdminSpecsDefinitionsLazyRouteImport.update({
     id: '/specs/definitions',
@@ -296,6 +318,7 @@ export interface FileRoutesByFullPath {
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
   '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/cliente/': typeof ClienteIndexRoute
@@ -310,6 +333,7 @@ export interface FileRoutesByFullPath {
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
+  '/admin/specs/propuestas': typeof AdminSpecsPropuestasLazyRoute
   '/admin/equipos/': typeof AdminEquiposIndexLazyRoute
   '/admin/pedidos/': typeof AdminPedidosIndexLazyRoute
 }
@@ -330,6 +354,7 @@ export interface FileRoutesByTo {
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
   '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/cliente': typeof ClienteIndexRoute
@@ -344,6 +369,7 @@ export interface FileRoutesByTo {
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
+  '/admin/specs/propuestas': typeof AdminSpecsPropuestasLazyRoute
   '/admin/equipos': typeof AdminEquiposIndexLazyRoute
   '/admin/pedidos': typeof AdminPedidosIndexLazyRoute
 }
@@ -368,6 +394,7 @@ export interface FileRoutesById {
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
   '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/cliente/': typeof ClienteIndexRoute
@@ -382,6 +409,7 @@ export interface FileRoutesById {
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
+  '/admin/specs/propuestas': typeof AdminSpecsPropuestasLazyRoute
   '/admin/equipos/': typeof AdminEquiposIndexLazyRoute
   '/admin/pedidos/': typeof AdminPedidosIndexLazyRoute
 }
@@ -407,6 +435,7 @@ export interface FileRouteTypes {
     | '/admin/clientes'
     | '/admin/diseno'
     | '/admin/estadisticas'
+    | '/admin/gear-compatibility'
     | '/admin/hoy'
     | '/admin/settings'
     | '/cliente/'
@@ -421,6 +450,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/admin/specs/definitions'
+    | '/admin/specs/propuestas'
     | '/admin/equipos/'
     | '/admin/pedidos/'
   fileRoutesByTo: FileRoutesByTo
@@ -441,6 +471,7 @@ export interface FileRouteTypes {
     | '/admin/clientes'
     | '/admin/diseno'
     | '/admin/estadisticas'
+    | '/admin/gear-compatibility'
     | '/admin/hoy'
     | '/admin/settings'
     | '/cliente'
@@ -455,6 +486,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/admin/specs/definitions'
+    | '/admin/specs/propuestas'
     | '/admin/equipos'
     | '/admin/pedidos'
   id:
@@ -478,6 +510,7 @@ export interface FileRouteTypes {
     | '/admin/clientes'
     | '/admin/diseno'
     | '/admin/estadisticas'
+    | '/admin/gear-compatibility'
     | '/admin/hoy'
     | '/admin/settings'
     | '/cliente/'
@@ -492,6 +525,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/admin/specs/definitions'
+    | '/admin/specs/propuestas'
     | '/admin/equipos/'
     | '/admin/pedidos/'
   fileRoutesById: FileRoutesById
@@ -584,6 +618,13 @@ declare module '@tanstack/react-router' {
       path: '/hoy'
       fullPath: '/admin/hoy'
       preLoaderRoute: typeof AdminHoyLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/gear-compatibility': {
+      id: '/admin/gear-compatibility'
+      path: '/gear-compatibility'
+      fullPath: '/admin/gear-compatibility'
+      preLoaderRoute: typeof AdminGearCompatibilityLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/estadisticas': {
@@ -683,6 +724,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/equipos/'
       preLoaderRoute: typeof AdminEquiposIndexLazyRouteImport
       parentRoute: typeof AdminEquiposRoute
+    }
+    '/admin/specs/propuestas': {
+      id: '/admin/specs/propuestas'
+      path: '/specs/propuestas'
+      fullPath: '/admin/specs/propuestas'
+      preLoaderRoute: typeof AdminSpecsPropuestasLazyRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/specs/definitions': {
       id: '/admin/specs/definitions'
@@ -791,12 +839,14 @@ interface AdminRouteChildren {
   AdminClientesLazyRoute: typeof AdminClientesLazyRoute
   AdminDisenoLazyRoute: typeof AdminDisenoLazyRoute
   AdminEstadisticasLazyRoute: typeof AdminEstadisticasLazyRoute
+  AdminGearCompatibilityLazyRoute: typeof AdminGearCompatibilityLazyRoute
   AdminHoyLazyRoute: typeof AdminHoyLazyRoute
   AdminSettingsLazyRoute: typeof AdminSettingsLazyRoute
   AdminIndexLazyRoute: typeof AdminIndexLazyRoute
   AdminPedidosIdLazyRoute: typeof AdminPedidosIdLazyRoute
   AdminPedidosNuevoLazyRoute: typeof AdminPedidosNuevoLazyRoute
   AdminSpecsDefinitionsLazyRoute: typeof AdminSpecsDefinitionsLazyRoute
+  AdminSpecsPropuestasLazyRoute: typeof AdminSpecsPropuestasLazyRoute
   AdminPedidosIndexLazyRoute: typeof AdminPedidosIndexLazyRoute
 }
 
@@ -808,12 +858,14 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminClientesLazyRoute: AdminClientesLazyRoute,
   AdminDisenoLazyRoute: AdminDisenoLazyRoute,
   AdminEstadisticasLazyRoute: AdminEstadisticasLazyRoute,
+  AdminGearCompatibilityLazyRoute: AdminGearCompatibilityLazyRoute,
   AdminHoyLazyRoute: AdminHoyLazyRoute,
   AdminSettingsLazyRoute: AdminSettingsLazyRoute,
   AdminIndexLazyRoute: AdminIndexLazyRoute,
   AdminPedidosIdLazyRoute: AdminPedidosIdLazyRoute,
   AdminPedidosNuevoLazyRoute: AdminPedidosNuevoLazyRoute,
   AdminSpecsDefinitionsLazyRoute: AdminSpecsDefinitionsLazyRoute,
+  AdminSpecsPropuestasLazyRoute: AdminSpecsPropuestasLazyRoute,
   AdminPedidosIndexLazyRoute: AdminPedidosIndexLazyRoute,
 }
 

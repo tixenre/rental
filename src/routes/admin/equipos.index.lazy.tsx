@@ -152,9 +152,22 @@ function EquiposPage() {
   // en vuelo, y que aparezcan errores parciales después del cierre).
   const saveMut = useMutation({
     mutationFn: async ({ data, etiquetas }: { data: EquipoInput; etiquetas: string[] }) => {
-      const eq = editing
-        ? await adminApi.updateEquipo(editing.id, data)
-        : await adminApi.createEquipo(data);
+      // Guardia anti-duplicado: si tenemos `editing` con id, SIEMPRE va por
+      // updateEquipo. Si `editing` está truthy pero sin id (estado inconsistente),
+      // abortar antes de crear un equipo nuevo por accidente — el bug clásico
+      // que dejaba duplicados en la DB.
+      if (editing) {
+        if (!editing.id) {
+          throw new Error(
+            "Estado inconsistente: el form está en modo edición pero no tiene id. " +
+            "Cerrá el dialog y reabrí el equipo.",
+          );
+        }
+        const eq = await adminApi.updateEquipo(editing.id, data);
+        await adminApi.setEtiquetas(eq.id, etiquetas);
+        return eq;
+      }
+      const eq = await adminApi.createEquipo(data);
       await adminApi.setEtiquetas(eq.id, etiquetas);
       return eq;
     },

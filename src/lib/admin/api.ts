@@ -263,6 +263,17 @@ export type SpecTipo = "string" | "number" | "enum" | "bool" | "rango" | "wxh" |
 /** Definición global de una spec (post refactor unificar_specs_definitions).
  *  Cada spec_key existe UNA sola vez en el sistema. Sus categorías la
  *  referencian via spec_def_id en la asignación. */
+export type CompatibilidadModo = "exacta" | "jerarquia";
+export type RolCompatibilidad = "contenedor" | "contenido" | null;
+
+/** Asignación de una spec a una categoría (con su template_id para poder
+ *  desasignar desde el modal de edición). */
+export type SpecDefinitionCategoriaAsign = {
+  id: number;
+  nombre: string;
+  template_id: number;
+};
+
 export type SpecDefinition = {
   id: number;
   spec_key: string;
@@ -272,10 +283,15 @@ export type SpecDefinition = {
   enum_options: string[] | null;
   ayuda: string | null;
   es_compatibilidad: boolean;
+  compatibilidad_modo: CompatibilidadModo;
+  /** Flag manual: el dueño la revisó y aprobó. Se ordenan arriba. */
+  validado: boolean;
   /** Solo en GET /admin/spec-definitions: cuántas categorías la asignaron. */
   uso_categorias?: number;
   /** Solo en GET /admin/spec-definitions: cuántos equipos tienen value. */
   uso_equipos?: number;
+  /** Solo en GET: categorías que la asignan (con id + nombre + template_id). */
+  categorias?: SpecDefinitionCategoriaAsign[];
 };
 
 export type SpecDefinitionInput = {
@@ -286,6 +302,8 @@ export type SpecDefinitionInput = {
   enum_options?: string[] | null;
   ayuda?: string | null;
   es_compatibilidad?: boolean;
+  compatibilidad_modo?: CompatibilidadModo;
+  validado?: boolean;
 };
 
 /** Asignación de una spec_def a una categoría + flags propios. El backend
@@ -303,6 +321,7 @@ export type SpecTemplate = {
   unidad: string | null;
   enum_options: string[] | null;
   es_compatibilidad: boolean;
+  compatibilidad_modo: CompatibilidadModo;
   // Per-categoría:
   prioridad: number;
   visible_en_card: boolean;
@@ -311,6 +330,7 @@ export type SpecTemplate = {
   obligatorio: boolean;
   ayuda: string | null;
   destacado: boolean;
+  rol_compatibilidad: RolCompatibilidad;
 };
 
 /** Body para asignar una spec ya existente a una categoría. */
@@ -323,6 +343,7 @@ export type SpecAssignmentInput = {
   visible_en_filtros?: boolean;
   visible_en_nombre?: boolean;
   ayuda?: string | null;
+  rol_compatibilidad?: RolCompatibilidad;
 };
 
 /** Body para editar los flags de una asignación. */
@@ -334,6 +355,7 @@ export type SpecAssignmentUpdate = {
   visible_en_filtros?: boolean;
   visible_en_nombre?: boolean;
   ayuda?: string | null;
+  rol_compatibilidad?: RolCompatibilidad;
 };
 
 /** Compat alias: el SpecTemplatesSection viejo usaba SpecTemplateInput. Lo
@@ -406,6 +428,71 @@ export type OrphanSpec = {
   label: string;
   count_equipos: number;
   sample_values: string[];
+};
+
+/** Overall status de la compatibilidad automática.
+ *  - compatible: todas las specs comparten valor exacto.
+ *  - compatible_con_crop: jerárquica donde el contenedor proyecta más grande
+ *    que el contenido (lente FF en sensor APS-C ⇒ crop central, usable).
+ *  - parcial: viñetea u otra mismatch jerárquica con roles definidos.
+ *  - incompatible: alguna spec exacta no matchea, o manual override negativo.
+ *  - requiere_adaptador: manual `equipo_compatibilidad` con adaptador linkeado.
+ *  - sin_relacion: no comparten specs con es_compatibilidad=true. */
+export type CompatibleOverall =
+  | "compatible"
+  | "compatible_con_crop"
+  | "parcial"
+  | "incompatible"
+  | "requiere_adaptador"
+  | "sin_relacion";
+
+export type CompatibleRazon = {
+  spec: string;
+  status:
+    | "match"
+    | "match_con_crop"
+    | "mismatch"
+    | "partial_vignette"
+    | "partial";
+  mensaje: string;
+};
+
+export type CompatibleEquipo = {
+  equipo_id: number;
+  nombre: string;
+  foto_url: string | null;
+  marca: string | null;
+  overall: CompatibleOverall;
+  razones: CompatibleRazon[];
+  adaptador?: { id: number; nombre: string } | null;
+};
+
+// ── Propuestas IA del skill gear-compatibility ──────────────────────
+export type PropuestaTipo = "enum_option" | "spec_nueva" | "merge_specs" | "assign_spec";
+
+/** Una propuesta pendiente generada por el skill `gear-compatibility`.
+ *  Hasta aplicarla, no afecta el catálogo. El payload varía por tipo. */
+export type PropuestaPendiente = {
+  id: number;
+  tipo: PropuestaTipo;
+  payload: Record<string, unknown>;
+  origen: string | null;
+  confianza: number | null;
+  created_at: string;
+  aplicado_at: string | null;
+  descartado_at: string | null;
+};
+
+/** Equipo pendiente de análisis de compatibilidad. Lo lista el skill
+ *  cuando se invoca `/gear-compat new`. */
+export type EquipoPendienteCompat = {
+  id: number;
+  nombre: string;
+  marca: string | null;
+  modelo: string | null;
+  categorias: string[];
+  compat_analizado_at: string | null;
+  motivo: "nunca_analizado" | "modificado" | "al_dia";
 };
 
 export const adminApi = {
@@ -573,9 +660,29 @@ export const adminApi = {
       body: JSON.stringify(data),
     }),
   /** Aplica el resultado de /admin/equipos/autocompletar en un único call.
-   *  Acepta cualquier subset de campos; los no enviados quedan como están. */
+   *  Acepta cualquier subset de campos; los no enviados quedan como están.
+   *  `specs_matching` reporta el resultado del matching estructurado:
+   *    - aplicadas: cuántas specs entrantes se conectaron a un spec_def
+   *      asignado al equipo (cargadas en equipo_specs).
+   *    - propuestas_creadas: cuántas specs entrantes no encajaron y
+   *      generaron propuestas en spec_propuestas_pendientes (visibles en
+   *      /admin/gear-compatibility → Propuestas IA).
+   *    - saltadas: errores u otros casos no procesables. */
   aplicarEnriquecimiento: (id: number, data: Record<string, unknown>) =>
-    authedJson<{ equipo: Equipo; ficha: Ficha | null }>(
+    authedJson<{
+      equipo: Equipo;
+      ficha: Ficha | null;
+      specs_matching?: {
+        aplicadas: number;
+        propuestas_creadas: number;
+        saltadas: number;
+        detalle: {
+          aplicadas: Array<{ label: string; spec_def_id: number; value: string }>;
+          propuestas: Array<{ tipo: "assign_spec" | "spec_nueva"; label: string; valor: string }>;
+          saltadas: Array<{ label: string; motivo: string }>;
+        };
+      };
+    }>(
       `/api/admin/equipos/${id}/aplicar-autocompletado`,
       {
         method: "POST",
@@ -868,6 +975,9 @@ export const adminApi = {
         tipo: "compatible" | "incompatible" | "requiere_adaptador";
         nota: string | null;
         adaptador_id: number | null; adaptador_nombre: string | null;
+        auto_generado?: boolean;
+        razon_ia?: string | null;
+        confianza?: number | null;
       }>;
     }>(`/api/admin/equipos/${id}/compatibilidades`),
   crearCompatibilidad: (
@@ -886,6 +996,45 @@ export const adminApi = {
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
     }
   },
+  /** Compatibilidad automática derivada de specs (modo exacta + jerárquica
+   *  con roles contenedor/contenido) + merge con manual `equipo_compatibilidad`.
+   *  El backend agrupa por overall y ya devuelve razones legibles. */
+  listarCompatiblesAuto: (
+    id: number,
+    params: { categoria_id?: number; overall_min?: CompatibleOverall } = {},
+  ) => {
+    const sp = new URLSearchParams();
+    if (params.categoria_id) sp.set("categoria_id", String(params.categoria_id));
+    if (params.overall_min) sp.set("overall_min", params.overall_min);
+    const qs = sp.toString();
+    return authedJson<{ items: CompatibleEquipo[] }>(
+      `/api/admin/equipos/${id}/compatibles${qs ? `?${qs}` : ""}`,
+    );
+  },
+
+  // ── Skill gear-compatibility (F6): pendientes + propuestas ─────────
+  /** Equipos pendientes de análisis IA (nunca analizados o modificados
+   *  después del último run). Lo consume el skill cuando se invoca `new`. */
+  listarPendientesCompat: (limit = 50) =>
+    authedJson<{ total: number; items: EquipoPendienteCompat[] }>(
+      `/api/admin/equipos/pendientes-compat?limit=${limit}`,
+    ),
+  /** Lista propuestas IA generadas por el skill. estado:
+   *  pendientes (default) | aplicadas | descartadas | todas. */
+  listarPropuestas: (estado: "pendientes" | "aplicadas" | "descartadas" | "todas" = "pendientes") =>
+    authedJson<{ items: PropuestaPendiente[] }>(
+      `/api/admin/specs/propuestas?estado=${estado}`,
+    ),
+  aplicarPropuesta: (propuestaId: number) =>
+    authedPostJson<{ ok: true; id: number; tipo: PropuestaTipo }>(
+      `/api/admin/specs/propuestas/${propuestaId}/aplicar`,
+      {},
+    ),
+  descartarPropuesta: (propuestaId: number) =>
+    authedPostJson<{ ok: true; id: number }>(
+      `/api/admin/specs/propuestas/${propuestaId}/descartar`,
+      {},
+    ),
 
   // ── Nombres públicos / validación ──────────────────────────────────
   regenerarNombres: (dry_run = true) =>

@@ -1245,10 +1245,28 @@ export function EquipoFormDialogV2({
           </section>
 
           {/* ════════════════════════════════════════════════════════════════
-              FICHA TÉCNICA — colapsable. Va antes que categorías por feedback
-              del dueño: en edición, los specs son lo que más se toca y las
-              categorías ya están seteadas. El template-aware está abajo via
-              templateItems.
+              DESCRIPCIÓN — campo de marketing/catálogo, separado de la
+              ficha técnica. Va en una sección propia para evitar confusión
+              con specs.
+          ════════════════════════════════════════════════════════════════ */}
+          <CollapsibleSection
+            title="Descripción (catálogo público)"
+            defaultOpen={!!descripcion}
+            actions={<CacheBtn section="descripcion" />}
+          >
+            <Field label="Texto descriptivo">
+              <Textarea
+                rows={3}
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
+                placeholder="Texto de marketing visible en la ficha del catálogo. Ej: ventajas, casos de uso típicos, diferenciales."
+              />
+            </Field>
+          </CollapsibleSection>
+
+          {/* ════════════════════════════════════════════════════════════════
+              FICHA TÉCNICA — colapsable. Solo specs estructuradas (template
+              + custom). La descripción está separada en su propia sección.
           ════════════════════════════════════════════════════════════════ */}
           <CollapsibleSection
             title="Ficha técnica"
@@ -1256,17 +1274,6 @@ export function EquipoFormDialogV2({
             actions={<CacheBtn section="ficha" />}
           >
             <div className="space-y-3">
-              <Field
-                label="Descripción (visible en el catálogo)"
-                actions={<CacheBtn section="descripcion" />}
-              >
-                <Textarea
-                  rows={3}
-                  value={descripcion}
-                  onChange={(e) => setDescripcion(e.target.value)}
-                />
-              </Field>
-
               <SpecsDiffEditor
                 specs={specs}
                 propuestos={specsPropuestos}

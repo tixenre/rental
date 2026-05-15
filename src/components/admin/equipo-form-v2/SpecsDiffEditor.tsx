@@ -175,7 +175,9 @@ export function SpecsDiffEditor({
         </div>
       )}
 
-      {/* Sección custom (drag-drop) */}
+      {/* Sección custom (drag-drop). Mostramos warning si un custom colide
+          con una spec oficial del catálogo global (mismo label normalizado
+          o spec_key parecido) — sugiere usar la spec del template. */}
       {custom.length > 0 && (
         <div className="space-y-1">
           {templateBound.length > 0 && (
@@ -186,14 +188,23 @@ export function SpecsDiffEditor({
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={custom.map((s) => s.id)} strategy={verticalListSortingStrategy}>
               <div className="space-y-1">
-                {custom.map((s) => (
-                  <CustomSortableRow
-                    key={s.id}
-                    spec={s}
-                    onUpdate={(patch) => updateSpec(s.id, patch)}
-                    onRemove={() => removeSpec(s.id)}
-                  />
-                ))}
+                {custom.map((s) => {
+                  // ¿Colide con una spec oficial del template? (label match
+                  // case-insensitive ignorando paréntesis y "/" extras).
+                  const norm = normalizeForCollision(s.label);
+                  const tmplCollision = (templateItems ?? []).find(
+                    (t) => normalizeForCollision(t.label) === norm,
+                  );
+                  return (
+                    <CustomSortableRow
+                      key={s.id}
+                      spec={s}
+                      onUpdate={(patch) => updateSpec(s.id, patch)}
+                      onRemove={() => removeSpec(s.id)}
+                      tmplCollision={tmplCollision ?? null}
+                    />
+                  );
+                })}
               </div>
             </SortableContext>
           </DndContext>
@@ -276,19 +287,7 @@ function TypedValueInput({
   }
 
   if (tmpl.tipo === "bool") {
-    const isYes = value.trim().toLowerCase() === "sí" || value.trim().toLowerCase() === "si"
-      || value.trim().toLowerCase() === "true" || value.trim() === "1";
-    return (
-      <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={isYes}
-          onChange={(e) => onChange(e.target.checked ? "Sí" : "")}
-          className="h-4 w-4 cursor-pointer"
-        />
-        <span className="text-muted-foreground">{isYes ? "Sí" : "No"}</span>
-      </label>
-    );
+    return <BoolValueInput value={value} onChange={onChange} />;
   }
 
   // string (default)
@@ -304,12 +303,29 @@ function TypedValueInput({
 
 // ── Custom row (drag-drop + label/value libres) ─────────────────────────
 
+/** Normaliza un label para detectar colisión: lowercase, sin paréntesis
+ *  finales, sin separadores "/" o "-", colapsa espacios. Ej:
+ *    "Línea / serie" → "linea serie"
+ *    "Formato de sensor" → "formato de sensor"
+ *    "Peso (g)" → "peso" */
+function normalizeForCollision(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/\s*\([^)]*\)\s*$/, "")
+    .replace(/[\/\-_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function CustomSortableRow({
-  spec, onUpdate, onRemove,
+  spec, onUpdate, onRemove, tmplCollision,
 }: {
   spec: Spec;
   onUpdate: (patch: Partial<Spec>) => void;
   onRemove: () => void;
+  /** Si esta spec custom colide con una del template, viene seteado. */
+  tmplCollision: SpecTemplate | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: spec.id });
@@ -321,31 +337,40 @@ function CustomSortableRow({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex gap-1 items-center bg-background">
-      <button
-        type="button"
-        className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground touch-none px-0.5"
-        {...attributes}
-        {...listeners}
-        tabIndex={-1}
-      >
-        <GripVertical className="h-3.5 w-3.5" />
-      </button>
-      <Input
-        value={spec.label}
-        onChange={(e) => onUpdate({ label: e.target.value })}
-        placeholder="Spec"
-        className="text-xs"
-      />
-      <Input
-        value={spec.value}
-        onChange={(e) => onUpdate({ value: e.target.value })}
-        placeholder="Valor"
-        className="text-xs"
-      />
-      <Button type="button" size="icon" variant="ghost" onClick={onRemove}>
-        <Trash2 className="h-3.5 w-3.5" />
-      </Button>
+    <div ref={setNodeRef} style={style} className="space-y-0.5">
+      <div className="flex gap-1 items-center bg-background">
+        <button
+          type="button"
+          className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground touch-none px-0.5"
+          {...attributes}
+          {...listeners}
+          tabIndex={-1}
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+        <Input
+          value={spec.label}
+          onChange={(e) => onUpdate({ label: e.target.value })}
+          placeholder="Spec"
+          className={"text-xs " + (tmplCollision ? "border-amber/60" : "")}
+        />
+        <Input
+          value={spec.value}
+          onChange={(e) => onUpdate({ value: e.target.value })}
+          placeholder="Valor"
+          className="text-xs"
+        />
+        <Button type="button" size="icon" variant="ghost" onClick={onRemove}>
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      {tmplCollision && (
+        <div className="ml-6 text-[10px] text-amber-700 italic">
+          ⚠ Existe la spec oficial <strong>"{tmplCollision.label}"</strong> en
+          el template — eliminala y usá la del template para que entre al
+          sistema estructurado.
+        </div>
+      )}
     </div>
   );
 }
@@ -599,6 +624,61 @@ function NumericValueInput({
           {unidad}
         </span>
       )}
+    </div>
+  );
+}
+
+// ── BoolValueInput ─────────────────────────────────────────────────────
+// Toggle segmentado Sí/No en lugar de checkbox — la casilla vacía leía
+// como "no determinado" cuando en realidad significaba "No". Acá ambas
+// opciones son visualmente explícitas; cuando ninguna está activa el
+// valor está realmente sin determinar.
+
+function isBoolYes(v: string): boolean {
+  const t = v.trim().toLowerCase();
+  return t === "sí" || t === "si" || t === "true" || t === "1";
+}
+function isBoolNo(v: string): boolean {
+  const t = v.trim().toLowerCase();
+  return t === "no" || t === "false" || t === "0";
+}
+
+function BoolValueInput({
+  value, onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const yes = isBoolYes(value);
+  const no = isBoolNo(value);
+  return (
+    <div className="inline-flex rounded-md border hairline overflow-hidden text-xs">
+      <button
+        type="button"
+        onClick={() => onChange(yes ? "" : "Sí")}
+        className={
+          "px-3 py-1 transition border-r hairline " +
+          (yes
+            ? "bg-emerald-100 text-emerald-800 font-medium"
+            : "bg-background text-muted-foreground hover:bg-muted/40")
+        }
+        aria-pressed={yes}
+      >
+        Sí
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(no ? "" : "No")}
+        className={
+          "px-3 py-1 transition " +
+          (no
+            ? "bg-muted text-ink font-medium"
+            : "bg-background text-muted-foreground hover:bg-muted/40")
+        }
+        aria-pressed={no}
+      >
+        No
+      </button>
     </div>
   );
 }

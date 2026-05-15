@@ -45,8 +45,8 @@ TEMPLATES: dict[str, list[dict]] = {
     # catálogo. El orden de la prioridad refleja qué es lo primero que mira un
     # DP/fotógrafo cuando elige cámara para rentar.
     "Cámaras": [
-        {"key": "montura", "label": "Montura", "tipo": "enum",
-         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "BMD", "B4"],
+        {"key": "lens_mount", "label": "Lens mount", "tipo": "enum",
+         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "BMD", "B4", "M42"],
          "prioridad": 10, "en_card": True, "en_filtros": True, "en_nombre": True,
          "destacado": True},
         {"key": "formato", "label": "Formato", "tipo": "enum",
@@ -121,8 +121,8 @@ TEMPLATES: dict[str, list[dict]] = {
     # que cubren fijo y zoom en un solo campo. Si tu DB ya tiene los legacy,
     # podés borrarlos desde /admin/equipos/specs sin que el seed los reinserte.
     "Lentes": [
-        {"key": "montura", "label": "Montura", "tipo": "enum",
-         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "M42"],
+        {"key": "lens_mount", "label": "Lens mount", "tipo": "enum",
+         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "BMD", "B4", "M42"],
          "prioridad": 10, "en_card": True, "en_filtros": True, "en_nombre": True,
          "destacado": True},
         {"key": "distancia_focal", "label": "Distancia focal", "tipo": "rango",
@@ -200,8 +200,8 @@ TEMPLATES: dict[str, list[dict]] = {
         {"key": "material", "label": "Material", "tipo": "enum",
          "enum_options": ["Difusor", "Negro", "Plata", "Oro", "Blanco", "Mixto"],
          "prioridad": 30},
-        {"key": "montura", "label": "Montura", "tipo": "string",
-         "prioridad": 40, "ayuda": "Ej: Bowens, varillas, libre"},
+        {"key": "modificador_montura", "label": "Sistema de montaje", "tipo": "string",
+         "prioridad": 40, "ayuda": "Ej: Bowens, Profoto, varillas, libre"},
         {"key": "plegable", "label": "Plegable", "tipo": "bool", "prioridad": 50},
     ],
 
@@ -306,12 +306,14 @@ TEMPLATES: dict[str, list[dict]] = {
                           "Filtro polarizador", "Filtro UV", "Filtro variable",
                           "Macro tube"],
          "prioridad": 10, "obligatorio": True, "en_card": True, "en_nombre": True},
-        {"key": "montura_in", "label": "Montura entrada", "tipo": "enum",
-         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "M42"],
-         "prioridad": 20, "en_card": True},
-        {"key": "montura_out", "label": "Montura salida", "tipo": "enum",
-         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL"],
-         "prioridad": 30, "en_card": True},
+        {"key": "lens_mount", "label": "Lens mount", "tipo": "enum",
+         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "BMD", "B4", "M42"],
+         "prioridad": 20, "en_card": True,
+         "ayuda": "Lado body (la rosca que se enchufa a la cámara)"},
+        {"key": "lens_mount_out", "label": "Lens mount — lado salida (adaptador)", "tipo": "enum",
+         "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "BMD", "B4", "M42"],
+         "prioridad": 30, "en_card": True,
+         "ayuda": "Solo adaptadores: rosca que recibe el lente del otro sistema"},
         {"key": "diametro_mm", "label": "Diámetro", "tipo": "number", "unidad": "mm",
          "prioridad": 40, "ayuda": "Solo para filtros"},
         {"key": "densidad", "label": "Densidad ND", "tipo": "string",

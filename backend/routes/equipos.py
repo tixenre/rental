@@ -665,10 +665,51 @@ def get_equipo(id_or_slug: str):
         conn.close()
 
 
+# Series tipo "N/A", "ND", "-", "Sin serie" se aceptan duplicadas — son
+# placeholders comunes para equipos sin serial real.
+_PLACEHOLDER_SERIE_RE = re.compile(r"^(n/?a|n/?d|sin\s*serie|-+)$", re.IGNORECASE)
+
+
+def _serie_es_placeholder(serie: Optional[str]) -> bool:
+    if not serie:
+        return True
+    return bool(_PLACEHOLDER_SERIE_RE.match(serie.strip()))
+
+
+def _check_serie_unica(conn, serie: Optional[str], exclude_id: Optional[int] = None) -> None:
+    """Lanza 409 si la serie ya existe en otro equipo activo (no eliminado).
+    Series placeholder (N/A, ND, -, sin serie) NO se chequean."""
+    if _serie_es_placeholder(serie):
+        return
+    serie_norm = (serie or "").strip()
+    if not serie_norm:
+        return
+    query = """
+        SELECT id, nombre FROM equipos
+        WHERE TRIM(LOWER(serie)) = LOWER(?)
+          AND eliminado_at IS NULL
+    """
+    params: list = [serie_norm]
+    if exclude_id is not None:
+        query += " AND id != ?"
+        params.append(exclude_id)
+    query += " LIMIT 1"
+    existing = conn.execute(query, tuple(params)).fetchone()
+    if existing:
+        ed = row_to_dict(existing) if not isinstance(existing, dict) else existing
+        raise HTTPException(
+            409,
+            f"La serie '{serie_norm}' ya existe en el equipo #{ed['id']} ('{ed['nombre']}'). "
+            "Las series deben ser únicas por equipo (excepto placeholders como N/A).",
+        )
+
+
 @router.post("/equipos", status_code=201)
 def create_equipo(data: EquipoCreate):
     conn = get_db()
     try:
+        # Validar serie única (rechaza 409 si choca con otro activo)
+        _check_serie_unica(conn, data.serie)
         cur  = conn.execute("""
             INSERT INTO equipos (nombre, marca, modelo, cantidad,
                                  precio_jornada, precio_usd, roi_pct,
@@ -709,6 +750,10 @@ def update_equipo(id: int, data: EquipoUpdate):
         updates = data.model_dump(exclude_unset=True)
         if not updates:
             raise HTTPException(400, "Nada para actualizar")
+        # Validar serie única si se está cambiando (excluyendo este equipo).
+        # Rechaza si otra fila activa tiene la misma serie.
+        if "serie" in updates:
+            _check_serie_unica(conn, updates["serie"], exclude_id=id)
         # Registrar cambio de precio si cambió
         if "precio_jornada" in updates and updates["precio_jornada"] != existing["precio_jornada"]:
             conn.execute(
@@ -2821,9 +2866,10 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
                 "keywords":          {"type": "array", "items": {"type": "string"}},
                 "peso":              {"type": "string"},
                 "dimensiones":       {"type": "string"},
-                "montura":           {"type": "string"},
-                "formato":           {"type": "string"},
-                "resolucion":        {"type": "string"},
+                # NOTA: monturas/formato/resolución se devuelven dentro de `specs`
+                # como label canónico del template de la categoría (ej. "Lens mount",
+                # "Formato de sensor", etc.). El matching estructurado los conecta
+                # al spec_def_id correcto vía _matchear_y_persistir_specs.
                 "alimentacion":      {"type": "string"},
                 "incluye":           {"type": "array", "items": {"type": "string"}},
                 "conectividad":      {"type": "array", "items": {"type": "string"}},
@@ -3528,6 +3574,185 @@ class AplicarEnriquecimientoInput(BaseModel):
     enriquecido_fuente: Optional[str] = None
 
 
+# ── Matching estructurado de specs entrantes ──────────────────────────
+#
+# El autocompletar trae specs como dict {label: value}. Para conectarlas
+# al sistema estructurado (equipo_specs con spec_def_id) tenemos que:
+#   1. Resolver cada label al spec_def_id correcto (case-insensitive,
+#      ignorando espacios y prefijos como "(en mm)").
+#   2. Solo aplicar las specs ASIGNADAS a las categorías del equipo.
+#   3. Para los labels que no matchean nada asignado, generar propuestas
+#      en spec_propuestas_pendientes (assign_spec si la spec global
+#      existe, spec_nueva si no).
+
+def _normalize_label(s: str) -> str:
+    """Para matching: lowercase, sin espacios extra, sin paréntesis finales."""
+    import re
+    s = s.lower().strip()
+    s = re.sub(r"\s*\([^)]*\)\s*$", "", s)   # "Peso (g)" → "peso"
+    s = re.sub(r"\s+", " ", s)
+    return s
+
+
+def _matchear_y_persistir_specs(
+    conn,
+    equipo_id: int,
+    specs_entrantes: dict,
+    *,
+    crear_propuestas: bool = True,
+) -> dict:
+    """Mapea {label: value} entrantes a spec_def_id del equipo y persiste:
+       - Matches con specs asignadas → INSERT en equipo_specs.
+       - No-matches → propuestas en spec_propuestas_pendientes.
+
+    Retorna {aplicadas: [{label, spec_def_id, value}], propuestas: [...],
+             saltadas: [{label, motivo}]}.
+    """
+    import json as _json
+
+    if not specs_entrantes:
+        return {"aplicadas": [], "propuestas": [], "saltadas": []}
+
+    # 1. Cargar specs asignadas al equipo (vía sus categorías + ancestros).
+    rows_asignadas = conn.execute(
+        """
+        WITH RECURSIVE chain AS (
+            SELECT c.id, c.parent_id
+            FROM equipo_categorias ec JOIN categorias c ON c.id = ec.categoria_id
+            WHERE ec.equipo_id = ?
+            UNION
+            SELECT c2.id, c2.parent_id FROM categorias c2 JOIN chain ON c2.id = chain.parent_id
+        )
+        SELECT DISTINCT sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.enum_options
+        FROM categoria_spec_templates t
+        JOIN spec_definitions sd ON sd.id = t.spec_def_id
+        WHERE t.categoria_id IN (SELECT id FROM chain)
+        """,
+        (equipo_id,),
+    ).fetchall()
+
+    # Index por label normalizado y spec_key
+    index_asignadas: dict[str, dict] = {}
+    for r in rows_asignadas:
+        rd = row_to_dict(r) if not isinstance(r, dict) else r
+        index_asignadas[_normalize_label(rd["label"])] = rd
+        index_asignadas[_normalize_label(rd["spec_key"])] = rd
+
+    # 2. Cargar TODAS las specs globales para detectar candidatos a assign_spec.
+    all_global = conn.execute(
+        "SELECT id, spec_key, label, tipo, unidad, enum_options FROM spec_definitions"
+    ).fetchall()
+    index_global: dict[str, dict] = {}
+    for r in all_global:
+        rd = row_to_dict(r) if not isinstance(r, dict) else r
+        index_global[_normalize_label(rd["label"])] = rd
+        index_global[_normalize_label(rd["spec_key"])] = rd
+
+    # Categoría principal del equipo (para sugerir asignación a esa cat).
+    cat_principal = conn.execute(
+        "SELECT categoria_id FROM equipo_categorias WHERE equipo_id = ? ORDER BY categoria_id LIMIT 1",
+        (equipo_id,),
+    ).fetchone()
+    cat_principal_id = cat_principal["categoria_id"] if cat_principal else None
+
+    aplicadas: list[dict] = []
+    propuestas: list[dict] = []
+    saltadas: list[dict] = []
+
+    for raw_label, value in specs_entrantes.items():
+        # Skip vacíos / nulls
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        value_str = (
+            ", ".join(str(v) for v in value) if isinstance(value, list)
+            else str(value).strip()
+        )
+        if not value_str:
+            continue
+
+        norm = _normalize_label(raw_label)
+        # Match contra specs asignadas
+        match = index_asignadas.get(norm)
+        if match:
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO equipo_specs (equipo_id, spec_def_id, value)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT (equipo_id, spec_def_id) DO UPDATE
+                        SET value = EXCLUDED.value
+                    """,
+                    (equipo_id, match["id"], value_str),
+                )
+                aplicadas.append({
+                    "label": match["label"],
+                    "spec_def_id": match["id"],
+                    "value": value_str,
+                })
+            except Exception as e:
+                saltadas.append({"label": raw_label, "motivo": f"error guardando: {e}"})
+            continue
+
+        # No matchea asignadas. ¿Existe en el catálogo global?
+        if not crear_propuestas:
+            saltadas.append({"label": raw_label, "motivo": "no asignada a esta categoría"})
+            continue
+
+        global_match = index_global.get(norm)
+        if global_match and cat_principal_id:
+            # Propuesta: asignar spec existente a la categoría
+            payload = {
+                "spec_def_id": global_match["id"],
+                "spec_key": global_match["spec_key"],
+                "categoria_id": cat_principal_id,
+                "valor_sugerido": value_str,
+                "source_equipo_id": equipo_id,
+                "razon": f"detectada por autocompletar en equipo {equipo_id}",
+            }
+            conn.execute(
+                """
+                INSERT INTO spec_propuestas_pendientes (tipo, payload, origen, confianza)
+                VALUES (?, ?::jsonb, ?, ?)
+                """,
+                ("assign_spec", json.dumps(payload), f"autocompletar-equipo-{equipo_id}", 0.8),
+            )
+            propuestas.append({"tipo": "assign_spec", "label": raw_label, "valor": value_str})
+        elif cat_principal_id:
+            # Propuesta: crear spec nueva
+            payload = {
+                "spec_key": _slugify(raw_label),
+                "label": raw_label,
+                "tipo": "string",   # default conservador, el dueño elige al aplicar
+                "valor_sugerido": value_str,
+                "source_equipo_id": equipo_id,
+                "categoria_id_sugerida": cat_principal_id,
+                "razon": f"detectada por autocompletar en equipo {equipo_id}, no existe en el catálogo",
+            }
+            conn.execute(
+                """
+                INSERT INTO spec_propuestas_pendientes (tipo, payload, origen, confianza)
+                VALUES (?, ?::jsonb, ?, ?)
+                """,
+                ("spec_nueva", json.dumps(payload), f"autocompletar-equipo-{equipo_id}", 0.6),
+            )
+            propuestas.append({"tipo": "spec_nueva", "label": raw_label, "valor": value_str})
+        else:
+            saltadas.append({"label": raw_label, "motivo": "equipo sin categoría — no se puede sugerir asignación"})
+
+    return {"aplicadas": aplicadas, "propuestas": propuestas, "saltadas": saltadas}
+
+
+def _slugify(s: str) -> str:
+    import re
+    s = s.lower().strip()
+    s = re.sub(r"[áéíóúüñ]", lambda m: "aeiouun"[("áéíóúüñ").index(m.group())], s)
+    s = re.sub(r"[^a-z0-9]+", "_", s)
+    s = s.strip("_")
+    return s[:64] or "spec"
+
+
 @router.post("/admin/equipos/{id}/aplicar-autocompletado")
 def admin_aplicar_autocompletado(id: int, payload: AplicarEnriquecimientoInput, request: Request):
     """Endpoint canónico — alias de /aplicar-enriquecimiento (legacy)."""
@@ -3603,14 +3828,28 @@ def admin_aplicar_enriquecimiento(id: int, payload: AplicarEnriquecimientoInput,
                 list(ficha_fields.values()) + [id],
             )
 
+        # ── Matching estructurado de specs ──────────────────────────────
+        # Las specs que matchean con lo asignado al equipo se cargan en
+        # equipo_specs (estructurado). Lo que no matchea genera propuestas
+        # en spec_propuestas_pendientes (assign_spec o spec_nueva).
+        matching_result = {"aplicadas": [], "propuestas": [], "saltadas": []}
+        if "specs" in body and isinstance(body["specs"], dict) and body["specs"]:
+            matching_result = _matchear_y_persistir_specs(conn, id, body["specs"])
+
         conn.commit()
 
-        # Devolver equipo + ficha actualizados
+        # Devolver equipo + ficha actualizados + resumen del matching
         eq_row = conn.execute("SELECT * FROM equipos WHERE id = ?", (id,)).fetchone()
         ficha_row = conn.execute("SELECT * FROM equipo_fichas WHERE equipo_id = ?", (id,)).fetchone()
         return {
             "equipo": row_to_dict(eq_row),
             "ficha":  row_to_dict(ficha_row) if ficha_row else None,
+            "specs_matching": {
+                "aplicadas": len(matching_result["aplicadas"]),
+                "propuestas_creadas": len(matching_result["propuestas"]),
+                "saltadas": len(matching_result["saltadas"]),
+                "detalle": matching_result,
+            },
         }
     except HTTPException:
         raise
