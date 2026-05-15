@@ -100,6 +100,9 @@ Body explica el **por qué**, no el **qué**. Bullets si hay varios efectos.
 - Body: 3 secciones — Summary / Cambios / Test plan.
 - Linkear el issue con `Closes #N`.
 - CI debe estar verde antes de mergear (TypeScript typecheck, Python tests, Build frontend, mobile-smoke).
+- **Auto-merge habilitado por default**: cada PR que Claude crea queda con auto-merge enabled. Cuando CI verde → GitHub mergea sola, borra la branch, listo. El dueño no tiene que clickear "Merge" en cada PR.
+  - **Gate humano**: si una PR no debería mergearse sin revisión visual (cambio sensible, decisión arquitectónica, UI grande), dejarla como **draft**. GitHub no auto-mergea drafts.
+  - **Opt-out por PR**: pedir explícitamente "no auto-merge esta" — Claude la deja sin habilitar.
 - Conflicts con main: rebase / merge desde el branch (no force-push a main).
 
 Detalle completo del flow en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
