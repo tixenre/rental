@@ -32,38 +32,49 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 
-type Token = {
-  id: string;        // único para dnd-kit
-  placeholder: string;  // ej. "{marca}", "{spec:Montura}"
-  label: string;     // texto visible en el chip
-};
+type Token =
+  | { id: string; kind: "placeholder"; placeholder: string; label: string }
+  | { id: string; kind: "literal"; text: string };
 
-/** Parsea un template string a tokens. Literales entre placeholders se
- *  concatenan al prefijo si están al principio, o se ignoran (limitación
- *  intencional del MVP — los nombres complejos suelen ser placeholder+espacio). */
+let _tokenCounter = 0;
+const nextId = () => `t-${++_tokenCounter}-${Date.now().toString(36)}`;
+
+/** Parsea un template string a tokens (placeholders + literales entre ellos).
+ *  Los literales preservan los espacios y la puntuación exacta — el dueño
+ *  puede meter "-", "(", "f/", etc. entre placeholders. */
 function parseTemplate(tpl: string): { prefix: string; tokens: Token[] } {
   if (!tpl.trim()) return { prefix: "", tokens: [] };
-  // Match placeholders {x} y devuelve también lo que hay antes del primero.
   const re = /\{([^}]+)\}/g;
   const tokens: Token[] = [];
   let prefix = "";
   let firstMatch = true;
   let lastIndex = 0;
   let m: RegExpExecArray | null;
-  let counter = 0;
   while ((m = re.exec(tpl)) !== null) {
     const literalBefore = tpl.slice(lastIndex, m.index);
     if (firstMatch) {
+      // El primer literal va al prefijo si es algo "limpio" (sin caracteres
+      // raros); sino lo dejamos como literal token para no perderlo.
       prefix = literalBefore.trim();
       firstMatch = false;
+    } else if (literalBefore && literalBefore !== " ") {
+      // Literal real entre placeholders — preservar como token literal.
+      // El espacio simple lo ignoramos (es el separador default cuando no
+      // hay literal explícito).
+      tokens.push({ id: nextId(), kind: "literal", text: literalBefore });
     }
-    const ph = m[0];
     tokens.push({
-      id: `t-${counter++}`,
-      placeholder: ph,
-      label: prettyLabel(ph),
+      id: nextId(),
+      kind: "placeholder",
+      placeholder: m[0],
+      label: prettyLabel(m[0]),
     });
     lastIndex = m.index + m[0].length;
+  }
+  // Literal final (después del último placeholder).
+  const trailing = tpl.slice(lastIndex);
+  if (trailing && trailing !== " ") {
+    tokens.push({ id: nextId(), kind: "literal", text: trailing });
   }
   return { prefix, tokens };
 }
@@ -79,8 +90,21 @@ function prettyLabel(placeholder: string): string {
 }
 
 function buildTemplate(prefix: string, tokens: Token[]): string {
-  const placeholders = tokens.map((t) => t.placeholder).join(" ");
-  return prefix.trim() ? `${prefix.trim()} ${placeholders}`.trim() : placeholders;
+  // Compose token-by-token. Si tokens consecutivos no tienen un literal entre
+  // medio, ponemos un espacio. Si hay literal explícito, se respeta tal cual.
+  let out = "";
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    const prev = tokens[i - 1];
+    if (t.kind === "placeholder") {
+      // Espacio de separación si el anterior fue placeholder (sin literal entre medio).
+      if (prev && prev.kind === "placeholder") out += " ";
+      out += t.placeholder;
+    } else {
+      out += t.text;
+    }
+  }
+  return prefix.trim() ? `${prefix.trim()} ${out}`.trim() : out.trim();
 }
 
 export function NombreTemplateBuilder({
@@ -118,19 +142,34 @@ export function NombreTemplateBuilder({
     setTokens((items) => arrayMove(items, oldIdx, newIdx));
   };
 
-  const addToken = (placeholder: string) => {
+  const addPlaceholder = (placeholder: string) => {
     setTokens((cur) => [
       ...cur,
-      { id: `t-${Date.now()}-${Math.random()}`, placeholder, label: prettyLabel(placeholder) },
+      { id: nextId(), kind: "placeholder", placeholder, label: prettyLabel(placeholder) },
+    ]);
+  };
+
+  const addLiteral = (initial = " - ") => {
+    setTokens((cur) => [
+      ...cur,
+      { id: nextId(), kind: "literal", text: initial },
     ]);
   };
 
   const removeToken = (id: string) => setTokens((cur) => cur.filter((t) => t.id !== id));
 
+  const updateLiteral = (id: string, text: string) => {
+    setTokens((cur) =>
+      cur.map((t) => (t.id === id && t.kind === "literal" ? { ...t, text } : t)),
+    );
+  };
+
   const currentTemplate = buildTemplate(prefix, tokens);
 
   // Detectar qué placeholders ya están usados, para no duplicar en la paleta.
-  const usedPlaceholders = new Set(tokens.map((t) => t.placeholder));
+  const usedPlaceholders = new Set(
+    tokens.filter((t) => t.kind === "placeholder").map((t) => (t as Extract<Token, { kind: "placeholder" }>).placeholder),
+  );
 
   const saveMut = useMutation({
     mutationFn: (template: string) =>
@@ -204,7 +243,12 @@ export function NombreTemplateBuilder({
                     </span>
                   )}
                   {tokens.map((t) => (
-                    <TokenChip key={t.id} token={t} onRemove={() => removeToken(t.id)} />
+                    <TokenChip
+                      key={t.id}
+                      token={t}
+                      onRemove={() => removeToken(t.id)}
+                      onChangeLiteral={(v) => updateLiteral(t.id, v)}
+                    />
                   ))}
                 </div>
               </SortableContext>
@@ -222,7 +266,7 @@ export function NombreTemplateBuilder({
                 key={p.placeholder}
                 type="button"
                 disabled={usedPlaceholders.has(p.placeholder)}
-                onClick={() => addToken(p.placeholder)}
+                onClick={() => addPlaceholder(p.placeholder)}
                 className="inline-flex items-center gap-1 rounded border hairline px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-amber-soft transition disabled:opacity-40 disabled:cursor-not-allowed"
                 title={usedPlaceholders.has(p.placeholder) ? "Ya está en el template" : "Agregar al template"}
               >
@@ -237,7 +281,7 @@ export function NombreTemplateBuilder({
                   key={t.id}
                   type="button"
                   disabled={used}
-                  onClick={() => addToken(ph)}
+                  onClick={() => addPlaceholder(ph)}
                   className="inline-flex items-center gap-1 rounded border hairline border-amber/40 bg-amber-soft/30 px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-amber-soft transition disabled:opacity-40 disabled:cursor-not-allowed"
                   title={used ? "Ya está en el template" : `Agregar spec "${t.label}"`}
                 >
@@ -245,6 +289,14 @@ export function NombreTemplateBuilder({
                 </button>
               );
             })}
+            <button
+              type="button"
+              onClick={() => addLiteral(" - ")}
+              className="inline-flex items-center gap-1 rounded border hairline border-dashed px-2 py-0.5 font-mono text-[11px] text-muted-foreground hover:bg-muted/40 transition"
+              title="Agregar texto literal entre tokens (ej. '-', '(', ')', 'f/')"
+            >
+              <Plus className="h-3 w-3" /> Texto
+            </button>
           </div>
         </div>
 
@@ -284,9 +336,55 @@ export function NombreTemplateBuilder({
   );
 }
 
-function TokenChip({ token, onRemove }: { token: Token; onRemove: () => void }) {
+function TokenChip({
+  token, onRemove, onChangeLiteral,
+}: {
+  token: Token;
+  onRemove: () => void;
+  onChangeLiteral: (v: string) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: token.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
+
+  if (token.kind === "literal") {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`inline-flex items-center gap-1 rounded border border-dashed border-muted-foreground/40 bg-muted/30 px-1.5 py-0.5 font-mono text-[11px] text-ink ${
+          isDragging ? "opacity-60" : ""
+        }`}
+        title="Texto literal — editá inline, los espacios cuentan"
+      >
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-ink"
+          aria-label="Arrastrar"
+        >
+          <GripVertical className="h-3 w-3" />
+        </button>
+        <input
+          type="text"
+          value={token.text}
+          onChange={(e) => onChangeLiteral(e.target.value)}
+          placeholder="texto"
+          className="bg-transparent border-0 outline-none focus:outline-none focus:ring-0 px-0.5 font-mono text-[11px] text-ink text-center"
+          style={{ width: `${Math.max(2, token.text.length + 1)}ch` }}
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-muted-foreground hover:text-destructive"
+          aria-label="Quitar"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+
   const isSpec = token.placeholder.startsWith("{spec:");
   return (
     <div
