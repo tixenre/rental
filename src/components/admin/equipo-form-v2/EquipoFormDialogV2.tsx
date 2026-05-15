@@ -237,7 +237,16 @@ export function EquipoFormDialogV2({
       // Si el nombre público guardado no tiene tokens, lo usamos como literal.
       // Si tiene tokens ({...}), lo dejamos vacío — el usuario regenera con auto.
       const tpl = (f.nombre_publico_template ?? "").trim();
-      setNombrePublico(/\{[^}]+\}/.test(tpl) ? "" : tpl);
+      const hasTokens = /\{[^}]+\}/.test(tpl);
+      setNombrePublico(hasTokens ? "" : tpl);
+      // Detectar override manual: si hay texto literal sin tokens, asumimos
+      // que el dueño puso un nombre a mano y no queremos que auto-gen lo
+      // pise al abrir (issue de auditoría). toggle OFF en ese caso.
+      if (tpl && !hasTokens) {
+        setNombrePublicoAuto(false);
+      } else {
+        setNombrePublicoAuto(true);
+      }
 
       let parsedSpecs: Spec[] = [];
       try {

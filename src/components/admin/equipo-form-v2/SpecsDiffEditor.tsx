@@ -349,6 +349,9 @@ function CustomSortableRow({
 // La BD almacena el string final con unidad como sufijo.
 
 function parseRango(raw: string): { min: string; max: string } {
+  // Acepta tanto sufijo ("24-70 mm") como prefijo ("f/24-70"). El regex
+  // encuentra el primer par de números en el string, ignorando la unidad
+  // antes/después.
   const match = /(\d+(?:\.\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?/.exec(raw);
   return {
     min: match?.[1] ?? "",
