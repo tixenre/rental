@@ -1140,11 +1140,11 @@ def regenerate_auto_tags(conn, equipo_id: int) -> int:
         """, (equipo_id, row["id"], orden))
         count += 1
 
-    # Limpiar etiquetas auto que ya no las usa ningún equipo.
+    # Limpiar etiquetas que ya no las usa ningún equipo (ni manual ni auto).
+    # `etiquetas` no tiene columna `origen` — el origen vive en `equipo_etiquetas`.
     conn.execute("""
         DELETE FROM etiquetas
-        WHERE origen = 'auto'
-          AND id NOT IN (SELECT DISTINCT etiqueta_id FROM equipo_etiquetas)
+        WHERE id NOT IN (SELECT DISTINCT etiqueta_id FROM equipo_etiquetas)
     """)
 
     return count

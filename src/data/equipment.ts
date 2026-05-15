@@ -1,25 +1,7 @@
-export type Category =
-  | "Cámaras"
-  | "Lentes"
-  | "Iluminación"
-  | "Audio"
-  | "Soportes"
-  | "Accesorios"
-  | "Adaptadores"
-  // Categorías inferidas desde el backend (useEquipos.inferCategory)
-  | "Baterías"
-  | "Filtros"
-  | "Monitores"
-  | "Comunicación"
-  | "Flash"
-  | "Sonido"
-  | "Brazo Mágico"
-  | "Stands"
-  | "Tungsteno"
-  | "Modificadores"
-  | "Luces"
-  | "Trípode"
-  | "Grips";
+// Nombre de categoría — ahora es el nombre literal del backend (tabla `categorias`).
+// Se mantiene como string para soportar cualquier nombre que el admin cree.
+// La inferencia por keywords se usa solo como fallback para equipos sin categoría asignada.
+export type Category = string;
 
 export type IncludedItem = {
   /** Si está y matchea con un equipo del catálogo, se enriquece con su info. */
