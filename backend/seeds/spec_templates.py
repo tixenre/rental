@@ -66,30 +66,24 @@ TEMPLATES: dict[str, list[dict]] = {
     # 2. Lentes — alineado a la tabla de specs de B&H (lo más rico para
     # cinematografía y foto). Las destacadas (★) marcan lo que aparece como
     # quick fact en la fila del catálogo.
+    #
+    # NOTA: focal_min/focal_max/apertura_max/apertura_min se SACARON del seed
+    # — quedaron reemplazados por distancia_focal y apertura (ambos tipo rango)
+    # que cubren fijo y zoom en un solo campo. Si tu DB ya tiene los legacy,
+    # podés borrarlos desde /admin/equipos/specs sin que el seed los reinserte.
     "Lentes": [
         {"key": "montura", "label": "Montura", "tipo": "enum",
          "enum_options": ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "M42"],
          "prioridad": 10, "en_card": True, "en_filtros": True, "en_nombre": True,
          "destacado": True},
-        # focal_min/focal_max son legacy del seed inicial. Para lentes nuevos
-        # se sugiere usar distancia_focal (tipo rango) que cubre fijo y zoom
-        # en un solo campo. Mantenemos las viejas por compat con equipos ya
-        # cargados.
         {"key": "distancia_focal", "label": "Distancia focal", "tipo": "rango",
          "unidad": "mm", "prioridad": 15, "en_card": True, "en_nombre": True,
          "destacado": True,
          "ayuda": "Un valor (ej. 50) si es fijo, dos (ej. 24-70) si es zoom"},
-        {"key": "focal_min", "label": "Focal mín", "tipo": "number", "unidad": "mm",
-         "prioridad": 20, "en_card": True, "en_nombre": True},
-        {"key": "focal_max", "label": "Focal máx", "tipo": "number", "unidad": "mm",
-         "prioridad": 30, "en_card": True, "en_nombre": True,
-         "ayuda": "Vacío si es lente fijo"},
-        {"key": "apertura_max", "label": "Apertura máx", "tipo": "string",
-         "prioridad": 40, "en_card": True, "en_nombre": True, "destacado": True,
-         "ayuda": "Ej: f/1.4 o f/2.8-4"},
-        {"key": "apertura_min", "label": "Apertura mín", "tipo": "string",
-         "prioridad": 42,
-         "ayuda": "Ej: f/22"},
+        {"key": "apertura", "label": "Apertura", "tipo": "rango",
+         "unidad": "f/", "prioridad": 20, "en_card": True, "en_nombre": True,
+         "destacado": True,
+         "ayuda": "Un valor (ej. 2.8) si es fija, dos (ej. 2.8-4) si es variable"},
         {"key": "formato", "label": "Formato", "tipo": "enum",
          "enum_options": ["Full-frame", "APS-C", "MFT", "Super 35", "Medium Format"],
          "prioridad": 50, "en_filtros": True, "destacado": True},
@@ -113,8 +107,8 @@ TEMPLATES: dict[str, list[dict]] = {
          "prioridad": 90},
         {"key": "construccion_optica", "label": "Construcción óptica", "tipo": "string",
          "prioridad": 95, "ayuda": "Ej: 20 elementos / 15 grupos"},
-        {"key": "peso", "label": "Peso", "tipo": "string", "prioridad": 100,
-         "ayuda": "Ej: 695 g"},
+        {"key": "peso", "label": "Peso", "tipo": "number", "unidad": "g",
+         "prioridad": 100, "ayuda": "Ej: 695"},
         {"key": "dimensiones", "label": "Dimensiones", "tipo": "string",
          "prioridad": 105, "ayuda": "Ej: Ø87.8 × 119.9 mm"},
     ],
