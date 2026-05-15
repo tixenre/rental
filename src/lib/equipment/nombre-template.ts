@@ -36,11 +36,28 @@ function normalizeLabel(s: string): string {
     .trim();
 }
 
+/** Algunas unidades se escriben antes del número (f/, $, €). Si el value
+ *  legacy fue guardado como "2.8 f/" (sufijo), lo reformateamos a "f/2.8"
+ *  para mostrar la convención correcta en el nombre público.
+ *  Solo aplica cuando detectamos la unidad termina en "/" o empieza con
+ *  un símbolo monetario. */
+function normalizePrefixUnitValue(raw: string): string {
+  const trimmed = raw.trim();
+  // Match: "<number(-number)?> <unit>" donde unit es prefijo por convención.
+  const m = /^(\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?)\s+(\S+)$/.exec(trimmed);
+  if (!m) return trimmed;
+  const num = m[1];
+  const unit = m[2];
+  const isPrefix = unit.endsWith("/") || /^[$€£¥]/.test(unit);
+  return isPrefix ? `${unit}${num}` : trimmed;
+}
+
 function lookupSpec(specs: SpecLike[] | undefined, label: string): string {
   if (!specs) return "";
   const target = normalizeLabel(label);
   const found = specs.find((s) => normalizeLabel(s.label) === target);
-  return (found?.value ?? "").trim();
+  if (!found) return "";
+  return normalizePrefixUnitValue((found.value ?? "").trim());
 }
 
 /**
