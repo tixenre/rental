@@ -807,6 +807,52 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
         conn.close()
 
 
+def _validate_multi_enum_value(value: str, enum_options: list[str], spec_label: str) -> str:
+    """Normaliza `value` a JSON array y valida que cada item esté en
+    `enum_options`. Acepta dos shapes de entrada (CSV legacy o JSON array)
+    pero siempre devuelve JSON array compactado.
+
+    El endpoint PUT usa esto para enforce el storage canónico definido en
+    la migration `f3a5c7d9e1b6_multi_enum_json_canonical.py`."""
+    v = (value or "").strip()
+    if not v:
+        return "[]"
+    items: list[str]
+    if v.startswith("["):
+        try:
+            parsed = json.loads(v)
+        except Exception:
+            raise HTTPException(
+                400, f"Spec '{spec_label}' tipo multi_enum: JSON inválido."
+            )
+        if not isinstance(parsed, list):
+            raise HTTPException(
+                400, f"Spec '{spec_label}': multi_enum debe ser array."
+            )
+        items = [str(x).strip() for x in parsed if str(x).strip()]
+    else:
+        items = [p.strip() for p in v.split(",") if p.strip()]
+    # Validar contra enum_options si están declaradas. Si la spec no tiene
+    # enum_options (caso raro), aceptamos cualquier valor pero canonizado.
+    if enum_options:
+        opts_set = set(enum_options)
+        invalid = [x for x in items if x not in opts_set]
+        if invalid:
+            raise HTTPException(
+                400,
+                f"Spec '{spec_label}' multi_enum: valores no permitidos {invalid}. "
+                f"Opciones: {enum_options}.",
+            )
+    # Dedup preservando orden de aparición.
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for x in items:
+        if x not in seen:
+            seen.add(x)
+            deduped.append(x)
+    return json.dumps(deduped, ensure_ascii=False)
+
+
 def _validate_tabla_value(value: str, columnas: list[dict], spec_label: str) -> str:
     """Valida que `value` sea JSON array donde cada row tiene las keys de
     `columnas` con los tipos correctos. Devuelve el JSON re-serializado
@@ -902,7 +948,8 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
         if keys_int:
             placeholders = ",".join(["?"] * len(keys_int))
             def_rows = conn.execute(
-                f"SELECT id, label, tipo, tabla_columnas FROM spec_definitions WHERE id IN ({placeholders})",
+                f"SELECT id, label, tipo, tabla_columnas, enum_options "
+                f"FROM spec_definitions WHERE id IN ({placeholders})",
                 tuple(keys_int),
             ).fetchall()
             defs_by_id = {r["id"]: row_to_dict(r) for r in def_rows}
@@ -926,6 +973,18 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
                 persist_value = _validate_tabla_value(persist_value, cols, sd.get("label") or "")
                 if persist_value == "[]":
                     continue  # tabla totalmente vacía → no persistir nada
+            elif sd and sd.get("tipo") == "multi_enum":
+                opts = sd.get("enum_options")
+                if isinstance(opts, str):
+                    try:
+                        opts = json.loads(opts)
+                    except Exception:
+                        opts = []
+                persist_value = _validate_multi_enum_value(
+                    persist_value, opts or [], sd.get("label") or "",
+                )
+                if persist_value == "[]":
+                    continue  # multi_enum vacío → no persistir
             conn.execute(
                 """
                 INSERT INTO equipo_specs (equipo_id, spec_def_id, value)
