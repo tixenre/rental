@@ -278,6 +278,7 @@ function EquiposPage() {
         <FaltaBanner
           falta={falta}
           total={total}
+          loading={equiposQ.isLoading}
           onClear={() => updateFilters({ falta: undefined })}
         />
       )}
@@ -1023,10 +1024,12 @@ const FALTA_LABELS: Record<FaltaField, string> = {
 function FaltaBanner({
   falta,
   total,
+  loading,
   onClear,
 }: {
   falta: FaltaField;
   total: number;
+  loading: boolean;
   onClear: () => void;
 }) {
   return (
@@ -1034,7 +1037,10 @@ function FaltaBanner({
       <AlertCircle className="h-4 w-4 shrink-0 text-amber-700" />
       <div className="flex-1 min-w-0 text-sm">
         <span className="font-medium text-ink">Filtrando equipos {FALTA_LABELS[falta]}</span>
-        <span className="text-muted-foreground"> · {total} {total === 1 ? "resultado" : "resultados"}</span>
+        <span className="text-muted-foreground">
+          {" · "}
+          {loading ? "cargando…" : `${total} ${total === 1 ? "resultado" : "resultados"}`}
+        </span>
       </div>
       <Button variant="ghost" size="sm" onClick={onClear}>Quitar filtro</Button>
     </div>
