@@ -53,16 +53,21 @@ def _require_admin(request: Request) -> dict:
 class SpecDefinitionInput(BaseModel):
     spec_key: str
     label: str
-    tipo: str   # "string" | "number" | "enum" | "bool" | "rango" | "wxh" | "wxhxd" | "multi_enum"
+    tipo: str   # "string" | "number" | "enum" | "bool" | "rango" | "wxh" | "wxhxd" | "multi_enum" | "tabla"
     unidad: Optional[str] = None
     enum_options: Optional[list[str]] = None
     ayuda: Optional[str] = None
     es_compatibilidad: bool = False
     compatibilidad_modo: str = "exacta"  # "exacta" | "jerarquia"
     validado: bool = False
+    # tabla_columnas: shape de columnas cuando tipo='tabla'. Cada item:
+    #   {key, label, tipo, options?, unidad?}
+    # `tipo` interno de la columna: "string" | "number" | "enum" | "bool".
+    tabla_columnas: Optional[list[dict]] = None
 
 
 class SpecDefinitionUpdate(BaseModel):
+    spec_key: Optional[str] = None  # Editable durante construcción del sistema.
     label: Optional[str] = None
     tipo: Optional[str] = None
     unidad: Optional[str] = None
@@ -71,6 +76,7 @@ class SpecDefinitionUpdate(BaseModel):
     es_compatibilidad: Optional[bool] = None
     compatibilidad_modo: Optional[str] = None
     validado: Optional[bool] = None
+    tabla_columnas: Optional[list[dict]] = None
 
 
 # Asignación de una spec_def a una categoría con flags propios.
@@ -181,7 +187,7 @@ def listar_spec_definitions(request: Request):
         rows = conn.execute("""
             SELECT
               sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
-              sd.enum_options, sd.ayuda,
+              sd.enum_options, sd.ayuda, sd.tabla_columnas,
               COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
               COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
               COALESCE(sd.validado, FALSE) AS validado,
@@ -208,7 +214,34 @@ def listar_spec_definitions(request: Request):
         conn.close()
 
 
-_VALID_SPEC_TIPOS = {"string", "number", "enum", "bool", "rango", "wxh", "wxhxd", "multi_enum"}
+_VALID_SPEC_TIPOS = {"string", "number", "enum", "bool", "rango", "wxh", "wxhxd", "multi_enum", "tabla"}
+_VALID_COL_TIPOS = {"string", "number", "enum", "bool", "valor_unidad"}
+
+
+def _validate_tabla_columnas(cols: Optional[list[dict]]) -> None:
+    """Verifica el shape de `tabla_columnas`: cada item debe tener
+    {key, label, tipo} con tipo en _VALID_COL_TIPOS, opciones obligatorias
+    si tipo='enum', keys únicas."""
+    if not cols:
+        raise HTTPException(400, "Para tipo 'tabla' hay que definir al menos una columna.")
+    seen: set[str] = set()
+    for i, c in enumerate(cols):
+        if not isinstance(c, dict):
+            raise HTTPException(400, f"Columna {i}: debe ser objeto JSON.")
+        key = (c.get("key") or "").strip()
+        label = (c.get("label") or "").strip()
+        tipo = (c.get("tipo") or "").strip()
+        if not key or not label or not tipo:
+            raise HTTPException(400, f"Columna {i}: faltan key/label/tipo.")
+        if key in seen:
+            raise HTTPException(400, f"Columna {i}: key '{key}' duplicada.")
+        seen.add(key)
+        if tipo not in _VALID_COL_TIPOS:
+            raise HTTPException(
+                400, f"Columna '{key}': tipo '{tipo}' inválido. Permitidos: {sorted(_VALID_COL_TIPOS)}"
+            )
+        if tipo == "enum" and not c.get("options"):
+            raise HTTPException(400, f"Columna '{key}' tipo enum: hay que listar 'options'.")
 
 
 @router.post("/admin/spec-definitions", status_code=201)
@@ -220,6 +253,8 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
         raise HTTPException(400, "Para este tipo la unidad es obligatoria (mm, px, °, kg…).")
     if payload.tipo in ("enum", "multi_enum") and not payload.enum_options:
         raise HTTPException(400, "Para tipo enum / multi_enum hay que listar al menos una opción.")
+    if payload.tipo == "tabla":
+        _validate_tabla_columnas(payload.tabla_columnas)
     if payload.compatibilidad_modo not in ("exacta", "jerarquia"):
         raise HTTPException(400, "compatibilidad_modo debe ser 'exacta' o 'jerarquia'.")
     if payload.compatibilidad_modo == "jerarquia" and payload.tipo != "enum":
@@ -235,8 +270,8 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
                 """
                 INSERT INTO spec_definitions
                   (spec_key, label, tipo, unidad, enum_options, ayuda,
-                   es_compatibilidad, compatibilidad_modo, validado)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   es_compatibilidad, compatibilidad_modo, validado, tabla_columnas)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """,
                 (
@@ -249,6 +284,7 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
                     payload.es_compatibilidad,
                     payload.compatibilidad_modo,
                     payload.validado,
+                    json.dumps(payload.tabla_columnas) if payload.tabla_columnas else None,
                 ),
             )
             new_id = cur.fetchone()[0]
@@ -269,10 +305,28 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(400, "Nada para actualizar")
+    if "spec_key" in updates:
+        # Editable durante construcción del sistema. Validamos formato igual
+        # que en CREATE; la colisión por UNIQUE constraint la captura el
+        # except más abajo.
+        new_key = (updates["spec_key"] or "").strip()
+        import re as _re
+        if not _re.match(r"^[a-z][a-z0-9_]*$", new_key):
+            raise HTTPException(
+                400,
+                "spec_key inválida: solo minúsculas, números y _ (debe empezar con letra).",
+            )
+        updates["spec_key"] = new_key
     if "enum_options" in updates:
         updates["enum_options"] = (
             json.dumps(updates["enum_options"]) if updates["enum_options"] else None
         )
+    if "tabla_columnas" in updates:
+        if updates["tabla_columnas"]:
+            _validate_tabla_columnas(updates["tabla_columnas"])
+            updates["tabla_columnas"] = json.dumps(updates["tabla_columnas"])
+        else:
+            updates["tabla_columnas"] = None
     if "compatibilidad_modo" in updates and updates["compatibilidad_modo"] not in ("exacta", "jerarquia"):
         raise HTTPException(400, "compatibilidad_modo debe ser 'exacta' o 'jerarquia'.")
     conn = get_db()
@@ -306,11 +360,21 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
                     "Borralos primero o creá una spec nueva.",
                 )
         set_clause = ", ".join(f"{k} = ?" for k in updates)
-        conn.execute(
-            f"UPDATE spec_definitions SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            list(updates.values()) + [def_id],
-        )
-        conn.commit()
+        try:
+            conn.execute(
+                f"UPDATE spec_definitions SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                list(updates.values()) + [def_id],
+            )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            msg = str(e).lower()
+            if "duplicate key" in msg or "unique" in msg:
+                raise HTTPException(
+                    409,
+                    f"Ya existe otra spec con key '{updates.get('spec_key')}'. Elegí otra.",
+                )
+            raise
         return {"ok": True, "id": def_id, **updates}
     except HTTPException:
         conn.rollback()
@@ -389,6 +453,7 @@ def listar_templates(categoria_id: int, request: Request):
             SELECT
               t.id, t.categoria_id, t.spec_def_id,
               sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.enum_options,
+              sd.tabla_columnas,
               t.prioridad,
               COALESCE(t.visible_en_card, FALSE) AS visible_en_card,
               COALESCE(t.visible_en_filtros, FALSE) AS visible_en_filtros,
@@ -640,6 +705,7 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
                 t.id AS template_id,
                 t.spec_def_id,
                 sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.enum_options,
+                sd.tabla_columnas,
                 t.prioridad,
                 t.visible_en_card, t.visible_en_filtros, t.visible_en_nombre,
                 t.obligatorio,
@@ -667,6 +733,73 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
         conn.close()
 
 
+def _validate_tabla_value(value: str, columnas: list[dict], spec_label: str) -> str:
+    """Valida que `value` sea JSON array donde cada row tiene las keys de
+    `columnas` con los tipos correctos. Devuelve el JSON re-serializado
+    (compactado) para garantizar storage normalizado."""
+    try:
+        data = json.loads(value)
+    except Exception:
+        raise HTTPException(400, f"Spec '{spec_label}' tipo tabla: value debe ser JSON válido.")
+    if not isinstance(data, list):
+        raise HTTPException(400, f"Spec '{spec_label}': tabla debe ser un array de filas.")
+    cleaned: list[dict] = []
+    col_by_key = {c["key"]: c for c in columnas}
+    for i, row in enumerate(data):
+        if not isinstance(row, dict):
+            raise HTTPException(400, f"Spec '{spec_label}' fila {i}: debe ser objeto.")
+        clean_row: dict = {}
+        for key, col in col_by_key.items():
+            v = row.get(key)
+            if v is None or v == "":
+                continue  # campo vacío permitido en cualquier columna
+            ctipo = col["tipo"]
+            if ctipo == "number":
+                try:
+                    clean_row[key] = float(v) if "." in str(v) else int(v)
+                except (TypeError, ValueError):
+                    raise HTTPException(
+                        400,
+                        f"Spec '{spec_label}' fila {i} columna '{key}': debe ser número, vino {v!r}.",
+                    )
+            elif ctipo == "valor_unidad":
+                # Objeto {valor, unidad}. Permite que la unidad varíe por fila.
+                if not isinstance(v, dict):
+                    raise HTTPException(
+                        400,
+                        f"Spec '{spec_label}' fila {i} columna '{key}': debe ser objeto {{valor, unidad}}.",
+                    )
+                valor_raw = v.get("valor")
+                unidad_raw = v.get("unidad", "")
+                has_valor = valor_raw not in (None, "")
+                has_unidad = bool(str(unidad_raw or "").strip())
+                if not has_valor and not has_unidad:
+                    continue
+                cell: dict = {}
+                if has_valor:
+                    try:
+                        cell["valor"] = float(valor_raw) if "." in str(valor_raw) else int(valor_raw)
+                    except (TypeError, ValueError):
+                        cell["valor"] = str(valor_raw).strip()
+                if has_unidad:
+                    cell["unidad"] = str(unidad_raw).strip()
+                clean_row[key] = cell
+            elif ctipo == "bool":
+                clean_row[key] = bool(v) if isinstance(v, bool) else str(v).lower() in ("true", "1", "yes", "sí", "si")
+            elif ctipo == "enum":
+                if str(v) not in (col.get("options") or []):
+                    raise HTTPException(
+                        400,
+                        f"Spec '{spec_label}' fila {i} columna '{key}': '{v}' no está en opciones {col.get('options')}.",
+                    )
+                clean_row[key] = str(v)
+            else:  # string
+                clean_row[key] = str(v).strip()
+        if clean_row:  # solo persistir filas con al menos un valor
+            cleaned.append(clean_row)
+    return json.dumps(cleaned, ensure_ascii=False)
+
+
 @router.put("/admin/equipos/{equipo_id}/specs")
 def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: Request):
     """Reemplaza TODAS las specs del equipo. Body shape:
@@ -680,17 +813,45 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
         if not eq:
             raise HTTPException(404, "Equipo no existe")
 
-        conn.execute("DELETE FROM equipo_specs WHERE equipo_id = ?", (equipo_id,))
-        for key, value in payload.specs.items():
-            if value is None or value == "":
-                continue
+        # Pre-cargar las defs referenciadas (tipo + tabla_columnas) para
+        # validar el value de specs tipo 'tabla' antes de persistir.
+        keys_int: list[int] = []
+        for key in payload.specs.keys():
             try:
-                spec_def_id = int(key)
+                keys_int.append(int(key))
             except (TypeError, ValueError):
                 raise HTTPException(
                     400,
                     f"spec_def_id inválido en payload.specs: '{key}'. Las keys deben ser IDs numéricos.",
                 )
+        defs_by_id: dict[int, dict] = {}
+        if keys_int:
+            placeholders = ",".join(["?"] * len(keys_int))
+            def_rows = conn.execute(
+                f"SELECT id, label, tipo, tabla_columnas FROM spec_definitions WHERE id IN ({placeholders})",
+                tuple(keys_int),
+            ).fetchall()
+            defs_by_id = {r["id"]: row_to_dict(r) for r in def_rows}
+
+        conn.execute("DELETE FROM equipo_specs WHERE equipo_id = ?", (equipo_id,))
+        for key, value in payload.specs.items():
+            if value is None or value == "":
+                continue
+            spec_def_id = int(key)
+            sd = defs_by_id.get(spec_def_id)
+            persist_value = str(value)
+            if sd and sd.get("tipo") == "tabla":
+                cols = sd.get("tabla_columnas")
+                if isinstance(cols, str):
+                    cols = json.loads(cols)
+                if not cols:
+                    raise HTTPException(
+                        500,
+                        f"Spec '{sd.get('label')}' tipo tabla sin tabla_columnas definidas.",
+                    )
+                persist_value = _validate_tabla_value(persist_value, cols, sd.get("label") or "")
+                if persist_value == "[]":
+                    continue  # tabla totalmente vacía → no persistir nada
             conn.execute(
                 """
                 INSERT INTO equipo_specs (equipo_id, spec_def_id, value)
@@ -698,7 +859,7 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
                 ON CONFLICT (equipo_id, spec_def_id) DO UPDATE
                     SET value = EXCLUDED.value
                 """,
-                (equipo_id, spec_def_id, str(value)),
+                (equipo_id, spec_def_id, persist_value),
             )
 
         try:

@@ -258,7 +258,30 @@ export type MarcaAdmin = {
 
 // ── Templates de specs por categoría (CRUD admin) ────────────────────────
 
-export type SpecTipo = "string" | "number" | "enum" | "bool" | "rango" | "wxh" | "wxhxd" | "multi_enum";
+export type SpecTipo = "string" | "number" | "enum" | "bool" | "rango" | "wxh" | "wxhxd" | "multi_enum" | "tabla";
+
+/** Tipo de una columna individual cuando spec_definitions.tipo='tabla'.
+ *  - `valor_unidad`: la celda tiene 2 sub-campos (número + unidad), permite
+ *    que la unidad varíe por fila (ej. 10000 lumen / 8000 lumen). */
+export type SpecTablaColTipo = "string" | "number" | "enum" | "bool" | "valor_unidad";
+
+/** Una columna de una spec tipo tabla. Define qué se carga en cada celda
+ *  y cómo se renderiza el input. */
+export type SpecTablaColumna = {
+  key: string;
+  label: string;
+  tipo: SpecTablaColTipo;
+  /** Para tipo='enum': opciones permitidas. */
+  options?: string[];
+  /** Sufijo visual (lm, °C, etc.). Solo para tipos escalares. */
+  unidad?: string | null;
+  /** Para tipo='valor_unidad': lista cerrada de unidades permitidas. Si está
+   *  definida, el input de unidad se renderiza como select. Si no, input libre. */
+  unidades_opciones?: string[];
+  /** Texto fijo que aparece ANTES del valor — sirve como conector textual
+   *  entre columnas. Ej. col2.prefijo="a" → "10000 lm a 5700 K". */
+  prefijo?: string | null;
+};
 
 /** Definición global de una spec (post refactor unificar_specs_definitions).
  *  Cada spec_key existe UNA sola vez en el sistema. Sus categorías la
@@ -286,12 +309,28 @@ export type SpecDefinition = {
   compatibilidad_modo: CompatibilidadModo;
   /** Flag manual: el dueño la revisó y aprobó. Se ordenan arriba. */
   validado: boolean;
+  /** Solo para tipo='tabla': shape de las columnas. */
+  tabla_columnas: SpecTablaColumna[] | null;
   /** Solo en GET /admin/spec-definitions: cuántas categorías la asignaron. */
   uso_categorias?: number;
   /** Solo en GET /admin/spec-definitions: cuántos equipos tienen value. */
   uso_equipos?: number;
   /** Solo en GET: categorías que la asignan (con id + nombre + template_id). */
   categorias?: SpecDefinitionCategoriaAsign[];
+};
+
+/** Una unidad del catálogo global (lm, K, V…). */
+export type Unidad = {
+  id: number;
+  simbolo: string;
+  nombre: string;
+  dimension: string | null;
+};
+
+export type UnidadInput = {
+  simbolo: string;
+  nombre: string;
+  dimension?: string | null;
 };
 
 export type SpecDefinitionInput = {
@@ -304,6 +343,7 @@ export type SpecDefinitionInput = {
   es_compatibilidad?: boolean;
   compatibilidad_modo?: CompatibilidadModo;
   validado?: boolean;
+  tabla_columnas?: SpecTablaColumna[] | null;
 };
 
 /** Asignación de una spec_def a una categoría + flags propios. El backend
@@ -320,6 +360,7 @@ export type SpecTemplate = {
   tipo: SpecTipo;
   unidad: string | null;
   enum_options: string[] | null;
+  tabla_columnas: SpecTablaColumna[] | null;
   es_compatibilidad: boolean;
   compatibilidad_modo: CompatibilidadModo;
   // Per-categoría:
@@ -885,6 +926,7 @@ export const adminApi = {
         spec_def_id: number;
         spec_key: string; label: string; tipo: string;
         unidad: string | null; enum_options: string[] | null;
+        tabla_columnas: SpecTablaColumna[] | null;
         prioridad: number;
         visible_en_card: boolean; visible_en_filtros: boolean; visible_en_nombre: boolean;
         obligatorio: boolean; ayuda: string | null;
@@ -921,6 +963,29 @@ export const adminApi = {
     }),
   deleteSpecDefinition: async (defId: number) => {
     const res = await authedFetch(`/api/admin/spec-definitions/${defId}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const body = await res.text();
+      throw new Error(body || `HTTP ${res.status}`);
+    }
+  },
+
+  // ── Catálogo global de unidades (lm, K, V, etc.) ───────────────────
+  listUnidades: () =>
+    authedJson<{ items: Unidad[] }>("/api/admin/unidades"),
+  createUnidad: (input: UnidadInput) =>
+    authedJson<Unidad>("/api/admin/unidades", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  updateUnidad: (unidadId: number, input: Partial<UnidadInput>) =>
+    authedJson<{ ok: true; id: number }>(`/api/admin/unidades/${unidadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteUnidad: async (unidadId: number) => {
+    const res = await authedFetch(`/api/admin/unidades/${unidadId}`, { method: "DELETE" });
     if (!res.ok && res.status !== 204) {
       const body = await res.text();
       throw new Error(body || `HTTP ${res.status}`);

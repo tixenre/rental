@@ -38,6 +38,7 @@ import {
 import type { SpecTemplate } from "@/lib/admin/api";
 
 import { type Spec, sameLabel, extractNumericPart } from "./spec-helpers";
+import { TablaValueInput } from "./TablaValueInput";
 
 const lower = (s: string) => s.trim().toLowerCase();
 
@@ -293,6 +294,16 @@ function TypedValueInput({
 
   if (tmpl.tipo === "bool") {
     return <BoolValueInput value={value} onChange={onChange} />;
+  }
+
+  if (tmpl.tipo === "tabla" && tmpl.tabla_columnas?.length) {
+    return (
+      <TablaValueInput
+        value={value}
+        columnas={tmpl.tabla_columnas}
+        onChange={onChange}
+      />
+    );
   }
 
   // string (default)
