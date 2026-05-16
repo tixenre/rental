@@ -144,10 +144,16 @@ TEMPLATES: dict[str, list[dict]] = {
         {"key": "angulo_vision", "label": "Ángulo de visión", "tipo": "rango",
          "unidad": "°", "prioridad": 65,
          "ayuda": "Un valor si es fijo (ej. 75), dos si es zoom (ej. 84-34)"},
+        # Observado en 3 equipos como "Distancia mínima de enfoque" (sin el
+        # "_m"). Usamos la spec_key existente — el alias en commit anterior
+        # cubre la variante del label de B&H.
         {"key": "distancia_minima_m", "label": "Distancia mínima de foco", "tipo": "number",
          "unidad": "cm", "prioridad": 70},
+        # Observado en 3 equipos: "Magnificación" (sin "máxima"). Mantenemos
+        # spec_key existente; el matching contra "Magnificación" lo cubre el
+        # alias agregado en este commit (más abajo).
         {"key": "magnificacion", "label": "Magnificación máxima", "tipo": "string",
-         "prioridad": 75, "ayuda": "Ej: 0.32x"},
+         "prioridad": 75, "ayuda": "Ej: 0.32x, 1:2 (macro)"},
         {"key": "hojas_diafragma", "label": "Hojas de diafragma", "tipo": "number",
          "prioridad": 78},
         {"key": "estabilizacion", "label": "Estabilización óptica", "tipo": "bool",
@@ -156,6 +162,13 @@ TEMPLATES: dict[str, list[dict]] = {
          "prioridad": 90},
         {"key": "construccion_optica", "label": "Construcción óptica", "tipo": "string",
          "prioridad": 95, "ayuda": "Ej: 20 elementos / 15 grupos"},
+        # Observado en B&H: el material del anillo de filtros y lentes
+        # cinema (3 equipos con valor "Aluminio").
+        {"key": "material_anillo", "label": "Material del anillo", "tipo": "string",
+         "prioridad": 96, "ayuda": "Ej: Aluminio, Bronce"},
+        # Para teleconverters / extenders (observado "1-Stop Light Gain").
+        {"key": "cambio_exposicion", "label": "Cambio de exposición", "tipo": "string",
+         "prioridad": 97, "ayuda": "Solo teleconverters/extenders. Ej: 1-Stop Light Gain"},
         {"key": "peso", "label": "Peso", "tipo": "number", "unidad": "g",
          "prioridad": 100, "ayuda": "Ej: 695"},
         {"key": "dimensiones", "label": "Dimensiones", "tipo": "string",
@@ -171,6 +184,11 @@ TEMPLATES: dict[str, list[dict]] = {
         {"key": "cri", "label": "CRI", "tipo": "number",
          "prioridad": 30, "en_filtros": True,
          "ayuda": "Color Rendering Index (0-100)"},
+        # Sister del CRI — Television Lighting Consistency Index. Observado
+        # en 2 equipos amaran. Mismo rango (0-100), idealmente >=90.
+        {"key": "tlci", "label": "TLCI", "tipo": "number",
+         "prioridad": 32, "en_filtros": True,
+         "ayuda": "Television Lighting Consistency Index (0-100)"},
         {"key": "temperatura_k", "label": "Temperatura color", "tipo": "string",
          "prioridad": 40, "ayuda": "Ej: 3200K-5600K o 5600K"},
         {"key": "bicolor", "label": "Bicolor", "tipo": "bool",
@@ -203,9 +221,20 @@ TEMPLATES: dict[str, list[dict]] = {
         {"key": "material", "label": "Material", "tipo": "enum",
          "enum_options": ["Difusor", "Negro", "Plata", "Oro", "Blanco", "Mixto"],
          "prioridad": 30},
+        # Para softboxes/octobox: el color del interior define la calidad
+        # de la luz reflejada (Plata = más intenso, Blanco = más suave).
+        {"key": "color_interior", "label": "Color interior", "tipo": "enum",
+         "enum_options": ["Plata", "Blanco", "Oro", "Mixto"],
+         "prioridad": 35},
         {"key": "modificador_montura", "label": "Sistema de montaje", "tipo": "string",
          "prioridad": 40, "ayuda": "Ej: Bowens, Profoto, varillas, libre"},
         {"key": "plegable", "label": "Plegable", "tipo": "bool", "prioridad": 50},
+        # Observado: softboxes con grids opcionales / incluidos.
+        {"key": "acepta_rejillas", "label": "Acepta rejillas", "tipo": "bool",
+         "prioridad": 60, "ayuda": "Si soporta grid/honeycomb (incluido o vendido aparte)"},
+        # Para modificadores específicos de una serie de luz (ej. amaran 150c/300c).
+        {"key": "compatibilidad_luz", "label": "Compatibilidad de luz", "tipo": "string",
+         "prioridad": 70, "ayuda": "Marca/modelo de luz compatible. Ej: amaran 150c, Bowens, Profoto"},
     ],
 
     # 5. Soportes
@@ -222,6 +251,9 @@ TEMPLATES: dict[str, list[dict]] = {
          "prioridad": 40, "en_filtros": True},
         {"key": "cabeza", "label": "Cabezal", "tipo": "string",
          "prioridad": 50, "ayuda": "Ej: 504HD, 502AH, fluida"},
+        # Observado: trípodes pro tienen base de bola con tamaño estándar.
+        {"key": "base_montaje", "label": "Base de montaje", "tipo": "string",
+         "prioridad": 55, "ayuda": "Ej: 75 mm Half Ball, 100 mm Bowl, Mitchell"},
         {"key": "nivel", "label": "Nivel", "tipo": "bool", "prioridad": 60},
         {"key": "material", "label": "Material", "tipo": "enum",
          "enum_options": ["Aluminio", "Acero", "Fibra de carbono", "Mixto"],
@@ -273,6 +305,17 @@ TEMPLATES: dict[str, list[dict]] = {
          "prioridad": 60, "en_filtros": True},
         {"key": "incluye", "label": "Incluye", "tipo": "string",
          "prioridad": 70, "ayuda": "Ej: Tx + Rx, deadcat, soporte de cámara"},
+        # Observado en mics shotgun y wireless. SPL = nivel de presión
+        # sonora máximo antes de distorsión.
+        {"key": "spl_maximo", "label": "SPL máximo", "tipo": "number", "unidad": "dB",
+         "prioridad": 75, "ayuda": "Ej: 132 (a 1 kHz)"},
+        # Rango de frecuencias que el mic captura. Útil para comparar
+        # mics estudio vs shotgun vs lavalier.
+        {"key": "frecuencia_respuesta", "label": "Respuesta de frecuencia", "tipo": "string",
+         "prioridad": 76, "ayuda": "Ej: 20 Hz a 20 kHz"},
+        # Para sistemas inalámbricos: protocolo + banda.
+        {"key": "tecnologia_inalambrica", "label": "Tecnología inalámbrica", "tipo": "string",
+         "prioridad": 77, "ayuda": "Ej: Digital 2.4 GHz, DECT 1.9 GHz, UHF 470-608 MHz"},
         {"key": "peso", "label": "Peso", "tipo": "string", "prioridad": 80},
     ],
 
@@ -360,6 +403,18 @@ TEMPLATES: dict[str, list[dict]] = {
          "prioridad": 40},
         {"key": "clase", "label": "Clase", "tipo": "string",
          "prioridad": 50, "ayuda": "Ej: V90, UHS-II, U3"},
+        # Bus es jerárquico: UHS-I < UHS-II / PCIe 3.0 < PCIe 4.0.
+        # Con la familia jerárquica permite matching de compat (ej. tarjeta
+        # PCIe 4.0 lee a velocidad PCIe 3.0 si la cámara es PCIe 3.0).
+        {"key": "bus", "label": "Bus", "tipo": "enum",
+         "enum_options": ["UHS-I", "UHS-II", "UHS-III", "PCIe 3.0", "PCIe 4.0", "USB 3.2 Gen 1", "USB 3.2 Gen 2", "Thunderbolt 3", "Thunderbolt 4"],
+         "prioridad": 55, "en_filtros": True,
+         "ayuda": "Interfaz física. Determina velocidad teórica máxima."},
+        # Class de velocidad (V90, V60, V30 = video; U3, U1 = generic).
+        # Se mantiene como string porque a veces vienen combinadas
+        # ("Class 10 / U3 / V90").
+        {"key": "clase_velocidad", "label": "Clase de velocidad", "tipo": "string",
+         "prioridad": 56, "ayuda": "Ej: V90, V60, U3, Class 10"},
         {"key": "interfaz", "label": "Interfaz", "tipo": "string",
          "prioridad": 60, "ayuda": "Solo lectores. Ej: USB-C, Thunderbolt 3"},
     ],
