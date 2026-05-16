@@ -426,6 +426,91 @@
           {"label": "Box Dimensions (LxWxH)", "value": "9.6 x 9 x 5.9\""}
         ]
       }
+    },
+
+    {
+      "id": "red_komodo_x_6k",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Cinema Camera Super35",
+      "marca": "RED DIGITAL CINEMA",
+      "modelo": "KOMODO-X 6K Digital Cinema Camera (Canon RF, Black)",
+      "url_source": null,
+      "precio_usd": null,
+      "status_bh": "[ilegible en screenshot]",
+      "fuente": "screenshot manual del dueño (16-may-2026)",
+      "secciones": {
+        "Key Specs": [
+          {"label": "Lens Mount", "value": "Canon RF"},
+          {"label": "Image Sensor", "value": "Super35"},
+          {"label": "Effective Sensor Resolution", "value": "19.9 Megapixel (6144 x 3240)"},
+          {"label": "Image Stabilization", "value": "No"},
+          {"label": "Max Recording Modes", "value": "REDCODE RAW\nUp to 6K up to 80 fps\nProRes 422/ProRes 422 HQ/ProRes 422LT\n(ver Internal Recording para lista completa)"},
+          {"label": "Max Video Output", "value": "4:2:2\nUp to DCI 4K up to 60.00 fps"},
+          {"label": "Media/Memory Card Slot", "value": "Single Slot: CFexpress Type B (CFexpress 2.0)"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nFunctionality: Remote Control"},
+          {"label": "Battery", "value": "V-Mount"}
+        ],
+        "Imaging": [
+          {"label": "Lens Mount", "value": "Canon RF"},
+          {"label": "Lens Communication", "value": "Yes: with Autofocus Support"},
+          {"label": "Image Sensor", "value": "27.03 x 14.26 mm (Super35) CMOS"},
+          {"label": "Effective Sensor Resolution", "value": "19.9 Megapixel (6144 x 3240)"},
+          {"label": "Image Stabilization", "value": "No"},
+          {"label": "Capture Type", "value": "Stills & Video"}
+        ],
+        "Exposure Control": [
+          {"label": "Shutter Type", "value": "Electronic Global Shutter"},
+          {"label": "Advertised Dynamic Range", "value": "16.5 Stops"}
+        ],
+        "Focus": [
+          {"label": "Focus Mode", "value": "Automatic, Manual Focus"}
+        ],
+        "Video Capture": [
+          {"label": "Internal Recording", "value": "REDCODE RAW\n6144 x 3240 up to 80 fps (560 Mb/s)\n5120 x 2700 up to 96 fps (560 Mb/s)\n4096 x 2160 up to 120 fps (560 Mb/s)\n2048 x 1080 up to 240 fps (560 Mb/s)\nProRes 422/ProRes 422 HQ/ProRes 422LT\n4096 x 2160 up to 120 fps (560 MB/s)\nProRes 4444 4:4:4\n4096 x 2160 up to 80 fps (560 MB/s)\nProRes 4444XQ 4:4:4\n4096 x 2160 up to 60.00 fps (560 MB/s)"},
+          {"label": "Video Output", "value": "4:2:2\n4096 x 2160 up to 60.00 fps\n2048 x 1080p up to 60.00 fps"},
+          {"label": "Fast-/Slow-Motion Support", "value": "Yes"},
+          {"label": "Built-In Microphone", "value": "Stereo"},
+          {"label": "Audio Recording", "value": "2-Channel, 24-Bit at 48 kHz"},
+          {"label": "IP Streaming", "value": "MJPEG\n1920 x 1080 (5000.00 Mb/s)"}
+        ],
+        "Interface": [
+          {"label": "Media/Memory Card Slot", "value": "Single Slot: CFexpress Type B (CFexpress 2.0)"},
+          {"label": "Internal Storage", "value": "No"},
+          {"label": "Video I/O", "value": "1x BNC (12G-SDI) Output"},
+          {"label": "Audio I/O", "value": "1x 5-Pin LEMO Line Input on Camera Body"},
+          {"label": "Power I/O", "value": "1x LEMO 6-Pin (11 to 17VDC) Input"},
+          {"label": "Other I/O", "value": "1x 9-Pin (Genlock, GPI, Timecode)\n1x USB-C (Camera Interface) Control/Data/Video Input/Output\n1x RED Cable-Free Monitor Connection Output"},
+          {"label": "Wireless", "value": "Wi-Fi"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nApp Name: RED Control\nFunctionality: Remote Control"},
+          {"label": "Global Positioning (GPS, GLONASS, etc.)", "value": "No"}
+        ],
+        "Monitor": [
+          {"label": "Display Type", "value": "Primary Monitor: Fixed 2.9\" Touchscreen LCD"},
+          {"label": "Resolution", "value": "Primary Monitor: 1440 x 1440"}
+        ],
+        "Viewfinder": [
+          {"label": "Type", "value": "Optional, Not Included"}
+        ],
+        "Power": [
+          {"label": "Battery", "value": "V-Mount"}
+        ],
+        "Environmental": [
+          {"label": "Operating Conditions", "value": "32 to 104°F / 0 to 40°C"},
+          {"label": "Storage Conditions", "value": "-4 to 122°F / -20 to 50°C up to 85% Humidity"}
+        ],
+        "General": [
+          {"label": "Tripod Mount", "value": "1/4\"-20 Female (Bottom)\n3/8\"-16 Female (Bottom)"},
+          {"label": "Accessory Mounting Thread", "value": "4x 1/4\"-20\n4x M4"},
+          {"label": "Netflix Approved", "value": "Yes"},
+          {"label": "Materials", "value": "Aluminum"},
+          {"label": "Dimensions (W x H x D)", "value": "5.09 x 3.99 x 3.75\" / 129.37 x 101.26 x 95.26 mm"},
+          {"label": "Weight", "value": "2.62 lb / 1.19 kg (Body Only)"}
+        ],
+        "Packaging Info": [
+          {"label": "Package Weight", "value": "7.165 lb"},
+          {"label": "Box Dimensions (LxWxH)", "value": "13.2 x 9.8 x 6\""}
+        ]
+      }
     }
   ],
 
