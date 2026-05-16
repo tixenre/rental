@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
 import { LayoutGrid, List, ArrowRight, Search, X, Sparkles, Loader2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/rental/PublicLayout";
@@ -59,8 +60,22 @@ export const Route = createFileRoute("/")({
       { rel: "canonical", href: "https://ramblarental.com/" },
     ],
   }),
-  component: Index,
+  component: IndexOrMobile,
 });
+
+function IndexOrMobile() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)");
+    const onChange = () => setIsMobile(window.innerWidth < 768);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  if (isMobile) return <CatalogoMovil />;
+  return <Index />;
+}
 
 type Mode = "grid" | "list";
 
