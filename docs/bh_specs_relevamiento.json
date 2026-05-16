@@ -254,7 +254,7 @@
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Light Panel RGB",
       "marca": "Godox",
-      "modelo": "RGB Mini Creative M1 On-Camera Video LED Light (Gray) M1",
+      "modelo": "RGB Mini Creative M1 On-Camera Video LED Light (Gray)",
       "url_source": "https://www.bhphotovideo.com/c/product/1552705-REG/godox_rgb_mini_creative_m1.html",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-16)",
@@ -454,7 +454,7 @@
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Monolight",
       "marca": "Nanlite",
-      "modelo": "FC500B Bi-Color LED Spotlight FC500B B&amp;H Photo Video",
+      "modelo": "FC500B Bi-Color LED Spotlight",
       "url_source": "https://www.bhphotovideo.com/c/product/1779322-REG/nanlite_fc500b_fc_500_led_spotlight.html",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-16)",
@@ -640,7 +640,7 @@
       "categoria_raiz": "Iluminación",
       "subtipo": "COB LED Monolight RGB",
       "marca": "Amaran",
-      "modelo": "Ray 360c RGB LED Monolight MP00000191 B&amp;H Photo Video",
+      "modelo": "Ray 360c RGB LED Monolight",
       "url_source": "https://www.bhphotovideo.com/c/product/1930190-REG/amaran_mp00000191_ray_360c_rgb_led.html/specs",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-16)",
@@ -858,7 +858,7 @@
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Array LED Light Panel RGB",
       "marca": "Aputure",
-      "modelo": "NOVA II 2x1 Tunable Color LED Light Panel AP0400040J B&amp;H",
+      "modelo": "NOVA II 2x1 Tunable Color LED Light Panel",
       "url_source": "https://www.bhphotovideo.com/c/product/1920544-REG/aputure_ap0400040j_nova_ii_2x1_rgb.html",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-16)",
@@ -1072,7 +1072,7 @@
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Fresnel",
       "marca": "Mole-richardson",
-      "modelo": "JuniorLED 200W 8\" Fresnel with DMX 8941-50REV",
+      "modelo": "JuniorLED 200W 8\" Fresnel with DMX",
       "url_source": "https://www.bhphotovideo.com/c/product/979830-REG/mole_richardson_8941_50rev_junior_200w_8_junior.html",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-16)",
@@ -1260,7 +1260,7 @@
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Light Tube/Wand RGB",
       "marca": "Godox",
-      "modelo": "TL60 RGB LED Tube Light (2.5') TL60 B&amp;H Photo Video",
+      "modelo": "TL60 RGB LED Tube Light (2.5')",
       "url_source": "https://www.bhphotovideo.com/c/product/1611957-REG/godox_tl60_tube_light_2700_6500k.html",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-16)",
@@ -1478,7 +1478,7 @@
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Lamp",
       "marca": "Aputure",
-      "modelo": "Accent B7c LED RGBWW Light APC0146A7B B&amp;H Photo Video",
+      "modelo": "Accent B7c LED RGBWW Light",
       "url_source": "https://www.bhphotovideo.com/c/product/1595337-REG/aputure_aacbc7_accent_b7c_led_light.html",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-16)",
@@ -1542,7 +1542,7 @@
       "categoria_raiz": "Iluminación",
       "subtipo": "1 x",
       "marca": "Godox",
-      "modelo": "VL150 LED Video Light VL150 B&amp;H Photo Video",
+      "modelo": "VL150 LED Video Light",
       "url_source": "https://www.bhphotovideo.com/c/product/1513246-REG/godox_vl150_video_led_light.html?fromDisList=y",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-16)",
@@ -1734,11 +1734,217 @@
       }
     },
     {
+      "id": "godox_vl300ii",
+      "categoria_raiz": "Iluminación",
+      "subtipo": "COB LED Monolight",
+      "marca": "Godox",
+      "modelo": "VL300II Daylight LED Monolight (320W)",
+      "url_source": "https://www.bhphotovideo.com/c/product/1721572-REG/godox_vl300ii_series_300w_led.html/specs?fromDisList=y",
+      "status_bh": "Desconocido",
+      "fuente": "html guardado manual (2026-05-16)",
+      "secciones": {
+        "Key Specs": [
+          {
+            "label": "Item Type",
+            "value": "1x COB LED Monolight"
+          },
+          {
+            "label": "Included Storage Case",
+            "value": "Yes"
+          },
+          {
+            "label": "Photometrics at 3.3' / 1 m",
+            "value": "5600K: 1077 fc / 11,600 Lux"
+          },
+          {
+            "label": "Color Accuracy Standard",
+            "value": "CRI 96"
+          },
+          {
+            "label": "Dimming",
+            "value": "Controller Included"
+          },
+          {
+            "label": "Front Accessory Mount",
+            "value": "Bowens S"
+          },
+          {
+            "label": "Wireless Remote Control Type",
+            "value": "Bluetooth"
+          },
+          {
+            "label": "Power Source",
+            "value": "AC to DC Adapter (Included)"
+          },
+          {
+            "label": "Battery Plate Type",
+            "value": "2x V-Mount (Built-In)"
+          },
+          {
+            "label": "Battery",
+            "value": "2x V-Mount Rechargeable (Not Included)"
+          },
+          {
+            "label": "Input Power",
+            "value": "50 VDC at 6 A"
+          },
+          {
+            "label": "Power Consumption",
+            "value": "320 W  (Maximum)"
+          },
+          {
+            "label": "Fixture Mounting",
+            "value": "Support Mount"
+          }
+        ],
+        "Light Fixture": [
+          {
+            "label": "Item Type",
+            "value": "1x COB LED Monolight"
+          },
+          {
+            "label": "Included Storage Case",
+            "value": "Yes"
+          },
+          {
+            "label": "Photometrics",
+            "value": "5600K:"
+          },
+          {
+            "label": "Color Accuracy Standard",
+            "value": "CRI 96"
+          },
+          {
+            "label": "Dimming",
+            "value": "Controller Included"
+          },
+          {
+            "label": "Cooling System",
+            "value": "Fan"
+          },
+          {
+            "label": "Built-In Flash",
+            "value": "No"
+          },
+          {
+            "label": "Preprogrammed Effects",
+            "value": "Yes"
+          },
+          {
+            "label": "Umbrella Mount",
+            "value": "Yes"
+          },
+          {
+            "label": "Front Accessory Mount",
+            "value": "Bowens S"
+          }
+        ],
+        "Connectivity": [
+          {
+            "label": "Wireless Remote Control Type",
+            "value": "Bluetooth"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Wireless Channels",
+            "value": "32"
+          },
+          {
+            "label": "Wireless Groups",
+            "value": "16"
+          },
+          {
+            "label": "Wireless Frequency",
+            "value": "2.4 GHz"
+          }
+        ],
+        "Power & I/O": [
+          {
+            "label": "Power Source",
+            "value": "AC to DC Adapter (Included)"
+          },
+          {
+            "label": "Inputs/Outputs",
+            "value": "Light Fixture"
+          },
+          {
+            "label": "Battery Plate Type",
+            "value": "2x V-Mount (Built-In)"
+          },
+          {
+            "label": "Battery",
+            "value": "2x V-Mount Rechargeable, 14.8 VDC (Not Included)"
+          },
+          {
+            "label": "Input Power",
+            "value": "50 VDC at 6 A"
+          },
+          {
+            "label": "Included Adapter / Cable",
+            "value": "Yes"
+          },
+          {
+            "label": "Inline Switch",
+            "value": "No"
+          },
+          {
+            "label": "Power Pass-Thru",
+            "value": "No"
+          },
+          {
+            "label": "Power Consumption",
+            "value": "320 W  (Maximum)"
+          }
+        ],
+        "Mounting": [
+          {
+            "label": "Fixture Mounting",
+            "value": "Support Mount"
+          }
+        ],
+        "General": [
+          {
+            "label": "Display",
+            "value": "Yes"
+          },
+          {
+            "label": "Environmental Resistance",
+            "value": "No"
+          },
+          {
+            "label": "Operating Conditions",
+            "value": "14 to 104°F / -10 to 40°C"
+          },
+          {
+            "label": "Dimensions",
+            "value": "11.5 x 6.9 x 10.7\" / 29.2 x 27.2 x 17.6 cm (Fixture)"
+          },
+          {
+            "label": "Weight",
+            "value": "6.2 lb / 2.4 kg (Fixture)"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "21.9 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "22.9 x 12.2 x 10.8\""
+          }
+        ]
+      }
+    },
+    {
       "id": "nanlite_forza",
       "categoria_raiz": "Iluminación",
       "subtipo": "1 x",
       "marca": "Nanlite",
-      "modelo": "Forza 500 Daylight LED Monolight 12-2026 B&amp;H Photo Video",
+      "modelo": "Forza 500 Daylight LED Monolight",
       "url_source": "https://www.bhphotovideo.com/c/product/1476382-REG/nanlite_12_2026_forza_500_led_monolight.html?fromDisList=y",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-16)",
@@ -1944,7 +2150,7 @@
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Monolight",
       "marca": "Nanlite",
-      "modelo": "Forza 60B II Bi-Color LED Monolight FORZA60BII B&amp;H Photo",
+      "modelo": "Forza 60B II Bi-Color LED Monolight",
       "url_source": "https://www.bhphotovideo.com/c/product/1736656-REG/nanlite_forza60bii_forza_60b_ii_bi_color.html",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-16)",
@@ -2162,7 +2368,7 @@
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Monolight RGB",
       "marca": "Amaran",
-      "modelo": "300c RGB LED Monolight (Gray) AP30011A99 B&amp;H Photo Video",
+      "modelo": "300c RGB LED Monolight (Gray)",
       "url_source": "https://www.bhphotovideo.com/c/product/1762211-REG/amaran_ap30011a10_300c_rgb_led_monolight.html?fromDisList=y",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-16)",
@@ -2372,7 +2578,7 @@
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Light",
       "marca": "Godox",
-      "modelo": "V100 Flash for Sony V100S B&amp;H Photo Video",
+      "modelo": "V100 Flash for Sony V100S",
       "url_source": "https://www.bhphotovideo.com/c/product/1868006-REG/godox_v100s_v100_flash_for_sony.html",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-16)",
@@ -2516,8 +2722,8 @@
       "marca": "ARRI",
       "modelo": "650 Plus",
       "url_source": "https://www.arri.com/en/lighting/daylight-tungsten/tungsten/arri-junior/arri-650-plus",
-      "status_bh": "N/A — sitio fabricante",
-      "fuente": "ARRI oficial (web fetch + verificación visual screenshot)",
+      "status_bh": "N/A",
+      "fuente": "ARRI oficial",
       "secciones": {
         "Technical Data": [
           {
@@ -2652,24 +2858,18 @@
             "label": "Certifications",
             "value": "CE, UKCA, CB, GS, cNRTLus"
           }
-        ],
-        "_nota_ficha": [
-          {
-            "label": "Note",
-            "value": "*Weight and dimensions are rounded values."
-          }
         ]
       }
     },
     {
       "id": "molerichardson_1000w",
       "categoria_raiz": "Iluminación",
-      "subtipo": "Tungsten Fresnel Spotlight",
+      "subtipo": "Tungsten Fresnel",
       "marca": "Mole-Richardson",
       "modelo": "407 Baby Solarspot 1000W 6\"",
       "url_source": "https://www.mole.com/407-baby-solarspot",
-      "status_bh": "N/A — sitio fabricante",
-      "fuente": "Mole-Richardson oficial (web fetch)",
+      "status_bh": "N/A",
+      "fuente": "Mole oficial",
       "secciones": {
         "Technical Specifications": [
           {
@@ -2690,7 +2890,7 @@
           },
           {
             "label": "Lens",
-            "value": "Fresnel 6\" (152 mm), construcción de vidrio"
+            "value": "Fresnel 6\" (152 mm), vidrio"
           },
           {
             "label": "Field Angle",
@@ -2698,19 +2898,11 @@
           },
           {
             "label": "Reflector",
-            "value": "Alzak aluminum, sistema condensador con lente Fresnel"
-          },
-          {
-            "label": "Head Construction",
-            "value": "Aluminio liviano con canales verticales interbloqueados"
+            "value": "Alzak aluminum, condensador con lente Fresnel"
           },
           {
             "label": "Yoke",
-            "value": "Aluminio fundido, encaja en spud 5/8\" (16 mm) estándar"
-          },
-          {
-            "label": "Focusing Mechanism",
-            "value": "Paletas de acción rápida frente y atrás"
+            "value": "Aluminio fundido, spud 5/8\" (16 mm)"
           },
           {
             "label": "Finish",
@@ -2726,15 +2918,7 @@
           },
           {
             "label": "Cable",
-            "value": "25 ft, Type SO, 3 conductor #16/3 con Edison plug"
-          },
-          {
-            "label": "Switch",
-            "value": "Toggle, montado en lamp trough"
-          },
-          {
-            "label": "Standard Accessories",
-            "value": "Ninguno (barn doors, scrims, snoot, C-clamp se venden aparte)"
+            "value": "25 ft, Type SO, 3 cond #16/3 con Edison plug"
           }
         ]
       }

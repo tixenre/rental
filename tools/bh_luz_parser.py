@@ -17,6 +17,7 @@ Idempotente: si un producto (por id) ya existe en el JSON no lo pisa.
 Si se quiere re-procesar un producto, borrar su entrada primero.
 """
 
+import html
 import json
 import re
 import sys
@@ -131,9 +132,22 @@ _DIMENSION_RE = re.compile(r"^\d+x\d+$", re.IGNORECASE)
 _UNIT_SPEC_RE = re.compile(r"^\d+(?:\.\d+)?(?:W|V|A|K|kW|MHz|GHz|Hz|mm|cm|kg|g|lb|oz)$", re.IGNORECASE)
 
 
-def _strip_title_prefixes(title: str) -> str:
-    """Quita prefijos que no son parte del nombre del producto (ej. 'Used', 'Open Box')."""
-    return re.sub(r"^(?:used|open\s+box|refurbished|demo)\s+", "", title, flags=re.IGNORECASE)
+def _clean_title(title: str) -> str:
+    """Decodifica entities, quita prefijos (Used, Open Box) y sufijos B&H."""
+    title = html.unescape(title)
+    # Quitar prefijos
+    title = re.sub(r"^(?:used|open\s+box|refurbished|demo)\s+", "", title, flags=re.IGNORECASE)
+    # Quitar sufijos típicos de B&H/sitios (en orden de más específico a menos)
+    title = re.sub(r"\s+(?:B&H|BH)\s+Photo(?:\s+Video)?\s*$", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\s+Photo\s+Video\s*$", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\s+(?:B&H|BH)\.?\s*$", "", title, flags=re.IGNORECASE)
+    # Quitar SKU final con guiones (ej. "8941-50REV", "AP00000-191")
+    title = re.sub(r"\s+[A-Z0-9]+-[A-Z0-9-]+\s*$", "", title)
+    return title.strip()
+
+
+# Backwards compat
+_strip_title_prefixes = _clean_title
 
 
 def _extract_id(title: str) -> str:
@@ -186,13 +200,19 @@ def _extract_brand(title: str) -> str:
 
 
 def _extract_modelo(title: str) -> str:
-    """Todo el título menos la primera palabra (brand) y el SKU final si hay."""
+    """Todo el título menos la primera palabra (brand) y SKU duplicado al final."""
     words = title.strip().split()
     if len(words) <= 1:
         return title
+
     # Quitar último token si parece un SKU (todo mayúsculas+dígitos, ≥6 chars)
-    if re.fullmatch(r"[A-Z0-9]{6,}", words[-1]):
+    while words and re.fullmatch(r"[A-Z0-9]{6,}", words[-1]):
         words = words[:-1]
+
+    # Si el último token es igual a algún token previo (SKU/modelo repetido), quitarlo
+    if len(words) > 2 and words[-1].upper() in {w.upper() for w in words[1:-1]}:
+        words = words[:-1]
+
     return " ".join(words[1:])
 
 
@@ -257,15 +277,40 @@ def _parse_cri(secciones: dict) -> int | None:
     return None
 
 
-def _parse_temperatura(secciones: dict) -> str | None:
+def _parse_temperatura(secciones: dict, title: str = "") -> str | None:
     val = _find_value(secciones, "Color Temperature")
     if not val:
-        # Fallback: inferir desde Color Modes cuando es color fijo
         modes = (_find_value(secciones, "Color Modes") or "").strip()
-        if modes.lower() == "tungsten":
+        modes_lower = modes.lower()
+
+        # ¿Es multi-modo (RGB+bicolor)? Entonces la photometrics muestra valores
+        # puntuales que NO representan el rango real. Mejor devolver null.
+        is_multi_mode = (
+            "rgb" in modes_lower
+            or ("daylight" in modes_lower and "tungsten" in modes_lower)
+            or "," in modes  # múltiples modos
+        )
+
+        # Fallback 1: Color Modes con un solo color fijo
+        if modes_lower == "tungsten":
             return "3200K"
-        if modes.lower() == "daylight":
+        if modes_lower == "daylight":
             return "5600K"
+
+        # Fallback 2: solo si NO es multi-modo, usar prefijo de Photometrics
+        if not is_multi_mode:
+            photo = (_find_value(secciones, "Photometrics", "Photometrics at 3.3' / 1 m") or "")
+            m = re.search(r"\b(\d{4,5})K\s*:", photo)
+            if m:
+                return f"{m.group(1)}K"
+
+        # Fallback 3: keyword en título/item_type — solo para single-color obvios
+        item = (_find_value(secciones, "Item Type") or "").lower()
+        ctx = f"{title} {item}".lower()
+        if "daylight" in ctx and "bi-color" not in ctx and "rgb" not in ctx:
+            return "5600K"
+        if "tungsten" in ctx and "bi-color" not in ctx and "rgb" not in ctx:
+            return "3200K"
         return None
     # Tomar primera línea (puede haber varias para distintos modos)
     line = val.splitlines()[0].strip()
@@ -613,7 +658,7 @@ def map_luz_specs(secciones: dict, title: str = "") -> dict:
     if cri is not None:
         result["cri"] = cri
 
-    temperatura = _parse_temperatura(secciones)
+    temperatura = _parse_temperatura(secciones, title)
     if temperatura:
         result["temperatura_k"] = temperatura
 
@@ -650,7 +695,7 @@ def parse_html(path: Path) -> dict:
     # Extraer título con regex (más robusto que acumular en el parser)
     title_m = re.search(r"<title[^>]*>(.*?)</title>", content, re.IGNORECASE | re.DOTALL)
     title = title_m.group(1).strip() if title_m else path.stem
-    title = _strip_title_prefixes(title)
+    title = _clean_title(title)
 
     parser = BHSpecsParser()
     parser.feed(content)
