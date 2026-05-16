@@ -12,6 +12,7 @@
         "potencia_w": 120,
         "lux_at_1m_3200k": 3208,
         "cri": 95,
+        "tlci": 98,
         "temperatura_k": {
           "min": 2500,
           "max": 7500
@@ -34,25 +35,33 @@
         "peso_g": 390
       },
       "extras": {
-        "item_type": "1x LED Flexible Light",
-        "beam_angle": "180°",
+        "beam_angle": {
+          "min": 180.0,
+          "max": 180.0
+        },
         "cooling": "Passive",
-        "photometrics_1m": "3200K: 298 fc / 3208 Lux",
-        "display": "OLED",
-        "app_compatible": true,
-        "modificador_incluido": "1x Softbox with Removable Grid",
-        "case_incluido": "Yes",
-        "vida_util_horas": "50,000 Hours",
-        "fixture_mount": "1x 5/8\" Receiver",
-        "wireless_range": "262.5' / 80 m (Bluetooth)",
-        "io": "1x USB-C DMX Input",
-        "materiales": "Plastic (Housing)",
-        "certificaciones": "CE",
         "dimensiones_cm": {
           "largo_cm": 60.0,
           "ancho_cm": 30.0,
           "alto_cm": 0.5
-        }
+        },
+        "display": "OLED",
+        "app_compatible": true,
+        "ssi": {
+          "at_5600k": 81
+        },
+        "photometrics_full": [
+          "3200K: 298 fc / 3208 Lux",
+          "5600K: 340 fc / 3670 Lux"
+        ],
+        "wireless_range_m": 80,
+        "vida_util_h": 50000,
+        "modificador_incluido": "1x Softbox with Removable Grid",
+        "case_incluido": "Yes",
+        "fixture_mount": "1x 5/8\" Receiver",
+        "io": "1x USB-C DMX Input",
+        "materiales": "Plastic (Housing)",
+        "certificaciones": "CE"
       },
       "ficha": {
         "Key Specs": [
@@ -291,6 +300,7 @@
         "tipo": "Panel",
         "potencia_w": 13,
         "cri": 97,
+        "tlci": 97,
         "temperatura_k": {
           "min": 2500,
           "max": 8500
@@ -307,18 +317,20 @@
         "peso_g": 240
       },
       "extras": {
-        "item_type": "1x LED Light Panel",
         "cooling": "Passive",
-        "display": "LCD",
-        "case_incluido": "Yes",
-        "fixture_mount": "Multiple x 1/4\"-20 Female Thread",
-        "io": "1x USB-C Power Input",
-        "materiales": "Aluminum (Housing)",
         "dimensiones_cm": {
           "largo_cm": 14.5,
           "ancho_cm": 7.0,
           "alto_cm": 1.5
-        }
+        },
+        "display": "LCD",
+        "photometrics_full": [
+          "Not Specified by Manufacturer"
+        ],
+        "case_incluido": "Yes",
+        "fixture_mount": "Multiple x 1/4\"-20 Female Thread",
+        "io": "1x USB-C Power Input",
+        "materiales": "Aluminum (Housing)"
       },
       "ficha": {
         "Key Specs": [
@@ -511,6 +523,7 @@
         "tipo": "Monolight",
         "potencia_w": 520,
         "cri": 96,
+        "tlci": 98,
         "temperatura_k": {
           "min": 2700,
           "max": 6500
@@ -530,20 +543,27 @@
         "peso_g": 3160
       },
       "extras": {
-        "item_type": "1x LED Monolight",
-        "beam_angle": "120°",
+        "beam_angle": {
+          "min": 120.0,
+          "max": 120.0
+        },
         "cooling": "Fan",
-        "photometrics_1m": "2700K: 1516 fc / 16,320 Lux",
-        "display": "Yes",
-        "app_compatible": true,
-        "case_incluido": "Yes",
-        "yoke": "Manually-Operated Yoke",
-        "fixture_mount": "1x 5/8\" Receiver (Via Yoke Mount)",
         "dimensiones_cm": {
           "largo_cm": 37.31,
           "ancho_cm": 24.64,
           "alto_cm": 14.91
-        }
+        },
+        "display": "Yes",
+        "app_compatible": true,
+        "photometrics_full": [
+          "2700K: 1516 fc / 16,320 Lux",
+          "3200K: 1640 fc / 17,660 Lux",
+          "5600K: 1961 fc / 21,110 Lux",
+          "6500K: 1846 fc / 19,880 Lux"
+        ],
+        "case_incluido": "Yes",
+        "yoke": "Manually-Operated Yoke",
+        "fixture_mount": "1x 5/8\" Receiver (Via Yoke Mount)"
       },
       "ficha": {
         "Key Specs": [
@@ -732,6 +752,7 @@
         "lumens_at_5600k": 23174,
         "lux_at_1m_3200k": 15900,
         "cri": 95,
+        "tlci": 95,
         "temperatura_k": {
           "min": 1800,
           "max": 20000
@@ -753,23 +774,40 @@
         "peso_g": 3300
       },
       "extras": {
-        "item_type": "1x COB LED Monolight",
-        "beam_angle": "70°",
+        "beam_angle": {
+          "min": 70.0,
+          "max": 70.0
+        },
         "cooling": "Fan",
         "ip_rating": "IP54",
-        "photometrics_1m": "70° at 3200K: 1477 fc / 15,900 Lux (Unmodified)",
-        "display": "LCD",
-        "app_compatible": true,
-        "modificador_incluido": "1x Reflector",
-        "case_incluido": "Yes",
-        "fixture_mount": "1x 5/8\" Receiver (Via Swivel Mount)",
-        "wireless_range": "262.5' / 80 m (Bluetooth)",
-        "io": "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)",
         "dimensiones_cm": {
           "largo_cm": 25.5,
           "ancho_cm": 16.51,
           "alto_cm": 14.81
-        }
+        },
+        "display": "LCD",
+        "app_compatible": true,
+        "tm30_rf": 94,
+        "tm30_rg": 100,
+        "ssi": {
+          "at_5600k": 80,
+          "at_3200k": 87
+        },
+        "color_temp_ranges": [
+          "1800 to 20,000K",
+          "2300 to 10,000K"
+        ],
+        "photometrics_full": [
+          "70° at 3200K: 1477 fc / 15,900 Lux (Unmodified)",
+          "45° at 3200K: 3883 fc / 41,800 Lux (with Reflector)",
+          "70° at 5600K: 1583 fc / 17,040 Lux (Unmodified)",
+          "45° at 5600K: 4143 fc / 44,600 Lux (with Reflector)"
+        ],
+        "wireless_range_m": 80,
+        "modificador_incluido": "1x Reflector",
+        "case_incluido": "Yes",
+        "fixture_mount": "1x 5/8\" Receiver (Via Swivel Mount)",
+        "io": "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)"
       },
       "ficha": {
         "Key Specs": [
@@ -989,6 +1027,7 @@
         "potencia_w": 1000,
         "lux_at_1m_3200k": 194400,
         "cri": 95,
+        "tlci": 95,
         "temperatura_k": {
           "min": 1800,
           "max": 20000
@@ -1011,23 +1050,36 @@
         "peso_g": 16250
       },
       "extras": {
-        "item_type": "1x LED Array LED Light Panel",
-        "beam_angle": "35°",
+        "beam_angle": {
+          "min": 35.0,
+          "max": 35.0
+        },
         "cooling": "Fan",
         "ip_rating": "IP65",
-        "photometrics_1m": "35° at 3200K: 18,059 fc / 194,400 Lux (Unmodified)",
-        "display": "Yes",
-        "app_compatible": true,
-        "modificador_incluido": "1x Diffuser",
-        "yoke": "Manually-Operated Yoke",
-        "fixture_mount": "1x 1-1/8\" Stud (Via Yoke Mount)",
-        "wireless_range": "328.1' / 100 m",
-        "io": "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)",
         "dimensiones_cm": {
           "largo_cm": 69.1,
           "ancho_cm": 38.9,
           "alto_cm": 13.7
-        }
+        },
+        "display": "Yes",
+        "app_compatible": true,
+        "tm30_rf": 95,
+        "tm30_rg": 100,
+        "ssi": {
+          "at_3200k": 90,
+          "at_5600k": 86
+        },
+        "photometrics_full": [
+          "35° at 3200K: 18,059 fc / 194,400 Lux (Unmodified)",
+          "35° at 5600K: 18,329 fc / 197,300 Lux (Unmodified)",
+          "95° at 3200K: 3725 fc / 40,100 Lux (with Diffuser)",
+          "95° at 5600K: 3781 fc / 40,700 Lux (with Diffuser)"
+        ],
+        "wireless_range_m": 100,
+        "modificador_incluido": "1x Diffuser",
+        "yoke": "Manually-Operated Yoke",
+        "fixture_mount": "1x 1-1/8\" Stud (Via Yoke Mount)",
+        "io": "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)"
       },
       "ficha": {
         "Key Specs": [
@@ -1258,21 +1310,26 @@
         "peso_g": 6400
       },
       "extras": {
-        "item_type": "1x LED Fresnel",
-        "beam_angle": "13-54°",
+        "beam_angle": {
+          "min": 13.0,
+          "max": 54.0
+        },
         "cooling": "Passive",
         "ip_rating": "IP30",
-        "photometrics_1m": "Flood Beam at 3200K: 1394 fc / 15,016 Lux",
-        "yoke": "Manually-Operated Yoke",
-        "fixture_mount": "1x 1-1/8\" Stud (Via Yoke Mount)",
-        "io": "1x powerCON Power Input",
-        "materiales": "Aluminum, Steel (Housing)",
-        "certificaciones": "RoHS",
         "dimensiones_cm": {
           "largo_cm": 52.3,
           "ancho_cm": 35.6,
           "alto_cm": 30.5
-        }
+        },
+        "photometrics_full": [
+          "Flood Beam at 3200K: 1394 fc / 15,016 Lux",
+          "Spot Beam at 3200K: 4049 fc / 43,594 Lux"
+        ],
+        "yoke": "Manually-Operated Yoke",
+        "fixture_mount": "1x 1-1/8\" Stud (Via Yoke Mount)",
+        "io": "1x powerCON Power Input",
+        "materiales": "Aluminum, Steel (Housing)",
+        "certificaciones": "RoHS"
       },
       "ficha": {
         "Key Specs": [
@@ -1462,6 +1519,7 @@
         "potencia_w": 18,
         "lux_at_1m_5600k": 421,
         "cri": 96,
+        "tlci": 98,
         "temperatura_k": {
           "min": 2700,
           "max": 6500
@@ -1484,19 +1542,20 @@
         "peso_g": 726
       },
       "extras": {
-        "item_type": "1x LED Light Tube/Wand",
         "cooling": "Passive",
-        "photometrics_1m": "5600K: 39 fc / 421 Lux",
-        "display": "LCD",
-        "app_compatible": true,
-        "case_incluido": "Yes",
-        "fixture_mount": "2x 1/4\"-20 Female Thread (Via Mounting Clip)",
-        "wireless_range": "98.4' / 30 m (Bluetooth)",
-        "io": "1x Barrel / Coax Power Input (20 VDC at 2.4 A)",
         "dimensiones_cm": {
           "largo_cm": 75.0,
           "ancho_cm": 4.8
-        }
+        },
+        "display": "LCD",
+        "app_compatible": true,
+        "photometrics_full": [
+          "5600K: 39 fc / 421 Lux"
+        ],
+        "wireless_range_m": 30,
+        "case_incluido": "Yes",
+        "fixture_mount": "2x 1/4\"-20 Female Thread (Via Mounting Clip)",
+        "io": "1x Barrel / Coax Power Input (20 VDC at 2.4 A)"
       },
       "ficha": {
         "Key Specs": [
@@ -1732,7 +1791,6 @@
         "peso_g": 210
       },
       "extras": {
-        "item_type": "1x  LED Lamp",
         "base_type": "E26/E27",
         "dimensiones_cm": {
           "largo_cm": 11.5,
@@ -1780,9 +1838,7 @@
           {
             "label": "Maximum Overall Diameter (MOD)",
             "value": "2.74\" / 69.6 mm"
-          }
-        ],
-        "Packaging Info": [
+          },
           {
             "label": "Package Weight",
             "value": "0.915 lb"
@@ -1802,6 +1858,7 @@
         "tipo": "Monolight",
         "potencia_w": 150,
         "cri": 96,
+        "tlci": 95,
         "temperatura_k": {
           "min": 5600,
           "max": 5600
@@ -1821,13 +1878,13 @@
       },
       "extras": {
         "cooling": "Fan",
-        "display": "LED",
-        "yoke": "Manually-Operated Yoke",
         "dimensiones_cm": {
           "largo_cm": 21.0,
           "ancho_cm": 11.5,
           "alto_cm": 3.6
-        }
+        },
+        "display": "LED",
+        "yoke": "Manually-Operated Yoke"
       },
       "ficha": {
         "Key Specs": [
@@ -1981,6 +2038,7 @@
         "potencia_w": 320,
         "lux_at_1m_5600k": 11600,
         "cri": 96,
+        "tlci": 96,
         "temperatura_k": {
           "min": 5600,
           "max": 5600
@@ -2001,18 +2059,19 @@
         "peso_g": 2400
       },
       "extras": {
-        "item_type": "1x COB LED Monolight",
         "cooling": "Fan",
-        "photometrics_1m": "5600K: 1077 fc / 11,600 Lux",
-        "display": "Yes",
-        "app_compatible": true,
-        "case_incluido": "Yes",
-        "fixture_mount": "Support Mount",
         "dimensiones_cm": {
           "largo_cm": 29.2,
           "ancho_cm": 27.2,
           "alto_cm": 17.6
-        }
+        },
+        "display": "Yes",
+        "app_compatible": true,
+        "photometrics_full": [
+          "5600K: 1077 fc / 11,600 Lux"
+        ],
+        "case_incluido": "Yes",
+        "fixture_mount": "Support Mount"
       },
       "ficha": {
         "Key Specs": [
@@ -2238,15 +2297,23 @@
         "peso_g": 2490
       },
       "extras": {
-        "beam_angle": "55°",
+        "beam_angle": {
+          "min": 55.0,
+          "max": 55.0
+        },
         "cooling": "Fan",
-        "display": "Yes",
-        "yoke": "Manually-Operated Yoke",
         "dimensiones_cm": {
           "largo_cm": 30.7,
           "ancho_cm": 20.6,
           "alto_cm": 14.2
-        }
+        },
+        "display": "Yes",
+        "photometrics_full": [
+          ":",
+          "8672 fc / 93,350 Lux at 3.3' / 1 m (with Reflector)*",
+          "*Standardized Measurement Supplied by the Manufacturer"
+        ],
+        "yoke": "Manually-Operated Yoke"
       },
       "ficha": {
         "Key Specs": [
@@ -2414,6 +2481,7 @@
         "potencia_w": 72,
         "lux_at_1m_3200k": 2235,
         "cri": 96,
+        "tlci": 98,
         "temperatura_k": {
           "min": 2700,
           "max": 6500
@@ -2435,21 +2503,28 @@
         "peso_g": 680
       },
       "extras": {
-        "item_type": "1x LED Monolight",
-        "beam_angle": "45°",
+        "beam_angle": {
+          "min": 45.0,
+          "max": 45.0
+        },
         "cooling": "Fan",
-        "photometrics_1m": "3200K: 207 fc / 2235 Lux",
-        "display": "OLED",
-        "app_compatible": true,
-        "case_incluido": "Yes",
-        "yoke": "Manually-Operated Yoke",
-        "fixture_mount": "Support Mount",
-        "io": "1x Barrel / Coax Power Input",
         "dimensiones_cm": {
           "largo_cm": 19.8,
           "ancho_cm": 10.4,
           "alto_cm": 8.4
-        }
+        },
+        "display": "OLED",
+        "app_compatible": true,
+        "photometrics_full": [
+          "3200K: 207 fc / 2235 Lux",
+          "5600K: 239 fc / 2577 Lux",
+          "55° at 3200K: 1130 fc / 12,170 Lux (with Reflector)",
+          "55° at 5600K: 1333 fc / 14,350 Lux (with Reflector)"
+        ],
+        "case_incluido": "Yes",
+        "yoke": "Manually-Operated Yoke",
+        "fixture_mount": "Support Mount",
+        "io": "1x Barrel / Coax Power Input"
       },
       "ficha": {
         "Key Specs": [
@@ -2670,6 +2745,7 @@
         "lumens_at_5600k": 19389,
         "lux_at_1m_3200k": 7520,
         "cri": 95,
+        "tlci": 95,
         "temperatura_k": {
           "min": 2500,
           "max": 7500
@@ -2691,21 +2767,34 @@
         "peso_g": 2600
       },
       "extras": {
-        "item_type": "1x LED Monolight",
-        "beam_angle": "90°",
+        "beam_angle": {
+          "min": 90.0,
+          "max": 90.0
+        },
         "cooling": "Fan",
-        "photometrics_1m": "90° at 3200K: 698 fc / 7520 Lux",
-        "display": "LCD",
-        "app_compatible": true,
-        "case_incluido": "Yes",
-        "fixture_mount": "1x 5/8\" Receiver",
-        "wireless_range": "328.1' / 100 m (Bluetooth)",
-        "io": "1x XLR 3-Pin Power Input",
         "dimensiones_cm": {
           "largo_cm": 25.1,
           "ancho_cm": 24.9,
           "alto_cm": 19.3
-        }
+        },
+        "display": "LCD",
+        "app_compatible": true,
+        "tm30_rf": 92,
+        "tm30_rg": 100,
+        "ssi": {
+          "at_3200k": 83,
+          "at_5600k": 71
+        },
+        "photometrics_full": [
+          "90° at 3200K: 698 fc / 7520 Lux",
+          "90° at 5600K: 870 fc / 9370 Lux",
+          "65° at 3200K: 1987 fc / 21,390 Lux (with Reflector)",
+          "65° at 5600K: 2469 fc / 26,580 Lux (with Reflector)"
+        ],
+        "wireless_range_m": 100,
+        "case_incluido": "Yes",
+        "fixture_mount": "1x 5/8\" Receiver",
+        "io": "1x XLR 3-Pin Power Input"
       },
       "ficha": {
         "Key Specs": [
@@ -2914,22 +3003,22 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1868006-REG/godox_v100s_v100_flash_for_sony.html",
       "specs": {
         "tipo": "Flash",
+        "color_modes": [
+          "Daylight"
+        ],
         "dimming": false,
         "alimentacion": [
           "AC"
         ],
-        "peso_g": 635,
-        "color_modes": [
-          "Daylight"
-        ]
+        "peso_g": 635
       },
       "extras": {
-        "app_compatible": false,
         "dimensiones_cm": {
           "largo_cm": 7.59,
           "ancho_cm": 20.6,
           "alto_cm": 7.14
-        }
+        },
+        "app_compatible": false
       },
       "ficha": {
         "Key Specs": [
@@ -3079,22 +3168,27 @@
         "peso_g": 3000
       },
       "extras": {
-        "item_type": "Tungsten Fresnel",
         "bulb_type": "GY9.5 — CP89 FRL/FRK 650W (acepta CP82 500W / CP81 300W)",
-        "beam_angle": "12-52°",
+        "beam_angle": {
+          "min": 12.0,
+          "max": 52.0
+        },
         "cooling": "Passive",
         "ip_rating": "IP20",
-        "fixture_mount": "Socket 5/8\" (16 mm)",
-        "accessory_diameter": "168 mm / 6.6\"",
-        "voltaje": "230 V / 120 V",
-        "certificaciones": "CE, UKCA, CB, GS, cNRTLus",
-        "reflector": "Esférico especular de aluminio de alta pureza",
-        "serie": "ARRI Junior",
         "dimensiones_cm": {
           "largo_cm": 30.0,
           "ancho_cm": 22.0,
           "alto_cm": 19.0
-        }
+        },
+        "voltaje_v": [
+          120,
+          230
+        ],
+        "fixture_mount": "Socket 5/8\" (16 mm)",
+        "accessory_diameter": "168 mm / 6.6\"",
+        "certificaciones": "CE, UKCA, CB, GS, cNRTLus",
+        "reflector": "Esférico especular de aluminio de alta pureza",
+        "serie": "ARRI Junior"
       },
       "ficha": {
         "Technical Data": [
@@ -3257,19 +3351,24 @@
         "peso_g": 6240
       },
       "extras": {
-        "item_type": "Tungsten Fresnel Spotlight",
         "bulb_type": "Medium Bi-post (1000W tungsten)",
-        "beam_angle": "15-58°",
+        "beam_angle": {
+          "min": 15.0,
+          "max": 58.0
+        },
         "cooling": "Passive",
-        "fixture_mount": "Yoke con spud 5/8\" (16 mm)",
-        "accessory_diameter": "6 5/8\" (168 mm)",
-        "cable_length": "25 ft (7.6 m) Type SO",
-        "voltaje": "120 / 240 VAC",
         "dimensiones_cm": {
           "largo_cm": 28.6,
           "ancho_cm": 21.9,
           "alto_cm": 26.7
-        }
+        },
+        "voltaje_v": [
+          120,
+          240
+        ],
+        "fixture_mount": "Yoke con spud 5/8\" (16 mm)",
+        "accessory_diameter": "6 5/8\" (168 mm)",
+        "cable_length": "25 ft (7.6 m) Type SO"
       },
       "ficha": {
         "Technical Specifications": [
