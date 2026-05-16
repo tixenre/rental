@@ -980,6 +980,8 @@ export const adminApi = {
       matched_count: number;
       unmatched_count: number;
       equipos_con_raw_json: number;
+      equipos_scrapeables_pendientes: number;
+      equipos_total: number;
       last_observed_at: string | null;
     }>("/api/admin/specs/observatorio/stats"),
   observatorioAgregado: (params: {
