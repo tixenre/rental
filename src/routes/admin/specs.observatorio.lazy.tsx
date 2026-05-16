@@ -168,7 +168,7 @@ function ObservatorioPage() {
       </header>
 
       {/* Stats */}
-      <section className="grid grid-cols-2 md:grid-cols-5 gap-2">
+      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         <StatCard
           label="Observaciones"
           value={stats?.total_obs ?? "—"}
@@ -177,7 +177,19 @@ function ObservatorioPage() {
         <StatCard
           label="Equipos cubiertos"
           value={stats?.equipos_cubiertos ?? "—"}
-          hint={`${stats?.equipos_con_raw_json ?? "—"} tienen raw_json`}
+          hint={
+            stats
+              ? `${stats.equipos_con_raw_json}/${stats.equipos_total} con raw_json`
+              : undefined
+          }
+        />
+        <StatCard
+          label="Pendientes scrape"
+          value={stats?.equipos_scrapeables_pendientes ?? "—"}
+          hint="Tienen bh_url pero falta scrapear"
+          tone={
+            stats && stats.equipos_scrapeables_pendientes > 0 ? "warn" : undefined
+          }
         />
         <StatCard
           label="Labels únicos"

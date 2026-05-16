@@ -348,6 +348,29 @@ def stats_observatorio(request: Request) -> dict:
         ).fetchone()
         raw_d = row_to_dict(equipos_con_raw) if not isinstance(equipos_con_raw, dict) else (equipos_con_raw or {})
 
+        # Equipos scrapeables pero todavía no scrapeados: tienen bh_url
+        # cargada pero `equipo_fichas.raw_json` está vacío o no existe.
+        # Si querés más data en el observatorio, hay que correr
+        # batch-enriquecer sobre estos.
+        equipos_pendientes = conn.execute(
+            """
+            SELECT COUNT(*) AS n
+            FROM equipos e
+            LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
+            WHERE e.eliminado_at IS NULL
+              AND e.bh_url IS NOT NULL
+              AND TRIM(e.bh_url) <> ''
+              AND (ef.raw_json IS NULL OR TRIM(ef.raw_json) = '')
+            """
+        ).fetchone()
+        pend_d = row_to_dict(equipos_pendientes) if not isinstance(equipos_pendientes, dict) else (equipos_pendientes or {})
+
+        # Total de equipos activos (para contextualizar los demás counts).
+        total_eq = conn.execute(
+            "SELECT COUNT(*) AS n FROM equipos WHERE eliminado_at IS NULL"
+        ).fetchone()
+        total_d = row_to_dict(total_eq) if not isinstance(total_eq, dict) else (total_eq or {})
+
         return {
             "total_obs": d.get("total_obs", 0) or 0,
             "equipos_cubiertos": d.get("equipos_cubiertos", 0) or 0,
@@ -355,6 +378,8 @@ def stats_observatorio(request: Request) -> dict:
             "matched_count": d.get("matched_count", 0) or 0,
             "unmatched_count": d.get("unmatched_count", 0) or 0,
             "equipos_con_raw_json": raw_d.get("n", 0) or 0,
+            "equipos_scrapeables_pendientes": pend_d.get("n", 0) or 0,
+            "equipos_total": total_d.get("n", 0) or 0,
             "last_observed_at": last_d.get("last_obs"),
         }
     finally:
