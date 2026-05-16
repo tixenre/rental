@@ -342,69 +342,88 @@
       "fuente": "screenshot manual del dueño (16-may-2026)",
       "secciones": {
         "Key Specs": [
-          {"label": "Image Sensor", "value": "Full Frame"},
-          {"label": "Effective Sensor Resolution", "value": "[ilegible en screenshot]"},
-          {"label": "Sensor Autofocus", "value": "[ilegible en screenshot]"},
-          {"label": "Max Recording Frame Rate", "value": "[ilegible en screenshot — compound multi-format]"},
-          {"label": "Max Video Output", "value": "[ilegible en screenshot]"},
-          {"label": "Media/Memory Card Slot", "value": "Dual Slot (CFexpress Type A / SDXC)"},
+          {"label": "Image Sensor", "value": "Full-Frame"},
+          {"label": "Effective Sensor Resolution", "value": "10.2 Megapixel"},
+          {"label": "Image Stabilization", "value": "Sensor-Shift"},
+          {"label": "ISO/Gain Sensitivity", "value": "Native: 80 to 102,400 (80 to 409,600 Extended)"},
+          {"label": "Max Recording Modes", "value": "MPEG-4 AVC/XAVC S-I 4:2:2 10-Bit\nUp to DCI 4K up to 23.98/24.00/29.97/48.00/59.94 fps\nH.265 Long GOP/XAVC HS 4:2:2 10-Bit\n(ver Internal Recording para lista completa)"},
+          {"label": "Max Video Output", "value": "Raw 16-Bit\nUp to 4.2K at 23.98/25/50/59.94 fps"},
+          {"label": "Media/Memory Card Slot", "value": "Dual Slot: CFexpress Type A / SDXC"},
           {"label": "Video I/O", "value": "HDMI"},
-          {"label": "Sync Input/Output", "value": "[ilegible en screenshot]"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS"},
           {"label": "Battery", "value": "NP-FZ100"}
         ],
         "Imaging": [
-          {"label": "Image Sensor Format", "value": "Full Frame"},
-          {"label": "Effective Sensor Resolution", "value": "[ilegible en screenshot]"},
-          {"label": "Image Stabilization", "value": "[ilegible en screenshot]"},
+          {"label": "Lens Communication", "value": "Yes: with Autofocus Support"},
+          {"label": "Image Sensor", "value": "35.6 x 23.8 mm (Full-Frame) CMOS"},
+          {"label": "Effective Sensor Resolution", "value": "Effective: 10.2 Megapixel\nActual: 12.1 Megapixel"},
+          {"label": "Image Stabilization", "value": "Sensor-Shift, 5-Axis"},
           {"label": "Built-In ND Filter", "value": "No"},
-          {"label": "Built-In Flash", "value": "No"},
-          {"label": "Capture Type", "value": "Video"}
+          {"label": "Built-In CC Filter", "value": "No"},
+          {"label": "Internal Filter Holder", "value": "No"},
+          {"label": "Capture Type", "value": "Stills & Video"}
         ],
         "Exposure Control": [
-          {"label": "Shutter Type", "value": "[ilegible en screenshot]"},
-          {"label": "Shutter Speed", "value": "[ilegible en screenshot]"},
-          {"label": "Minimum ISO", "value": "[ilegible en screenshot]"},
-          {"label": "Expanded ISO Range", "value": "[ilegible en screenshot]"},
-          {"label": "White Balance", "value": "[ilegible en screenshot]"}
+          {"label": "Shutter Type", "value": "Mechanical Focal Plane Shutter and Electronic Rolling Shutter"},
+          {"label": "Shutter Speed", "value": "1/8000 to 1/4 Second"},
+          {"label": "ISO/Gain Sensitivity", "value": "Native: 80 to 102,400 (80 to 409,600 Extended)"},
+          {"label": "Signal-to-Noise Ratio", "value": "Not Specified by Manufacturer"},
+          {"label": "Advertised Dynamic Range", "value": "15 Stops"},
+          {"label": "White Balance", "value": "Range: 2500 to 9900K\nPresets: Auto, Cloudy, Daylight, Flash, Fluorescent, Incandescent, Shade, Underwater"}
         ],
         "Focus": [
-          {"label": "Focus Mode", "value": "Automatic / Continuous / Manual"},
-          {"label": "Autofocus Points", "value": "[ilegible en screenshot]"}
+          {"label": "Focus Mode", "value": "Automatic, Continuous-Servo AF, Direct Manual Focus, Manual Focus"},
+          {"label": "Autofocus Points", "value": "Phase Detection: 759"}
         ],
         "Video Capture": [
-          {"label": "Video Recording", "value": "[ilegible en screenshot — compound multi-format XAVC-HS/XAVC-S/XAVC-I con múltiples resoluciones y fps]"},
-          {"label": "Video Format", "value": "[ilegible en screenshot]"},
-          {"label": "Color Space", "value": "[ilegible en screenshot]"}
+          {"label": "Internal Recording", "value": "MPEG-4 AVC/XAVC S-I 4:2:2 10-Bit\n4096 x 2160 up to 23.98/24.00/29.97/48.00/59.94 fps\n3840 x 2160 up to 23.98/25/29.97/59.94/100/120 fps (240 to 600 Mb/s)\n1920 x 1080p up to 23.98/25/29.97/50/59.94/100/120/200/240 fps (89 to 222 Mb/s)\nH.265 Long GOP/XAVC HS 4:2:2 10-Bit\n3840 x 2160 up to 23.98/25/29.97/50/59.94/100/120 fps (50 to 280 Mb/s)\nH.265 Long GOP/XAVC HS 4:2:0 10-Bit\n3840 x 2160 up to 23.98/25/29.97/50/59.94/100/120 fps (30 to 150 Mb/s)\nMPEG-4 AVC/XAVC S 4:2:2 10-Bit\n3840 x 2160 up to 23.98/25/29.97/50/59.94/100/120 fps (100 to 280 Mb/s)\n1920 x 1080p up to 23.98/25/29.97/50/59.94/100/120/200/240 fps (50 Mb/s)\nMPEG-4 AVC/XAVC S 4:2:0 8-Bit\n3840 x 2160 up to 23.98/25/29.97/50/59.94/100/120 fps (60 to 200 Mb/s)\n1920 x 1080p up to 23.98/25/29.97/50/59.94/100/120/200/240 fps (16 to 100 Mb/s)\nXAVC Proxy\n1920 x 1080 (9 to 16 Mb/s)\n1280 x 720 (6 Mb/s)"},
+          {"label": "Video Output", "value": "Raw 16-Bit\n4264 x 2408 at 23.98/25/50/59.94 fps\n3840 x 2160 at 23.98/25/50/59.94 fps\n1920 x 1080p at 23.98/25/50/59.94 fps\n1920 x 1080i at 50/59.94 fps"},
+          {"label": "Fast-/Slow-Motion Support", "value": "Yes"},
+          {"label": "Gamma Curve", "value": "HDR-HLG, S Cinetone, Sony S-Log 2, Sony S-Log 3, Standard"},
+          {"label": "Audio Recording", "value": "4-Channel, 24-Bit via LPCM Audio\n2-Channel, 24-Bit via LPCM Audio"},
+          {"label": "IP Streaming", "value": "Yes"}
         ],
         "Interface": [
-          {"label": "Memory/Recording Card Slot", "value": "Dual Slot (CFexpress Type A / SDXC)"},
+          {"label": "Media/Memory Card Slot", "value": "Dual Slot: CFexpress Type A / SDXC"},
           {"label": "Internal Storage", "value": "No"},
-          {"label": "USB", "value": "[ilegible en screenshot]"},
-          {"label": "HDMI I/O", "value": "1x HDMI"},
-          {"label": "Audio I/O", "value": "[ilegible en screenshot]"},
-          {"label": "Network", "value": "[ilegible en screenshot]"},
-          {"label": "Mobile App Compatible", "value": "[ilegible en screenshot]"}
+          {"label": "Video I/O", "value": "1x HDMI Output"},
+          {"label": "Audio I/O", "value": "1x 1/8\" / 3.5 mm TRS Stereo Microphone Input\n1x 1/8\" / 3.5 mm TRS Stereo Headphone Output"},
+          {"label": "Power I/O", "value": "1x USB-C Input"},
+          {"label": "Other I/O", "value": "1x Micro-USB"},
+          {"label": "Wireless", "value": "Wi-Fi 5 (802.11ac) / Bluetooth"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nApp Name: Creators' App"},
+          {"label": "Global Positioning (GPS, GLONASS, etc.)", "value": "No"}
         ],
         "Monitor": [
-          {"label": "Display Type", "value": "[ilegible en screenshot]"},
-          {"label": "Tilt", "value": "[ilegible en screenshot]"}
+          {"label": "Display Type", "value": "Primary Monitor: 180° Tilting 3\" Touchscreen LCD"}
+        ],
+        "Viewfinder": [
+          {"label": "Type", "value": "Optional, Not Included"}
         ],
         "Power": [
           {"label": "Battery", "value": "NP-FZ100"},
-          {"label": "Power Consumption", "value": "[ilegible en screenshot]"}
+          {"label": "Power Consumption", "value": "7.3 W"}
         ],
         "Environmental": [
-          {"label": "Operating Conditions", "value": "[ilegible en screenshot]"},
-          {"label": "Storage Conditions", "value": "[ilegible en screenshot]"}
+          {"label": "Operating Conditions", "value": "32 to 104°F / 0 to 40°C"},
+          {"label": "Storage Conditions", "value": "-4 to 140°F / -20 to 60°C"}
+        ],
+        "General": [
+          {"label": "Shoe Mount", "value": "1x Intelligent Hot Shoe"},
+          {"label": "Tripod Mount", "value": "1/4\"-20 Female"},
+          {"label": "Accessory Mounting Thread", "value": "5x 1/4\"-20 on Camera Body\n3x 1/4\"-20 on Included Handle"},
+          {"label": "Netflix Approved", "value": "Yes"},
+          {"label": "Materials", "value": "Magnesium Alloy"},
+          {"label": "Dimensions (W x H x D)", "value": "5.1 x 3.3 x 3.1\" / 129.7 x 84.5 x 77.8 mm"},
+          {"label": "Weight", "value": "1.4 lb / 640 g (Body Only)\n1.6 lb / 715 g (With Battery, Recording Media)"}
         ],
         "Optics": [
           {"label": "Lens Mount", "value": "Sony E"},
-          {"label": "Interchangeable Lens", "value": "Yes"},
-          {"label": "Filter Thread", "value": "[ilegible en screenshot]"}
+          {"label": "Interchangeable Lens", "value": "Yes"}
         ],
         "Packaging Info": [
-          {"label": "Package Weight", "value": "[ilegible en screenshot]"},
-          {"label": "Box Dimensions (LxWxH)", "value": "[ilegible en screenshot]"}
+          {"label": "Package Weight", "value": "3.665 lb"},
+          {"label": "Box Dimensions (LxWxH)", "value": "9.6 x 9 x 5.9\""}
         ]
       }
     }
