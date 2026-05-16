@@ -511,6 +511,100 @@
           {"label": "Box Dimensions (LxWxH)", "value": "13.2 x 9.8 x 6\""}
         ]
       }
+    },
+
+    {
+      "id": "nikon_zr",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Cinema Camera Full-Frame",
+      "marca": "Nikon",
+      "modelo": "ZR Cinema Camera (Z Mount)",
+      "url_source": null,
+      "precio_usd": null,
+      "status_bh": "[ilegible en screenshot]",
+      "fuente": "screenshot manual del dueño (16-may-2026)",
+      "secciones": {
+        "Key Specs": [
+          {"label": "Image Sensor", "value": "Full-Frame"},
+          {"label": "Effective Sensor Resolution", "value": "24.5 Megapixel"},
+          {"label": "Image Stabilization", "value": "Sensor-Shift"},
+          {"label": "ISO/Gain Sensitivity", "value": "Dual Base: 800 / 6400\nNative: 100 to 64,000"},
+          {"label": "Max Recording Modes", "value": "ProRes RAW 12-Bit\nUp to 6K at 23.98/25/29.97 fps\nREDCODE RAW 12-Bit\n(ver Internal Recording para lista completa)"},
+          {"label": "Max Video Output", "value": "UHD 4K"},
+          {"label": "Media/Memory Card Slot", "value": "Slot 1: CFexpress Type B\nSlot 2: microSD/microSDHC/microSDXC (UHS-I)"},
+          {"label": "Video I/O", "value": "Micro-HDMI"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS"},
+          {"label": "Battery", "value": "Nikon EN-EL15c"}
+        ],
+        "Imaging": [
+          {"label": "Lens Communication", "value": "Yes: with Autofocus Support"},
+          {"label": "Image Sensor", "value": "35.9 x 23.9 mm (Full-Frame) CMOS"},
+          {"label": "Effective Sensor Resolution", "value": "24.5 Megapixel"},
+          {"label": "Image Stabilization", "value": "Sensor-Shift, 5-Axis"},
+          {"label": "Built-In ND Filter", "value": "No"},
+          {"label": "Built-In CC Filter", "value": "No"},
+          {"label": "Internal Filter Holder", "value": "No"},
+          {"label": "Capture Type", "value": "Stills & Video"}
+        ],
+        "Exposure Control": [
+          {"label": "Shutter Type", "value": "Electronic Rolling Shutter"},
+          {"label": "Shutter Speed", "value": "Electronic Shutter: 1/16000 to 900 Seconds"},
+          {"label": "Shutter Angle", "value": "5.6 to 360°"},
+          {"label": "ISO/Gain Sensitivity", "value": "Dual Base: 800 / 6400\nNative: 100 to 64,000"},
+          {"label": "Signal-to-Noise Ratio", "value": "Not Specified by Manufacturer"},
+          {"label": "Advertised Dynamic Range", "value": "15 Stops"},
+          {"label": "White Balance", "value": "Range: 2500 to 10,000K\nPresets: Auto, Cloudy, Color Temperature, Direct Sunlight, Flash, Fluorescent, Incandescent, Preset Manual, Shade"},
+          {"label": "Exposure Modes", "value": "Auto, Manual"}
+        ],
+        "Focus": [
+          {"label": "Focus Mode", "value": "Automatic, Continuous-Servo AF, Full-Time Servo, Manual Focus"}
+        ],
+        "Video Capture": [
+          {"label": "Internal Recording", "value": "ProRes RAW 12-Bit\n6048 x 3402 at 23.98/25/29.97 fps\n4030 x 2268 at 23.98/25/29.97/50/59.94 fps\nREDCODE RAW 12-Bit\n6048 x 3402 at 23.98/25/29.97/50/59.94 fps (780 to 1710 Mb/s)\n4030 x 2268 at 23.98/25/29.97/50/59.94 fps (700 to 1710 Mb/s)\n3984 x 2240 at 23.98/25/29.97/50/59.94/100/120 fps\nH.265 4:2:0 8/10-Bit\n5376 x 3024 at 23.98/25/29.97/50/59.94 fps\n3840 x 2160 at 23.98/25/29.97/50/59.94/100/120 fps\n1920 x 1080 at 23.98/25/29.97/50/59.94/100/120/200/240 fps\nProRes 422 HQ 4:2:2 10-Bit\n5376 x 3024 at 23.98/25/29.97 fps\n3840 x 2160 at 23.98/25/29.97/50/59.94 fps\n1920 x 1080 at 50/59.94/100/120 fps\nH.264 4:2:0 8-Bit\n1920 x 1080 at 23.98/25/29.97/50/59.94 fps"},
+          {"label": "Video Output", "value": "3840 x 2160"},
+          {"label": "Fast-/Slow-Motion Support", "value": "Yes"},
+          {"label": "Gamma Curve", "value": "Nikon N-Log, REDWideGamutRGB"},
+          {"label": "Built-In Microphone", "value": "Stereo"},
+          {"label": "Audio Recording", "value": "ProRes, Raw: 2-Channel, 32-Bit\nProRes, Raw: 2-Channel, 24-Bit"},
+          {"label": "IP Streaming", "value": "No"}
+        ],
+        "Interface": [
+          {"label": "Media/Memory Card Slot", "value": "Slot 1: CFexpress Type B\nSlot 2: microSD/microSDHC/microSDXC (UHS-I)"},
+          {"label": "Internal Storage", "value": "No"},
+          {"label": "Video I/O", "value": "1x Micro-HDMI Output"},
+          {"label": "Audio I/O", "value": "1x 1/8\" / 3.5 mm TRS Stereo Mic/Line Input\n1x 1/8\" / 3.5 mm TRS Stereo Headphone Output"},
+          {"label": "Power I/O", "value": "1x USB-C Input"},
+          {"label": "Other I/O", "value": "1x USB-C (USB 3.2 / 3.1 Gen 2) Data Output (Shared with Power Input)"},
+          {"label": "Wireless", "value": "Wi-Fi / Bluetooth"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nApp Name: SnapBridge"},
+          {"label": "Global Positioning (GPS, GLONASS, etc.)", "value": "No"}
+        ],
+        "Monitor": [
+          {"label": "Display Type", "value": "Primary Monitor: Articulating 4\" Touchscreen LCD"},
+          {"label": "Resolution", "value": "Primary Monitor: 3,070,000 Dot"}
+        ],
+        "Viewfinder": [
+          {"label": "Type", "value": "[ilegible en screenshot]"}
+        ],
+        "Power": [
+          {"label": "Battery", "value": "Nikon EN-EL15c"}
+        ],
+        "Environmental": [
+          {"label": "Operating Conditions", "value": "[ilegible en screenshot]"},
+          {"label": "Storage Conditions", "value": "[ilegible en screenshot]"}
+        ],
+        "General": [
+          {"label": "Shoe Mount", "value": "1x Intelligent Hot Shoe"},
+          {"label": "Tripod Mount", "value": "1x 1/4\"-20 Female (Bottom)"},
+          {"label": "Accessory Mounting Thread", "value": "No"},
+          {"label": "Dimensions (W x H x D)", "value": "5.2 x 3.2 x 1.9\" / 133 x 80.5 x 48.7 mm"},
+          {"label": "Weight", "value": "1.19 lb / 540 g (Body Only)"}
+        ],
+        "Packaging Info": [
+          {"label": "Package Weight", "value": "2.27 lb"},
+          {"label": "Box Dimensions (LxWxH)", "value": "8 x 7 x 5.3\""}
+        ]
+      }
     }
   ],
 
