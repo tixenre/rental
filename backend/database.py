@@ -747,6 +747,26 @@ def init_db():
         "ON spec_definitions(es_compatibilidad) WHERE es_compatibilidad"
     )
 
+    # Familias jerárquicas para specs multi_enum (HDMI 1.4 < 2.0 < 2.1, SDI
+    # 3G < 6G < 12G, sensor formats, etc.). Editable desde UI admin —
+    # antes vivían hardcodeadas en routes/specs.py.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS spec_familia_jerarquia (
+            id          SERIAL PRIMARY KEY,
+            familia     VARCHAR(64) NOT NULL,
+            valor       VARCHAR(64) NOT NULL,
+            posicion    INTEGER NOT NULL,
+            spec_def_id INTEGER REFERENCES spec_definitions(id) ON DELETE CASCADE,
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (familia, valor)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_fam_jer_familia_pos "
+        "ON spec_familia_jerarquia (familia, posicion)"
+    )
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS categoria_spec_templates (
             id                  SERIAL PRIMARY KEY,

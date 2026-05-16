@@ -460,6 +460,149 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
         conn.close()
 
 
+# ── CRUD familias jerárquicas (multi_enum) ─────────────────────────────
+
+
+class SpecFamiliaItemInput(BaseModel):
+    familia: str
+    valor: str
+    posicion: int
+    spec_def_id: Optional[int] = None
+
+
+class SpecFamiliaItemUpdate(BaseModel):
+    familia: Optional[str] = None
+    valor: Optional[str] = None
+    posicion: Optional[int] = None
+    spec_def_id: Optional[int] = None
+
+
+@router.get("/admin/spec-familias")
+def listar_familias(request: Request):
+    """Lista todas las entries de spec_familia_jerarquia agrupadas por
+    familia. Devuelve `[{familia, items: [{id, valor, posicion, spec_def_id}]}]`
+    ordenadas por familia y posicion."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, familia, valor, posicion, spec_def_id "
+            "FROM spec_familia_jerarquia "
+            "ORDER BY familia, posicion, valor"
+        ).fetchall()
+        grupos: dict[str, list[dict]] = {}
+        for r in rows:
+            d = row_to_dict(r) if not isinstance(r, dict) else r
+            grupos.setdefault(d["familia"], []).append({
+                "id": d["id"],
+                "valor": d["valor"],
+                "posicion": d["posicion"],
+                "spec_def_id": d.get("spec_def_id"),
+            })
+        return {
+            "items": [
+                {"familia": fam, "items": items}
+                for fam, items in sorted(grupos.items())
+            ],
+        }
+    finally:
+        conn.close()
+
+
+@router.post("/admin/spec-familias", status_code=201)
+def crear_familia_item(payload: SpecFamiliaItemInput, request: Request):
+    """Crea una entry nueva en la familia (ej. agregar HDMI 2.1b)."""
+    _require_admin(request)
+    familia = (payload.familia or "").strip().lower()
+    valor = (payload.valor or "").strip()
+    if not familia or not valor:
+        raise HTTPException(400, "familia y valor son obligatorios.")
+    conn = get_db()
+    try:
+        try:
+            cur = conn.execute(
+                """
+                INSERT INTO spec_familia_jerarquia
+                  (familia, valor, posicion, spec_def_id)
+                VALUES (?, ?, ?, ?)
+                RETURNING id
+                """,
+                (familia, valor, payload.posicion, payload.spec_def_id),
+            )
+            new_id = cur.fetchone()[0]
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+                raise HTTPException(
+                    409, f"Ya existe valor '{valor}' en familia '{familia}'."
+                )
+            raise
+    finally:
+        conn.close()
+    _MULTI_ENUM_FAMILIES.invalidate()
+    return {"id": new_id, "familia": familia, "valor": valor, "posicion": payload.posicion}
+
+
+@router.patch("/admin/spec-familias/{item_id}")
+def actualizar_familia_item(item_id: int, payload: SpecFamiliaItemUpdate, request: Request):
+    """Modifica un item (reordenar via posicion, renombrar valor, mover de familia)."""
+    _require_admin(request)
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(400, "Nada para actualizar.")
+    if "familia" in updates:
+        updates["familia"] = (updates["familia"] or "").strip().lower()
+    if "valor" in updates:
+        updates["valor"] = (updates["valor"] or "").strip()
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM spec_familia_jerarquia WHERE id = ?", (item_id,)
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Item no existe.")
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        try:
+            conn.execute(
+                f"UPDATE spec_familia_jerarquia SET {set_clause}, "
+                f"updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                list(updates.values()) + [item_id],
+            )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+                raise HTTPException(
+                    409, "Conflicto: el (familia, valor) resultante ya existe."
+                )
+            raise
+    finally:
+        conn.close()
+    _MULTI_ENUM_FAMILIES.invalidate()
+    return {"ok": True, "id": item_id, **updates}
+
+
+@router.delete("/admin/spec-familias/{item_id}", status_code=204)
+def borrar_familia_item(item_id: int, request: Request):
+    """Borra un item. La compat de equipos que usen ese valor en sus
+    specs sigue funcionando vía match exacto — solo deja de aplicar la
+    jerarquía intra-familia para ese valor."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM spec_familia_jerarquia WHERE id = ?", (item_id,)
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Item no existe.")
+        conn.execute("DELETE FROM spec_familia_jerarquia WHERE id = ?", (item_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    _MULTI_ENUM_FAMILIES.invalidate()
+
+
 @router.delete("/admin/spec-definitions/{def_id}", status_code=204)
 def borrar_spec_definition(def_id: int, request: Request):
     _require_admin(request)
@@ -1337,12 +1480,85 @@ def borrar_compatibilidad(compat_id: int, request: Request):
 # Familias jerárquicas dentro de specs multi_enum. La lógica de compat aplica
 # "mínimo común" por familia cuando dos equipos comparten familia pero no
 # versión exacta (ej. cámara HDMI 2.1 + monitor HDMI 2.0 → ambos hablan 2.0).
-# Hardcodeado aquí porque el catálogo AV es estable; si crece, mover a metadata
-# en spec_definitions.
-_MULTI_ENUM_FAMILIES: dict[str, list[str]] = {
+#
+# Las familias viven en la tabla `spec_familia_jerarquia` (editable desde
+# `/admin/specs/familias`). Este dict queda como FALLBACK para cuando la
+# tabla está vacía (pre-migration o BD nueva sin seed).
+_FAMILIES_FALLBACK: dict[str, list[str]] = {
     "HDMI": ["HDMI 1.4", "HDMI 2.0", "HDMI 2.1"],
     "SDI":  ["SDI 3G", "SDI 6G", "SDI 12G"],
 }
+
+
+def _load_families_from_db() -> dict[str, list[str]]:
+    """Lee la tabla `spec_familia_jerarquia` y devuelve `{familia: [valores ordenados por posicion]}`.
+    El nombre de familia en el dict mantiene el casing del display
+    (HDMI/SDI). Si la tabla está vacía o falla, devuelve `_FAMILIES_FALLBACK`."""
+    try:
+        conn = get_db()
+        try:
+            rows = conn.execute(
+                "SELECT familia, valor, posicion FROM spec_familia_jerarquia "
+                "ORDER BY familia, posicion"
+            ).fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return dict(_FAMILIES_FALLBACK)
+
+    if not rows:
+        return dict(_FAMILIES_FALLBACK)
+
+    out: dict[str, list[str]] = {}
+    for r in rows:
+        d = row_to_dict(r) if not isinstance(r, dict) else r
+        fam_norm = (d.get("familia") or "").strip()
+        # Display name = uppercase si todo el valor empieza con el familia
+        # (HDMI/SDI casos). Sino, capitalize.
+        fam_display = fam_norm.upper() if len(fam_norm) <= 4 else fam_norm.capitalize()
+        out.setdefault(fam_display, []).append(d.get("valor"))
+    return out
+
+
+# Alias retro-compat: el código existente usa `_MULTI_ENUM_FAMILIES` como
+# un dict. Lo hacemos `property-like` consultando DB on demand.
+class _FamiliesProxy:
+    """Compatibilidad: actúa como dict pero hidrata de DB cada vez que
+    se itera/lee. Caché de 60s para no martillar la BD en el motor de
+    compat que itera por cada par de equipos."""
+    _cache: dict[str, list[str]] = {}
+    _cache_at: float = 0.0
+    _ttl = 60.0
+
+    def _refresh_if_needed(self) -> dict[str, list[str]]:
+        import time
+        now = time.time()
+        if now - self._cache_at > self._ttl:
+            self._cache = _load_families_from_db()
+            self._cache_at = now
+        return self._cache
+
+    def items(self):
+        return self._refresh_if_needed().items()
+
+    def __iter__(self):
+        return iter(self._refresh_if_needed())
+
+    def __getitem__(self, key):
+        return self._refresh_if_needed()[key]
+
+    def __contains__(self, key):
+        return key in self._refresh_if_needed()
+
+    def get(self, key, default=None):
+        return self._refresh_if_needed().get(key, default)
+
+    def invalidate(self):
+        """Borrar cache. Llamar después de CRUD a `spec_familia_jerarquia`."""
+        self._cache_at = 0.0
+
+
+_MULTI_ENUM_FAMILIES = _FamiliesProxy()
 
 
 def _parse_multi_enum_value(value: str) -> list[str]:

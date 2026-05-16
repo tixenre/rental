@@ -1171,6 +1171,47 @@ export const adminApi = {
       skipped_by_confianza: number;
     }>("/api/admin/specs/propuestas/bulk", input),
 
+  // ── Familias jerárquicas (HDMI 1.4 < 2.0 < 2.1, SDI, etc.) ────────
+  listSpecFamilias: () =>
+    authedJson<{
+      items: Array<{
+        familia: string;
+        items: Array<{
+          id: number;
+          valor: string;
+          posicion: number;
+          spec_def_id: number | null;
+        }>;
+      }>;
+    }>("/api/admin/spec-familias"),
+  createSpecFamiliaItem: (input: {
+    familia: string;
+    valor: string;
+    posicion: number;
+    spec_def_id?: number | null;
+  }) =>
+    authedJson<{ id: number; familia: string; valor: string; posicion: number }>(
+      "/api/admin/spec-familias",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    ),
+  updateSpecFamiliaItem: (
+    itemId: number,
+    input: { familia?: string; valor?: string; posicion?: number; spec_def_id?: number | null },
+  ) =>
+    authedJson<{ ok: true; id: number }>(`/api/admin/spec-familias/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteSpecFamiliaItem: async (itemId: number) => {
+    const res = await authedFetch(`/api/admin/spec-familias/${itemId}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+  },
+
   // ── Nombres públicos / validación ──────────────────────────────────
   regenerarNombres: (dry_run = true) =>
     authedPostJson<{
