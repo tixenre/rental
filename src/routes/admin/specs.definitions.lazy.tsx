@@ -735,6 +735,7 @@ function DefinitionFormModal({
     es_compatibilidad: definition?.es_compatibilidad ?? false,
     compatibilidad_modo: definition?.compatibilidad_modo ?? "exacta",
     tabla_columnas: definition?.tabla_columnas ?? [],
+    output_config: definition?.output_config ?? null,
   });
   const [enumInput, setEnumInput] = useState((definition?.enum_options ?? []).join(", "));
   const [busy, setBusy] = useState(false);
@@ -842,6 +843,7 @@ function DefinitionFormModal({
         es_compatibilidad: form.es_compatibilidad,
         compatibilidad_modo: form.es_compatibilidad ? modo : "exacta",
         tabla_columnas: form.tipo === "tabla" ? (form.tabla_columnas ?? []) : null,
+        output_config: form.tipo === "tabla" ? (form.output_config ?? null) : null,
       };
       let specDefId: number;
       if (isNew) {
@@ -957,10 +959,38 @@ function DefinitionFormModal({
           </div>
 
           {form.tipo === "tabla" && (
-            <TablaColumnasEditor
-              columnas={form.tabla_columnas ?? []}
-              onChange={(cols) => setForm({ ...form, tabla_columnas: cols })}
-            />
+            <>
+              <TablaColumnasEditor
+                columnas={form.tabla_columnas ?? []}
+                onChange={(cols) => setForm({ ...form, tabla_columnas: cols })}
+              />
+              <div>
+                <Label className="text-xs">
+                  Estrategia de filas en placeholder
+                </Label>
+                <Select
+                  value={form.output_config?.row_strategy ?? "all"}
+                  onValueChange={(v: "all" | "first" | "last") =>
+                    setForm({
+                      ...form,
+                      output_config: v === "all" ? null : { row_strategy: v },
+                    })
+                  }
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las filas (default)</SelectItem>
+                    <SelectItem value="first">Solo primera fila</SelectItem>
+                    <SelectItem value="last">Solo última fila</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Qué filas se rinden cuando aparece <code className="font-mono">{"{spec:Label}"}</code> en
+                  el nombre público (sin selector de columna). "Primera" / "última" sirven cuando el nombre
+                  es single-line y solo querés mostrar una fila representativa.
+                </p>
+              </div>
+            </>
           )}
 
           {(form.tipo === "number" || form.tipo === "rango" || form.tipo === "wxh" || form.tipo === "wxhxd") && (

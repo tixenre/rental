@@ -19,6 +19,8 @@ import {
   Palette,
   Ruler,
   ShieldCheck,
+  Telescope,
+  Network,
 } from "lucide-react";
 
 import {
@@ -62,6 +64,8 @@ const items: NavItem[] = [
       { title: "Etiquetas",           url: "/admin/equipos/etiquetas",  icon: Tag },
       { title: "Specs por categoría", url: "/admin/equipos/specs",      icon: Wrench },
       { title: "Gear Compatibility",  url: "/admin/gear-compatibility", icon: Sparkles },
+      { title: "Observatorio specs",  url: "/admin/specs/observatorio", icon: Telescope },
+      { title: "Familias jerárquicas", url: "/admin/specs/familias",     icon: Network },
       { title: "Unidades",            url: "/admin/unidades",           icon: Ruler },
     ],
   },

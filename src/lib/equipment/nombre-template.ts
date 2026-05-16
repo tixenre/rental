@@ -25,6 +25,11 @@ export type SpecLike = {
    *  Sirve para placeholders `{spec:Label.colKey}` que extraen celdas
    *  específicas en lugar del texto completo. */
   value_raw?: string;
+  /** Config declarativa de render — backend la inyecta junto al value.
+   *  Hoy solo lleva `row_strategy` para tabla. La canónica vive en
+   *  backend/services/spec_render.py; acá solo aplicamos lo mínimo para
+   *  el preview live del editor. */
+  output_config?: { row_strategy?: "all" | "first" | "last" } | null;
 };
 
 export type NombreTemplateVars = {
@@ -77,21 +82,28 @@ function formatTablaCell(cell: unknown): string {
  *  - Sin `.colKey`: si el value es un JSON tabla, ya viene pre-formateado por
  *    backend; lo devolvemos tal cual. Si no, value crudo.
  *  - Con `.colKey`: parsea el value como JSON array y extrae la celda de la
- *    columna `colKey` en la fila `i` (default 0).  */
+ *    columna `colKey` en la fila `i` (default 0).
+ *
+ *  La `output_config.row_strategy` del spec NO se aplica acá porque el value
+ *  ya viene pre-formateado por backend con esa estrategia. Sólo se aplica al
+ *  fallback de "preview en form" cuando re-parseamos value_raw sin selector
+ *  explícito (ver caso below). */
 function lookupSpec(specs: SpecLike[] | undefined, key: string): string {
   if (!specs) return "";
   // Parsear "Label.colKey[i]" o "Label.colKey" o "Label".
   let label = key;
   let colKey: string | null = null;
   let rowIdx = 0;
+  let hasExplicitIndex = false;
   const dotIdx = key.indexOf(".");
   if (dotIdx !== -1) {
     label = key.slice(0, dotIdx);
-    let rest = key.slice(dotIdx + 1);
+    const rest = key.slice(dotIdx + 1);
     const m = rest.match(/^(.+?)\[(\d+)\]$/);
     if (m) {
       colKey = m[1];
       rowIdx = parseInt(m[2], 10) || 0;
+      hasExplicitIndex = true;
     } else {
       colKey = rest;
     }
@@ -110,8 +122,18 @@ function lookupSpec(specs: SpecLike[] | undefined, key: string): string {
   if (!raw.startsWith("[") && !raw.startsWith("{")) return "";
   try {
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || rowIdx >= parsed.length) return "";
-    const row = parsed[rowIdx];
+    if (!Array.isArray(parsed) || parsed.length === 0) return "";
+    // Si NO hay índice explícito, respetamos row_strategy del spec_definition
+    // para elegir qué fila representa al spec (path explícito gana siempre).
+    let effectiveIdx = rowIdx;
+    if (!hasExplicitIndex) {
+      const strategy = found.output_config?.row_strategy ?? "all";
+      if (strategy === "last") effectiveIdx = parsed.length - 1;
+      // "first" y "all" → 0 (cuando hay path por columna sin [i], siempre
+      // tomamos la primera fila para mantener el contrato de un value puntual).
+    }
+    if (effectiveIdx >= parsed.length || effectiveIdx < 0) return "";
+    const row = parsed[effectiveIdx];
     if (!row || typeof row !== "object") return "";
     return formatTablaCell((row as Record<string, unknown>)[colKey]);
   } catch {
