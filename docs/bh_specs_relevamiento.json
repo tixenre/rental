@@ -2515,21 +2515,191 @@
       "subtipo": "Tungsten Fresnel",
       "marca": "ARRI",
       "modelo": "650 Plus",
-      "url_source": "https://www.arri.com/en/lighting/daylight-tungsten/tungsten/arri-junior/arri-650",
+      "url_source": "https://www.arri.com/en/lighting/daylight-tungsten/tungsten/arri-junior/arri-650-plus",
       "status_bh": "N/A — sitio fabricante",
-      "fuente": "manual (specs oficiales ARRI)",
-      "secciones": {}
+      "fuente": "ARRI oficial (web fetch)",
+      "secciones": {
+        "Technical Data": [
+          {
+            "label": "Category",
+            "value": "Tungsten"
+          },
+          {
+            "label": "Series",
+            "value": "ARRI Junior"
+          },
+          {
+            "label": "Model",
+            "value": "ARRI 650 Plus"
+          },
+          {
+            "label": "Mains Plug",
+            "value": "Schuko, Bare Ends"
+          },
+          {
+            "label": "Lamphead Type",
+            "value": "Fresnel, 650 W"
+          },
+          {
+            "label": "Reflector",
+            "value": "Spherical specular high purity aluminium"
+          },
+          {
+            "label": "Lamp Type",
+            "value": "CP89 FRL 650W/230V; CP89 FRK 650W/120V; CP82 500W; CP81 300W"
+          },
+          {
+            "label": "Power Consumption",
+            "value": "650 W / 500 W / 300 W"
+          },
+          {
+            "label": "Voltage Range",
+            "value": "230 V / 120 V"
+          },
+          {
+            "label": "Lamp Base",
+            "value": "GY9.5"
+          },
+          {
+            "label": "Dimming",
+            "value": "Yes, 0 to 100% via external dimming system"
+          },
+          {
+            "label": "Correlated Color Temperature",
+            "value": "3200 K"
+          },
+          {
+            "label": "Beam Angle",
+            "value": "12° to 52°"
+          },
+          {
+            "label": "Weight (net)",
+            "value": "Approx. 3 kg / 6 lbs"
+          },
+          {
+            "label": "Weight (packed)",
+            "value": "Approx. 4 kg / 8 lbs"
+          },
+          {
+            "label": "Measurements (HxWxL) with Pin",
+            "value": "300 × 220 × 190 mm"
+          },
+          {
+            "label": "Measurements (HxWxL) without Pin",
+            "value": "256 × 220 × 190 mm"
+          },
+          {
+            "label": "Packed Size (HxWxL)",
+            "value": "295 × 220 × 255 mm"
+          },
+          {
+            "label": "Lens / UV-Protection Glass Diameter",
+            "value": "112 mm / 4.4\""
+          },
+          {
+            "label": "Accessory Diameter",
+            "value": "168 mm / 6.6\""
+          },
+          {
+            "label": "Barndoor",
+            "value": "168 mm / 6.6\""
+          },
+          {
+            "label": "Mounting",
+            "value": "Socket 16 mm / 5/8\""
+          },
+          {
+            "label": "Housing Color",
+            "value": "Blue/Silver, Black"
+          },
+          {
+            "label": "Protection Class / IP Rating",
+            "value": "I / IP20"
+          },
+          {
+            "label": "Certifications",
+            "value": "CE, UKCA, CB, GS, cNRTLus"
+          }
+        ]
+      }
     },
     {
       "id": "molerichardson_1000w",
       "categoria_raiz": "Iluminación",
-      "subtipo": "Tungsten Fresnel",
+      "subtipo": "Tungsten Fresnel Spotlight",
       "marca": "Mole-Richardson",
-      "modelo": "1000W 6\" 407 Baby Spotlight",
+      "modelo": "407 Baby Solarspot 1000W 6\"",
       "url_source": "https://www.mole.com/407-baby-solarspot",
       "status_bh": "N/A — sitio fabricante",
-      "fuente": "manual (specs oficiales Mole)",
-      "secciones": {}
+      "fuente": "Mole-Richardson oficial (web fetch)",
+      "secciones": {
+        "Technical Specifications": [
+          {
+            "label": "Model",
+            "value": "407 Baby Solarspot 1,000W 6\""
+          },
+          {
+            "label": "Power Rating",
+            "value": "1000 Watts"
+          },
+          {
+            "label": "Voltage",
+            "value": "120 / 240 VAC or DC, 8.3 A máx."
+          },
+          {
+            "label": "Lamp Socket",
+            "value": "Medium Bi-post"
+          },
+          {
+            "label": "Lens",
+            "value": "Fresnel 6\" (152 mm), construcción de vidrio"
+          },
+          {
+            "label": "Field Angle",
+            "value": "15° to 58°"
+          },
+          {
+            "label": "Reflector",
+            "value": "Alzak aluminum, sistema condensador con lente Fresnel"
+          },
+          {
+            "label": "Head Construction",
+            "value": "Aluminio liviano con canales verticales interbloqueados"
+          },
+          {
+            "label": "Yoke",
+            "value": "Aluminio fundido, encaja en spud 5/8\" (16 mm) estándar"
+          },
+          {
+            "label": "Focusing Mechanism",
+            "value": "Paletas de acción rápida frente y atrás"
+          },
+          {
+            "label": "Finish",
+            "value": "Maroon powder coat enamel"
+          },
+          {
+            "label": "Dimensions",
+            "value": "11¼\" × 8⅝\" × 10½\""
+          },
+          {
+            "label": "Weight",
+            "value": "13¾ lbs (6.24 kg) con cable"
+          },
+          {
+            "label": "Cable",
+            "value": "25 ft, Type SO, 3 conductor #16/3 con Edison plug"
+          },
+          {
+            "label": "Switch",
+            "value": "Toggle, montado en lamp trough"
+          },
+          {
+            "label": "Standard Accessories",
+            "value": "Ninguno (barn doors, scrims, snoot, C-clamp se venden aparte)"
+          }
+        ]
+      }
     }
   ],
   "_analisis_pendiente": []

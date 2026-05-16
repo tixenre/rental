@@ -2793,36 +2793,145 @@
     "arri_650plus": {
       "marca": "ARRI",
       "modelo": "650 Plus Tungsten Fresnel",
-      "url_source": "https://www.arri.com/en/lighting/daylight-tungsten/tungsten/arri-junior/arri-650",
+      "url_source": "https://www.arri.com/en/lighting/daylight-tungsten/tungsten/arri-junior/arri-650-plus",
       "specs": {
         "potencia_w": 650,
         "cri": 100,
         "temperatura_k": "3200K",
         "bicolor": false,
         "rgb": false,
-        "dimming": false,
+        "dimming": true,
         "alimentacion": [
           "AC"
         ],
         "montaje": "Fresnel",
-        "peso": "2900 g"
+        "peso": "3000 g"
       },
       "extras": {
         "tipo": "Fresnel",
         "item_type": "Tungsten Fresnel",
-        "bulb_type": "GY9.5 (FRK 650W)",
-        "beam_angle": "13-60°",
+        "bulb_type": "GY9.5 — CP89 FRL/FRK 650W (también acepta CP82 500W / CP81 300W)",
+        "beam_angle": "12-52°",
         "cooling": "Passive",
-        "vida_util_horas": "200 hours (lamp)",
-        "fixture_mount": "5/8\" stand mount",
-        "materiales": "Aluminum"
+        "ip_rating": "IP20",
+        "dimensiones": "30 × 22 × 19 cm",
+        "fixture_mount": "Socket 5/8\" (16 mm)",
+        "materiales": "Aluminio fundido a presión, resistente a corrosión",
+        "certificaciones": "CE, UKCA, CB, GS, cNRTLus",
+        "voltaje": "230 V / 120 V",
+        "serie": "ARRI Junior",
+        "reflector": "Esférico especular de aluminio de alta pureza",
+        "accessory_diameter": "168 mm / 6.6\""
       },
-      "ficha": {},
-      "_nota": "Specs cargadas manualmente — fuente: ARRI oficial"
+      "ficha": {
+        "Technical Data": [
+          {
+            "label": "Category",
+            "value": "Tungsten"
+          },
+          {
+            "label": "Series",
+            "value": "ARRI Junior"
+          },
+          {
+            "label": "Model",
+            "value": "ARRI 650 Plus"
+          },
+          {
+            "label": "Mains Plug",
+            "value": "Schuko, Bare Ends"
+          },
+          {
+            "label": "Lamphead Type",
+            "value": "Fresnel, 650 W"
+          },
+          {
+            "label": "Reflector",
+            "value": "Spherical specular high purity aluminium"
+          },
+          {
+            "label": "Lamp Type",
+            "value": "CP89 FRL 650W/230V; CP89 FRK 650W/120V; CP82 500W; CP81 300W"
+          },
+          {
+            "label": "Power Consumption",
+            "value": "650 W / 500 W / 300 W"
+          },
+          {
+            "label": "Voltage Range",
+            "value": "230 V / 120 V"
+          },
+          {
+            "label": "Lamp Base",
+            "value": "GY9.5"
+          },
+          {
+            "label": "Dimming",
+            "value": "Yes, 0 to 100% via external dimming system"
+          },
+          {
+            "label": "Correlated Color Temperature",
+            "value": "3200 K"
+          },
+          {
+            "label": "Beam Angle",
+            "value": "12° to 52°"
+          },
+          {
+            "label": "Weight (net)",
+            "value": "Approx. 3 kg / 6 lbs"
+          },
+          {
+            "label": "Weight (packed)",
+            "value": "Approx. 4 kg / 8 lbs"
+          },
+          {
+            "label": "Measurements (HxWxL) with Pin",
+            "value": "300 × 220 × 190 mm"
+          },
+          {
+            "label": "Measurements (HxWxL) without Pin",
+            "value": "256 × 220 × 190 mm"
+          },
+          {
+            "label": "Packed Size (HxWxL)",
+            "value": "295 × 220 × 255 mm"
+          },
+          {
+            "label": "Lens / UV-Protection Glass Diameter",
+            "value": "112 mm / 4.4\""
+          },
+          {
+            "label": "Accessory Diameter",
+            "value": "168 mm / 6.6\""
+          },
+          {
+            "label": "Barndoor",
+            "value": "168 mm / 6.6\""
+          },
+          {
+            "label": "Mounting",
+            "value": "Socket 16 mm / 5/8\""
+          },
+          {
+            "label": "Housing Color",
+            "value": "Blue/Silver, Black"
+          },
+          {
+            "label": "Protection Class / IP Rating",
+            "value": "I / IP20"
+          },
+          {
+            "label": "Certifications",
+            "value": "CE, UKCA, CB, GS, cNRTLus"
+          }
+        ]
+      },
+      "_nota": "Datos oficiales ARRI (arri.com) — fixture no se vende en B&H"
     },
     "molerichardson_1000w": {
       "marca": "Mole-Richardson",
-      "modelo": "1000W 6\" 407 Baby Spotlight",
+      "modelo": "407 Baby Solarspot 1000W 6\"",
       "url_source": "https://www.mole.com/407-baby-solarspot",
       "specs": {
         "potencia_w": 1000,
@@ -2830,25 +2939,96 @@
         "temperatura_k": "3200K",
         "bicolor": false,
         "rgb": false,
-        "dimming": false,
+        "dimming": true,
         "alimentacion": [
           "AC"
         ],
         "montaje": "Fresnel",
-        "peso": "5900 g"
+        "peso": "6240 g"
       },
       "extras": {
         "tipo": "Fresnel",
         "item_type": "Tungsten Fresnel Spotlight",
-        "bulb_type": "G22 base (BTL/EGT 1000W)",
-        "beam_angle": "10-45°",
+        "bulb_type": "Medium Bi-post (1000W tungsten)",
+        "beam_angle": "15-58°",
         "cooling": "Passive",
-        "vida_util_horas": "200-500 hours (lamp)",
-        "fixture_mount": "Yoke con 1-1/8\" stud",
-        "materiales": "Aluminum"
+        "dimensiones": "28.6 × 21.9 × 26.7 cm (11¼ × 8⅝ × 10½\")",
+        "fixture_mount": "Yoke con spud 5/8\" (16 mm)",
+        "materiales": "Aluminio liviano, reflector Alzak, yoke fundido",
+        "cable_length": "25 ft (7.6 m) Type SO 3-cond #16/3 + Edison plug",
+        "modificador_incluido": "Ninguno (barn doors, scrims, snoot venden aparte)",
+        "voltaje": "120 / 240 VAC",
+        "accessory_diameter": "6 5/8\" (168 mm)"
       },
-      "ficha": {},
-      "_nota": "Specs cargadas manualmente — fuente: Mole-Richardson oficial"
+      "ficha": {
+        "Technical Specifications": [
+          {
+            "label": "Model",
+            "value": "407 Baby Solarspot 1,000W 6\""
+          },
+          {
+            "label": "Power Rating",
+            "value": "1000 Watts"
+          },
+          {
+            "label": "Voltage",
+            "value": "120 / 240 VAC or DC, 8.3 A máx."
+          },
+          {
+            "label": "Lamp Socket",
+            "value": "Medium Bi-post"
+          },
+          {
+            "label": "Lens",
+            "value": "Fresnel 6\" (152 mm), construcción de vidrio"
+          },
+          {
+            "label": "Field Angle",
+            "value": "15° to 58°"
+          },
+          {
+            "label": "Reflector",
+            "value": "Alzak aluminum, sistema condensador con lente Fresnel"
+          },
+          {
+            "label": "Head Construction",
+            "value": "Aluminio liviano con canales verticales interbloqueados"
+          },
+          {
+            "label": "Yoke",
+            "value": "Aluminio fundido, encaja en spud 5/8\" (16 mm) estándar"
+          },
+          {
+            "label": "Focusing Mechanism",
+            "value": "Paletas de acción rápida frente y atrás"
+          },
+          {
+            "label": "Finish",
+            "value": "Maroon powder coat enamel"
+          },
+          {
+            "label": "Dimensions",
+            "value": "11¼\" × 8⅝\" × 10½\""
+          },
+          {
+            "label": "Weight",
+            "value": "13¾ lbs (6.24 kg) con cable"
+          },
+          {
+            "label": "Cable",
+            "value": "25 ft, Type SO, 3 conductor #16/3 con Edison plug"
+          },
+          {
+            "label": "Switch",
+            "value": "Toggle, montado en lamp trough"
+          },
+          {
+            "label": "Standard Accessories",
+            "value": "Ninguno (barn doors, scrims, snoot, C-clamp se venden aparte)"
+          }
+        ]
+      },
+      "_nota": "Datos oficiales Mole-Richardson (mole.com) — fixture no se vende en B&H"
     },
     "godox_vl300": {
       "marca": "Godox",
