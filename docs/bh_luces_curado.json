@@ -1,0 +1,296 @@
+{
+  "_meta": {
+    "descripcion": "Specs curadas mapeadas a spec_keys del proyecto."
+  },
+  "products": {
+    "godox_vl150": {
+      "marca": "Godox",
+      "modelo": "VL150 LED Video Light VL150 B&amp;H Photo Video",
+      "specs": {
+        "potencia_w": 150,
+        "cri": 96,
+        "temperatura_k": "5600K",
+        "bicolor": false,
+        "rgb": false,
+        "dimming": true,
+        "control_inalambrico": "Bluetooth",
+        "alimentacion": [
+          "AC"
+        ],
+        "montaje": "Bowens",
+        "peso": "860 g"
+      }
+    },
+    "nanlite_forza": {
+      "marca": "Nanlite",
+      "modelo": "Forza 500 Daylight LED Monolight 12-2026 B&amp;H Photo Video",
+      "specs": {
+        "potencia_w": 500,
+        "lumens": 46613,
+        "cri": 98,
+        "temperatura_k": "5600K",
+        "bicolor": false,
+        "rgb": false,
+        "dimming": true,
+        "control_inalambrico": "Wi-Fi",
+        "alimentacion": [
+          "AC"
+        ],
+        "montaje": "Bowens",
+        "peso": "2490 g"
+      }
+    },
+    "nanlite_60b": {
+      "marca": "Nanlite",
+      "modelo": "Forza 60B II Bi-Color LED Monolight FORZA60BII B&amp;H Photo",
+      "specs": {
+        "potencia_w": 72,
+        "cri": 96,
+        "temperatura_k": "2700-6500K",
+        "bicolor": true,
+        "rgb": false,
+        "dimming": true,
+        "control_inalambrico": "Bluetooth",
+        "alimentacion": [
+          "V-mount",
+          "AC",
+          "Batería integrada"
+        ],
+        "montaje": "Propietario",
+        "peso": "680 g"
+      }
+    },
+    "amaran_300c": {
+      "marca": "Amaran",
+      "modelo": "300c RGB LED Monolight (Gray) AP30011A99 B&amp;H Photo Video",
+      "specs": {
+        "potencia_w": 360,
+        "lumens": 19389,
+        "cri": 95,
+        "bicolor": true,
+        "rgb": true,
+        "dimming": true,
+        "control_inalambrico": "Bluetooth",
+        "alimentacion": [
+          "AC",
+          "Batería integrada"
+        ],
+        "montaje": "Bowens",
+        "peso": "2600 g",
+        "temperatura_k": "2500-7500K"
+      }
+    },
+    "godox_v100": {
+      "marca": "Godox",
+      "modelo": "V100 Flash for Sony V100S B&amp;H Photo Video",
+      "specs": {
+        "bicolor": false,
+        "rgb": false,
+        "dimming": false,
+        "alimentacion": [
+          "AC"
+        ],
+        "peso": "635 g"
+      }
+    },
+    "arri_650plus": {
+      "marca": "ARRI",
+      "modelo": "650 Plus Tungsten Fresnel",
+      "fuente": "manual — specs oficiales ARRI",
+      "specs": {
+        "potencia_w": 650,
+        "cri": 100,
+        "temperatura_k": "3200K",
+        "bicolor": false,
+        "rgb": false,
+        "dimming": false,
+        "alimentacion": [
+          "AC"
+        ],
+        "montaje": "Fresnel",
+        "peso": "2900 g"
+      }
+    },
+    "molerichardson_1000w": {
+      "marca": "Mole-Richardson",
+      "modelo": "1000W 6\" 407 Baby Spotlight",
+      "fuente": "manual — specs oficiales Mole-Richardson",
+      "specs": {
+        "potencia_w": 1000,
+        "cri": 100,
+        "temperatura_k": "3200K",
+        "bicolor": false,
+        "rgb": false,
+        "dimming": false,
+        "alimentacion": [
+          "AC"
+        ],
+        "montaje": "Fresnel",
+        "peso": "5900 g"
+      }
+    },
+    "godox_vl300": {
+      "marca": "Godox",
+      "modelo": "VL300 LED Video Light",
+      "fuente": "manual — specs B&H producto nuevo (listing Used tenía layout roto)",
+      "specs": {
+        "potencia_w": 300,
+        "cri": 96,
+        "temperatura_k": "5600K",
+        "bicolor": false,
+        "rgb": false,
+        "dimming": true,
+        "control_inalambrico": "Bluetooth",
+        "alimentacion": [
+          "AC"
+        ],
+        "montaje": "Bowens",
+        "peso": "2850 g"
+      }
+    },
+    "amaran_f21x": {
+      "marca": "Amaran",
+      "modelo": "F21x 2x1 Bi-Color LED Flexible Mat (V-Mount)",
+      "specs": {
+        "potencia_w": 120,
+        "cri": 95,
+        "temperatura_k": "2500-7500K",
+        "bicolor": true,
+        "rgb": false,
+        "dimming": true,
+        "control_inalambrico": "Bluetooth, DMX",
+        "alimentacion": [
+          "V-mount",
+          "AC",
+          "Batería integrada"
+        ],
+        "montaje": "Propietario",
+        "peso": "390 g"
+      }
+    },
+    "godox_m1": {
+      "marca": "Godox",
+      "modelo": "RGB Mini Creative M1 On-Camera Video LED Light (Gray) M1",
+      "specs": {
+        "potencia_w": 13,
+        "cri": 97,
+        "temperatura_k": "2500-8500K",
+        "bicolor": true,
+        "rgb": true,
+        "dimming": true,
+        "alimentacion": [
+          "Batería integrada"
+        ],
+        "montaje": "No",
+        "peso": "240 g"
+      }
+    },
+    "nanlite_fc500b": {
+      "marca": "Nanlite",
+      "modelo": "FC500B Bi-Color LED Spotlight FC500B B&amp;H Photo Video",
+      "specs": {
+        "potencia_w": 520,
+        "cri": 96,
+        "temperatura_k": "2700-6500K",
+        "bicolor": true,
+        "rgb": false,
+        "dimming": true,
+        "control_inalambrico": "Bluetooth",
+        "alimentacion": [
+          "AC"
+        ],
+        "montaje": "Bowens",
+        "peso": "3160 g"
+      }
+    },
+    "amaran_360c": {
+      "marca": "Amaran",
+      "modelo": "Ray 360c RGB LED Monolight MP00000191 B&amp;H Photo Video",
+      "specs": {
+        "potencia_w": 410,
+        "lumens": 23174,
+        "cri": 95,
+        "temperatura_k": "1800-20000K",
+        "bicolor": true,
+        "rgb": true,
+        "dimming": true,
+        "control_inalambrico": "Bluetooth, DMX",
+        "alimentacion": [
+          "AC"
+        ],
+        "montaje": "Bowens",
+        "peso": "3300 g"
+      }
+    },
+    "aputure_nova": {
+      "marca": "Aputure",
+      "modelo": "NOVA II 2x1 Tunable Color LED Light Panel AP0400040J B&amp;H",
+      "specs": {
+        "potencia_w": 1000,
+        "cri": 95,
+        "temperatura_k": "1800-20000K",
+        "bicolor": true,
+        "rgb": true,
+        "dimming": true,
+        "control_inalambrico": "Bluetooth, DMX, RDM",
+        "alimentacion": [
+          "AC"
+        ],
+        "montaje": "Propietario",
+        "peso": "16250 g"
+      }
+    },
+    "molerichardson_juniorled": {
+      "marca": "Mole-richardson",
+      "modelo": "JuniorLED 200W 8\" Fresnel with DMX 8941-50REV",
+      "specs": {
+        "potencia_w": 200,
+        "cri": 95,
+        "temperatura_k": "3200K",
+        "bicolor": false,
+        "rgb": false,
+        "dimming": true,
+        "alimentacion": [
+          "AC"
+        ],
+        "montaje": "Fresnel",
+        "peso": "6400 g"
+      }
+    },
+    "godox_tl60": {
+      "marca": "Godox",
+      "modelo": "TL60 RGB LED Tube Light (2.5') TL60 B&amp;H Photo Video",
+      "specs": {
+        "potencia_w": 18,
+        "cri": 96,
+        "temperatura_k": "2700-6500K",
+        "bicolor": true,
+        "rgb": true,
+        "dimming": true,
+        "control_inalambrico": "Bluetooth, DMX",
+        "alimentacion": [
+          "AC",
+          "Batería integrada"
+        ],
+        "montaje": "Propietario",
+        "peso": "726 g"
+      }
+    },
+    "aputure_b7c": {
+      "marca": "Aputure",
+      "modelo": "Accent B7c LED RGBWW Light APC0146A7B B&amp;H Photo Video",
+      "specs": {
+        "potencia_w": 7,
+        "lumens": 570,
+        "cri": 95,
+        "temperatura_k": "2000-10000K",
+        "bicolor": true,
+        "rgb": true,
+        "dimming": true,
+        "alimentacion": [
+          "AC"
+        ]
+      }
+    }
+  }
+}
