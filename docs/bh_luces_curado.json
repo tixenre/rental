@@ -2851,11 +2851,11 @@
           },
           {
             "label": "Lamp Type",
-            "value": "CP89 FRL 650W/230V; CP89 FRK 650W/120V; CP82 500W; CP81 300W"
+            "value": "CP89 FRL 650 W / 230 V; CP89 FRK 650 W / 120 V; CP82 500W; CP81 300W"
           },
           {
             "label": "Power Consumption",
-            "value": "650 W / 500 W / 300 W"
+            "value": "650 W, 500 W, 300 W"
           },
           {
             "label": "Voltage Range",
@@ -2867,51 +2867,83 @@
           },
           {
             "label": "Dimming",
-            "value": "Yes, 0 to 100% via external dimming system"
+            "value": "yes, 0 to 100 % via external dimming system"
           },
           {
             "label": "Correlated Color Temperature",
-            "value": "3200 K"
+            "value": "3,200 K"
           },
           {
             "label": "Beam Angle",
             "value": "12° to 52°"
           },
           {
-            "label": "Weight (net)",
-            "value": "Approx. 3 kg / 6 lbs"
+            "label": "Weight in kg net*",
+            "value": "approx. 3 kg"
           },
           {
-            "label": "Weight (packed)",
-            "value": "Approx. 4 kg / 8 lbs"
+            "label": "Weight in kg packed*",
+            "value": "approx. 4 kg"
           },
           {
-            "label": "Measurements (HxWxL) with Pin",
-            "value": "300 × 220 × 190 mm"
+            "label": "Weight in lbs. net*",
+            "value": "approx. 6 lbs"
           },
           {
-            "label": "Measurements (HxWxL) without Pin",
-            "value": "256 × 220 × 190 mm"
+            "label": "Weight in lbs. Packed*",
+            "value": "approx. 8 lbs"
           },
           {
-            "label": "Packed Size (HxWxL)",
-            "value": "295 × 220 × 255 mm"
+            "label": "Measurements (HxWxL) incl. Pin in mm*",
+            "value": "300 x 220 x 190 mm"
           },
           {
-            "label": "Lens / UV-Protection Glass Diameter",
-            "value": "112 mm / 4.4\""
+            "label": "Measurements (HxWxL) excl. Pin in mm*",
+            "value": "256 x 220 x 190 mm"
           },
           {
-            "label": "Accessory Diameter",
-            "value": "168 mm / 6.6\""
+            "label": "Measurements (HxWxL) incl. Pin in inch*",
+            "value": "11.8 x 8.7 x 7.5\""
           },
           {
-            "label": "Barndoor",
-            "value": "168 mm / 6.6\""
+            "label": "Measurements (HxWxL) excl. Pin in inch*",
+            "value": "10.1 x 8.7 x 7.5\""
+          },
+          {
+            "label": "Measurements (HxWxL) Packed size in mm*",
+            "value": "295 x 220 x 255 mm"
+          },
+          {
+            "label": "Measurements (HxWxL) Packed size in inch*",
+            "value": "11.6 x 8.7 x 10.0\""
+          },
+          {
+            "label": "Lens / UV-Protection Glass Diameter in mm",
+            "value": "112 mm"
+          },
+          {
+            "label": "Lens / UV-Protection Glass Diameter in inch",
+            "value": "4.4\""
+          },
+          {
+            "label": "Accessory Diameter in mm",
+            "value": "168 mm"
+          },
+          {
+            "label": "Accessory Diameter in inch",
+            "value": "6.6\" (Scrim)"
+          },
+          {
+            "label": "Barndoor in mm",
+            "value": "168 mm"
+          },
+          {
+            "label": "Barndoor in inch",
+            "value": "6.6\""
           },
           {
             "label": "Mounting",
-            "value": "Socket 16 mm / 5/8\""
+            "value": "Socket 16 mm / 5/8\" (0.6\")"
           },
           {
             "label": "Housing Color",
@@ -2925,9 +2957,15 @@
             "label": "Certifications",
             "value": "CE, UKCA, CB, GS, cNRTLus"
           }
+        ],
+        "_nota_ficha": [
+          {
+            "label": "Note",
+            "value": "*Weight and dimensions are rounded values."
+          }
         ]
       },
-      "_nota": "Datos oficiales ARRI (arri.com) — fixture no se vende en B&H"
+      "_nota": "Datos oficiales arri.com — 33 campos exactos del Technical Data table"
     },
     "molerichardson_1000w": {
       "marca": "Mole-Richardson",
