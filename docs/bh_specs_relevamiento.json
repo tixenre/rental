@@ -328,6 +328,85 @@
           {"label": "Box Dimensions (LxWxH)", "value": "31.1 x 3.7 x 3.1\""}
         ]
       }
+    },
+
+    {
+      "id": "sony_fx3a",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Cinema Camera Full-Frame",
+      "marca": "Sony",
+      "modelo": "FX3A Full-Frame Cinema Camera",
+      "url_source": null,
+      "precio_usd": 4298,
+      "status_bh": "In Stock",
+      "fuente": "screenshot manual del dueño (16-may-2026)",
+      "secciones": {
+        "Key Specs": [
+          {"label": "Image Sensor", "value": "Full Frame"},
+          {"label": "Effective Sensor Resolution", "value": "[ilegible en screenshot]"},
+          {"label": "Sensor Autofocus", "value": "[ilegible en screenshot]"},
+          {"label": "Max Recording Frame Rate", "value": "[ilegible en screenshot — compound multi-format]"},
+          {"label": "Max Video Output", "value": "[ilegible en screenshot]"},
+          {"label": "Media/Memory Card Slot", "value": "Dual Slot (CFexpress Type A / SDXC)"},
+          {"label": "Video I/O", "value": "HDMI"},
+          {"label": "Sync Input/Output", "value": "[ilegible en screenshot]"},
+          {"label": "Battery", "value": "NP-FZ100"}
+        ],
+        "Imaging": [
+          {"label": "Image Sensor Format", "value": "Full Frame"},
+          {"label": "Effective Sensor Resolution", "value": "[ilegible en screenshot]"},
+          {"label": "Image Stabilization", "value": "[ilegible en screenshot]"},
+          {"label": "Built-In ND Filter", "value": "No"},
+          {"label": "Built-In Flash", "value": "No"},
+          {"label": "Capture Type", "value": "Video"}
+        ],
+        "Exposure Control": [
+          {"label": "Shutter Type", "value": "[ilegible en screenshot]"},
+          {"label": "Shutter Speed", "value": "[ilegible en screenshot]"},
+          {"label": "Minimum ISO", "value": "[ilegible en screenshot]"},
+          {"label": "Expanded ISO Range", "value": "[ilegible en screenshot]"},
+          {"label": "White Balance", "value": "[ilegible en screenshot]"}
+        ],
+        "Focus": [
+          {"label": "Focus Mode", "value": "Automatic / Continuous / Manual"},
+          {"label": "Autofocus Points", "value": "[ilegible en screenshot]"}
+        ],
+        "Video Capture": [
+          {"label": "Video Recording", "value": "[ilegible en screenshot — compound multi-format XAVC-HS/XAVC-S/XAVC-I con múltiples resoluciones y fps]"},
+          {"label": "Video Format", "value": "[ilegible en screenshot]"},
+          {"label": "Color Space", "value": "[ilegible en screenshot]"}
+        ],
+        "Interface": [
+          {"label": "Memory/Recording Card Slot", "value": "Dual Slot (CFexpress Type A / SDXC)"},
+          {"label": "Internal Storage", "value": "No"},
+          {"label": "USB", "value": "[ilegible en screenshot]"},
+          {"label": "HDMI I/O", "value": "1x HDMI"},
+          {"label": "Audio I/O", "value": "[ilegible en screenshot]"},
+          {"label": "Network", "value": "[ilegible en screenshot]"},
+          {"label": "Mobile App Compatible", "value": "[ilegible en screenshot]"}
+        ],
+        "Monitor": [
+          {"label": "Display Type", "value": "[ilegible en screenshot]"},
+          {"label": "Tilt", "value": "[ilegible en screenshot]"}
+        ],
+        "Power": [
+          {"label": "Battery", "value": "NP-FZ100"},
+          {"label": "Power Consumption", "value": "[ilegible en screenshot]"}
+        ],
+        "Environmental": [
+          {"label": "Operating Conditions", "value": "[ilegible en screenshot]"},
+          {"label": "Storage Conditions", "value": "[ilegible en screenshot]"}
+        ],
+        "Optics": [
+          {"label": "Lens Mount", "value": "Sony E"},
+          {"label": "Interchangeable Lens", "value": "Yes"},
+          {"label": "Filter Thread", "value": "[ilegible en screenshot]"}
+        ],
+        "Packaging Info": [
+          {"label": "Package Weight", "value": "[ilegible en screenshot]"},
+          {"label": "Box Dimensions (LxWxH)", "value": "[ilegible en screenshot]"}
+        ]
+      }
     }
   ],
 
