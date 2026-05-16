@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   Telescope, RefreshCcw, Loader2, ChevronDown, ChevronRight,
-  CheckCircle2, AlertCircle,
+  CheckCircle2, AlertCircle, Download,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,47 @@ function ObservatorioPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /** Descarga el snapshot completo del observatorio como JSON. Fetcha
+   *  stats + agregado SIN filtros (todas las categorías, matched +
+   *  unmatched) con top_values=20 para tener data rica. Sirve para
+   *  pasarle el snapshot a alguien que no tenga acceso a la UI o para
+   *  hacer análisis offline. */
+  const [downloading, setDownloading] = useState(false);
+  async function downloadSnapshot() {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const [statsData, agregadoData] = await Promise.all([
+        adminApi.observatorioStats(),
+        adminApi.observatorioAgregado({ top_values: 20 }),
+      ]);
+      const snapshot = {
+        generated_at: new Date().toISOString(),
+        stats: statsData,
+        agregado: agregadoData,
+      };
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      a.download = `specs-observatorio-${ts}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(
+        `Snapshot descargado: ${agregadoData.total} labels, ${statsData.total_obs} observaciones`,
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falló la descarga");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   const items = agregadoQ.data?.items ?? [];
   const itemsFiltrados = filtroLabel
     ? items.filter((it) =>
@@ -96,16 +137,34 @@ function ObservatorioPage() {
             con datos reales en vez de suposiciones.
           </p>
         </div>
-        <Button
-          onClick={() => recomputeMut.mutate()}
-          disabled={recomputeMut.isPending}
-        >
-          {recomputeMut.isPending ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Recomputando…</>
-          ) : (
-            <><RefreshCcw className="h-4 w-4 mr-2" /> Recomputar</>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={downloadSnapshot}
+            disabled={downloading || !stats || stats.total_obs === 0}
+            title={
+              !stats || stats.total_obs === 0
+                ? "Primero recomputá para tener datos"
+                : "Descarga un JSON con stats + agregado completo (sin filtros)"
+            }
+          >
+            {downloading ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Descargando…</>
+            ) : (
+              <><Download className="h-4 w-4 mr-2" /> Descargar JSON</>
+            )}
+          </Button>
+          <Button
+            onClick={() => recomputeMut.mutate()}
+            disabled={recomputeMut.isPending}
+          >
+            {recomputeMut.isPending ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Recomputando…</>
+            ) : (
+              <><RefreshCcw className="h-4 w-4 mr-2" /> Recomputar</>
+            )}
+          </Button>
+        </div>
       </header>
 
       {/* Stats */}
