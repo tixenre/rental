@@ -16,6 +16,7 @@ import { Route as PrivacidadRouteImport } from './routes/privacidad'
 import { Route as PreguntasFrecuentesRouteImport } from './routes/preguntas-frecuentes'
 import { Route as EstudioRouteImport } from './routes/estudio'
 import { Route as ClienteRouteImport } from './routes/cliente'
+import { Route as CatalogoRouteImport } from './routes/catalogo'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ClienteIndexRouteImport } from './routes/cliente.index'
@@ -104,6 +105,11 @@ const EstudioRoute = EstudioRouteImport.update({
 const ClienteRoute = ClienteRouteImport.update({
   id: '/cliente',
   path: '/cliente',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CatalogoRoute = CatalogoRouteImport.update({
+  id: '/catalogo',
+  path: '/catalogo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -346,6 +352,7 @@ const AdminEquiposEtiquetasRoute = AdminEquiposEtiquetasRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/catalogo': typeof CatalogoRoute
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
@@ -389,6 +396,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/catalogo': typeof CatalogoRoute
   '/estudio': typeof EstudioRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/privacidad': typeof PrivacidadRoute
@@ -432,6 +440,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/catalogo': typeof CatalogoRoute
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
@@ -478,6 +487,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/catalogo'
     | '/cliente'
     | '/estudio'
     | '/preguntas-frecuentes'
@@ -521,6 +531,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/catalogo'
     | '/estudio'
     | '/preguntas-frecuentes'
     | '/privacidad'
@@ -563,6 +574,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/catalogo'
     | '/cliente'
     | '/estudio'
     | '/preguntas-frecuentes'
@@ -608,6 +620,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
+  CatalogoRoute: typeof CatalogoRoute
   ClienteRoute: typeof ClienteRouteWithChildren
   EstudioRoute: typeof EstudioRoute
   PreguntasFrecuentesRoute: typeof PreguntasFrecuentesRoute
@@ -651,6 +664,13 @@ declare module '@tanstack/react-router' {
       path: '/cliente'
       fullPath: '/cliente'
       preLoaderRoute: typeof ClienteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/catalogo': {
+      id: '/catalogo'
+      path: '/catalogo'
+      fullPath: '/catalogo'
+      preLoaderRoute: typeof CatalogoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -1013,6 +1033,7 @@ const ClienteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
+  CatalogoRoute: CatalogoRoute,
   ClienteRoute: ClienteRouteWithChildren,
   EstudioRoute: EstudioRoute,
   PreguntasFrecuentesRoute: PreguntasFrecuentesRoute,
