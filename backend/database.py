@@ -742,6 +742,17 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_spec_def_unidad_id "
         "ON spec_definitions(unidad_id) WHERE unidad_id IS NOT NULL"
     )
+    # Aliases: labels alternativos para matching tolerante en el observatorio
+    # y autocompletar IA. Ej. spec "lens_mount" con aliases ["Montura",
+    # "Lens Mount", "Mount"] matchea las 3 variantes.
+    conn.execute(
+        "ALTER TABLE spec_definitions "
+        "ADD COLUMN IF NOT EXISTS aliases JSONB"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spec_def_aliases "
+        "ON spec_definitions USING GIN (aliases) WHERE aliases IS NOT NULL"
+    )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
         "ON spec_definitions(es_compatibilidad) WHERE es_compatibilidad"

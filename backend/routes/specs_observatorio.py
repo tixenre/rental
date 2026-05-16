@@ -109,17 +109,41 @@ def _categoria_raiz_del_equipo(conn, equipo_id: int) -> Optional[str]:
 
 def _spec_def_index(conn) -> dict[str, dict]:
     """Devuelve un dict {label_normalizado: {id, spec_key}} con TODAS las
-    spec_definitions vigentes — usado para matching contra observaciones."""
+    spec_definitions vigentes — usado para matching contra observaciones.
+
+    Incluye tanto el `label` canónico como cada item de `aliases` (también
+    normalizado). Permite que el observatorio matchee labels alternativos
+    sin tocar el spec canónico (ej. "Montura" → spec lens_mount via
+    aliases, sin renombrar el spec)."""
     rows = conn.execute(
-        "SELECT id, spec_key, label FROM spec_definitions"
+        "SELECT id, spec_key, label, aliases FROM spec_definitions"
     ).fetchall()
     out: dict[str, dict] = {}
     for r in rows:
         d = row_to_dict(r) if not isinstance(r, dict) else r
+        spec_id = d["id"]
+        spec_key = d["spec_key"]
+
+        # 1) Label canónico.
         norm = norm_spec_label(d.get("label") or "")
-        if not norm:
-            continue
-        out[norm] = {"id": d["id"], "spec_key": d["spec_key"]}
+        if norm and norm not in out:
+            out[norm] = {"id": spec_id, "spec_key": spec_key}
+
+        # 2) Aliases (si los tiene). El primer match gana (no pisa el canónico).
+        aliases = d.get("aliases")
+        if isinstance(aliases, str):
+            try:
+                import json as _json
+                aliases = _json.loads(aliases)
+            except Exception:
+                aliases = None
+        if isinstance(aliases, list):
+            for alias in aliases:
+                if not alias:
+                    continue
+                alias_norm = norm_spec_label(str(alias))
+                if alias_norm and alias_norm not in out:
+                    out[alias_norm] = {"id": spec_id, "spec_key": spec_key}
     return out
 
 

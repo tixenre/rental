@@ -736,8 +736,10 @@ function DefinitionFormModal({
     compatibilidad_modo: definition?.compatibilidad_modo ?? "exacta",
     tabla_columnas: definition?.tabla_columnas ?? [],
     output_config: definition?.output_config ?? null,
+    aliases: definition?.aliases ?? [],
   });
   const [enumInput, setEnumInput] = useState((definition?.enum_options ?? []).join(", "));
+  const [aliasesInput, setAliasesInput] = useState((definition?.aliases ?? []).join(", "));
   const [busy, setBusy] = useState(false);
 
   // Asignación a categorías: pre-carga las que ya están asignadas, permite
@@ -844,6 +846,10 @@ function DefinitionFormModal({
         compatibilidad_modo: form.es_compatibilidad ? modo : "exacta",
         tabla_columnas: form.tipo === "tabla" ? (form.tabla_columnas ?? []) : null,
         output_config: form.tipo === "tabla" ? (form.output_config ?? null) : null,
+        aliases: aliasesInput
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
       };
       let specDefId: number;
       if (isNew) {
@@ -1027,6 +1033,21 @@ function DefinitionFormModal({
               onChange={(e) => setForm({ ...form, ayuda: e.target.value })}
               placeholder="Texto que aparece bajo el input al cargar un equipo"
             />
+          </div>
+
+          <div>
+            <Label className="text-xs">Aliases (opcional)</Label>
+            <Input
+              value={aliasesInput}
+              onChange={(e) => setAliasesInput(e.target.value)}
+              placeholder="ej. Lens Mount, Mount, Montura"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Labels alternativos separados por coma. Sirven para el
+              matching del observatorio (B&amp;H devuelve "Mount" pero la
+              spec se llama "Lens mount") y del autocompletar IA. Case y
+              tildes no importan.
+            </p>
           </div>
 
           <fieldset className="border hairline rounded-md p-2 space-y-1.5">

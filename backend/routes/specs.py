@@ -68,6 +68,10 @@ class SpecDefinitionInput(BaseModel):
     # Por ahora solo soporta `row_strategy: "all" | "first" | "last"` para
     # specs tipo tabla. NULL = defaults (all).
     output_config: Optional[dict] = None
+    # Labels alternativos para matching tolerante. Ej. lens_mount con
+    # ["Montura", "Lens Mount", "Mount"] matchea las 3 variantes desde
+    # el observatorio o el autocompletar IA.
+    aliases: Optional[list[str]] = None
 
 
 class SpecDefinitionUpdate(BaseModel):
@@ -82,6 +86,7 @@ class SpecDefinitionUpdate(BaseModel):
     validado: Optional[bool] = None
     tabla_columnas: Optional[list[dict]] = None
     output_config: Optional[dict] = None
+    aliases: Optional[list[str]] = None
 
 
 # Asignación de una spec_def a una categoría con flags propios.
@@ -192,7 +197,7 @@ def listar_spec_definitions(request: Request):
         rows = conn.execute("""
             SELECT
               sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id,
-              sd.enum_options, sd.ayuda, sd.tabla_columnas, sd.output_config,
+              sd.enum_options, sd.ayuda, sd.tabla_columnas, sd.output_config, sd.aliases,
               COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
               COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
               COALESCE(sd.validado, FALSE) AS validado,
@@ -327,8 +332,8 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
                 INSERT INTO spec_definitions
                   (spec_key, label, tipo, unidad, unidad_id, enum_options, ayuda,
                    es_compatibilidad, compatibilidad_modo, validado,
-                   tabla_columnas, output_config)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   tabla_columnas, output_config, aliases)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """,
                 (
@@ -344,6 +349,7 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
                     payload.validado,
                     json.dumps(payload.tabla_columnas) if payload.tabla_columnas else None,
                     json.dumps(payload.output_config) if payload.output_config else None,
+                    json.dumps(payload.aliases) if payload.aliases else None,
                 ),
             )
             new_id = cur.fetchone()[0]
@@ -393,6 +399,10 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
         # contra existing_dict + final_tipo. Acá solo serializamos.
         oc_val = updates["output_config"]
         updates["output_config"] = json.dumps(oc_val) if oc_val else None
+    if "aliases" in updates:
+        al_val = updates["aliases"]
+        # Lista vacía o None → NULL en DB. Lista con items → serializar.
+        updates["aliases"] = json.dumps(al_val) if al_val else None
     # Sync unidad ↔ unidad_id: si el caller cambia `unidad`, recomputamos
     # `unidad_id` desde el catálogo (creándolo si no existe).
     sync_unidad_id: Optional[bool] = "unidad" in updates
@@ -1041,7 +1051,7 @@ def listar_templates(categoria_id: int, request: Request):
             SELECT
               t.id, t.categoria_id, t.spec_def_id,
               sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id, sd.enum_options,
-              sd.tabla_columnas, sd.output_config,
+              sd.tabla_columnas, sd.output_config, sd.aliases,
               t.prioridad,
               COALESCE(t.visible_en_card, FALSE) AS visible_en_card,
               COALESCE(t.visible_en_filtros, FALSE) AS visible_en_filtros,

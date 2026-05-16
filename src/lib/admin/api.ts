@@ -315,6 +315,9 @@ export type SpecDefinition = {
   /** FK al catálogo `unidades` (sync con el string `unidad` por el backend).
    *  null si la spec no tiene unidad asociada. */
   unidad_id: number | null;
+  /** Labels alternativos para matching tolerante en el observatorio y
+   *  autocompletar IA. Ej. lens_mount con ["Montura", "Lens Mount"]. */
+  aliases: string[] | null;
   enum_options: string[] | null;
   ayuda: string | null;
   es_compatibilidad: boolean;
@@ -359,6 +362,7 @@ export type SpecDefinitionInput = {
   validado?: boolean;
   tabla_columnas?: SpecTablaColumna[] | null;
   output_config?: SpecOutputConfig | null;
+  aliases?: string[] | null;
 };
 
 /** Asignación de una spec_def a una categoría + flags propios. El backend
@@ -378,6 +382,7 @@ export type SpecTemplate = {
   enum_options: string[] | null;
   tabla_columnas: SpecTablaColumna[] | null;
   output_config: SpecOutputConfig | null;
+  aliases: string[] | null;
   es_compatibilidad: boolean;
   compatibilidad_modo: CompatibilidadModo;
   // Per-categoría: (los flags aplicados por la asignación)
