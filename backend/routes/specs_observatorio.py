@@ -312,6 +312,36 @@ def agregado_observatorio(
         conn.close()
 
 
+@router.get("/admin/specs/observatorio/scrapeables-pendientes")
+def listar_scrapeables_pendientes(request: Request) -> dict:
+    """Devuelve los IDs de equipos que tienen `bh_url` cargada pero
+    no tienen `equipo_fichas.raw_json` cacheado. Son los candidatos
+    para correr `batch-enriquecer` masivamente desde la UI del
+    observatorio."""
+    require_admin(request)
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """
+            SELECT e.id, e.nombre, e.bh_url
+            FROM equipos e
+            LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
+            WHERE e.eliminado_at IS NULL
+              AND e.bh_url IS NOT NULL
+              AND TRIM(e.bh_url) <> ''
+              AND (ef.raw_json IS NULL OR TRIM(ef.raw_json) = '')
+            ORDER BY e.id
+            """
+        ).fetchall()
+        items = [
+            {"id": r["id"], "nombre": r["nombre"], "bh_url": r["bh_url"]}
+            for r in rows
+        ]
+        return {"total": len(items), "items": items, "ids": [it["id"] for it in items]}
+    finally:
+        conn.close()
+
+
 @router.get("/admin/specs/observatorio/stats")
 def stats_observatorio(request: Request) -> dict:
     """Resumen global: total observaciones, equipos cubiertos, % matched."""

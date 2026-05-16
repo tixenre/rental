@@ -984,6 +984,12 @@ export const adminApi = {
       equipos_total: number;
       last_observed_at: string | null;
     }>("/api/admin/specs/observatorio/stats"),
+  observatorioScrapeablesPendientes: () =>
+    authedJson<{
+      total: number;
+      ids: number[];
+      items: Array<{ id: number; nombre: string; bh_url: string | null }>;
+    }>("/api/admin/specs/observatorio/scrapeables-pendientes"),
   observatorioAgregado: (params: {
     categoria?: string | null;
     solo_unmapped?: boolean;
