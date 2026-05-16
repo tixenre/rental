@@ -692,6 +692,177 @@ class SpecDedupMergeInput(BaseModel):
     drop_id: int
 
 
+# ── Cleanup de specs legacy (equipo_fichas.specs_json) ─────────────────
+
+
+@router.get("/admin/specs/legacy/inventario")
+def listar_legacy_inventario(request: Request):
+    """Lista los equipos que tienen `equipo_fichas.specs_json` con specs
+    cargadas, junto con cuántas matchean fuzzy una `spec_definitions` y
+    cuántas son genuinamente custom (sin equivalente).
+
+    Devuelve `[{equipo_id, equipo_nombre, total, matched, custom}]`
+    ordenado por total descendente. El admin después usa
+    `POST /admin/specs/legacy/promover/{equipo_id}` para mover las
+    matched a `equipo_specs`."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        # Index de spec_definitions por label normalizado.
+        from services.spec_render import norm_spec_label
+        def_rows = conn.execute(
+            "SELECT id, label FROM spec_definitions"
+        ).fetchall()
+        defs_by_norm: dict[str, int] = {}
+        for r in def_rows:
+            d = row_to_dict(r) if not isinstance(r, dict) else r
+            n = norm_spec_label(d.get("label") or "")
+            if n:
+                defs_by_norm[n] = d["id"]
+
+        eq_rows = conn.execute(
+            """
+            SELECT e.id, e.nombre, ef.specs_json
+            FROM equipos e
+            JOIN equipo_fichas ef ON ef.equipo_id = e.id
+            WHERE e.eliminado_at IS NULL
+              AND ef.specs_json IS NOT NULL
+              AND TRIM(ef.specs_json) <> ''
+            """
+        ).fetchall()
+
+        items: list[dict] = []
+        for r in eq_rows:
+            d = row_to_dict(r) if not isinstance(r, dict) else r
+            try:
+                arr = json.loads(d["specs_json"])
+            except Exception:
+                continue
+            if not isinstance(arr, list):
+                continue
+            matched = 0
+            custom = 0
+            total = 0
+            for s in arr:
+                if not isinstance(s, dict):
+                    continue
+                label = s.get("label") or ""
+                value = s.get("value")
+                if not label or value is None or value == "":
+                    continue
+                total += 1
+                if defs_by_norm.get(norm_spec_label(label)):
+                    matched += 1
+                else:
+                    custom += 1
+            if total > 0:
+                items.append({
+                    "equipo_id": d["id"],
+                    "equipo_nombre": d["nombre"],
+                    "total": total,
+                    "matched": matched,
+                    "custom": custom,
+                })
+        items.sort(key=lambda x: -x["total"])
+        return {"total": len(items), "items": items}
+    finally:
+        conn.close()
+
+
+@router.post("/admin/specs/legacy/promover/{equipo_id}")
+def promover_legacy_equipo(equipo_id: int, request: Request):
+    """Para cada spec del `specs_json` legacy del equipo cuyo label
+    matchee un `spec_definitions`:
+      1. Crea o actualiza `equipo_specs` (PK equipo_id, spec_def_id).
+      2. Saca esa entry del `specs_json`.
+
+    Las specs custom (sin matching) quedan en el JSON intactas — el
+    admin decide manualmente si crear la spec global o borrarlas. Esto
+    NO toca specs tabla (las marca como `value_raw` y tienen flujo
+    propio)."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        from services.spec_render import norm_spec_label
+        def_rows = conn.execute(
+            "SELECT id, label, tipo FROM spec_definitions"
+        ).fetchall()
+        defs_by_norm: dict[str, dict] = {}
+        for r in def_rows:
+            d = row_to_dict(r) if not isinstance(r, dict) else r
+            n = norm_spec_label(d.get("label") or "")
+            if n:
+                defs_by_norm[n] = {"id": d["id"], "tipo": d["tipo"]}
+
+        ficha = conn.execute(
+            "SELECT specs_json FROM equipo_fichas WHERE equipo_id = ?",
+            (equipo_id,),
+        ).fetchone()
+        if not ficha or not ficha["specs_json"]:
+            raise HTTPException(404, "Equipo sin specs_json.")
+
+        try:
+            arr = json.loads(ficha["specs_json"])
+        except Exception:
+            raise HTTPException(400, "specs_json corrupto.")
+        if not isinstance(arr, list):
+            raise HTTPException(400, "specs_json no es array.")
+
+        kept: list[dict] = []
+        promoted: list[dict] = []
+        for s in arr:
+            if not isinstance(s, dict):
+                kept.append(s)
+                continue
+            label = s.get("label") or ""
+            value = s.get("value")
+            if not label or value is None or value == "":
+                kept.append(s)
+                continue
+            match = defs_by_norm.get(norm_spec_label(label))
+            if not match:
+                kept.append(s)
+                continue
+            # Skip specs tabla — su shape no es el del legacy plain.
+            if match["tipo"] == "tabla":
+                kept.append(s)
+                continue
+            # Migrar.
+            conn.execute(
+                """
+                INSERT INTO equipo_specs (equipo_id, spec_def_id, value)
+                VALUES (?, ?, ?)
+                ON CONFLICT (equipo_id, spec_def_id) DO UPDATE
+                  SET value = EXCLUDED.value
+                """,
+                (equipo_id, match["id"], str(value)),
+            )
+            promoted.append({"label": label, "spec_def_id": match["id"]})
+
+        # Actualizar specs_json sin las que migramos.
+        new_json = json.dumps(kept, ensure_ascii=False) if kept else None
+        conn.execute(
+            "UPDATE equipo_fichas SET specs_json = ? WHERE equipo_id = ?",
+            (new_json, equipo_id),
+        )
+        conn.commit()
+        return {
+            "ok": True,
+            "equipo_id": equipo_id,
+            "promoted_count": len(promoted),
+            "kept_count": len(kept),
+            "promoted": promoted,
+        }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 @router.post("/admin/specs/dedup/merge")
 def merge_specs(payload: SpecDedupMergeInput, request: Request):
     """Mergea `drop_id` dentro de `keep_id` en una transacción:

@@ -22,6 +22,7 @@ import {
   Telescope,
   Network,
   GitMerge,
+  Archive,
 } from "lucide-react";
 
 import {
@@ -68,6 +69,7 @@ const items: NavItem[] = [
       { title: "Observatorio specs",  url: "/admin/specs/observatorio", icon: Telescope },
       { title: "Familias jerárquicas", url: "/admin/specs/familias",     icon: Network },
       { title: "Dedup de specs",      url: "/admin/specs/dedup",        icon: GitMerge },
+      { title: "Cleanup legacy",      url: "/admin/specs/legacy",       icon: Archive },
       { title: "Unidades",            url: "/admin/unidades",           icon: Ruler },
     ],
   },
