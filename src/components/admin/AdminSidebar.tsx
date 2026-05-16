@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Telescope,
   Network,
+  GitMerge,
 } from "lucide-react";
 
 import {
@@ -66,6 +67,7 @@ const items: NavItem[] = [
       { title: "Gear Compatibility",  url: "/admin/gear-compatibility", icon: Sparkles },
       { title: "Observatorio specs",  url: "/admin/specs/observatorio", icon: Telescope },
       { title: "Familias jerárquicas", url: "/admin/specs/familias",     icon: Network },
+      { title: "Dedup de specs",      url: "/admin/specs/dedup",        icon: GitMerge },
       { title: "Unidades",            url: "/admin/unidades",           icon: Ruler },
     ],
   },

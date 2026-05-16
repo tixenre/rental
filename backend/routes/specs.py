@@ -603,6 +603,206 @@ def borrar_familia_item(item_id: int, request: Request):
     _MULTI_ENUM_FAMILIES.invalidate()
 
 
+# ── Dedup tool: detectar y mergear specs duplicadas ────────────────────
+
+
+def _levenshtein(a: str, b: str) -> int:
+    """Distancia de edición simple. Suficiente para labels cortos."""
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            cost = 0 if ca == cb else 1
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+        prev = cur
+    return prev[-1]
+
+
+@router.get("/admin/specs/dedup/candidatos")
+def listar_dedup_candidatos(request: Request):
+    """Devuelve pares de spec_definitions sospechosas de ser duplicadas:
+    labels normalizados con distancia ≤ 2 y tipos compatibles.
+
+    Por cada par, devuelve cuántos equipos usan cada una y un score
+    sugiriendo cuál mantener (la que tiene más uso o validado=true).
+    El admin revisa y aprueba el merge."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT
+              sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.validado,
+              (SELECT COUNT(*) FROM categoria_spec_templates t WHERE t.spec_def_id = sd.id) AS uso_cat,
+              (SELECT COUNT(*) FROM equipo_specs es WHERE es.spec_def_id = sd.id) AS uso_eq
+            FROM spec_definitions sd
+        """).fetchall()
+        defs = [row_to_dict(r) for r in rows]
+
+        from services.spec_render import norm_spec_label
+        candidatos: list[dict] = []
+        for i, a in enumerate(defs):
+            la = norm_spec_label(a["label"])
+            for b in defs[i + 1:]:
+                # Solo comparar tipos compatibles (string/number/enum entre sí
+                # — la migración manual entre tipos heterogéneos es más
+                # delicada y queda fuera del dedup automático).
+                if a["tipo"] != b["tipo"]:
+                    continue
+                lb = norm_spec_label(b["label"])
+                if la == lb or _levenshtein(la, lb) <= 2:
+                    # Sugerir cuál mantener: validado primero, luego más uso.
+                    score_a = (1 if a["validado"] else 0) * 100 + a["uso_cat"] * 10 + a["uso_eq"]
+                    score_b = (1 if b["validado"] else 0) * 100 + b["uso_cat"] * 10 + b["uso_eq"]
+                    keep, drop = (a, b) if score_a >= score_b else (b, a)
+                    candidatos.append({
+                        "keep": {
+                            "id": keep["id"], "spec_key": keep["spec_key"],
+                            "label": keep["label"], "tipo": keep["tipo"],
+                            "unidad": keep["unidad"], "validado": keep["validado"],
+                            "uso_cat": keep["uso_cat"], "uso_eq": keep["uso_eq"],
+                        },
+                        "drop": {
+                            "id": drop["id"], "spec_key": drop["spec_key"],
+                            "label": drop["label"], "tipo": drop["tipo"],
+                            "unidad": drop["unidad"], "validado": drop["validado"],
+                            "uso_cat": drop["uso_cat"], "uso_eq": drop["uso_eq"],
+                        },
+                        "label_distance": _levenshtein(la, lb),
+                    })
+        # Más exactos primero (distance 0), después más usados.
+        candidatos.sort(
+            key=lambda x: (
+                x["label_distance"],
+                -(x["keep"]["uso_eq"] + x["drop"]["uso_eq"]),
+            ),
+        )
+        return {"total": len(candidatos), "items": candidatos}
+    finally:
+        conn.close()
+
+
+class SpecDedupMergeInput(BaseModel):
+    keep_id: int
+    drop_id: int
+
+
+@router.post("/admin/specs/dedup/merge")
+def merge_specs(payload: SpecDedupMergeInput, request: Request):
+    """Mergea `drop_id` dentro de `keep_id` en una transacción:
+    - Reasigna `categoria_spec_templates.spec_def_id` (skip si ya existe
+      una asignación con keep_id en la misma categoría — gana keep).
+    - Reasigna `equipo_specs.spec_def_id` (skip si el equipo ya tiene
+      keep_id cargado — gana keep).
+    - Si keep es tipo enum/multi_enum: UNION de enum_options conservando
+      orden de keep.
+    - Borra `drop` de spec_definitions.
+
+    Operación reversible solo via backup — el merge es destructivo."""
+    _require_admin(request)
+    if payload.keep_id == payload.drop_id:
+        raise HTTPException(400, "keep_id y drop_id deben ser distintos.")
+    conn = get_db()
+    try:
+        keep = conn.execute(
+            "SELECT id, tipo, enum_options FROM spec_definitions WHERE id = ?",
+            (payload.keep_id,),
+        ).fetchone()
+        drop = conn.execute(
+            "SELECT id, tipo, enum_options FROM spec_definitions WHERE id = ?",
+            (payload.drop_id,),
+        ).fetchone()
+        if not keep:
+            raise HTTPException(404, f"keep_id {payload.keep_id} no existe.")
+        if not drop:
+            raise HTTPException(404, f"drop_id {payload.drop_id} no existe.")
+
+        # Reasignar templates (skip si categoría ya tiene keep).
+        conn.execute(
+            """
+            DELETE FROM categoria_spec_templates
+            WHERE spec_def_id = ?
+              AND categoria_id IN (
+                  SELECT categoria_id FROM categoria_spec_templates
+                  WHERE spec_def_id = ?
+              )
+            """,
+            (payload.drop_id, payload.keep_id),
+        )
+        conn.execute(
+            "UPDATE categoria_spec_templates SET spec_def_id = ? WHERE spec_def_id = ?",
+            (payload.keep_id, payload.drop_id),
+        )
+
+        # Reasignar equipo_specs (skip si equipo ya tiene keep).
+        conn.execute(
+            """
+            DELETE FROM equipo_specs
+            WHERE spec_def_id = ?
+              AND equipo_id IN (
+                  SELECT equipo_id FROM equipo_specs WHERE spec_def_id = ?
+              )
+            """,
+            (payload.drop_id, payload.keep_id),
+        )
+        conn.execute(
+            "UPDATE equipo_specs SET spec_def_id = ? WHERE spec_def_id = ?",
+            (payload.keep_id, payload.drop_id),
+        )
+
+        # Union de enum_options si aplica.
+        if keep["tipo"] in ("enum", "multi_enum"):
+            keep_opts = keep["enum_options"]
+            drop_opts = drop["enum_options"]
+            if isinstance(keep_opts, str):
+                try:
+                    keep_opts = json.loads(keep_opts)
+                except Exception:
+                    keep_opts = []
+            if isinstance(drop_opts, str):
+                try:
+                    drop_opts = json.loads(drop_opts)
+                except Exception:
+                    drop_opts = []
+            keep_opts = keep_opts or []
+            drop_opts = drop_opts or []
+            seen = set(keep_opts)
+            merged = list(keep_opts)
+            for o in drop_opts:
+                if o not in seen:
+                    merged.append(o)
+                    seen.add(o)
+            if merged != keep_opts:
+                conn.execute(
+                    "UPDATE spec_definitions SET enum_options = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (json.dumps(merged), payload.keep_id),
+                )
+
+        # Finalmente borrar drop.
+        conn.execute(
+            "DELETE FROM spec_definitions WHERE id = ?", (payload.drop_id,)
+        )
+        conn.commit()
+        return {
+            "ok": True,
+            "keep_id": payload.keep_id,
+            "drop_id": payload.drop_id,
+        }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 @router.delete("/admin/spec-definitions/{def_id}", status_code=204)
 def borrar_spec_definition(def_id: int, request: Request):
     _require_admin(request)
