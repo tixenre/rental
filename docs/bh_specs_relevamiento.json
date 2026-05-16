@@ -269,10 +269,6 @@
             "value": "Yes"
           },
           {
-            "label": "Photometrics at 3.3' / 1 m",
-            "value": "Not Specified by Manufacturer"
-          },
-          {
             "label": "Color Temperature",
             "value": "2500 to 8500K"
           },
@@ -325,10 +321,6 @@
           {
             "label": "Included Storage Case",
             "value": "Yes"
-          },
-          {
-            "label": "Photometrics",
-            "value": "Not Specified by Manufacturer"
           },
           {
             "label": "Color Temperature",
@@ -854,7 +846,7 @@
       }
     },
     {
-      "id": "aputure_nova",
+      "id": "aputure_nova_ii_2x1",
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Array LED Light Panel RGB",
       "marca": "Aputure",
@@ -1068,10 +1060,10 @@
       }
     },
     {
-      "id": "molerichardson_juniorled",
+      "id": "molerichardson_juniorled_200",
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Fresnel",
-      "marca": "Mole-richardson",
+      "marca": "Mole-Richardson",
       "modelo": "JuniorLED 200W 8\" Fresnel with DMX",
       "url_source": "https://www.bhphotovideo.com/c/product/979830-REG/mole_richardson_8941_50rev_junior_200w_8_junior.html",
       "status_bh": "Desconocido",
@@ -1540,7 +1532,7 @@
     {
       "id": "godox_vl150",
       "categoria_raiz": "Iluminación",
-      "subtipo": "1 x",
+      "subtipo": "LED Light",
       "marca": "Godox",
       "modelo": "VL150 LED Video Light",
       "url_source": "https://www.bhphotovideo.com/c/product/1513246-REG/godox_vl150_video_led_light.html?fromDisList=y",
@@ -1548,14 +1540,6 @@
       "fuente": "html guardado manual (2026-05-16)",
       "secciones": {
         "Key Specs": [
-          {
-            "label": "Item Type",
-            "value": "1 x"
-          },
-          {
-            "label": "Included Light Modifier",
-            "value": "1 x"
-          },
           {
             "label": "Color Temperature",
             "value": "5600K +/- 200K"
@@ -1581,14 +1565,6 @@
             "value": "AC to DC Adapter (Included)"
           },
           {
-            "label": "Battery Plate Type",
-            "value": "1 x"
-          },
-          {
-            "label": "Battery",
-            "value": "1 x"
-          },
-          {
             "label": "AC Input Power",
             "value": "110 to 240 VAC, 50 / 60 Hz"
           },
@@ -1599,21 +1575,9 @@
           {
             "label": "Power Consumption",
             "value": "150 W"
-          },
-          {
-            "label": "Fixture Mounting",
-            "value": "1 x"
           }
         ],
         "Light Fixture": [
-          {
-            "label": "Item Type",
-            "value": "1 x"
-          },
-          {
-            "label": "Included Light Modifier",
-            "value": "1 x"
-          },
           {
             "label": "Color Temperature",
             "value": "5600K +/- 200K"
@@ -1659,24 +1623,12 @@
             "value": "Light Fixture"
           },
           {
-            "label": "Battery Plate Type",
-            "value": "1 x"
-          },
-          {
-            "label": "Battery",
-            "value": "1 x"
-          },
-          {
             "label": "AC Input Power",
             "value": "110 to 240 VAC, 50 / 60 Hz"
           },
           {
             "label": "DC Input Power",
             "value": "16.8 VDC"
-          },
-          {
-            "label": "Included Adapter / Cable",
-            "value": "1 x"
           },
           {
             "label": "Inline Switch",
@@ -1695,10 +1647,6 @@
           {
             "label": "Yoke Type",
             "value": "Manually-Operated Yoke"
-          },
-          {
-            "label": "Fixture Mounting",
-            "value": "1 x"
           }
         ],
         "Environmental": [
@@ -1940,9 +1888,9 @@
       }
     },
     {
-      "id": "nanlite_forza",
+      "id": "nanlite_forza_500",
       "categoria_raiz": "Iluminación",
-      "subtipo": "1 x",
+      "subtipo": "LED Light",
       "marca": "Nanlite",
       "modelo": "Forza 500 Daylight LED Monolight",
       "url_source": "https://www.bhphotovideo.com/c/product/1476382-REG/nanlite_12_2026_forza_500_led_monolight.html?fromDisList=y",
@@ -1950,22 +1898,6 @@
       "fuente": "html guardado manual (2026-05-16)",
       "secciones": {
         "Key Specs": [
-          {
-            "label": "Item Type",
-            "value": "1 x"
-          },
-          {
-            "label": "Included Light Modifier",
-            "value": "1 x"
-          },
-          {
-            "label": "Included Storage Case",
-            "value": "1 x"
-          },
-          {
-            "label": "Photometrics at 3.3' / 1 m",
-            "value": ":"
-          },
           {
             "label": "Color Temperature",
             "value": "5600K"
@@ -2009,32 +1941,12 @@
           {
             "label": "Power Consumption",
             "value": "500 W"
-          },
-          {
-            "label": "Fixture Mounting",
-            "value": "1 x"
           }
         ],
         "Light Fixture": [
           {
-            "label": "Item Type",
-            "value": "1 x"
-          },
-          {
-            "label": "Included Light Modifier",
-            "value": "1 x"
-          },
-          {
-            "label": "Included Storage Case",
-            "value": "1 x"
-          },
-          {
             "label": "Lumens",
             "value": "46,613"
-          },
-          {
-            "label": "Photometrics",
-            "value": ":"
           },
           {
             "label": "Color Temperature",
@@ -2113,10 +2025,6 @@
           {
             "label": "Yoke Type",
             "value": "Manually-Operated Yoke"
-          },
-          {
-            "label": "Fixture Mounting",
-            "value": "1 x"
           }
         ],
         "General": [
@@ -2146,7 +2054,7 @@
       }
     },
     {
-      "id": "nanlite_60b",
+      "id": "nanlite_forza_60b",
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Monolight",
       "marca": "Nanlite",
@@ -2585,10 +2493,6 @@
       "secciones": {
         "Key Specs": [
           {
-            "label": "Guide Number",
-            "value": "Not Specified by Manufacturer"
-          },
-          {
             "label": "Auto Zoom Head",
             "value": "Yes"
           },
@@ -2614,10 +2518,6 @@
           }
         ],
         "Flash Head": [
-          {
-            "label": "Guide Number",
-            "value": "Not Specified by Manufacturer"
-          },
           {
             "label": "Auto Zoom Head",
             "value": "Yes"
@@ -2722,8 +2622,8 @@
       "marca": "ARRI",
       "modelo": "650 Plus",
       "url_source": "https://www.arri.com/en/lighting/daylight-tungsten/tungsten/arri-junior/arri-650-plus",
-      "status_bh": "N/A",
-      "fuente": "ARRI oficial",
+      "status_bh": "N/A — sitio fabricante",
+      "fuente": "ARRI oficial (web fetch)",
       "secciones": {
         "Technical Data": [
           {
@@ -2868,8 +2768,8 @@
       "marca": "Mole-Richardson",
       "modelo": "407 Baby Solarspot 1000W 6\"",
       "url_source": "https://www.mole.com/407-baby-solarspot",
-      "status_bh": "N/A",
-      "fuente": "Mole oficial",
+      "status_bh": "N/A — sitio fabricante",
+      "fuente": "Mole-Richardson oficial (web fetch)",
       "secciones": {
         "Technical Specifications": [
           {

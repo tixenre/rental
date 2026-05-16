@@ -94,7 +94,13 @@ class BHSpecsParser(HTMLParser):
                 self._pending_label = text
             self._in_label = False
         elif self._in_value:
-            if self._current_section and self._pending_label:
+            # Filtrar valores basura: "1 x", "1x", ":" sueltos vienen de celdas
+            # B&H con solo imagen y sin texto. "Not Specified by Manufacturer" tampoco aporta.
+            is_garbage = (
+                text in ("1 x", "1x", ":", "—", "-", "N/A", "n/a")
+                or text.lower().startswith("not specified")
+            )
+            if self._current_section and self._pending_label and not is_garbage:
                 key = f"{self._current_section}|{self._pending_label}|{text}"
                 if key not in self._seen_pairs:
                     self._seen_pairs.add(key)
@@ -394,7 +400,7 @@ def _parse_control_inalambrico(secciones: dict) -> str | None:
 
 
 def _parse_alimentacion(secciones: dict) -> list[str]:
-    """Devuelve lista de enum values del proyecto."""
+    """Devuelve lista de enum values del proyecto, ordenada por prioridad canónica."""
     ENUM_MAP = {
         # B&H keyword → enum value del proyecto
         "v-mount": "V-mount",
@@ -416,6 +422,8 @@ def _parse_alimentacion(secciones: dict) -> list[str]:
         "integrated battery": "Batería integrada",
         "rechargeable": "Batería integrada",
     }
+    # Orden canónico de aparición en la lista (AC primero, batería integrada al final)
+    PRIORITY = ["AC", "V-mount", "Gold Mount", "NP-F", "D-Tap", "USB-C", "Batería integrada"]
 
     sources = []
     for label in (
@@ -445,7 +453,11 @@ def _parse_alimentacion(secciones: dict) -> list[str]:
         found.append("V-mount")
         seen.add("V-mount")
 
-    return found if found else ["AC"]  # default si no se puede inferir
+    if not found:
+        found = ["AC"]  # default si no se puede inferir
+
+    # Ordenar por prioridad canónica
+    return sorted(found, key=lambda x: PRIORITY.index(x) if x in PRIORITY else 99)
 
 
 def _parse_montaje(secciones: dict) -> str | None:
@@ -467,7 +479,7 @@ def _parse_montaje(secciones: dict) -> str | None:
         return "Elinchrom"
     if "proprietary" in val_lower or "propietario" in val_lower:
         return "Propietario"
-    if "none" in val_lower or "n/a" in val_lower:
+    if val_lower.strip() in ("none", "n/a", "no"):
         return None
     # Ignorar valores que son stud/receiver (montaje de fixture, no de modificador)
     if re.search(r'\d/\d["\']|stud|receiver|yoke', val_lower):
@@ -498,10 +510,10 @@ def _parse_peso(secciones: dict) -> str | None:
 _TIPO_KEYWORDS = [
     ("Fresnel", ["fresnel"]),
     ("Tube Light", ["tube light", "led tube"]),
-    ("Flexible Mat", ["flexible mat", "flex mat"]),
+    ("Flexible Mat", ["flexible mat", "flex mat", "flexible light"]),
     ("Panel", ["light panel", "led panel"]),
     ("COB Monolight", ["cob led monolight", "cob monolight"]),
-    ("Monolight", ["led monolight", "monolight"]),
+    ("Monolight", ["led monolight", "monolight", "video light"]),
     ("Spotlight", ["spotlight"]),
     ("On-Camera", ["on-camera"]),
     ("Bulb / Lamp", ["led lamp", "lamp"]),
@@ -522,11 +534,13 @@ def _parse_beam_angle(secciones: dict) -> str | None:
     val = _find_value(secciones, "Beam Angle")
     if not val:
         return None
-    # Tomar primera línea, ej. "55°" o "13 to 54°"
     line = val.splitlines()[0].strip()
     # "13 to 54°" → "13-54°"
     line = re.sub(r"(\d+)\s+to\s+(\d+)", r"\1-\2", line)
-    return line
+    # Quitar calificadores comunes: "Unmodified", "with Included Reflector", etc.
+    line = re.sub(r"\s+(?:Unmodified|with\s+Included\s+Reflector|with\s+Reflector|\(Unmodified\)|\(With\s+Reflector\))\s*$",
+                  "", line, flags=re.IGNORECASE)
+    return line.strip()
 
 
 def _parse_cooling(secciones: dict) -> str | None:
@@ -553,10 +567,26 @@ def _parse_dimensiones(secciones: dict) -> str | None:
     val = _find_value(secciones, "Dimensions", "Dimensions (W x H x D)")
     if not val:
         return None
-    # Preferir parte métrica: "23.6 x 11.8 x 0.2\" / 60 x 30 x 0.5 cm (Fixture)" → "60 × 30 × 0.5 cm"
-    m = re.search(r"([\d.]+\s*x\s*[\d.]+(?:\s*x\s*[\d.]+)?)\s*cm", val, re.IGNORECASE)
-    if m:
-        return m.group(1).replace("x", "×") + " cm"
+
+    # B&H a veces tiene typos de decimales en las conversiones cm. Validamos:
+    # convertimos inch a cm y si la diferencia es enorme, preferimos calcular de inch.
+    m_in = re.search(r"([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*[\"']", val)
+    m_cm = re.search(r"([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*cm", val, re.IGNORECASE)
+
+    if m_in and m_cm:
+        inch_vals = [float(x) for x in m_in.groups()]
+        cm_vals = [float(x) for x in m_cm.groups()]
+        # Si los cm están MAL (off por factor ~10), recalcular desde inches
+        expected = inch_vals[0] * 2.54
+        if expected > 0 and abs(cm_vals[0] - expected) / expected > 0.5:
+            # Recalcular desde inches
+            converted = [round(v * 2.54, 1) for v in inch_vals]
+            return f"{converted[0]} × {converted[1]} × {converted[2]} cm"
+        return f"{cm_vals[0]} × {cm_vals[1]} × {cm_vals[2]} cm"
+
+    # Solo métrico
+    if m_cm:
+        return f"{m_cm.group(1)} × {m_cm.group(2)} × {m_cm.group(3)} cm"
     m_mm = re.search(r"([\d.]+\s*x\s*[\d.]+(?:\s*x\s*[\d.]+)?)\s*mm", val, re.IGNORECASE)
     if m_mm:
         return m_mm.group(1).replace("x", "×") + " mm"
@@ -598,7 +628,11 @@ def _parse_display(secciones: dict) -> str | None:
     v = val.strip()
     if v.lower() in ("no", "none"):
         return None
-    return v
+    # Normalizar: "LED (Via Included Power Supply/Controller)" → "LED"
+    # "Yes: LCD" → "LCD"
+    v = re.sub(r"^Yes:\s*", "", v, flags=re.IGNORECASE)
+    v = re.sub(r"\s*\(.*?\)\s*$", "", v)  # quitar parentético al final
+    return v.strip() or None
 
 
 def map_luz_extras(secciones: dict, title: str = "") -> dict:
