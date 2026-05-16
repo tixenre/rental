@@ -45,8 +45,13 @@
           "ancho_cm": 30.0,
           "alto_cm": 0.5
         },
-        "display": "OLED",
+        "has_display": true,
+        "display_type": "OLED",
         "app_compatible": true,
+        "app_platforms": [
+          "Android",
+          "iOS"
+        ],
         "ssi": {
           "at_5600k": 81
         },
@@ -56,10 +61,18 @@
         ],
         "wireless_range_m": 80,
         "vida_util_h": 50000,
-        "modificador_incluido": "1x Softbox with Removable Grid",
-        "case_incluido": "Yes",
+        "included_accessories": [
+          "Softbox with Removable Grid",
+          "Storage Case"
+        ],
+        "case_included": true,
         "fixture_mount": "1x 5/8\" Receiver",
-        "io": "1x USB-C DMX Input",
+        "io": [
+          "1x USB-C DMX Input",
+          "*Adapter Required (Not Included)",
+          "1x XLR 3-Pin Power Input",
+          "1x Proprietary Power Output"
+        ],
         "materiales": "Plastic (Housing)",
         "certificaciones": "CE"
       },
@@ -323,13 +336,19 @@
           "ancho_cm": 7.0,
           "alto_cm": 1.5
         },
-        "display": "LCD",
+        "has_display": true,
+        "display_type": "LCD",
         "photometrics_full": [
           "Not Specified by Manufacturer"
         ],
-        "case_incluido": "Yes",
+        "included_accessories": [
+          "Storage Case"
+        ],
+        "case_included": true,
         "fixture_mount": "Multiple x 1/4\"-20 Female Thread",
-        "io": "1x USB-C Power Input",
+        "io": [
+          "1x USB-C Power Input"
+        ],
         "materiales": "Aluminum (Housing)"
       },
       "ficha": {
@@ -553,15 +572,22 @@
           "ancho_cm": 24.64,
           "alto_cm": 14.91
         },
-        "display": "Yes",
+        "has_display": true,
         "app_compatible": true,
+        "app_platforms": [
+          "Android",
+          "iOS"
+        ],
         "photometrics_full": [
           "2700K: 1516 fc / 16,320 Lux",
           "3200K: 1640 fc / 17,660 Lux",
           "5600K: 1961 fc / 21,110 Lux",
           "6500K: 1846 fc / 19,880 Lux"
         ],
-        "case_incluido": "Yes",
+        "included_accessories": [
+          "Storage Case"
+        ],
+        "case_included": true,
         "yoke": "Manually-Operated Yoke",
         "fixture_mount": "1x 5/8\" Receiver (Via Yoke Mount)"
       },
@@ -785,8 +811,13 @@
           "ancho_cm": 16.51,
           "alto_cm": 14.81
         },
-        "display": "LCD",
+        "has_display": true,
+        "display_type": "LCD",
         "app_compatible": true,
+        "app_platforms": [
+          "Android",
+          "iOS"
+        ],
         "tm30_rf": 94,
         "tm30_rg": 100,
         "ssi": {
@@ -804,10 +835,17 @@
           "45° at 5600K: 4143 fc / 44,600 Lux (with Reflector)"
         ],
         "wireless_range_m": 80,
-        "modificador_incluido": "1x Reflector",
-        "case_incluido": "Yes",
+        "included_accessories": [
+          "Reflector",
+          "Storage Case"
+        ],
+        "case_included": true,
         "fixture_mount": "1x 5/8\" Receiver (Via Swivel Mount)",
-        "io": "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)"
+        "io": [
+          "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)",
+          "1x USB-C DMX/Firmware Input",
+          "*Adapter Required (Not Included)"
+        ]
       },
       "ficha": {
         "Key Specs": [
@@ -1051,18 +1089,28 @@
       },
       "extras": {
         "beam_angle": {
-          "min": 35.0,
-          "max": 35.0
+          "min": 35,
+          "max": 95
         },
+        "beam_angle_note": "35° native / 95° with diffuser",
         "cooling": "Fan",
+        "noise_db": {
+          "silent": 0,
+          "medium": 35,
+          "high": 40
+        },
         "ip_rating": "IP65",
         "dimensiones_cm": {
           "largo_cm": 69.1,
           "ancho_cm": 38.9,
           "alto_cm": 13.7
         },
-        "display": "Yes",
+        "has_display": true,
         "app_compatible": true,
+        "app_platforms": [
+          "Android",
+          "iOS"
+        ],
         "tm30_rf": 95,
         "tm30_rg": 100,
         "ssi": {
@@ -1076,10 +1124,18 @@
           "95° at 5600K: 3781 fc / 40,700 Lux (with Diffuser)"
         ],
         "wireless_range_m": 100,
-        "modificador_incluido": "1x Diffuser",
+        "included_accessories": [
+          "Diffuser"
+        ],
         "yoke": "Manually-Operated Yoke",
         "fixture_mount": "1x 1-1/8\" Stud (Via Yoke Mount)",
-        "io": "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)"
+        "io": [
+          "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)",
+          "1x XLR 5-Pin DMX Input",
+          "1x XLR 5-Pin DMX Output",
+          "2x RJ45 Network Input/Output",
+          "1x USB-A Firmware Input"
+        ]
       },
       "ficha": {
         "Key Specs": [
@@ -1327,7 +1383,11 @@
         ],
         "yoke": "Manually-Operated Yoke",
         "fixture_mount": "1x 1-1/8\" Stud (Via Yoke Mount)",
-        "io": "1x powerCON Power Input",
+        "io": [
+          "1x powerCON Power Input",
+          "1x XLR 5-Pin DMX Input",
+          "1x XLR 5-Pin DMX Output"
+        ],
         "materiales": "Aluminum, Steel (Housing)",
         "certificaciones": "RoHS"
       },
@@ -1547,15 +1607,27 @@
           "largo_cm": 75.0,
           "ancho_cm": 4.8
         },
-        "display": "LCD",
+        "has_display": true,
+        "display_type": "LCD",
         "app_compatible": true,
+        "app_platforms": [
+          "Android",
+          "iOS"
+        ],
         "photometrics_full": [
           "5600K: 39 fc / 421 Lux"
         ],
         "wireless_range_m": 30,
-        "case_incluido": "Yes",
+        "included_accessories": [
+          "Storage Case"
+        ],
+        "case_included": true,
         "fixture_mount": "2x 1/4\"-20 Female Thread (Via Mounting Clip)",
-        "io": "1x Barrel / Coax Power Input (20 VDC at 2.4 A)"
+        "io": [
+          "1x Barrel / Coax Power Input (20 VDC at 2.4 A)",
+          "1x RJ45 DMX Input",
+          "1x RJ45 DMX Output"
+        ]
       },
       "ficha": {
         "Key Specs": [
@@ -1792,9 +1864,15 @@
       },
       "extras": {
         "base_type": "E26/E27",
+        "beam_angle": {
+          "min": 360,
+          "max": 360
+        },
+        "beam_angle_note": "Omnidireccional (bulbo)",
         "dimensiones_cm": {
           "largo_cm": 11.5,
-          "ancho_cm": 7.0
+          "ancho_cm": 7.0,
+          "alto_cm": 7.0
         }
       },
       "ficha": {
@@ -1883,8 +1961,20 @@
           "ancho_cm": 11.5,
           "alto_cm": 3.6
         },
-        "display": "LED",
-        "yoke": "Manually-Operated Yoke"
+        "has_display": true,
+        "display_type": "LED",
+        "included_accessories": [
+          "Reflector"
+        ],
+        "yoke": "Manually-Operated Yoke",
+        "io": [
+          "Light Fixture",
+          "To Power Supply/Controller: 1 x XLR 4-Pin  Input",
+          "Power Supply/Controller",
+          "To Light Fixture: 1 x XLR 4-Pin  Output",
+          "1 x XLR 4-Pin  Input",
+          "2 x Barrel / Coax Antenna Input"
+        ]
       },
       "ficha": {
         "Key Specs": [
@@ -2065,13 +2155,27 @@
           "ancho_cm": 27.2,
           "alto_cm": 17.6
         },
-        "display": "Yes",
+        "has_display": true,
         "app_compatible": true,
+        "app_platforms": [
+          "Android",
+          "iOS"
+        ],
         "photometrics_full": [
           "5600K: 1077 fc / 11,600 Lux"
         ],
-        "case_incluido": "Yes",
-        "fixture_mount": "Support Mount"
+        "included_accessories": [
+          "Storage Case"
+        ],
+        "case_included": true,
+        "fixture_mount": "Support Mount",
+        "io": [
+          "Light Fixture",
+          "1x Unspecified Power Input",
+          "Power Supply/Controller",
+          "1x Unspecified Power Output",
+          "1x Unspecified Power Input"
+        ]
       },
       "ficha": {
         "Key Specs": [
@@ -2307,13 +2411,25 @@
           "ancho_cm": 20.6,
           "alto_cm": 14.2
         },
-        "display": "Yes",
+        "has_display": true,
         "photometrics_full": [
           ":",
           "8672 fc / 93,350 Lux at 3.3' / 1 m (with Reflector)*",
           "*Standardized Measurement Supplied by the Manufacturer"
         ],
-        "yoke": "Manually-Operated Yoke"
+        "included_accessories": [
+          "Reflector"
+        ],
+        "yoke": "Manually-Operated Yoke",
+        "io": [
+          "Light Fixture",
+          "To Power Supply/Controller: 1 x Unspecified Power/DMX Input (48 VDC)",
+          "Power Supply/Controller",
+          "To Light Fixture: 1 x Unspecified Power/DMX Output",
+          "1 x XLR 5-Pin DMX Input (48 VDC)",
+          "1 x XLR 5-Pin DMX Output",
+          "1 x Unspecified Power Input (48 VDC)"
+        ]
       },
       "ficha": {
         "Key Specs": [
@@ -2513,18 +2629,28 @@
           "ancho_cm": 10.4,
           "alto_cm": 8.4
         },
-        "display": "OLED",
+        "has_display": true,
+        "display_type": "OLED",
         "app_compatible": true,
+        "app_platforms": [
+          "Android",
+          "iOS"
+        ],
         "photometrics_full": [
           "3200K: 207 fc / 2235 Lux",
           "5600K: 239 fc / 2577 Lux",
           "55° at 3200K: 1130 fc / 12,170 Lux (with Reflector)",
           "55° at 5600K: 1333 fc / 14,350 Lux (with Reflector)"
         ],
-        "case_incluido": "Yes",
+        "included_accessories": [
+          "Storage Case"
+        ],
+        "case_included": true,
         "yoke": "Manually-Operated Yoke",
         "fixture_mount": "Support Mount",
-        "io": "1x Barrel / Coax Power Input"
+        "io": [
+          "1x Barrel / Coax Power Input"
+        ]
       },
       "ficha": {
         "Key Specs": [
@@ -2777,8 +2903,13 @@
           "ancho_cm": 24.9,
           "alto_cm": 19.3
         },
-        "display": "LCD",
+        "has_display": true,
+        "display_type": "LCD",
         "app_compatible": true,
+        "app_platforms": [
+          "Android",
+          "iOS"
+        ],
         "tm30_rf": 92,
         "tm30_rg": 100,
         "ssi": {
@@ -2792,9 +2923,14 @@
           "65° at 5600K: 2469 fc / 26,580 Lux (with Reflector)"
         ],
         "wireless_range_m": 100,
-        "case_incluido": "Yes",
+        "included_accessories": [
+          "Storage Case"
+        ],
+        "case_included": true,
         "fixture_mount": "1x 5/8\" Receiver",
-        "io": "1x XLR 3-Pin Power Input"
+        "io": [
+          "1x XLR 3-Pin Power Input"
+        ]
       },
       "ficha": {
         "Key Specs": [
@@ -3368,7 +3504,8 @@
         ],
         "fixture_mount": "Yoke con spud 5/8\" (16 mm)",
         "accessory_diameter": "6 5/8\" (168 mm)",
-        "cable_length": "25 ft (7.6 m) Type SO"
+        "cable_length_m": 7.6,
+        "cable_specs": "25 ft (7.6 m) Type SO"
       },
       "ficha": {
         "Technical Specifications": [
