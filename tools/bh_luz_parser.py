@@ -448,6 +448,155 @@ def _parse_peso(secciones: dict) -> str | None:
     return val.strip()
 
 
+# ── Extras (campos estructurados extra para ficha técnica) ───────────────────
+
+_TIPO_KEYWORDS = [
+    ("Fresnel", ["fresnel"]),
+    ("Tube Light", ["tube light", "led tube"]),
+    ("Flexible Mat", ["flexible mat", "flex mat"]),
+    ("Panel", ["light panel", "led panel"]),
+    ("COB Monolight", ["cob led monolight", "cob monolight"]),
+    ("Monolight", ["led monolight", "monolight"]),
+    ("Spotlight", ["spotlight"]),
+    ("On-Camera", ["on-camera"]),
+    ("Bulb / Lamp", ["led lamp", "lamp"]),
+    ("Flash", ["flash", "speedlight", "strobe"]),
+]
+
+
+def _parse_tipo(secciones: dict, title: str = "") -> str | None:
+    item_type = (_find_value(secciones, "Item Type") or "").lower()
+    haystack = f"{item_type} {title}".lower()
+    for label, keywords in _TIPO_KEYWORDS:
+        if any(k in haystack for k in keywords):
+            return label
+    return None
+
+
+def _parse_beam_angle(secciones: dict) -> str | None:
+    val = _find_value(secciones, "Beam Angle")
+    if not val:
+        return None
+    # Tomar primera línea, ej. "55°" o "13 to 54°"
+    line = val.splitlines()[0].strip()
+    # "13 to 54°" → "13-54°"
+    line = re.sub(r"(\d+)\s+to\s+(\d+)", r"\1-\2", line)
+    return line
+
+
+def _parse_cooling(secciones: dict) -> str | None:
+    val = _find_value(secciones, "Cooling System")
+    if not val:
+        return None
+    v = val.strip().lower()
+    if "fan" in v:
+        return "Fan"
+    if "passive" in v:
+        return "Passive"
+    return val.strip()
+
+
+def _parse_ip_rating(secciones: dict) -> str | None:
+    val = _find_value(secciones, "Environmental Resistance", "IP Rating")
+    if not val:
+        return None
+    m = re.search(r"IP\d{2}", val)
+    return m.group(0) if m else val.strip()
+
+
+def _parse_dimensiones(secciones: dict) -> str | None:
+    val = _find_value(secciones, "Dimensions", "Dimensions (W x H x D)")
+    if not val:
+        return None
+    # Preferir parte métrica: "23.6 x 11.8 x 0.2\" / 60 x 30 x 0.5 cm (Fixture)" → "60 × 30 × 0.5 cm"
+    m = re.search(r"([\d.]+\s*x\s*[\d.]+(?:\s*x\s*[\d.]+)?)\s*cm", val, re.IGNORECASE)
+    if m:
+        return m.group(1).replace("x", "×") + " cm"
+    m_mm = re.search(r"([\d.]+\s*x\s*[\d.]+(?:\s*x\s*[\d.]+)?)\s*mm", val, re.IGNORECASE)
+    if m_mm:
+        return m_mm.group(1).replace("x", "×") + " mm"
+    return val.split("\n")[0].strip()
+
+
+def _parse_photometrics(secciones: dict) -> str | None:
+    """Lux/fc a 1m — output real del fixture. B&H lo formatea raro, devolvemos limpio."""
+    val = _find_value(secciones, "Photometrics at 3.3' / 1 m", "Photometrics")
+    if not val:
+        return None
+    # Quedarnos con la primera línea útil (descartar ":" sueltos)
+    for line in val.splitlines():
+        line = line.strip()
+        if line and line != ":" and "Lux" in line:
+            return line
+    return val.splitlines()[0].strip() if val else None
+
+
+def _parse_tlci(secciones: dict) -> int | None:
+    val = _find_value(secciones, "Color Accuracy Standard")
+    if not val:
+        return None
+    m = re.search(r"TLCI\s*(\d+)", val, re.IGNORECASE)
+    return int(m.group(1)) if m else None
+
+
+def _parse_app_compatible(secciones: dict) -> bool | None:
+    val = _find_value(secciones, "Mobile App Compatible")
+    if not val:
+        return None
+    return val.strip().lower().startswith(("yes", "sí", "si"))
+
+
+def _parse_display(secciones: dict) -> str | None:
+    val = _find_value(secciones, "Display")
+    if not val:
+        return None
+    v = val.strip()
+    if v.lower() in ("no", "none"):
+        return None
+    return v
+
+
+def map_luz_extras(secciones: dict, title: str = "") -> dict:
+    """Campos extra estructurados para ficha técnica (no son para comparación primaria)."""
+    result: dict = {}
+
+    def _add(key, val):
+        if val is not None and val != "":
+            result[key] = val
+
+    _add("tipo", _parse_tipo(secciones, title))
+    _add("beam_angle", _parse_beam_angle(secciones))
+    _add("cooling", _parse_cooling(secciones))
+    _add("ip_rating", _parse_ip_rating(secciones))
+    _add("dimensiones", _parse_dimensiones(secciones))
+    _add("photometrics_1m", _parse_photometrics(secciones))
+    _add("tlci", _parse_tlci(secciones))
+    _add("app_compatible", _parse_app_compatible(secciones))
+    _add("display", _parse_display(secciones))
+
+    # Otros campos útiles directos del raw
+    for src_label, dst_key in [
+        ("Item Type", "item_type"),
+        ("Included Light Modifier", "modificador_incluido"),
+        ("Included Storage Case", "case_incluido"),
+        ("Bulb Type", "bulb_type"),
+        ("Base Type", "base_type"),
+        ("Expected Lamp Life", "vida_util_horas"),
+        ("Yoke Type", "yoke"),
+        ("Fixture Mounting", "fixture_mount"),
+        ("Cable Length", "cable_length"),
+        ("Materials", "materiales"),
+        ("Certifications", "certificaciones"),
+        ("Wireless Range", "wireless_range"),
+        ("Inputs/Outputs", "io"),
+    ]:
+        v = _find_value(secciones, src_label)
+        if v:
+            result[dst_key] = v.split("\n")[0].strip() if "\n" in v else v.strip()
+
+    return result
+
+
 def map_luz_specs(secciones: dict, title: str = "") -> dict:
     """Mapea secciones raw de B&H → spec_keys del proyecto para Iluminación."""
     result: dict = {}
@@ -612,10 +761,14 @@ def main(html_paths: list[Path]):
 
         # Curado: siempre regenerar (para reflectar el mapper actualizado)
         specs = map_luz_specs(raw["secciones"], title=raw["modelo"])
+        extras = map_luz_extras(raw["secciones"], title=raw["modelo"])
         curado["products"][prod_id] = {
             "marca": raw["marca"],
             "modelo": raw["modelo"],
-            "specs": specs,
+            "url_source": raw.get("url_source", ""),
+            "specs": specs,         # 11 normalizados para comparación
+            "extras": extras,        # campos estructurados extra (tipo, beam_angle, etc.)
+            "ficha": raw["secciones"],  # todas las secciones B&H completas
         }
         added_curado += 1
         print(f"  + curado: {specs}")
