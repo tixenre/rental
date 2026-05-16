@@ -233,9 +233,10 @@ function TemplateBoundRow({
   tmpl: SpecTemplate;
   onUpdate: (patch: Partial<Spec>) => void;
 }) {
+  const validation = validateSpecValue(tmpl, spec.value);
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] items-center gap-2">
-      <div className="min-w-0 text-xs">
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] items-start gap-2">
+      <div className="min-w-0 text-xs pt-1.5">
         <span className="text-ink">{tmpl.label}</span>
         {tmpl.obligatorio && <span className="text-destructive ml-0.5">*</span>}
         {tmpl.ayuda && (
@@ -244,13 +245,101 @@ function TemplateBoundRow({
           </div>
         )}
       </div>
-      <TypedValueInput
-        tmpl={tmpl}
-        value={spec.value}
-        onChange={(v) => onUpdate({ value: v })}
-      />
+      <div className="space-y-0.5">
+        <TypedValueInput
+          tmpl={tmpl}
+          value={spec.value}
+          onChange={(v) => onUpdate({ value: v })}
+        />
+        {validation.message && (
+          <div
+            className={
+              "text-[10px] " + (validation.severity === "error"
+                ? "text-destructive"
+                : "text-amber-700")
+            }
+          >
+            {validation.severity === "error" ? "✗ " : "⚠ "}
+            {validation.message}
+          </div>
+        )}
+      </div>
     </div>
   );
+}
+
+/** Validación inline para mostrar feedback al admin mientras edita.
+ *  La validación authoritative vive en backend; esta es solo visual
+ *  preventiva para que el admin no termine pegando algo que falle al
+ *  guardar. */
+function validateSpecValue(
+  tmpl: SpecTemplate,
+  value: string,
+): { severity?: "error" | "warn"; message?: string } {
+  const v = (value ?? "").trim();
+  if (!v) {
+    if (tmpl.obligatorio) {
+      return { severity: "warn", message: "Obligatorio" };
+    }
+    return {};
+  }
+  if (tmpl.tipo === "number") {
+    // Acepta number con unidad como sufijo: "640 g" → match en \d+
+    if (!/^[+-]?\d+(\.\d+)?(\s+\S+)?$/.test(v)) {
+      return { severity: "error", message: "Valor numérico (ej. 640 o 640 g)" };
+    }
+  }
+  if (tmpl.tipo === "rango") {
+    // Tolera prefijo (f/2.8) o sufijo (24-70 mm). Solo chequea que tenga
+    // al menos un número.
+    if (!/\d/.test(v)) {
+      return { severity: "error", message: "Faltan números — ej. '50' o '24-70'" };
+    }
+  }
+  if (tmpl.tipo === "wxh") {
+    const nums = v.match(/\d+(\.\d+)?/g) ?? [];
+    if (nums.length < 2) {
+      return { severity: "error", message: "Necesita 2 números (ancho × alto)" };
+    }
+  }
+  if (tmpl.tipo === "wxhxd") {
+    const nums = v.match(/\d+(\.\d+)?/g) ?? [];
+    if (nums.length < 3) {
+      return { severity: "error", message: "Necesita 3 números (W × H × D)" };
+    }
+  }
+  if (tmpl.tipo === "enum" && tmpl.enum_options?.length) {
+    if (!tmpl.enum_options.includes(v)) {
+      return { severity: "warn", message: `Valor no está en opciones (${tmpl.enum_options.slice(0, 3).join(", ")}…)` };
+    }
+  }
+  if (tmpl.tipo === "multi_enum" && tmpl.enum_options?.length) {
+    try {
+      const arr = v.startsWith("[") ? JSON.parse(v) : v.split(",").map((s) => s.trim());
+      if (Array.isArray(arr)) {
+        const opts = new Set(tmpl.enum_options);
+        const invalid = arr.filter((x) => typeof x === "string" && !opts.has(x));
+        if (invalid.length > 0) {
+          return { severity: "warn", message: `Fuera de opciones: ${invalid.slice(0, 3).join(", ")}` };
+        }
+      }
+    } catch {
+      return { severity: "error", message: "JSON inválido" };
+    }
+  }
+  if (tmpl.tipo === "tabla") {
+    if (v.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(v);
+        if (!Array.isArray(parsed)) {
+          return { severity: "error", message: "Tabla debe ser array de filas" };
+        }
+      } catch {
+        return { severity: "error", message: "JSON de tabla inválido" };
+      }
+    }
+  }
+  return {};
 }
 
 function TypedValueInput({
