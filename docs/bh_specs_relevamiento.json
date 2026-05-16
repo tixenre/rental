@@ -196,6 +196,82 @@
     },
 
     {
+      "id": "amaran_f21x",
+      "categoria_raiz": "Iluminación",
+      "subtipo": "LED Flexible Mat Bi-Color",
+      "marca": "Amaran",
+      "modelo": "F21X 2x1 Bi-Color LED Flexible Mat (V-Mount)",
+      "url_source": null,
+      "precio_usd": 399,
+      "status_bh": "In Stock",
+      "fuente": "screenshot manual del dueño (16-may-2026)",
+      "secciones": {
+        "Key Specs": [
+          {"label": "Item Type", "value": "Soft LED Flexible Light"},
+          {"label": "Included Light Modifier", "value": "1x Diffusion with Removable Side"},
+          {"label": "Included Storage Case", "value": "Yes"},
+          {"label": "Photometrics at 3.3' / 1 m", "value": "[ilegible en screenshot]"},
+          {"label": "Color Temperature", "value": "2800 to 7500K"},
+          {"label": "Color Modes", "value": "Daylight, Tungsten"},
+          {"label": "Color Accuracy Statement", "value": "[ilegible en screenshot]"},
+          {"label": "Dimming", "value": "[ilegible en screenshot]"},
+          {"label": "Wireless Remote Control Type", "value": "Bluetooth"},
+          {"label": "Power Source", "value": "AC to DC Adapter (Included)\nBattery (Not Included)"},
+          {"label": "Battery Plate Type", "value": "1x V-Mount"},
+          {"label": "Input Power", "value": "[ilegible en screenshot]"},
+          {"label": "Power Consumption", "value": "120W"},
+          {"label": "Fixture Mounting", "value": "[ilegible en screenshot]"}
+        ],
+        "Light Fixture": [
+          {"label": "Item Type", "value": "Soft LED Flexible Light"},
+          {"label": "Included Light Modifier", "value": "1x Diffusion with Removable Side"},
+          {"label": "Included Storage Case", "value": "Yes"},
+          {"label": "Photometrics", "value": "[ilegible en screenshot — compound multi-CCT]"},
+          {"label": "Color Temperature", "value": "2800 to 7500K"},
+          {"label": "Color Modes", "value": "Daylight, Tungsten"},
+          {"label": "Color Accuracy Standard", "value": "[ilegible en screenshot]"},
+          {"label": "Dimming", "value": "Controller-labeled (Continuous)\n• 0 to 100%"},
+          {"label": "Cooling System", "value": "Passive"},
+          {"label": "Flicker Avoidance", "value": "[ilegible en screenshot]"},
+          {"label": "Beam Angle", "value": "120°"},
+          {"label": "Built-In Flash", "value": "No"},
+          {"label": "Preprogrammed Effects", "value": "No"},
+          {"label": "Video-Assist Mount", "value": "No"},
+          {"label": "Front Accessory Mount", "value": "Proprietary"}
+        ],
+        "Connectivity": [
+          {"label": "Wireless Remote Control Type", "value": "Bluetooth"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nApp Name: Sidus Link\nFunctionality: Remote Control"},
+          {"label": "Wireless Range", "value": "[ilegible en screenshot]"}
+        ],
+        "Power & I/O": [
+          {"label": "Power Source", "value": "AC to DC Adapter (Included)\nBattery (Not Included)"},
+          {"label": "Inputs/Outputs", "value": "[ilegible en screenshot]"},
+          {"label": "Battery Plate Type", "value": "1x V-Mount"},
+          {"label": "Battery", "value": "[ilegible en screenshot]"},
+          {"label": "Input Power", "value": "[ilegible en screenshot]"},
+          {"label": "Power Pass-Thru", "value": "No"},
+          {"label": "Power Consumption", "value": "120W"}
+        ],
+        "Mounting": [
+          {"label": "Fixture Mounting", "value": "5/8\" Spigot"},
+          {"label": "Included Mount", "value": "[ilegible en screenshot]"}
+        ],
+        "General": [
+          {"label": "Display", "value": "OLED"},
+          {"label": "Environmental Resistance", "value": "[ilegible en screenshot]"},
+          {"label": "Cabinets", "value": "Fabric"},
+          {"label": "Dimensions", "value": "[ilegible en screenshot]"},
+          {"label": "Weight", "value": "[ilegible en screenshot]"}
+        ],
+        "Packaging Info": [
+          {"label": "Package Weight", "value": "[ilegible en screenshot]"},
+          {"label": "Box Dimensions (LxWxH)", "value": "[ilegible en screenshot]"}
+        ]
+      }
+    },
+
+    {
       "id": "godox_tl60",
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Tube/Wand RGB",
