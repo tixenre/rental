@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   Telescope, RefreshCcw, Loader2, ChevronDown, ChevronRight,
-  CheckCircle2, AlertCircle, Download,
+  CheckCircle2, AlertCircle, Download, Cloud,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -110,6 +110,62 @@ function ObservatorioPage() {
     }
   }
 
+  /** Scrapea en cadena los equipos con bh_url pero sin raw_json. Itera
+   *  el endpoint batch-enriquecer (max 3 por call, 1s sleep entre cada
+   *  scrape). Tarda ~4s por equipo. Al final sugiere recomputar para
+   *  procesar los nuevos raw_json. */
+  const [scrapeProgress, setScrapeProgress] = useState<
+    | { mode: "idle" }
+    | { mode: "running"; done: number; total: number; ok: number; failed: number }
+  >({ mode: "idle" });
+
+  async function scrapearPendientes() {
+    if (scrapeProgress.mode === "running") return;
+    let pendientes;
+    try {
+      pendientes = await adminApi.observatorioScrapeablesPendientes();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falló al listar pendientes");
+      return;
+    }
+    const ids = pendientes.ids;
+    if (ids.length === 0) {
+      toast.success("No hay equipos pendientes de scrape");
+      return;
+    }
+    if (!window.confirm(
+      `Scrapear ${ids.length} equipos contra B&H/Adorama?\n`
+      + `Tarda ~${Math.ceil(ids.length * 4 / 60)} min (rate limit 1s entre scrapes).`,
+    )) return;
+
+    setScrapeProgress({ mode: "running", done: 0, total: ids.length, ok: 0, failed: 0 });
+    let ok = 0;
+    let failed = 0;
+    let done = 0;
+
+    // Procesar en chunks de 3 (límite del endpoint).
+    for (let i = 0; i < ids.length; i += 3) {
+      const chunk = ids.slice(i, i + 3);
+      try {
+        const res = await adminApi.batchEnriquecer(chunk);
+        for (const r of res.results) {
+          if (r.status === "ok") ok++;
+          else failed++;
+        }
+      } catch {
+        failed += chunk.length;
+      }
+      done += chunk.length;
+      setScrapeProgress({ mode: "running", done, total: ids.length, ok, failed });
+    }
+
+    setScrapeProgress({ mode: "idle" });
+    toast.success(
+      `Scrape terminado: ${ok} ok, ${failed} fallaron. Tocá "Recomputar" para refrescar el observatorio.`,
+    );
+    qc.invalidateQueries({ queryKey: ["admin", "observatorio"] });
+  }
+
   const items = agregadoQ.data?.items ?? [];
   const itemsFiltrados = filtroLabel
     ? items.filter((it) =>
@@ -137,7 +193,28 @@ function ObservatorioPage() {
             con datos reales en vez de suposiciones.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {stats && stats.equipos_scrapeables_pendientes > 0 && (
+            <Button
+              variant="outline"
+              onClick={scrapearPendientes}
+              disabled={scrapeProgress.mode === "running"}
+              title={`Dispara batch-enriquecer en cadena para los ${stats.equipos_scrapeables_pendientes} equipos con bh_url sin raw_json`}
+            >
+              {scrapeProgress.mode === "running" ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Scrapeando {scrapeProgress.done}/{scrapeProgress.total}
+                  {scrapeProgress.failed > 0 && ` (${scrapeProgress.failed} fail)`}
+                </>
+              ) : (
+                <>
+                  <Cloud className="h-4 w-4 mr-2" />
+                  Scrapear {stats.equipos_scrapeables_pendientes} pendientes
+                </>
+              )}
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={downloadSnapshot}
