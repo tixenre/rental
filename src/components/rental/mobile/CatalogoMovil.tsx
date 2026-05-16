@@ -2,13 +2,20 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   Camera, Sun, Mic, Layers, Monitor, Zap, Battery,
   Package, SlidersHorizontal, Search, User, Plus,
-  ChevronUp, ChevronRight, X, Calendar,
+  ChevronUp, ChevronRight, X, Calendar, Loader2,
 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useEquipos } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { formatARS } from "@/lib/format";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
+import { createOrder } from "@/lib/orders";
+import { authedFetch } from "@/lib/authedFetch";
+import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
+import { apiGetDescuentosJornada, interpolarDescuento } from "@/lib/api";
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 function addDays(date: Date, days: number): Date {
@@ -263,11 +270,15 @@ interface CartSheetProps {
   horaHasta: string;
 }
 
+const WA_PHONE = "+5492235852510";
+
 function CartSheet({
   onClose, onOpenDateSheet, equipos, cartItems, jornadas,
   fechaDesde, horaDesde, horaHasta,
 }: CartSheetProps) {
+  const navigate = useNavigate();
   const [solicitado, setSolicitado] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const entries = Object.entries(cartItems)
     .map(([id, qty]) => ({ eq: equipos.find((e) => e.id === id)!, qty }))
@@ -277,11 +288,81 @@ function CartSheet({
   const subtotal = entries.reduce((s, { eq, qty }) => s + eq.pricePerDay * qty * jornadasEfectivas, 0);
   const fechaHasta = fechaDesde ? addDays(fechaDesde, jornadas - 1) : null;
 
-  const descJornadas = fechaDesde && jornadas >= 3 ? { pct: 10, label: "3+ jornadas" } : null;
+  // Descuento por jornadas desde el backend
+  const { data: descuentosPuntos = [] } = useQuery({
+    queryKey: ["descuentos-jornada"],
+    queryFn: apiGetDescuentosJornada,
+    staleTime: 10 * 60 * 1000,
+  });
+  const descuentoPct = fechaDesde ? interpolarDescuento(descuentosPuntos, jornadas) : 0;
+  const descJornadas = descuentoPct > 0
+    ? { pct: descuentoPct, label: `${jornadas} jornadas` }
+    : null;
+
+  // Descuento cliente — placeholder según spec del design (conectar con perfil real)
   const descCliente = { pct: 5, label: "cliente registrado" };
-  const montoDescJornadas = descJornadas ? Math.round(subtotal * descJornadas.pct / 100) : 0;
+  const montoDescJornadas = Math.round(subtotal * (descJornadas?.pct ?? 0) / 100);
   const montoDescCliente = Math.round(subtotal * descCliente.pct / 100);
   const totalFinal = subtotal - montoDescJornadas - montoDescCliente;
+
+  async function handleSubmit() {
+    if (entries.length === 0) return;
+    if (!fechaDesde) {
+      toast.error("Elegí las fechas del rental antes de solicitar.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const me = await authedFetch("/api/cliente/me");
+      if (!me.ok) {
+        toast.error("Debés iniciar sesión para solicitar un rental.", {
+          duration: 5000,
+          action: { label: "Iniciar sesión", onClick: () => navigate({ to: "/cliente/login" }) },
+        });
+        return;
+      }
+    } catch {
+      toast.error("Sin conexión. Verificá tu internet.", { duration: 4000 });
+      return;
+    } finally {
+      // only clear submitting if we returned early above
+    }
+    try {
+      await createOrder({
+        status: "solicitado",
+        startDate: fechaDesde,
+        endDate: addDays(fechaDesde, jornadas - 1),
+        startTime: horaDesde,
+        endTime: horaHasta,
+        days: jornadas,
+        resolvedItems: entries.map(({ eq, qty }) => ({
+          id: eq.id,
+          name: eq.name,
+          brand: eq.brand,
+          category: eq.category,
+          qty,
+          pricePerDay: eq.pricePerDay,
+          backendId: eq._backendId,
+        })),
+      });
+      setSolicitado(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error al enviar el pedido";
+      toast.error(msg, { duration: 6000 });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const waMessage = [
+    "¡Hola! Acabo de solicitar un rental en Rambla:",
+    ...entries.map(({ eq, qty }) => `• ${qty}× ${eq.brand} ${eq.name}`),
+    fechaDesde
+      ? `Fechas: ${fmtDate(fechaDesde)} → ${fmtDate(fechaHasta)} (${jornadas} jorn.)`
+      : "",
+    `Total estimado: ${formatARS(totalFinal)}`,
+  ].filter(Boolean).join("\n");
+  const waHref = whatsappLink({ phone: WA_PHONE, message: waMessage }) ?? `https://wa.me/${normalizePhone(WA_PHONE)}`;
 
   return (
     <>
@@ -449,20 +530,28 @@ function CartSheet({
                   Lo revisamos manualmente y te confirmamos a la brevedad.
                 </div>
               </div>
-              <button className="w-full py-3 rounded-full border-[1.5px] border-hairline bg-transparent text-ink font-sans text-sm font-semibold flex items-center justify-center gap-2 hover:border-ink hover:bg-muted transition-colors">
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 rounded-full border-[1.5px] border-hairline bg-transparent text-ink font-sans text-sm font-semibold flex items-center justify-center gap-2 hover:border-ink hover:bg-muted transition-colors"
+              >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
                   <path d="M12 0C5.373 0 0 5.373 0 12c0 2.122.558 4.112 1.528 5.836L.057 23.857a.5.5 0 00.609.61l6.098-1.458A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.722.89.921-3.618-.234-.373A9.818 9.818 0 1112 21.818z" fillRule="evenodd" clipRule="evenodd" />
                 </svg>
                 Consultanos por WhatsApp
-              </button>
+              </a>
             </div>
           ) : (
             <button
-              className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-[15px] font-bold hover:bg-amber hover:text-ink transition-colors"
-              onClick={() => setSolicitado(true)}
+              className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-[15px] font-bold hover:bg-amber hover:text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleSubmit}
+              disabled={submitting}
             >
-              Solicitar rental
+              {submitting
+                ? <Loader2 size={18} className="animate-spin mx-auto" />
+                : "Solicitar rental"}
             </button>
           )}
         </div>
