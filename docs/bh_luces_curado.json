@@ -1,6 +1,307 @@
 {
   "_meta": {
-    "descripcion": "Specs curadas mapeadas a spec_keys del proyecto."
+    "version": "2.0",
+    "ultima_actualizacion": "2026-05-16",
+    "descripcion": "Dataset normalizado de luces del inventario. Cada producto tiene specs (comparables/filtrables), extras (ficha técnica), y ficha (raw B&H/manufacturer).",
+    "fuente_principal": "B&H Photo HTML guardado + JSON-LD structured data",
+    "fuente_alternativa": "manufacturer sites (arri.com, mole.com, aputure.com) vía WebFetch",
+    "ubicacion_htmls": "~/Desktop/Paginas/{Data Set, Inventario}/",
+    "schema": {
+      "specs": {
+        "descripcion": "Campos canónicos para comparación/filtros — TODOS numéricos o enum",
+        "campos": {
+          "tipo": {
+            "tipo": "enum",
+            "valores": [
+              "Flash",
+              "Bulb / Lamp",
+              "Panel",
+              "Tube Light",
+              "Flexible Mat",
+              "Monolight",
+              "COB Monolight",
+              "Spotlight",
+              "Fresnel",
+              "On-Camera"
+            ]
+          },
+          "potencia_w": {
+            "tipo": "int",
+            "unidad": "W"
+          },
+          "lumens_at_5600k": {
+            "tipo": "int",
+            "unidad": "lm",
+            "nota": "Algunos fabricantes no lo publican"
+          },
+          "lumens_at_3200k": {
+            "tipo": "int",
+            "unidad": "lm"
+          },
+          "lux_at_1m_5600k": {
+            "tipo": "int",
+            "unidad": "lx",
+            "nota": "Estándar cine — Lux a 1m"
+          },
+          "lux_at_1m_3200k": {
+            "tipo": "int",
+            "unidad": "lx"
+          },
+          "cri": {
+            "tipo": "int",
+            "rango": "0-100"
+          },
+          "tlci": {
+            "tipo": "int",
+            "rango": "0-100",
+            "nota": "Broadcast standard"
+          },
+          "r9": {
+            "tipo": "int",
+            "rango": "0-100",
+            "nota": "Deep red rendering"
+          },
+          "temperatura_k": {
+            "tipo": "objeto",
+            "shape": {
+              "min": "int",
+              "max": "int"
+            },
+            "unidad": "K",
+            "nota": "Si fijo: min==max"
+          },
+          "color_modes": {
+            "tipo": "array<enum>",
+            "valores": [
+              "RGB",
+              "Daylight",
+              "Tungsten",
+              "HSI",
+              "Bicolor variable"
+            ]
+          },
+          "dimming": {
+            "tipo": "bool"
+          },
+          "control_inalambrico": {
+            "tipo": "array<enum>",
+            "valores": [
+              "Bluetooth",
+              "DMX",
+              "RDM",
+              "Wi-Fi",
+              "CRMX",
+              "Lumenradio",
+              "Art-Net",
+              "sACN"
+            ]
+          },
+          "alimentacion": {
+            "tipo": "array<enum>",
+            "valores": [
+              "AC",
+              "V-mount",
+              "Gold Mount",
+              "NP-F",
+              "D-Tap",
+              "USB-C",
+              "Batería integrada"
+            ],
+            "orden": "canónico (AC primero)"
+          },
+          "montaje": {
+            "tipo": "enum",
+            "valores": [
+              "Bowens",
+              "Propietario",
+              "Fresnel",
+              "Profoto",
+              "Elinchrom"
+            ],
+            "nota": "Modificador de luz; null si no aplica"
+          },
+          "peso_g": {
+            "tipo": "int",
+            "unidad": "g",
+            "nota": "Base — UI computa kg/lb"
+          }
+        }
+      },
+      "extras": {
+        "descripcion": "Campos descriptivos / ficha técnica detallada — opcional, pero útil para producto",
+        "campos": {
+          "bulb_type": {
+            "tipo": "string",
+            "ejemplo": "GY9.5 — CP89 FRL 650W"
+          },
+          "base_type": {
+            "tipo": "string",
+            "ejemplo": "E26/E27"
+          },
+          "beam_angle": {
+            "tipo": "objeto",
+            "shape": {
+              "min": "float",
+              "max": "float"
+            },
+            "unidad": "°"
+          },
+          "beam_angle_note": {
+            "tipo": "string",
+            "nota": "Calificadores (ej. 'native vs con diffuser')"
+          },
+          "cooling": {
+            "tipo": "enum",
+            "valores": [
+              "Fan",
+              "Passive"
+            ]
+          },
+          "noise_db": {
+            "tipo": "objeto",
+            "shape": {
+              "silent": "int",
+              "medium": "int",
+              "high": "int"
+            },
+            "unidad": "dB"
+          },
+          "ip_rating": {
+            "tipo": "string",
+            "ejemplo": "IP54, IP65"
+          },
+          "dimensiones_cm": {
+            "tipo": "objeto",
+            "shape": {
+              "largo_cm": "float",
+              "ancho_cm": "float",
+              "alto_cm": "float"
+            }
+          },
+          "has_display": {
+            "tipo": "bool"
+          },
+          "display_type": {
+            "tipo": "enum",
+            "valores": [
+              "LCD",
+              "OLED",
+              "LED"
+            ]
+          },
+          "app_compatible": {
+            "tipo": "bool"
+          },
+          "app_platforms": {
+            "tipo": "array<enum>",
+            "valores": [
+              "Android",
+              "iOS"
+            ]
+          },
+          "tm30_rf": {
+            "tipo": "int",
+            "rango": "0-100",
+            "nota": "Modern color fidelity"
+          },
+          "tm30_rg": {
+            "tipo": "int",
+            "rango": "0-150",
+            "nota": "Modern color gamut"
+          },
+          "ssi": {
+            "tipo": "objeto",
+            "shape": {
+              "at_3200k": "int",
+              "at_5600k": "int"
+            },
+            "nota": "Sony Spectral Similarity"
+          },
+          "color_temp_ranges": {
+            "tipo": "array<string>",
+            "nota": "Si tiene múltiples rangos selectables"
+          },
+          "photometrics_full": {
+            "tipo": "array<string>",
+            "nota": "Todas las líneas de fc/Lux x angle x temp"
+          },
+          "wireless_range_m": {
+            "tipo": "int",
+            "unidad": "m"
+          },
+          "voltaje_v": {
+            "tipo": "array<int>",
+            "unidad": "V",
+            "ejemplo": "[120, 230]"
+          },
+          "vida_util_h": {
+            "tipo": "int",
+            "unidad": "h"
+          },
+          "included_accessories": {
+            "tipo": "array<string>"
+          },
+          "case_included": {
+            "tipo": "bool"
+          },
+          "yoke": {
+            "tipo": "string"
+          },
+          "fixture_mount": {
+            "tipo": "string",
+            "nota": "Imperial-native (5/8\" stud, etc.)"
+          },
+          "accessory_diameter": {
+            "tipo": "string",
+            "nota": "Imperial-native con métrico"
+          },
+          "io": {
+            "tipo": "array<string>"
+          },
+          "cable_length_m": {
+            "tipo": "float",
+            "unidad": "m"
+          },
+          "cable_specs": {
+            "tipo": "string",
+            "nota": "Tipo, plug, etc."
+          },
+          "materiales": {
+            "tipo": "string"
+          },
+          "certificaciones": {
+            "tipo": "string",
+            "ejemplo": "CE, UKCA, CB, GS"
+          },
+          "reflector": {
+            "tipo": "string"
+          },
+          "serie": {
+            "tipo": "string",
+            "ejemplo": "ARRI Junior, Nanlite Forza"
+          }
+        }
+      },
+      "ficha": {
+        "descripcion": "Raw del scrape — todas las secciones B&H tal cual aparecen. Para renderizar ficha técnica completa.",
+        "shape": "{ section_name: [{label, value}, ...] }"
+      },
+      "image_url": "URL de imagen principal (extraída de JSON-LD Product.image)",
+      "url_source": "URL canónica del producto (B&H, arri.com, mole.com)"
+    },
+    "convenciones": {
+      "ids": "{marca}_{modelo}, snake_case. Ej: aputure_nova_ii_2x1, godox_vl300ii",
+      "unidades": "Numéricos en base SI (g, m, cm, W, K). UI computa imperial.",
+      "imperial_native": "Pin sizes / fixture mounts en imperial (5/8\", 1/4\"-20) con equiv. métrico",
+      "ausencia": "null o campo ausente significa 'no aplica' o 'no publicado'"
+    },
+    "como_agregar_luz_nueva": [
+      "1. Guardar página B&H del producto en ~/Desktop/Paginas/Inventario/ (Cmd+S → Webpage Complete)",
+      "2. Agregar la ruta del HTML en tools/bh_luz_rebuild.sh",
+      "3. Correr: bash tools/bh_luz_rebuild.sh",
+      "4. Verificar resultado en docs/bh_luces_curado.json",
+      "5. Si el HTML viene del sitio fabricante (no B&H), agregar entrada manual en tools/bh_luz_patches.py"
+    ]
   },
   "products": {
     "amaran_f21x": {
@@ -303,7 +604,8 @@
             "value": "26.7 x 15.7 x 5.2\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/amaran_ap20232a14_f21x_2x1_bi_color_led_1698321.jpg"
     },
     "godox_m1": {
       "marca": "Godox",
@@ -532,7 +834,8 @@
             "value": "6.95 x 4.15 x 2.4\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/godox_rgb_mini_creative_m1_1552705.jpg"
     },
     "nanlite_fc500b": {
       "marca": "Nanlite",
@@ -766,7 +1069,8 @@
             "value": "23.1 x 18.6 x 18\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/nanlite_fc500b_fc_500_led_spotlight_1779322.jpg"
     },
     "amaran_360c": {
       "marca": "Amaran",
@@ -1054,7 +1358,8 @@
             "value": "19.7 x 13.8 x 9.9\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/amaran_mp00000191_ray_360c_rgb_led_1930190.jpg"
     },
     "aputure_nova_ii_2x1": {
       "marca": "Aputure",
@@ -1340,7 +1645,8 @@
             "value": "35.25 x 20 x 14\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/aputure_ap0400040j_nova_ii_2x1_rgb_1920544.jpg"
     },
     "molerichardson_juniorled_200": {
       "marca": "Mole-Richardson",
@@ -1568,7 +1874,8 @@
             "value": "14 lb / 6.4 kg"
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/mole_richardson_8941_50rev_junior_200w_8_junior_979830.jpg"
     },
     "godox_tl60": {
       "marca": "Godox",
@@ -1836,7 +2143,8 @@
             "value": "31.1 x 3.7 x 3.1\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/godox_tl60_tube_light_2700_6500k_1611957.jpg"
     },
     "aputure_b7c": {
       "marca": "Aputure",
@@ -1926,7 +2234,8 @@
             "value": "6.6 x 4.6 x 3.5\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/aputure_aacbc7_accent_b7c_led_light_1595337.jpg"
     },
     "godox_vl150": {
       "marca": "Godox",
@@ -2117,7 +2426,8 @@
             "value": "22.9 x 11.8 x 11.3\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/godox_vl150_video_led_light_1513246.jpg"
     },
     "godox_vl300ii": {
       "marca": "Godox",
@@ -2372,7 +2682,8 @@
             "value": "22.9 x 12.2 x 10.8\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/godox_vl300ii_series_300w_led_1721572.jpg"
     },
     "nanlite_forza_500": {
       "marca": "Nanlite",
@@ -2586,7 +2897,8 @@
             "value": "23 x 13.3 x 11.2\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/nanlite_12_2026_forza_500_led_monolight_1476382.jpg"
     },
     "nanlite_forza_60b": {
       "marca": "Nanlite",
@@ -2859,7 +3171,8 @@
             "value": "15.25 x 10 x 8\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/nanlite_forza60bii_forza_60b_ii_bi_color_1736656.jpg"
     },
     "amaran_300c": {
       "marca": "Amaran",
@@ -3131,7 +3444,8 @@
             "value": "17.4 x 13.8 x 9.1\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/amaran_ap30011a10_300c_rgb_led_monolight_1762211.jpg"
     },
     "godox_v100": {
       "marca": "Godox",
@@ -3279,7 +3593,8 @@
             "value": "9.8 x 7.8 x 3.9\""
           }
         ]
-      }
+      },
+      "image_url": "https://www.bhphotovideo.com/images/fb/godox_v100s_v100_flash_for_sony_1868006.jpg"
     },
     "arri_650plus": {
       "marca": "ARRI",
@@ -3462,7 +3777,8 @@
           }
         ]
       },
-      "_nota": "Datos oficiales arri.com (33 campos exactos)"
+      "_nota": "Datos oficiales arri.com (33 campos exactos)",
+      "image_url": "https://www.arri.com/resource/blob/47018/d8bc3c1de27c2c64321f44d6e62fd9b8/650-junior-plus-blue-silver-data.jpg"
     },
     "molerichardson_1000w": {
       "marca": "Mole-Richardson",
@@ -3559,7 +3875,8 @@
           }
         ]
       },
-      "_nota": "Datos oficiales mole.com"
+      "_nota": "Datos oficiales mole.com",
+      "image_url": "https://www.mole.com/images/products/407.jpg"
     }
   }
 }
