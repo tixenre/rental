@@ -16,7 +16,7 @@ export const Route = createLazyFileRoute("/admin/specs/legacy")({
 });
 
 function LegacyPage() {
-  useDocumentTitle("Cleanup legacy · Back Office");
+  useDocumentTitle("Cleanup de specs legacy · Back Office");
   const qc = useQueryClient();
   const listQ = useQuery({
     queryKey: ["admin", "specs-legacy"],
