@@ -20,13 +20,30 @@ ROOT = Path(__file__).parent.parent.parent
 DATASET_PATH = ROOT / "docs" / "camaras.json"
 
 CATEGORIA_RAIZ = "Cámaras"
-SUBCATEGORIAS = [
-    ("Cinema",      10),  # FX3A, C200, KOMODO-X
-    ("Mirrorless",  20),  # a7V
-    ("Vlogging",    30),  # ZV-E1
-    ("Action",      40),  # HERO12
-    ("DSLR",        50),  # futuro
-    ("Medium Format", 60),  # futuro
+
+# Taxonomía de 2 niveles, alineada con cómo el cliente busca:
+#   Foto / Video / Acción son los "buckets" principales (use case).
+#   Video se sub-divide en Cine vs Híbrida (granularidad técnica).
+#
+# El parent "Video" se crea sin productos directos — sus children son los
+# que contienen los equipos. La estructura final en categorias table:
+#   Cámaras (raíz)
+#     ├─ Foto
+#     ├─ Video (intermediate)
+#     │     ├─ Cine
+#     │     └─ Híbrida
+#     └─ Acción
+
+SUBCATEGORIAS_NIVEL1 = [
+    ("Foto",   10),   # DSLR, Medium Format, mirrorless stills-focused
+    ("Video",  20),   # contenedor (cine + híbrida abajo)
+    ("Acción", 30),   # GoPro, Insta360, DJI Action, etc.
+]
+
+# Sub-sub-categorías dentro de "Video"
+SUBCATEGORIAS_NIVEL2_VIDEO = [
+    ("Cine",     10),  # FX3A, C200, KOMODO-X — cinema-grade dedicated
+    ("Híbrida",  20),  # a7V, ZV-E1 — mirrorless con buen video pero también stills
 ]
 
 
@@ -94,15 +111,25 @@ SPEC_FLAGS_CAMARAS = {
 
 
 def categorize(producto: dict) -> str:
-    """Sub-categoría según tipo."""
+    """Sub-categoría hoja (segundo nivel cuando aplica).
+
+    Devuelve el nombre de la categoría más específica donde va el producto:
+      Acción      — action cams (GoPro, Insta360, DJI Action)
+      Foto        — DSLRs, Medium Format, mirrorless stills-focused
+      Cine        — cinema cameras dedicadas (FX3A, KOMODO-X, C200, Alexa)
+      Híbrida     — mirrorless full-frame / APS-C hybrid (a7V, ZV-E1, FX30)
+
+    El parent 'Video' agrupa Cine + Híbrida pero no recibe productos directos.
+    """
     tipo = producto.get("specs", {}).get("tipo", "")
-    if tipo == "Cinema Camera": return "Cinema"
-    if tipo == "Mirrorless":     return "Mirrorless"
-    if tipo == "Vlogging":       return "Vlogging"
-    if tipo == "Action Camera":  return "Action"
-    if tipo == "DSLR":           return "DSLR"
-    if tipo == "Medium Format":  return "Medium Format"
-    return "Mirrorless"  # fallback razonable
+    if tipo == "Action Camera":
+        return "Acción"
+    if tipo in ("DSLR", "Medium Format", "Compact"):
+        return "Foto"
+    if tipo == "Cinema Camera":
+        return "Cine"
+    # Mirrorless, Vlogging, Camera (genérico) → Híbrida por default
+    return "Híbrida"
 
 
 def serialize_spec_value(spec_key: str, value) -> str | None:
@@ -172,7 +199,50 @@ def seed_camaras(conn, dry_run: bool = False) -> dict:
     parent_id = parent_row["id"]
 
     subcat_ids: dict[str, int] = {}
-    for name, prio in SUBCATEGORIAS:
+
+    def _upsert_subcat(name: str, prio: int, parent: int) -> int | None:
+        """Inserta o trae el id de una sub-categoría bajo el parent dado."""
+        row = conn.execute("SELECT id, parent_id FROM categorias WHERE nombre = %s", (name,)).fetchone()
+        if row:
+            # Si ya existe pero con otro parent_id, actualizarlo (idempotente)
+            if row["parent_id"] != parent and not dry_run:
+                conn.execute("UPDATE categorias SET parent_id = %s WHERE id = %s", (parent, row["id"]))
+            return row["id"]
+        if dry_run:
+            stats["subcategorias_creadas"] += 1
+            return -1
+        cur = conn.execute("""
+            INSERT INTO categorias (nombre, prioridad, parent_id) VALUES (%s, %s, %s)
+            ON CONFLICT (nombre) DO UPDATE
+                SET parent_id = EXCLUDED.parent_id,
+                    prioridad = CASE WHEN categorias.prioridad = 100 THEN EXCLUDED.prioridad ELSE categorias.prioridad END
+            RETURNING id
+        """, (name, prio, parent))
+        new = cur.fetchone()
+        if new:
+            stats["subcategorias_creadas"] += 1
+            return new[0] if isinstance(new, tuple) else new["id"]
+        return None
+
+    # Nivel 1: Foto / Video (intermediate) / Acción
+    nivel1_ids: dict[str, int] = {}
+    for name, prio in SUBCATEGORIAS_NIVEL1:
+        nid = _upsert_subcat(name, prio, parent_id)
+        if nid is not None:
+            nivel1_ids[name] = nid
+            subcat_ids[name] = nid
+
+    # Nivel 2: Cine, Híbrida dentro de Video
+    video_id = nivel1_ids.get("Video")
+    if video_id:
+        for name, prio in SUBCATEGORIAS_NIVEL2_VIDEO:
+            nid = _upsert_subcat(name, prio, video_id)
+            if nid is not None:
+                subcat_ids[name] = nid
+
+    # NOTA: el código viejo continuaba con SUBCATEGORIAS; ahora skipeamos
+    # la iteración antigua porque ya hicimos todo arriba.
+    for name, prio in []:  # placeholder vacío para mantener estructura
         row = conn.execute("SELECT id FROM categorias WHERE nombre = %s", (name,)).fetchone()
         if row:
             subcat_ids[name] = row["id"]

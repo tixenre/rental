@@ -51,22 +51,26 @@ Campos opcionales descriptivos:
 
 ## Sub-categorías (taxonomía de catálogo)
 
+Estructura de 2 niveles, alineada con cómo el cliente busca (use case + granularidad):
+
 ```
 Cámaras
-├─ Cinema      (FX3A, KOMODO-X, C200)
-├─ Mirrorless  (a7V)
-├─ Vlogging    (ZV-E1)
-├─ Action      (HERO12)
-├─ DSLR        (futuro)
-└─ Medium Format (futuro)
+├─ Foto                      — DSLRs, Medium Format, mirrorless stills-focused
+├─ Video                     — contenedor (sin productos directos)
+│   ├─ Cine                  — cinema cameras dedicadas (FX3A, KOMODO-X, C200, Alexa)
+│   └─ Híbrida               — mirrorless full-frame / APS-C híbridas (a7V, ZV-E1, FX30)
+└─ Acción                    — GoPro, Insta360, DJI Action
 ```
 
-Lógica de categorización: `seeds/camaras.py::categorize()` mapea por `tipo`:
-- `Cinema Camera` → Cinema
-- `Mirrorless` → Mirrorless
-- `Vlogging` → Vlogging
-- `Action Camera` → Action
-- Fallback → Mirrorless
+**Decisión de diseño:** "Video" es un parent intermedio sin productos. El cliente
+que busca "cámara de video" entra a Video y ve Cine + Híbrida como sub-opciones.
+Esto se alinea con el flujo de búsqueda real (use case primero, granularidad después).
+
+Lógica en `seeds/camaras.py::categorize()`:
+- `tipo == "Action Camera"` → Acción
+- `tipo in ("DSLR", "Medium Format", "Compact")` → Foto
+- `tipo == "Cinema Camera"` → Cine (bajo Video)
+- `Mirrorless`, `Vlogging`, default → Híbrida (bajo Video)
 
 ## Marcas canónicas
 
