@@ -3,13 +3,13 @@ import {
   Camera, Sun, Mic, Layers, Monitor, Zap, Battery,
   Package, SlidersHorizontal, Search, User, Plus,
   ChevronUp, ChevronRight, X, Calendar, Loader2,
-  Check, Building2,
+  Check,
 } from "lucide-react";
 import { BottomSheet } from "@/components/mobile/BottomSheet";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useEquipos } from "@/hooks/useEquipos";
+import { useEquipos, useMarcas } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { formatARS } from "@/lib/format";
 import { type Equipment } from "@/data/equipment";
@@ -955,6 +955,10 @@ function EquipmentRow({ eq, inCart, isExpanded, jornadas, fechaDesde, onTap, onA
 export function CatalogoMovil() {
   // Equipment data
   const { data: allEquipos, isLoading } = useEquipos();
+  // Marcas: misma source que BrandCarousel del desktop + admin/marcas.
+  // Trae logo_url, destacada, orden, popularidad_score, etc.
+  const { data: marcasData } = useMarcas();
+  const marcasCanonicas = marcasData?.items ?? [];
 
   // Cart store
   const cart = useCart();
@@ -1026,21 +1030,40 @@ export function CatalogoMovil() {
     return ["Todo", ...Array.from(cats).sort()];
   }, [allEquipos]);
 
-  // Brands derivadas del stock real, ordenadas alfab\u00e9ticas. Cuenta los
-  // equipos visibles por categor\u00eda actual + b\u00fasqueda (no por marca, para
-  // que el contador no sea siempre 0 cuando ya filtraste por marca).
+  // Brands para el sheet: parte del cat\u00e1logo can\u00f3nico (useMarcas, misma
+  // source que BrandCarousel del desktop y /admin/equipos/marcas) y le
+  // agrega el count en la categor\u00eda activa. Filtra las que no tienen
+  // ning\u00fan equipo en la cat seleccionada (sino al clickearlas el listado
+  // queda vac\u00edo). Orden: destacadas primero (por orden manual del admin),
+  // resto alfab\u00e9tico.
   const brands = useMemo(() => {
-    const map = new Map<string, number>();
+    const counts = new Map<string, number>();
     for (const e of allEquipos) {
       if (!e.brand) continue;
       const matchCat = activeTab === "Todo" || e.category === activeTab;
       if (!matchCat) continue;
-      map.set(e.brand, (map.get(e.brand) ?? 0) + 1);
+      const k = e.brand.toLowerCase();
+      counts.set(k, (counts.get(k) ?? 0) + 1);
     }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a.localeCompare(b, "es"))
-      .map(([nombre, count]) => ({ nombre, count }));
-  }, [allEquipos, activeTab]);
+
+    const enriched = marcasCanonicas
+      .map((m) => ({
+        nombre: m.nombre,
+        logo_url: m.logo_url ?? null,
+        destacada: !!m.destacada,
+        orden: m.orden ?? 100,
+        count: counts.get(m.nombre.toLowerCase()) ?? 0,
+      }))
+      .filter((m) => m.count > 0);
+
+    enriched.sort((a, b) => {
+      if (a.destacada !== b.destacada) return a.destacada ? -1 : 1;
+      if (a.destacada && b.destacada) return a.orden - b.orden;
+      return a.nombre.localeCompare(b.nombre, "es");
+    });
+
+    return enriched;
+  }, [allEquipos, activeTab, marcasCanonicas]);
 
   // Filtered equipment
   const filteredEquipos = useMemo(() => {
@@ -1431,6 +1454,13 @@ export function CatalogoMovil() {
 }
 
 /* ── BrandSheet ──────────────────────────────────────────────────── */
+type BrandSheetItem = {
+  nombre: string;
+  logo_url: string | null;
+  destacada: boolean;
+  count: number;
+};
+
 function BrandSheet({
   open,
   onOpenChange,
@@ -1440,7 +1470,7 @@ function BrandSheet({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  brands: { nombre: string; count: number }[];
+  brands: BrandSheetItem[];
   selected: string | null;
   onSelect: (brand: string | null) => void;
 }) {
@@ -1474,17 +1504,24 @@ function BrandSheet({
                 onOpenChange(false);
               }}
               className={cn(
-                "w-full flex items-center justify-between gap-2 rounded-lg px-3 py-3 text-left transition",
+                "w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left transition",
                 active
                   ? "bg-amber-soft border border-amber/40"
                   : "border border-hairline hover:bg-muted",
               )}
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <span className="font-sans text-sm font-semibold text-ink truncate">
-                  {b.nombre}
-                </span>
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <BrandLogo nombre={b.nombre} logo_url={b.logo_url} />
+                <div className="min-w-0 flex-1">
+                  <div className="font-sans text-sm font-semibold text-ink truncate">
+                    {b.nombre}
+                  </div>
+                  {b.destacada && (
+                    <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-amber/80 mt-0.5">
+                      Destacada
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
@@ -1497,11 +1534,35 @@ function BrandSheet({
         })}
         {brands.length === 0 && (
           <div className="text-center py-8 text-sm text-muted-foreground">
-            No hay marcas en la categoría actual.
+            No hay marcas con equipos en la categoría actual.
           </div>
         )}
       </div>
     </BottomSheet>
+  );
+}
+
+function BrandLogo({ nombre, logo_url }: { nombre: string; logo_url: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (logo_url && !failed) {
+    return (
+      <div className="h-9 w-9 rounded-md bg-white border border-hairline grid place-items-center shrink-0 overflow-hidden p-1">
+        <img
+          src={logo_url}
+          alt={nombre}
+          className="max-h-full max-w-full object-contain"
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      </div>
+    );
+  }
+  // Fallback: cuadradito con las iniciales (estilo de BrandCard del desktop).
+  const inicial = (nombre[0] ?? "?").toUpperCase();
+  return (
+    <div className="h-9 w-9 rounded-md bg-muted border border-hairline grid place-items-center shrink-0 font-display text-base font-black text-ink">
+      {inicial}
+    </div>
   );
 }
 
