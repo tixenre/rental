@@ -423,7 +423,8 @@ def _fmt_lente(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], l
         else:
             v = str(apertura).strip()
             if not v.lower().startswith(("f/", "t/")):
-                v = f"f/{re.sub(r'^f\\s*', '', v, flags=re.IGNORECASE)}"
+                clean = re.sub(r"^f\s*", "", v, flags=re.IGNORECASE)
+                v = f"f/{clean}"
             extras_corto.append(v)
 
     # Línea (Art / GM / L) — antes de la montura
