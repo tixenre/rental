@@ -42,7 +42,9 @@ def upgrade() -> None:
     op.execute("""
         CREATE TABLE spec_definitions (
             id                  SERIAL PRIMARY KEY,
-            categoria_raiz_id   INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+            -- nullable: el admin endpoint puede crear specs free-floating;
+            -- el registry-driven flow siempre setea categoria_raiz_id
+            categoria_raiz_id   INTEGER REFERENCES categorias(id) ON DELETE CASCADE,
             spec_key            VARCHAR(64) NOT NULL,
             label               VARCHAR(120) NOT NULL,
             tipo                VARCHAR(16) NOT NULL,
@@ -67,6 +69,14 @@ def upgrade() -> None:
     op.execute(
         "CREATE INDEX idx_spec_def_compat "
         "ON spec_definitions(spec_key) WHERE es_compatibilidad"
+    )
+    # Specs free-floating (admin endpoint sin categoría): el composite
+    # UNIQUE (categoria_raiz_id, spec_key) trata NULLs como distintos, por lo
+    # que sin esto se podrían crear duplicados. Partial index garantiza
+    # unicidad global del spec_key dentro de las free-floating.
+    op.execute(
+        "CREATE UNIQUE INDEX idx_spec_def_global_unique "
+        "ON spec_definitions(spec_key) WHERE categoria_raiz_id IS NULL"
     )
 
     # categoria_spec_templates: asigna una spec_def a una sub-categoría

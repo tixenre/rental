@@ -644,7 +644,7 @@ def init_db():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS spec_definitions (
             id                  SERIAL PRIMARY KEY,
-            categoria_raiz_id   INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+            categoria_raiz_id   INTEGER REFERENCES categorias(id) ON DELETE CASCADE,
             spec_key            VARCHAR(64) NOT NULL,
             label               VARCHAR(120) NOT NULL,
             tipo                VARCHAR(16) NOT NULL,
@@ -669,6 +669,11 @@ def init_db():
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
         "ON spec_definitions(spec_key) WHERE es_compatibilidad"
+    )
+    # Specs free-floating (admin endpoint sin categoría) — partial unique.
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_spec_def_global_unique "
+        "ON spec_definitions(spec_key) WHERE categoria_raiz_id IS NULL"
     )
 
     # Observatorio de specs: relevamiento desnormalizado de los specs que
