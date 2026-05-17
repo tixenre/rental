@@ -215,7 +215,9 @@ Puntos de entrada para no grepear:
 - **Normalizer de specs**: backend traduce labels EN→ES (Weight→Peso, Lens Mount→Montura, etc.) y convierte unidades (lbs→kg, in→cm, °F→°C, ranges, dimensiones N×N×N).
 - **Cache del scrape**: el `AutocompletarResult` completo se guarda en `equipo_fichas.raw_json`. Habilita botones ✨ por sección en el form V2 que re-aplican campos sin volver a scrapear.
 - **Batch**: `POST /admin/equipos/batch-enriquecer` procesa hasta 3 equipos por request (cap defensivo, max 50 ids en body). Frontend re-batchea hasta terminar. Resultado se persiste en raw_json (cache). Sleep 1s entre scrapes para no rate-limitear B&H.
-- **HTML upload (fallback de máxima calidad)**: `POST /admin/equipos/autocompletar-from-html` acepta un `.html` guardado manualmente (Cmd+S → Webpage Complete desde B&H/manufacturer) y devuelve specs normalizados usando el MISMO pipeline que el seed (`backend/services/luces_html_extractor.py` → `tools/iluminacion_parser.py` + `iluminacion_normalizar.py`). Calidad idéntica al dataset curado: lee JSON-LD structured data (TLCI, TM-30, photometrics multi-temp, color_modes array). Pensado para cuando Firecrawl falla con bot-detection de B&H o el LLM extract pierde data. UI: botón "Subir HTML guardado" en el diálogo de autocompletar.
+- **Parser determinístico embebido (URL path)**: el endpoint URL existente ahora pide `rawHtml` a Firecrawl además del `json` extract. Si el rawHtml tiene JSON-LD estructurado (B&H lo siempre tiene), se corre `services/luces_html_extractor.py` (el MISMO pipeline del seed). Cuando el parser detecta ≥3 specs canónicos, OVERRIDE marca/modelo/specs/foto del LLM extract con la versión normalizada. Si no detecta nada (no es lighting, parser falla), se mantiene el flujo LLM intacto. → **Resultado: URL paste ahora también da calidad seed para luces sin tocar la UX**.
+- **HTML upload (fallback / cuando Firecrawl falla)**: `POST /admin/equipos/autocompletar-from-html` acepta un `.html` guardado manualmente (Cmd+S → Webpage Complete desde B&H/manufacturer) y corre el mismo pipeline directo sobre el HTML, sin Firecrawl. Sirve cuando B&H bloquea Firecrawl con bot-detection o cuando la URL no es accesible. UI: botón "Subir HTML guardado" en el diálogo de autocompletar.
+- **Paridad URL ↔ HTML upload**: ambos paths llaman a `luces_html_extractor.extract_from_html()` que reusa `tools/iluminacion_parser.py` + `iluminacion_normalizar.py`. Cualquier mejora al parser/normalizer mejora los TRES paths (seed bulk + URL autocompletar + HTML upload) automáticamente.
 
 ### Dataset y seed por categoría (bulk inicial)
 
@@ -269,12 +271,18 @@ Puntos de entrada para no grepear:
 
 | Acción | Sin Claude | Con Claude |
 |---|---|---|
-| Agregar 1 equipo nuevo (categoría existente) — URL | ✅ Admin UI + autocompletar URL | — |
-| Agregar 1 equipo nuevo — calidad seed (Cmd+S → upload HTML) | ✅ Admin UI + "Subir HTML guardado" | — |
+| Agregar 1 luz nueva — URL paste (Firecrawl OK) | ✅ Calidad seed automática (parser embebido) | — |
+| Agregar 1 luz nueva — URL paste falla (Firecrawl rate-limit / bot-detection) | ✅ Subir HTML guardado (Cmd+S → upload) | — |
+| Agregar equipo no-luz (cámara, lente) — categoría existente | ✅ Admin UI + autocompletar (LLM extract) | — |
 | Editar precio / foto / nombre / spec value | ✅ Admin UI | — |
 | Agregar spec key nueva al catálogo global | ✅ `/admin/equipos/specs` | — |
-| Importar bulk de una categoría NUEVA (ej. cámaras) | — | ✅ Curar HTMLs + seed |
+| Importar bulk de una categoría NUEVA (ej. cámaras) — primera vez | — | ✅ Curar HTMLs + parser específico + seed |
 | Refactor del schema (ej. partir `peso` en sub-campos) | — | ✅ Plan + migration |
+
+**Limitaciones:**
+- El parser determinístico hoy solo cubre **luces** (`iluminacion_parser`). Para cámaras/lentes/etc. el URL paste cae al LLM extract hasta que armemos el parser específico por categoría (`camaras_parser.py`, etc. — patrón replicable).
+- El parser asume estructura B&H. Otros sites (Adorama, manufacturer pages) caen al LLM extract.
+- Si Firecrawl no puede acceder al URL (bot-detection más agresivo de B&H, sitio caído), fallback a HTML upload.
 
 El JSON del dataset NO se edita post-seed (es dev artifact). Para cambios puntuales: admin UI. Para reseed masivo (raro): editar JSON + re-correr seed (idempotente, no pisa campos manuales como `precio_jornada`).
 

@@ -2979,15 +2979,24 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         """Devuelve {extracted, foto_candidates, meta} o None si falló.
         foto_candidates es una lista ordenada de URLs candidatas (LLM primero,
         luego og:image, twitter:image, dedupe).
+
+        Si el URL es de B&H, también solicitamos `rawHtml` para correr el
+        parser determinístico del seed (services/luces_html_extractor.py).
+        Si el parser detecta data de iluminación (>=3 specs canónicos), su
+        resultado OVERRIDE marca/modelo/specs/foto del LLM extract — calidad
+        idéntica al seed. Si no detecta nada (no es luz, o parser falla),
+        se mantiene el flujo LLM intacto.
         """
         try:
+            # rawHtml es necesario para correr iluminacion_parser sobre el HTML
+            # completo (JSON-LD structured data). Mismo costo de scrape.
             rs = client.post(
                 "https://api.firecrawl.dev/v2/scrape",
                 headers=headers_fc,
                 json={
                     "url": url,
-                    "formats": ["markdown", json_format],
-                    "onlyMainContent": True,
+                    "formats": ["markdown", "rawHtml", json_format],
+                    "onlyMainContent": False,  # JSON-LD vive fuera de mainContent
                 },
             )
         except httpx.HTTPError:
@@ -3002,6 +3011,42 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         sd = sj.get("data") or sj
         meta      = sd.get("metadata") or {}
         extracted = sd.get("json") or {}
+        raw_html  = sd.get("rawHtml") or sd.get("html") or ""
+
+        # ── Intento de mejora con parser determinístico ───────────────────
+        # Si tenemos rawHtml, intentamos correr el parser del seed. Si
+        # detecta >=3 specs de iluminación, overridamos los campos clave del
+        # extracted con la versión normalizada (calidad seed). Esto cierra
+        # la brecha entre URL-based autocompletar y HTML upload.
+        if raw_html and len(raw_html) > 5000:
+            try:
+                from services.luces_html_extractor import extract_from_html
+                parser_result = extract_from_html(raw_html)
+                if parser_result and len(parser_result.get("specs", [])) >= 3:
+                    # Override fields con calidad seed (mantener LLM-only fields
+                    # como descripcion y keywords)
+                    if parser_result.get("marca"):
+                        extracted["marca"] = parser_result["marca"]
+                    if parser_result.get("modelo"):
+                        extracted["modelo"] = parser_result["modelo"]
+                    if parser_result.get("specs"):
+                        extracted["specs"] = parser_result["specs"]
+                    if parser_result.get("foto_url"):
+                        # Prepend al array de foto_urls
+                        foto = parser_result["foto_url"]
+                        existing_fotos = extracted.get("foto_urls") or []
+                        if foto not in existing_fotos:
+                            extracted["foto_urls"] = [foto] + existing_fotos
+                    # Ficha extendida del parser
+                    for k in ("peso", "dimensiones", "alimentacion", "incluye"):
+                        v = parser_result.get(k)
+                        if v and not extracted.get(k):
+                            extracted[k] = v
+                    extracted["_parser_source"] = "iluminacion_parser"
+            except Exception as e:
+                logger.warning("iluminacion_parser falló sobre rawHtml de %s: %s", url, e)
+                # Silenciosamente seguimos con el extracted LLM
+                pass
 
         # Candidatos: LLM (array) primero (mejor ranking), después meta tags
         candidates: list[str] = []
