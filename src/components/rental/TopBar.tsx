@@ -1,9 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, ShoppingBag, User, LogOut, Search, X } from "lucide-react";
+import { Calendar as CalendarIcon, ShoppingBag, User, LogOut } from "lucide-react";
 import { RentalDateModal } from "./RentalDateModal";
 import { Logo } from "./Logo";
 import { cn } from "@/lib/utils";
@@ -19,43 +19,66 @@ export type TopBarProps = {
   userName?: string;
   /** Solo aplica cuando variant === "cliente". */
   onLogout?: () => void;
-  /** Valor del input de búsqueda en desktop (solo variant "default"). */
-  searchValue?: string;
-  /** Callback cuando el usuario escribe en la búsqueda del TopBar. */
-  onSearch?: (value: string) => void;
+  /**
+   * Cuando true, el TopBar se tiñe de amber gradualmente conforme el hero
+   * (primera sección de la página) scrollea hacia arriba.
+   * El progreso se lee de `--amber-pct` en `document.documentElement`.
+   */
+  amberOnScroll?: boolean;
 };
 
-export function TopBar({ variant = "default", userName, onLogout, searchValue, onSearch }: TopBarProps = {}) {
+export function TopBar({ variant = "default", userName, onLogout, amberOnScroll }: TopBarProps = {}) {
   if (variant === "cliente") {
     return <ClienteTopBar userName={userName} onLogout={onLogout} />;
   }
-  return <DefaultTopBar searchValue={searchValue} onSearch={onSearch} />;
+  return <DefaultTopBar amberOnScroll={amberOnScroll} />;
 }
 
-function DefaultTopBar({ searchValue, onSearch }: Pick<TopBarProps, "searchValue" | "onSearch">) {
-  const {
-    startDate,
-    endDate,
-    startTime,
-    endTime,
-    setDrawerOpen,
-    totalItems,
-    days,
-  } = useCart();
+function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
+  const { startDate, endDate, startTime, endTime, setDrawerOpen, totalItems, days } = useCart();
   const [dateModalOpen, setDateModalOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+  const [snapped, setSnapped] = useState(false);
   const count = totalItems();
   const hasDates = !!(startDate && endDate);
   const jornadas = days();
 
+  // Amber-on-scroll: lee --amber-pct del <html> (puesto por la página)
+  // y aplica el gradiente al header + calcula el snap a 65%.
+  useEffect(() => {
+    if (!amberOnScroll) return;
+    const header = headerRef.current;
+    if (!header) return;
+
+    const onScroll = () => {
+      const pct = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue("--amber-pct") || "0",
+      );
+      header.style.background = `color-mix(in oklch, var(--amber) ${pct}%, color-mix(in oklch, var(--background) 92%, transparent))`;
+      setSnapped(pct >= 65);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll(); // sync inicial
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [amberOnScroll]);
+
   return (
     <>
       <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
-      <header className="sticky top-0 z-40 border-b hairline bg-background/95 backdrop-blur-md md:bg-background/85 md:backdrop-blur-xl">
-        <div className="px-4 py-3 md:px-6 md:grid md:grid-cols-[auto_1fr_auto] md:gap-4 md:items-center">
-
-          {/* Mobile: logo centrado con ícono de usuario a la derecha */}
+      <header
+        ref={headerRef}
+        className="sticky top-0 z-[var(--z-topbar)] border-b hairline backdrop-blur-xl transition-[background,border-color]"
+        style={amberOnScroll ? undefined : undefined}
+      >
+        <div
+          className={cn(
+            "px-4 py-3 md:px-6 md:grid md:grid-cols-[auto_1fr_auto] md:gap-4 md:items-center",
+            !amberOnScroll && "bg-background/95 md:bg-background/85",
+          )}
+        >
+          {/* Mobile: logo centrado + botón sesión derecha */}
           <div className="flex items-center md:hidden">
-            {/* Espaciador izquierdo igual al ancho del ícono derecho */}
             <div className="w-10" />
             <div className="flex-1 flex justify-center">
               <Logo size="md" linkTo="/" />
@@ -69,129 +92,84 @@ function DefaultTopBar({ searchValue, onSearch }: Pick<TopBarProps, "searchValue
             </Link>
           </div>
 
-          {/* Desktop: logo izquierda */}
-          <div className="hidden md:flex items-center gap-2 shrink-0">
+          {/* Desktop col izquierda: logo */}
+          <div className="hidden md:flex items-center shrink-0">
             <Logo size="md" linkTo="/" />
           </div>
 
-          {/* Centro desktop: búsqueda (cuando se pasa onSearch) o pill de fechas */}
-          {onSearch ? (
-            <div className="hidden md:flex px-2">
-              <div className="relative w-full max-w-[560px] mx-auto">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={searchValue ?? ""}
-                  onChange={(e) => onSearch(e.target.value)}
-                  placeholder="Buscar equipo, marca…"
-                  className="w-full rounded-full border-[1.5px] border-hairline bg-surface py-2.5 pl-10 pr-9 text-sm placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
-                />
-                {searchValue && (
-                  <button
-                    onClick={() => onSearch("")}
-                    aria-label="Limpiar búsqueda"
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-ink"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="hidden md:flex px-4">
-              <button
-                onClick={() => setDateModalOpen(true)}
-                className="w-full flex items-center justify-center gap-3 rounded-full border-2 border-amber/50 bg-amber/10 px-6 py-2 transition hover:border-amber hover:bg-amber/20 shadow-sm"
-                aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
-              >
-                <CalendarIcon className="h-5 w-5 shrink-0 text-amber" />
-                {hasDates ? (
-                  <span className="text-base font-semibold tabular-nums">
-                    {format(startDate!, "EEE dd MMM", { locale: es })} {startTime}
-                    <span className="mx-2 text-muted-foreground">→</span>
-                    {format(endDate!, "EEE dd MMM", { locale: es })} {endTime}
-                    <span className="ml-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                      · {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
-                    </span>
+          {/* Desktop col central: pill de fechas */}
+          <div className="hidden md:flex px-4">
+            <button
+              onClick={() => setDateModalOpen(true)}
+              className={cn(
+                "w-full flex items-center justify-center gap-3 rounded-full border-2 px-6 py-2 transition shadow-sm",
+                snapped
+                  ? "border-background/80 bg-background text-ink hover:bg-background/90"
+                  : "border-amber/50 bg-amber/10 hover:border-amber hover:bg-amber/20",
+              )}
+              aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
+            >
+              <CalendarIcon className={cn("h-5 w-5 shrink-0", snapped ? "text-amber" : "text-amber")} />
+              {hasDates ? (
+                <span className="text-base font-semibold tabular-nums">
+                  {format(startDate!, "EEE dd MMM", { locale: es })} {startTime}
+                  <span className="mx-2 opacity-50">→</span>
+                  {format(endDate!, "EEE dd MMM", { locale: es })} {endTime}
+                  <span className={cn("ml-2 font-mono text-[11px] uppercase tracking-wider", snapped ? "text-ink/60" : "text-muted-foreground")}>
+                    · {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
                   </span>
-                ) : (
-                  <span className="text-base font-semibold">Elegir fechas</span>
-                )}
-              </button>
-            </div>
-          )}
+                </span>
+              ) : (
+                <span className="text-base font-semibold">Elegir fechas</span>
+              )}
+            </button>
+          </div>
 
-          {/* Acciones desktop */}
+          {/* Desktop col derecha: carrito + sesión */}
           <div className="hidden md:flex items-center gap-2 shrink-0">
-            {/* Pill de fechas compacta — solo cuando búsqueda está en el centro */}
-            {onSearch && (
-              <button
-                onClick={() => setDateModalOpen(true)}
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-full border-[1.5px] px-3.5 py-2 text-sm font-semibold transition",
-                  hasDates
-                    ? "border-amber/50 bg-amber/10 hover:border-amber hover:bg-amber/20"
-                    : "border-hairline bg-surface hover:border-amber/50",
-                )}
-                aria-label={hasDates ? "Editar fechas" : "Elegir fechas"}
-              >
-                <CalendarIcon className="h-4 w-4 shrink-0 text-amber" />
-                {hasDates ? (
-                  <span className="tabular-nums text-xs">
-                    {format(startDate!, "dd MMM", { locale: es })}
-                    <span className="mx-1.5 text-muted-foreground">→</span>
-                    {format(endDate!, "dd MMM", { locale: es })}
-                    <span className="ml-1.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                      · {jornadas}j
-                    </span>
-                  </span>
-                ) : (
-                  <span className="text-xs">Fechas</span>
-                )}
-              </button>
-            )}
             <button
               onClick={() => setDrawerOpen(true, "bottom")}
-              className="flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:bg-amber hover:text-ink"
+              className={cn(
+                "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition relative",
+                snapped
+                  ? "bg-ink text-amber hover:opacity-90"
+                  : "bg-foreground text-background hover:bg-amber hover:text-ink",
+              )}
               aria-label={`Carrito (${count})`}
             >
               <ShoppingBag className="h-4 w-4" />
-              <span className="tabular-nums">{count}</span>
-              <span>{count === 1 ? "ítem" : "ítems"}</span>
+              {count > 0 && <span className="tabular-nums">{count}</span>}
+              <span>{count > 0 ? (count === 1 ? "ítem" : "ítems") : "Tu rental"}</span>
             </button>
             <Link
               to="/cliente"
-              className="flex items-center justify-center w-9 h-9 rounded-full border hairline hover:border-foreground/40"
+              className={cn(
+                "flex items-center justify-center w-9 h-9 rounded-full border transition",
+                snapped
+                  ? "border-background/80 bg-background text-ink hover:bg-background/90"
+                  : "hairline hover:border-foreground/40",
+              )}
               aria-label="Ingresar"
             >
               <User className="h-4 w-4" />
             </Link>
           </div>
-
         </div>
       </header>
     </>
   );
 }
 
-function ClienteTopBar({
-  userName,
-  onLogout,
-}: {
-  userName?: string;
-  onLogout?: () => void;
-}) {
+function ClienteTopBar({ userName, onLogout }: { userName?: string; onLogout?: () => void }) {
   return (
-    <header className="sticky top-0 z-40 border-b hairline bg-background/95 backdrop-blur-md md:bg-background/85 md:backdrop-blur-xl">
+    <header className="sticky top-0 z-[var(--z-topbar)] border-b hairline bg-background/95 backdrop-blur-md md:bg-background/85 md:backdrop-blur-xl">
       <div className="px-4 py-3 md:px-6 flex items-center gap-3">
-        {/* Logo */}
         <div className="shrink-0">
           <Logo size="md" linkTo="/" />
         </div>
-
-        {/* Spacer */}
         <div className="flex-1" />
 
-        {/* User pill: avatar inicial + nombre */}
+        {/* Avatar pill: inicial amber + nombre */}
         <Link
           to="/cliente/perfil"
           className="inline-flex items-center gap-2 rounded-full border hairline px-2 py-1 hover:border-ink/30 transition"
@@ -207,7 +185,6 @@ function ClienteTopBar({
           )}
         </Link>
 
-        {/* Salir */}
         {onLogout && (
           <button
             type="button"

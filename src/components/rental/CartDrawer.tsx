@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Trash2, Plus, Minus, Loader2, AlertCircle, Calendar as CalendarIcon } from "lucide-react";
+import { X, Trash2, Plus, Minus, Loader2, AlertCircle, Calendar as CalendarIcon, ShoppingBag } from "lucide-react";
+import { EmptyState } from "./EmptyState";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
@@ -314,14 +315,18 @@ export function CartDrawer({
                 {/* Lista de items — área scrolleable */}
                 <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
                   {list.length === 0 ? (
-                    <div className="flex h-full flex-col items-center justify-center text-center">
-                      <div className="font-display text-xl text-muted-foreground">
-                        Tu pedido está vacío
-                      </div>
-                      <p className="mt-2 max-w-xs text-sm text-muted-foreground">
-                        Elegí equipos del catálogo y se sumarán acá.
-                      </p>
-                    </div>
+                    <EmptyState
+                      icon={<ShoppingBag className="h-6 w-6" />}
+                      title="Tu rental está vacío"
+                      sub="Elegí equipos del catálogo y se sumarán acá."
+                    >
+                      <button
+                        onClick={() => setDrawerOpen(false, "bottom")}
+                        className="rounded-full bg-ink px-5 py-2 text-sm font-semibold text-amber transition hover:opacity-90"
+                      >
+                        Explorar catálogo
+                      </button>
+                    </EmptyState>
                   ) : (
                     <>
                       <ul className="space-y-2.5">

@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
-import { LayoutGrid, List, ArrowRight, Sparkles, Loader2 } from "lucide-react";
+import { LayoutGrid, List, ArrowRight, Sparkles, Loader2, Search, X } from "lucide-react";
+import { ViewToggle } from "@/components/rental/ViewToggle";
 import { Link } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { MobileStickyBar } from "@/components/rental/MobileStickyBar";
@@ -180,11 +181,29 @@ function Index() {
 
   const getDisponible = (item: Equipment) => item.disponible;
 
+  // Hero scroll-amber: calcula --amber-pct para que el TopBar se tiña
+  const heroRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    const onScroll = () => {
+      const heroH = hero.offsetHeight;
+      const pct = heroH > 0 ? Math.min(100, Math.round((window.scrollY / heroH) * 100)) : 0;
+      document.documentElement.style.setProperty("--amber-pct", pct + "%");
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      document.documentElement.style.setProperty("--amber-pct", "0%");
+    };
+  }, []);
+
   return (
-    <PublicLayout searchValue={query} onSearch={setQuery}>
+    <PublicLayout topBar={{ amberOnScroll: true }}>
         <ViewIntroDialog onPick={(m) => setMode(m)} />
         {/* Hero amarillo brand */}
-        <section className="relative overflow-hidden border-b hairline bg-amber text-ink">
+        <section ref={heroRef} className="relative overflow-hidden border-b hairline bg-amber text-ink">
           <div className="absolute inset-0 grain opacity-40" />
           <div className="relative px-6 py-12 lg:px-12 lg:py-16">
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] sm:tracking-[0.3em] text-ink/70 break-words">
@@ -246,35 +265,21 @@ function Index() {
             />
           </div>
 
-          {/* Desktop: grid 3 cols alineado con el TopBar */}
-          <div className="hidden sm:grid sm:grid-cols-[auto_1fr_auto] sm:gap-4 sm:items-center sm:px-6 sm:py-2.5">
+          {/* Desktop: cat-bar con ViewToggle + popular chips + buscador */}
+          <div className="hidden sm:flex sm:items-center sm:gap-4 sm:px-6 sm:py-2.5">
 
-            {/* Col izquierda: toggle Explorar/Lista (bajo el logo) */}
-            <div className="flex items-center gap-1 rounded-full border hairline p-0.5 shrink-0">
-              <button
-                onClick={() => setMode("grid")}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
-                  mode === "grid" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
-                )}
-              >
-                <LayoutGrid className="h-3 w-3" />
-                <span>Explorar</span>
-              </button>
-              <button
-                onClick={() => setMode("list")}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
-                  mode === "list" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
-                )}
-              >
-                <List className="h-3 w-3" />
-                <span>Lista</span>
-              </button>
-            </div>
+            {/* ViewToggle con indicador deslizable */}
+            <ViewToggle
+              options={[
+                { value: "grid" as Mode, label: "Explorar", icon: <LayoutGrid className="h-3 w-3" /> },
+                { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
+              ]}
+              value={mode}
+              onChange={setMode}
+            />
 
-            {/* Col central: popular chips (la búsqueda está en el TopBar en desktop) */}
-            <div className="flex items-center gap-2 overflow-x-auto px-2 scrollbar-none">
+            {/* Popular chips */}
+            <div className="flex flex-1 items-center gap-2 overflow-x-auto scrollbar-none">
               <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground shrink-0 select-none">
                 Popular
               </span>
@@ -294,11 +299,31 @@ function Index() {
               ))}
             </div>
 
-            {/* Col derecha: contador (bajo carrito/ingresar) */}
+            {/* Buscador en la derecha del cat-bar */}
+            <div className="relative shrink-0 w-56">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar…"
+                className="w-full rounded-full border hairline bg-surface py-1.5 pl-8 pr-7 text-sm placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  aria-label="Limpiar"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Contador */}
             <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular shrink-0">
               {query.trim() || mode === "list"
-                ? `${filtered.length} resultados`
-                : `${allEquipos.length} equipos`}
+                ? `${filtered.length}`
+                : `${allEquipos.length}`}
             </div>
           </div>
         </div>
