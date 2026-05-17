@@ -51,7 +51,7 @@ def categorize(producto: dict) -> list[str]:
       Mirrorless (default) → [Foto, Montura X] (híbrida real)
     """
     specs = producto.get("specs", {})
-    tipo = specs.get("camera_subtipo") or specs.get("tipo") or ""
+    tipo = specs.get("camera_subtipo") or ""
     mount = specs.get("lens_mount")
 
     if tipo == "Action Camera":

@@ -145,10 +145,13 @@ def _jsonld_url(html_content: str) -> str | None:
 
 # ── Adapter común: convierte specs dict → array [{label, value}] ────────
 
-# Labels canónicos por spec_key (en español, lo que se muestra en el form)
+# Labels canónicos por spec_key (en español, lo que se muestra en el form).
+# Las claves son las que emiten los parsers de tools/. Si una clave no figura
+# acá, se usa el spec_key tal cual (capitalizado) en la UI. Para metadata
+# canónica completa (tipo, enum, unidad), `backend/specs/registry.py`.
 _SPEC_LABELS: dict[str, str] = {
     # Cámaras
-    "tipo": "Tipo",
+    "camera_subtipo": "Tipo",
     "lens_mount": "Lens mount",
     "formato": "Formato",
     "resolucion_max": "Resolución máxima",
@@ -182,14 +185,17 @@ _SPEC_LABELS: dict[str, str] = {
     "construccion_optica": "Construcción óptica",
     "dimensiones": "Dimensiones",
     # Adaptadores
+    "adaptador_subtipo": "Tipo",
     "lens_mount_out": "Lens mount — lado lente",
     "electronica": "Comunicación electrónica",
     "incluye_iris": "Iris incluido",
     # Filtros
+    "filtro_subtipo": "Tipo",
     "densidad": "Densidad ND",
     "material": "Material",
     "grade": "Grado",
     # Iluminación
+    "iluminacion_subtipo": "Tipo",
     "potencia_w": "Potencia",
     "lumens": "Lúmenes",
     "lumens_at_5600k": "Lúmenes (5600K)",

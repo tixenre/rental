@@ -31,7 +31,7 @@ CATEGORIA_RAIZ = "Iluminación"
 def categorize(producto: dict) -> str:
     """Sub-cat por color_modes + tipo (canónico: iluminacion_subtipo)."""
     s = producto.get("specs", {})
-    tipo = s.get("iluminacion_subtipo") or s.get("tipo") or ""
+    tipo = s.get("iluminacion_subtipo") or ""
     modes = set(s.get("color_modes", []))
 
     if tipo == "Flash":

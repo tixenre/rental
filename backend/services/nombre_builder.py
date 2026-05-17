@@ -537,8 +537,13 @@ def _fmt_adaptador(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str
        Filtro variable Tiffen 82mm 2-8 stops
 
     Schema canónico (lens_mount/lens_mount_out/diametro_filtro/densidad).
-    Fallback a claves legacy (montura entrada/salida, diámetro, densidad nd)."""
-    tipo = specs.get("tipo") or SUBCATEGORIA_A_TIPO.get(subcat or "", "Adaptador")
+    Lee filtro_subtipo / adaptador_subtipo según corresponda; fallback al
+    nombre de sub-categoría."""
+    tipo = (
+        specs.get("filtro_subtipo")
+        or specs.get("adaptador_subtipo")
+        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Adaptador")
+    )
     modelo_lc = (modelo or "").lower()
 
     # Solo eliminamos el tipo si el modelo ARRANCA con la primera palabra del tipo
