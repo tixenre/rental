@@ -188,29 +188,66 @@ def clean_extras(extras: dict) -> dict:
 
 SPECS_ORDER = [
     "tipo", "lens_mount", "formato",
-    "resolucion_max", "fps_max",
-    "megapixels", "codecs",
+    "resolucion_max", "fps_max", "codecs",
+    "megapixels", "continuous_shooting_fps",
     "iso_nativo", "iso_extendido", "rango_dinamico_stops",
     "estabilizacion", "autofocus",
+    "fast_slow_motion", "lens_communication",
+    "gps", "ip_streaming",
     "netflix_approved",
+    "max_aperture", "sensor_crop",
+    "recording_limit_min",
     "peso_g",
 ]
+
 EXTRAS_ORDER = [
-    "sensor", "tipo_estabilizacion",
-    "af_puntos",
-    "memoria_tipo",
-    "salida_video", "audio_io", "power_io", "other_io",
-    "audio_canales", "audio_recording", "built_in_mic",
-    "visor_evf", "pantalla",
-    "shutter_type", "shutter_speed",
-    "white_balance", "gamma_curve", "bit_depth", "aspect_ratio",
-    "bateria", "consumo_w",
-    "built_in_nd",
-    "tripod_mount", "shoe_mount",
-    "dimensiones_cm",
-    "materiales", "operating_temp",
+    # Imaging
+    "sensor", "sensor_size", "total_pixels", "effective_pixels",
+    "tipo_estabilizacion", "af_puntos",
+    "autofocus_system", "autofocus_sensitivity",
+    "focus_modes", "focus_type",
+    # Stills
+    "image_file_format", "still_image_support", "interval_recording", "creative_effects",
+    # Video meta
+    "video_output_modes", "video_format", "frame_rate_raw",
+    "time_code", "scanning_system", "signal_system", "system_frequency",
+    "bit_depth", "aspect_ratio",
+    # Exposure
+    "shutter_type", "shutter_speed", "shutter_modes",
+    "exposure_modes", "exposure_compensation",
+    "metering_method", "metering_range",
+    "bulb_mode", "self_timer",
+    "white_balance", "gamma_curve", "gain", "signal_to_noise",
+    # Lens / filters
+    "focal_length", "zoom", "field_of_view",
+    "built_in_nd", "built_in_cc", "internal_filter_holder", "color_filter_system",
+    # Flash
+    "built_in_flash", "built_in_light",
+    "external_flash", "max_sync_speed", "flash_modes",
+    "flash_compensation", "dedicated_flash",
+    # Display / viewfinder
+    "pantalla", "visor_evf",
+    "viewfinder_coverage", "viewfinder_magnification",
+    "viewfinder_eye_point", "viewfinder_diopter",
+    # Storage / I/O
+    "memoria_tipo", "internal_storage",
+    "salida_video", "hdmi_output", "sdi",
+    "audio_io", "audio_canales", "audio_recording", "audio_inputs",
+    "built_in_mic", "headphone", "phantom_power",
+    "power_io", "other_io", "inputs_outputs",
+    # Mounting
+    "tripod_mount", "shoe_mount", "accessory_thread", "tripod_thread",
+    # Connectivity
     "wireless", "app_compatible_raw",
-    "capture_type",
+    # Power
+    "bateria", "consumo_w", "power_supply",
+    "charging_time", "battery_life",
+    # Physical / environment
+    "dimensiones_cm", "materiales",
+    "operating_temp", "storage_temp",
+    "environmental_resistance", "impact_resistance",
+    # Processing
+    "processor", "capture_type",
 ]
 
 

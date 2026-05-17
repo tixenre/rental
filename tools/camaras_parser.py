@@ -416,90 +416,286 @@ def _parse_tipo(secciones: dict, title: str = "") -> str | None:
 
 # ── Mappers principales ─────────────────────────────────────────────────
 
+def _parse_continuous_shooting_fps(secciones: dict) -> int | None:
+    """Burst rate fps para stills. Ej. '10 fps' → 10"""
+    val = _find_value(secciones, "Continuous Shooting") or ""
+    if not val:
+        return None
+    m = re.search(r"(\d+(?:\.\d+)?)\s*fps", val, re.IGNORECASE)
+    return int(float(m.group(1))) if m else None
+
+
+def _parse_fast_slow_motion(secciones: dict) -> bool | None:
+    val = _find_value(secciones, "Fast-/Slow-Motion Support", "Fast-/Slow-Motion")
+    if val is None:
+        return None
+    return val.strip().lower() in ("yes", "true", "sí", "si")
+
+
+def _parse_lens_communication(secciones: dict) -> bool | None:
+    val = _find_value(secciones, "Lens Communication")
+    if val is None:
+        return None
+    return val.strip().lower().startswith(("yes", "sí", "si", "true"))
+
+
+def _parse_max_aperture(secciones: dict) -> str | None:
+    """Solo aplica para fixed-lens (GoPro/action cams)."""
+    val = _find_value(secciones, "Maximum Aperture")
+    if not val:
+        return None
+    line = val.split("|")[0].split("\n")[0].strip()
+    return line
+
+
+def _parse_recording_limit_min(secciones: dict) -> int | None:
+    """Recording limit en minutos. Ej. 'Unlimited' → null; '29 minutes 59 seconds' → 29"""
+    val = _find_value(secciones, "Recording Limit") or ""
+    if not val or val.strip().lower() in ("unlimited", "none", "no limit", "no"):
+        return None
+    m = re.search(r"(\d+)\s*minute", val, re.IGNORECASE)
+    return int(m.group(1)) if m else None
+
+
+def _parse_sensor_crop(secciones: dict) -> str | None:
+    val = _find_value(secciones, "Sensor Crop (35mm Equivalent)", "Sensor Crop")
+    if not val:
+        return None
+    return val.strip()
+
+
+def _parse_gps(secciones: dict) -> bool | None:
+    val = _find_value(secciones, "Global Positioning (GPS, GLONASS, etc.)", "GPS")
+    if val is None:
+        return None
+    v = val.strip().lower()
+    return v not in ("no", "none", "n/a", "")
+
+
+def _parse_ip_streaming(secciones: dict) -> bool | None:
+    val = _find_value(secciones, "IP Streaming")
+    if val is None:
+        return None
+    return val.strip().lower() in ("yes", "true", "sí", "si")
+
+
+def _parse_internal_storage(secciones: dict) -> str | None:
+    val = _find_value(secciones, "Internal Storage")
+    if not val or val.strip().lower() in ("no", "none", "n/a"):
+        return None
+    return val.strip()
+
+
 def map_camara_specs(secciones: dict, title: str = "") -> dict:
-    """Mapea secciones raw → spec_keys canónicos del proyecto para Cámaras."""
+    """Mapea secciones raw → spec_keys canónicos del proyecto para Cámaras.
+
+    Incluye campos filtrables/comparables. Los descriptivos van en extras.
+    """
     result: dict = {}
 
     def _add(key, val):
         if val is not None and val != "" and val != []:
             result[key] = val
 
+    # Core identity
     _add("tipo", _parse_tipo(secciones, title))
     _add("lens_mount", _parse_lens_mount(secciones, title))
     _add("formato", _parse_formato(secciones))
+
+    # Video specs
     _add("resolucion_max", _parse_resolucion_max(secciones, title))
     _add("fps_max", _parse_fps_max(secciones))
-    _add("megapixels", _parse_megapixels(secciones))
     _add("codecs", _parse_codecs(secciones))
 
-    iso_nat = _parse_iso_range(secciones, "native")
-    _add("iso_nativo", iso_nat)
-    iso_ext = _parse_iso_range(secciones, "extended")
-    _add("iso_extendido", iso_ext)
+    # Stills specs
+    _add("megapixels", _parse_megapixels(secciones))
+    _add("continuous_shooting_fps", _parse_continuous_shooting_fps(secciones))
 
+    # ISO / dynamic range
+    _add("iso_nativo", _parse_iso_range(secciones, "native"))
+    _add("iso_extendido", _parse_iso_range(secciones, "extended"))
     _add("rango_dinamico_stops", _parse_rango_dinamico(secciones))
 
+    # Capabilities (booleans / specific)
     est = _parse_estabilizacion(secciones)
-    if est is not None:
-        result["estabilizacion"] = est
-
+    if est is not None: result["estabilizacion"] = est
     af = _parse_autofocus(secciones)
-    if af is not None:
-        result["autofocus"] = af
+    if af is not None: result["autofocus"] = af
+    fsm = _parse_fast_slow_motion(secciones)
+    if fsm is not None: result["fast_slow_motion"] = fsm
+    lc = _parse_lens_communication(secciones)
+    if lc is not None: result["lens_communication"] = lc
+    gps = _parse_gps(secciones)
+    if gps is not None: result["gps"] = gps
+    ips = _parse_ip_streaming(secciones)
+    if ips is not None: result["ip_streaming"] = ips
 
+    # Cinema-grade
     _add("netflix_approved", _parse_netflix_approved(secciones))
+
+    # Fixed-lens specs (GoPro/action)
+    _add("max_aperture", _parse_max_aperture(secciones))
+    _add("sensor_crop", _parse_sensor_crop(secciones))
+
+    # Recording limits
+    _add("recording_limit_min", _parse_recording_limit_min(secciones))
+
+    # Physical
     _add("peso_g", _parse_peso_g(secciones))
 
     return result
 
 
 def map_camara_extras(secciones: dict, title: str = "") -> dict:
-    """Campos extra estructurados para ficha técnica de cámaras."""
+    """Campos extra estructurados para ficha técnica de cámaras.
+
+    Captura sistemáticamente TODO lo útil del JSON-LD de B&H que no esté
+    ya en `specs`. Cada campo del raw → key estructurada.
+    """
     result: dict = {}
 
     def _add(key, val):
         if val is not None and val != "" and val != []:
             result[key] = val
 
+    # ── Imaging ──────────────────────────────────────────────────────
     _add("sensor", _parse_sensor(secciones))
     _add("tipo_estabilizacion", _parse_tipo_estabilizacion(secciones))
     _add("af_puntos", _parse_af_puntos(secciones))
+
+    # ── Storage / memoria ────────────────────────────────────────────
     _add("memoria_tipo", _parse_memoria_tipo(secciones))
+    _add("internal_storage", _parse_internal_storage(secciones))
+
+    # ── I/O ───────────────────────────────────────────────────────────
     _add("salida_video", _parse_salida_video(secciones))
     _add("audio_canales", _parse_audio_canales(secciones))
+
+    # ── Display ───────────────────────────────────────────────────────
     _add("visor_evf", _parse_visor_evf(secciones))
     _add("pantalla", _parse_pantalla(secciones))
+
+    # ── Power ─────────────────────────────────────────────────────────
     _add("bateria", _parse_bateria(secciones))
     _add("consumo_w", _parse_consumo_w(secciones))
+
+    # ── Physical ──────────────────────────────────────────────────────
     _add("dimensiones_cm", _parse_dimensiones_cm(secciones))
 
-    # Otros campos directos del raw
-    for src, dst in [
+    # ── Catch-all: campos directos del JSON-LD de B&H ────────────────
+    # Cada (label_raw, key_destino) — preserva valor multi-línea con \n
+    FIELD_MAP = [
+        # Connectivity & I/O
         ("Mobile App Compatible", "app_compatible_raw"),
-        ("Wireless", "wireless"),
-        ("Audio I/O", "audio_io"),
-        ("Power I/O", "power_io"),
-        ("Other I/O", "other_io"),
-        ("Tripod Mount", "tripod_mount"),
-        ("Shoe Mount", "shoe_mount"),
-        ("Built-In Microphone", "built_in_mic"),
-        ("Audio Recording", "audio_recording"),
-        ("Built-In ND Filter", "built_in_nd"),
-        ("Shutter Type", "shutter_type"),
-        ("Shutter Speed", "shutter_speed"),
-        ("Materials", "materiales"),
-        ("Capture Type", "capture_type"),
-        ("Aspect Ratio", "aspect_ratio"),
-        ("Operating Conditions", "operating_temp"),
-        ("Bit Depth", "bit_depth"),
-        ("Gamma Curve", "gamma_curve"),
-        ("White Balance", "white_balance"),
-    ]:
+        ("Wireless",              "wireless"),
+        ("Audio I/O",             "audio_io"),
+        ("Power I/O",             "power_io"),
+        ("Other I/O",             "other_io"),
+        ("HDMI Output",           "hdmi_output"),
+        ("SDI",                   "sdi"),
+        ("Inputs/Outputs",        "inputs_outputs"),
+        ("Headphone Connector",   "headphone"),
+        ("Phantom Power",         "phantom_power"),
+
+        # Mounting
+        ("Tripod Mount",          "tripod_mount"),
+        ("Shoe Mount",            "shoe_mount"),
+        ("Accessory Mounting Thread", "accessory_thread"),
+        ("Tripod Mounting Thread", "tripod_thread"),
+
+        # Audio
+        ("Built-In Microphone",   "built_in_mic"),
+        ("Audio Recording",       "audio_recording"),
+        ("Audio Input Terminals", "audio_inputs"),
+
+        # Filters / lens
+        ("Built-In ND Filter",    "built_in_nd"),
+        ("Built-In CC Filter",    "built_in_cc"),
+        ("Internal Filter Holder", "internal_filter_holder"),
+        ("Color Filter System",   "color_filter_system"),
+        ("Focal Length",          "focal_length"),
+        ("Zoom",                  "zoom"),
+        ("Field of View",         "field_of_view"),
+
+        # Exposure
+        ("Shutter Type",          "shutter_type"),
+        ("Shutter Speed",         "shutter_speed"),
+        ("Shutter Modes",         "shutter_modes"),
+        ("Exposure Modes",        "exposure_modes"),
+        ("Exposure Compensation", "exposure_compensation"),
+        ("Metering Method",       "metering_method"),
+        ("Metering Range",        "metering_range"),
+        ("Bulb/Time Mode",        "bulb_mode"),
+        ("Self-Timer",            "self_timer"),
+        ("Bit Depth",             "bit_depth"),
+        ("Aspect Ratio",          "aspect_ratio"),
+        ("White Balance",         "white_balance"),
+        ("Gamma Curve",           "gamma_curve"),
+        ("Gain",                  "gain"),
+        ("Signal-to-Noise Ratio", "signal_to_noise"),
+        ("Autofocus Sensitivity", "autofocus_sensitivity"),
+        ("Autofocus System",      "autofocus_system"),
+        ("Focus Mode",            "focus_modes"),
+        ("Focus Modes",           "focus_modes"),
+        ("Focus Type",            "focus_type"),
+
+        # Flash
+        ("External Flash Connection", "external_flash"),
+        ("Maximum Sync Speed",    "max_sync_speed"),
+        ("Flash Modes",           "flash_modes"),
+        ("Flash Compensation",    "flash_compensation"),
+        ("Dedicated Flash System", "dedicated_flash"),
+        ("Built-In Flash/Light",  "built_in_flash"),
+        ("Built-In Light",        "built_in_light"),
+
+        # Stills / file
+        ("Image File Format",     "image_file_format"),
+        ("Still Image Support",   "still_image_support"),
+        ("Interval Recording",    "interval_recording"),
+        ("Creative Effects",      "creative_effects"),
+
+        # Video meta
+        ("Video Output",          "video_output_modes"),
+        ("Video Format",          "video_format"),
+        ("Frame Rate",            "frame_rate_raw"),
+        ("Time Code",             "time_code"),
+        ("Scanning System",       "scanning_system"),
+        ("Signal System",         "signal_system"),
+        ("System Frequency Selection", "system_frequency"),
+
+        # Viewfinder details
+        ("Coverage",              "viewfinder_coverage"),
+        ("Magnification",         "viewfinder_magnification"),
+        ("Eye Point",             "viewfinder_eye_point"),
+        ("Diopter Adjustment",    "viewfinder_diopter"),
+
+        # Physical / general
+        ("Materials",             "materiales"),
+        ("Capture Type",          "capture_type"),
+        ("Operating Conditions",  "operating_temp"),
+        ("Storage Conditions",    "storage_temp"),
+        ("Environmental Resistance", "environmental_resistance"),
+        ("Impact Resistance",     "impact_resistance"),
+        ("Processor",             "processor"),
+        ("Power Supply",          "power_supply"),
+        ("Charging Time",         "charging_time"),
+        ("Estimated Battery Life", "battery_life"),
+        ("Sensor Size",           "sensor_size"),
+        ("Total Pixels",          "total_pixels"),
+        ("Effective Pixels",      "effective_pixels"),
+    ]
+
+    seen_keys = set()
+    for src, dst in FIELD_MAP:
+        if dst in seen_keys:
+            continue  # ya capturado por otra variante de label
         v = _find_value(secciones, src)
         if v:
-            line = v.split("|")[0].split("\n")[0].strip() if "|" in v or "\n" in v else v.strip()
-            if line and line.lower() not in ("no", "n/a", "none"):
+            # Preservar multi-línea (B&H lista varios valores con \n)
+            line = v.strip()
+            if line and line.lower() not in ("no", "n/a", "none", "1 x"):
                 result[dst] = line
+                seen_keys.add(dst)
 
     return result
 
