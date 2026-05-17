@@ -1,12 +1,11 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { StatCard } from "@/components/rental/StatCard";
 import { EstadoBadge } from "@/components/rental/EstadoBadge";
-import { ViewToggle } from "@/components/rental/ViewToggle";
-import { EmptyState } from "@/components/rental/EmptyState";
-import { ShoppingBag } from "lucide-react";
+import { ArrowRight, ChevronDown, ShoppingBag } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mi cuenta — Rambla Rental" }] }),
@@ -42,12 +41,14 @@ type Pedido = {
 };
 
 const ACTIVE_STATES = new Set(["solicitado", "confirmado", "entregado"]);
-const HIST_STATES = new Set(["devuelto", "finalizado"]);
+const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
 
-const TAB_OPTIONS = [
-  { value: "todos" as const, label: "Todos" },
-  { value: "activos" as const, label: "Activos" },
-  { value: "historial" as const, label: "Historial" },
+type Filtro = "todos" | "activos" | "historial";
+
+const TAB_OPTIONS: { value: Filtro; label: string }[] = [
+  { value: "todos", label: "Todos" },
+  { value: "activos", label: "Activos" },
+  { value: "historial", label: "Historial" },
 ];
 
 function fmt(n?: number) {
@@ -57,7 +58,15 @@ function fmt(n?: number) {
 function fmtDate(s?: string) {
   if (!s) return "—";
   // slice(0,10) normaliza "YYYY-MM-DD HH:MM:SS" y "YYYY-MM-DDTHH:MM:SS" a "YYYY-MM-DD"
-  return new Date(s.slice(0, 10) + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" });
+  const d = new Date(s.slice(0, 10) + "T12:00:00");
+  const dias = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
+}
+function fmtTime(s?: string) {
+  if (!s || s.length < 16) return null;
+  // "YYYY-MM-DD HH:MM:SS" → "HH:MM"
+  return s.slice(11, 16);
 }
 
 export default function ClientePortal() {
@@ -66,7 +75,7 @@ export default function ClientePortal() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [tab, setTab] = useState<"todos" | "activos" | "historial">("todos");
+  const [tab, setTab] = useState<Filtro>("todos");
 
   useEffect(() => {
     let alive = true;
@@ -108,6 +117,12 @@ export default function ClientePortal() {
   );
   const historico = pedidos.filter((p) => HIST_STATES.has(p.estado)).length;
 
+  const counts: Record<Filtro, number> = {
+    todos: pedidos.length,
+    activos: activosPedidos.length,
+    historial: historico,
+  };
+
   const filteredPedidos =
     tab === "activos" ? pedidos.filter((p) => ACTIVE_STATES.has(p.estado))
     : tab === "historial" ? pedidos.filter((p) => HIST_STATES.has(p.estado))
@@ -117,25 +132,23 @@ export default function ClientePortal() {
     <PublicLayout
       topBar={{ variant: "cliente", userName, onLogout: handleLogout }}
     >
-      {/* Sub-header amarillo Rambla — saludo / título de página */}
-      <div className="bg-amber border-b hairline">
-        <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/60">
+      <div className="bg-amber border-b border-[color-mix(in_oklch,var(--ink)_12%,transparent)]">
+        <div className="max-w-[760px] mx-auto px-6 pt-9 pb-10">
+          <div className="font-mono text-[10px] uppercase tracking-[0.26em] text-ink/60">
             Portal de clientes
           </div>
-          <h1 className="font-display text-4xl sm:text-5xl font-black text-ink mt-1.5 leading-none tracking-tight">
+          <h1 className="font-display text-[48px] font-black text-ink leading-none tracking-[-0.025em] mt-1.5">
             {perfil ? `Hola, ${perfil.nombre}` : "Mi cuenta"}
           </h1>
-          <p className="mt-3 text-sm text-ink/70">
+          <p className="font-sans text-sm text-ink/70 mt-3">
             Mirá tus pedidos, descargá documentos y consultá pagos.
           </p>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        {/* Stats row */}
+      <div className="max-w-[760px] mx-auto px-6 pt-8 pb-20">
         {pedidos.length > 0 && (
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-3 gap-2.5 mb-8">
             <StatCard
               label="Activos"
               value={String(activosPedidos.length)}
@@ -155,34 +168,59 @@ export default function ClientePortal() {
           </div>
         )}
 
-        {/* Filter tabs */}
+        <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-4">
+          Mis pedidos
+        </h2>
+
         {pedidos.length > 0 && (
-          <div className="flex items-center justify-between">
-            <ViewToggle options={TAB_OPTIONS} value={tab} onChange={setTab} />
-            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground tabular-nums">
-              {filteredPedidos.length} {filteredPedidos.length === 1 ? "pedido" : "pedidos"}
-            </span>
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {TAB_OPTIONS.map(({ value, label }) => {
+              const active = tab === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setTab(value)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-3.5 py-1.5 font-sans text-xs font-semibold transition",
+                    active
+                      ? "bg-ink text-amber border-ink"
+                      : "border-[var(--hairline)] text-muted-foreground hover:text-ink hover:border-ink",
+                  )}
+                >
+                  {label}
+                  <span
+                    className={cn(
+                      "font-mono text-[9px] tabular-nums",
+                      active ? "opacity-85" : "opacity-60",
+                    )}
+                  >
+                    {counts[value]}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
         {pedidos.length === 0 ? (
-          <EmptyState
-            icon={<ShoppingBag className="h-6 w-6" />}
+          <PedidoEmpty
             title="Sin pedidos aún"
             sub="Todavía no tenés pedidos registrados."
+            cta
           />
         ) : filteredPedidos.length === 0 ? (
-          <EmptyState
-            icon={<ShoppingBag className="h-6 w-6" />}
-            title={tab === "activos" ? "Sin rentals activos" : "Sin historial aún"}
+          <PedidoEmpty
+            title={tab === "activos" ? "Sin rentals activos" : "Sin pedidos por acá"}
             sub={
               tab === "activos"
                 ? "No tenés rentals activos en este momento."
-                : "Todavía no tenés pedidos completados."
+                : "No tenés pedidos en esta sección todavía."
             }
+            cta
           />
         ) : (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-2.5">
             {filteredPedidos.map((p) => (
               <PedidoCard
                 key={p.id}
@@ -195,6 +233,26 @@ export default function ClientePortal() {
         )}
       </div>
     </PublicLayout>
+  );
+}
+
+function PedidoEmpty({ title, sub, cta }: { title: string; sub: string; cta?: boolean }) {
+  return (
+    <div className="rounded-xl border border-dashed border-[var(--hairline)] px-6 py-[60px] text-center">
+      <div className="mx-auto mb-3.5 grid h-14 w-14 place-items-center rounded-full bg-amber-soft text-amber">
+        <ShoppingBag className="h-6 w-6" strokeWidth={1.5} />
+      </div>
+      <div className="font-display text-xl font-black text-ink mb-1.5">{title}</div>
+      <div className="font-sans text-[13px] text-muted-foreground mb-[18px]">{sub}</div>
+      {cta && (
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-2.5 font-sans text-[13px] font-bold text-amber transition hover:bg-amber hover:text-ink"
+        >
+          Explorar catálogo <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      )}
+    </div>
   );
 }
 
@@ -218,115 +276,137 @@ function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: 
   const pagado = pedido.monto_pagado ?? 0;
   const balance = Math.max(0, total - pagado);
 
+  const retiroTime = fmtTime(pedido.fecha_desde);
+  const devolucionTime = fmtTime(pedido.fecha_hasta);
+
   return (
-    <div className="rounded-xl border hairline bg-surface overflow-hidden">
-      {/* Cabecera del pedido */}
+    <div
+      className={cn(
+        "rounded-xl border bg-surface overflow-hidden transition-[border-color,box-shadow]",
+        expanded
+          ? "border-amber shadow-[0_0_0_1px_var(--amber)]"
+          : "border-[var(--hairline)] hover:border-ink/30",
+      )}
+    >
       <button
+        type="button"
         onClick={onToggle}
-        className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-muted/30 transition"
+        className="w-full flex items-center gap-3.5 px-4 sm:px-[18px] py-3.5 transition hover:bg-[color-mix(in_oklch,var(--ink)_2%,transparent)]"
       >
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="font-mono text-xs text-muted-foreground shrink-0">
-            #{pedido.numero_pedido}
+        <span className="font-mono text-[11px] font-bold text-ink tracking-[0.05em]">
+          #{pedido.numero_pedido}
+        </span>
+        <EstadoBadge estado={pedido.estado} />
+        <span className="font-sans text-[13px] text-muted-foreground flex-1 min-w-0 truncate text-left">
+          {fmtDate(pedido.fecha_desde)}
+          <span className="opacity-40 mx-1">→</span>
+          {fmtDate(pedido.fecha_hasta)}
+        </span>
+        {pedido.monto_total != null && (
+          <span className="font-display text-lg font-extrabold text-ink tabular-nums shrink-0">
+            {fmt(pedido.monto_total)}
           </span>
-          <EstadoBadge estado={pedido.estado} />
-          <span className="text-xs text-muted-foreground truncate hidden sm:block">
-            {fmtDate(pedido.fecha_desde)} – {fmtDate(pedido.fecha_hasta)}
-          </span>
-        </div>
-        <div className="flex items-center gap-3 shrink-0 ml-2">
-          {pedido.monto_total != null && (
-            <span className="text-sm font-medium text-ink">{fmt(pedido.monto_total)}</span>
+        )}
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 transition-[transform,color] duration-200",
+            expanded ? "rotate-180 text-ink" : "text-muted-foreground",
           )}
-          <svg
-            className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+        />
       </button>
 
-      {/* Detalle expandido — vista read-only del pedido */}
       {expanded && (
-        <div className="border-t hairline px-4 py-4 space-y-5">
+        <div className="border-t border-dashed border-[var(--hairline)] px-4 sm:px-[18px] pt-[18px] pb-[22px] flex flex-col gap-5 animate-[expand-in_.22s_ease-out]">
 
-          {/* Bloque: período de alquiler */}
-          <section className="grid grid-cols-3 gap-2 text-xs">
-            <div className="rounded-md border hairline bg-background px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Desde</div>
-              <div className="text-ink mt-0.5">{fmtDate(pedido.fecha_desde)}</div>
+          <section className="grid grid-cols-3 gap-2">
+            <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
+              <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">Retiro</div>
+              <div className="font-sans text-sm font-semibold text-ink mt-0.5">{fmtDate(pedido.fecha_desde)}</div>
+              {retiroTime && <div className="font-mono text-[10px] text-muted-foreground">{retiroTime}</div>}
             </div>
-            <div className="rounded-md border hairline bg-background px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Hasta</div>
-              <div className="text-ink mt-0.5">{fmtDate(pedido.fecha_hasta)}</div>
+            <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
+              <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">Devolución</div>
+              <div className="font-sans text-sm font-semibold text-ink mt-0.5">{fmtDate(pedido.fecha_hasta)}</div>
+              {devolucionTime && <div className="font-mono text-[10px] text-muted-foreground">{devolucionTime}</div>}
             </div>
-            <div className="rounded-md border hairline bg-background px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Jornadas</div>
-              <div className="text-ink mt-0.5 tabular-nums">{jornadas}</div>
+            <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
+              <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">Jornadas</div>
+              <div className="font-display text-2xl font-black text-ink tabular-nums leading-none mt-1">{jornadas}</div>
             </div>
           </section>
 
-          {/* Bloque: items detallados */}
           <section>
-            <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
+            <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
               Equipos ({pedido.items.length})
             </h3>
-            <ul className="space-y-2">
+            <ul>
               {pedido.items.map((item, i) => {
                 const display = item.nombre_publico || item.nombre;
-                const cap = `${item.marca ?? ""}${item.modelo ? ` · ${item.modelo}` : ""}`.trim();
                 return (
-                  <li key={i} className="flex items-start gap-3 text-sm">
+                  <li
+                    key={i}
+                    className="flex items-center gap-2.5 py-2 border-b border-[var(--hairline)] last:border-b-0"
+                  >
                     {item.foto_url ? (
                       <img
                         src={item.foto_url}
                         alt={display}
                         loading="lazy"
-                        className="h-10 w-10 rounded object-cover shrink-0 bg-muted"
+                        className="h-10 w-10 rounded-sm border border-[var(--hairline)] bg-white object-cover shrink-0"
                       />
                     ) : (
-                      <div className="h-10 w-10 rounded bg-muted shrink-0" />
+                      <div className="h-10 w-10 rounded-sm border border-[var(--hairline)] bg-white grid place-items-center shrink-0">
+                        <ShoppingBag className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                      </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="text-ink truncate">{display}</div>
-                      {cap && <div className="text-xs text-muted-foreground truncate">{cap}</div>}
-                      <div className="text-[11px] text-muted-foreground tabular-nums mt-0.5">
-                        {item.cantidad} × {fmt(item.precio_jornada)} × {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
+                      {item.marca && (
+                        <div className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground leading-none">
+                          {item.marca}
+                        </div>
+                      )}
+                      <div className="font-sans text-[13px] font-semibold text-ink leading-tight mt-0.5 truncate">
+                        {display}
+                      </div>
+                      <div className="font-mono text-[10px] text-muted-foreground tabular-nums mt-0.5">
+                        {item.cantidad} × {fmt(item.precio_jornada)}/j · {jornadas}j
                       </div>
                     </div>
-                    <div className="text-sm text-ink tabular-nums shrink-0">{fmt(item.subtotal)}</div>
+                    <div className="font-mono text-[13px] font-bold text-ink tabular-nums shrink-0">
+                      {fmt(item.subtotal)}
+                    </div>
                   </li>
                 );
               })}
             </ul>
           </section>
 
-          {/* Bloque: desglose económico */}
-          <section className="border-t hairline pt-3 space-y-1 text-xs">
-            <div className="flex justify-between text-muted-foreground">
-              <span>Subtotal equipos</span>
-              <span className="tabular-nums">{fmt(subtotalItems)}</span>
+          <section className="flex flex-col gap-1.5 pt-2.5 border-t border-[var(--hairline)]">
+            <div className="flex justify-between items-baseline font-sans text-[13px]">
+              <span className="text-muted-foreground">Subtotal equipos</span>
+              <span className="font-mono font-semibold text-ink tabular-nums">{fmt(subtotalItems)}</span>
             </div>
             {descuentoPct > 0 && (
-              <div className="flex justify-between text-muted-foreground">
-                <span>Descuento ({descuentoPct}%)</span>
-                <span className="tabular-nums text-amber-700">−{fmt(descuentoMonto)}</span>
+              <div className="flex justify-between items-baseline font-sans text-[13px]">
+                <span className="text-muted-foreground">Descuento ({descuentoPct}%)</span>
+                <span className="font-mono font-semibold tabular-nums text-verde">
+                  −{fmt(descuentoMonto)}
+                </span>
               </div>
             )}
-            <div className="flex justify-between pt-1 border-t hairline">
-              <span className="text-ink font-medium">Total</span>
-              <span className="text-ink font-medium tabular-nums">{fmt(total)}</span>
+            <div className="flex justify-between items-baseline pt-1.5 mt-1 border-t border-[var(--hairline)]">
+              <span className="font-sans text-[15px] font-bold text-ink">Total</span>
+              <span className="font-display text-[22px] font-black text-ink tabular-nums">{fmt(total)}</span>
             </div>
             {pagado > 0 && (
               <>
-                <div className="flex justify-between text-green-700">
-                  <span>Pagado</span>
-                  <span className="tabular-nums">{fmt(pagado)}</span>
+                <div className="flex justify-between items-baseline font-sans text-[13px]">
+                  <span className="text-muted-foreground">Pagado</span>
+                  <span className="font-mono font-semibold tabular-nums text-verde">{fmt(pagado)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-ink">Balance pendiente</span>
-                  <span className={`tabular-nums font-medium ${balance > 0 ? "text-ink" : "text-green-700"}`}>
+                <div className="flex justify-between items-baseline font-sans text-[13px]">
+                  <span className="text-muted-foreground">{balance > 0 ? "Balance pendiente" : "Saldo"}</span>
+                  <span className={cn("font-mono font-bold tabular-nums", balance > 0 ? "text-ink" : "text-verde")}>
                     {fmt(balance)}
                   </span>
                 </div>
@@ -334,62 +414,46 @@ function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: 
             )}
           </section>
 
-          {/* Bloque: pagos detallados */}
           {pedido.pagos && pedido.pagos.length > 0 && (
             <section>
-              <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Pagos</h3>
-              <ul className="space-y-1 text-xs">
+              <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">Pagos</h3>
+              <ul className="flex flex-col gap-1">
                 {pedido.pagos.map((pg, i) => (
-                  <li key={i} className="flex items-center justify-between gap-2 text-muted-foreground">
+                  <li key={i} className="flex items-center justify-between gap-2 font-sans text-xs text-muted-foreground">
                     <span className="truncate">
                       {fmtDate(pg.fecha)}{pg.concepto ? ` · ${pg.concepto}` : ""}
                     </span>
-                    <span className="tabular-nums text-green-700 shrink-0">{fmt(pg.monto)}</span>
+                    <span className="font-mono tabular-nums text-verde shrink-0">{fmt(pg.monto)}</span>
                   </li>
                 ))}
               </ul>
             </section>
           )}
 
-          {/* Bloque: notas */}
-          {pedido.notas && (
+          {(docs.remito || docs.contrato || docs.albaran) && (
             <section>
-              <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Notas</h3>
-              <p className="text-xs text-muted-foreground whitespace-pre-wrap">{pedido.notas}</p>
+              <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+                Documentos
+              </h3>
+              <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
+                {docs.remito && (
+                  <DocActions pedidoId={pedido.id} numero={numero} tipo="remito" label="Remito" />
+                )}
+                {docs.contrato && (
+                  <DocActions pedidoId={pedido.id} numero={numero} tipo="contrato" label="Contrato" />
+                )}
+                {docs.albaran && (
+                  <DocActions pedidoId={pedido.id} numero={numero} tipo="albaran" label="Albarán" />
+                )}
+              </div>
             </section>
           )}
 
-          {/* Bloque: documentos (preview HTML + descarga PDF). Issue #106. */}
-          {(docs.remito || docs.contrato || docs.albaran) && (
-            <section className="border-t hairline pt-3">
-              <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
-                Documentos
-              </h3>
-              <div className="flex flex-col gap-1.5">
-                {docs.remito && (
-                  <DocActions
-                    pedidoId={pedido.id}
-                    numero={numero}
-                    tipo="remito"
-                    label="Remito"
-                  />
-                )}
-                {docs.contrato && (
-                  <DocActions
-                    pedidoId={pedido.id}
-                    numero={numero}
-                    tipo="contrato"
-                    label="Contrato"
-                  />
-                )}
-                {docs.albaran && (
-                  <DocActions
-                    pedidoId={pedido.id}
-                    numero={numero}
-                    tipo="albaran"
-                    label="Albarán"
-                  />
-                )}
+          {pedido.notas && (
+            <section>
+              <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">Notas</h3>
+              <div className="rounded-md border border-[color-mix(in_oklch,var(--amber)_40%,transparent)] bg-amber-soft px-3.5 py-3 font-sans text-xs text-ink leading-[1.5] whitespace-pre-wrap">
+                {pedido.notas}
               </div>
             </section>
           )}
@@ -399,10 +463,20 @@ function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: 
   );
 }
 
-function PdfIcon() {
+const DOC_ICONS: Record<"remito" | "contrato" | "albaran", string> = {
+  remito:
+    "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
+  contrato:
+    "M9 11l3 3 8-8 M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11",
+  albaran:
+    "M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z",
+};
+
+function DocPath({ tipo }: { tipo: keyof typeof DOC_ICONS }) {
+  const paths = DOC_ICONS[tipo].split(" M");
   return (
-    <svg className="h-3.5 w-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      {paths.map((p, i) => <path key={i} d={i === 0 ? p : `M${p}`} />)}
     </svg>
   );
 }
@@ -426,21 +500,34 @@ function DocActions({
 
   return (
     <>
-      <div className="flex items-stretch gap-1.5">
+      <div className="flex items-stretch gap-1">
         <button
           type="button"
           onClick={() => setPreviewOpen(true)}
-          className="flex-1 inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-3 text-xs font-medium text-ink hover:bg-muted/50 transition justify-start"
+          className="flex-1 flex items-center gap-2.5 rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5 text-left transition hover:border-ink hover:bg-muted"
         >
-          <PdfIcon /> Ver {label}
+          <div className="grid h-8 w-8 place-items-center rounded-sm bg-amber-soft text-amber shrink-0">
+            <DocPath tipo={tipo} />
+          </div>
+          <div className="min-w-0">
+            <div className="font-sans text-xs font-semibold text-ink leading-tight">{label}</div>
+            <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+              Ver · PDF
+            </div>
+          </div>
         </button>
         <a
           href={`/api/cliente/pedidos/${pedidoId}/${tipo}.pdf`}
           download={`${tipo}-${numero}.pdf`}
-          className="inline-flex items-center gap-1.5 rounded-md border hairline bg-background px-3 py-3 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-ink transition"
+          className="grid place-items-center w-10 rounded-md border border-[var(--hairline)] bg-card text-muted-foreground transition hover:border-ink hover:text-ink"
           title={`Descargar ${label} en PDF`}
+          aria-label={`Descargar ${label} en PDF`}
         >
-          ⬇ PDF
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
         </a>
       </div>
 
