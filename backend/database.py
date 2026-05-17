@@ -628,26 +628,24 @@ def init_db():
 
     # ── Specs estructurados por categoría (rediseño docs/DISEÑO_SPECS.md - PR A) ──
     #
-    # Modelo de specs (refactor unificar_specs_definitions):
+    # Modelo de specs (registry-driven, composite key por categoría):
     #
-    # 1) `spec_definitions` — catálogo global de specs. Cada spec_key existe
-    #    UNA sola vez en el sistema (montura, formato, distancia_focal, etc.).
-    #    El tipo, unidad, enum_options y el flag `es_compatibilidad` viven acá.
+    # 1) `spec_definitions` — UNIQUE(categoria_raiz_id, spec_key). Cada cat
+    #    raíz es dueña de sus filas; los keys "shared" (lens_mount, formato,
+    #    diametro_filtro, peso_g) están duplicados por cat. El motor de
+    #    compat matchea por string-equality del spec_key + value.
+    #    Single source of truth: `backend/specs/registry.py`.
     #
-    # 2) `categoria_spec_templates` — asigna una spec_definition a una
-    #    categoría con flags propios (prioridad, destacado, obligatorio,
-    #    visible_en_card/filtros/nombre, ayuda override).
+    # 2) `categoria_spec_templates` — asigna spec_def a una sub-categoría
+    #    con flags overriding (prioridad, destacado, en_card/filtros/nombre).
     #
-    # 3) `equipo_specs` — los valores concretos por equipo, referenciados
-    #    por spec_def_id (no por spec_key string).
-    #
-    # Beneficios: compartir "montura" entre Cámaras y Lentes con consistencia
-    # de tipo y opciones; setea la base para compatibilidad auto.
+    # 3) `equipo_specs` — valores concretos por equipo, FK a spec_def.
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS spec_definitions (
             id                  SERIAL PRIMARY KEY,
-            spec_key            VARCHAR(64) UNIQUE NOT NULL,
+            categoria_raiz_id   INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+            spec_key            VARCHAR(64) NOT NULL,
             label               VARCHAR(120) NOT NULL,
             tipo                VARCHAR(16) NOT NULL,
             unidad              VARCHAR(32),
@@ -655,33 +653,22 @@ def init_db():
             ayuda               TEXT,
             es_compatibilidad   BOOLEAN NOT NULL DEFAULT FALSE,
             compatibilidad_modo VARCHAR(16) NOT NULL DEFAULT 'exacta',
+            rol_compatibilidad  VARCHAR(16),
+            validado            BOOLEAN NOT NULL DEFAULT FALSE,
+            tabla_columnas      JSONB,
+            output_config       JSONB,
             created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (categoria_raiz_id, spec_key)
         )
     """)
-    # Migration idempotente: agrega columna si fresh install vino sin ella.
     conn.execute(
-        "ALTER TABLE spec_definitions "
-        "ADD COLUMN IF NOT EXISTS compatibilidad_modo VARCHAR(16) NOT NULL DEFAULT 'exacta'"
+        "CREATE INDEX IF NOT EXISTS idx_spec_def_categoria "
+        "ON spec_definitions(categoria_raiz_id, spec_key)"
     )
-    # Flag manual que el dueño marca cuando confirmó que la spec está bien
-    # curada. Las validadas se muestran arriba en /admin/gear-compatibility.
     conn.execute(
-        "ALTER TABLE spec_definitions "
-        "ADD COLUMN IF NOT EXISTS validado BOOLEAN NOT NULL DEFAULT FALSE"
-    )
-    # Para specs tipo 'tabla': shape de columnas (key, label, tipo, options?, unidad?).
-    # El value en equipo_specs se persiste como JSON array de rows.
-    conn.execute(
-        "ALTER TABLE spec_definitions "
-        "ADD COLUMN IF NOT EXISTS tabla_columnas JSONB"
-    )
-    # Config declarativa de cómo se rinde la spec en un placeholder
-    # {spec:Label}. Ej. {"row_strategy": "first"} en una tabla rinde solo
-    # la primera fila. NULL = defaults (row_strategy=all).
-    conn.execute(
-        "ALTER TABLE spec_definitions "
-        "ADD COLUMN IF NOT EXISTS output_config JSONB"
+        "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
+        "ON spec_definitions(spec_key) WHERE es_compatibilidad"
     )
 
     # Observatorio de specs: relevamiento desnormalizado de los specs que
@@ -772,7 +759,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS categoria_spec_templates (
             id                  SERIAL PRIMARY KEY,
             categoria_id        INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
-            spec_def_id         INTEGER NOT NULL REFERENCES spec_definitions(id) ON DELETE RESTRICT,
+            spec_def_id         INTEGER NOT NULL REFERENCES spec_definitions(id) ON DELETE CASCADE,
             prioridad           INTEGER DEFAULT 100,
             destacado           BOOLEAN DEFAULT FALSE,
             obligatorio         BOOLEAN DEFAULT FALSE,
@@ -780,15 +767,9 @@ def init_db():
             visible_en_filtros  BOOLEAN DEFAULT FALSE,
             visible_en_nombre   BOOLEAN DEFAULT FALSE,
             ayuda               TEXT,
-            rol_compatibilidad  VARCHAR(16),
             UNIQUE (categoria_id, spec_def_id)
         )
     """)
-    # Migration idempotente.
-    conn.execute(
-        "ALTER TABLE categoria_spec_templates "
-        "ADD COLUMN IF NOT EXISTS rol_compatibilidad VARCHAR(16)"
-    )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_cst_categoria "
         "ON categoria_spec_templates(categoria_id, prioridad)"
@@ -801,7 +782,7 @@ def init_db():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_specs (
             equipo_id   INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
-            spec_def_id INTEGER NOT NULL REFERENCES spec_definitions(id) ON DELETE RESTRICT,
+            spec_def_id INTEGER NOT NULL REFERENCES spec_definitions(id) ON DELETE CASCADE,
             value       TEXT NOT NULL,
             PRIMARY KEY (equipo_id, spec_def_id)
         )
@@ -809,6 +790,10 @@ def init_db():
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_equipo_specs_def_value "
         "ON equipo_specs(spec_def_id, value)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_equipo_specs_equipo "
+        "ON equipo_specs(equipo_id)"
     )
 
     # ── Mantenimiento log por equipo ─────────────────────────────────────
