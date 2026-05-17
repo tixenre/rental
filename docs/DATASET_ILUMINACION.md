@@ -91,7 +91,7 @@ pasar por Claude**. El admin lo hace solo desde el back-office:
 
 1. Ir al producto en B&H (o sitio fabricante) en el browser.
 2. **Cmd+S** → "Webpage, Complete" → guardar el `.html` en cualquier carpeta.
-3. En `/admin/equipos` → crear equipo o abrir uno existente → botón Auto-completar (✨).
+3. En `/admin/equipos` → crear equipo o abrir uno existente → botón Auto-completar.
 4. Click "**Subir HTML guardado**" (debajo de "Buscar foto / + Specs").
 5. Seleccionar el `.html` recién guardado.
 6. El form se llena con marca, modelo, foto, URL, y los 10+ specs canónicos — **misma calidad que el seed**.

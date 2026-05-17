@@ -80,7 +80,7 @@ Definidas en `tools/camaras_normalizar.py::BRAND_CANON`.
 
 **Sin Claude** (mismo flow que luces, una vez wireado el endpoint):
 1. En B&H: Cmd+S → "Webpage, Complete" → `~/Desktop/Paginas/Camaras/`
-2. En `/admin/equipos` → ✨ Auto-completar → "Subir HTML guardado"
+2. En `/admin/equipos` → Auto-completar → "Subir HTML guardado"
 3. Form se llena con specs canónicos
 
 NOTA: hoy el endpoint `/admin/equipos/autocompletar-from-html` está cableado

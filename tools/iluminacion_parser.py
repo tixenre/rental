@@ -821,7 +821,7 @@ def main(html_paths: list[Path]):
 
     for path in html_paths:
         if not path.exists():
-            print(f"  ⚠  No existe: {path}")
+            print(f"  WARN: no existe: {path}")
             continue
 
         print(f"Procesando: {path.name}")

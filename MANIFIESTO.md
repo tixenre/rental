@@ -213,7 +213,7 @@ Puntos de entrada para no grepear:
 - **URL única** en la autocompletar bar: bindeada al campo `bh_url` del form, con botones copy/abrir inline.
 - **Backend**: endpoint canónico `POST /admin/equipos/autocompletar` (alias deprecated `/enriquecer`). Scrape con Firecrawl + extract con LLM. Devuelve `AutocompletarResult` normalizado.
 - **Normalizer de specs**: backend traduce labels EN→ES (Weight→Peso, Lens Mount→Montura, etc.) y convierte unidades (lbs→kg, in→cm, °F→°C, ranges, dimensiones N×N×N).
-- **Cache del scrape**: el `AutocompletarResult` completo se guarda en `equipo_fichas.raw_json`. Habilita botones ✨ por sección en el form V2 que re-aplican campos sin volver a scrapear.
+- **Cache del scrape**: el `AutocompletarResult` completo se guarda en `equipo_fichas.raw_json`. Habilita los botones de re-aplicar por sección en el form V2 sin volver a scrapear.
 - **Batch**: `POST /admin/equipos/batch-enriquecer` procesa hasta 3 equipos por request (cap defensivo, max 50 ids en body). Frontend re-batchea hasta terminar. Resultado se persiste en raw_json (cache). Sleep 1s entre scrapes para no rate-limitear B&H.
 - **Parser determinístico embebido (URL path)**: el endpoint URL existente ahora pide `rawHtml` a Firecrawl además del `json` extract. Si el rawHtml tiene JSON-LD estructurado (B&H lo siempre tiene), se corre `services/luces_html_extractor.py` (el MISMO pipeline del seed). Cuando el parser detecta ≥3 specs canónicos, OVERRIDE marca/modelo/specs/foto del LLM extract con la versión normalizada. Si no detecta nada (no es lighting, parser falla), se mantiene el flujo LLM intacto. → **Resultado: URL paste ahora también da calidad seed para luces sin tocar la UX**.
 - **HTML upload (fallback / cuando Firecrawl falla)**: `POST /admin/equipos/autocompletar-from-html` acepta un `.html` guardado manualmente (Cmd+S → Webpage Complete desde B&H/manufacturer) y corre el mismo pipeline directo sobre el HTML, sin Firecrawl. Sirve cuando B&H bloquea Firecrawl con bot-detection o cuando la URL no es accesible. UI: botón "Subir HTML guardado" en el diálogo de autocompletar.
@@ -253,10 +253,10 @@ Puntos de entrada para no grepear:
 
 | Categoría | Estado | Doc |
 |---|---|---|
-| Iluminación | ✅ 16 luces curadas, seed listo, HTML upload wireado al admin | [`docs/DATASET_ILUMINACION.md`](docs/DATASET_ILUMINACION.md) |
-| Cámaras | ✅ 6 cámaras curadas + seed listo. **HTML upload UI aún apunta solo a iluminacion_html_extractor** — falta dispatcher por categoría | [`docs/DATASET_CAMARAS.md`](docs/DATASET_CAMARAS.md) |
-| Lentes | ⏳ pendiente | — |
-| (otras) | ⏳ pendiente | — |
+| Iluminación | Listo — 16 luces curadas, seed funcional, HTML upload wireado al admin | [`docs/DATASET_ILUMINACION.md`](docs/DATASET_ILUMINACION.md) |
+| Cámaras | Listo — 6 cámaras curadas + seed funcional. **HTML upload UI aún apunta solo a iluminacion_html_extractor** — falta dispatcher por categoría | [`docs/DATASET_CAMARAS.md`](docs/DATASET_CAMARAS.md) |
+| Lentes | Pendiente | — |
+| (otras) | Pendiente | — |
 
 **Por qué el seed coexiste con `categoria_spec_templates`:** ese table sigue siendo necesario porque define UI metadata (qué specs van en card/filtros/nombre, prioridad de display) — eso no se deriva del dato del equipo. Lo que el seed automatiza es que el admin no la pueble a mano: el script lo hace en una pasada idempotente.
 
@@ -271,13 +271,13 @@ Puntos de entrada para no grepear:
 
 | Acción | Sin Claude | Con Claude |
 |---|---|---|
-| Agregar 1 luz nueva — URL paste (Firecrawl OK) | ✅ Calidad seed automática (parser embebido) | — |
-| Agregar 1 luz nueva — URL paste falla (Firecrawl rate-limit / bot-detection) | ✅ Subir HTML guardado (Cmd+S → upload) | — |
-| Agregar equipo no-luz (cámara, lente) — categoría existente | ✅ Admin UI + autocompletar (LLM extract) | — |
-| Editar precio / foto / nombre / spec value | ✅ Admin UI | — |
-| Agregar spec key nueva al catálogo global | ✅ `/admin/equipos/specs` | — |
-| Importar bulk de una categoría NUEVA (ej. cámaras) — primera vez | — | ✅ Curar HTMLs + parser específico + seed |
-| Refactor del schema (ej. partir `peso` en sub-campos) | — | ✅ Plan + migration |
+| Agregar 1 luz nueva — URL paste (Firecrawl OK) | Sí — calidad seed automática (parser embebido) | — |
+| Agregar 1 luz nueva — URL paste falla (Firecrawl rate-limit / bot-detection) | Sí — subir HTML guardado (Cmd+S → upload) | — |
+| Agregar equipo no-luz (cámara, lente) — categoría existente | Sí — admin UI + autocompletar (LLM extract) | — |
+| Editar precio / foto / nombre / spec value | Sí — admin UI | — |
+| Agregar spec key nueva al catálogo global | Sí — `/admin/equipos/specs` | — |
+| Importar bulk de una categoría NUEVA (ej. cámaras) — primera vez | — | Sí — curar HTMLs + parser específico + seed |
+| Refactor del schema (ej. partir `peso` en sub-campos) | — | Sí — plan + migration |
 
 **Limitaciones:**
 - El parser determinístico hoy solo cubre **luces** (`iluminacion_parser`). Para cámaras/lentes/etc. el URL paste cae al LLM extract hasta que armemos el parser específico por categoría (`camaras_parser.py`, etc. — patrón replicable).
