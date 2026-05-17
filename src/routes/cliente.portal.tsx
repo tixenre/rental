@@ -2,6 +2,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { PublicLayout } from "@/components/rental/PublicLayout";
+import { StatCard } from "@/components/rental/StatCard";
+import { EstadoBadge } from "@/components/rental/EstadoBadge";
+import { ViewToggle } from "@/components/rental/ViewToggle";
+import { EmptyState } from "@/components/rental/EmptyState";
+import { ShoppingBag } from "lucide-react";
 
 export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mi cuenta — Rambla Rental" }] }),
@@ -36,21 +41,14 @@ type Pedido = {
   documentos_disponibles: { remito: boolean; contrato: boolean; albaran: boolean };
 };
 
-const ESTADO_LABEL: Record<string, string> = {
-  borrador: "Borrador", presupuesto: "Presupuesto", solicitado: "Solicitado",
-  confirmado: "Confirmado", entregado: "Entregado", devuelto: "Devuelto",
-  finalizado: "Finalizado", cancelado: "Cancelado",
-};
-const ESTADO_COLOR: Record<string, string> = {
-  borrador: "bg-muted text-muted-foreground",
-  presupuesto: "bg-blue-50 text-blue-700 border-blue-200",
-  solicitado: "bg-amber-50 text-amber-700 border-amber-200",
-  confirmado: "bg-green-50 text-green-700 border-green-200",
-  entregado: "bg-green-100 text-green-800 border-green-300",
-  devuelto: "bg-slate-100 text-slate-600 border-slate-300",
-  finalizado: "bg-slate-100 text-slate-600 border-slate-300",
-  cancelado: "bg-red-50 text-red-600 border-red-200",
-};
+const ACTIVE_STATES = new Set(["solicitado", "confirmado", "entregado"]);
+const HIST_STATES = new Set(["devuelto", "finalizado"]);
+
+const TAB_OPTIONS = [
+  { value: "todos" as const, label: "Todos" },
+  { value: "activos" as const, label: "Activos" },
+  { value: "historial" as const, label: "Historial" },
+];
 
 function fmt(n?: number) {
   if (n == null) return "—";
@@ -68,6 +66,7 @@ export default function ClientePortal() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [tab, setTab] = useState<"todos" | "activos" | "historial">("todos");
 
   useEffect(() => {
     let alive = true;
@@ -101,8 +100,6 @@ export default function ClientePortal() {
 
   const userName = perfil ? `${perfil.nombre} ${perfil.apellido}` : undefined;
 
-  const ACTIVE_STATES = new Set(["solicitado", "confirmado", "entregado"]);
-  const HIST_STATES = new Set(["devuelto", "finalizado"]);
   const activosPedidos = pedidos.filter((p) => ACTIVE_STATES.has(p.estado));
   const totalActivos = activosPedidos.reduce((sum, p) => sum + (p.monto_total ?? 0), 0);
   const pendientePago = activosPedidos.reduce(
@@ -110,6 +107,11 @@ export default function ClientePortal() {
     0,
   );
   const historico = pedidos.filter((p) => HIST_STATES.has(p.estado)).length;
+
+  const filteredPedidos =
+    tab === "activos" ? pedidos.filter((p) => ACTIVE_STATES.has(p.estado))
+    : tab === "historial" ? pedidos.filter((p) => HIST_STATES.has(p.estado))
+    : pedidos;
 
   return (
     <PublicLayout
@@ -134,41 +136,54 @@ export default function ClientePortal() {
         {/* Stats row */}
         {pedidos.length > 0 && (
           <div className="grid grid-cols-3 gap-2.5">
-            <div className="rounded-lg border hairline bg-surface px-4 py-3">
-              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Activos</div>
-              <div className="font-display text-2xl font-black text-ink tabular-nums leading-none mt-1.5">
-                {activosPedidos.length}
-              </div>
-              <div className="font-mono text-[10px] text-muted-foreground mt-1">{fmt(totalActivos)} en rentals</div>
-            </div>
-            <div className="rounded-lg border hairline bg-surface px-4 py-3">
-              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">A pagar</div>
-              <div className={`font-display text-2xl font-black tabular-nums leading-none mt-1.5 ${pendientePago > 0 ? "text-ink" : "text-verde"}`}>
-                {pendientePago > 0 ? fmt(pendientePago) : "$ 0"}
-              </div>
-              <div className="font-mono text-[10px] text-muted-foreground mt-1">
-                {pendientePago > 0 ? "saldo pendiente" : "todo al día"}
-              </div>
-            </div>
-            <div className="rounded-lg border hairline bg-surface px-4 py-3">
-              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Histórico</div>
-              <div className="font-display text-2xl font-black text-ink tabular-nums leading-none mt-1.5">
-                {historico}
-              </div>
-              <div className="font-mono text-[10px] text-muted-foreground mt-1">pedidos completados</div>
-            </div>
+            <StatCard
+              label="Activos"
+              value={String(activosPedidos.length)}
+              meta={`${fmt(totalActivos)} en rentals`}
+            />
+            <StatCard
+              label="A pagar"
+              value={pendientePago > 0 ? fmt(pendientePago) : "$ 0"}
+              meta={pendientePago > 0 ? "saldo pendiente" : "todo al día"}
+              valueClassName={pendientePago === 0 ? "text-verde" : undefined}
+            />
+            <StatCard
+              label="Histórico"
+              value={String(historico)}
+              meta="pedidos completados"
+            />
           </div>
         )}
 
-        <h2 className="font-display text-xl text-ink">Mis pedidos</h2>
+        {/* Filter tabs */}
+        {pedidos.length > 0 && (
+          <div className="flex items-center justify-between">
+            <ViewToggle options={TAB_OPTIONS} value={tab} onChange={setTab} />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground tabular-nums">
+              {filteredPedidos.length} {filteredPedidos.length === 1 ? "pedido" : "pedidos"}
+            </span>
+          </div>
+        )}
 
         {pedidos.length === 0 ? (
-          <div className="rounded-xl border hairline p-8 text-center text-sm text-muted-foreground">
-            Todavía no tenés pedidos registrados.
-          </div>
+          <EmptyState
+            icon={<ShoppingBag className="h-6 w-6" />}
+            title="Sin pedidos aún"
+            sub="Todavía no tenés pedidos registrados."
+          />
+        ) : filteredPedidos.length === 0 ? (
+          <EmptyState
+            icon={<ShoppingBag className="h-6 w-6" />}
+            title={tab === "activos" ? "Sin rentals activos" : "Sin historial aún"}
+            sub={
+              tab === "activos"
+                ? "No tenés rentals activos en este momento."
+                : "Todavía no tenés pedidos completados."
+            }
+          />
         ) : (
           <div className="space-y-3">
-            {pedidos.map((p) => (
+            {filteredPedidos.map((p) => (
               <PedidoCard
                 key={p.id}
                 pedido={p}
@@ -193,7 +208,6 @@ function jornadasEntre(desde?: string, hasta?: string): number {
 
 function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: boolean; onToggle: () => void }) {
   const { documentos_disponibles: docs } = pedido;
-  const estadoClass = ESTADO_COLOR[pedido.estado] ?? "bg-muted text-muted-foreground";
   const numero = pedido.numero_pedido ?? pedido.id;
   const jornadas = jornadasEntre(pedido.fecha_desde, pedido.fecha_hasta);
 
@@ -215,9 +229,7 @@ function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: 
           <span className="font-mono text-xs text-muted-foreground shrink-0">
             #{pedido.numero_pedido}
           </span>
-          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${estadoClass}`}>
-            {ESTADO_LABEL[pedido.estado] ?? pedido.estado}
-          </span>
+          <EstadoBadge estado={pedido.estado} />
           <span className="text-xs text-muted-foreground truncate hidden sm:block">
             {fmtDate(pedido.fecha_desde)} – {fmtDate(pedido.fecha_hasta)}
           </span>
