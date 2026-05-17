@@ -22,13 +22,17 @@ import { Footer } from "./Footer";
 export function PublicLayout({
   children,
   topBar,
+  searchValue,
+  onSearch,
 }: {
   children: ReactNode;
   topBar?: TopBarProps;
+  searchValue?: string;
+  onSearch?: (value: string) => void;
 }) {
   return (
     <div className="min-h-dvh flex flex-col bg-background text-foreground">
-      <TopBar {...topBar} />
+      <TopBar {...topBar} searchValue={searchValue} onSearch={onSearch} />
       <main className="flex-1">{children}</main>
       <Footer />
     </div>
