@@ -379,6 +379,34 @@ DB value:           lumens_at_5600k = 19389 (int)
 - Boolean false → string vacío (se elimina del nombre)
 - **Spec no aplica al producto** (ej. `lens_mount` en GoPro/Insta360) → guardar `null` en `equipo_specs`. El placeholder `{spec:Lens mount}` se omite automáticamente del nombre **junto con sus separadores** (sin double-spaces ni guiones sueltos). Mismo template funciona para productos con y sin la spec.
 
+### Workflow al agregar una sub-categoría nueva
+
+La taxonomía de sub-categorías por categoría raíz vive en `backend/seeds/<categoria>.py`. **Es código, no JSON** — porque tiene lógica de asignación (`categorize()`) además de la estructura.
+
+**Para agregar una sub-categoría hoja** (ej. una nueva montura bajo Cámaras/Video):
+
+1. Editar la lista `SUBCATEGORIAS_NIVEL2_VIDEO` en `backend/seeds/camaras.py` → agregar tupla `("Montura X", prioridad)`.
+2. Si requiere lógica nueva de asignación: extender `categorize()` con el caso.
+3. Re-correr el seed: `python -m backend.seeds.camaras`.
+
+El seed es idempotente:
+- Sub-categorías que ya existían se respetan (ON CONFLICT DO NOTHING)
+- Sub-categorías nuevas se crean
+- Equipos se RE-asignan según las reglas actuales de `categorize()` (ON CONFLICT DO NOTHING en `equipo_categorias`)
+
+**Para agregar un nivel de profundidad** (ej. sub-sub-categoría):
+- Agregar `SUBCATEGORIAS_NIVEL3` con su parent
+- Extender `seed_<categoria>()` con un loop adicional usando `_upsert_subcat(name, prio, parent_nivel2)`
+- El schema soporta árbol arbitrario via `categorias.parent_id`
+
+**Para crear sub-categorías ad-hoc desde la UI admin** (sin tocar código):
+- Sí, posible vía `/admin/categorias`
+- Crear ahí → quedan en DB, pero NO en el seed
+- Si se borran y se re-corre seed, el seed las recrea según su definición
+- Si querés que sean permanentes: agregar al seed después
+
+**Auto-creación on-the-fly**: si `categorize()` devuelve un nombre de sub-categoría que no está pre-definida (ej. una montura nueva), el seed la crea con `prio=99` automáticamente como child del parent intermedio. Evita que productos queden huérfanos.
+
 ### Workflow al agregar un spec nuevo
 
 Cuando agregamos un spec_key nuevo a una categoría (en seed `backend/seeds/<categoria>.py`):
