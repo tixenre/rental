@@ -477,60 +477,6 @@ def _fmt_luz(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], lis
     return base + extras_corto, base + extras_largo
 
 
-def _fmt_modificador(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Softbox Aputure 90cm
-       Bandera Negra 35x40cm"""
-    # Si hay spec "tipo" en specs, lo preferimos sobre subcategoría
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Modificador")
-    )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    if specs.get("medidas"):
-        extras_corto.append(specs["medidas"])
-    extras_largo = list(extras_corto)
-    if specs.get("material"):
-        extras_largo.append(specs["material"])
-    return base + extras_corto, base + extras_largo
-
-
-def _fmt_soporte(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Trípode video Manfrotto 504 Carga 12kg
-       C-Stand Avenger A2030D
-       Gimbal Tilta Gravity G2X 3 ejes"""
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Soporte")
-    )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    extras_largo = []
-    # Solo gimbal: ejes
-    if (specs.get("tipo") == "Gimbal" or "gimbal" in (subcat or "").lower()) and specs.get("ejes"):
-        extras_corto.append(f"{specs['ejes']} ejes")
-    if specs.get("carga máx") or specs.get("carga max"):
-        v = specs.get("carga máx") or specs.get("carga max")
-        extras_largo.append(f"Carga {v}kg")
-    return base + extras_corto, base + extras_largo
-
-
-def _fmt_grip(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Brazo Avenger D200
-       Lastre Impact 15 lb
-       Cage Tilta para FX3"""
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Grip")
-    )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    extras_largo = []
-    if specs.get("medidas"):
-        extras_corto.append(specs["medidas"])
-    return base + extras_corto, base + extras_largo
-
-
 def _fmt_adaptador(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
     """Adaptador Sigma MC-11 EF → E
        Filtro polarizador Tiffen 82mm
@@ -583,71 +529,6 @@ def _fmt_adaptador(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str
     return base + extras_corto, base + extras_corto
 
 
-def _fmt_sonido(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Lavalier Rode Wireless GO II
-       Shotgun Sennheiser MKE 600"""
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Audio")
-    )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    extras_largo = []
-    if specs.get("banda"):
-        extras_largo.append(specs["banda"])
-    return base + extras_corto, base + extras_largo
-
-
-def _fmt_monitor(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Monitor SmallHD 7" 1080p
-       Grabador Atomos Ninja V"""
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Monitor")
-    )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    if specs.get("pulgadas"):
-        extras_corto.append(f"{specs['pulgadas']}\"")
-    extras_largo = list(extras_corto)
-    if specs.get("resolución") or specs.get("resolucion"):
-        v = specs.get("resolución") or specs.get("resolucion")
-        extras_largo.append(v)
-    return base + extras_corto, base + extras_largo
-
-
-def _fmt_energia(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Batería V-mount 150Wh
-       Distribución V-mount 4 canales"""
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Batería")
-    )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    if specs.get("capacidad"):
-        extras_corto.append(f"{specs['capacidad']}Wh")
-    if specs.get("canales"):
-        extras_corto.append(f"{specs['canales']} canales")
-    return base + extras_corto, base + extras_corto
-
-
-def _fmt_media(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Tarjeta SD SanDisk 256GB V90
-       Lector CFexpress Sony MRW-G2"""
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Media")
-    )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    if specs.get("capacidad"):
-        extras_corto.append(f"{specs['capacidad']}GB")
-    if specs.get("clase"):
-        extras_corto.append(specs["clase"])
-    return base + extras_corto, base + extras_corto
-
-
 def _fmt_generico(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
     """Fallback: tipo + marca + modelo, sin specs."""
     tipo = SUBCATEGORIA_A_TIPO.get(subcat or "", RAIZ_A_TIPO.get(raiz or "", ""))
@@ -659,15 +540,8 @@ _FORMATTERS = {
     "Cámaras": _fmt_camara,
     "Lentes": _fmt_lente,
     "Iluminación": _fmt_luz,
-    "Modificadores": _fmt_modificador,
-    "Soportes": _fmt_soporte,
-    "Grip": _fmt_grip,
     "Adaptadores": _fmt_adaptador,
     "Filtros": _fmt_adaptador,  # mismo formatter (rama filtro detecta por specs)
-    "Sonido": _fmt_sonido,
-    "Monitores y Video": _fmt_monitor,
-    "Energía": _fmt_energia,
-    "Media y Datos": _fmt_media,
 }
 
 
