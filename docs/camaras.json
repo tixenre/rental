@@ -42,14 +42,14 @@
         "fps_max": 120,
         "codecs": "XAVC HS, XAVC S-I 4:2:2, XAVC S 4:2:2, MPEG-4 AVC, H.265 HEVC",
         "megapixels": 10.2,
-        "iso_nativo": {
-          "min": 80,
-          "max": 102400
-        },
-        "iso_extendido": {
-          "min": 80,
-          "max": 409600
-        },
+        "iso_nativo": [
+          80,
+          102400
+        ],
+        "iso_extendido": [
+          80,
+          409600
+        ],
         "rango_dinamico_stops": 15,
         "estabilizacion": true,
         "autofocus": true,
@@ -555,10 +555,10 @@
         "codecs": "XAVC HS, XAVC S-I 4:2:2, XAVC S 4:2:2, H.265 HEVC, H.264",
         "megapixels": 33.0,
         "continuous_shooting_fps": 30,
-        "iso_extendido": {
-          "min": 50,
-          "max": 204800
-        },
+        "iso_extendido": [
+          50,
+          204800
+        ],
         "estabilizacion": true,
         "autofocus": true,
         "fast_slow_motion": true,
@@ -1267,14 +1267,14 @@
         "codecs": "XAVC HS, XAVC S-I 4:2:2, XAVC S 4:2:2",
         "megapixels": 12.1,
         "continuous_shooting_fps": 10,
-        "iso_nativo": {
-          "min": 80,
-          "max": 102400
-        },
-        "iso_extendido": {
-          "min": 80,
-          "max": 409600
-        },
+        "iso_nativo": [
+          80,
+          102400
+        ],
+        "iso_extendido": [
+          80,
+          409600
+        ],
         "estabilizacion": true,
         "autofocus": true,
         "fast_slow_motion": true,
@@ -2884,10 +2884,10 @@
         "fps_max": 120,
         "codecs": "ProRes, REDCODE",
         "megapixels": 19.9,
-        "iso_nativo": {
-          "min": 250,
-          "max": 12800
-        },
+        "iso_nativo": [
+          250,
+          12800
+        ],
         "rango_dinamico_stops": 16,
         "estabilizacion": false,
         "autofocus": true,
@@ -3467,10 +3467,10 @@
         "fps_max": 240,
         "codecs": "H.265 HEVC",
         "megapixels": 27.6,
-        "iso_nativo": {
-          "min": 100,
-          "max": 3200
-        },
+        "iso_nativo": [
+          100,
+          3200
+        ],
         "estabilizacion": true,
         "ip_streaming": false,
         "max_aperture": "f/2.5",

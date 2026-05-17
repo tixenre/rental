@@ -24,10 +24,16 @@ from .registry import (
     get_categoria,
     get_spec,
 )
+from .validation import (
+    ValidationError,
+    validate_dataset,
+    validate_or_raise,
+)
 
 __all__ = [
     "CategoriaRegistry", "CompatMode", "CompatRol", "Registry",
     "SpecDef", "SpecTipo", "SubCategoria",
     "REGISTRY", "FORMATO_ENUM", "LENS_MOUNT_ENUM",
     "all_categorias", "get_categoria", "get_spec",
+    "ValidationError", "validate_dataset", "validate_or_raise",
 ]

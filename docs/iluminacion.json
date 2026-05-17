@@ -10,11 +10,15 @@
       "specs": {
         "potencia_w": 120,
         "cri": 95,
-        "temperatura_k": "2500-7500K",
-        "bicolor": true,
-        "rgb": false,
+        "temperatura_k": [
+          2500,
+          7500
+        ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth, DMX",
+        "control_inalambrico": [
+          "Bluetooth",
+          "DMX"
+        ],
         "alimentacion": [
           "AC",
           "V-mount",
@@ -22,7 +26,11 @@
         ],
         "montaje": "Propietario",
         "peso_g": 390,
-        "iluminacion_subtipo": "Flexible Mat"
+        "iluminacion_subtipo": "Flexible Mat",
+        "color_modes": [
+          "Tungsten",
+          "Daylight"
+        ]
       },
       "extras": {
         "item_type": "1x LED Flexible Light",
@@ -277,15 +285,21 @@
       "specs": {
         "potencia_w": 13,
         "cri": 97,
-        "temperatura_k": "2500-8500K",
-        "bicolor": true,
-        "rgb": true,
+        "temperatura_k": [
+          2500,
+          8500
+        ],
         "dimming": true,
         "alimentacion": [
           "Batería integrada"
         ],
         "peso_g": 240,
-        "iluminacion_subtipo": "Panel"
+        "iluminacion_subtipo": "Panel",
+        "color_modes": [
+          "RGB",
+          "Tungsten",
+          "Daylight"
+        ]
       },
       "extras": {
         "item_type": "1x LED Light Panel",
@@ -487,17 +501,24 @@
       "specs": {
         "potencia_w": 520,
         "cri": 96,
-        "temperatura_k": "2700-6500K",
-        "bicolor": true,
-        "rgb": false,
+        "temperatura_k": [
+          2700,
+          6500
+        ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC"
         ],
         "montaje": "Bowens",
         "peso_g": 3160,
-        "iluminacion_subtipo": "Monolight"
+        "iluminacion_subtipo": "Monolight",
+        "color_modes": [
+          "Tungsten",
+          "Daylight"
+        ]
       },
       "extras": {
         "item_type": "1x LED Monolight",
@@ -696,17 +717,26 @@
         "potencia_w": 410,
         "lumens": 23174,
         "cri": 95,
-        "temperatura_k": "1800-20000K",
-        "bicolor": true,
-        "rgb": true,
+        "temperatura_k": [
+          1800,
+          20000
+        ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth, DMX",
+        "control_inalambrico": [
+          "Bluetooth",
+          "DMX"
+        ],
         "alimentacion": [
           "AC"
         ],
         "montaje": "Bowens",
         "peso_g": 3300,
-        "iluminacion_subtipo": "COB Monolight"
+        "iluminacion_subtipo": "COB Monolight",
+        "color_modes": [
+          "RGB",
+          "Tungsten",
+          "Daylight"
+        ]
       },
       "extras": {
         "item_type": "1x COB LED Monolight",
@@ -939,17 +969,27 @@
       "specs": {
         "potencia_w": 1000,
         "cri": 95,
-        "temperatura_k": "1800-20000K",
-        "bicolor": true,
-        "rgb": true,
+        "temperatura_k": [
+          1800,
+          20000
+        ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth, DMX, RDM",
+        "control_inalambrico": [
+          "Bluetooth",
+          "DMX",
+          "RDM"
+        ],
         "alimentacion": [
           "AC"
         ],
         "montaje": "Propietario",
         "peso_g": 16250,
-        "iluminacion_subtipo": "Panel"
+        "iluminacion_subtipo": "Panel",
+        "color_modes": [
+          "RGB",
+          "Tungsten",
+          "Daylight"
+        ]
       },
       "extras": {
         "item_type": "1x LED Array LED Light Panel",
@@ -1178,16 +1218,19 @@
       "specs": {
         "potencia_w": 200,
         "cri": 95,
-        "temperatura_k": "3200K",
-        "bicolor": false,
-        "rgb": false,
+        "temperatura_k": [
+          3200
+        ],
         "dimming": true,
         "alimentacion": [
           "AC"
         ],
         "montaje": "Fresnel",
         "peso_g": 6400,
-        "iluminacion_subtipo": "Fresnel"
+        "iluminacion_subtipo": "Fresnel",
+        "color_modes": [
+          "Tungsten"
+        ]
       },
       "extras": {
         "item_type": "1x LED Fresnel",
@@ -1388,18 +1431,27 @@
       "specs": {
         "potencia_w": 18,
         "cri": 96,
-        "temperatura_k": "2700-6500K",
-        "bicolor": true,
-        "rgb": true,
+        "temperatura_k": [
+          2700,
+          6500
+        ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth, DMX",
+        "control_inalambrico": [
+          "Bluetooth",
+          "DMX"
+        ],
         "alimentacion": [
           "AC",
           "Batería integrada"
         ],
         "montaje": "Propietario",
         "peso_g": 730,
-        "iluminacion_subtipo": "Tube Light"
+        "iluminacion_subtipo": "Tube Light",
+        "color_modes": [
+          "RGB",
+          "Tungsten",
+          "Daylight"
+        ]
       },
       "extras": {
         "item_type": "1x LED Light Tube/Wand",
@@ -1630,15 +1682,21 @@
         "potencia_w": 7,
         "lumens": 570,
         "cri": 95,
-        "temperatura_k": "2000-10000K",
-        "bicolor": true,
-        "rgb": true,
+        "temperatura_k": [
+          2000,
+          10000
+        ],
         "dimming": true,
         "alimentacion": [
           "AC"
         ],
         "peso_g": 210,
-        "iluminacion_subtipo": "Bulb / Lamp"
+        "iluminacion_subtipo": "Bulb / Lamp",
+        "color_modes": [
+          "RGB",
+          "Tungsten",
+          "Daylight"
+        ]
       },
       "extras": {
         "item_type": "1x  LED Lamp",
@@ -1707,17 +1765,22 @@
       "specs": {
         "potencia_w": 150,
         "cri": 96,
-        "temperatura_k": "5600K",
-        "bicolor": false,
-        "rgb": false,
+        "temperatura_k": [
+          5600
+        ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC"
         ],
         "montaje": "Bowens",
         "peso_g": 860,
-        "iluminacion_subtipo": "Monolight"
+        "iluminacion_subtipo": "Monolight",
+        "color_modes": [
+          "Tungsten"
+        ]
       },
       "extras": {
         "cooling": "Fan",
@@ -1876,11 +1939,13 @@
       "specs": {
         "potencia_w": 320,
         "cri": 96,
-        "temperatura_k": "5600K",
-        "bicolor": false,
-        "rgb": false,
+        "temperatura_k": [
+          5600
+        ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC",
           "V-mount",
@@ -1888,7 +1953,10 @@
         ],
         "montaje": "Bowens",
         "peso_g": 2400,
-        "iluminacion_subtipo": "COB Monolight"
+        "iluminacion_subtipo": "COB Monolight",
+        "color_modes": [
+          "Tungsten"
+        ]
       },
       "extras": {
         "item_type": "1x COB LED Monolight",
@@ -2106,17 +2174,22 @@
         "potencia_w": 500,
         "lumens": 46613,
         "cri": 98,
-        "temperatura_k": "5600K",
-        "bicolor": false,
-        "rgb": false,
+        "temperatura_k": [
+          5600
+        ],
         "dimming": true,
-        "control_inalambrico": "Wi-Fi",
+        "control_inalambrico": [
+          "Wi-Fi"
+        ],
         "alimentacion": [
           "AC"
         ],
         "montaje": "Bowens",
         "peso_g": 2490,
-        "iluminacion_subtipo": "Monolight"
+        "iluminacion_subtipo": "Monolight",
+        "color_modes": [
+          "Tungsten"
+        ]
       },
       "extras": {
         "beam_angle": "55°",
@@ -2291,9 +2364,9 @@
         "potencia_w": 60,
         "lumens": 6732,
         "cri": 98,
-        "temperatura_k": "5600K",
-        "bicolor": false,
-        "rgb": false,
+        "temperatura_k": [
+          5600
+        ],
         "dimming": true,
         "alimentacion": [
           "AC",
@@ -2302,7 +2375,10 @@
         ],
         "montaje": "Propietario",
         "peso_g": 830,
-        "iluminacion_subtipo": "Monolight"
+        "iluminacion_subtipo": "Monolight",
+        "color_modes": [
+          "Tungsten"
+        ]
       },
       "extras": {
         "item_type": "1x LED Monolight",
@@ -2500,18 +2576,26 @@
         "potencia_w": 360,
         "lumens": 19389,
         "cri": 95,
-        "temperatura_k": "2500-7500K",
-        "bicolor": true,
-        "rgb": true,
+        "temperatura_k": [
+          2500,
+          7500
+        ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC",
           "Batería integrada"
         ],
         "montaje": "Bowens",
         "peso_g": 2600,
-        "iluminacion_subtipo": "Monolight"
+        "iluminacion_subtipo": "Monolight",
+        "color_modes": [
+          "RGB",
+          "Tungsten",
+          "Daylight"
+        ]
       },
       "extras": {
         "item_type": "1x LED Monolight",
@@ -2735,11 +2819,14 @@
         "potencia_w": 229,
         "lumens": 17000,
         "cri": 95,
-        "temperatura_k": "2700-6500K",
-        "bicolor": true,
-        "rgb": false,
+        "temperatura_k": [
+          2700,
+          6500
+        ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC",
           "V-mount",
@@ -2747,7 +2834,11 @@
         ],
         "montaje": "Bowens",
         "peso_g": 1560,
-        "iluminacion_subtipo": "COB Monolight"
+        "iluminacion_subtipo": "COB Monolight",
+        "color_modes": [
+          "Tungsten",
+          "Daylight"
+        ]
       },
       "extras": {
         "item_type": "1x COB LED Monolight",
@@ -2992,14 +3083,15 @@
       "modelo": "V100",
       "url_source": "https://www.bhphotovideo.com/c/product/1868006-REG/godox_v100s_v100_flash_for_sony.html",
       "specs": {
-        "bicolor": false,
-        "rgb": false,
         "dimming": false,
         "alimentacion": [
           "AC"
         ],
         "peso_g": 619,
-        "iluminacion_subtipo": "Flash"
+        "iluminacion_subtipo": "Flash",
+        "color_modes": [
+          "Daylight"
+        ]
       },
       "extras": {
         "dimensiones": "7.59 × 20.6 × 7.14 cm",
@@ -3137,16 +3229,19 @@
       "specs": {
         "potencia_w": 650,
         "cri": 100,
-        "temperatura_k": "3200K",
-        "bicolor": false,
-        "rgb": false,
+        "temperatura_k": [
+          3200
+        ],
         "dimming": true,
         "alimentacion": [
           "AC"
         ],
         "montaje": "Fresnel",
         "peso_g": 3000,
-        "iluminacion_subtipo": "Fresnel"
+        "iluminacion_subtipo": "Fresnel",
+        "color_modes": [
+          "Tungsten"
+        ]
       },
       "extras": {
         "item_type": "Tungsten Fresnel",
@@ -3307,16 +3402,19 @@
       "specs": {
         "potencia_w": 2000,
         "cri": 100,
-        "temperatura_k": "3200K",
-        "bicolor": false,
-        "rgb": false,
+        "temperatura_k": [
+          3200
+        ],
         "dimming": true,
         "alimentacion": [
           "AC"
         ],
         "montaje": "Fresnel",
         "peso_g": 6240,
-        "iluminacion_subtipo": "Fresnel"
+        "iluminacion_subtipo": "Fresnel",
+        "color_modes": [
+          "Tungsten"
+        ]
       },
       "extras": {
         "item_type": "Tungsten Fresnel Spotlight",
