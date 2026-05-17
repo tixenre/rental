@@ -16,6 +16,7 @@ import {
 
 import { adminApi, descuentosJornadaApi, type ImportCsvResp } from "@/lib/admin/api";
 import { interpolarDescuento } from "@/lib/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/settings")({
   component: SettingsPage,
@@ -24,6 +25,7 @@ export const Route = createLazyFileRoute("/admin/settings")({
 type Kind = "equipos" | "clientes" | "alquileres";
 
 function SettingsPage() {
+  useDocumentTitle("Settings · Back Office");
   const [results, setResults] = useState<Record<Kind, ImportCsvResp | null>>({
     equipos: null, clientes: null, alquileres: null,
   });

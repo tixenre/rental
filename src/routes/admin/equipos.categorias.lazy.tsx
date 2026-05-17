@@ -1,11 +1,13 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { CategoriasSection } from "@/components/admin/equipos-mgmt/CategoriasSection";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/equipos/categorias")({
   component: CategoriasPage,
 });
 
 function CategoriasPage() {
+  useDocumentTitle("Categorías · Back Office");
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-4xl mx-auto">
       <header>

@@ -14,12 +14,14 @@ import {
 import { adminApi, type PedidoResumen } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
 import { CalendarioWidget } from "@/components/admin/CalendarioWidget";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/")({
   component: AdminDashboard,
 });
 
 function AdminDashboard() {
+  useDocumentTitle("Dashboard · Back Office");
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["admin", "dashboard"],
     queryFn: () => adminApi.dashboard(),

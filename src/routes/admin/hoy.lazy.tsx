@@ -12,6 +12,7 @@ import {
   AdminCardPrice,
   AdminCardActions,
 } from "@/components/mobile";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/hoy")({
   component: HoyPage,
@@ -133,6 +134,7 @@ function LoadingSkeleton() {
 }
 
 function HoyPage() {
+  useDocumentTitle("Hoy · Back Office");
   const navigate = useNavigate();
 
   const { data, isLoading } = useQuery({

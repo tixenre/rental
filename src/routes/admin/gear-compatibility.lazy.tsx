@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import { SpecDefinitionsContent } from "./specs.definitions.lazy";
 import { PropuestasContent } from "./specs.propuestas.lazy";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 type Tab = "definitions" | "propuestas";
 const TAB_STORAGE_KEY = "gear-compat:tab";
@@ -15,6 +16,7 @@ export const Route = createLazyFileRoute("/admin/gear-compatibility")({
 });
 
 function GearCompatibilityPage() {
+  useDocumentTitle("Gear Compatibility · Back Office");
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     if (typeof window === "undefined") return "definitions";
     return (localStorage.getItem(TAB_STORAGE_KEY) as Tab) ?? "definitions";

@@ -30,6 +30,7 @@ import {
   AdminCardActions,
   FAB,
 } from "@/components/mobile";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/pedidos/")({
   component: PedidosPage,
@@ -87,6 +88,7 @@ function MobileCardSkeleton() {
 }
 
 function PedidosPage() {
+  useDocumentTitle("Pedidos · Back Office");
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [q, setQ] = useState("");

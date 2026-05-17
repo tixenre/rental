@@ -21,8 +21,11 @@ import {
   ShieldCheck,
   Telescope,
   Network,
-  GitMerge,
-  Archive,
+  Sun,
+  CalendarDays,
+  Check,
+  Database,
+  Bot,
 } from "lucide-react";
 
 import {
@@ -54,6 +57,8 @@ type NavItem = {
 
 const items: NavItem[] = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard, exact: true },
+  { title: "Hoy",        url: "/admin/hoy",        icon: Sun },
+  { title: "Calendario", url: "/admin/calendario", icon: CalendarDays },
   {
     title: "Inventario",
     url: "/admin/equipos",
@@ -61,15 +66,17 @@ const items: NavItem[] = [
     children: [
       { title: "Equipos",             url: "/admin/equipos",            icon: List },
       { title: "Calidad",             url: "/admin/equipos/calidad",    icon: ShieldCheck },
+      { title: "Clasificar equipos",  url: "/admin/equipos/clasificar", icon: Sparkles },
+      { title: "Validar nombres",     url: "/admin/equipos/validacion", icon: Check },
       { title: "Categorías",          url: "/admin/equipos/categorias", icon: FolderTree },
       { title: "Marcas",              url: "/admin/equipos/marcas",     icon: Building2 },
-      { title: "Etiquetas",           url: "/admin/equipos/etiquetas",  icon: Tag },
+      { title: "Etiquetas libres",    url: "/admin/equipos/etiquetas",  icon: Tag },
       { title: "Specs por categoría", url: "/admin/equipos/specs",      icon: Wrench },
+      { title: "Catálogo global de specs", url: "/admin/specs/definitions", icon: Database },
+      { title: "Propuestas IA",       url: "/admin/specs/propuestas",   icon: Bot },
       { title: "Gear Compatibility",  url: "/admin/gear-compatibility", icon: Sparkles },
-      { title: "Observatorio specs",  url: "/admin/specs/observatorio", icon: Telescope },
+      { title: "Observatorio de specs", url: "/admin/specs/observatorio", icon: Telescope },
       { title: "Familias jerárquicas", url: "/admin/specs/familias",     icon: Network },
-      { title: "Dedup de specs",      url: "/admin/specs/dedup",        icon: GitMerge },
-      { title: "Cleanup legacy",      url: "/admin/specs/legacy",       icon: Archive },
       { title: "Unidades",            url: "/admin/unidades",           icon: Ruler },
     ],
   },

@@ -8,7 +8,7 @@ import { ArrowRight, ChevronDown, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cliente/portal")({
-  head: () => ({ meta: [{ title: "Mi cuenta — Rambla Rental" }] }),
+  head: () => ({ meta: [{ title: "Mis pedidos — Rambla Rental" }] }),
   component: ClientePortal,
 });
 
@@ -138,7 +138,7 @@ export default function ClientePortal() {
             Portal de clientes
           </div>
           <h1 className="font-display text-[48px] font-black text-ink leading-none tracking-[-0.025em] mt-1.5">
-            {perfil ? `Hola, ${perfil.nombre}` : "Mi cuenta"}
+            {perfil ? `Hola, ${perfil.nombre}` : "Mis pedidos"}
           </h1>
           <p className="font-sans text-sm text-ink/70 mt-3">
             Mirá tus pedidos, descargá documentos y consultá pagos.

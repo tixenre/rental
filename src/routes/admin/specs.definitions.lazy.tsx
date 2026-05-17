@@ -27,6 +27,7 @@ import {
   type SpecTipo,
   type Unidad,
 } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/specs/definitions")({
   component: SpecDefinitionsPage,
@@ -52,6 +53,7 @@ const TIPO_LABEL: Record<SpecTipo, string> = {
 };
 
 function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) {
+  useDocumentTitle("Catálogo de specs · Back Office");
   const qc = useQueryClient();
   const [editing, setEditing] = useState<SpecDefinition | "new" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SpecDefinition | null>(null);

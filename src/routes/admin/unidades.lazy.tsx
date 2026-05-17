@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, type Unidad, type UnidadInput } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 
 export const Route = createLazyFileRoute("/admin/unidades")({
@@ -28,6 +29,7 @@ export const Route = createLazyFileRoute("/admin/unidades")({
 });
 
 function UnidadesPage() {
+  useDocumentTitle("Unidades · Back Office");
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Unidad | "new" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Unidad | null>(null);
@@ -87,7 +89,7 @@ function UnidadesPage() {
       <header className="flex items-end justify-between gap-3">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            Back-office › Catálogo
+            Back-office › Specs
           </div>
           <h1 className="font-display text-3xl text-ink flex items-center gap-2">
             <Ruler className="h-6 w-6 text-amber" />

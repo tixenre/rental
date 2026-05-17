@@ -58,7 +58,6 @@ const AdminSpecsFamiliasLazyRouteImport = createFileRoute(
 const AdminSpecsDefinitionsLazyRouteImport = createFileRoute(
   '/admin/specs/definitions',
 )()
-const AdminSpecsDedupLazyRouteImport = createFileRoute('/admin/specs/dedup')()
 const AdminPedidosNuevoLazyRouteImport = createFileRoute(
   '/admin/pedidos/nuevo',
 )()
@@ -277,13 +276,6 @@ const AdminSpecsDefinitionsLazyRoute =
   } as any).lazy(() =>
     import('./routes/admin/specs.definitions.lazy').then((d) => d.Route),
   )
-const AdminSpecsDedupLazyRoute = AdminSpecsDedupLazyRouteImport.update({
-  id: '/specs/dedup',
-  path: '/specs/dedup',
-  getParentRoute: () => AdminRoute,
-} as any).lazy(() =>
-  import('./routes/admin/specs.dedup.lazy').then((d) => d.Route),
-)
 const AdminPedidosNuevoLazyRoute = AdminPedidosNuevoLazyRouteImport.update({
   id: '/pedidos/nuevo',
   path: '/pedidos/nuevo',
@@ -385,7 +377,6 @@ export interface FileRoutesByFullPath {
   '/admin/equipos/validacion': typeof AdminEquiposValidacionLazyRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
-  '/admin/specs/dedup': typeof AdminSpecsDedupLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
   '/admin/specs/familias': typeof AdminSpecsFamiliasLazyRoute
   '/admin/specs/legacy': typeof AdminSpecsLegacyLazyRoute
@@ -427,7 +418,6 @@ export interface FileRoutesByTo {
   '/admin/equipos/validacion': typeof AdminEquiposValidacionLazyRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
-  '/admin/specs/dedup': typeof AdminSpecsDedupLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
   '/admin/specs/familias': typeof AdminSpecsFamiliasLazyRoute
   '/admin/specs/legacy': typeof AdminSpecsLegacyLazyRoute
@@ -473,7 +463,6 @@ export interface FileRoutesById {
   '/admin/equipos/validacion': typeof AdminEquiposValidacionLazyRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
-  '/admin/specs/dedup': typeof AdminSpecsDedupLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
   '/admin/specs/familias': typeof AdminSpecsFamiliasLazyRoute
   '/admin/specs/legacy': typeof AdminSpecsLegacyLazyRoute
@@ -520,7 +509,6 @@ export interface FileRouteTypes {
     | '/admin/equipos/validacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
-    | '/admin/specs/dedup'
     | '/admin/specs/definitions'
     | '/admin/specs/familias'
     | '/admin/specs/legacy'
@@ -562,7 +550,6 @@ export interface FileRouteTypes {
     | '/admin/equipos/validacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
-    | '/admin/specs/dedup'
     | '/admin/specs/definitions'
     | '/admin/specs/familias'
     | '/admin/specs/legacy'
@@ -607,7 +594,6 @@ export interface FileRouteTypes {
     | '/admin/equipos/validacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
-    | '/admin/specs/dedup'
     | '/admin/specs/definitions'
     | '/admin/specs/familias'
     | '/admin/specs/legacy'
@@ -862,13 +848,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSpecsDefinitionsLazyRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/specs/dedup': {
-      id: '/admin/specs/dedup'
-      path: '/specs/dedup'
-      fullPath: '/admin/specs/dedup'
-      preLoaderRoute: typeof AdminSpecsDedupLazyRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/pedidos/nuevo': {
       id: '/admin/pedidos/nuevo'
       path: '/pedidos/nuevo'
@@ -976,7 +955,6 @@ interface AdminRouteChildren {
   AdminIndexLazyRoute: typeof AdminIndexLazyRoute
   AdminPedidosIdLazyRoute: typeof AdminPedidosIdLazyRoute
   AdminPedidosNuevoLazyRoute: typeof AdminPedidosNuevoLazyRoute
-  AdminSpecsDedupLazyRoute: typeof AdminSpecsDedupLazyRoute
   AdminSpecsDefinitionsLazyRoute: typeof AdminSpecsDefinitionsLazyRoute
   AdminSpecsFamiliasLazyRoute: typeof AdminSpecsFamiliasLazyRoute
   AdminSpecsLegacyLazyRoute: typeof AdminSpecsLegacyLazyRoute
@@ -1000,7 +978,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminIndexLazyRoute: AdminIndexLazyRoute,
   AdminPedidosIdLazyRoute: AdminPedidosIdLazyRoute,
   AdminPedidosNuevoLazyRoute: AdminPedidosNuevoLazyRoute,
-  AdminSpecsDedupLazyRoute: AdminSpecsDedupLazyRoute,
   AdminSpecsDefinitionsLazyRoute: AdminSpecsDefinitionsLazyRoute,
   AdminSpecsFamiliasLazyRoute: AdminSpecsFamiliasLazyRoute,
   AdminSpecsLegacyLazyRoute: AdminSpecsLegacyLazyRoute,

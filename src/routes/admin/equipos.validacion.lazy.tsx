@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { adminApi } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 
 export const Route = createLazyFileRoute("/admin/equipos/validacion")({
@@ -31,6 +32,7 @@ type Filtro = "all" | "pendientes" | "aprobados" | "editados";
 
 
 function ValidacionPage() {
+  useDocumentTitle("Validar nombres · Back Office");
   const qc = useQueryClient();
   const [filtro, setFiltro] = useState<Filtro>("pendientes");
   const [busqueda, setBusqueda] = useState("");
@@ -103,7 +105,7 @@ function ValidacionPage() {
       <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            Back-office · Rediseño
+            Back-office › Equipos
           </div>
           <h1 className="font-display text-3xl text-ink">Validar nombres públicos</h1>
           <p className="text-sm text-muted-foreground mt-1">
