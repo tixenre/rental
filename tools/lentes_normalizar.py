@@ -168,13 +168,13 @@ LENTE_SPECS_ORDER = [
 ]
 
 ADAPTADOR_SPECS_ORDER = [
-    "tipo", "lens_mount", "lens_mount_out",
+    "adaptador_subtipo", "lens_mount", "lens_mount_out",
     "electronica", "incluye_iris", "magnificacion",
     "peso_g",
 ]
 
 FILTRO_SPECS_ORDER = [
-    "tipo", "diametro_filtro", "densidad",
+    "filtro_subtipo", "diametro_filtro", "densidad",
     "material", "grade", "peso_g",
 ]
 

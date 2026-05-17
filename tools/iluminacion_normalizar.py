@@ -167,13 +167,14 @@ def clean_extras(extras: dict) -> dict:
 # ── Reordenar specs (orden visual canónico) ──────────────────────────────────
 
 SPECS_ORDER = [
+    "iluminacion_subtipo",
     "potencia_w", "lumens", "cri", "temperatura_k",
     "bicolor", "rgb", "dimming",
     "control_inalambrico", "alimentacion", "montaje", "peso",
 ]
 
 EXTRAS_ORDER = [
-    "tipo", "item_type", "bulb_type", "base_type",
+    "item_type", "bulb_type", "base_type",
     "beam_angle", "cooling", "ip_rating",
     "dimensiones", "photometrics_1m",
     "cri", "tlci",

@@ -19,11 +19,11 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1234034-REG/sigma_89e965_mc_11_mount_adapter_for.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/sigma_89e965_mc_11_mount_adapter_for_1234034.jpg",
       "specs": {
-        "tipo": "Adaptador montura",
         "lens_mount": "E",
         "lens_mount_out": "EF",
         "electronica": true,
-        "incluye_iris": false
+        "incluye_iris": false,
+        "adaptador_subtipo": "Adaptador montura"
       },
       "extras": {
         "item_type": "1x Lens Mount Adapter",
@@ -113,12 +113,12 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1595393-REG/canon_mount_adapter_ef_eos_r.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/canon_mount_adapter_ef_eos_r_1595393.jpg",
       "specs": {
-        "tipo": "Speedbooster",
         "lens_mount": "RF",
         "lens_mount_out": "EF",
         "electronica": true,
         "incluye_iris": false,
-        "magnificacion": "0.71x"
+        "magnificacion": "0.71x",
+        "adaptador_subtipo": "Speedbooster"
       },
       "extras": {
         "item_type": "1x Reducing Lens Mount Adapter",
@@ -217,12 +217,12 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1433719-REG/canon_mount_adapter_ef_rf_with.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/canon_mount_adapter_ef_rf_with_1433719.jpg",
       "specs": {
-        "tipo": "Adaptador montura",
         "lens_mount": "RF",
         "lens_mount_out": "EF",
         "electronica": true,
         "incluye_iris": true,
-        "peso_g": 121
+        "peso_g": 121,
+        "adaptador_subtipo": "Adaptador montura"
       },
       "extras": {
         "item_type": "1x Lens Mount Adapter with Drop-In Filter Support (1.5 to 9-Stop Variable ND Included)",
@@ -321,11 +321,11 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1349617-REG/vello_la_nex_m42_m42_lens_mount_adapter.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/vello_la_nex_m42_m42_lens_mount_adapter_1349617.jpg",
       "specs": {
-        "tipo": "Adaptador montura",
         "lens_mount": "E",
         "lens_mount_out": "M42",
         "electronica": false,
-        "incluye_iris": false
+        "incluye_iris": false,
+        "adaptador_subtipo": "Adaptador montura"
       },
       "extras": {
         "item_type": "1x Lens Mount Adapter",

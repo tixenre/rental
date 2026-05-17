@@ -88,12 +88,12 @@ def apply_patches():
         "modelo": "650 Plus",
         "url_source": "https://www.arri.com/en/lighting/daylight-tungsten/tungsten/arri-junior/arri-650-plus",
         "specs": {
+            "iluminacion_subtipo": "Fresnel",
             "potencia_w": 650, "cri": 100, "temperatura_k": "3200K",
             "bicolor": False, "rgb": False, "dimming": True,
             "alimentacion": ["AC"], "montaje": "Fresnel", "peso_g": 3000,
         },
         "extras": {
-            "tipo": "Fresnel",
             "item_type": "Tungsten Fresnel",
             "bulb_type": "GY9.5 — CP89 FRL/FRK 650W (acepta CP82 500W / CP81 300W)",
             "beam_angle": "12-52°",
@@ -129,12 +129,12 @@ def apply_patches():
         "modelo": "407 Baby Solarspot 2000W 6\"",
         "url_source": "https://www.mole.com/407-baby-solarspot",
         "specs": {
+            "iluminacion_subtipo": "Fresnel",
             "potencia_w": 2000, "cri": 100, "temperatura_k": "3200K",
             "bicolor": False, "rgb": False, "dimming": True,
             "alimentacion": ["AC"], "montaje": "Fresnel", "peso_g": 6240,
         },
         "extras": {
-            "tipo": "Fresnel",
             "item_type": "Tungsten Fresnel Spotlight",
             "bulb_type": "Medium Bi-post (2000W tungsten) — el chassis 407 es nominal 1000W; el usuario opera con bulb 2kW",
             "beam_angle": "15-58°",

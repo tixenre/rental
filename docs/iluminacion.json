@@ -21,10 +21,10 @@
           "Batería integrada"
         ],
         "montaje": "Propietario",
-        "peso_g": 390
+        "peso_g": 390,
+        "iluminacion_subtipo": "Flexible Mat"
       },
       "extras": {
-        "tipo": "Flexible Mat",
         "item_type": "1x LED Flexible Light",
         "beam_angle": "180°",
         "cooling": "Passive",
@@ -284,10 +284,10 @@
         "alimentacion": [
           "Batería integrada"
         ],
-        "peso_g": 240
+        "peso_g": 240,
+        "iluminacion_subtipo": "Panel"
       },
       "extras": {
-        "tipo": "Panel",
         "item_type": "1x LED Light Panel",
         "cooling": "Passive",
         "dimensiones": "14.5 × 7.0 × 1.5 cm",
@@ -496,10 +496,10 @@
           "AC"
         ],
         "montaje": "Bowens",
-        "peso_g": 3160
+        "peso_g": 3160,
+        "iluminacion_subtipo": "Monolight"
       },
       "extras": {
-        "tipo": "Monolight",
         "item_type": "1x LED Monolight",
         "beam_angle": "120°",
         "cooling": "Fan",
@@ -705,10 +705,10 @@
           "AC"
         ],
         "montaje": "Bowens",
-        "peso_g": 3300
+        "peso_g": 3300,
+        "iluminacion_subtipo": "COB Monolight"
       },
       "extras": {
-        "tipo": "COB Monolight",
         "item_type": "1x COB LED Monolight",
         "beam_angle": "70°",
         "cooling": "Fan",
@@ -948,10 +948,10 @@
           "AC"
         ],
         "montaje": "Propietario",
-        "peso_g": 16250
+        "peso_g": 16250,
+        "iluminacion_subtipo": "Panel"
       },
       "extras": {
-        "tipo": "Panel",
         "item_type": "1x LED Array LED Light Panel",
         "beam_angle": "35°",
         "cooling": "Fan",
@@ -1186,10 +1186,10 @@
           "AC"
         ],
         "montaje": "Fresnel",
-        "peso_g": 6400
+        "peso_g": 6400,
+        "iluminacion_subtipo": "Fresnel"
       },
       "extras": {
-        "tipo": "Fresnel",
         "item_type": "1x LED Fresnel",
         "beam_angle": "13-54°",
         "cooling": "Passive",
@@ -1398,10 +1398,10 @@
           "Batería integrada"
         ],
         "montaje": "Propietario",
-        "peso_g": 730
+        "peso_g": 730,
+        "iluminacion_subtipo": "Tube Light"
       },
       "extras": {
-        "tipo": "Tube Light",
         "item_type": "1x LED Light Tube/Wand",
         "cooling": "Passive",
         "dimensiones": "29.5 x 1.9\" / 75 x 4.8 cm (Fixture)",
@@ -1637,10 +1637,10 @@
         "alimentacion": [
           "AC"
         ],
-        "peso_g": 210
+        "peso_g": 210,
+        "iluminacion_subtipo": "Bulb / Lamp"
       },
       "extras": {
-        "tipo": "Bulb / Lamp",
         "item_type": "1x  LED Lamp",
         "base_type": "E26/E27",
         "dimensiones": "11.5 × 7 cm (alto × diámetro)"
@@ -1716,10 +1716,10 @@
           "AC"
         ],
         "montaje": "Bowens",
-        "peso_g": 860
+        "peso_g": 860,
+        "iluminacion_subtipo": "Monolight"
       },
       "extras": {
-        "tipo": "Monolight",
         "cooling": "Fan",
         "dimensiones": "21.0 × 11.5 × 3.6 cm",
         "display": "LED",
@@ -1887,10 +1887,10 @@
           "Batería integrada"
         ],
         "montaje": "Bowens",
-        "peso_g": 2400
+        "peso_g": 2400,
+        "iluminacion_subtipo": "COB Monolight"
       },
       "extras": {
-        "tipo": "COB Monolight",
         "item_type": "1x COB LED Monolight",
         "cooling": "Fan",
         "dimensiones": "29.2 × 27.2 × 17.6 cm",
@@ -2115,10 +2115,10 @@
           "AC"
         ],
         "montaje": "Bowens",
-        "peso_g": 2490
+        "peso_g": 2490,
+        "iluminacion_subtipo": "Monolight"
       },
       "extras": {
-        "tipo": "Monolight",
         "beam_angle": "55°",
         "cooling": "Fan",
         "dimensiones": "30.7 × 20.6 × 14.2 cm",
@@ -2301,10 +2301,10 @@
           "Batería integrada"
         ],
         "montaje": "Propietario",
-        "peso_g": 830
+        "peso_g": 830,
+        "iluminacion_subtipo": "Monolight"
       },
       "extras": {
-        "tipo": "Monolight",
         "item_type": "1x LED Monolight",
         "cooling": "Fan",
         "dimensiones": "19.89 × 8.51 × 10.49 cm",
@@ -2510,10 +2510,10 @@
           "Batería integrada"
         ],
         "montaje": "Bowens",
-        "peso_g": 2600
+        "peso_g": 2600,
+        "iluminacion_subtipo": "Monolight"
       },
       "extras": {
-        "tipo": "Monolight",
         "item_type": "1x LED Monolight",
         "beam_angle": "90°",
         "cooling": "Fan",
@@ -2746,10 +2746,10 @@
           "Batería integrada"
         ],
         "montaje": "Bowens",
-        "peso_g": 1560
+        "peso_g": 1560,
+        "iluminacion_subtipo": "COB Monolight"
       },
       "extras": {
-        "tipo": "COB Monolight",
         "item_type": "1x COB LED Monolight",
         "beam_angle": "26°",
         "cooling": "Fan",
@@ -2998,10 +2998,10 @@
         "alimentacion": [
           "AC"
         ],
-        "peso_g": 619
+        "peso_g": 619,
+        "iluminacion_subtipo": "Flash"
       },
       "extras": {
-        "tipo": "Flash",
         "dimensiones": "7.59 × 20.6 × 7.14 cm",
         "app_compatible": false
       },
@@ -3145,10 +3145,10 @@
           "AC"
         ],
         "montaje": "Fresnel",
-        "peso_g": 3000
+        "peso_g": 3000,
+        "iluminacion_subtipo": "Fresnel"
       },
       "extras": {
-        "tipo": "Fresnel",
         "item_type": "Tungsten Fresnel",
         "bulb_type": "GY9.5 — CP89 FRL/FRK 650W (acepta CP82 500W / CP81 300W)",
         "beam_angle": "12-52°",
@@ -3315,10 +3315,10 @@
           "AC"
         ],
         "montaje": "Fresnel",
-        "peso_g": 6240
+        "peso_g": 6240,
+        "iluminacion_subtipo": "Fresnel"
       },
       "extras": {
-        "tipo": "Fresnel",
         "item_type": "Tungsten Fresnel Spotlight",
         "bulb_type": "Medium Bi-post (2000W tungsten) — el chassis 407 es nominal 1000W; el usuario opera con bulb 2kW",
         "beam_angle": "15-58°",

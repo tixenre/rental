@@ -358,7 +358,7 @@ def _build_filter_id(brand: str, specs: dict, title: str = "") -> str:
     if d:
         parts.append(str(d))
 
-    tipo = (specs.get("tipo") or "").lower()
+    tipo = (specs.get("filtro_subtipo") or "").lower()
     if "polariz" in tipo:
         parts.append("cpl")
     elif "variable" in tipo:
@@ -389,7 +389,7 @@ def _build_adapter_id(brand: str, specs: dict, title: str = "") -> str:
         parts.append(f"{mount_out}_{mount}")
 
     # Diferenciador: speedbooster vs regular vs drop-in
-    tipo = (specs.get("tipo") or "").lower()
+    tipo = (specs.get("adaptador_subtipo") or "").lower()
     title_l = title.lower()
     if "speedbooster" in tipo or "speed" in title_l:
         parts.append("speedbooster")
@@ -424,7 +424,7 @@ def _build_accesorio_model(brand: str, specs: dict, title: str) -> str:
         m = re.search(r"grade\s*(\d+\s*/\s*\d+)", title, re.IGNORECASE)
         if m:
             return f"Black Pro-Mist {m.group(1)} {d}mm"
-        tipo = (specs.get("tipo") or "").lower()
+        tipo = (specs.get("filtro_subtipo") or "").lower()
         if "polariz" in tipo:
             return f"Polarizador circular {d}mm"
         if "variable" in tipo:
@@ -436,7 +436,7 @@ def _build_accesorio_model(brand: str, specs: dict, title: str) -> str:
             return f"ND {d}mm"
         if "uv" in tipo:
             return f"UV {d}mm"
-        return f"{specs.get('tipo', 'Filtro')} {d}mm"
+        return f"{specs.get('filtro_subtipo', 'Filtro')} {d}mm"
 
     # ── Adaptadores ─────────────────────────────────────────────────
     mount_out = specs.get("lens_mount_out", "")
@@ -446,7 +446,7 @@ def _build_accesorio_model(brand: str, specs: dict, title: str) -> str:
         # Detectar marca-modelo identificador
         if "mc-11" in title_l or "mc11" in title_l:
             return f"MC-11 {arrow}"
-        if "speedbooster" in title_l or specs.get("tipo") == "Speedbooster":
+        if "speedbooster" in title_l or specs.get("adaptador_subtipo") == "Speedbooster":
             m = re.search(r"([\d.]+x)", title)
             ratio = f" {m.group(1)}" if m else ""
             return f"Speedbooster{ratio} {arrow}"
@@ -629,7 +629,7 @@ def map_filtro_specs(secciones: dict, title: str = "") -> dict:
         if val is not None and val != "" and val != []:
             result[key] = val
 
-    _add("tipo", _parse_filtro_tipo(secciones, title))
+    _add("filtro_subtipo", _parse_filtro_tipo(secciones, title))
     _add("diametro_filtro", _parse_filtro_diametro(secciones, title))
     _add("densidad", _parse_filtro_densidad(secciones))
     _add("material", _parse_filtro_material(secciones))
@@ -646,7 +646,7 @@ def map_adaptador_specs(secciones: dict, title: str = "") -> dict:
         if val is not None and val != "" and val != []:
             result[key] = val
 
-    _add("tipo", _parse_adaptador_tipo(secciones))
+    _add("adaptador_subtipo", _parse_adaptador_tipo(secciones))
     _add("lens_mount", _normalize_mount(_find_value(secciones, "Camera Compatibility") or ""))
     _add("lens_mount_out", _normalize_mount(_find_value(secciones, "Lens Compatibility") or ""))
 

@@ -19,10 +19,10 @@
       "url_source": "https://www.bhphotovideo.com/c/product/56638-REG/Tiffen_82CP_82mm_Circular_Polarizing.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/Tiffen_82CP_82mm_Circular_Polarizing_56638.jpg",
       "specs": {
-        "tipo": "Filtro polarizador",
         "diametro_filtro": 82,
         "densidad": "1.2-Stop",
-        "material": "Vidrio"
+        "material": "Vidrio",
+        "filtro_subtipo": "Filtro polarizador"
       },
       "extras": {
         "filter_type_raw": "Circular Polarizer",
@@ -130,10 +130,10 @@
       "url_source": "https://www.bhphotovideo.com/c/product/55645-REG/Tiffen_82BPM14_82mm_Black_Pro_Mist_1_4.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/Tiffen_82BPM14_82mm_Black_Pro_Mist_1_4_55645.jpg",
       "specs": {
-        "tipo": "Filtro difusión",
         "diametro_filtro": 82,
         "material": "Vidrio",
-        "grade": "1/4"
+        "grade": "1/4",
+        "filtro_subtipo": "Filtro difusión"
       },
       "extras": {
         "filter_type_raw": "Black Mist (Grade 1/4)",
@@ -223,10 +223,10 @@
       "url_source": "https://www.bhphotovideo.com/c/product/55692-REG/Tiffen_82BPM18_82mm_Black_Pro_Mist_1_8.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/Tiffen_82BPM18_82mm_Black_Pro_Mist_1_8_55692.jpg",
       "specs": {
-        "tipo": "Filtro difusión",
         "diametro_filtro": 82,
         "material": "Vidrio",
-        "grade": "1/8"
+        "grade": "1/8",
+        "filtro_subtipo": "Filtro difusión"
       },
       "extras": {
         "filter_type_raw": "Black Mist (Grade 1/8)",
@@ -316,10 +316,10 @@
       "url_source": "https://www.bhphotovideo.com/c/product/821128-REG/Tiffen_82VND_82mm_Variable_Neutral_Density.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/Tiffen_82VND_82mm_Variable_Neutral_Density_821128.jpg",
       "specs": {
-        "tipo": "Filtro variable",
         "diametro_filtro": 82,
         "densidad": "2 to 8-Stop",
-        "material": "Vidrio"
+        "material": "Vidrio",
+        "filtro_subtipo": "Filtro variable"
       },
       "extras": {
         "filter_type_raw": "Variable ND",

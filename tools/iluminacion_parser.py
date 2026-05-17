@@ -656,7 +656,8 @@ def map_luz_extras(secciones: dict, title: str = "") -> dict:
         if val is not None and val != "":
             result[key] = val
 
-    _add("tipo", _parse_tipo(secciones, title))
+    # `tipo` ahora vive en specs como `iluminacion_subtipo`. Acá solo dejamos
+    # campos descriptivos (no canónicos) que no llegan a spec_definitions.
     _add("beam_angle", _parse_beam_angle(secciones))
     _add("cooling", _parse_cooling(secciones))
     _add("ip_rating", _parse_ip_rating(secciones))
@@ -692,6 +693,10 @@ def map_luz_extras(secciones: dict, title: str = "") -> dict:
 def map_luz_specs(secciones: dict, title: str = "") -> dict:
     """Mapea secciones raw de B&H → spec_keys del proyecto para Iluminación."""
     result: dict = {}
+
+    subtipo = _parse_tipo(secciones, title)
+    if subtipo:
+        result["iluminacion_subtipo"] = subtipo
 
     potencia = _parse_potencia(secciones)
     if potencia is not None:
