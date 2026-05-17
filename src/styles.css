@@ -251,6 +251,27 @@
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
+
+  /* Rambla seal: badge amber + R bone por default. En el topbar móvil
+     amber-on-scroll, al pasar 65% del progreso (.topbar-snap), los
+     colores se invierten — el badge se vuelve bone y la R amber. */
+  .topbar-seal .seal-badge { fill: var(--amber); transition: fill .12s; }
+  .topbar-seal .seal-r     { fill: var(--background); transition: fill .12s; }
+  .topbar-snap .topbar-seal .seal-badge { fill: var(--background); }
+  .topbar-snap .topbar-seal .seal-r     { fill: var(--amber); }
+
+  /* Topbar móvil snap: cuando el scroll-amber pasa 65%, el date-pill y
+     el botón de sesión se invierten a fondo bone con ink. */
+  .topbar-snap .date-pill-snap {
+    background: var(--background) !important;
+    border-color: var(--background) !important;
+    color: var(--ink);
+  }
+  .topbar-snap .user-btn-snap {
+    background: var(--background) !important;
+    border-color: var(--background) !important;
+    color: var(--ink);
+  }
 }
 
 /* Prevent iOS Safari from zooming in on input focus (font-size must be ≥ 16px) */

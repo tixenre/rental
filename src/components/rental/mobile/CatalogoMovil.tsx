@@ -3,11 +3,13 @@ import {
   Camera, Sun, Mic, Layers, Monitor, Zap, Battery,
   Package, SlidersHorizontal, Search, User, Plus,
   ChevronUp, ChevronRight, X, Calendar, Loader2,
+  Check,
 } from "lucide-react";
+import { BottomSheet } from "@/components/mobile/BottomSheet";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useEquipos } from "@/hooks/useEquipos";
+import { useEquipos, useMarcas } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { formatARS } from "@/lib/format";
 import { type Equipment } from "@/data/equipment";
@@ -74,10 +76,103 @@ function CatIcon({ cat, size = 20 }: { cat: string; size?: number }) {
 }
 
 /* ── Shared styles ───────────────────────────────────────────────── */
-const TOPBAR_BG = "color-mix(in oklch, var(--background) 90%, transparent)";
 const SEARCH_BG = "color-mix(in oklch, var(--background) 94%, transparent)";
 const TABS_BG = "color-mix(in oklch, var(--background) 90%, transparent)";
 const CARTBAR_BG = "color-mix(in oklch, var(--background) 96%, transparent)";
+
+/* ── Rambla Seal SVG ─────────────────────────────────────────────── */
+// Inline SVG en lugar de /rambla-icon-seal.png para poder invertir los
+// colores via CSS cuando el topbar entra en snap (>65% scroll-amber).
+// Path[0] = badge exterior, Path[1] = letra R interior.
+// Estado default: badge amber, R bone.
+// Estado snap (.topbar-snap): badge bone, R amber.
+function RamblaSeal() {
+  return (
+    <svg
+      className="topbar-seal shrink-0 block"
+      width={34}
+      height={34}
+      viewBox="0 0 2000 2000"
+      aria-label="Rambla"
+    >
+      <path
+        className="seal-badge"
+        d="M1930.45,949.73c-.44-.28-.88-.55-1.32-.82l-5.91-3.61c-3.19-2.29-6.58-4.35-10.13-6.19l-121.29-74.1c-49.62-30.31-68.53-93.07-43.93-145.76l63.92-136.86c37.05-79.33-25.29-169.12-112.57-162.14l-150.57,12.05c-57.96,4.64-110.15-35.02-121.21-92.1l-28.73-148.29c-16.65-85.96-119.87-121.96-186.37-65.01l-114.72,98.25c-44.16,37.82-109.7,36.42-152.2-3.26l-110.4-103.08c-64-59.75-168.66-28.21-188.99,56.95l-35.07,146.92c-13.5,56.56-67.34,93.94-125.05,86.82l-149.9-18.5c-86.89-10.72-153.03,76.31-119.42,157.16l57.99,139.48c22.32,53.69.73,115.58-50.14,143.74l-140.79,77.93c-.61.33-1.21.68-1.8,1.02-31.8,18.36-44.19,49.65-41.44,79.73-2.42,22.36,6.21,45.75,29.16,60.2.44.28.88.55,1.32.82l5.91,3.61c3.19,2.29,6.58,4.35,10.13,6.19l121.29,74.1c49.62,30.31,68.54,93.08,43.93,145.76l-63.92,136.86c-37.05,79.33,25.29,169.12,112.57,162.14l150.57-12.05c57.96-4.64,110.15,35.02,121.21,92.1l28.73,148.29c16.65,85.96,119.87,121.96,186.37,65.01l114.72-98.25c44.17-37.82,109.7-36.42,152.2,3.26l110.4,103.08c64,59.75,168.66,28.21,188.99-56.95l35.07-146.92c13.5-56.56,67.34-93.94,125.05-86.82l149.9,18.5c86.89,10.72,153.03-76.31,119.42-157.16l-57.99-139.48c-22.32-53.69-.73-115.58,50.14-143.74l140.79-77.93c.61-.33,1.21-.67,1.8-1.02,31.8-18.36,44.19-49.65,41.44-79.72,2.42-22.36-6.21-45.75-29.16-60.2Z"
+      />
+      <path
+        className="seal-r"
+        fillRule="evenodd"
+        d="M915.75,1195.19c4.65.25,9.34.57,14.09.7,180.57,4.81,361.28-126.11,403.64-292.43,42.36-166.32-69.69-323.8-250.26-328.61-60.73-1.62-124.87,22.33-177.52,54.92-12.49,7.73-28.44-1.73-27.15-16.37.03-.31.05-.61.08-.92.9-10.19-7.03-18.98-17.27-18.98h-187.42c-3.01,0-5.51,2.32-5.73,5.33-3.46,46.93-27.1,395.19,9.77,700.72,7.24,59.98,58.55,104.88,118.96,104.88h123.28c3.55,0,6.27-3.07,5.69-6.57-1.81-10.9-5.72-34.52-10.67-64.49-.88-5.33,5.3-8.96,9.37-5.4,43.04,37.71,196.54,152,393.92,65.79,2.12-.93,3.54-3.07,3.54-5.39v-254.14c0-9.38-10.05-15.37-18.26-10.83-57.94,32.1-242.52,124.87-389.33,93.98-18.62-3.92-17.49-23.19,1.25-22.2ZM876.68,978.38c26.29-62.04,108.33-118.54,183.26-126.2,74.92-7.66,114.35,36.41,88.07,98.45-26.29,62.04-108.33,118.54-183.26,126.2-74.92,7.66-114.35-36.41-88.07-98.45Z"
+      />
+    </svg>
+  );
+}
+
+/* ── HeroBanner ──────────────────────────────────────────────────── */
+// Hero amber del catálogo móvil (mock Catálogo Móvil - Lista.html §HeroBanner).
+// Eyebrow + headline brand "un lugar / donde pasan / cosas" + body + card
+// Estudio negro con CTA amber. El heroRef se usa para el amber-on-scroll del
+// topbar (cuando el bottom del hero llega al topbar, el topbar está full
+// amber y el seal/pill snapean a inverted).
+function HeroBanner({
+  heroRef,
+  equipCount,
+}: {
+  heroRef: React.RefObject<HTMLDivElement | null>;
+  equipCount: number;
+}) {
+  const navigate = useNavigate();
+  return (
+    <div
+      ref={heroRef}
+      className="relative bg-amber"
+      style={{ padding: "28px 20px 32px" }}
+    >
+      <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-4">
+        Catálogo · {equipCount} equipos · Mar del Plata
+      </div>
+
+      <div className="font-display text-[46px] font-black text-ink leading-[1] tracking-[-0.02em] mb-[18px]">
+        un lugar<br />donde pasan<br />cosas.
+      </div>
+
+      <p className="font-sans text-[15px] leading-[1.55] text-ink/75 mb-7">
+        Cámaras, ópticas, luces, audio y soportes para producciones
+        audiovisuales. Elegí fechas y armá tu pedido — te lo dejamos listo
+        para retirar.
+      </p>
+
+      {/* Card Estudio — ink bg con CTA amber */}
+      <div className="rounded-2xl bg-ink p-5">
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_oklch,var(--amber)_35%,transparent)] bg-[color-mix(in_oklch,var(--amber)_12%,transparent)] px-3 py-1 mb-3">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
+          </svg>
+          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-amber">
+            Espacio Rambla
+          </span>
+        </div>
+
+        <div className="font-display text-[28px] font-black text-amber leading-[1.1] mb-2">
+          Conocé el Estudio
+        </div>
+
+        <p className="font-sans text-[13px] leading-[1.55] text-[color-mix(in_oklch,var(--amber)_65%,white)] mb-5">
+          Foto y video · reservá por hora · pack de luces y grips opcional
+        </p>
+
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/estudio" })}
+          className="w-full flex items-center justify-center gap-1.5 py-3.5 rounded-full bg-amber text-ink font-sans text-[15px] font-bold transition hover:opacity-90"
+        >
+          Ver estudio
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /* ── SheetClose button ───────────────────────────────────────────── */
 function SheetClose({ onClose }: { onClose: () => void }) {
@@ -926,6 +1021,10 @@ function EquipmentRow({ eq, inCart, isExpanded, jornadas, fechaDesde, onTap, onA
 export function CatalogoMovil() {
   // Equipment data
   const { data: allEquipos, isLoading } = useEquipos();
+  // Marcas: misma source que BrandCarousel del desktop + admin/marcas.
+  // Trae logo_url, destacada, orden, popularidad_score, etc.
+  const { data: marcasData } = useMarcas();
+  const marcasCanonicas = marcasData?.items ?? [];
 
   // Cart store
   const cart = useCart();
@@ -934,6 +1033,7 @@ export function CatalogoMovil() {
   const [activeTab, setActiveTab] = useState("Todo");
   const [query, setQuery] = useState("");
   const [stockOnly, setStockOnly] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   // Date state
@@ -945,17 +1045,43 @@ export function CatalogoMovil() {
   // Sheet state
   const [showDateSheet, setShowDateSheet] = useState(false);
   const [showCartSheet, setShowCartSheet] = useState(false);
+  const [showBrandSheet, setShowBrandSheet] = useState(false);
+  const [showFiltrosSheet, setShowFiltrosSheet] = useState(false);
   const [fichaEq, setFichaEq] = useState<Equipment | null>(null);
 
   // Scroll state
   const scrollRef = useRef<HTMLDivElement>(null);
+  const topbarRef = useRef<HTMLElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
     const el = scrollRef.current;
+    const topbar = topbarRef.current;
     if (!el) return;
-    const onScroll = () => setIsScrolled(el.scrollTop > 56);
+    const onScroll = () => {
+      const st = el.scrollTop;
+      setIsScrolled(st > 56);
+      // Amber-on-scroll: el topbar se tiñe amber gradualmente conforme el
+      // hero amber scrollea hacia arriba. Mientras el bottom del hero está
+      // bien debajo de la topbar (~53px) el progreso es 0; cuando llega
+      // al topbar, progreso 1. Misma lógica que el mock hifi.
+      // En 65% del progreso, el seal y el date-pill invierten colores.
+      const hero = heroRef.current;
+      if (topbar && hero) {
+        const heroRect = hero.getBoundingClientRect();
+        const containerRect = el.getBoundingClientRect();
+        const relBottom = heroRect.bottom - containerRect.top;
+        const progress = Math.min(
+          1,
+          Math.max(0, 1 - (relBottom - 53) / (heroRect.height * 0.5)),
+        );
+        topbar.style.setProperty("--amber-pct", `${Math.round(progress * 100)}%`);
+        topbar.classList.toggle("topbar-snap", progress > 0.65);
+      }
+    };
     el.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
@@ -980,6 +1106,41 @@ export function CatalogoMovil() {
     return ["Todo", ...Array.from(cats).sort()];
   }, [allEquipos]);
 
+  // Brands para el sheet: parte del cat\u00e1logo can\u00f3nico (useMarcas, misma
+  // source que BrandCarousel del desktop y /admin/equipos/marcas) y le
+  // agrega el count en la categor\u00eda activa. Filtra las que no tienen
+  // ning\u00fan equipo en la cat seleccionada (sino al clickearlas el listado
+  // queda vac\u00edo). Orden: destacadas primero (por orden manual del admin),
+  // resto alfab\u00e9tico.
+  const brands = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of allEquipos) {
+      if (!e.brand) continue;
+      const matchCat = activeTab === "Todo" || e.category === activeTab;
+      if (!matchCat) continue;
+      const k = e.brand.toLowerCase();
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+
+    const enriched = marcasCanonicas
+      .map((m) => ({
+        nombre: m.nombre,
+        logo_url: m.logo_url ?? null,
+        destacada: !!m.destacada,
+        orden: m.orden ?? 100,
+        count: counts.get(m.nombre.toLowerCase()) ?? 0,
+      }))
+      .filter((m) => m.count > 0);
+
+    enriched.sort((a, b) => {
+      if (a.destacada !== b.destacada) return a.destacada ? -1 : 1;
+      if (a.destacada && b.destacada) return a.orden - b.orden;
+      return a.nombre.localeCompare(b.nombre, "es");
+    });
+
+    return enriched;
+  }, [allEquipos, activeTab, marcasCanonicas]);
+
   // Filtered equipment
   const filteredEquipos = useMemo(() => {
     const norm = (s: string) =>
@@ -990,9 +1151,15 @@ export function CatalogoMovil() {
         query === "" ||
         norm([e.name, e.brand, e.category, e.description ?? ""].join(" ")).includes(norm(query));
       const matchStock = !stockOnly || (e.cantidad == null || e.cantidad > 0);
-      return matchCat && matchQ && matchStock;
+      const matchBrand = !selectedBrand || e.brand === selectedBrand;
+      return matchCat && matchQ && matchStock && matchBrand;
     });
-  }, [allEquipos, activeTab, query, stockOnly]);
+  }, [allEquipos, activeTab, query, stockOnly, selectedBrand]);
+
+  // Filtros activos (para el badge del botón "Filtros"). Excluye categoría
+  // (esa la elige el tab) y búsqueda (esa tiene su propio input visible).
+  const activeFiltersCount =
+    (stockOnly ? 1 : 0) + (selectedBrand ? 1 : 0);
 
   // Cart totals
   const totalItems = Object.values(cart.items).reduce((s, q) => s + q, 0);
@@ -1043,21 +1210,24 @@ export function CatalogoMovil() {
         className="flex-1 overflow-y-auto overflow-x-hidden"
         style={{ WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}
       >
-        {/* TopBar */}
+        {/* TopBar — amber-on-scroll: el background mezcla amber según
+            el progreso de scroll (--amber-pct, seteado en el onScroll).
+            En el snap (>65%), el seal invierte sus colores via la clase
+            topbar-snap. */}
         <header
-          className="sticky top-0 z-40 flex items-center gap-2.5 px-4 py-[10px] border-b border-hairline backdrop-blur-xl"
-          style={{ background: TOPBAR_BG }}
+          ref={topbarRef}
+          className="topbar-mobile sticky top-0 z-40 flex items-center gap-2.5 px-4 py-[10px] border-b border-hairline backdrop-blur-xl transition-colors"
+          style={{
+            background:
+              "color-mix(in oklch, var(--amber) var(--amber-pct, 0%), color-mix(in oklch, var(--background) 90%, transparent))",
+            paddingTop: "max(10px, calc(env(safe-area-inset-top) + 4px))",
+          }}
         >
-          <img
-            src="/rambla-icon-seal.png"
-            alt="Rambla"
-            width={34}
-            height={34}
-            className="shrink-0 block"
-          />
+          <RamblaSeal />
+
 
           <button
-            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3.5 rounded-full font-sans text-xs font-semibold text-ink transition-all whitespace-nowrap"
+            className="date-pill-snap flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3.5 rounded-full font-sans text-xs font-semibold text-ink transition-all whitespace-nowrap"
             style={{
               border: "1.5px solid color-mix(in oklch, var(--amber) 55%, transparent)",
               background: "var(--amber-soft)",
@@ -1074,11 +1244,15 @@ export function CatalogoMovil() {
           </button>
 
           <button
-            className="p-1.5 rounded-full border border-hairline text-ink hover:border-ink transition-colors"
+            className="user-btn-snap p-1.5 rounded-full border border-hairline text-ink hover:border-ink transition-colors"
           >
             <User size={15} />
           </button>
         </header>
+
+        {/* Hero banner amber — eyebrow + headline brand + Estudio card.
+            Anclado al heroRef del amber-on-scroll del topbar. */}
+        <HeroBanner heroRef={heroRef} equipCount={allEquipos?.length ?? 0} />
 
         {/* SearchSection */}
         <div
@@ -1195,18 +1369,46 @@ export function CatalogoMovil() {
             )}
             Disponibles
           </button>
-          <button className="flex items-center gap-1.5 px-[11px] py-[5px] rounded-full border border-hairline font-sans text-[11px] font-medium text-ink hover:border-ink hover:bg-muted transition-all">
-            Marca ▾
+          <button
+            type="button"
+            onClick={() => setShowBrandSheet(true)}
+            className={cn(
+              "flex items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium text-ink transition-all",
+              selectedBrand
+                ? "bg-amber-soft border-amber/60 font-semibold"
+                : "border-hairline bg-transparent hover:border-ink hover:bg-muted",
+            )}
+          >
+            {selectedBrand ?? "Marca"} ▾
           </button>
           <div className="flex-1" />
-          <button className="flex items-center gap-1.5 px-[11px] py-[5px] rounded-full border border-hairline font-sans text-[11px] font-medium text-muted-foreground hover:border-ink hover:text-ink transition-all">
+          <button
+            type="button"
+            onClick={() => setShowFiltrosSheet(true)}
+            className={cn(
+              "relative flex items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium transition-all",
+              activeFiltersCount > 0
+                ? "border-ink text-ink"
+                : "border-hairline text-muted-foreground hover:border-ink hover:text-ink",
+            )}
+          >
             <SlidersHorizontal size={11} />
             Filtros
+            {activeFiltersCount > 0 && (
+              <span className="inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-ink px-1 font-mono text-[8px] font-bold text-amber">
+                {activeFiltersCount}
+              </span>
+            )}
           </button>
         </div>
 
-        {/* Equipment list */}
-        <div className="flex flex-col px-4" style={{ paddingBottom: 120 }}>
+        {/* Equipment list — paddingBottom respeta safe-area-inset-bottom
+            de iOS para que cuando no hay cart bar visible, el último item
+            no quede tapado por el home indicator. */}
+        <div
+          className="flex flex-col px-4"
+          style={{ paddingBottom: "calc(120px + env(safe-area-inset-bottom))" }}
+        >
           {isLoading && (
             <div className="text-center py-8 text-muted-foreground font-sans text-sm">
               Cargando equipos…
@@ -1232,7 +1434,8 @@ export function CatalogoMovil() {
           ))}
         </div>
 
-        {/* CartMiniBar */}
+        {/* CartMiniBar — paddingBottom respeta env(safe-area-inset-bottom)
+            para que el home indicator de iPhone no tape el contenido. */}
         {totalItems > 0 && (
           <div
             className="sticky bottom-0 z-40 flex items-center gap-2.5 px-4 cursor-pointer border-t-[1.5px] border-amber backdrop-blur-lg transition-colors hover:bg-amber/5"
@@ -1240,7 +1443,7 @@ export function CatalogoMovil() {
               background: CARTBAR_BG,
               boxShadow: "0 -8px 24px -8px rgba(0,0,0,0.12)",
               paddingTop: 10,
-              paddingBottom: 14,
+              paddingBottom: "max(14px, calc(env(safe-area-inset-bottom) + 8px))",
               animation: "slide-up 0.2s cubic-bezier(.32,.72,0,1)",
               WebkitTapHighlightColor: "transparent",
             }}
@@ -1301,6 +1504,254 @@ export function CatalogoMovil() {
           horaHasta={horaHasta}
         />
       )}
+      <BrandSheet
+        open={showBrandSheet}
+        onOpenChange={setShowBrandSheet}
+        brands={brands}
+        selected={selectedBrand}
+        onSelect={setSelectedBrand}
+      />
+      <FiltrosSheet
+        open={showFiltrosSheet}
+        onOpenChange={setShowFiltrosSheet}
+        stockOnly={stockOnly}
+        onStockToggle={() => setStockOnly((v) => !v)}
+        selectedBrand={selectedBrand}
+        onBrandClear={() => setSelectedBrand(null)}
+        onOpenBrandSheet={() => {
+          setShowFiltrosSheet(false);
+          setShowBrandSheet(true);
+        }}
+        activeFiltersCount={activeFiltersCount}
+        onClearAll={() => {
+          setStockOnly(false);
+          setSelectedBrand(null);
+          setShowFiltrosSheet(false);
+        }}
+      />
     </div>
+  );
+}
+
+/* ── BrandSheet ──────────────────────────────────────────────────── */
+type BrandSheetItem = {
+  nombre: string;
+  logo_url: string | null;
+  destacada: boolean;
+  count: number;
+};
+
+function BrandSheet({
+  open,
+  onOpenChange,
+  brands,
+  selected,
+  onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  brands: BrandSheetItem[];
+  selected: string | null;
+  onSelect: (brand: string | null) => void;
+}) {
+  return (
+    <BottomSheet open={open} onOpenChange={onOpenChange} title="Marca" showClose>
+      <div className="px-4 py-3 space-y-1">
+        <button
+          type="button"
+          onClick={() => {
+            onSelect(null);
+            onOpenChange(false);
+          }}
+          className={cn(
+            "w-full flex items-center justify-between gap-2 rounded-lg px-3 py-3 text-left transition",
+            selected === null
+              ? "bg-amber-soft border border-amber/40"
+              : "border border-hairline hover:bg-muted",
+          )}
+        >
+          <span className="font-sans text-sm font-semibold text-ink">Todas las marcas</span>
+          {selected === null && <Check className="h-4 w-4 text-amber" />}
+        </button>
+        {brands.map((b) => {
+          const active = selected === b.nombre;
+          return (
+            <button
+              key={b.nombre}
+              type="button"
+              onClick={() => {
+                onSelect(active ? null : b.nombre);
+                onOpenChange(false);
+              }}
+              className={cn(
+                "w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left transition",
+                active
+                  ? "bg-amber-soft border border-amber/40"
+                  : "border border-hairline hover:bg-muted",
+              )}
+            >
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <BrandLogo nombre={b.nombre} logo_url={b.logo_url} />
+                <div className="min-w-0 flex-1">
+                  <div className="font-sans text-sm font-semibold text-ink truncate">
+                    {b.nombre}
+                  </div>
+                  {b.destacada && (
+                    <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-amber/80 mt-0.5">
+                      Destacada
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                  {b.count}
+                </span>
+                {active && <Check className="h-4 w-4 text-amber" />}
+              </div>
+            </button>
+          );
+        })}
+        {brands.length === 0 && (
+          <div className="text-center py-8 text-sm text-muted-foreground">
+            No hay marcas con equipos en la categoría actual.
+          </div>
+        )}
+      </div>
+    </BottomSheet>
+  );
+}
+
+function BrandLogo({ nombre, logo_url }: { nombre: string; logo_url: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (logo_url && !failed) {
+    return (
+      <div className="h-9 w-9 rounded-md bg-white border border-hairline grid place-items-center shrink-0 overflow-hidden p-1">
+        <img
+          src={logo_url}
+          alt={nombre}
+          className="max-h-full max-w-full object-contain"
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      </div>
+    );
+  }
+  // Fallback: cuadradito con las iniciales (estilo de BrandCard del desktop).
+  const inicial = (nombre[0] ?? "?").toUpperCase();
+  return (
+    <div className="h-9 w-9 rounded-md bg-muted border border-hairline grid place-items-center shrink-0 font-display text-base font-black text-ink">
+      {inicial}
+    </div>
+  );
+}
+
+/* ── FiltrosSheet ────────────────────────────────────────────────── */
+function FiltrosSheet({
+  open,
+  onOpenChange,
+  stockOnly,
+  onStockToggle,
+  selectedBrand,
+  onBrandClear,
+  onOpenBrandSheet,
+  activeFiltersCount,
+  onClearAll,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  stockOnly: boolean;
+  onStockToggle: () => void;
+  selectedBrand: string | null;
+  onBrandClear: () => void;
+  onOpenBrandSheet: () => void;
+  activeFiltersCount: number;
+  onClearAll: () => void;
+}) {
+  return (
+    <BottomSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros"
+      showClose
+      footer={
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClearAll}
+            disabled={activeFiltersCount === 0}
+            className="flex-1 py-3 rounded-full border-[1.5px] border-hairline font-sans text-sm font-semibold text-ink transition hover:border-ink hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Limpiar
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="flex-1 py-3 rounded-full bg-ink text-amber font-sans text-sm font-bold transition hover:bg-amber hover:text-ink"
+          >
+            Aplicar
+          </button>
+        </div>
+      }
+    >
+      <div className="px-4 py-3 space-y-3">
+        {/* Disponibles toggle */}
+        <div className="rounded-lg border border-hairline px-3.5 py-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="font-sans text-sm font-semibold text-ink">Disponibles</div>
+            <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+              Esconder equipos sin stock para tus fechas
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onStockToggle}
+            role="switch"
+            aria-checked={stockOnly}
+            className={cn(
+              "relative h-6 w-11 rounded-full transition shrink-0",
+              stockOnly ? "bg-amber" : "bg-muted",
+            )}
+          >
+            <span
+              className={cn(
+                "absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+                stockOnly && "translate-x-5",
+              )}
+            />
+          </button>
+        </div>
+
+        {/* Marca selector */}
+        <button
+          type="button"
+          onClick={onOpenBrandSheet}
+          className="w-full rounded-lg border border-hairline px-3.5 py-3 flex items-center justify-between gap-3 hover:bg-muted transition text-left"
+        >
+          <div className="min-w-0">
+            <div className="font-sans text-sm font-semibold text-ink">Marca</div>
+            <div className="font-mono text-[10px] text-muted-foreground mt-0.5 truncate">
+              {selectedBrand ?? "Todas"}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {selectedBrand && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBrandClear();
+                }}
+                className="grid h-6 w-6 place-items-center rounded-full bg-muted text-muted-foreground hover:bg-ink/10 hover:text-ink"
+                aria-label="Limpiar marca"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </button>
+      </div>
+    </BottomSheet>
   );
 }
