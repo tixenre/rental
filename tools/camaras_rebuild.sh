@@ -20,6 +20,7 @@ python3 tools/camaras_parser.py \
   "$CAMARAS_DIR/Sony ZVE1 Mirrorless Camera (ZV-E1 Camera Body Black) B&H Photo Video.html" \
   "$CAMARAS_DIR/Used Canon EOS C200 Cinema Camera (EF-Mount) 2215C002 B&H Photo.html" \
   "$CAMARAS_DIR/RED KOMODO-X DIGITAL CINEMA KOMODO-X 6K Digital Cinema Camera 710-0356.html" \
+  "$CAMARAS_DIR/RED DIGITAL CINEMA KOMODO 6K Camera Production Pack 710-0340 B&H.html" \
   "$CAMARAS_DIR/GoPro HERO12 Black CHDHX-121-TH B&H Photo Video.html" \
   > /tmp/camaras_parser.log
 

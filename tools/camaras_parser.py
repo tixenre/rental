@@ -84,20 +84,37 @@ def _parse_lens_mount(secciones: dict, title: str = "") -> str | None:
     val = (_find_value(secciones, "Lens Mount", "Mount") or "").strip().lower()
     title_l = title.lower()
 
-    # 1. Match desde el campo Lens Mount directo (más confiable)
+    # 1. Match desde el campo Lens Mount directo (más confiable).
+    # Usamos substring matching para tolerar variantes como
+    # "Canon RF with Included Canon EF Adapter" → debe matchear "RF" primario.
     if val:
-        if val in ("sony e", "e", "e-mount"): return "E"
-        if val in ("canon rf", "rf", "rf-mount"): return "RF"
-        if val in ("canon ef", "ef", "ef-mount"): return "EF"
-        if val in ("l", "l-mount"): return "L"
-        if val in ("nikon z", "z", "z-mount"): return "Z"
-        if val in ("fuji x", "fujifilm x", "x", "x-mount"): return "X"
-        if "micro four thirds" in val or val in ("mft", "m4/3"): return "MFT"
-        if val in ("pl", "pl-mount"): return "PL"
-        if "blackmagic" in val or val in ("bmd", "bmd-mount"): return "BMD"
-        if val in ("b4", "b4-mount"): return "B4"
-        # Multi-mount listings (KOMODO viene en RF/EF/PL)
-        if "rf" in val and "mount" in val: return "RF"  # default RF si lista varios
+        # Detección por prefijo / inclusión, priorizando el mount nativo
+        # (lo primero que aparece en el value es el mount del cuerpo)
+        # Orden: PL antes que L; RF/EF específicos primero
+        if val.startswith("canon rf") or val.startswith("rf with") or val.startswith("rf-mount") or val == "rf":
+            return "RF"
+        if val.startswith("canon ef") or val.startswith("ef-mount") or val == "ef":
+            return "EF"
+        if val.startswith("sony e") or val.startswith("e-mount") or val == "e":
+            return "E"
+        if val.startswith("l-mount") or val == "l":
+            return "L"
+        if val.startswith("nikon z") or val.startswith("z-mount") or val == "z":
+            return "Z"
+        if val.startswith("fuji") or val.startswith("x-mount") or val == "x":
+            return "X"
+        if "micro four thirds" in val or val == "mft" or val == "m4/3":
+            return "MFT"
+        if val.startswith("pl-mount") or val == "pl" or val.startswith("arri pl"):
+            return "PL"
+        if "blackmagic" in val or val == "bmd":
+            return "BMD"
+        if val == "b4" or val.startswith("b4-mount"):
+            return "B4"
+        # Fallback genérico: detectar tokens conocidos en cualquier parte del string
+        for token, mount in [("rf", "RF"), ("ef", "EF"), ("pl", "PL"), ("bmd", "BMD")]:
+            if re.search(rf"\b{token}\b", val):
+                return mount
 
     # 2. Inferir desde título
     # Action cams / smartphones con lente fijo → null (no aplica)
@@ -705,7 +722,12 @@ def map_camara_extras(secciones: dict, title: str = "") -> dict:
 # ── JSON-LD enrichment (mismo flow que iluminacion) ────────────────────
 
 def jsonld_specs(html_path: Path) -> dict:
-    """Extrae propiedades desde Product.additionalProperty del JSON-LD."""
+    """Extrae propiedades desde Product.additionalProperty del JSON-LD.
+
+    Si una propiedad aparece varias veces (ej. "Weight" para cuerpo +
+    accesorios del kit), se PRESERVA LA PRIMERA — que es típicamente el
+    item principal del producto (cuerpo de cámara), no los accesorios.
+    """
     if not html_path.exists():
         return {}
     content = html_path.read_text(encoding="utf-8", errors="replace")
@@ -727,7 +749,7 @@ def jsonld_specs(html_path: Path) -> dict:
             if isinstance(pv, dict):
                 n = pv.get("name")
                 v = pv.get("value")
-                if n:
+                if n and n not in result:  # NO sobreescribir — la primera ocurrencia gana
                     if isinstance(v, list):
                         v = [html_lib.unescape(x.replace(" ", " ")) if isinstance(x, str) else x for x in v]
                     elif isinstance(v, str):

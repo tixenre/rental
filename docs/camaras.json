@@ -35,8 +35,8 @@
         "peso_g": 640
       },
       "extras": {
-        "sensor": "35.6 x 23.8 mm (Full-Frame) CMOS — 10.2 Megapixel",
-        "tipo_estabilizacion": "Sensor-Shift, 5-Axis",
+        "sensor": "Full-Frame — 10.2 Megapixel",
+        "tipo_estabilizacion": "Sensor-Shift",
         "af_puntos": 759,
         "focus_modes": "Automatic, Continuous-Servo AF, Direct Manual Focus, Manual Focus",
         "video_output_modes": "Raw 16-Bit\n4264 x 2408 at 23.98/25/50/59.94 fps\n3840 x 2160 at 23.98/25/50/59.94 fps\n1920 x 1080p at 23.98/25/50/59.94 fps\n1920 x 1080i at 50/59.94 fps",
@@ -57,7 +57,7 @@
         "shoe_mount": "1x Intelligent Hot Shoe",
         "accessory_thread": "5x 1/4\"-20 on Camera Body\n3x 1/4\"-20 on Included Handle",
         "wireless": "Wi-Fi 5 (802.11ac) / Bluetooth",
-        "app_compatible_raw": "Yes: Android & iOS\nApp Name: Creators' App",
+        "app_compatible_raw": "Yes: Android & iOS",
         "bateria": "NP-FZ100",
         "consumo_w": 7.3,
         "dimensiones_cm": {
@@ -74,15 +74,15 @@
         "Specs (JSON-LD)": [
           {
             "label": "Image Sensor",
-            "value": "35.6 x 23.8 mm (Full-Frame) CMOS"
+            "value": "Full-Frame"
           },
           {
             "label": "Effective Sensor Resolution",
-            "value": "Effective: 10.2 Megapixel\nActual: 12.1 Megapixel"
+            "value": "10.2 Megapixel"
           },
           {
             "label": "Image Stabilization",
-            "value": "Sensor-Shift, 5-Axis"
+            "value": "Sensor-Shift"
           },
           {
             "label": "ISO/Gain Sensitivity",
@@ -102,11 +102,11 @@
           },
           {
             "label": "Video I/O",
-            "value": "1x  HDMI Output"
+            "value": "HDMI"
           },
           {
             "label": "Mobile App Compatible",
-            "value": "Yes: Android & iOS\nApp Name: Creators' App"
+            "value": "Yes: Android & iOS"
           },
           {
             "label": "Battery",
@@ -542,8 +542,8 @@
         "peso_g": 610
       },
       "extras": {
-        "sensor": "35.9 x 23.9 mm (Full-Frame) Partially Stacked CMOS — 33 Megapixel",
-        "tipo_estabilizacion": "Sensor-Shift, 5-Axis",
+        "sensor": "Full-Frame — 33 Megapixel",
+        "tipo_estabilizacion": "Sensor-Shift",
         "af_puntos": 759,
         "autofocus_sensitivity": "-4 to +20 EV",
         "focus_modes": "Continuous-Servo AF, Direct Manual Focus, Manual Focus, Single-Servo AF, Subject Tracking (Auto-Tracking/Animals/Birds/Eyes/Insects/People/Vehicles)",
@@ -599,15 +599,15 @@
           },
           {
             "label": "Effective Sensor Resolution",
-            "value": "Effective: 33 Megapixel (7008 x 4672)\nActual: 35.7 Megapixel"
+            "value": "33 Megapixel (7008 x 4672)"
           },
           {
             "label": "Image Sensor",
-            "value": "35.9 x 23.9 mm (Full-Frame) Partially Stacked CMOS"
+            "value": "Full-Frame"
           },
           {
             "label": "Image Stabilization",
-            "value": "Sensor-Shift, 5-Axis"
+            "value": "Sensor-Shift"
           },
           {
             "label": "ISO/Gain Sensitivity",
@@ -767,7 +767,7 @@
           },
           {
             "label": "Resolution",
-            "value": "3,686,400 Dot"
+            "value": "2,095,104 Dot"
           },
           {
             "label": "Type",
@@ -1259,8 +1259,8 @@
         "peso_g": 399
       },
       "extras": {
-        "sensor": "35.6 x 23.8 mm (Full-Frame) CMOS — 12.1 Megapixel",
-        "tipo_estabilizacion": "Sensor-Shift, 5-Axis",
+        "sensor": "Full-Frame — 12.1 Megapixel",
+        "tipo_estabilizacion": "Sensor-Shift",
         "af_puntos": 759,
         "autofocus_sensitivity": "6 to +20 EV",
         "focus_modes": "Automatic, Direct Manual Focus, Manual Focus",
@@ -1311,15 +1311,15 @@
           },
           {
             "label": "Effective Sensor Resolution",
-            "value": "Effective: 12.1 Megapixel (4240 x 2832)\nActual: 12.9 Megapixel"
+            "value": "12.1 Megapixel (4240 x 2832)"
           },
           {
             "label": "Image Sensor",
-            "value": "35.6 x 23.8 mm (Full-Frame) CMOS"
+            "value": "Full-Frame"
           },
           {
             "label": "Image Stabilization",
-            "value": "Sensor-Shift, 5-Axis"
+            "value": "Sensor-Shift"
           },
           {
             "label": "ISO/Gain Sensitivity",
@@ -1867,7 +1867,7 @@
         "peso_g": 1500
       },
       "extras": {
-        "sensor": "24.6 x 13.8 mm (Super35) CMOS — 8.85 Megapixel",
+        "sensor": "Super35 — 8.85 Megapixel",
         "sensor_size": "Super 35\n24.6 x 13.8 mm effective size / 6.4 x 6.4µm pixel pitch",
         "total_pixels": "Approx. 9.84 MP (4206 x 2340)",
         "effective_pixels": "4096 x 2160 / 2048 x 1080: approx. 8.85 MP (4096 x 2160)\n3840 x 2160 / 1920 x 1080: approx. 8.29 MP (3840 x 2160)",
@@ -1893,7 +1893,6 @@
         "audio_canales": 2,
         "audio_recording": "Raw: Linear PCM 16-bit 48 kHz 4-ch\nMP4: MPEG-4 AAC-LC 16-bit 48 kHz 2-channel, Linear PCM 16-bit 48 kHz 4-ch",
         "audio_inputs": "2 x Balanced 3-pin XLR (Mic Level, Mic Level with phantom power and Line Level) 1 x 3.5 mm microphone jack",
-        "built_in_mic": "Mono",
         "headphone": "3.5 mm stereo mini-jack",
         "phantom_power": "+48V",
         "power_io": "1x LEMO 4-Pin Input",
@@ -1914,11 +1913,11 @@
         "Specs (JSON-LD)": [
           {
             "label": "Image Sensor",
-            "value": "24.6 x 13.8 mm (Super35) CMOS"
+            "value": "Super35"
           },
           {
             "label": "Effective Sensor Resolution",
-            "value": "Effective: 8.85 Megapixel (4096 x 2160)\nActual: 9.84 Megapixel (4206 x 2340)"
+            "value": "8.85 Megapixel (4096 x 2160)"
           },
           {
             "label": "Image Stabilization",
@@ -1942,7 +1941,7 @@
           },
           {
             "label": "Type",
-            "value": "Rotating color LCD\nSize: 4.00\" / 10.16 cm\nResolution: 1,230,000 dots\nAspect Ratio\n16:9"
+            "value": "CMOS"
           },
           {
             "label": "Color Filter System",
@@ -2050,7 +2049,7 @@
           },
           {
             "label": "Built-In Microphone",
-            "value": "Mono"
+            "value": "None"
           },
           {
             "label": "Audio Inputs",
@@ -2114,7 +2113,7 @@
           },
           {
             "label": "Weight",
-            "value": "3.2 lb / 1.5 kg"
+            "value": "3.2 lb / 1.5 kg (approximately)"
           },
           {
             "label": "Shoe Mount",
@@ -2442,7 +2441,7 @@
         "peso_g": 1190
       },
       "extras": {
-        "sensor": "27.03 x 14.26 mm (Super35) CMOS — 19.9 Megapixel",
+        "sensor": "Super35 — 19.9 Megapixel",
         "focus_modes": "Automatic, Manual Focus",
         "video_output_modes": "4:2:2\n4096 x 2160 up to 60.00 fps\n2048 x 1080p up to 60.00 fps",
         "shutter_type": "Electronic Global Shutter",
@@ -2458,7 +2457,7 @@
         "tripod_mount": "1/4\"-20 Female (Bottom)\n3/8\"-16 Female (Bottom)",
         "accessory_thread": "4x 1/4\"-20\n4x M4",
         "wireless": "Wi-Fi",
-        "app_compatible_raw": "Yes: Android & iOS\nApp Name: RED Control\nFunctionality: Remote Control",
+        "app_compatible_raw": "Yes: Android & iOS\nFunctionality: Remote Control",
         "bateria": "V-Mount",
         "dimensiones_cm": {
           "largo_cm": 12.937000000000001,
@@ -2478,7 +2477,7 @@
           },
           {
             "label": "Image Sensor",
-            "value": "27.03 x 14.26 mm (Super35) CMOS"
+            "value": "Super35"
           },
           {
             "label": "Effective Sensor Resolution",
@@ -2502,7 +2501,7 @@
           },
           {
             "label": "Mobile App Compatible",
-            "value": "Yes: Android & iOS\nApp Name: RED Control\nFunctionality: Remote Control"
+            "value": "Yes: Android & iOS\nFunctionality: Remote Control"
           },
           {
             "label": "Battery",
@@ -2843,6 +2842,590 @@
           {
             "label": "Box Dimensions (LxWxH)",
             "value": "13.2 x 9.8 x 6\""
+          }
+        ]
+      }
+    },
+    "red_komodo": {
+      "marca": "RED",
+      "modelo": "KOMODO 6K Production Pack",
+      "url_source": "https://www.bhphotovideo.com/c/product/1598392-REG/red_digital_cinema_710_0340_komodo_6k_camera_production.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/red_digital_cinema_710_0340_komodo_6k_camera_production_1598392.jpg",
+      "specs": {
+        "tipo": "Cinema Camera",
+        "lens_mount": "RF",
+        "formato": "Super 35",
+        "resolucion_max": "6K",
+        "fps_max": 120,
+        "codecs": "ProRes, REDCODE",
+        "megapixels": 19.9,
+        "iso_nativo": {
+          "min": 250,
+          "max": 12800
+        },
+        "rango_dinamico_stops": 16,
+        "estabilizacion": false,
+        "autofocus": true,
+        "fast_slow_motion": true,
+        "lens_communication": true,
+        "gps": false,
+        "netflix_approved": true,
+        "peso_g": 1000
+      },
+      "extras": {
+        "sensor": "Super35 — 19.9 Megapixel",
+        "focus_modes": "Automatic, Manual Focus",
+        "video_output_modes": "4:2:2 10-Bit\n4096 x 2160 at 25/24.00/29.97/50/59.94/23.98 fps\n3840 x 2160 at 59.94/23.98/24.00/25/29.97/50 fps\n1920 x 1080p at 59.94/23.98/24.00/25/29.97/50 fps\n2048 x 1080 at 59.94/23.98/24.00/25/29.97/50 fps",
+        "shutter_type": "Electronic Global Shutter",
+        "shutter_speed": "1 to 1/8000 Second",
+        "white_balance": "Range: 1700 to 10,000K",
+        "gamma_curve": "DCI-P3, Rec709, Rec2020, REDWideGamutRGB",
+        "pantalla": "Primary Monitor: Fixed 2.9\" Touchscreen LCD",
+        "memoria_tipo": "Single Slot: CFast (CFast 2.0)",
+        "salida_video": "</b<",
+        "audio_io": "1x 1/8\" / 3.5 mm TRS Stereo Microphone Input",
+        "audio_canales": 2,
+        "audio_recording": "2-Channel, 24-Bit at 48 kHz",
+        "built_in_mic": "Stereo",
+        "power_io": "1x LEMO 2-Pin (7 to 17VDC) Input",
+        "other_io": "1x 9-Pin (RS-232, Genlock, GPI, Timecode)",
+        "inputs_outputs": "1x Pogo Remote Output",
+        "tripod_mount": "1/4\"-20 Female (Bottom)\n3/8\"-16 Female (Bottom)",
+        "wireless": "Wi-Fi 5 (802.11ac)",
+        "app_compatible_raw": "Yes: Android & iOS\nFunctionality: Remote Control",
+        "bateria": "Canon BP-9 Series",
+        "consumo_w": 37.0,
+        "dimensiones_cm": {
+          "largo_cm": 10.2,
+          "ancho_cm": 10.2,
+          "alto_cm": 10.2
+        },
+        "materiales": "Aluminum",
+        "operating_temp": "32 to 104°F / 0 to 40°C",
+        "storage_temp": "-4 to 122°F / -20 to 50°C up to 85% Humidity",
+        "capture_type": "Stills & Video"
+      },
+      "ficha": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Lens Mount",
+            "value": "Canon RF with Included Canon EF  Adapter"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "Super35"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "19.9 Megapixel (6144 x 3240)"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Native: 250 to 12,800"
+          },
+          {
+            "label": "Max Recording Modes",
+            "value": "REDCODE RAW\nUp to 6K up to 40 fps\nProRes 422/ProRes 422 HQ\nDCI 4K up to 59.94 fps\nProRes 422\nDCI 2K up to 120 fps"
+          },
+          {
+            "label": "Max Video Output",
+            "value": "4:2:2 10-Bit\nUp to DCI 4K at 25/24.00/29.97/50/59.94/23.98 fps"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: CFast (CFast 2.0)"
+          },
+          {
+            "label": "Video I/O",
+            "value": "</b<"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS\nFunctionality: Remote Control"
+          },
+          {
+            "label": "Battery",
+            "value": "Canon BP-9 Series"
+          },
+          {
+            "label": "Lens Communication",
+            "value": "Yes: with Autofocus Support"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          },
+          {
+            "label": "Shutter Type",
+            "value": "Electronic Global Shutter"
+          },
+          {
+            "label": "Shutter Speed",
+            "value": "1 to 1/8000 Second"
+          },
+          {
+            "label": "Shutter Angle",
+            "value": "0 to 360°"
+          },
+          {
+            "label": "Advertised Dynamic Range",
+            "value": "16 Stops"
+          },
+          {
+            "label": "White Balance",
+            "value": "Range: 1700 to 10,000K"
+          },
+          {
+            "label": "Focus Mode",
+            "value": "Automatic, Manual Focus"
+          },
+          {
+            "label": "Internal Recording",
+            "value": "REDCODE RAW\n6144 x 3240 up to 40 fps (280 MB/s)\n5120 x 2700 up to 48.00 fps (280 MB/s)*\n4096 x 2160 up to 59.94 fps (280 MB/s)*\n2048 x 1080 up to 120 fps (280 MB/s)*\n*Sensor Crops During Recording\nProRes 422/ProRes 422 HQ\n4096 x 2160 up to 59.94 fps\nProRes 422\n2048 x 1080 up to 120 fps"
+          },
+          {
+            "label": "Video Output",
+            "value": "4:2:2 10-Bit\n4096 x 2160 at 25/24.00/29.97/50/59.94/23.98 fps\n3840 x 2160 at 59.94/23.98/24.00/25/29.97/50 fps\n1920 x 1080p at 59.94/23.98/24.00/25/29.97/50 fps\n2048 x 1080 at 59.94/23.98/24.00/25/29.97/50 fps"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Gamma Curve",
+            "value": "DCI-P3, Rec709, Rec2020, REDWideGamutRGB"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Stereo"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "2-Channel, 24-Bit at 48 kHz"
+          },
+          {
+            "label": "Internal Storage",
+            "value": "No"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 1/8\" / 3.5 mm TRS Stereo Microphone Input"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x LEMO 2-Pin (7 to 17VDC) Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x 9-Pin (RS-232, Genlock, GPI, Timecode)"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi 5 (802.11ac)"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "No"
+          },
+          {
+            "label": "Display Type",
+            "value": "Primary Monitor: Fixed 2.9\" Touchscreen LCD"
+          },
+          {
+            "label": "Resolution",
+            "value": "Primary Monitor: 1440 x 1440"
+          },
+          {
+            "label": "Type",
+            "value": "Optional, Not Included"
+          },
+          {
+            "label": "Power Consumption",
+            "value": "≤37 W"
+          },
+          {
+            "label": "Operating Conditions",
+            "value": "32 to 104°F / 0 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 122°F / -20 to 50°C up to 85% Humidity"
+          },
+          {
+            "label": "Tripod Mount",
+            "value": "1/4\"-20 Female (Bottom)\n3/8\"-16 Female (Bottom)"
+          },
+          {
+            "label": "Netflix Approved",
+            "value": "Yes"
+          },
+          {
+            "label": "Materials",
+            "value": "Aluminum"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "4 x 4 x 4\" / 10.2 x 10.2 x 10.2 cm"
+          },
+          {
+            "label": "Weight",
+            "value": "2.1 lb / 1 kg (Body Only)"
+          },
+          {
+            "label": "Package Weight",
+            "value": "4.45 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "12.1 x 6.9 x 5.4\""
+          },
+          {
+            "label": "Item Type",
+            "value": "1x Handgrip for Right Side"
+          },
+          {
+            "label": "Rotation",
+            "value": "Yes:  360° Adjustable via Screw/Twist Lock"
+          },
+          {
+            "label": "Built-In Controls",
+            "value": "Remote Trigger"
+          },
+          {
+            "label": "Main Attachment",
+            "value": "2x 1/4\"-20 Male Screw (Built-In)\nCamera Compatibility\nRED KOMODO"
+          },
+          {
+            "label": "Additional Mounting",
+            "value": "2x 1/4\"-20 Female Thread"
+          },
+          {
+            "label": "Inputs/Outputs",
+            "value": "1x Pogo Remote Output"
+          },
+          {
+            "label": "Dimensions",
+            "value": "7.5 x 5 x 2.5\" / 191 x 127 x 64 mm"
+          },
+          {
+            "label": "Connections",
+            "value": "Genlock: 1 x BNC\nGPI: 1 x BNC\nTimecode In: 1 x BNC\nControl: 1 x 4-Pin"
+          },
+          {
+            "label": "Accessory Mounting Threads",
+            "value": "Multiple: 1/4\"-20\nMultiple: 3/8\"-16\nMultiple: ARRI-Style Anti-Twist"
+          },
+          {
+            "label": "Material of Construction",
+            "value": "Aluminum Alloy"
+          },
+          {
+            "label": "Quantity",
+            "value": "1"
+          },
+          {
+            "label": "Card Type",
+            "value": "CFast 2.0"
+          },
+          {
+            "label": "Storage Capacity",
+            "value": "512 GB"
+          },
+          {
+            "label": "Speed (X-rating)",
+            "value": "3500x"
+          },
+          {
+            "label": "Media Card Reader",
+            "value": "1x CFast (CFast 2.0 / SATA III [6 Gb/s])"
+          },
+          {
+            "label": "Host Connection",
+            "value": "USB-C 3.0 / 3.1/3.2 Gen 1 via Integrated Cable"
+          },
+          {
+            "label": "Power Source",
+            "value": "Bus Powered"
+          },
+          {
+            "label": "Connector 1",
+            "value": "1x 2-Pin"
+          },
+          {
+            "label": "Connector 2",
+            "value": "1x D-Tap"
+          },
+          {
+            "label": "Voltage Control",
+            "value": "Regulated"
+          },
+          {
+            "label": "Voltage",
+            "value": "7 to 17 VDC"
+          },
+          {
+            "label": "Cable Length",
+            "value": "6' / 1.83 m"
+          },
+          {
+            "label": "Camera Compatibility",
+            "value": "Canon RF Mount"
+          },
+          {
+            "label": "Lens Compatibility",
+            "value": "Canon EF/EF-S Mount"
+          },
+          {
+            "label": "Electronic Communication",
+            "value": "Yes"
+          },
+          {
+            "label": "Filter Type",
+            "value": "Clear"
+          },
+          {
+            "label": "Size",
+            "value": "Dedicated"
+          },
+          {
+            "label": "Front Accessory Thread / Bayonet",
+            "value": "No"
+          },
+          {
+            "label": "Filter Material",
+            "value": "Glass"
+          }
+        ],
+        "Key Specs": [
+          {
+            "label": "Lens Mount",
+            "value": "Canon RF with Included Canon EF  Adapter"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "Super35"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "19.9 Megapixel (6144 x 3240)"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Native: 250 to 12,800"
+          },
+          {
+            "label": "Max Recording Modes",
+            "value": "REDCODE RAW"
+          },
+          {
+            "label": "Max Video Output",
+            "value": "4:2:2 10-Bit"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: CFast (CFast 2.0)"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Battery",
+            "value": "Canon BP-9 Series"
+          }
+        ],
+        "Imaging": [
+          {
+            "label": "Lens Mount",
+            "value": "Canon RF with Included Canon EF  Adapter"
+          },
+          {
+            "label": "Lens Communication",
+            "value": "Yes: with Autofocus Support"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "27.03 x 14.26 mm (Super35) CMOS"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "19.9 Megapixel (6144 x 3240)"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          }
+        ],
+        "Exposure Control": [
+          {
+            "label": "Shutter Type",
+            "value": "Electronic Global Shutter"
+          },
+          {
+            "label": "Shutter Speed",
+            "value": "1 to 1/8000 Second"
+          },
+          {
+            "label": "Shutter Angle",
+            "value": "0 to 360°"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Native: 250 to 12,800"
+          },
+          {
+            "label": "Advertised Dynamic Range",
+            "value": "16 Stops"
+          },
+          {
+            "label": "White Balance",
+            "value": "Range: 1700 to 10,000K"
+          }
+        ],
+        "Focus": [
+          {
+            "label": "Focus Mode",
+            "value": "Automatic, Manual Focus"
+          }
+        ],
+        "Video Capture": [
+          {
+            "label": "Internal Recording",
+            "value": "REDCODE RAW"
+          },
+          {
+            "label": "Video Output",
+            "value": "4:2:2 10-Bit"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Gamma Curve",
+            "value": "DCI-P3, Rec709, Rec2020, REDWideGamutRGB"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Stereo"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "2-Channel, 24-Bit at 48 kHz"
+          }
+        ],
+        "Interface": [
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: CFast (CFast 2.0)"
+          },
+          {
+            "label": "Internal Storage",
+            "value": "No"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 1/8\" / 3.5 mm TRS Stereo Microphone Input"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x LEMO 2-Pin (7 to 17VDC) Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x 9-Pin (RS-232, Genlock, GPI, Timecode)"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi 5 (802.11ac)"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "No"
+          }
+        ],
+        "Monitor": [
+          {
+            "label": "Display Type",
+            "value": "Primary Monitor: Fixed 2.9\" Touchscreen LCD"
+          },
+          {
+            "label": "Resolution",
+            "value": "Primary Monitor: 1440 x 1440"
+          }
+        ],
+        "Viewfinder": [
+          {
+            "label": "Type",
+            "value": "Optional, Not Included"
+          }
+        ],
+        "Power": [
+          {
+            "label": "Battery",
+            "value": "Canon BP-9 Series"
+          },
+          {
+            "label": "Power Consumption",
+            "value": "≤37 W"
+          }
+        ],
+        "Environmental": [
+          {
+            "label": "Operating Conditions",
+            "value": "32 to 104°F / 0 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 122°F / -20 to 50°C up to 85% Humidity"
+          }
+        ],
+        "General": [
+          {
+            "label": "Tripod Mount",
+            "value": "1/4\"-20 Female (Bottom)"
+          },
+          {
+            "label": "Netflix Approved",
+            "value": "Yes"
+          },
+          {
+            "label": "Materials",
+            "value": "Aluminum"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "4 x 4 x 4\" / 10.2 x 10.2 x 10.2 cm"
+          },
+          {
+            "label": "Weight",
+            "value": "2.1 lb / 1 kg (Body Only)"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "4.45 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "12.1 x 6.9 x 5.4\""
           }
         ]
       }

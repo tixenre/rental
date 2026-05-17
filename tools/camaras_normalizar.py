@@ -146,11 +146,15 @@ ID_REMAP = {
     # Canon
     "canon_eos": "canon_c200",  # fallback ambiguo si _extract_id pega solo "eos"
     "canon_c200": "canon_c200",
-    # RED
-    "red_komodo": "red_komodo_x",
-    "red_digital": "red_komodo_x",  # fallback feo
-    "red_komodo_x": "red_komodo_x",
-    "red_komodox": "red_komodo_x",
+    # RED — distinguir KOMODO regular vs KOMODO-X.
+    # Los IDs raw del parser dependen del título B&H:
+    #   "RED KOMODO-X DIGITAL CINEMA KOMODO-X 6K ..." → red_komodox / red_komodo_x
+    #   "RED DIGITAL CINEMA KOMODO 6K Camera Production Pack ..." → red_digital
+    #   "RED KOMODO 6K ..." → red_komodo
+    "red_komodo_x":  "red_komodo_x",
+    "red_komodox":   "red_komodo_x",
+    "red_komodo":    "red_komodo",     # regular, no X
+    "red_digital":   "red_komodo",     # fallback para "RED DIGITAL CINEMA KOMODO" sin X
     # GoPro
     "gopro_hero12": "gopro_hero12",
     "gopro_hero": "gopro_hero12",
