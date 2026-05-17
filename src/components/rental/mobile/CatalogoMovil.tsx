@@ -858,7 +858,7 @@ function EquipmentRow({ eq, inCart, isExpanded, jornadas, fechaDesde, onTap, onA
         onClick={onTap}
       >
         {/* Thumbnail */}
-        <div className="w-12 h-12 rounded-full bg-surface border border-hairline flex items-center justify-center text-muted-foreground shrink-0 overflow-hidden">
+        <div className="w-12 h-12 rounded-xl bg-surface border border-hairline flex items-center justify-center text-muted-foreground shrink-0 overflow-hidden">
           {eq.fotoUrl && !imgFailed ? (
             <img
               src={eq.fotoUrl}
