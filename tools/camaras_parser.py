@@ -101,7 +101,7 @@ def _parse_lens_mount(secciones: dict, title: str = "") -> str | None:
 
     # 2. Inferir desde título
     if "gopro" in title_l or re.search(r"\bhero\d", title_l) or "action camera" in title_l:
-        return "Fixed (action)"
+        return "Fija"
     # Sony cinema/mirrorless con modelo conocido → E mount
     if re.search(r"\b(ilme|ilce|fx[369]|a[679]|zv-e|nex)", title_l):
         return "E"

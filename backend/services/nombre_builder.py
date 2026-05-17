@@ -253,7 +253,8 @@ SPEC_DISPLAY_TEMPLATES: dict[str, dict | str] = {
     # alimentacion (multi_enum) → sin template, render genérico join con ", "
 
     # ── Cámaras ──────────────────────────────────────────────────────
-    # Enums simples (tipo, lens_mount, formato, resolucion_max) → valor crudo
+    # Enums simples (tipo, formato, resolucion_max) → valor crudo
+    "lens_mount":        {"short": "Montura {value}", "long": "Lens mount {value}"},
     "megapixels":        "{value}MP",
     "fps_max":           "{value}fps",
     "continuous_shooting_fps": {"short": "{value}fps", "long": "{value}fps (ráfaga)"},
