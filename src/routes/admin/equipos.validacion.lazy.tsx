@@ -107,7 +107,7 @@ function ValidacionPage() {
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
             Back-office › Equipos
           </div>
-          <h1 className="font-display text-3xl text-ink">Validar nombres públicos</h1>
+          <h1 className="font-display text-3xl text-ink">Validar nombres</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Revisá y aprobá los nombres auto-generados que ve el cliente.
             Podés editarlos manualmente o dejar el automático.
