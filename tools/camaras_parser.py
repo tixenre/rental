@@ -100,8 +100,10 @@ def _parse_lens_mount(secciones: dict, title: str = "") -> str | None:
         if "rf" in val and "mount" in val: return "RF"  # default RF si lista varios
 
     # 2. Inferir desde título
-    if "gopro" in title_l or re.search(r"\bhero\d", title_l) or "action camera" in title_l:
-        return "Fija"
+    # Action cams / smartphones con lente fijo → null (no aplica)
+    # El placeholder {spec:Lens mount} se omite automáticamente cuando es null.
+    if "gopro" in title_l or re.search(r"\bhero\d", title_l) or "action camera" in title_l or "insta360" in title_l:
+        return None
     # Sony cinema/mirrorless con modelo conocido → E mount
     if re.search(r"\b(ilme|ilce|fx[369]|a[679]|zv-e|nex)", title_l):
         return "E"

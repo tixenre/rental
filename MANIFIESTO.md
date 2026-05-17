@@ -377,6 +377,7 @@ DB value:           lumens_at_5600k = 19389 (int)
 - Sin contexto redundante en short — la temp ya está implícita en el contexto del producto
 - Boolean true → label corto descriptivo (`"GPS"`, `"IBIS"`, `"AF"`, `"Netflix"`)
 - Boolean false → string vacío (se elimina del nombre)
+- **Spec no aplica al producto** (ej. `lens_mount` en GoPro/Insta360) → guardar `null` en `equipo_specs`. El placeholder `{spec:Lens mount}` se omite automáticamente del nombre **junto con sus separadores** (sin double-spaces ni guiones sueltos). Mismo template funciona para productos con y sin la spec.
 
 ### Workflow al agregar un spec nuevo
 
