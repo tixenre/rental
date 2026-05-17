@@ -215,8 +215,29 @@ def _cap_largo(s: str, max_chars: int) -> str:
 # Keys: spec_key canónico (estable ante traducciones de label).
 
 SPEC_DISPLAY_TEMPLATES: dict[str, dict | str] = {
+    # ────────────────────────────────────────────────────────────────
+    # CONVENCIONES
+    # ────────────────────────────────────────────────────────────────
+    # Valor de spec_key → template. Cada uno puede ser:
+    #
+    #   a) string con "{value}"   → interpolación directa
+    #      ej. "{value}W" → "1000W"
+    #
+    #   b) dict {"short": ..., "long": ...}  → distintas variantes
+    #      ej. {"short": "{value} lumen", "long": "{value} lm a 5600K"}
+    #
+    #   c) string sin {value} (literal) → para BOOLEANS
+    #      Si bool true → devolver el literal. Si false → "".
+    #      ej. "GPS" → value=True → "GPS"; value=False → ""
+    #
+    #   d) handler especial (string que empieza con "_") → función dedicada
+    #      ej. "_smart_kg", "_rango_k", "_iso_short"
+    #
+    # KEYS: spec_key canónico (estable ante traducciones de label).
+
     # ── Luces (Iluminación) ──────────────────────────────────────────
-    "potencia_w":        "{value}W",  # mismo short/long
+    # Enums simples (tipo, montaje) → sin template, devuelve valor crudo
+    "potencia_w":        "{value}W",
     "lumens_at_5600k":   {"short": "{value} lumen",            "long": "{value} lm a 5600K"},
     "lumens_at_3200k":   {"short": "{value} lumen (tungsten)", "long": "{value} lm a 3200K"},
     "lux_at_1m_5600k":   {"short": "{value} lux",              "long": "{value} lux a 1m (5600K)"},
@@ -226,8 +247,13 @@ SPEC_DISPLAY_TEMPLATES: dict[str, dict | str] = {
     "r9":                "R9 {value}",
     "temperatura_k":     "_rango_k",
     "peso_g":            "_smart_kg",
+    # Booleans de capacidad
+    "dimming":           "Dimmer",
+    # color_modes (multi_enum) y control_inalambrico (multi_enum) y
+    # alimentacion (multi_enum) → sin template, render genérico join con ", "
 
     # ── Cámaras ──────────────────────────────────────────────────────
+    # Enums simples (tipo, lens_mount, formato, resolucion_max) → valor crudo
     "megapixels":        "{value}MP",
     "fps_max":           "{value}fps",
     "continuous_shooting_fps": {"short": "{value}fps", "long": "{value}fps (ráfaga)"},
@@ -236,8 +262,26 @@ SPEC_DISPLAY_TEMPLATES: dict[str, dict | str] = {
     "rango_dinamico_stops": "{value} stops",
     "recording_limit_min": "{value} min",
     "consumo_w":         "{value}W",
+    "max_aperture":      "{value}",   # ya viene como "f/2.5"
+    "sensor_crop":       "{value}",   # ya viene como "1.5x" o "Crop Factor: 1.5x"
+    # Booleans de capacidad (label-when-true)
+    "estabilizacion":    "IBIS",
+    "autofocus":         "AF",
+    "fast_slow_motion":  {"short": "S&Q", "long": "Slow/Fast motion"},
+    "lens_communication": {"short": "AF lente", "long": "Comunicación electrónica lente"},
+    "gps":               "GPS",
+    "ip_streaming":      {"short": "Streaming IP", "long": "IP Streaming"},
+    "netflix_approved":  {"short": "Netflix", "long": "Netflix approved"},
+    # codecs (string libre) → valor crudo
 
-    # ── Otros (crecerán con el dataset) ──────────────────────────────
+    # ── Para próximas categorías ─────────────────────────────────────
+    # Lentes: lens_mount, distancia_focal (rango mm), apertura (rango f/),
+    #         formato, diametro_filtro, estabilizacion → templates similares
+    # Monitores: pulgadas (number "), resolucion (string), brillo_nits (number)
+    # Soportes: altura_max_m, altura_min_m, peso_max_kg
+    # Sonido: tipo, patron, banda_freq, canales
+    # Energía: capacidad_wh, voltaje
+    # Cuando agregues, sumá la entrada acá y al LABEL_TO_SPEC_KEY abajo.
 }
 
 
@@ -284,6 +328,15 @@ def render_spec_value(spec_key: str, value, variant: str = "short") -> str:
         return f"ISO {value} (ext)"
     if tpl == "_bool_yes":
         return "Sí" if value in (True, "true", "1", "Sí", "Si", "yes") else "No"
+
+    # Boolean con template literal (label-when-true pattern)
+    # Ej. spec gps=true con tpl="GPS" → "GPS"; gps=false → ""
+    is_bool = isinstance(value, bool) or (
+        isinstance(value, str) and value.strip().lower() in ("true", "false", "yes", "no", "sí", "si")
+    )
+    if is_bool and tpl and "{value}" not in tpl and not tpl.startswith("_"):
+        truthy = value in (True, "true", "1", "yes", "Sí", "sí", "Si") if isinstance(value, (bool, str)) else bool(value)
+        return tpl if truthy else ""
 
     # Template con {value}
     if tpl and "{value}" in tpl:
@@ -367,29 +420,47 @@ def _norm_label(s: str) -> str:
 
 # Mapeo de label normalizado → spec_key para aplicar display templates.
 # Permite que `{spec:Lúmenes (5600K)}` aplique el template de `lumens_at_5600k`.
+# Convención: keys SIN tildes, lowercase, trim (matching de _norm_label).
 LABEL_TO_SPEC_KEY: dict[str, str] = {
-    # Luces
-    "potencia":            "potencia_w",
-    "lumenes (5600k)":     "lumens_at_5600k",
-    "lumens (5600k)":      "lumens_at_5600k",
-    "lumenes (3200k)":     "lumens_at_3200k",
-    "lumens (3200k)":      "lumens_at_3200k",
-    "lux a 1m (5600k)":    "lux_at_1m_5600k",
-    "lux a 1m (3200k)":    "lux_at_1m_3200k",
-    "cri":                 "cri",
-    "tlci":                "tlci",
-    "r9":                  "r9",
-    "temperatura color":   "temperatura_k",
-    "peso":                "peso_g",
-    # Cámaras
-    "megapixels":          "megapixels",
-    "fps max":             "fps_max",
-    "rafaga (stills)":     "continuous_shooting_fps",
-    "iso nativo":          "iso_nativo",
-    "iso extendido":       "iso_extendido",
-    "rango dinamico":      "rango_dinamico_stops",
-    "limite de grabacion": "recording_limit_min",
-    "consumo":             "consumo_w",
+    # ── Luces (Iluminación) ──────────────────────────────────────────
+    "potencia":              "potencia_w",
+    "lumenes (5600k)":       "lumens_at_5600k",
+    "lumens (5600k)":        "lumens_at_5600k",
+    "lumenes (3200k)":       "lumens_at_3200k",
+    "lumens (3200k)":        "lumens_at_3200k",
+    "lux a 1m (5600k)":      "lux_at_1m_5600k",
+    "lux a 1m (3200k)":      "lux_at_1m_3200k",
+    "cri":                   "cri",
+    "tlci":                  "tlci",
+    "r9":                    "r9",
+    "temperatura color":     "temperatura_k",
+    "peso":                  "peso_g",
+    "dimmer":                "dimming",
+
+    # ── Cámaras ──────────────────────────────────────────────────────
+    "megapixels":            "megapixels",
+    "fps max":               "fps_max",
+    "rafaga (stills)":       "continuous_shooting_fps",
+    "iso nativo":            "iso_nativo",
+    "iso extendido":         "iso_extendido",
+    "rango dinamico":        "rango_dinamico_stops",
+    "limite de grabacion":   "recording_limit_min",
+    "consumo":               "consumo_w",
+    "apertura maxima (fixed-lens)": "max_aperture",
+    "apertura maxima":       "max_aperture",
+    "sensor crop (35mm eq.)": "sensor_crop",
+    "sensor crop":           "sensor_crop",
+    "estabilizacion optica": "estabilizacion",
+    "autofocus":             "autofocus",
+    "fast/slow motion":      "fast_slow_motion",
+    "comunicacion electronica lente": "lens_communication",
+    "gps":                   "gps",
+    "ip streaming":          "ip_streaming",
+    "netflix approved":      "netflix_approved",
+    "tipo":                  "tipo",          # general — tanto luces como cámaras
+    "lens mount":            "lens_mount",
+    "formato":               "formato",
+    "resolucion maxima":     "resolucion_max",
 }
 
 

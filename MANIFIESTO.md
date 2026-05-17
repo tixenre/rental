@@ -318,35 +318,80 @@ DB value:           lumens_at_5600k = 19389 (int)
 - `LABEL_TO_SPEC_KEY`: dict label normalizado → spec_key
 - `render_spec_value(spec_key, value, variant="short")` → string formateado
 
-**Templates disponibles:**
+**Formato de cada template:**
 
-```
-spec_key                      short                       long
-─────────────────────────────────────────────────────────────────────────────
-potencia_w                    "1000W"                     "1000W"
-lumens_at_5600k               "19389 lumen"               "19389 lm a 5600K"
-lumens_at_3200k               "17000 lumen (tungsten)"    "17000 lm a 3200K"
-lux_at_1m_5600k               "11600 lux"                 "11600 lux a 1m (5600K)"
-cri                           "CRI 95"                    "CRI 95"
-tlci                          "TLCI 98"                   "TLCI 98"
-temperatura_k                 "1800-20000K" / "3200K"     idem
-peso_g                        "390g" / "3.3 kg"           idem
-megapixels                    "33.0MP"                    idem
-fps_max                       "120fps"                    idem
-continuous_shooting_fps       "30fps"                     "30fps (ráfaga)"
-iso_nativo                    "ISO 80-102400"             idem
-rango_dinamico_stops          "15 stops"                  idem
+```python
+# a) String con {value} → interpolación directa
+"potencia_w":  "{value}W"               # 1000 → "1000W"
+
+# b) Dict short/long → variantes distintas
+"lumens_at_5600k": {
+    "short": "{value} lumen",            # 19389 → "19389 lumen"
+    "long":  "{value} lm a 5600K",       #       → "19389 lm a 5600K"
+}
+
+# c) String literal (sin {value}) → label-when-true para booleans
+"gps":              "GPS"                # true → "GPS"; false → ""
+"netflix_approved": {"short": "Netflix", "long": "Netflix approved"}
+
+# d) Handler especial (string que empieza con "_") → función dedicada
+"peso_g":           "_smart_kg"          # 390 → "390g"; 3300 → "3.3 kg"
+"temperatura_k":    "_rango_k"           # {min:1800,max:20000} → "1800-20000K"
+"iso_nativo":       "_iso_short"         # {min:80,max:102400} → "ISO 80-102400"
 ```
 
-**Convenciones de naming en nombres públicos:**
+**Templates implementados:**
+
+| Spec | short | long |
+|---|---|---|
+| `potencia_w` | `"1000W"` | idem |
+| `lumens_at_5600k` | `"19389 lumen"` | `"19389 lm a 5600K"` |
+| `lumens_at_3200k` | `"17000 lumen (tungsten)"` | `"17000 lm a 3200K"` |
+| `lux_at_1m_5600k` | `"11600 lux"` | `"11600 lux a 1m (5600K)"` |
+| `cri` / `tlci` / `r9` | `"CRI 95"` / `"TLCI 98"` / `"R9 90"` | idem |
+| `temperatura_k` | `"1800-20000K"` / `"3200K"` si fixed | idem |
+| `peso_g` | `"390g"` / `"3.3 kg"` smart | idem |
+| `dimming` (bool) | `"Dimmer"` o `""` | idem |
+| `megapixels` | `"33.0MP"` | idem |
+| `fps_max` | `"120fps"` | idem |
+| `continuous_shooting_fps` | `"30fps"` | `"30fps (ráfaga)"` |
+| `iso_nativo` | `"ISO 80-102400"` | idem |
+| `iso_extendido` | `"ISO 80-409600 (ext)"` | idem |
+| `rango_dinamico_stops` | `"15 stops"` | idem |
+| `max_aperture` | `"f/2.5"` | idem |
+| `sensor_crop` | `"1.5x"` | idem |
+| `estabilizacion` (bool) | `"IBIS"` o `""` | idem |
+| `autofocus` (bool) | `"AF"` o `""` | idem |
+| `fast_slow_motion` (bool) | `"S&Q"` | `"Slow/Fast motion"` |
+| `lens_communication` (bool) | `"AF lente"` | `"Comunicación electrónica lente"` |
+| `gps` (bool) | `"GPS"` o `""` | idem |
+| `ip_streaming` (bool) | `"Streaming IP"` | `"IP Streaming"` |
+| `netflix_approved` (bool) | `"Netflix"` | `"Netflix approved"` |
+
+**Sin template (devuelven valor crudo):** enums simples (`tipo`, `lens_mount`, `formato`, `resolucion_max`, `montaje`), multi-enums (`color_modes`, `control_inalambrico`, `alimentacion` → join con `", "`), strings libres (`codecs`).
+
+**Convenciones de naming:**
 - Nombres cortos y claros (la ficha técnica completa muestra el detalle)
-- Sin "@" — usar "a" en español ("a 5600K" no "@ 5600K")
-- Unidades en palabra cuando es más legible ("lumen" vs "lm" en short)
-- Sin contexto redundante en short (la temp ya está implícita en el contexto general del producto)
+- Sin `@` — usar `"a"` en español (`"a 5600K"` no `"@ 5600K"`)
+- Unidades en palabra cuando es más legible (`"lumen"` vs `"lm"` en short)
+- Sin contexto redundante en short — la temp ya está implícita en el contexto del producto
+- Boolean true → label corto descriptivo (`"GPS"`, `"IBIS"`, `"AF"`, `"Netflix"`)
+- Boolean false → string vacío (se elimina del nombre)
 
-**Para agregar un display template nuevo:** editar `SPEC_DISPLAY_TEMPLATES` en `nombre_builder.py`. Si el label difiere del spec_key, agregar también el mapping en `LABEL_TO_SPEC_KEY`.
+### Workflow al agregar un spec nuevo
 
-**Futuro opcional:** mover `display_template_short` y `display_template_long` a columnas de `spec_definitions` para que el admin lo edite desde la UI sin tocar código. Patrón actual con dict en código alcanza para el inicio.
+Cuando agregamos un spec_key nuevo a una categoría (en seed `backend/seeds/<categoria>.py`):
+
+1. **Definir en `spec_definitions`** vía el seed: `(spec_key, label, tipo, unidad, enum_options, ayuda)`.
+2. **Decidir si necesita display template**: si es para placeholder en nombre público, agregar entrada a `SPEC_DISPLAY_TEMPLATES` en `backend/services/nombre_builder.py`. Default: si va a aparecer en nombres, sí necesita template; si solo en ficha técnica, opcional (la web puede formatear con su propia lógica).
+3. **Agregar el label normalizado** en `LABEL_TO_SPEC_KEY` para que `{spec:Label}` resuelva al spec_key correcto (sin tildes, lowercase).
+4. **Elegir variantes** short / long según uso:
+   - Solo nombres → string plano
+   - Nombre + ficha distintas → dict `{short, long}`
+   - Boolean → string literal (label-when-true)
+   - Numérico con conversión → handler especial
+
+**Futuro opcional:** mover `display_template_short` y `display_template_long` a columnas de `spec_definitions` para edición admin via UI. El patrón actual con dicts en código alcanza para todas las categorías que armemos.
 
 ### Bulk actions en lista admin
 
