@@ -3,7 +3,9 @@ import {
   Camera, Sun, Mic, Layers, Monitor, Zap, Battery,
   Package, SlidersHorizontal, Search, User, Plus,
   ChevronUp, ChevronRight, X, Calendar, Loader2,
+  Check, Building2,
 } from "lucide-react";
+import { BottomSheet } from "@/components/mobile/BottomSheet";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -961,6 +963,7 @@ export function CatalogoMovil() {
   const [activeTab, setActiveTab] = useState("Todo");
   const [query, setQuery] = useState("");
   const [stockOnly, setStockOnly] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   // Date state
@@ -972,6 +975,8 @@ export function CatalogoMovil() {
   // Sheet state
   const [showDateSheet, setShowDateSheet] = useState(false);
   const [showCartSheet, setShowCartSheet] = useState(false);
+  const [showBrandSheet, setShowBrandSheet] = useState(false);
+  const [showFiltrosSheet, setShowFiltrosSheet] = useState(false);
   const [fichaEq, setFichaEq] = useState<Equipment | null>(null);
 
   // Scroll state
@@ -1021,6 +1026,22 @@ export function CatalogoMovil() {
     return ["Todo", ...Array.from(cats).sort()];
   }, [allEquipos]);
 
+  // Brands derivadas del stock real, ordenadas alfab\u00e9ticas. Cuenta los
+  // equipos visibles por categor\u00eda actual + b\u00fasqueda (no por marca, para
+  // que el contador no sea siempre 0 cuando ya filtraste por marca).
+  const brands = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of allEquipos) {
+      if (!e.brand) continue;
+      const matchCat = activeTab === "Todo" || e.category === activeTab;
+      if (!matchCat) continue;
+      map.set(e.brand, (map.get(e.brand) ?? 0) + 1);
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b, "es"))
+      .map(([nombre, count]) => ({ nombre, count }));
+  }, [allEquipos, activeTab]);
+
   // Filtered equipment
   const filteredEquipos = useMemo(() => {
     const norm = (s: string) =>
@@ -1031,9 +1052,15 @@ export function CatalogoMovil() {
         query === "" ||
         norm([e.name, e.brand, e.category, e.description ?? ""].join(" ")).includes(norm(query));
       const matchStock = !stockOnly || (e.cantidad == null || e.cantidad > 0);
-      return matchCat && matchQ && matchStock;
+      const matchBrand = !selectedBrand || e.brand === selectedBrand;
+      return matchCat && matchQ && matchStock && matchBrand;
     });
-  }, [allEquipos, activeTab, query, stockOnly]);
+  }, [allEquipos, activeTab, query, stockOnly, selectedBrand]);
+
+  // Filtros activos (para el badge del botón "Filtros"). Excluye categoría
+  // (esa la elige el tab) y búsqueda (esa tiene su propio input visible).
+  const activeFiltersCount =
+    (stockOnly ? 1 : 0) + (selectedBrand ? 1 : 0);
 
   // Cart totals
   const totalItems = Object.values(cart.items).reduce((s, q) => s + q, 0);
@@ -1239,13 +1266,36 @@ export function CatalogoMovil() {
             )}
             Disponibles
           </button>
-          <button className="flex items-center gap-1.5 px-[11px] py-[5px] rounded-full border border-hairline font-sans text-[11px] font-medium text-ink hover:border-ink hover:bg-muted transition-all">
-            Marca ▾
+          <button
+            type="button"
+            onClick={() => setShowBrandSheet(true)}
+            className={cn(
+              "flex items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium text-ink transition-all",
+              selectedBrand
+                ? "bg-amber-soft border-amber/60 font-semibold"
+                : "border-hairline bg-transparent hover:border-ink hover:bg-muted",
+            )}
+          >
+            {selectedBrand ?? "Marca"} ▾
           </button>
           <div className="flex-1" />
-          <button className="flex items-center gap-1.5 px-[11px] py-[5px] rounded-full border border-hairline font-sans text-[11px] font-medium text-muted-foreground hover:border-ink hover:text-ink transition-all">
+          <button
+            type="button"
+            onClick={() => setShowFiltrosSheet(true)}
+            className={cn(
+              "relative flex items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium transition-all",
+              activeFiltersCount > 0
+                ? "border-ink text-ink"
+                : "border-hairline text-muted-foreground hover:border-ink hover:text-ink",
+            )}
+          >
             <SlidersHorizontal size={11} />
             Filtros
+            {activeFiltersCount > 0 && (
+              <span className="inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-ink px-1 font-mono text-[8px] font-bold text-amber">
+                {activeFiltersCount}
+              </span>
+            )}
           </button>
         </div>
 
@@ -1351,6 +1401,216 @@ export function CatalogoMovil() {
           horaHasta={horaHasta}
         />
       )}
+      <BrandSheet
+        open={showBrandSheet}
+        onOpenChange={setShowBrandSheet}
+        brands={brands}
+        selected={selectedBrand}
+        onSelect={setSelectedBrand}
+      />
+      <FiltrosSheet
+        open={showFiltrosSheet}
+        onOpenChange={setShowFiltrosSheet}
+        stockOnly={stockOnly}
+        onStockToggle={() => setStockOnly((v) => !v)}
+        selectedBrand={selectedBrand}
+        onBrandClear={() => setSelectedBrand(null)}
+        onOpenBrandSheet={() => {
+          setShowFiltrosSheet(false);
+          setShowBrandSheet(true);
+        }}
+        activeFiltersCount={activeFiltersCount}
+        onClearAll={() => {
+          setStockOnly(false);
+          setSelectedBrand(null);
+          setShowFiltrosSheet(false);
+        }}
+      />
     </div>
+  );
+}
+
+/* ── BrandSheet ──────────────────────────────────────────────────── */
+function BrandSheet({
+  open,
+  onOpenChange,
+  brands,
+  selected,
+  onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  brands: { nombre: string; count: number }[];
+  selected: string | null;
+  onSelect: (brand: string | null) => void;
+}) {
+  return (
+    <BottomSheet open={open} onOpenChange={onOpenChange} title="Marca" showClose>
+      <div className="px-4 py-3 space-y-1">
+        <button
+          type="button"
+          onClick={() => {
+            onSelect(null);
+            onOpenChange(false);
+          }}
+          className={cn(
+            "w-full flex items-center justify-between gap-2 rounded-lg px-3 py-3 text-left transition",
+            selected === null
+              ? "bg-amber-soft border border-amber/40"
+              : "border border-hairline hover:bg-muted",
+          )}
+        >
+          <span className="font-sans text-sm font-semibold text-ink">Todas las marcas</span>
+          {selected === null && <Check className="h-4 w-4 text-amber" />}
+        </button>
+        {brands.map((b) => {
+          const active = selected === b.nombre;
+          return (
+            <button
+              key={b.nombre}
+              type="button"
+              onClick={() => {
+                onSelect(active ? null : b.nombre);
+                onOpenChange(false);
+              }}
+              className={cn(
+                "w-full flex items-center justify-between gap-2 rounded-lg px-3 py-3 text-left transition",
+                active
+                  ? "bg-amber-soft border border-amber/40"
+                  : "border border-hairline hover:bg-muted",
+              )}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="font-sans text-sm font-semibold text-ink truncate">
+                  {b.nombre}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                  {b.count}
+                </span>
+                {active && <Check className="h-4 w-4 text-amber" />}
+              </div>
+            </button>
+          );
+        })}
+        {brands.length === 0 && (
+          <div className="text-center py-8 text-sm text-muted-foreground">
+            No hay marcas en la categoría actual.
+          </div>
+        )}
+      </div>
+    </BottomSheet>
+  );
+}
+
+/* ── FiltrosSheet ────────────────────────────────────────────────── */
+function FiltrosSheet({
+  open,
+  onOpenChange,
+  stockOnly,
+  onStockToggle,
+  selectedBrand,
+  onBrandClear,
+  onOpenBrandSheet,
+  activeFiltersCount,
+  onClearAll,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  stockOnly: boolean;
+  onStockToggle: () => void;
+  selectedBrand: string | null;
+  onBrandClear: () => void;
+  onOpenBrandSheet: () => void;
+  activeFiltersCount: number;
+  onClearAll: () => void;
+}) {
+  return (
+    <BottomSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Filtros"
+      showClose
+      footer={
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClearAll}
+            disabled={activeFiltersCount === 0}
+            className="flex-1 py-3 rounded-full border-[1.5px] border-hairline font-sans text-sm font-semibold text-ink transition hover:border-ink hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Limpiar
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="flex-1 py-3 rounded-full bg-ink text-amber font-sans text-sm font-bold transition hover:bg-amber hover:text-ink"
+          >
+            Aplicar
+          </button>
+        </div>
+      }
+    >
+      <div className="px-4 py-3 space-y-3">
+        {/* Disponibles toggle */}
+        <div className="rounded-lg border border-hairline px-3.5 py-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="font-sans text-sm font-semibold text-ink">Disponibles</div>
+            <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+              Esconder equipos sin stock para tus fechas
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onStockToggle}
+            role="switch"
+            aria-checked={stockOnly}
+            className={cn(
+              "relative h-6 w-11 rounded-full transition shrink-0",
+              stockOnly ? "bg-amber" : "bg-muted",
+            )}
+          >
+            <span
+              className={cn(
+                "absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+                stockOnly && "translate-x-5",
+              )}
+            />
+          </button>
+        </div>
+
+        {/* Marca selector */}
+        <button
+          type="button"
+          onClick={onOpenBrandSheet}
+          className="w-full rounded-lg border border-hairline px-3.5 py-3 flex items-center justify-between gap-3 hover:bg-muted transition text-left"
+        >
+          <div className="min-w-0">
+            <div className="font-sans text-sm font-semibold text-ink">Marca</div>
+            <div className="font-mono text-[10px] text-muted-foreground mt-0.5 truncate">
+              {selectedBrand ?? "Todas"}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {selectedBrand && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBrandClear();
+                }}
+                className="grid h-6 w-6 place-items-center rounded-full bg-muted text-muted-foreground hover:bg-ink/10 hover:text-ink"
+                aria-label="Limpiar marca"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </button>
+      </div>
+    </BottomSheet>
   );
 }
