@@ -5,7 +5,7 @@ Fuente fundamental para construir el catálogo de iluminación en la web.
 ficha técnica completa.
 
 Archivos:
-- `docs/iluminacion_dataset.json` — fuente de verdad (specs + extras + ficha + image)
+- `docs/iluminacion.json` — fuente de verdad (specs + extras + ficha + image)
 - `docs/iluminacion_raw.json` — raw del scrape original (auditoría)
 - `tools/iluminacion_parser.py` — extractor desde HTMLs B&H (DOM + JSON-LD)
 - `tools/iluminacion_patches.py` — overrides manuales para productos no parseables
@@ -102,7 +102,7 @@ Campos opcionales pero útiles. Los más relevantes:
    bash tools/iluminacion_rebuild.sh
    ```
 
-5. Verificar en `docs/iluminacion_dataset.json` que:
+5. Verificar en `docs/iluminacion.json` que:
    - Marca aparece en la lista canónica (sino, agregar a `BRAND_CANON` en `iluminacion_normalizar.py`)
    - Modelo está limpio (sin "LED Light", "(Gray)", SKUs duplicados)
    - `tipo` está bien clasificado

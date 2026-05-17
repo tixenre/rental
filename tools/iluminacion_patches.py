@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-CURADO_PATH = ROOT / "docs" / "iluminacion_dataset.json"
+CURADO_PATH = ROOT / "docs" / "iluminacion.json"
 RAW_PATH = ROOT / "docs" / "iluminacion_raw.json"
 
 

@@ -264,7 +264,19 @@ Puntos de entrada para no grepear:
 - **Spec definitions globales** (`/admin/equipos/specs`) — catálogo de specs (potencia_w, cri, etc.). Edita label, enum_options, ayuda.
 - **Categorías** — admin las gestiona en la UI existente de categorías.
 
-El JSON del dataset NO se edita desde el back-office (es dev artifact). Para tunear datos post-seed: editar en la UI admin. Para re-importar ajustes masivos: editar el JSON, re-correr el seed (idempotente, actualiza valores sin pisar campos manuales como precio).
+**Quién edita qué (operativa diaria):**
+
+| Acción | Sin Claude | Con Claude |
+|---|---|---|
+| Agregar 1 equipo nuevo (categoría existente) | ✅ Admin UI + autocompletar | — |
+| Editar precio / foto / nombre / spec value | ✅ Admin UI | — |
+| Agregar spec key nueva al catálogo global | ✅ `/admin/equipos/specs` | — |
+| Importar bulk de una categoría NUEVA (ej. cámaras) | — | ✅ Curar HTMLs + seed |
+| Refactor del schema (ej. partir `peso` en sub-campos) | — | ✅ Plan + migration |
+
+El JSON del dataset NO se edita post-seed (es dev artifact). Para cambios puntuales: admin UI. Para reseed masivo (raro): editar JSON + re-correr seed (idempotente, no pisa campos manuales como `precio_jornada`).
+
+**El JSON queda "congelado" después del seed.** Si querés un export del estado actual de la DB → JSON otra vez (por backup o re-importar a otro ambiente), se arma un script `dump_<categoria>.py` cuando haga falta. Por defecto no es necesario.
 
 ### Bulk actions en lista admin
 

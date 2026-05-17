@@ -19,7 +19,7 @@ DATASET="$PAGINAS/Data Set"
 INVENTARIO="$PAGINAS/Inventario"
 
 echo "▸ Limpiando outputs anteriores"
-rm -f docs/iluminacion_raw.json docs/iluminacion_dataset.json
+rm -f docs/iluminacion_raw.json docs/iluminacion.json
 
 echo "▸ Parseando HTMLs de B&H"
 python3 tools/iluminacion_parser.py \
@@ -51,7 +51,7 @@ echo ""
 echo "Dataset reconstruido."
 python3 -c "
 import json
-with open('docs/iluminacion_dataset.json') as f:
+with open('docs/iluminacion.json') as f:
     d = json.load(f)
 print(f'  Total: {len(d[\"products\"])} productos')
 "

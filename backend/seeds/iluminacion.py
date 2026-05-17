@@ -1,7 +1,7 @@
 """
 seeds/iluminacion.py — Importa el dataset curado de iluminación a la DB.
 
-Lee `docs/iluminacion_dataset.json` y popula:
+Lee `docs/iluminacion.json` y popula:
   1. categorias: sub-categorías de Iluminación (LED Daylight, LED Bicolor,
      LED RGB, Tungsteno, Flash)
   2. spec_definitions: specs específicas de iluminación (tipo, color_modes,
@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent.parent
-DATASET_PATH = ROOT / "docs" / "iluminacion_dataset.json"
+DATASET_PATH = ROOT / "docs" / "iluminacion.json"
 
 CATEGORIA_RAIZ = "Iluminación"
 SUBCATEGORIAS = [

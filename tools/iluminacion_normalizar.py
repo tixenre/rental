@@ -2,7 +2,7 @@
 """
 tools/iluminacion_normalizar.py — Normalización post-parse del dataset de luces.
 
-Toma docs/iluminacion_dataset.json y docs/iluminacion_raw.json,
+Toma docs/iluminacion.json y docs/iluminacion_raw.json,
 aplica reglas de canonicalización y guarda los archivos normalizados.
 
 Reglas que aplica:
@@ -18,7 +18,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-CURADO_PATH = ROOT / "docs" / "iluminacion_dataset.json"
+CURADO_PATH = ROOT / "docs" / "iluminacion.json"
 RAW_PATH = ROOT / "docs" / "iluminacion_raw.json"
 
 

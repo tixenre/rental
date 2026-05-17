@@ -11,7 +11,7 @@ Qué hace:
      label/value usando los atributos data-selenium del DOM.
   2. Guarda el raw (secciones B&H originales) en docs/iluminacion_raw.json.
   3. Mapea a los spec_keys del proyecto (Iluminación) y guarda el curado en
-     docs/iluminacion_dataset.json.
+     docs/iluminacion.json.
 
 Idempotente: si un producto (por id) ya existe en el JSON no lo pisa.
 Si se quiere re-procesar un producto, borrar su entrada primero.
@@ -29,7 +29,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 RELEVAMIENTO_PATH = ROOT / "docs" / "iluminacion_raw.json"
-CURADO_PATH = ROOT / "docs" / "iluminacion_dataset.json"
+CURADO_PATH = ROOT / "docs" / "iluminacion.json"
 
 # ── Parser HTML → secciones raw ─────────────────────────────────────────────
 
