@@ -253,8 +253,8 @@ Puntos de entrada para no grepear:
 
 | Categoría | Estado | Doc |
 |---|---|---|
-| Iluminación | ✅ 16 luces curadas, seed listo | [`docs/DATASET_ILUMINACION.md`](docs/DATASET_ILUMINACION.md) |
-| Cámaras | ⏳ pendiente | — |
+| Iluminación | ✅ 16 luces curadas, seed listo, HTML upload wireado al admin | [`docs/DATASET_ILUMINACION.md`](docs/DATASET_ILUMINACION.md) |
+| Cámaras | ✅ 6 cámaras curadas + seed listo. **HTML upload UI aún apunta solo a iluminacion_html_extractor** — falta dispatcher por categoría | [`docs/DATASET_CAMARAS.md`](docs/DATASET_CAMARAS.md) |
 | Lentes | ⏳ pendiente | — |
 | (otras) | ⏳ pendiente | — |
 
