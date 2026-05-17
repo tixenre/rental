@@ -192,25 +192,35 @@ def _cap_largo(s: str, max_chars: int) -> str:
 
 
 # ── Display templates por spec ──────────────────────────────────────────
-# Renderiza un (spec_key, valor) → string bonito para usar en placeholders.
-# Ejemplo: lumens_at_5600k=19389 → "19389 lm @ 5600K"
+# Renderiza un (spec_key, valor) → string bonito para placeholders y ficha.
 #
-# Templates:
-#   - "{value}" interpolación simple del valor crudo
-#   - "{value}<sufijo>" valor + sufijo literal
-#   - "_smart_kg"   valor int en gramos: <1000 → "Xg", >=1000 → "X.X kg"
-#   - "_rango_k"    rango Kelvin: {min,max} → "X-YK" o "XK" si fixed
-#   - "_iso_range"  rango ISO: {min,max} → "ISO X-Y"
-#   - "_bool_yes"   bool → "Sí"/"No" o label si True
+# Cada spec puede tener DOS variantes:
+#   - "short": para nombres públicos (conciso, sin contexto extra)
+#              Ej: lumens_at_5600k=19389 → "19389 lumen"
+#   - "long":  para ficha técnica / comparador (con contexto explícito)
+#              Ej: lumens_at_5600k=19389 → "19389 lm a 5600K"
 #
-# Keys: spec_key canónico (no label) para ser estable ante traducciones de label.
-SPEC_DISPLAY_TEMPLATES: dict[str, str] = {
+# Formato de cada variante:
+#   - "{value}<sufijo>"  interpolación simple
+#   - "_smart_kg"        gramos: <1000 → "Xg", >=1000 → "X.X kg"
+#   - "_rango_k_short"   rango K corto: solo el rango "X-YK"
+#   - "_rango_k_long"    rango K explícito (igual al short para luces)
+#   - "_iso_short"       "ISO X-Y" sin paréntesis
+#   - "_iso_long"        igual
+#   - "_iso_ext"         "ISO X-Y (ext)"
+#
+# Si tpl es un string plano, se usa para ambas variantes (backwards compat).
+# Si es dict {"short": ..., "long": ...}, se respeta cada uno.
+#
+# Keys: spec_key canónico (estable ante traducciones de label).
+
+SPEC_DISPLAY_TEMPLATES: dict[str, dict | str] = {
     # ── Luces (Iluminación) ──────────────────────────────────────────
-    "potencia_w":        "{value}W",
-    "lumens_at_5600k":   "{value} lm @ 5600K",
-    "lumens_at_3200k":   "{value} lm @ 3200K",
-    "lux_at_1m_5600k":   "{value} lux @ 1m (5600K)",
-    "lux_at_1m_3200k":   "{value} lux @ 1m (3200K)",
+    "potencia_w":        "{value}W",  # mismo short/long
+    "lumens_at_5600k":   {"short": "{value} lumen",            "long": "{value} lm a 5600K"},
+    "lumens_at_3200k":   {"short": "{value} lumen (tungsten)", "long": "{value} lm a 3200K"},
+    "lux_at_1m_5600k":   {"short": "{value} lux",              "long": "{value} lux a 1m (5600K)"},
+    "lux_at_1m_3200k":   {"short": "{value} lux (tungsten)",   "long": "{value} lux a 1m (3200K)"},
     "cri":               "CRI {value}",
     "tlci":              "TLCI {value}",
     "r9":                "R9 {value}",
@@ -220,28 +230,38 @@ SPEC_DISPLAY_TEMPLATES: dict[str, str] = {
     # ── Cámaras ──────────────────────────────────────────────────────
     "megapixels":        "{value}MP",
     "fps_max":           "{value}fps",
-    "continuous_shooting_fps": "{value}fps (ráfaga)",
-    "iso_nativo":        "_iso_range",
-    "iso_extendido":     "_iso_range_ext",
+    "continuous_shooting_fps": {"short": "{value}fps", "long": "{value}fps (ráfaga)"},
+    "iso_nativo":        "_iso_short",
+    "iso_extendido":     "_iso_ext",
     "rango_dinamico_stops": "{value} stops",
     "recording_limit_min": "{value} min",
     "consumo_w":         "{value}W",
 
-    # ── Otros (lentes, modificadores, etc., crecerán con el dataset) ─
+    # ── Otros (crecerán con el dataset) ──────────────────────────────
 }
 
 
-def render_spec_value(spec_key: str, value) -> str:
+def render_spec_value(spec_key: str, value, variant: str = "short") -> str:
     """Renderiza un spec value con su display template.
 
-    Si no hay template para `spec_key`, devuelve el valor crudo como string.
-    Soporta value de tipos: str, int, float, bool, dict (rangos {min, max}).
+    Args:
+        spec_key: clave canónica del spec (no label)
+        value: valor del spec (str, int, float, bool, dict con {min,max})
+        variant: "short" para nombres públicos (default), "long" para ficha técnica
+
+    Si no hay template, devuelve el valor crudo como string.
     """
     if value is None:
         return ""
-    tpl = SPEC_DISPLAY_TEMPLATES.get(spec_key)
+    raw_tpl = SPEC_DISPLAY_TEMPLATES.get(spec_key)
 
-    # Special handlers
+    # Si es dict, elegir variante; si es string, usar para ambos
+    if isinstance(raw_tpl, dict):
+        tpl = raw_tpl.get(variant) or raw_tpl.get("short") or raw_tpl.get("long")
+    else:
+        tpl = raw_tpl
+
+    # Handlers especiales
     if tpl == "_smart_kg":
         try:
             g = float(value)
@@ -252,14 +272,13 @@ def render_spec_value(spec_key: str, value) -> str:
         if isinstance(value, dict) and "min" in value and "max" in value:
             return f"{value['min']}K" if value["min"] == value["max"] else f"{value['min']}-{value['max']}K"
         if isinstance(value, str):
-            # Ya viene tipo "3200K" o "1800-20000K"
             return value if "K" in value.upper() else f"{value}K"
         return f"{value}K"
-    if tpl == "_iso_range":
+    if tpl in ("_iso_short", "_iso_range"):
         if isinstance(value, dict) and "min" in value and "max" in value:
             return f"ISO {value['min']}-{value['max']}"
         return f"ISO {value}"
-    if tpl == "_iso_range_ext":
+    if tpl == "_iso_ext":
         if isinstance(value, dict) and "min" in value and "max" in value:
             return f"ISO {value['min']}-{value['max']} (ext)"
         return f"ISO {value} (ext)"
@@ -398,13 +417,22 @@ def _render_template(
         before, key, after = m.group(1), m.group(2), m.group(3)
         key_stripped = key.strip()
         if key_stripped.lower().startswith("spec:"):
-            spec_label = key_stripped[len("spec:"):]
+            spec_part = key_stripped[len("spec:"):]
+            # Detectar variante: {spec:Label:long} → variant="long"
+            variant = "short"
+            if ":" in spec_part:
+                spec_label, variant = spec_part.rsplit(":", 1)
+                variant = variant.strip().lower()
+                if variant not in ("short", "long"):
+                    spec_label = spec_part  # no era variante, era parte del label
+                    variant = "short"
+            else:
+                spec_label = spec_part
             norm = _norm_label(spec_label)
             val = spec_map.get(norm, "")
-            # Aplicar display template si tenemos mapeo label → spec_key
             spec_key = LABEL_TO_SPEC_KEY.get(norm)
             if spec_key and val:
-                val = render_spec_value(spec_key, val)
+                val = render_spec_value(spec_key, val, variant=variant)
         else:
             val = lower.get(key_stripped.lower(), "")
         if val:

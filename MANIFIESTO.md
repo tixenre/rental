@@ -292,38 +292,61 @@ El JSON del dataset NO se edita post-seed (es dev artifact). Para cambios puntua
 
 > **Cuándo aplica:** cuando un spec se usa en una plantilla de nombre público vía `{spec:Label}`. El sistema mapea el label → spec_key → display template para mostrar el valor con formato bonito en vez del valor crudo.
 
+**Dos variantes por spec:**
+
+- **`short`** (default): para nombres públicos, conciso, sin contexto extra.
+- **`long`**: para ficha técnica / comparador, con contexto explícito.
+
+**Sintaxis de placeholder:**
+
+```
+{spec:Label}        → variante short (default — nombres concisos)
+{spec:Label:long}   → variante long  (con contexto, para ficha)
+```
+
 **Ejemplo:**
 
 ```
-Plantilla:  "Luz {marca} {modelo} {spec:Lúmenes (5600K)}"
-DB value:   lumens_at_5600k = 19389  (int)
-Template:   "{value} lm @ 5600K"     (en SPEC_DISPLAY_TEMPLATES)
-Output:     "Luz Amaran 360c 19389 lm @ 5600K"
+DB value:           lumens_at_5600k = 19389 (int)
+
+{spec:Lúmenes (5600K)}       → "19389 lumen"           (short)
+{spec:Lúmenes (5600K):long}  → "19389 lm a 5600K"      (long)
 ```
 
 **Dónde vive:** `backend/services/nombre_builder.py`:
-- `SPEC_DISPLAY_TEMPLATES`: dict spec_key → template string o handler especial
-- `LABEL_TO_SPEC_KEY`: dict label normalizado → spec_key (para que `{spec:Label}` aplique el template)
-- `render_spec_value(spec_key, value)` → string formateado
+- `SPEC_DISPLAY_TEMPLATES`: dict `spec_key → str | {"short": ..., "long": ...}` o handler
+- `LABEL_TO_SPEC_KEY`: dict label normalizado → spec_key
+- `render_spec_value(spec_key, value, variant="short")` → string formateado
 
 **Templates disponibles:**
 
-```python
-"potencia_w":         "{value}W"            → "1000W"
-"lumens_at_5600k":    "{value} lm @ 5600K"  → "19389 lm @ 5600K"
-"cri":                "CRI {value}"         → "CRI 95"
-"tlci":               "TLCI {value}"        → "TLCI 98"
-"temperatura_k":      "_rango_k" (handler)  → "1800-20000K" o "3200K" si fixed
-"peso_g":             "_smart_kg" (handler) → "390g" si <1kg, else "3.3 kg"
-"megapixels":         "{value}MP"           → "33.0MP"
-"fps_max":            "{value}fps"          → "120fps"
-"iso_nativo":         "_iso_range"          → "ISO 80-102400"
-"rango_dinamico_stops": "{value} stops"     → "15 stops"
 ```
+spec_key                      short                       long
+─────────────────────────────────────────────────────────────────────────────
+potencia_w                    "1000W"                     "1000W"
+lumens_at_5600k               "19389 lumen"               "19389 lm a 5600K"
+lumens_at_3200k               "17000 lumen (tungsten)"    "17000 lm a 3200K"
+lux_at_1m_5600k               "11600 lux"                 "11600 lux a 1m (5600K)"
+cri                           "CRI 95"                    "CRI 95"
+tlci                          "TLCI 98"                   "TLCI 98"
+temperatura_k                 "1800-20000K" / "3200K"     idem
+peso_g                        "390g" / "3.3 kg"           idem
+megapixels                    "33.0MP"                    idem
+fps_max                       "120fps"                    idem
+continuous_shooting_fps       "30fps"                     "30fps (ráfaga)"
+iso_nativo                    "ISO 80-102400"             idem
+rango_dinamico_stops          "15 stops"                  idem
+```
+
+**Convenciones de naming en nombres públicos:**
+- Nombres cortos y claros (la ficha técnica completa muestra el detalle)
+- Sin "@" — usar "a" en español ("a 5600K" no "@ 5600K")
+- Unidades en palabra cuando es más legible ("lumen" vs "lm" en short)
+- Sin contexto redundante en short (la temp ya está implícita en el contexto general del producto)
 
 **Para agregar un display template nuevo:** editar `SPEC_DISPLAY_TEMPLATES` en `nombre_builder.py`. Si el label difiere del spec_key, agregar también el mapping en `LABEL_TO_SPEC_KEY`.
 
-**Futuro opcional:** mover `display_template` a una columna de `spec_definitions` para que el admin lo edite desde la UI sin tocar código. Patrón actual con dict en código alcanza para el inicio.
+**Futuro opcional:** mover `display_template_short` y `display_template_long` a columnas de `spec_definitions` para que el admin lo edite desde la UI sin tocar código. Patrón actual con dict en código alcanza para el inicio.
 
 ### Bulk actions en lista admin
 
