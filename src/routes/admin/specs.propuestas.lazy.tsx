@@ -18,6 +18,7 @@ import {
   type PropuestaPendiente,
   type PropuestaTipo,
 } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/specs/propuestas")({
   component: PropuestasPage,
@@ -38,6 +39,7 @@ const TIPO_META: Record<PropuestaTipo, { label: string; icon: typeof Check; colo
 type Estado = "pendientes" | "aplicadas" | "descartadas" | "todas";
 
 function PropuestasPage({ embedded = false }: { embedded?: boolean } = {}) {
+  useDocumentTitle("Propuestas IA · Back Office");
   const qc = useQueryClient();
   const [estado, setEstado] = useState<Estado>("pendientes");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());

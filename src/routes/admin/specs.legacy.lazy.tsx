@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 import { adminApi } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/specs/legacy")({
   component: LegacyPage,
 });
 
 function LegacyPage() {
+  useDocumentTitle("Cleanup legacy · Back Office");
   const qc = useQueryClient();
   const listQ = useQuery({
     queryKey: ["admin", "specs-legacy"],

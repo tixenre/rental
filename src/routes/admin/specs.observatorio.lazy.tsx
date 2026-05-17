@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 
 import { adminApi } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/specs/observatorio")({
   component: ObservatorioPage,
@@ -35,6 +36,7 @@ const CATEGORIAS_OBSERVABLES = [
 ];
 
 function ObservatorioPage() {
+  useDocumentTitle("Observatorio · Back Office");
   const qc = useQueryClient();
   const [categoria, setCategoria] = useState<string>("__todas");
   const [soloUnmapped, setSoloUnmapped] = useState<boolean>(false);

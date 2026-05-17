@@ -1,12 +1,14 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 
 import { CalendarioWidget } from "@/components/admin/CalendarioWidget";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/calendario")({
   component: CalendarioPage,
 });
 
 function CalendarioPage() {
+  useDocumentTitle("Calendario · Back Office");
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-7xl mx-auto">
       <header>

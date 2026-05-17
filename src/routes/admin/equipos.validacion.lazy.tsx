@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { adminApi } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 
 export const Route = createLazyFileRoute("/admin/equipos/validacion")({
@@ -31,6 +32,7 @@ type Filtro = "all" | "pendientes" | "aprobados" | "editados";
 
 
 function ValidacionPage() {
+  useDocumentTitle("Validar nombres · Back Office");
   const qc = useQueryClient();
   const [filtro, setFiltro] = useState<Filtro>("pendientes");
   const [busqueda, setBusqueda] = useState("");

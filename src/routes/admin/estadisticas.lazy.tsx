@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, TrendingDown, Users, Package, DollarSign, Calendar } from "lucide-react";
 
 import { adminApi } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/estadisticas")({
   component: EstadisticasPage,
@@ -12,6 +13,7 @@ const fmtArs = (n: number | null | undefined) =>
   n != null ? `$${Math.round(Number(n)).toLocaleString("es-AR")}` : "$0";
 
 function EstadisticasPage() {
+  useDocumentTitle("Estadísticas · Back Office");
   const statsQ = useQuery({
     queryKey: ["admin", "estadisticas"],
     queryFn: () => adminApi.getEstadisticas(),

@@ -19,6 +19,7 @@ import {
 import { adminApi, ESTADO_LABEL, type Cliente } from "@/lib/admin/api";
 import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
 import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/clientes")({
   component: ClientesPage,
@@ -29,6 +30,7 @@ const fmtArs = (n: number | null | undefined) =>
 const fmtFecha = (s: string | null) => (s ? s.slice(0, 10) : "—");
 
 function ClientesPage() {
+  useDocumentTitle("Clientes · Back Office");
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Cliente | null>(null);

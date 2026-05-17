@@ -25,6 +25,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { adminApi, type CategoriaAdmin } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 
 export const Route = createLazyFileRoute("/admin/equipos/clasificar")({
@@ -54,6 +55,7 @@ type EditState = {
 
 
 function ClasificarPage() {
+  useDocumentTitle("Clasificar equipos · Back Office");
   const qc = useQueryClient();
   const [incluirAsignados, setIncluirAsignados] = useState(false);
   const [busqueda, setBusqueda] = useState("");

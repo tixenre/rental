@@ -3,12 +3,14 @@ import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { adminApi } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/pedidos/nuevo")({
   component: NuevoPedidoPage,
 });
 
 function NuevoPedidoPage() {
+  useDocumentTitle("Nuevo pedido · Back Office");
   const navigate = useNavigate();
   const started = useRef(false);
 

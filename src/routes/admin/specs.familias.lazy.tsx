@@ -12,12 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { adminApi } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/specs/familias")({
   component: FamiliasPage,
 });
 
 function FamiliasPage() {
+  useDocumentTitle("Familias jerárquicas · Back Office");
   const qc = useQueryClient();
   const listQ = useQuery({
     queryKey: ["admin", "spec-familias"],

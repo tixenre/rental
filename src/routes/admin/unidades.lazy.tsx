@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, type Unidad, type UnidadInput } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 
 export const Route = createLazyFileRoute("/admin/unidades")({
@@ -28,6 +29,7 @@ export const Route = createLazyFileRoute("/admin/unidades")({
 });
 
 function UnidadesPage() {
+  useDocumentTitle("Unidades · Back Office");
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Unidad | "new" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Unidad | null>(null);

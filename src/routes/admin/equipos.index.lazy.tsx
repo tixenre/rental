@@ -28,6 +28,7 @@ import { BatchAutocompletarDialog } from "@/components/admin/BatchAutocompletarD
 import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquipoDialog";
 import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
 import { DashboardUsoDialog } from "@/components/admin/DashboardUsoDialog";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/equipos/")({
   component: EquiposPage,
@@ -50,6 +51,7 @@ type EquiposSearch = {
 };
 
 function EquiposPage() {
+  useDocumentTitle("Equipos · Back Office");
   const qc = useQueryClient();
 
   const search = useSearch({ strict: false }) as EquiposSearch;

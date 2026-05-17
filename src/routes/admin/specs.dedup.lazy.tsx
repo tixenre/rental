@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 import { adminApi } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/specs/dedup")({
   component: DedupPage,
 });
 
 function DedupPage() {
+  useDocumentTitle("Dedup de specs · Back Office");
   const qc = useQueryClient();
   const candidatosQ = useQuery({
     queryKey: ["admin", "specs-dedup"],

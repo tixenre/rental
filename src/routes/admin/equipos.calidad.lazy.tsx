@@ -19,12 +19,14 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { adminApi, type CalidadInventario, type FaltaField, type Sugerencia } from "@/lib/admin/api";
+import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/equipos/calidad")({
   component: CalidadPage,
 });
 
 function CalidadPage() {
+  useDocumentTitle("Calidad · Back Office");
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["admin", "inventario", "calidad"],
     queryFn: () => adminApi.getCalidadInventario(),
