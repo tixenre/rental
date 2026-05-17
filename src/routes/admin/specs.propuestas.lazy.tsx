@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   Sparkles, Check, X, Loader2, ChevronDown, ChevronRight, ListPlus, Plus, GitMerge, Link2,
+  CheckSquare, Square,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,8 @@ type Estado = "pendientes" | "aplicadas" | "descartadas" | "todas";
 function PropuestasPage({ embedded = false }: { embedded?: boolean } = {}) {
   const qc = useQueryClient();
   const [estado, setEstado] = useState<Estado>("pendientes");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [minConfianza, setMinConfianza] = useState<string>("none");
 
   const listQ = useQuery({
     queryKey: ["admin", "spec-propuestas", estado],
@@ -65,6 +68,25 @@ function PropuestasPage({ embedded = false }: { embedded?: boolean } = {}) {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const bulkMut = useMutation({
+    mutationFn: (input: { ids: number[]; accion: "apply" | "discard"; min_confianza?: number }) =>
+      adminApi.bulkPropuestas(input),
+    onSuccess: (data) => {
+      const accionLabel = data.failed.length === 0 ? "Procesadas" : "Parcial";
+      const detalle = data.failed.length > 0
+        ? ` (${data.ok_count} ok, ${data.failed.length} fallaron)`
+        : ` (${data.ok_count})`;
+      const skipped = data.skipped_by_confianza > 0
+        ? `, ${data.skipped_by_confianza} omitidas por confianza`
+        : "";
+      toast.success(`${accionLabel}${detalle}${skipped}`);
+      setSelectedIds(new Set());
+      qc.invalidateQueries({ queryKey: ["admin", "spec-propuestas"] });
+      qc.invalidateQueries({ queryKey: ["admin", "spec-definitions"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const items = listQ.data?.items ?? [];
   const grupos: Record<PropuestaTipo, PropuestaPendiente[]> = {
     enum_option: [],
@@ -73,6 +95,36 @@ function PropuestasPage({ embedded = false }: { embedded?: boolean } = {}) {
     assign_spec: [],
   };
   for (const p of items) grupos[p.tipo].push(p);
+
+  // Propuestas seleccionables: pendientes que aún no fueron procesadas.
+  const seleccionables = items.filter((p) => !p.aplicado_at && !p.descartado_at);
+  const selectableIds = new Set(seleccionables.map((p) => p.id));
+  const allSelected = seleccionables.length > 0 && seleccionables.every((p) => selectedIds.has(p.id));
+  const someSelected = selectedIds.size > 0;
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableIds));
+    }
+  }
+
+  function runBulk(accion: "apply" | "discard") {
+    const ids = Array.from(selectedIds).filter((id) => selectableIds.has(id));
+    if (ids.length === 0) return;
+    const conf = minConfianza === "none" ? undefined : Number(minConfianza);
+    bulkMut.mutate({ ids, accion, min_confianza: conf });
+  }
 
   return (
     <div className={embedded ? "space-y-6" : "px-4 md:px-6 py-6 space-y-6 max-w-5xl mx-auto"}>
@@ -109,6 +161,73 @@ function PropuestasPage({ embedded = false }: { embedded?: boolean } = {}) {
           </SelectContent>
         </Select>
       </header>
+
+      {/* Toolbar bulk: solo visible cuando estamos viendo pendientes y hay
+          algo seleccionable. Permite aplicar/descartar varias propuestas a
+          la vez, opcionalmente filtrando por confianza mínima. */}
+      {estado === "pendientes" && seleccionables.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border hairline bg-muted/10 px-3 py-2 text-sm">
+          <button
+            type="button"
+            onClick={toggleSelectAll}
+            className="inline-flex items-center gap-1.5 text-ink hover:text-amber"
+          >
+            {allSelected
+              ? <CheckSquare className="h-4 w-4 text-amber" />
+              : <Square className="h-4 w-4 text-muted-foreground" />}
+            <span className="text-xs">
+              {allSelected ? "Deseleccionar todas" : `Seleccionar todas (${seleccionables.length})`}
+            </span>
+          </button>
+
+          <span className="text-muted-foreground">·</span>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Mín. confianza</span>
+            <Select value={minConfianza} onValueChange={setMinConfianza}>
+              <SelectTrigger className="h-7 w-24 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Cualquiera</SelectItem>
+                <SelectItem value="0.5">≥ 50%</SelectItem>
+                <SelectItem value="0.7">≥ 70%</SelectItem>
+                <SelectItem value="0.8">≥ 80%</SelectItem>
+                <SelectItem value="0.9">≥ 90%</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex-1" />
+
+          {someSelected && (
+            <Badge variant="outline" className="text-[10px]">
+              {selectedIds.size} seleccionadas
+            </Badge>
+          )}
+
+          <Button
+            size="sm" variant="outline"
+            onClick={() => runBulk("discard")}
+            disabled={!someSelected || bulkMut.isPending}
+            className="h-7 px-2"
+          >
+            <X className="h-3 w-3 mr-1" />
+            Descartar
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => runBulk("apply")}
+            disabled={!someSelected || bulkMut.isPending}
+            className="h-7 px-2"
+          >
+            {bulkMut.isPending
+              ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              : <Check className="h-3 w-3 mr-1" />}
+            Aplicar
+          </Button>
+        </div>
+      )}
 
       {listQ.isLoading && (
         <div className="rounded-md border hairline px-4 py-6 text-center text-sm text-muted-foreground">
@@ -148,9 +267,12 @@ function PropuestasPage({ embedded = false }: { embedded?: boolean } = {}) {
                 <PropuestaRow
                   key={p.id}
                   propuesta={p}
+                  selected={selectedIds.has(p.id)}
+                  selectable={estado === "pendientes" && selectableIds.has(p.id)}
+                  onToggleSelect={() => toggleSelect(p.id)}
                   onAplicar={() => aplicarMut.mutate(p.id)}
                   onDescartar={() => descartarMut.mutate(p.id)}
-                  busy={aplicarMut.isPending || descartarMut.isPending}
+                  busy={aplicarMut.isPending || descartarMut.isPending || bulkMut.isPending}
                 />
               ))}
             </div>
@@ -162,9 +284,12 @@ function PropuestasPage({ embedded = false }: { embedded?: boolean } = {}) {
 }
 
 function PropuestaRow({
-  propuesta, onAplicar, onDescartar, busy,
+  propuesta, selected, selectable, onToggleSelect, onAplicar, onDescartar, busy,
 }: {
   propuesta: PropuestaPendiente;
+  selected: boolean;
+  selectable: boolean;
+  onToggleSelect: () => void;
   onAplicar: () => void;
   onDescartar: () => void;
   busy: boolean;
@@ -175,8 +300,20 @@ function PropuestaRow({
   const finalizada = yaAplicada || yaDescartada;
 
   return (
-    <div className="px-3 py-2 text-sm hover:bg-muted/20">
+    <div className={`px-3 py-2 text-sm hover:bg-muted/20 ${selected ? "bg-amber-soft/20" : ""}`}>
       <div className="flex items-start gap-2">
+        {selectable && (
+          <button
+            type="button"
+            onClick={onToggleSelect}
+            className="mt-0.5 text-muted-foreground hover:text-amber"
+            aria-label={selected ? "Deseleccionar" : "Seleccionar"}
+          >
+            {selected
+              ? <CheckSquare className="h-4 w-4 text-amber" />
+              : <Square className="h-4 w-4" />}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}

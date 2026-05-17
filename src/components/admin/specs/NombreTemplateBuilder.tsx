@@ -100,13 +100,27 @@ export function NombreTemplateBuilder({
 
   const previewSpecs = (() => {
     if (!previewSpecsQ.data) {
-      return templateSpecs.map((t) => ({ label: t.label, value: `<${t.label}>` }));
+      return templateSpecs.map((t) => ({
+        label: t.label,
+        value: `<${t.label}>`,
+        output_config: null,
+      }));
     }
     const { specs: values, template: tmpl } = previewSpecsQ.data;
-    return tmpl.map((t) => ({
-      label: t.label,
-      value: values[t.spec_key] ?? "",
-    }));
+    return tmpl.map((t) => {
+      const raw = values[t.spec_key] ?? "";
+      // Para specs tabla, el backend guarda el JSON crudo en equipo_specs.
+      // Lo pasamos como value_raw para que el placeholder `{spec:Label.col}`
+      // pueda extraer celdas. El value queda igual al raw (no se pre-formatea
+      // acá; el preview en este editor es best-effort).
+      const isTabla = t.tipo === "tabla";
+      return {
+        label: t.label,
+        value: raw,
+        ...(isTabla && raw ? { value_raw: raw } : {}),
+        output_config: t.output_config ?? null,
+      };
+    });
   })();
 
   const preview = renderNombrePublicoTemplate(template, {
@@ -147,7 +161,8 @@ export function NombreTemplateBuilder({
             className="font-mono text-sm"
           />
           <p className="text-[10px] text-muted-foreground mt-1">
-            Sintaxis: <code className="font-mono">{"{marca}"}</code>, <code className="font-mono">{"{modelo}"}</code>, <code className="font-mono">{"{tipo}"}</code>, <code className="font-mono">{"{nombre}"}</code> y <code className="font-mono">{"{spec:Label}"}</code> para specs de la categoría.
+            Sintaxis: <code className="font-mono">{"{marca}"}</code>, <code className="font-mono">{"{modelo}"}</code>, <code className="font-mono">{"{tipo}"}</code>, <code className="font-mono">{"{nombre}"}</code> y <code className="font-mono">{"{spec:Label}"}</code>.
+            Para specs tipo tabla: <code className="font-mono">{"{spec:Label.columna}"}</code> extrae una sola celda.
           </p>
         </div>
 
@@ -169,16 +184,38 @@ export function NombreTemplateBuilder({
             ))}
             {templateSpecs.map((t) => {
               const ph = `{spec:${t.label}}`;
+              const cols = t.tabla_columnas ?? [];
               return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => insertPlaceholder(ph)}
-                  className="inline-flex items-center gap-1 rounded border hairline border-amber/40 bg-amber-soft/30 px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-amber-soft transition"
-                  title={`Insertar ${ph}`}
-                >
-                  <Plus className="h-3 w-3" /> {t.label}
-                </button>
+                <div key={t.id} className="inline-flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => insertPlaceholder(ph)}
+                    className="inline-flex items-center gap-1 rounded border hairline border-amber/40 bg-amber-soft/30 px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-amber-soft transition"
+                    title={`Insertar ${ph}${t.tipo === "tabla" ? " — devuelve toda la tabla formateada" : ""}`}
+                  >
+                    <Plus className="h-3 w-3" /> {t.label}
+                  </button>
+                  {/* Si la spec es tabla, ofrecer también las columnas como
+                      placeholders separados (extraen una celda específica). */}
+                  {t.tipo === "tabla" && cols.length > 0 && (
+                    <div className="inline-flex flex-wrap gap-0.5 ml-3">
+                      {cols.map((c) => {
+                        const subPh = `{spec:${t.label}.${c.key}}`;
+                        return (
+                          <button
+                            key={c.key}
+                            type="button"
+                            onClick={() => insertPlaceholder(subPh)}
+                            className="inline-flex items-center gap-0.5 rounded border hairline border-amber/30 bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-ink hover:bg-amber-soft/30 transition"
+                            title={`Insertar ${subPh} — extrae solo la columna ${c.label} de la primera fila`}
+                          >
+                            <Plus className="h-2.5 w-2.5" /> {c.key}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>

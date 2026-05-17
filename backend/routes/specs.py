@@ -53,16 +53,25 @@ def _require_admin(request: Request) -> dict:
 class SpecDefinitionInput(BaseModel):
     spec_key: str
     label: str
-    tipo: str   # "string" | "number" | "enum" | "bool" | "rango" | "wxh" | "wxhxd" | "multi_enum"
+    tipo: str   # "string" | "number" | "enum" | "bool" | "rango" | "wxh" | "wxhxd" | "multi_enum" | "tabla"
     unidad: Optional[str] = None
     enum_options: Optional[list[str]] = None
     ayuda: Optional[str] = None
     es_compatibilidad: bool = False
     compatibilidad_modo: str = "exacta"  # "exacta" | "jerarquia"
     validado: bool = False
+    # tabla_columnas: shape de columnas cuando tipo='tabla'. Cada item:
+    #   {key, label, tipo, options?, unidad?}
+    # `tipo` interno de la columna: "string" | "number" | "enum" | "bool".
+    tabla_columnas: Optional[list[dict]] = None
+    # Config declarativa de render del placeholder {spec:Label}.
+    # Por ahora solo soporta `row_strategy: "all" | "first" | "last"` para
+    # specs tipo tabla. NULL = defaults (all).
+    output_config: Optional[dict] = None
 
 
 class SpecDefinitionUpdate(BaseModel):
+    spec_key: Optional[str] = None  # Editable durante construcción del sistema.
     label: Optional[str] = None
     tipo: Optional[str] = None
     unidad: Optional[str] = None
@@ -71,6 +80,8 @@ class SpecDefinitionUpdate(BaseModel):
     es_compatibilidad: Optional[bool] = None
     compatibilidad_modo: Optional[str] = None
     validado: Optional[bool] = None
+    tabla_columnas: Optional[list[dict]] = None
+    output_config: Optional[dict] = None
 
 
 # Asignación de una spec_def a una categoría con flags propios.
@@ -180,8 +191,8 @@ def listar_spec_definitions(request: Request):
     try:
         rows = conn.execute("""
             SELECT
-              sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
-              sd.enum_options, sd.ayuda,
+              sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id,
+              sd.enum_options, sd.ayuda, sd.tabla_columnas, sd.output_config,
               COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
               COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
               COALESCE(sd.validado, FALSE) AS validado,
@@ -208,7 +219,83 @@ def listar_spec_definitions(request: Request):
         conn.close()
 
 
-_VALID_SPEC_TIPOS = {"string", "number", "enum", "bool", "rango", "wxh", "wxhxd", "multi_enum"}
+_VALID_SPEC_TIPOS = {"string", "number", "enum", "bool", "rango", "wxh", "wxhxd", "multi_enum", "tabla"}
+_VALID_COL_TIPOS = {"string", "number", "enum", "bool", "valor_unidad"}
+_VALID_ROW_STRATEGIES = {"all", "first", "last"}
+
+
+def _resolve_unidad_id(conn, simbolo: Optional[str]) -> Optional[int]:
+    """Lookup `unidades.id` por `simbolo`. Si no existe la entry y el
+    símbolo no está vacío, la crea (idempotent, dimension=NULL).
+    Devuelve `None` si simbolo es vacío/None."""
+    if simbolo is None:
+        return None
+    s = (simbolo or "").strip()
+    if not s:
+        return None
+    row = conn.execute(
+        "SELECT id FROM unidades WHERE simbolo = ?", (s,)
+    ).fetchone()
+    if row:
+        return row["id"] if isinstance(row, dict) or hasattr(row, "keys") else row[0]
+    conn.execute(
+        "INSERT INTO unidades (simbolo, nombre, dimension) "
+        "VALUES (?, ?, NULL) ON CONFLICT (simbolo) DO NOTHING",
+        (s, s),
+    )
+    row = conn.execute(
+        "SELECT id FROM unidades WHERE simbolo = ?", (s,)
+    ).fetchone()
+    if row is None:
+        return None
+    return row["id"] if isinstance(row, dict) or hasattr(row, "keys") else row[0]
+
+
+def _validate_output_config(oc: Optional[dict], tipo: str) -> None:
+    """Verifica shape de `output_config`. Solo soporta `row_strategy` por ahora,
+    y solo aplica a specs tipo tabla."""
+    if oc is None or oc == {}:
+        return
+    if not isinstance(oc, dict):
+        raise HTTPException(400, "output_config debe ser un objeto JSON.")
+    rs = oc.get("row_strategy")
+    if rs is not None:
+        if tipo != "tabla":
+            raise HTTPException(
+                400, "output_config.row_strategy solo aplica a specs tipo 'tabla'."
+            )
+        if rs not in _VALID_ROW_STRATEGIES:
+            raise HTTPException(
+                400,
+                f"output_config.row_strategy inválido: '{rs}'. "
+                f"Permitidos: {sorted(_VALID_ROW_STRATEGIES)}.",
+            )
+
+
+def _validate_tabla_columnas(cols: Optional[list[dict]]) -> None:
+    """Verifica el shape de `tabla_columnas`: cada item debe tener
+    {key, label, tipo} con tipo en _VALID_COL_TIPOS, opciones obligatorias
+    si tipo='enum', keys únicas."""
+    if not cols:
+        raise HTTPException(400, "Para tipo 'tabla' hay que definir al menos una columna.")
+    seen: set[str] = set()
+    for i, c in enumerate(cols):
+        if not isinstance(c, dict):
+            raise HTTPException(400, f"Columna {i}: debe ser objeto JSON.")
+        key = (c.get("key") or "").strip()
+        label = (c.get("label") or "").strip()
+        tipo = (c.get("tipo") or "").strip()
+        if not key or not label or not tipo:
+            raise HTTPException(400, f"Columna {i}: faltan key/label/tipo.")
+        if key in seen:
+            raise HTTPException(400, f"Columna {i}: key '{key}' duplicada.")
+        seen.add(key)
+        if tipo not in _VALID_COL_TIPOS:
+            raise HTTPException(
+                400, f"Columna '{key}': tipo '{tipo}' inválido. Permitidos: {sorted(_VALID_COL_TIPOS)}"
+            )
+        if tipo == "enum" and not c.get("options"):
+            raise HTTPException(400, f"Columna '{key}' tipo enum: hay que listar 'options'.")
 
 
 @router.post("/admin/spec-definitions", status_code=201)
@@ -220,6 +307,9 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
         raise HTTPException(400, "Para este tipo la unidad es obligatoria (mm, px, °, kg…).")
     if payload.tipo in ("enum", "multi_enum") and not payload.enum_options:
         raise HTTPException(400, "Para tipo enum / multi_enum hay que listar al menos una opción.")
+    if payload.tipo == "tabla":
+        _validate_tabla_columnas(payload.tabla_columnas)
+    _validate_output_config(payload.output_config, payload.tipo)
     if payload.compatibilidad_modo not in ("exacta", "jerarquia"):
         raise HTTPException(400, "compatibilidad_modo debe ser 'exacta' o 'jerarquia'.")
     if payload.compatibilidad_modo == "jerarquia" and payload.tipo != "enum":
@@ -231,12 +321,14 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
     conn = get_db()
     try:
         try:
+            unidad_id = _resolve_unidad_id(conn, payload.unidad)
             cur = conn.execute(
                 """
                 INSERT INTO spec_definitions
-                  (spec_key, label, tipo, unidad, enum_options, ayuda,
-                   es_compatibilidad, compatibilidad_modo, validado)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  (spec_key, label, tipo, unidad, unidad_id, enum_options, ayuda,
+                   es_compatibilidad, compatibilidad_modo, validado,
+                   tabla_columnas, output_config)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """,
                 (
@@ -244,11 +336,14 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
                     payload.label,
                     payload.tipo,
                     payload.unidad,
+                    unidad_id,
                     json.dumps(payload.enum_options) if payload.enum_options else None,
                     payload.ayuda,
                     payload.es_compatibilidad,
                     payload.compatibilidad_modo,
                     payload.validado,
+                    json.dumps(payload.tabla_columnas) if payload.tabla_columnas else None,
+                    json.dumps(payload.output_config) if payload.output_config else None,
                 ),
             )
             new_id = cur.fetchone()[0]
@@ -269,12 +364,38 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(400, "Nada para actualizar")
+    if "spec_key" in updates:
+        # Editable durante construcción del sistema. Validamos formato igual
+        # que en CREATE; la colisión por UNIQUE constraint la captura el
+        # except más abajo.
+        new_key = (updates["spec_key"] or "").strip()
+        import re as _re
+        if not _re.match(r"^[a-z][a-z0-9_]*$", new_key):
+            raise HTTPException(
+                400,
+                "spec_key inválida: solo minúsculas, números y _ (debe empezar con letra).",
+            )
+        updates["spec_key"] = new_key
     if "enum_options" in updates:
         updates["enum_options"] = (
             json.dumps(updates["enum_options"]) if updates["enum_options"] else None
         )
+    if "tabla_columnas" in updates:
+        if updates["tabla_columnas"]:
+            _validate_tabla_columnas(updates["tabla_columnas"])
+            updates["tabla_columnas"] = json.dumps(updates["tabla_columnas"])
+        else:
+            updates["tabla_columnas"] = None
     if "compatibilidad_modo" in updates and updates["compatibilidad_modo"] not in ("exacta", "jerarquia"):
         raise HTTPException(400, "compatibilidad_modo debe ser 'exacta' o 'jerarquia'.")
+    if "output_config" in updates:
+        # Necesita conocer el tipo final para validar — lo chequea más abajo
+        # contra existing_dict + final_tipo. Acá solo serializamos.
+        oc_val = updates["output_config"]
+        updates["output_config"] = json.dumps(oc_val) if oc_val else None
+    # Sync unidad ↔ unidad_id: si el caller cambia `unidad`, recomputamos
+    # `unidad_id` desde el catálogo (creándolo si no existe).
+    sync_unidad_id: Optional[bool] = "unidad" in updates
     conn = get_db()
     try:
         existing = conn.execute(
@@ -293,6 +414,13 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
                 400,
                 "Modo jerárquico solo aplica a tipo 'enum' — cambiá el tipo o el modo.",
             )
+        # Validar output_config contra el tipo final (después de aplicar
+        # cambios pendientes). Usamos el payload sin serializar de Pydantic.
+        if payload.output_config is not None:
+            _validate_output_config(payload.output_config, final_tipo)
+        # Sync unidad_id desde el catálogo cuando se cambia `unidad`.
+        if sync_unidad_id:
+            updates["unidad_id"] = _resolve_unidad_id(conn, updates.get("unidad"))
         # Si está cambiando el tipo y hay valores ya cargados, bloqueamos —
         # el cambio podría invalidar todos los formatos guardados.
         if "tipo" in updates and updates["tipo"] != existing_dict.get("tipo"):
@@ -306,12 +434,536 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
                     "Borralos primero o creá una spec nueva.",
                 )
         set_clause = ", ".join(f"{k} = ?" for k in updates)
+        try:
+            conn.execute(
+                f"UPDATE spec_definitions SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                list(updates.values()) + [def_id],
+            )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            msg = str(e).lower()
+            if "duplicate key" in msg or "unique" in msg:
+                raise HTTPException(
+                    409,
+                    f"Ya existe otra spec con key '{updates.get('spec_key')}'. Elegí otra.",
+                )
+            raise
+        return {"ok": True, "id": def_id, **updates}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# ── CRUD familias jerárquicas (multi_enum) ─────────────────────────────
+
+
+class SpecFamiliaItemInput(BaseModel):
+    familia: str
+    valor: str
+    posicion: int
+    spec_def_id: Optional[int] = None
+
+
+class SpecFamiliaItemUpdate(BaseModel):
+    familia: Optional[str] = None
+    valor: Optional[str] = None
+    posicion: Optional[int] = None
+    spec_def_id: Optional[int] = None
+
+
+@router.get("/admin/spec-familias")
+def listar_familias(request: Request):
+    """Lista todas las entries de spec_familia_jerarquia agrupadas por
+    familia. Devuelve `[{familia, items: [{id, valor, posicion, spec_def_id}]}]`
+    ordenadas por familia y posicion."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, familia, valor, posicion, spec_def_id "
+            "FROM spec_familia_jerarquia "
+            "ORDER BY familia, posicion, valor"
+        ).fetchall()
+        grupos: dict[str, list[dict]] = {}
+        for r in rows:
+            d = row_to_dict(r) if not isinstance(r, dict) else r
+            grupos.setdefault(d["familia"], []).append({
+                "id": d["id"],
+                "valor": d["valor"],
+                "posicion": d["posicion"],
+                "spec_def_id": d.get("spec_def_id"),
+            })
+        return {
+            "items": [
+                {"familia": fam, "items": items}
+                for fam, items in sorted(grupos.items())
+            ],
+        }
+    finally:
+        conn.close()
+
+
+@router.post("/admin/spec-familias", status_code=201)
+def crear_familia_item(payload: SpecFamiliaItemInput, request: Request):
+    """Crea una entry nueva en la familia (ej. agregar HDMI 2.1b)."""
+    _require_admin(request)
+    familia = (payload.familia or "").strip().lower()
+    valor = (payload.valor or "").strip()
+    if not familia or not valor:
+        raise HTTPException(400, "familia y valor son obligatorios.")
+    conn = get_db()
+    try:
+        try:
+            cur = conn.execute(
+                """
+                INSERT INTO spec_familia_jerarquia
+                  (familia, valor, posicion, spec_def_id)
+                VALUES (?, ?, ?, ?)
+                RETURNING id
+                """,
+                (familia, valor, payload.posicion, payload.spec_def_id),
+            )
+            new_id = cur.fetchone()[0]
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+                raise HTTPException(
+                    409, f"Ya existe valor '{valor}' en familia '{familia}'."
+                )
+            raise
+    finally:
+        conn.close()
+    _MULTI_ENUM_FAMILIES.invalidate()
+    return {"id": new_id, "familia": familia, "valor": valor, "posicion": payload.posicion}
+
+
+@router.patch("/admin/spec-familias/{item_id}")
+def actualizar_familia_item(item_id: int, payload: SpecFamiliaItemUpdate, request: Request):
+    """Modifica un item (reordenar via posicion, renombrar valor, mover de familia)."""
+    _require_admin(request)
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(400, "Nada para actualizar.")
+    if "familia" in updates:
+        updates["familia"] = (updates["familia"] or "").strip().lower()
+    if "valor" in updates:
+        updates["valor"] = (updates["valor"] or "").strip()
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM spec_familia_jerarquia WHERE id = ?", (item_id,)
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Item no existe.")
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        try:
+            conn.execute(
+                f"UPDATE spec_familia_jerarquia SET {set_clause}, "
+                f"updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                list(updates.values()) + [item_id],
+            )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+                raise HTTPException(
+                    409, "Conflicto: el (familia, valor) resultante ya existe."
+                )
+            raise
+    finally:
+        conn.close()
+    _MULTI_ENUM_FAMILIES.invalidate()
+    return {"ok": True, "id": item_id, **updates}
+
+
+@router.delete("/admin/spec-familias/{item_id}", status_code=204)
+def borrar_familia_item(item_id: int, request: Request):
+    """Borra un item. La compat de equipos que usen ese valor en sus
+    specs sigue funcionando vía match exacto — solo deja de aplicar la
+    jerarquía intra-familia para ese valor."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM spec_familia_jerarquia WHERE id = ?", (item_id,)
+        ).fetchone()
+        if not existing:
+            raise HTTPException(404, "Item no existe.")
+        conn.execute("DELETE FROM spec_familia_jerarquia WHERE id = ?", (item_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    _MULTI_ENUM_FAMILIES.invalidate()
+
+
+# ── Dedup tool: detectar y mergear specs duplicadas ────────────────────
+
+
+def _levenshtein(a: str, b: str) -> int:
+    """Distancia de edición simple. Suficiente para labels cortos."""
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            cost = 0 if ca == cb else 1
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+        prev = cur
+    return prev[-1]
+
+
+@router.get("/admin/specs/dedup/candidatos")
+def listar_dedup_candidatos(request: Request):
+    """Devuelve pares de spec_definitions sospechosas de ser duplicadas:
+    labels normalizados con distancia ≤ 2 y tipos compatibles.
+
+    Por cada par, devuelve cuántos equipos usan cada una y un score
+    sugiriendo cuál mantener (la que tiene más uso o validado=true).
+    El admin revisa y aprueba el merge."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT
+              sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.validado,
+              (SELECT COUNT(*) FROM categoria_spec_templates t WHERE t.spec_def_id = sd.id) AS uso_cat,
+              (SELECT COUNT(*) FROM equipo_specs es WHERE es.spec_def_id = sd.id) AS uso_eq
+            FROM spec_definitions sd
+        """).fetchall()
+        defs = [row_to_dict(r) for r in rows]
+
+        from services.spec_render import norm_spec_label
+        candidatos: list[dict] = []
+        for i, a in enumerate(defs):
+            la = norm_spec_label(a["label"])
+            for b in defs[i + 1:]:
+                # Solo comparar tipos compatibles (string/number/enum entre sí
+                # — la migración manual entre tipos heterogéneos es más
+                # delicada y queda fuera del dedup automático).
+                if a["tipo"] != b["tipo"]:
+                    continue
+                lb = norm_spec_label(b["label"])
+                if la == lb or _levenshtein(la, lb) <= 2:
+                    # Sugerir cuál mantener: validado primero, luego más uso.
+                    score_a = (1 if a["validado"] else 0) * 100 + a["uso_cat"] * 10 + a["uso_eq"]
+                    score_b = (1 if b["validado"] else 0) * 100 + b["uso_cat"] * 10 + b["uso_eq"]
+                    keep, drop = (a, b) if score_a >= score_b else (b, a)
+                    candidatos.append({
+                        "keep": {
+                            "id": keep["id"], "spec_key": keep["spec_key"],
+                            "label": keep["label"], "tipo": keep["tipo"],
+                            "unidad": keep["unidad"], "validado": keep["validado"],
+                            "uso_cat": keep["uso_cat"], "uso_eq": keep["uso_eq"],
+                        },
+                        "drop": {
+                            "id": drop["id"], "spec_key": drop["spec_key"],
+                            "label": drop["label"], "tipo": drop["tipo"],
+                            "unidad": drop["unidad"], "validado": drop["validado"],
+                            "uso_cat": drop["uso_cat"], "uso_eq": drop["uso_eq"],
+                        },
+                        "label_distance": _levenshtein(la, lb),
+                    })
+        # Más exactos primero (distance 0), después más usados.
+        candidatos.sort(
+            key=lambda x: (
+                x["label_distance"],
+                -(x["keep"]["uso_eq"] + x["drop"]["uso_eq"]),
+            ),
+        )
+        return {"total": len(candidatos), "items": candidatos}
+    finally:
+        conn.close()
+
+
+class SpecDedupMergeInput(BaseModel):
+    keep_id: int
+    drop_id: int
+
+
+# ── Cleanup de specs legacy (equipo_fichas.specs_json) ─────────────────
+
+
+@router.get("/admin/specs/legacy/inventario")
+def listar_legacy_inventario(request: Request):
+    """Lista los equipos que tienen `equipo_fichas.specs_json` con specs
+    cargadas, junto con cuántas matchean fuzzy una `spec_definitions` y
+    cuántas son genuinamente custom (sin equivalente).
+
+    Devuelve `[{equipo_id, equipo_nombre, total, matched, custom}]`
+    ordenado por total descendente. El admin después usa
+    `POST /admin/specs/legacy/promover/{equipo_id}` para mover las
+    matched a `equipo_specs`."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        # Index de spec_definitions por label normalizado.
+        from services.spec_render import norm_spec_label
+        def_rows = conn.execute(
+            "SELECT id, label FROM spec_definitions"
+        ).fetchall()
+        defs_by_norm: dict[str, int] = {}
+        for r in def_rows:
+            d = row_to_dict(r) if not isinstance(r, dict) else r
+            n = norm_spec_label(d.get("label") or "")
+            if n:
+                defs_by_norm[n] = d["id"]
+
+        eq_rows = conn.execute(
+            """
+            SELECT e.id, e.nombre, ef.specs_json
+            FROM equipos e
+            JOIN equipo_fichas ef ON ef.equipo_id = e.id
+            WHERE e.eliminado_at IS NULL
+              AND ef.specs_json IS NOT NULL
+              AND TRIM(ef.specs_json) <> ''
+            """
+        ).fetchall()
+
+        items: list[dict] = []
+        for r in eq_rows:
+            d = row_to_dict(r) if not isinstance(r, dict) else r
+            try:
+                arr = json.loads(d["specs_json"])
+            except Exception:
+                continue
+            if not isinstance(arr, list):
+                continue
+            matched = 0
+            custom = 0
+            total = 0
+            for s in arr:
+                if not isinstance(s, dict):
+                    continue
+                label = s.get("label") or ""
+                value = s.get("value")
+                if not label or value is None or value == "":
+                    continue
+                total += 1
+                if defs_by_norm.get(norm_spec_label(label)):
+                    matched += 1
+                else:
+                    custom += 1
+            if total > 0:
+                items.append({
+                    "equipo_id": d["id"],
+                    "equipo_nombre": d["nombre"],
+                    "total": total,
+                    "matched": matched,
+                    "custom": custom,
+                })
+        items.sort(key=lambda x: -x["total"])
+        return {"total": len(items), "items": items}
+    finally:
+        conn.close()
+
+
+@router.post("/admin/specs/legacy/promover/{equipo_id}")
+def promover_legacy_equipo(equipo_id: int, request: Request):
+    """Para cada spec del `specs_json` legacy del equipo cuyo label
+    matchee un `spec_definitions`:
+      1. Crea o actualiza `equipo_specs` (PK equipo_id, spec_def_id).
+      2. Saca esa entry del `specs_json`.
+
+    Las specs custom (sin matching) quedan en el JSON intactas — el
+    admin decide manualmente si crear la spec global o borrarlas. Esto
+    NO toca specs tabla (las marca como `value_raw` y tienen flujo
+    propio)."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        from services.spec_render import norm_spec_label
+        def_rows = conn.execute(
+            "SELECT id, label, tipo FROM spec_definitions"
+        ).fetchall()
+        defs_by_norm: dict[str, dict] = {}
+        for r in def_rows:
+            d = row_to_dict(r) if not isinstance(r, dict) else r
+            n = norm_spec_label(d.get("label") or "")
+            if n:
+                defs_by_norm[n] = {"id": d["id"], "tipo": d["tipo"]}
+
+        ficha = conn.execute(
+            "SELECT specs_json FROM equipo_fichas WHERE equipo_id = ?",
+            (equipo_id,),
+        ).fetchone()
+        if not ficha or not ficha["specs_json"]:
+            raise HTTPException(404, "Equipo sin specs_json.")
+
+        try:
+            arr = json.loads(ficha["specs_json"])
+        except Exception:
+            raise HTTPException(400, "specs_json corrupto.")
+        if not isinstance(arr, list):
+            raise HTTPException(400, "specs_json no es array.")
+
+        kept: list[dict] = []
+        promoted: list[dict] = []
+        for s in arr:
+            if not isinstance(s, dict):
+                kept.append(s)
+                continue
+            label = s.get("label") or ""
+            value = s.get("value")
+            if not label or value is None or value == "":
+                kept.append(s)
+                continue
+            match = defs_by_norm.get(norm_spec_label(label))
+            if not match:
+                kept.append(s)
+                continue
+            # Skip specs tabla — su shape no es el del legacy plain.
+            if match["tipo"] == "tabla":
+                kept.append(s)
+                continue
+            # Migrar.
+            conn.execute(
+                """
+                INSERT INTO equipo_specs (equipo_id, spec_def_id, value)
+                VALUES (?, ?, ?)
+                ON CONFLICT (equipo_id, spec_def_id) DO UPDATE
+                  SET value = EXCLUDED.value
+                """,
+                (equipo_id, match["id"], str(value)),
+            )
+            promoted.append({"label": label, "spec_def_id": match["id"]})
+
+        # Actualizar specs_json sin las que migramos.
+        new_json = json.dumps(kept, ensure_ascii=False) if kept else None
         conn.execute(
-            f"UPDATE spec_definitions SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            list(updates.values()) + [def_id],
+            "UPDATE equipo_fichas SET specs_json = ? WHERE equipo_id = ?",
+            (new_json, equipo_id),
         )
         conn.commit()
-        return {"ok": True, "id": def_id, **updates}
+        return {
+            "ok": True,
+            "equipo_id": equipo_id,
+            "promoted_count": len(promoted),
+            "kept_count": len(kept),
+            "promoted": promoted,
+        }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.post("/admin/specs/dedup/merge")
+def merge_specs(payload: SpecDedupMergeInput, request: Request):
+    """Mergea `drop_id` dentro de `keep_id` en una transacción:
+    - Reasigna `categoria_spec_templates.spec_def_id` (skip si ya existe
+      una asignación con keep_id en la misma categoría — gana keep).
+    - Reasigna `equipo_specs.spec_def_id` (skip si el equipo ya tiene
+      keep_id cargado — gana keep).
+    - Si keep es tipo enum/multi_enum: UNION de enum_options conservando
+      orden de keep.
+    - Borra `drop` de spec_definitions.
+
+    Operación reversible solo via backup — el merge es destructivo."""
+    _require_admin(request)
+    if payload.keep_id == payload.drop_id:
+        raise HTTPException(400, "keep_id y drop_id deben ser distintos.")
+    conn = get_db()
+    try:
+        keep = conn.execute(
+            "SELECT id, tipo, enum_options FROM spec_definitions WHERE id = ?",
+            (payload.keep_id,),
+        ).fetchone()
+        drop = conn.execute(
+            "SELECT id, tipo, enum_options FROM spec_definitions WHERE id = ?",
+            (payload.drop_id,),
+        ).fetchone()
+        if not keep:
+            raise HTTPException(404, f"keep_id {payload.keep_id} no existe.")
+        if not drop:
+            raise HTTPException(404, f"drop_id {payload.drop_id} no existe.")
+
+        # Reasignar templates (skip si categoría ya tiene keep).
+        conn.execute(
+            """
+            DELETE FROM categoria_spec_templates
+            WHERE spec_def_id = ?
+              AND categoria_id IN (
+                  SELECT categoria_id FROM categoria_spec_templates
+                  WHERE spec_def_id = ?
+              )
+            """,
+            (payload.drop_id, payload.keep_id),
+        )
+        conn.execute(
+            "UPDATE categoria_spec_templates SET spec_def_id = ? WHERE spec_def_id = ?",
+            (payload.keep_id, payload.drop_id),
+        )
+
+        # Reasignar equipo_specs (skip si equipo ya tiene keep).
+        conn.execute(
+            """
+            DELETE FROM equipo_specs
+            WHERE spec_def_id = ?
+              AND equipo_id IN (
+                  SELECT equipo_id FROM equipo_specs WHERE spec_def_id = ?
+              )
+            """,
+            (payload.drop_id, payload.keep_id),
+        )
+        conn.execute(
+            "UPDATE equipo_specs SET spec_def_id = ? WHERE spec_def_id = ?",
+            (payload.keep_id, payload.drop_id),
+        )
+
+        # Union de enum_options si aplica.
+        if keep["tipo"] in ("enum", "multi_enum"):
+            keep_opts = keep["enum_options"]
+            drop_opts = drop["enum_options"]
+            if isinstance(keep_opts, str):
+                try:
+                    keep_opts = json.loads(keep_opts)
+                except Exception:
+                    keep_opts = []
+            if isinstance(drop_opts, str):
+                try:
+                    drop_opts = json.loads(drop_opts)
+                except Exception:
+                    drop_opts = []
+            keep_opts = keep_opts or []
+            drop_opts = drop_opts or []
+            seen = set(keep_opts)
+            merged = list(keep_opts)
+            for o in drop_opts:
+                if o not in seen:
+                    merged.append(o)
+                    seen.add(o)
+            if merged != keep_opts:
+                conn.execute(
+                    "UPDATE spec_definitions SET enum_options = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (json.dumps(merged), payload.keep_id),
+                )
+
+        # Finalmente borrar drop.
+        conn.execute(
+            "DELETE FROM spec_definitions WHERE id = ?", (payload.drop_id,)
+        )
+        conn.commit()
+        return {
+            "ok": True,
+            "keep_id": payload.keep_id,
+            "drop_id": payload.drop_id,
+        }
     except HTTPException:
         conn.rollback()
         raise
@@ -388,7 +1040,8 @@ def listar_templates(categoria_id: int, request: Request):
             """
             SELECT
               t.id, t.categoria_id, t.spec_def_id,
-              sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.enum_options,
+              sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id, sd.enum_options,
+              sd.tabla_columnas, sd.output_config,
               t.prioridad,
               COALESCE(t.visible_en_card, FALSE) AS visible_en_card,
               COALESCE(t.visible_en_filtros, FALSE) AS visible_en_filtros,
@@ -639,7 +1292,8 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
             SELECT DISTINCT ON (t.spec_def_id)
                 t.id AS template_id,
                 t.spec_def_id,
-                sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.enum_options,
+                sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id, sd.enum_options,
+                sd.tabla_columnas, sd.output_config,
                 t.prioridad,
                 t.visible_en_card, t.visible_en_filtros, t.visible_en_nombre,
                 t.obligatorio,
@@ -667,6 +1321,119 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
         conn.close()
 
 
+def _validate_multi_enum_value(value: str, enum_options: list[str], spec_label: str) -> str:
+    """Normaliza `value` a JSON array y valida que cada item esté en
+    `enum_options`. Acepta dos shapes de entrada (CSV legacy o JSON array)
+    pero siempre devuelve JSON array compactado.
+
+    El endpoint PUT usa esto para enforce el storage canónico definido en
+    la migration `f3a5c7d9e1b6_multi_enum_json_canonical.py`."""
+    v = (value or "").strip()
+    if not v:
+        return "[]"
+    items: list[str]
+    if v.startswith("["):
+        try:
+            parsed = json.loads(v)
+        except Exception:
+            raise HTTPException(
+                400, f"Spec '{spec_label}' tipo multi_enum: JSON inválido."
+            )
+        if not isinstance(parsed, list):
+            raise HTTPException(
+                400, f"Spec '{spec_label}': multi_enum debe ser array."
+            )
+        items = [str(x).strip() for x in parsed if str(x).strip()]
+    else:
+        items = [p.strip() for p in v.split(",") if p.strip()]
+    # Validar contra enum_options si están declaradas. Si la spec no tiene
+    # enum_options (caso raro), aceptamos cualquier valor pero canonizado.
+    if enum_options:
+        opts_set = set(enum_options)
+        invalid = [x for x in items if x not in opts_set]
+        if invalid:
+            raise HTTPException(
+                400,
+                f"Spec '{spec_label}' multi_enum: valores no permitidos {invalid}. "
+                f"Opciones: {enum_options}.",
+            )
+    # Dedup preservando orden de aparición.
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for x in items:
+        if x not in seen:
+            seen.add(x)
+            deduped.append(x)
+    return json.dumps(deduped, ensure_ascii=False)
+
+
+def _validate_tabla_value(value: str, columnas: list[dict], spec_label: str) -> str:
+    """Valida que `value` sea JSON array donde cada row tiene las keys de
+    `columnas` con los tipos correctos. Devuelve el JSON re-serializado
+    (compactado) para garantizar storage normalizado."""
+    try:
+        data = json.loads(value)
+    except Exception:
+        raise HTTPException(400, f"Spec '{spec_label}' tipo tabla: value debe ser JSON válido.")
+    if not isinstance(data, list):
+        raise HTTPException(400, f"Spec '{spec_label}': tabla debe ser un array de filas.")
+    cleaned: list[dict] = []
+    col_by_key = {c["key"]: c for c in columnas}
+    for i, row in enumerate(data):
+        if not isinstance(row, dict):
+            raise HTTPException(400, f"Spec '{spec_label}' fila {i}: debe ser objeto.")
+        clean_row: dict = {}
+        for key, col in col_by_key.items():
+            v = row.get(key)
+            if v is None or v == "":
+                continue  # campo vacío permitido en cualquier columna
+            ctipo = col["tipo"]
+            if ctipo == "number":
+                try:
+                    clean_row[key] = float(v) if "." in str(v) else int(v)
+                except (TypeError, ValueError):
+                    raise HTTPException(
+                        400,
+                        f"Spec '{spec_label}' fila {i} columna '{key}': debe ser número, vino {v!r}.",
+                    )
+            elif ctipo == "valor_unidad":
+                # Objeto {valor, unidad}. Permite que la unidad varíe por fila.
+                if not isinstance(v, dict):
+                    raise HTTPException(
+                        400,
+                        f"Spec '{spec_label}' fila {i} columna '{key}': debe ser objeto {{valor, unidad}}.",
+                    )
+                valor_raw = v.get("valor")
+                unidad_raw = v.get("unidad", "")
+                has_valor = valor_raw not in (None, "")
+                has_unidad = bool(str(unidad_raw or "").strip())
+                if not has_valor and not has_unidad:
+                    continue
+                cell: dict = {}
+                if has_valor:
+                    try:
+                        cell["valor"] = float(valor_raw) if "." in str(valor_raw) else int(valor_raw)
+                    except (TypeError, ValueError):
+                        cell["valor"] = str(valor_raw).strip()
+                if has_unidad:
+                    cell["unidad"] = str(unidad_raw).strip()
+                clean_row[key] = cell
+            elif ctipo == "bool":
+                clean_row[key] = bool(v) if isinstance(v, bool) else str(v).lower() in ("true", "1", "yes", "sí", "si")
+            elif ctipo == "enum":
+                if str(v) not in (col.get("options") or []):
+                    raise HTTPException(
+                        400,
+                        f"Spec '{spec_label}' fila {i} columna '{key}': '{v}' no está en opciones {col.get('options')}.",
+                    )
+                clean_row[key] = str(v)
+            else:  # string
+                clean_row[key] = str(v).strip()
+        if clean_row:  # solo persistir filas con al menos un valor
+            cleaned.append(clean_row)
+    return json.dumps(cleaned, ensure_ascii=False)
+
+
 @router.put("/admin/equipos/{equipo_id}/specs")
 def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: Request):
     """Reemplaza TODAS las specs del equipo. Body shape:
@@ -680,17 +1447,58 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
         if not eq:
             raise HTTPException(404, "Equipo no existe")
 
-        conn.execute("DELETE FROM equipo_specs WHERE equipo_id = ?", (equipo_id,))
-        for key, value in payload.specs.items():
-            if value is None or value == "":
-                continue
+        # Pre-cargar las defs referenciadas (tipo + tabla_columnas) para
+        # validar el value de specs tipo 'tabla' antes de persistir.
+        keys_int: list[int] = []
+        for key in payload.specs.keys():
             try:
-                spec_def_id = int(key)
+                keys_int.append(int(key))
             except (TypeError, ValueError):
                 raise HTTPException(
                     400,
                     f"spec_def_id inválido en payload.specs: '{key}'. Las keys deben ser IDs numéricos.",
                 )
+        defs_by_id: dict[int, dict] = {}
+        if keys_int:
+            placeholders = ",".join(["?"] * len(keys_int))
+            def_rows = conn.execute(
+                f"SELECT id, label, tipo, tabla_columnas, enum_options "
+                f"FROM spec_definitions WHERE id IN ({placeholders})",
+                tuple(keys_int),
+            ).fetchall()
+            defs_by_id = {r["id"]: row_to_dict(r) for r in def_rows}
+
+        conn.execute("DELETE FROM equipo_specs WHERE equipo_id = ?", (equipo_id,))
+        for key, value in payload.specs.items():
+            if value is None or value == "":
+                continue
+            spec_def_id = int(key)
+            sd = defs_by_id.get(spec_def_id)
+            persist_value = str(value)
+            if sd and sd.get("tipo") == "tabla":
+                cols = sd.get("tabla_columnas")
+                if isinstance(cols, str):
+                    cols = json.loads(cols)
+                if not cols:
+                    raise HTTPException(
+                        500,
+                        f"Spec '{sd.get('label')}' tipo tabla sin tabla_columnas definidas.",
+                    )
+                persist_value = _validate_tabla_value(persist_value, cols, sd.get("label") or "")
+                if persist_value == "[]":
+                    continue  # tabla totalmente vacía → no persistir nada
+            elif sd and sd.get("tipo") == "multi_enum":
+                opts = sd.get("enum_options")
+                if isinstance(opts, str):
+                    try:
+                        opts = json.loads(opts)
+                    except Exception:
+                        opts = []
+                persist_value = _validate_multi_enum_value(
+                    persist_value, opts or [], sd.get("label") or "",
+                )
+                if persist_value == "[]":
+                    continue  # multi_enum vacío → no persistir
             conn.execute(
                 """
                 INSERT INTO equipo_specs (equipo_id, spec_def_id, value)
@@ -698,7 +1506,7 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
                 ON CONFLICT (equipo_id, spec_def_id) DO UPDATE
                     SET value = EXCLUDED.value
                 """,
-                (equipo_id, spec_def_id, str(value)),
+                (equipo_id, spec_def_id, persist_value),
             )
 
         try:
@@ -1040,80 +1848,180 @@ def borrar_compatibilidad(compat_id: int, request: Request):
 # (exacta o jerarquia), agrega overrides manuales de equipo_compatibilidad y
 # devuelve un overall + razones.
 
-# NOTA: las "familias jerárquicas" para specs multi_enum (HDMI 2.0/2.1/etc,
-# SDI 3G/6G/12G) y el match cross-spec direccional video_out↔video_in fueron
-# REMOVIDAS en esta sesión. La implementación original (commits 444a351 +
-# code en _compute_multi_enum_compat) iba a confundir con el sistema canónico
-# nuevo (compat_config.py + apply_compat_config).
+# Familias jerárquicas dentro de specs multi_enum. La lógica de compat aplica
+# "mínimo común" por familia cuando dos equipos comparten familia pero no
+# versión exacta (ej. cámara HDMI 2.1 + monitor HDMI 2.0 → ambos hablan 2.0).
 #
-# Cuando entre la categoría "Monitores y Video" con datos reales, replantear:
-#   - Defin compat_config para HDMI/SDI/Thunderbolt (similar a FORMATO_ENUM)
-#   - Multi-enum match con jerarquía → handler en _compute_compat alineado
-#     al patrón actual de match exacto/jerárquico.
+# Las familias viven en la tabla `spec_familia_jerarquia` (editable desde
+# `/admin/specs/familias`). Este dict queda como FALLBACK para cuando la
+# tabla está vacía (pre-migration o BD nueva sin seed).
+_FAMILIES_FALLBACK: dict[str, list[str]] = {
+    "HDMI": ["HDMI 1.4", "HDMI 2.0", "HDMI 2.1"],
+    "SDI":  ["SDI 3G", "SDI 6G", "SDI 12G"],
+}
 
-def _prefetch_manual_overrides(conn, equipo_a_id: int) -> dict[int, dict]:
-    """Pre-carga TODOS los overrides manuales que involucran al equipo A.
 
-    Útil para evitar N+1 en `listar_compatibles`: en vez de query por candidato,
-    una sola query y luego lookup por b_id. Devuelve dict {b_id: manual_data}.
-    """
-    rows = conn.execute(
-        """
-        SELECT
-          CASE WHEN ec.equipo_a_id = ? THEN ec.equipo_b_id ELSE ec.equipo_a_id END AS other_id,
-          ec.tipo, ec.nota, ec.adaptador_id,
-          a.nombre AS adaptador_nombre
-        FROM equipo_compatibilidad ec
-        LEFT JOIN equipos a ON a.id = ec.adaptador_id
-        WHERE ec.equipo_a_id = ? OR ec.equipo_b_id = ?
-        """,
-        (equipo_a_id, equipo_a_id, equipo_a_id),
-    ).fetchall()
-    out: dict[int, dict] = {}
+def _load_families_from_db() -> dict[str, list[str]]:
+    """Lee la tabla `spec_familia_jerarquia` y devuelve `{familia: [valores ordenados por posicion]}`.
+    El nombre de familia en el dict mantiene el casing del display
+    (HDMI/SDI). Si la tabla está vacía o falla, devuelve `_FAMILIES_FALLBACK`."""
+    try:
+        conn = get_db()
+        try:
+            rows = conn.execute(
+                "SELECT familia, valor, posicion FROM spec_familia_jerarquia "
+                "ORDER BY familia, posicion"
+            ).fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return dict(_FAMILIES_FALLBACK)
+
+    if not rows:
+        return dict(_FAMILIES_FALLBACK)
+
+    out: dict[str, list[str]] = {}
     for r in rows:
-        out[r["other_id"]] = {
-            "tipo": r["tipo"],
-            "nota": r["nota"],
-            "adaptador_id": r["adaptador_id"],
-            "adaptador_nombre": r["adaptador_nombre"],
-        }
+        d = row_to_dict(r) if not isinstance(r, dict) else r
+        fam_norm = (d.get("familia") or "").strip()
+        # Display name = uppercase si todo el valor empieza con el familia
+        # (HDMI/SDI casos). Sino, capitalize.
+        fam_display = fam_norm.upper() if len(fam_norm) <= 4 else fam_norm.capitalize()
+        out.setdefault(fam_display, []).append(d.get("valor"))
     return out
 
 
-def _compute_compat(
-    conn,
-    equipo_a_id: int,
-    equipo_b_id: int,
-    *,
-    manual_cache: dict[int, dict] | None = None,
-) -> dict:
+# Alias retro-compat: el código existente usa `_MULTI_ENUM_FAMILIES` como
+# un dict. Lo hacemos `property-like` consultando DB on demand.
+class _FamiliesProxy:
+    """Compatibilidad: actúa como dict pero hidrata de DB cada vez que
+    se itera/lee. Caché de 60s para no martillar la BD en el motor de
+    compat que itera por cada par de equipos."""
+    _cache: dict[str, list[str]] = {}
+    _cache_at: float = 0.0
+    _ttl = 60.0
+
+    def _refresh_if_needed(self) -> dict[str, list[str]]:
+        import time
+        now = time.time()
+        if now - self._cache_at > self._ttl:
+            self._cache = _load_families_from_db()
+            self._cache_at = now
+        return self._cache
+
+    def items(self):
+        return self._refresh_if_needed().items()
+
+    def __iter__(self):
+        return iter(self._refresh_if_needed())
+
+    def __getitem__(self, key):
+        return self._refresh_if_needed()[key]
+
+    def __contains__(self, key):
+        return key in self._refresh_if_needed()
+
+    def get(self, key, default=None):
+        return self._refresh_if_needed().get(key, default)
+
+    def invalidate(self):
+        """Borrar cache. Llamar después de CRUD a `spec_familia_jerarquia`."""
+        self._cache_at = 0.0
+
+
+_MULTI_ENUM_FAMILIES = _FamiliesProxy()
+
+
+def _parse_multi_enum_value(value: str) -> list[str]:
+    """Parsea un value de multi_enum desde su storage TEXT. El frontend lo
+    guarda como string CSV-ish: 'HDMI 2.0, SDI 12G'. Aceptamos también JSON
+    array por si vino del autocompletar IA."""
+    if not value:
+        return []
+    v = value.strip()
+    if v.startswith("["):
+        try:
+            arr = json.loads(v)
+            return [str(x).strip() for x in arr if x]
+        except Exception:
+            pass
+    return [p.strip() for p in v.split(",") if p.strip()]
+
+
+def _compute_multi_enum_compat(label: str, a_val: str, b_val: str) -> dict:
+    """Lógica de compat para multi_enum (ej. video_out).
+
+    Orden de prioridad:
+      1. Match exacto: comparten al menos un valor idéntico → status='match'.
+      2. Match jerárquico intra-familia: comparten familia pero distintas
+         versiones → status='match' con mensaje "limitado a versión mínima común".
+      3. Sin overlap: distintas familias o sin valores comunes → status='mismatch'.
+    """
+    a_set = set(_parse_multi_enum_value(a_val))
+    b_set = set(_parse_multi_enum_value(b_val))
+    if not a_set or not b_set:
+        return {"spec": label, "status": "mismatch",
+                "mensaje": f"{label}: uno de los dos no tiene valores cargados"}
+
+    # 1. Intersection directa
+    common = a_set & b_set
+    if common:
+        return {"spec": label, "status": "match",
+                "mensaje": f"{label}: comparten {', '.join(sorted(common))}"}
+
+    # 2. Match jerárquico intra-familia
+    common_versions = []
+    for family_name, order in _MULTI_ENUM_FAMILIES.items():
+        a_in_fam = [v for v in a_set if v in order]
+        b_in_fam = [v for v in b_set if v in order]
+        if not (a_in_fam and b_in_fam):
+            continue
+        # "El mejor que cada uno tiene" en esa familia
+        a_best = max(a_in_fam, key=lambda v: order.index(v))
+        b_best = max(b_in_fam, key=lambda v: order.index(v))
+        # Versión común = el menor de los dos máximos
+        min_idx = min(order.index(a_best), order.index(b_best))
+        common_versions.append({
+            "family": family_name,
+            "version": order[min_idx],
+            "a_best": a_best, "b_best": b_best,
+        })
+
+    if common_versions:
+        partes = [
+            f"{cv['family']} a {cv['version']}"
+            + (f" (A: {cv['a_best']}, B: {cv['b_best']})"
+               if cv["a_best"] != cv["b_best"] else "")
+            for cv in common_versions
+        ]
+        return {"spec": label, "status": "match",
+                "mensaje": f"{label}: compatible vía {', '.join(partes)} (versión mínima común)"}
+
+    # 3. Sin overlap
+    return {"spec": label, "status": "mismatch",
+            "mensaje": f"{label}: sin conectores en común (A: {', '.join(sorted(a_set))} · B: {', '.join(sorted(b_set))})"}
+
+
+def _compute_compat(conn, equipo_a_id: int, equipo_b_id: int) -> dict:
     """Devuelve {overall, razones, adaptador?} para el par (A, B).
 
     overall ∈ {compatible, compatible_con_crop, parcial, incompatible,
                requiere_adaptador, sin_relacion}
     razones: lista de {spec, status, mensaje}
-
-    Args:
-        manual_cache: opcional. Si se pasa (output de `_prefetch_manual_overrides`),
-            evita una query por candidato. Caso típico: el endpoint
-            `listar_compatibles` lo pre-carga una vez para todos los pares.
     """
     # 1. Manual override (gana).
-    if manual_cache is not None:
-        manual = manual_cache.get(equipo_b_id)
-    else:
-        manual = conn.execute(
-            """
-            SELECT ec.tipo, ec.nota, ec.adaptador_id,
-                   a.nombre AS adaptador_nombre
-            FROM equipo_compatibilidad ec
-            LEFT JOIN equipos a ON a.id = ec.adaptador_id
-            WHERE (ec.equipo_a_id = ? AND ec.equipo_b_id = ?)
-               OR (ec.equipo_a_id = ? AND ec.equipo_b_id = ?)
-            LIMIT 1
-            """,
-            (equipo_a_id, equipo_b_id, equipo_b_id, equipo_a_id),
-        ).fetchone()
+    manual = conn.execute(
+        """
+        SELECT ec.tipo, ec.nota, ec.adaptador_id,
+               a.nombre AS adaptador_nombre
+        FROM equipo_compatibilidad ec
+        LEFT JOIN equipos a ON a.id = ec.adaptador_id
+        WHERE (ec.equipo_a_id = ? AND ec.equipo_b_id = ?)
+           OR (ec.equipo_a_id = ? AND ec.equipo_b_id = ?)
+        LIMIT 1
+        """,
+        (equipo_a_id, equipo_b_id, equipo_b_id, equipo_a_id),
+    ).fetchone()
 
     if manual and manual["tipo"] == "incompatible":
         return {
@@ -1165,19 +2073,10 @@ def _compute_compat(
         a_val, b_val = r["a_value"], r["b_value"]
         label = r["label"]
         if modo == "exacta":
-            # multi_enum: fallback simple a intersección. Si comparten ≥1 valor → match.
-            # El sistema antiguo de "familias jerárquicas" (HDMI 2.1>2.0, SDI 12G>6G)
-            # se removió — cuando entren los Monitores se replantea con compat_config.py.
+            # multi_enum tiene su propia lógica: intersection + jerarquía
+            # intra-familia (HDMI 2.1/2.0, SDI 12G/6G/3G).
             if tipo == "multi_enum":
-                a_set = {v.strip() for v in (a_val or "").split(",") if v.strip()}
-                b_set = {v.strip() for v in (b_val or "").split(",") if v.strip()}
-                common = a_set & b_set
-                if common:
-                    razones.append({"spec": label, "status": "match",
-                                    "mensaje": f"{label}: comparten {', '.join(sorted(common))}"})
-                else:
-                    razones.append({"spec": label, "status": "mismatch",
-                                    "mensaje": f"{label}: sin valores comunes"})
+                razones.append(_compute_multi_enum_compat(label, a_val, b_val))
             elif a_val == b_val:
                 razones.append({"spec": label, "status": "match", "mensaje": f"{label}: {a_val}"})
             else:
@@ -1225,16 +2124,54 @@ def _compute_compat(
                 razones.append({"spec": label, "status": "partial",
                                 "mensaje": f"{label}: {a_val} vs {b_val} — tamaños difieren"})
 
-    # 2.b. (REMOVED) Cross-spec match video_out↔video_in
-    # El sistema original tenía aquí una rama para detectar conexiones
-    # direccionales cámara→monitor usando _compute_multi_enum_compat (HDMI/SDI
-    # con familias jerárquicas). Se removió en esta sesión por:
-    #   1. Los specs video_out/video_in NO están definidos hoy.
-    #   2. La función _compute_multi_enum_compat tenía lógica que iba a
-    #      colisionar con el sistema canónico nuevo (compat_config.py).
-    # Cuando entre la categoría "Monitores y Video" con datos reales, replantear
-    # esta sección integrada al patrón de compat_config (registrar specs
-    # multi_enum con familias en COMPAT_SPECS, similar a FORMATO_ENUM).
+    # 2.b. Cross-spec match: video_out (A) ↔ video_in (B), y video_in (A) ↔ video_out (B).
+    # Permite detectar conexiones direccionales sin necesidad de que ambos equipos
+    # tengan la misma spec. La cámara tiene solo video_out, el monitor solo video_in
+    # — el sistema debe match cross y entender "A puede salir hacia B".
+    cross_rows = conn.execute(
+        """
+        SELECT
+          sd_a.spec_key AS a_key, sd_a.label AS a_label, esa.value AS a_value,
+          sd_b.spec_key AS b_key, sd_b.label AS b_label, esb.value AS b_value
+        FROM equipo_specs esa
+        JOIN spec_definitions sd_a ON sd_a.id = esa.spec_def_id
+        JOIN equipo_specs esb ON esb.equipo_id = ?
+        JOIN spec_definitions sd_b ON sd_b.id = esb.spec_def_id
+        WHERE esa.equipo_id = ?
+          AND (
+            (sd_a.spec_key = 'video_out' AND sd_b.spec_key = 'video_in')
+            OR (sd_a.spec_key = 'video_in' AND sd_b.spec_key = 'video_out')
+          )
+        """,
+        (equipo_b_id, equipo_a_id),
+    ).fetchall()
+    cross_pairs_seen: set[tuple[str, str]] = set()
+    for cr in cross_rows:
+        # Procesamos ambas direcciones (out→in y in→out) porque ambos son
+        # conexiones reales. Dedup por par ordenado.
+        key = tuple(sorted([cr["a_key"], cr["b_key"]]))
+        if key in cross_pairs_seen:
+            continue
+        cross_pairs_seen.add(key)
+        # Determinar quién es out y quién es in para el mensaje direccional
+        if cr["a_key"] == "video_out":
+            out_val, in_val = cr["a_value"], cr["b_value"]
+            dir_label = "A→B"
+        else:
+            out_val, in_val = cr["b_value"], cr["a_value"]
+            dir_label = "B→A"
+        result = _compute_multi_enum_compat("Conexión video", out_val, in_val)
+        # Reescribimos el mensaje para reflejar la direccionalidad
+        if result["status"] == "match":
+            result["mensaje"] = result["mensaje"].replace(
+                "Conexión video: ", f"Conexión video: {dir_label} "
+            )
+        elif result["status"] == "mismatch":
+            result["mensaje"] = (
+                f"Conexión video: el out de {dir_label[0]} no matchea con "
+                f"el in de {dir_label[-1]} (posiblemente requiere adaptador/converter)"
+            )
+        razones.append(result)
 
     # 3. Aggregate.
     statuses = {r["status"] for r in razones}
@@ -1328,12 +2265,9 @@ def listar_compatibles(
 
         candidates = conn.execute(candidates_sql, params).fetchall()
 
-        # Pre-cargar overrides manuales del equipo base (evita N queries)
-        manual_cache = _prefetch_manual_overrides(conn, equipo_id)
-
         items = []
         for c in candidates:
-            result = _compute_compat(conn, equipo_id, c["id"], manual_cache=manual_cache)
+            result = _compute_compat(conn, equipo_id, c["id"])
             items.append({
                 "equipo_id": c["id"],
                 "nombre": c["nombre"],
@@ -2085,3 +3019,80 @@ def descartar_propuesta(propuesta_id: int, request: Request):
         return {"ok": True, "id": propuesta_id}
     finally:
         conn.close()
+
+
+class PropuestasBulkActionInput(BaseModel):
+    """Body del endpoint bulk. `ids` puede tener 1..N propuestas.
+    `accion` es 'apply' o 'discard'. `min_confianza` es opcional: si está
+    set, solo procesa propuestas con `confianza >= min_confianza` (útil
+    para "aplicar todas las que confianza ≥ 80%")."""
+    ids: list[int]
+    accion: str  # "apply" | "discard"
+    min_confianza: Optional[float] = None
+
+
+@router.post("/admin/specs/propuestas/bulk")
+def bulk_propuestas(payload: PropuestasBulkActionInput, request: Request):
+    """Aplica o descarta varias propuestas de una vez.
+
+    No es all-or-nothing — cada propuesta se procesa de forma independiente.
+    Las que fallan se reportan en `failed` con su error, las que pasan en
+    `ok_ids`. Permite resolver "aplicar las 12 que matchean" y dejar las
+    que requieren revisión manual.
+
+    Si una propuesta ya fue aplicada/descartada, se cuenta como ok
+    (idempotente)."""
+    _require_admin(request)
+    if not payload.ids:
+        return {"ok_count": 0, "ok_ids": [], "failed": []}
+    if payload.accion not in ("apply", "discard"):
+        raise HTTPException(400, "accion debe ser 'apply' o 'discard'.")
+
+    # Filtrar por confianza si se pidió.
+    ids_a_procesar = list(payload.ids)
+    if payload.min_confianza is not None:
+        conn = get_db()
+        try:
+            placeholders = ",".join(["?"] * len(payload.ids))
+            rows = conn.execute(
+                f"""
+                SELECT id, confianza FROM spec_propuestas_pendientes
+                WHERE id IN ({placeholders})
+                """,
+                tuple(payload.ids),
+            ).fetchall()
+            ids_a_procesar = [
+                r["id"] for r in rows
+                if (r["confianza"] or 0) >= payload.min_confianza
+            ]
+        finally:
+            conn.close()
+
+    ok_ids: list[int] = []
+    failed: list[dict] = []
+    for pid in ids_a_procesar:
+        try:
+            if payload.accion == "apply":
+                aplicar_propuesta(pid, request)
+            else:
+                descartar_propuesta(pid, request)
+            ok_ids.append(pid)
+        except HTTPException as he:
+            # Propuesta ya aplicada/descartada = ok (idempotente).
+            detail = str(he.detail).lower()
+            if "ya fue" in detail or he.status_code == 404:
+                ok_ids.append(pid)
+            else:
+                failed.append({"id": pid, "error": str(he.detail)[:200]})
+        except Exception as e:
+            failed.append({
+                "id": pid,
+                "error": f"Error inesperado ({type(e).__name__})",
+            })
+
+    return {
+        "ok_count": len(ok_ids),
+        "ok_ids": ok_ids,
+        "failed": failed,
+        "skipped_by_confianza": len(payload.ids) - len(ids_a_procesar),
+    }

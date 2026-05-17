@@ -51,18 +51,23 @@ def _categorias_de(conn, equipo_id: int) -> tuple[Optional[str], Optional[str]]:
     return row["parent_nombre"], row["nombre"]
 
 
-def _specs_en_nombre_de(conn, equipo_id: int) -> list[tuple[str, str]]:
-    """Devuelve TODAS las specs del equipo (con label desde spec_definitions),
-    ordenadas por prioridad de la asignación a la categoría. El builder de
-    nombres decide cuáles usar:
-      - Path template: el `{spec:Label}` busca por label exacto.
+def _specs_en_nombre_de(conn, equipo_id: int) -> list[dict]:
+    """Devuelve TODAS las specs del equipo con metadata para el render del
+    nombre. Cada item: {label, value, tipo, tabla_columnas}. Ordenadas por
+    prioridad de la asignación a la categoría.
+
+    El builder usa:
+      - Path template: el `{spec:Label}` busca por label; si la spec es tabla
+        usa `tabla_columnas` para formatear con conectores.
       - Path formatter: cada formatter filtra por las que le interesan.
 
     Ya no usamos el flag `visible_en_nombre` — está deprecado y removido del UI;
     el template (en `categoria.nombre_publico_template`) es source of truth."""
+    import json as _json
     rows = conn.execute(
         """
-        SELECT sd.label, sd.spec_key, es.value, t.prioridad
+        SELECT sd.label, sd.spec_key, sd.tipo, sd.tabla_columnas,
+               es.value, t.prioridad
         FROM equipo_specs es
         JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
         JOIN categoria_spec_templates t
@@ -73,7 +78,21 @@ def _specs_en_nombre_de(conn, equipo_id: int) -> list[tuple[str, str]]:
         """,
         (equipo_id,),
     ).fetchall()
-    return [(r["label"], r["value"] or "") for r in rows]
+    out: list[dict] = []
+    for r in rows:
+        cols = r["tabla_columnas"]
+        if isinstance(cols, str):
+            try:
+                cols = _json.loads(cols)
+            except Exception:
+                cols = None
+        out.append({
+            "label": r["label"],
+            "value": r["value"] or "",
+            "tipo": r["tipo"],
+            "tabla_columnas": cols,
+        })
+    return out
 
 
 def _ficha_template_de(conn, equipo_id: int) -> Optional[str]:

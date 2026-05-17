@@ -670,9 +670,102 @@ def init_db():
         "ALTER TABLE spec_definitions "
         "ADD COLUMN IF NOT EXISTS validado BOOLEAN NOT NULL DEFAULT FALSE"
     )
+    # Para specs tipo 'tabla': shape de columnas (key, label, tipo, options?, unidad?).
+    # El value en equipo_specs se persiste como JSON array de rows.
+    conn.execute(
+        "ALTER TABLE spec_definitions "
+        "ADD COLUMN IF NOT EXISTS tabla_columnas JSONB"
+    )
+    # Config declarativa de cómo se rinde la spec en un placeholder
+    # {spec:Label}. Ej. {"row_strategy": "first"} en una tabla rinde solo
+    # la primera fila. NULL = defaults (row_strategy=all).
+    conn.execute(
+        "ALTER TABLE spec_definitions "
+        "ADD COLUMN IF NOT EXISTS output_config JSONB"
+    )
+
+    # Observatorio de specs: relevamiento desnormalizado de los specs que
+    # el scrape B&H/Adorama detecta en `equipo_fichas.raw_json`. Sirve
+    # para detectar gaps del template, calibrar enum_options y familias
+    # jerárquicas. Se repopula con `POST /admin/specs/observatorio/recompute`.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS spec_observacion (
+            id                  SERIAL PRIMARY KEY,
+            equipo_id           INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            categoria_raiz      VARCHAR(64),
+            label_observado     VARCHAR(255) NOT NULL,
+            label_normalizado   VARCHAR(255) NOT NULL,
+            value_observado     TEXT NOT NULL,
+            spec_def_id         INTEGER REFERENCES spec_definitions(id) ON DELETE SET NULL,
+            matched_template    BOOLEAN NOT NULL DEFAULT FALSE,
+            source              VARCHAR(64),
+            observed_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (equipo_id, label_normalizado)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_obs_categoria_label "
+        "ON spec_observacion (categoria_raiz, label_normalizado)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_obs_matched "
+        "ON spec_observacion (matched_template) WHERE matched_template = FALSE"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_obs_spec_def "
+        "ON spec_observacion (spec_def_id) WHERE spec_def_id IS NOT NULL"
+    )
+    # Catálogo global de unidades (lm, K, V, A, W…). Referenciado por specs
+    # tabla con columnas `valor_unidad` para listas cerradas de opciones.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS unidades (
+            id          SERIAL PRIMARY KEY,
+            simbolo     VARCHAR(16) UNIQUE NOT NULL,
+            nombre      VARCHAR(64) NOT NULL,
+            dimension   VARCHAR(32),
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_unidades_dimension ON unidades(dimension)"
+    )
+    # FK al catálogo unidades. El `unidad` VARCHAR de spec_definitions se
+    # mantiene como cache denormalizado para evitar JOINs en el hot path
+    # (render, listing). El sync `unidad ↔ unidad_id` lo cuida el endpoint
+    # PATCH/POST en routes/specs.py.
+    conn.execute(
+        "ALTER TABLE spec_definitions "
+        "ADD COLUMN IF NOT EXISTS unidad_id INTEGER "
+        "REFERENCES unidades(id) ON DELETE SET NULL"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spec_def_unidad_id "
+        "ON spec_definitions(unidad_id) WHERE unidad_id IS NOT NULL"
+    )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
         "ON spec_definitions(es_compatibilidad) WHERE es_compatibilidad"
+    )
+
+    # Familias jerárquicas para specs multi_enum (HDMI 1.4 < 2.0 < 2.1, SDI
+    # 3G < 6G < 12G, sensor formats, etc.). Editable desde UI admin —
+    # antes vivían hardcodeadas en routes/specs.py.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS spec_familia_jerarquia (
+            id          SERIAL PRIMARY KEY,
+            familia     VARCHAR(64) NOT NULL,
+            valor       VARCHAR(64) NOT NULL,
+            posicion    INTEGER NOT NULL,
+            spec_def_id INTEGER REFERENCES spec_definitions(id) ON DELETE CASCADE,
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (familia, valor)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_fam_jer_familia_pos "
+        "ON spec_familia_jerarquia (familia, posicion)"
     )
 
     conn.execute("""
