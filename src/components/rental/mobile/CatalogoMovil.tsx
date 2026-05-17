@@ -108,6 +108,72 @@ function RamblaSeal() {
   );
 }
 
+/* ── HeroBanner ──────────────────────────────────────────────────── */
+// Hero amber del catálogo móvil (mock Catálogo Móvil - Lista.html §HeroBanner).
+// Eyebrow + headline brand "un lugar / donde pasan / cosas" + body + card
+// Estudio negro con CTA amber. El heroRef se usa para el amber-on-scroll del
+// topbar (cuando el bottom del hero llega al topbar, el topbar está full
+// amber y el seal/pill snapean a inverted).
+function HeroBanner({
+  heroRef,
+  equipCount,
+}: {
+  heroRef: React.RefObject<HTMLDivElement | null>;
+  equipCount: number;
+}) {
+  const navigate = useNavigate();
+  return (
+    <div
+      ref={heroRef}
+      className="relative bg-amber"
+      style={{ padding: "28px 20px 32px" }}
+    >
+      <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-4">
+        Catálogo · {equipCount} equipos · Mar del Plata
+      </div>
+
+      <div className="font-display text-[46px] font-black text-ink leading-[1] tracking-[-0.02em] mb-[18px]">
+        un lugar<br />donde pasan<br />cosas.
+      </div>
+
+      <p className="font-sans text-[15px] leading-[1.55] text-ink/75 mb-7">
+        Cámaras, ópticas, luces, audio y soportes para producciones
+        audiovisuales. Elegí fechas y armá tu pedido — te lo dejamos listo
+        para retirar.
+      </p>
+
+      {/* Card Estudio — ink bg con CTA amber */}
+      <div className="rounded-2xl bg-ink p-5">
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_oklch,var(--amber)_35%,transparent)] bg-[color-mix(in_oklch,var(--amber)_12%,transparent)] px-3 py-1 mb-3">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
+          </svg>
+          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-amber">
+            Espacio Rambla
+          </span>
+        </div>
+
+        <div className="font-display text-[28px] font-black text-amber leading-[1.1] mb-2">
+          Conocé el Estudio
+        </div>
+
+        <p className="font-sans text-[13px] leading-[1.55] text-[color-mix(in_oklch,var(--amber)_65%,white)] mb-5">
+          Foto y video · reservá por hora · pack de luces y grips opcional
+        </p>
+
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/estudio" })}
+          className="w-full flex items-center justify-center gap-1.5 py-3.5 rounded-full bg-amber text-ink font-sans text-[15px] font-bold transition hover:opacity-90"
+        >
+          Ver estudio
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── SheetClose button ───────────────────────────────────────────── */
 function SheetClose({ onClose }: { onClose: () => void }) {
   return (
@@ -986,6 +1052,7 @@ export function CatalogoMovil() {
   // Scroll state
   const scrollRef = useRef<HTMLDivElement>(null);
   const topbarRef = useRef<HTMLElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -995,11 +1062,20 @@ export function CatalogoMovil() {
     const onScroll = () => {
       const st = el.scrollTop;
       setIsScrolled(st > 56);
-      // Amber-on-scroll: el topbar entero se tiñe amber gradualmente en
-      // los primeros 150px de scroll (sin hero, anclamos al scroll mismo).
-      // En 65% del progreso, el seal invierte sus colores.
-      if (topbar) {
-        const progress = Math.min(1, Math.max(0, st / 150));
+      // Amber-on-scroll: el topbar se tiñe amber gradualmente conforme el
+      // hero amber scrollea hacia arriba. Mientras el bottom del hero está
+      // bien debajo de la topbar (~53px) el progreso es 0; cuando llega
+      // al topbar, progreso 1. Misma lógica que el mock hifi.
+      // En 65% del progreso, el seal y el date-pill invierten colores.
+      const hero = heroRef.current;
+      if (topbar && hero) {
+        const heroRect = hero.getBoundingClientRect();
+        const containerRect = el.getBoundingClientRect();
+        const relBottom = heroRect.bottom - containerRect.top;
+        const progress = Math.min(
+          1,
+          Math.max(0, 1 - (relBottom - 53) / (heroRect.height * 0.5)),
+        );
         topbar.style.setProperty("--amber-pct", `${Math.round(progress * 100)}%`);
         topbar.classList.toggle("topbar-snap", progress > 0.65);
       }
@@ -1173,6 +1249,10 @@ export function CatalogoMovil() {
             <User size={15} />
           </button>
         </header>
+
+        {/* Hero banner amber — eyebrow + headline brand + Estudio card.
+            Anclado al heroRef del amber-on-scroll del topbar. */}
+        <HeroBanner heroRef={heroRef} equipCount={allEquipos?.length ?? 0} />
 
         {/* SearchSection */}
         <div
