@@ -654,6 +654,7 @@ def get_equipo(id_or_slug: str):
             raise HTTPException(404, "Equipo no encontrado")
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         equipo = attach_ficha(conn, [equipo])[0]
+        equipo = attach_categorias(conn, [equipo])[0]
         kit = conn.execute("""
             SELECT kc.componente_id, kc.cantidad, e.nombre, e.marca, e.foto_url
             FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id

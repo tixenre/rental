@@ -24,12 +24,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 type IndexSearch = {
   /** Modo de visualización compartible por URL. `?view=grid` o `?view=list`. */
   view?: "grid" | "list";
+  /** Pre-filtra el catálogo por una categoría (root o sub-cat). Se usa para
+   *  deep-linking desde la página de detalle u otros entry points. */
+  cat?: string;
 };
 
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): IndexSearch => {
     const v = search.view;
-    return { view: v === "grid" || v === "list" ? v : undefined };
+    const c = search.cat;
+    return {
+      view: v === "grid" || v === "list" ? v : undefined,
+      cat: typeof c === "string" && c.trim() ? c.trim() : undefined,
+    };
   },
   head: () => ({
     meta: [
@@ -113,7 +120,9 @@ function Index() {
     });
   };
 
-  const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
+  const [selectedCats, setSelectedCats] = useState<Set<string>>(
+    () => (search.cat ? new Set([search.cat]) : new Set()),
+  );
   const [brand, setBrand] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
@@ -135,7 +144,15 @@ function Index() {
         .replace(/[\u0300-\u036f]/g, "");
 
     let list = allEquipos.slice();
-    if (selectedCats.size > 0) list = list.filter((e) => selectedCats.has(e.category));
+    if (selectedCats.size > 0) {
+      // Match contra root (`e.category`) + sub-cats (vía `equipo_categorias` M2M).
+      // Permite filtrar por "Montura E" o "Lentes" indistintamente.
+      list = list.filter(
+        (e) =>
+          selectedCats.has(e.category) ||
+          (e.categorias ?? []).some((c) => selectedCats.has(c.nombre)),
+      );
+    }
     if (brand) list = list.filter((e) => e.brand === brand);
     if (query.trim()) {
       // Cada palabra de la query debe aparecer en el "haystack" del equipo.
@@ -401,18 +418,23 @@ function GridMode({
 
   const isFiltered = selectedCats.size > 0 || !!selectedBrand;
   const isSearching = q.length > 0;
-  // Si hay categorías seleccionadas, limitamos a esas. Si solo está el
-  // filtro de marca o búsqueda, mostramos todas las categorías (matches()
-  // hace el resto del filtrado por marca/query).
-  const visibleCategories = selectedCats.size > 0
-    ? apiCategories.filter((c) => selectedCats.has(c))
-    : apiCategories;
+  // Si hay categorías seleccionadas, mostramos esas como secciones — pueden
+  // ser roots o sub-cats (ej. "Montura E"). Si solo hay filtro de marca o
+  // búsqueda, mostramos todas las roots del backend (matches() hace el resto).
+  const visibleCategories =
+    selectedCats.size > 0 ? Array.from(selectedCats) : apiCategories;
+
+  // Una categoría puede ser root o sub-cat. Esta helper matchea contra
+  // ambos: el `category` (root inferido por el mapper) y las refs en
+  // `categorias` (M2M completo). Reemplaza el viejo `e.category === c`.
+  const inCategory = (e: Equipment, c: string) =>
+    e.category === c || (e.categorias ?? []).some((cc) => cc.nombre === c);
 
   // Ancho fijo de cards en carrusel para snap consistente
   const cardW = 260;
 
   const totalVisible = visibleCategories.reduce(
-    (acc, c) => acc + allEquipos.filter((e) => e.category === c && matches(e)).length,
+    (acc, c) => acc + allEquipos.filter((e) => inCategory(e, c) && matches(e)).length,
     0,
   );
 
@@ -475,7 +497,7 @@ function GridMode({
         // NO re-sortear acá. allEquipos viene del backend ordenado por
         // relevancia_manual ASC, popularidad_score DESC, nombre ASC.
         // El filter preserva el orden, así que respeta el ranking automático.
-        const items = allEquipos.filter((e) => e.category === c && matches(e));
+        const items = allEquipos.filter((e) => inCategory(e, c) && matches(e));
         if (items.length === 0) return null;
 
         if (isFiltered) {

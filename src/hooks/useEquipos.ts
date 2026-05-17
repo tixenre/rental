@@ -247,6 +247,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     name,
     brand: marca || "—",
     category: e.categorias?.[0]?.nombre ?? resolveCategory(e.etiquetas ?? [], nombre, marca),
+    categorias: e.categorias ?? [],
     pricePerDay: e.precio_jornada ?? 0,
     fotoUrl: e.foto_url ?? null,
     cantidad: e.cantidad ?? 1,

@@ -12,12 +12,24 @@ export type IncludedItem = {
   fotoUrl?: string | null;
 };
 
+/** Ref a una categoría asignada al equipo via M2M `equipo_categorias`.
+ *  El backend devuelve la lista completa — el frontend usa `category`
+ *  (singular, root) como fallback y `categorias` para filtrar por sub-cats. */
+export type CategoryRef = {
+  id: number;
+  nombre: string;
+  parent_id: number | null;
+};
+
 export type Equipment = {
   id: string;        // string-ificado del ID numérico del backend
   slug: string;
   name: string;
   brand: string;
   category: Category;
+  /** Lista completa de categorías asignadas (root + sub) desde `equipo_categorias`.
+   *  Vacía cuando el equipo todavía no fue clasificado. */
+  categorias?: CategoryRef[];
   pricePerDay: number;
   description: string;
   specs: { label: string; value: string }[];
