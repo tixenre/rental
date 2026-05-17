@@ -258,6 +258,45 @@ function DateSheet({ onClose, onConfirm, initial }: DateSheetProps) {
   );
 }
 
+/* ── CartItem (subcomponent with per-item imgFailed state) ───────── */
+function CartItem({ eq, qty, fechaDesde, jornadas, jornadasEfectivas }: {
+  eq: Equipment; qty: number; fechaDesde: Date | null; jornadas: number; jornadasEfectivas: number;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+  return (
+    <div className="flex items-center gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0">
+      <div className="w-11 h-11 rounded-lg bg-surface border border-hairline flex items-center justify-center text-muted-foreground shrink-0 overflow-hidden">
+        {eq.fotoUrl && !imgFailed ? (
+          <img
+            src={eq.fotoUrl}
+            alt={eq.name}
+            className="w-full h-full object-contain p-1"
+            loading="lazy"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <CatIcon cat={eq.category} size={18} />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-mono text-[8px] tracking-[0.18em] uppercase text-muted-foreground">{eq.brand}</div>
+        <div className="font-sans text-sm font-bold text-ink leading-tight mt-0.5 truncate">{eq.name}</div>
+        <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+          {fechaDesde ? `${qty} × ${formatARS(eq.pricePerDay)} / jorn.` : `${formatARS(eq.pricePerDay)} / jornada`}
+        </div>
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="font-mono text-sm font-bold text-ink" style={{ fontVariantNumeric: "tabular-nums" }}>
+          {formatARS(eq.pricePerDay * qty * jornadasEfectivas)}
+        </div>
+        <div className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground mt-0.5">
+          {fechaDesde ? `${jornadas} jorn.` : "/ jorn."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── CartSheet ───────────────────────────────────────────────────── */
 interface CartSheetProps {
   onClose: () => void;
@@ -436,34 +475,7 @@ function CartSheet({
         <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarWidth: "none" }}>
           {/* Items */}
           {entries.map(({ eq, qty }) => (
-            <div key={eq.id} className="flex items-center gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0">
-              <div
-                className="w-11 h-11 rounded-lg bg-surface border border-hairline flex items-center justify-center text-muted-foreground shrink-0"
-              >
-                <CatIcon cat={eq.category} size={18} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-mono text-[8px] tracking-[0.18em] uppercase text-muted-foreground">
-                  {eq.brand}
-                </div>
-                <div className="font-sans text-sm font-bold text-ink leading-tight mt-0.5 truncate">
-                  {eq.name}
-                </div>
-                <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
-                  {fechaDesde
-                    ? `${qty} × ${formatARS(eq.pricePerDay)} / jorn.`
-                    : `${formatARS(eq.pricePerDay)} / jornada`}
-                </div>
-              </div>
-              <div className="shrink-0 text-right">
-                <div className="font-mono text-sm font-bold text-ink" style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {formatARS(eq.pricePerDay * qty * jornadasEfectivas)}
-                </div>
-                <div className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground mt-0.5">
-                  {fechaDesde ? `${jornadas} jorn.` : "/ jorn."}
-                </div>
-              </div>
-            </div>
+            <CartItem key={eq.id} eq={eq} qty={qty} fechaDesde={fechaDesde} jornadas={jornadas} jornadasEfectivas={jornadasEfectivas} />
           ))}
 
           {/* Totals — auto margin pushes to bottom when few items */}
@@ -571,6 +583,7 @@ interface FichaSheetProps {
 }
 
 function FichaSheet({ eq, onClose, onAddToCart, inCart, jornadas, fechaDesde }: FichaSheetProps) {
+  const [imgFailed, setImgFailed] = useState(false);
   const specsText = eq.specs.map((s) => `${s.label}: ${s.value}`).join(" · ");
 
   return (
@@ -596,12 +609,22 @@ function FichaSheet({ eq, onClose, onAddToCart, inCart, jornadas, fechaDesde }: 
         </div>
 
         <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-          {/* Photo placeholder */}
+          {/* Photo */}
           <div
-            className="mx-5 mt-3.5 rounded-[var(--radius-lg)] border border-hairline bg-surface flex items-center justify-center text-muted-foreground"
+            className="mx-5 mt-3.5 rounded-[var(--radius-lg)] border border-hairline bg-surface flex items-center justify-center text-muted-foreground overflow-hidden"
             style={{ aspectRatio: "4/3" }}
           >
-            <CatIcon cat={eq.category} size={48} />
+            {eq.fotoUrl && !imgFailed ? (
+              <img
+                src={eq.fotoUrl}
+                alt={eq.name}
+                className="w-full h-full object-contain p-4"
+                loading="lazy"
+                onError={() => setImgFailed(true)}
+              />
+            ) : (
+              <CatIcon cat={eq.category} size={48} />
+            )}
           </div>
 
           {/* Price */}
@@ -715,6 +738,7 @@ interface EquipmentRowProps {
 }
 
 function EquipmentRow({ eq, inCart, isExpanded, jornadas, fechaDesde, onTap, onAdd, onFicha }: EquipmentRowProps) {
+  const [imgFailed, setImgFailed] = useState(false);
   const priceDisplay = fechaDesde
     ? formatARS(eq.pricePerDay * jornadas)
     : formatARS(eq.pricePerDay);
@@ -739,8 +763,18 @@ function EquipmentRow({ eq, inCart, isExpanded, jornadas, fechaDesde, onTap, onA
         onClick={onTap}
       >
         {/* Thumbnail */}
-        <div className="w-12 h-12 rounded-full bg-surface border border-hairline flex items-center justify-center text-muted-foreground shrink-0">
-          <CatIcon cat={eq.category} size={20} />
+        <div className="w-12 h-12 rounded-full bg-surface border border-hairline flex items-center justify-center text-muted-foreground shrink-0 overflow-hidden">
+          {eq.fotoUrl && !imgFailed ? (
+            <img
+              src={eq.fotoUrl}
+              alt={eq.name}
+              className="w-full h-full object-contain p-1.5"
+              loading="lazy"
+              onError={() => setImgFailed(true)}
+            />
+          ) : (
+            <CatIcon cat={eq.category} size={20} />
+          )}
         </div>
 
         {/* Info */}
