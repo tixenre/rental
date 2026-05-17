@@ -492,57 +492,78 @@ Cuando agregamos un spec_key nuevo a una categoría (en seed `backend/seeds/<cat
 > **Fecha**: 2026-05-17. Esta sección reemplaza el borrador histórico
 > `docs/DISEÑO_SPECS.md`. Cuando hay duda, esto manda.
 
+### Single source of truth: `backend/specs/registry.py`
+
+Pydantic v2 registry. Todas las cats, sub-cats y specs están declaradas
+en un solo archivo. Cualquier consumer (seeds, parsers, API, UI metadata)
+lo importa.
+
+```python
+from specs import REGISTRY, get_categoria, get_spec, validate_dataset
+```
+
+**Cambios estructurales (PR feat/specs-registry)**:
+- Borrados: `seeds/spec_templates.py::TEMPLATES`, `seeds/<cat>.py::SPECS_X` (eran duplicados — generaban drift)
+- DB: `spec_definitions` ahora tiene UNIQUE `(categoria_raiz_id, spec_key)` (antes era UNIQUE global → colisión "tipo" cross-cat)
+- Cada cat tiene su `<cat>_subtipo` propio (camera_subtipo, iluminacion_subtipo, adaptador_subtipo, filtro_subtipo)
+- Datasets validan contra el registry en parse-time (`specs.validation.validate_dataset`)
+
 ### El stack en una imagen
 
 ```
+backend/specs/registry.py  (REGISTRY: dict[str, CategoriaRegistry])
+    │
+    ├──► seeds/registry_seeder.py  → DB (spec_definitions + categoria_spec_templates)
+    │                                ↑ idempotente, walks REGISTRY
+    │
+    └──► specs/validation.py  → valida docs/<cat>.json en parse
+
 HTMLs B&H (~/Desktop/Paginas/<categoría>/)
-    │ tools/<categoría>_parser.py
+    │ tools/<categoría>_parser.py  (emite keys del registry)
     ▼
-docs/<categoría>.json  (dataset canónico curado)
+docs/<categoría>.json  (dataset canónico, validado contra registry)
     │
     ▼
-backend/seeds/<categoría>.py  (idempotente, con match_map)
-    │           ├── crea spec_definitions canónicas
-    │           ├── ensure_categoria_raiz (auto-promueve sub-cats legacy)
-    │           ├── apply_compat_config (marca specs compat)
-    │           ├── apply_rol_compat (contenedor/contenido)
-    │           ├── resolve_equipo_id (match_map → preserva equipo.id)
-    │           ├── apply_overrides (corrige marca/modelo si DB mal-etiquetada)
-    │           └── write_keywords (compute_keywords → equipo_fichas.keywords_json)
+backend/seeds/<categoría>.py
+    ├── seed_categoria_from_registry()  → specs + sub-cats
+    ├── resolve_equipo_id() + apply_overrides()  → preserva equipo.id
+    └── write_keywords()  → equipo_fichas.keywords_json
     ▼
 DB Postgres
-    │
-    ▼
-GET /admin/equipos/{id}/compatibles  (motor _compute_compat)
-GET /api/equipos?q=...               (busca por keywords + specs + marca/modelo)
 ```
 
-### Convenciones canónicas
+### Specs por categoría (5 activas)
 
-**Specs por categoría** (5 activas con dataset):
+| Categoría | # specs | Subtipo canónico | Specs core |
+|---|---|---|---|
+| Cámaras | 22 | `camera_subtipo` | lens_mount, formato, resolucion_max, fps_max, codecs, iso_*, peso_g |
+| Lentes | 15 | — | lens_mount, distancia_focal (rango), apertura (rango), formato, linea, diametro_filtro |
+| Adaptadores | 7 | `adaptador_subtipo` | lens_mount, lens_mount_out, electronica, magnificacion |
+| Filtros | 6 | `filtro_subtipo` | diametro_filtro, densidad, material, grade |
+| Iluminación | 17 | `iluminacion_subtipo` | potencia_w, color_modes (multi_enum), temperatura_k (rango), cri, alimentacion (multi_enum) |
 
-| Categoría | # specs | Specs core |
-|---|---|---|
-| Cámaras | 22 | tipo, lens_mount, formato, resolucion_max, fps_max, codecs, iso_*, peso_g |
-| Lentes | 15 | lens_mount, distancia_focal (rango), apertura (rango), formato, linea, peso_g |
-| Adaptadores | 7 | tipo, lens_mount, lens_mount_out, electronica, magnificacion |
-| Filtros | 6 | tipo, diametro_filtro, densidad, material, grade |
-| Iluminación | 11 | potencia_w, lumens, cri, temperatura_k, bicolor, rgb, alimentacion |
-
-Specs compartidos (M2M habilitados via `es_compatibilidad=TRUE`):
+**Specs compartidas semánticamente** (mismo `spec_key` declarado en varias cats con metadata idéntica):
 - `lens_mount` — Cámaras ↔ Lentes ↔ Adaptadores (match exacto)
 - `formato` — Cámaras ↔ Lentes (jerárquico: FF > Super 35 > APS-C > MFT)
 - `diametro_filtro` — Lentes ↔ Filtros (match exacto)
+- `peso_g` — todas
 
-**Single source de enum jerárquico** (`compat_config.FORMATO_ENUM`):
+El motor de compat matchea por **string-equality del spec_key + value**. La composite key en DB las separa físicamente (cada cat es dueña de su fila) pero conceptualmente representan la misma propiedad. Esto elimina la colisión que tenía la arquitectura vieja sin sacrificar el matching cross-categoría.
+
+**Single source de enum jerárquico** (`specs.FORMATO_ENUM`):
 ```
 1" → MFT → M4/3 → APS-C → Super 35 → Full-frame → Medium Format
 ```
 
+**Roles de compat (jerarquía)**:
+- Lentes.formato = `contenedor` (proyecta sobre el sensor)
+- Cámaras.formato = `contenido` (recibe el círculo de imagen)
+
 **Convenciones de naming**:
-- `peso_g`: int gramos (todas las categorías activas)
-- Rangos (`distancia_focal`, `apertura`, `angulo_vision`): listas — `[v]` fijo, `[min, max]` zoom/variable
-- IDs estables del dataset: `marca_modelo_apertura[_linea]` (ej. `sony_24_70_28_gm_ii`)
+- `peso_g`: int gramos
+- Rangos (`distancia_focal`, `apertura`, `angulo_vision`, `iso_nativo`, `temperatura_k`): listas — `[v]` fijo, `[min, max]` variable
+- `multi_enum`: JSON array. Usados en `color_modes`, `control_inalambrico`, `alimentacion`
+- IDs estables del dataset: `marca_modelo_apertura[_linea]`
 
 ### Sub-categorías por raíz
 
@@ -588,15 +609,28 @@ python -m backend.seeds.{camaras,lentes,adaptadores,filtros,iluminacion}
 # Admin sube HTML B&H → endpoint usa el mismo parser → inserta canónico
 ```
 
+### Agregar specs / cats / sub-cats
+
+1. **Editar** `backend/specs/registry.py` — agregar al `CategoriaRegistry` correspondiente
+2. **Validar** localmente: `python -m pytest backend/tests/test_specs_registry.py`
+3. **Reseed** (o esperar al próximo deploy — el lifecycle DB corre `seed_all_categorias`):
+   ```bash
+   python -m backend.seeds.camaras  # o la cat que corresponda
+   ```
+
+Si una spec_key debe ser compartida con otra cat (compat matching): declararla idénticamente en ambas (mismo `tipo`, mismas `enum_options`, misma `unidad`). El test `test_shared_keys_consistentes_entre_cats` lo enforcea.
+
 ### Cuando se rompa o falte algo
 
 | Síntoma | Dónde mirar |
 |---|---|
-| Specs no aparecen como compatibilidad | `compat_config.COMPAT_SPECS` y `apply_compat_config` |
-| Match jerárquico no funciona | `compat_config.ROL_POR_CATEGORIA` + `compatibilidad_modo` en `spec_definitions` |
+| Specs no aparecen como compatibilidad | `SpecDef.es_compatibilidad` en el registry; reseed |
+| Match jerárquico no funciona | `SpecDef.compatibilidad_modo` + `rol_compatibilidad` en el registry |
+| Dataset rompe seed con error de validación | Output de `specs.validation.validate_dataset()` — el dataset desalineó del registry |
 | Equipos duplicados al re-seed | `docs/equipos_match.json` debe tener entry con `action: update` |
 | Keywords salen mal | `SPEC_KEYWORDS_TEMPLATES` en `nombre_builder.py` |
-| Falta sub-cat de montura/diámetro en sidebar | Backend devuelve solo cat raíz; pendiente exponer M2M (issue spawned) |
+| Falta sub-cat de montura/diámetro en sidebar | Sub-cats on-the-fly por stock — verificar `categorize_*()` en el seed |
+| Spec "tipo" cruza enums entre cats | No debería ocurrir: cada cat tiene `<cat>_subtipo`. Si pasa, el registry tiene drift |
 
 ---
 
