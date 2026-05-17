@@ -215,6 +215,7 @@ Puntos de entrada para no grepear:
 - **Normalizer de specs**: backend traduce labels EN→ES (Weight→Peso, Lens Mount→Montura, etc.) y convierte unidades (lbs→kg, in→cm, °F→°C, ranges, dimensiones N×N×N).
 - **Cache del scrape**: el `AutocompletarResult` completo se guarda en `equipo_fichas.raw_json`. Habilita botones ✨ por sección en el form V2 que re-aplican campos sin volver a scrapear.
 - **Batch**: `POST /admin/equipos/batch-enriquecer` procesa hasta 3 equipos por request (cap defensivo, max 50 ids en body). Frontend re-batchea hasta terminar. Resultado se persiste en raw_json (cache). Sleep 1s entre scrapes para no rate-limitear B&H.
+- **HTML upload (fallback de máxima calidad)**: `POST /admin/equipos/autocompletar-from-html` acepta un `.html` guardado manualmente (Cmd+S → Webpage Complete desde B&H/manufacturer) y devuelve specs normalizados usando el MISMO pipeline que el seed (`backend/services/luces_html_extractor.py` → `tools/iluminacion_parser.py` + `iluminacion_normalizar.py`). Calidad idéntica al dataset curado: lee JSON-LD structured data (TLCI, TM-30, photometrics multi-temp, color_modes array). Pensado para cuando Firecrawl falla con bot-detection de B&H o el LLM extract pierde data. UI: botón "Subir HTML guardado" en el diálogo de autocompletar.
 
 ### Dataset y seed por categoría (bulk inicial)
 
@@ -268,7 +269,8 @@ Puntos de entrada para no grepear:
 
 | Acción | Sin Claude | Con Claude |
 |---|---|---|
-| Agregar 1 equipo nuevo (categoría existente) | ✅ Admin UI + autocompletar | — |
+| Agregar 1 equipo nuevo (categoría existente) — URL | ✅ Admin UI + autocompletar URL | — |
+| Agregar 1 equipo nuevo — calidad seed (Cmd+S → upload HTML) | ✅ Admin UI + "Subir HTML guardado" | — |
 | Editar precio / foto / nombre / spec value | ✅ Admin UI | — |
 | Agregar spec key nueva al catálogo global | ✅ `/admin/equipos/specs` | — |
 | Importar bulk de una categoría NUEVA (ej. cámaras) | — | ✅ Curar HTMLs + seed |

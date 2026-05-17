@@ -84,7 +84,32 @@ Campos opcionales pero útiles. Los más relevantes:
 - `null` o campo ausente = "no aplica" o "no publicado"
 - NO usar strings como `"N/A"`, `"None"`, `"—"` — el parser ya los filtra
 
-## Cómo agregar una luz nueva
+## Agregar 1 luz nueva al inventario (sin Claude)
+
+Cuando solo necesitás sumar una luz a una categoría que ya existe — **no requiere
+pasar por Claude**. El admin lo hace solo desde el back-office:
+
+1. Ir al producto en B&H (o sitio fabricante) en el browser.
+2. **Cmd+S** → "Webpage, Complete" → guardar el `.html` en cualquier carpeta.
+3. En `/admin/equipos` → crear equipo o abrir uno existente → botón Auto-completar (✨).
+4. Click "**Subir HTML guardado**" (debajo de "Buscar foto / + Specs").
+5. Seleccionar el `.html` recién guardado.
+6. El form se llena con marca, modelo, foto, URL, y los 10+ specs canónicos — **misma calidad que el seed**.
+7. Revisar, ajustar si querés, "Aplicar al equipo".
+
+El backend (`POST /admin/equipos/autocompletar-from-html`) corre el MISMO parser que
+usa el seed (`tools/iluminacion_parser.py` + `iluminacion_normalizar.py`), así que
+no hay gap de calidad. Lee JSON-LD structured data → TLCI, TM-30, photometrics,
+color_modes array, marcas canónicas, peso numérico, etc.
+
+Workaround a propósito: B&H bloquea scrapers server-side con bot-detection, así
+que el flow asume que vos descargás el HTML manualmente. No hay dependencia de
+Firecrawl ni LLM para este path.
+
+## Re-curar el dataset entero / agregar categoría nueva (con Claude)
+
+Cuando entra una categoría entera nueva (cámaras, lentes), o querés re-procesar
+todas las luces con un parser actualizado:
 
 1. Guardar la página B&H del producto:
    ```

@@ -13,7 +13,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Query, HTTPException, Request
+from fastapi import APIRouter, Query, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel, Field
 
 from database import (
@@ -2624,6 +2624,55 @@ def admin_autocompletar_equipo(payload: EnriquecerInput, request: Request):
     El frontend ya usa "autocompletar" como nombre del feature; este endpoint
     coherente con el naming. /enriquecer queda como alias deprecated."""
     return admin_enriquecer_equipo(payload, request)
+
+
+@router.post("/admin/equipos/autocompletar-from-html")
+async def admin_autocompletar_from_html(
+    request: Request,
+    file: UploadFile = File(...),
+) -> dict:
+    """Acepta un HTML guardado de B&H (u otro site con structured data),
+    devuelve specs normalizados igualados al pipeline del seed.
+
+    Workaround para el bot-detection de B&H que bloquea scrapers server-side:
+    el admin guarda la página con Cmd+S → Webpage Complete y sube el .html acá.
+
+    Usa el MISMO pipeline que el seed (tools/iluminacion_parser.py +
+    iluminacion_normalizar.py) — calidad idéntica al dataset curado. Lee
+    JSON-LD structured data + DOM data-selenium attrs + title canónico.
+
+    Returns dict con shape compatible al AutocompletarResult del endpoint URL:
+        {
+          "marca": "Aputure",
+          "modelo": "NOVA II 2x1",
+          "foto_url": "https://...",
+          "bh_url": "https://...",
+          "specs": [{"label": "Potencia", "value": "1000 W"}, ...],
+          "extras": {"tipo": "Panel", "cooling": "Fan", ...},
+          "fuente": "html-upload",
+        }
+    """
+    require_admin(request)
+
+    content = await file.read()
+    if len(content) > 5_000_000:  # 5MB cap defensivo
+        raise HTTPException(400, "HTML demasiado grande (máx 5MB)")
+    if not content:
+        raise HTTPException(400, "Archivo vacío")
+
+    try:
+        html_content = content.decode("utf-8", errors="replace")
+    except Exception:
+        raise HTTPException(400, "HTML inválido (no es UTF-8)")
+
+    try:
+        from services.luces_html_extractor import extract_from_html
+        result = extract_from_html(html_content)
+    except Exception as e:
+        logger.exception("Error extrayendo specs del HTML")
+        raise HTTPException(500, f"Error parseando HTML: {e}")
+
+    return result
 
 
 @router.post("/admin/equipos/enriquecer", deprecated=True)

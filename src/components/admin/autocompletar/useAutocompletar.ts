@@ -127,6 +127,65 @@ export function useAutocompletar({
     }
   };
 
+  /** Sube un HTML guardado de B&H/manufacturer y extrae specs vía endpoint dedicado.
+   *  Usa el mismo pipeline que el seed (parser + normalizer) → calidad seed-level.
+   *  Workaround para casos donde Firecrawl/LLM falla o da data incompleta.
+   */
+  const runSearchFromHtml = async (file: File) => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setFotosResult([]);
+    setFotoUrl("");
+    setUploadingFotoUrl("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await authedFetch(
+        "/api/admin/equipos/autocompletar-from-html",
+        { method: "POST", body: formData },
+      );
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail?.detail ?? `HTTP ${response.status}`);
+      }
+      const r = await response.json() as AutocompletarResult;
+      setResult(r);
+      setMarca(r.marca ?? "");
+      setModelo(r.modelo ?? "");
+      setBhUrl(r.fuente_url);
+      setAplicarMarca(!equipo.marca && !!r.marca);
+      setAplicarModelo(!equipo.modelo && !!r.modelo);
+      setAplicarBh(!equipo.bh_url);
+      setAplicarDescripcion(false);  // HTML extractor no genera descripción
+      setAplicarSpecs(r.specs.length > 0);
+      setKeywords(r.keywords ?? []);
+      setAplicarKeywords((r.keywords ?? []).length > 0);
+      const tieneFichaExt = !!(
+        r.peso || r.dimensiones || r.alimentacion ||
+        (r.incluye?.length ?? 0) > 0
+      );
+      setAplicarFichaExtendida(tieneFichaExt);
+
+      // Foto del JSON-LD si vino
+      const cands = r.foto_candidates ?? [];
+      if (cands.length > 0) {
+        setFotosResult(cands);
+        void selectFoto(cands[0]);
+        setAplicarFoto(!equipo.foto_url);
+      } else {
+        setAplicarFoto(false);
+      }
+
+      toast.success(`Extraídos ${r.specs.length} specs desde HTML`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error parseando HTML");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   /** Busca specs + foto en paralelo (proceso completo). */
   const runSearch = async () => {
     setLoading(true);
@@ -461,6 +520,6 @@ export function useAutocompletar({
     searchingPhotos,
     customUrl, setCustomUrl,
     fichaExtendidaTieneDatos,
-    buscarFoto, runSearch, aplicarSoloFoto, buscarMasFotos, addKeyword, removeKeyword, setAll, aplicar,
+    buscarFoto, runSearch, runSearchFromHtml, aplicarSoloFoto, buscarMasFotos, addKeyword, removeKeyword, setAll, aplicar,
   };
 }
