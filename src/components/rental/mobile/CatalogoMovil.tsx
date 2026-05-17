@@ -9,7 +9,7 @@ import { BottomSheet } from "@/components/mobile/BottomSheet";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useEquipos, useMarcas } from "@/hooks/useEquipos";
+import { useEquipos, useMarcas, useCategorias } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { formatARS } from "@/lib/format";
 import { type Equipment } from "@/data/equipment";
@@ -1025,6 +1025,10 @@ export function CatalogoMovil() {
   // Trae logo_url, destacada, orden, popularidad_score, etc.
   const { data: marcasData } = useMarcas();
   const marcasCanonicas = marcasData?.items ?? [];
+  // Categorías canónicas (con parent_id) — usamos solo las root para los
+  // cat-tabs, así no se mezclan sub-cats como "82mm" o "Montura E" que
+  // aparecían cuando derivábamos del e.category del equipo.
+  const { data: categoriasCanonicas = [] } = useCategorias();
 
   // Cart store
   const cart = useCart();
@@ -1049,19 +1053,18 @@ export function CatalogoMovil() {
   const [showFiltrosSheet, setShowFiltrosSheet] = useState(false);
   const [fichaEq, setFichaEq] = useState<Equipment | null>(null);
 
+  const navigate = useNavigate();
+
   // Scroll state
   const scrollRef = useRef<HTMLDivElement>(null);
   const topbarRef = useRef<HTMLElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
-  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
     const el = scrollRef.current;
     const topbar = topbarRef.current;
     if (!el) return;
     const onScroll = () => {
-      const st = el.scrollTop;
-      setIsScrolled(st > 56);
       // Amber-on-scroll: el topbar se tiñe amber gradualmente conforme el
       // hero amber scrollea hacia arriba. Mientras el bottom del hero está
       // bien debajo de la topbar (~53px) el progreso es 0; cuando llega
@@ -1100,11 +1103,18 @@ export function CatalogoMovil() {
     return `${fmt(fechaDesde)} · ${fmt(fechaHasta!)}`;
   }, [fechaDesde, fechaHasta]);
 
-  // Unique categories from data
+  // Cat-tabs: solo roots (parent_id IS NULL) en orden del backend
+  // (prioridad → popularidad → nombre). Antes derivábamos del e.category
+  // pero el mapper a veces devolvía sub-cats ("82mm", "Montura E"),
+  // entonces aparecían mezcladas en la barra.
   const categories = useMemo(() => {
-    const cats = new Set(allEquipos.map((e) => e.category));
-    return ["Todo", ...Array.from(cats).sort()];
-  }, [allEquipos]);
+    type Cat = { id?: number; nombre: string; parent_id?: number | null; total?: number };
+    const cats = categoriasCanonicas as Cat[];
+    const roots = cats
+      .filter((c) => c.parent_id == null && (c.total ?? 0) > 0)
+      .map((c) => c.nombre);
+    return ["Todo", ...roots];
+  }, [categoriasCanonicas]);
 
   // Brands para el sheet: parte del cat\u00e1logo can\u00f3nico (useMarcas, misma
   // source que BrandCarousel del desktop y /admin/equipos/marcas) y le
@@ -1116,8 +1126,11 @@ export function CatalogoMovil() {
     const counts = new Map<string, number>();
     for (const e of allEquipos) {
       if (!e.brand) continue;
-      const matchCat = activeTab === "Todo" || e.category === activeTab;
-      if (!matchCat) continue;
+      const inTab =
+        activeTab === "Todo" ||
+        e.category === activeTab ||
+        (e.categorias ?? []).some((c) => c.nombre === activeTab);
+      if (!inTab) continue;
       const k = e.brand.toLowerCase();
       counts.set(k, (counts.get(k) ?? 0) + 1);
     }
@@ -1142,11 +1155,18 @@ export function CatalogoMovil() {
   }, [allEquipos, activeTab, marcasCanonicas]);
 
   // Filtered equipment
+  // Helper: matchea el activeTab contra el root del equipo o su M2M.
+  const matchesActiveTab = (e: Equipment): boolean => {
+    if (activeTab === "Todo") return true;
+    if (e.category === activeTab) return true;
+    return (e.categorias ?? []).some((c) => c.nombre === activeTab);
+  };
+
   const filteredEquipos = useMemo(() => {
     const norm = (s: string) =>
       (s ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     return allEquipos.filter((e) => {
-      const matchCat = activeTab === "Todo" || e.category === activeTab;
+      const matchCat = matchesActiveTab(e);
       const matchQ =
         query === "" ||
         norm([e.name, e.brand, e.category, e.description ?? ""].join(" ")).includes(norm(query));
@@ -1200,10 +1220,13 @@ export function CatalogoMovil() {
   );
 
   // Height of compact search (used for category tabs top offset)
-  const searchStickyTop = isScrolled ? 97 : 53;
+  // Cat-tabs sticky bajo el topbar (54px de altura incluyendo borde).
+  const CAT_TABS_STICKY_TOP = 53;
 
+  // h-dvh (dynamic viewport) respeta la URL bar de safari iOS — antes
+  // h-screen dejaba el cart-bar tapado cuando safari mostraba su UI.
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background relative">
+    <div className="flex flex-col h-dvh overflow-hidden bg-background relative">
       {/* Scroll container */}
       <div
         ref={scrollRef}
@@ -1244,7 +1267,10 @@ export function CatalogoMovil() {
           </button>
 
           <button
+            type="button"
+            onClick={() => navigate({ to: "/cliente" })}
             className="user-btn-snap p-1.5 rounded-full border border-hairline text-ink hover:border-ink transition-colors"
+            aria-label="Acceso clientes"
           >
             <User size={15} />
           </button>
@@ -1254,64 +1280,47 @@ export function CatalogoMovil() {
             Anclado al heroRef del amber-on-scroll del topbar. */}
         <HeroBanner heroRef={heroRef} equipCount={allEquipos?.length ?? 0} />
 
-        {/* SearchSection */}
-        <div
-          className={cn(
-            "transition-all",
-            isScrolled
-              ? "sticky z-[38] backdrop-blur border-b border-hairline px-3.5 py-1.5"
-              : "px-4 pt-3 pb-2",
-          )}
-          style={
-            isScrolled
-              ? { top: 53, background: SEARCH_BG }
-              : undefined
-          }
-        >
+        {/* SearchSection — scrollea con el contenido. Antes se ponía
+            sticky al pasar el threshold (overlapeaba con la cat-bar al
+            tener ambas top:53 durante el frame de transición). Mejor
+            UX: solo la cat-bar queda sticky bajo el topbar. */}
+        <div className="px-4 pt-3 pb-2">
           <div className="relative">
             <Search
               size={15}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
             />
             <input
-              className={cn(
-                "w-full rounded-[var(--radius-lg)] border-[1.5px] border-hairline bg-surface font-sans text-ink placeholder:text-muted-foreground outline-none transition-all focus:border-amber",
-                isScrolled ? "text-[13px] py-2 pl-[34px] pr-3" : "text-sm py-[11px] pl-[38px] pr-3",
-              )}
-              style={{
-                fontFamily: "var(--font-sans)",
-                boxShadow: undefined,
-              }}
+              className="w-full rounded-[var(--radius-lg)] border-[1.5px] border-hairline bg-surface font-sans text-sm py-[11px] pl-[38px] pr-3 text-ink placeholder:text-muted-foreground outline-none transition-all focus:border-amber"
+              style={{ fontFamily: "var(--font-sans)" }}
               placeholder="Buscar equipo, marca, pack…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
 
-          {/* Popular chips — hidden when compact */}
-          {!isScrolled && (
-            <div className="flex gap-1.5 mt-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
-              <span className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground whitespace-nowrap self-center shrink-0">
-                Populares:
-              </span>
-              {POPULAR_CHIPS.map((chip) => (
-                <button
-                  key={chip}
-                  className="px-[11px] py-1 rounded-full border border-hairline bg-surface font-sans text-[11px] font-medium text-ink whitespace-nowrap shrink-0 hover:border-ink hover:bg-muted transition-all"
-                  onClick={() => setQuery(chip)}
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Popular chips */}
+          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
+            <span className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground whitespace-nowrap self-center shrink-0">
+              Populares:
+            </span>
+            {POPULAR_CHIPS.map((chip) => (
+              <button
+                key={chip}
+                className="px-[11px] py-1 rounded-full border border-hairline bg-surface font-sans text-[11px] font-medium text-ink whitespace-nowrap shrink-0 hover:border-ink hover:bg-muted transition-all"
+                onClick={() => setQuery(chip)}
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Category tabs */}
         <div
           className="sticky z-[39] border-b border-hairline backdrop-blur transition-[top] duration-150"
           style={{
-            top: searchStickyTop,
+            top: CAT_TABS_STICKY_TOP,
             background: TABS_BG,
           }}
         >
@@ -1320,7 +1329,11 @@ export function CatalogoMovil() {
               const count =
                 cat === "Todo"
                   ? allEquipos.length
-                  : allEquipos.filter((e) => e.category === cat).length;
+                  : allEquipos.filter(
+                      (e) =>
+                        e.category === cat ||
+                        (e.categorias ?? []).some((c) => c.nombre === cat),
+                    ).length;
               return (
                 <button
                   key={cat}
