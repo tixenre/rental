@@ -83,14 +83,20 @@ Cámaras
 
 Lógica en `seeds/camaras.py::categorize()`:
 
-| tipo (del producto) | Aparece en |
-|---|---|
-| `Action Camera` | `["Acción"]` |
-| `DSLR` / `Medium Format` / `Compact` | `["Foto", "Montura {X}"]` si tiene mount |
-| `Cinema Camera` | `["Montura {X}"]` solo (no Foto) |
-| `Mirrorless` / `Vlogging` / default | `["Foto", "Montura {X}"]` |
+**Regla fundamental**: categorizar por **caso de uso primario**, no por capacidad técnica. Que una cámara *pueda* hacer X no significa que pertenezca a la categoría X. Pertenece si se *renta* para eso.
+
+| tipo (del producto) | Aparece en | Razonamiento |
+|---|---|---|
+| `Action Camera` | `["Acción"]` | GoPro, Insta360 |
+| `Medium Format` | `["Foto"]` | Hasselblad, Phase One — no video relevante |
+| `DSLR` / `Compact` | `["Foto"]` | Primary stills, video como bonus |
+| `Cinema Camera` | `["Montura {X}"]` | FX3A, KOMODO, C200, Alexa — video puro |
+| `Vlogging` | `["Montura {X}"]` | ZV-E1, ZV-E10 — diseñadas para video creator, los stills son incidentales |
+| `Mirrorless` / default | `["Foto", "Montura {X}"]` | a7V, R5, S5 — híbridas reales (foto + video equivalente) |
 
 Donde `{X}` es el `lens_mount` del producto.
+
+**Por qué Vlogging ≠ Foto+Video:** la ZV-E1 tiene 12MP (vs 33MP de la a7V), gimbal-style IBIS, "Product Showcase" mode, mic frontal específico. Está pensada para creators de video, no para sesiones de foto. Aunque dispare stills, en el catálogo no aparece bajo "Foto" porque nadie la renta con ese fin.
 
 **Ejemplo distribución actual:**
 

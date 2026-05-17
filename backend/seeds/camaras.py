@@ -128,12 +128,20 @@ SPEC_FLAGS_CAMARAS = {
 def categorize(producto: dict) -> list[str]:
     """Devuelve LISTA de sub-categorías donde va el producto (M2M).
 
-    Reglas:
-      - tipo Action Camera → ["Acción"]
-      - tipo DSLR / Medium Format / Compact → ["Foto"]
-      - tipo Cinema Camera → ["Video / Montura X"] solo (cinema = video)
-      - tipo Mirrorless / Vlogging → ["Foto", "Video / Montura X"]
-        (híbridas se rentan para ambos casos de uso)
+    Regla: categorizar por **caso de uso primario**, no por capacidad técnica.
+    Que una cámara PUEDA hacer X no significa que pertenezca a la categoría X.
+    Pertenece a X si se RENTA para eso.
+
+    Mapeo por tipo:
+      Action Camera           → ["Acción"]
+      Medium Format           → ["Foto"]                       (sin video)
+      DSLR                    → ["Foto"]                       (primarily stills)
+      Compact                 → ["Foto"]                       (point & shoot)
+      Cinema Camera           → ["Montura X"]                  (video puro)
+      Vlogging                → ["Montura X"]                  (video puro, vlog
+                                                                features)
+      Mirrorless              → ["Foto", "Montura X"]          (hybrid real:
+                                                                a7V, R5, etc.)
 
     El segundo nivel para Video depende de lens_mount del equipo.
     """
@@ -141,27 +149,29 @@ def categorize(producto: dict) -> list[str]:
     tipo = specs.get("tipo", "")
     mount = specs.get("lens_mount")
 
+    # 1. Acción
     if tipo == "Action Camera":
         return ["Acción"]
-    if tipo in ("DSLR", "Medium Format", "Compact"):
-        # Foto pura — pero si tiene buen video, mostrar también en Video
-        cats = ["Foto"]
-        if mount:
-            cats.append(_video_subcat_for_mount(mount))
-        return cats
 
-    # Video-primary (cinema) o Híbrida (mirrorless/vlogging)
-    cats = []
-    if tipo == "Cinema Camera":
-        # Cinema → solo Video
+    # 2. Foto puras (sin video relevante)
+    if tipo == "Medium Format":
+        return ["Foto"]
+    if tipo in ("DSLR", "Compact"):
+        # Foto primary. Si tiene video razonable también podríamos sumar Video,
+        # pero la mayoría se rentan para foto. Mantener simple: solo Foto.
+        return ["Foto"]
+
+    # 3. Video puras (cinema cámaras + vlogging)
+    if tipo in ("Cinema Camera", "Vlogging"):
         if mount:
-            cats.append(_video_subcat_for_mount(mount))
-    else:
-        # Mirrorless / Vlogging / Híbrida — sirve para foto Y video
-        cats.append("Foto")
-        if mount:
-            cats.append(_video_subcat_for_mount(mount))
-    return cats or ["Foto"]  # fallback razonable
+            return [_video_subcat_for_mount(mount)]
+        return ["Acción"]  # fallback raro
+
+    # 4. Mirrorless / default → híbridas reales (foto + video)
+    cats = ["Foto"]
+    if mount:
+        cats.append(_video_subcat_for_mount(mount))
+    return cats
 
 
 def _video_subcat_for_mount(mount: str) -> str:
