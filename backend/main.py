@@ -257,6 +257,44 @@ def init_db_bg():
     except Exception as e:
         logger.warning("Registry seeder falló (no crítico): %s", e)
 
+    # Per-cat seeds: pueblan `equipo_specs` (valores) y sub-cats dinámicas
+    # (Monturas, diámetros) que el registry no declara. Idempotentes:
+    # ON CONFLICT (equipo_id, spec_def_id) DO UPDATE en equipo_specs,
+    # docs/equipos_match.json preserva equipo.id para FKs de pedidos.
+    # Sin esto, la migración c1f9e5d3b7a8 (que wipea equipo_specs) deja la
+    # DB con specs vacíos hasta que un humano corra `python -m backend.seeds.*`
+    # a mano en la shell de Railway.
+    _PER_CAT_SEEDS = [
+        ("camaras",     "seed_camaras"),
+        ("lentes",      "seed_lentes"),
+        ("adaptadores", "seed_adaptadores"),
+        ("filtros",     "seed_filtros"),
+        ("iluminacion", "seed_iluminacion"),
+    ]
+    for modname, fnname in _PER_CAT_SEEDS:
+        try:
+            from database import get_db
+            mod = __import__(f"seeds.{modname}", fromlist=[fnname])
+            fn = getattr(mod, fnname)
+            conn = get_db()
+            try:
+                stats = fn(conn)
+                conn.commit()
+                if isinstance(stats, dict) and "error" not in stats:
+                    logger.info(
+                        "Seed %s OK: +%d equipos, ~%d actualizados, %d specs",
+                        modname,
+                        stats.get("equipos_creados", 0),
+                        stats.get("equipos_actualizados", 0),
+                        stats.get("equipo_specs_insertados", 0),
+                    )
+                elif isinstance(stats, dict) and "error" in stats:
+                    logger.warning("Seed %s skip: %s", modname, stats["error"])
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.warning("Seed %s falló (no crítico, sigue resto): %s", modname, e)
+
     # Auto-run del ranking si nunca corrió (popularidad_score=0 en todos
     # los equipos). Después de eso, queda en manos del admin desde
     # /admin/settings. Issue #131.
