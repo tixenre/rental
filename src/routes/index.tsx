@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
-import { LayoutGrid, List, ArrowRight, Sparkles, Loader2, Search, X } from "lucide-react";
+import { LayoutGrid, List, ArrowRight, Sparkles, Loader2, Search, X, Check, SearchX } from "lucide-react";
 import { ViewToggle } from "@/components/rental/ViewToggle";
 import { Link } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/rental/PublicLayout";
@@ -17,6 +17,7 @@ import { BrandCarousel } from "@/components/rental/BrandCarousel";
 import { ListFilters } from "@/components/rental/ListFilters";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { ViewIntroDialog } from "@/components/rental/ViewIntroDialog";
+import { PreviewPane } from "@/components/rental/PreviewPane";
 import { useEquipos, useCategorias, useMarcas } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
@@ -143,6 +144,10 @@ function Index() {
   );
   const [brand, setBrand] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  // Filtro "Disponibles": esconde equipos con disponible === 0 (sin stock
+  // para las fechas pickeadas). Solo tiene efecto cuando hay rango de fechas
+  // — sin fechas, `disponible` queda undefined y todos pasan.
+  const [disponiblesOnly, setDisponiblesOnly] = useState(false);
 
   const toggleCat = (c: string) => {
     setSelectedCats((prev) => {
@@ -172,6 +177,9 @@ function Index() {
       );
     }
     if (brand) list = list.filter((e) => e.brand === brand);
+    if (disponiblesOnly) {
+      list = list.filter((e) => e.disponible === undefined || e.disponible > 0);
+    }
     if (query.trim()) {
       // Cada palabra de la query debe aparecer en el "haystack" del equipo.
       const tokens = norm(query).split(/\s+/).filter(Boolean);
@@ -184,7 +192,7 @@ function Index() {
       });
     }
     return list;
-  }, [selectedCats, brand, query, allEquipos]);
+  }, [selectedCats, brand, query, disponiblesOnly, allEquipos]);
 
   const jumpToCategory = (c: string) => {
     setSelectedCats(new Set([c]));
@@ -336,6 +344,23 @@ function Index() {
               )}
             </div>
 
+            {/* Filtro Disponibles — solo tiene efecto con fechas pickeadas */}
+            <button
+              type="button"
+              onClick={() => setDisponiblesOnly((v) => !v)}
+              className={cn(
+                "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
+                disponiblesOnly
+                  ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
+                  : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
+              )}
+              aria-pressed={disponiblesOnly}
+              title="Mostrar solo equipos disponibles para las fechas elegidas"
+            >
+              <Check className="h-3 w-3" />
+              Disponibles
+            </button>
+
             {/* Contador */}
             <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular shrink-0">
               {query.trim() || mode === "list"
@@ -395,6 +420,7 @@ function Index() {
             selectedCats={selectedCats}
             onClearCats={() => setSelectedCats(new Set())}
             query={query}
+            disponiblesOnly={disponiblesOnly}
             getDisponible={getDisponible}
           />
         ) : (
@@ -412,9 +438,14 @@ function Index() {
               setSelectedCats(new Set());
               setBrand(null);
               setQuery("");
+              setDisponiblesOnly(false);
             }}
             filtered={filtered}
             getDisponible={getDisponible}
+            onSuggestCategory={(c) => {
+              setSelectedCats(new Set([c]));
+              setQuery("");
+            }}
           />
         )}
 
@@ -433,6 +464,7 @@ function GridMode({
   selectedCats,
   onClearCats,
   query,
+  disponiblesOnly,
   getDisponible,
 }: {
   allEquipos: Equipment[];
@@ -444,11 +476,13 @@ function GridMode({
   selectedCats: Set<string>;
   onClearCats: () => void;
   query: string;
+  disponiblesOnly: boolean;
   getDisponible: (item: Equipment) => number | undefined;
 }) {
   const q = query.trim().toLowerCase();
   const matches = (e: Equipment) => {
     if (selectedBrand && e.brand !== selectedBrand) return false;
+    if (disponiblesOnly && e.disponible !== undefined && e.disponible <= 0) return false;
     if (!q) return true;
     return (
       (e.name ?? "").toLowerCase().includes(q) ||
@@ -595,13 +629,51 @@ function GridMode({
       })}
 
       {isSearching && totalVisible === 0 && (
-        <div className="mx-4 rounded-lg border hairline bg-surface px-6 py-16 text-center lg:mx-12">
-          <div className="font-display text-2xl text-muted-foreground">Sin resultados</div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Probá con otro término — ningún equipo coincide con "{query}".
-          </p>
-        </div>
+        <SearchEmptyState
+          query={query}
+          categories={apiCategories.slice(0, 6)}
+          onSuggestCategory={onJumpToCategory}
+        />
       )}
+    </div>
+  );
+}
+
+function SearchEmptyState({
+  query,
+  categories,
+  onSuggestCategory,
+}: {
+  query: string;
+  categories: string[];
+  onSuggestCategory: (c: string) => void;
+}) {
+  return (
+    <div className="px-4 lg:px-12">
+      <div className="flex flex-col items-center gap-3 py-20 text-center">
+        <div className="opacity-20">
+          <SearchX className="h-16 w-16 text-ink" strokeWidth={1.2} />
+        </div>
+        <div className="font-display text-3xl font-black text-ink">Sin resultados</div>
+        <div className="font-sans text-sm text-muted-foreground max-w-md">
+          Ningún equipo coincide con "{query}". Probá con otro término o explorá las
+          categorías populares:
+        </div>
+        {categories.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5 justify-center">
+            {categories.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => onSuggestCategory(c)}
+                className="rounded-full border border-[var(--hairline)] bg-surface px-3 py-1 text-xs font-medium text-ink hover:border-ink hover:bg-muted transition"
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -619,6 +691,7 @@ function ListMode({
   onClear,
   filtered,
   getDisponible,
+  onSuggestCategory,
 }: {
   allEquipos: Equipment[];
   apiCategories: string[];
@@ -632,10 +705,26 @@ function ListMode({
   onClear: () => void;
   filtered: Equipment[];
   getDisponible: (item: Equipment) => number | undefined;
+  onSuggestCategory: (c: string) => void;
 }) {
   const PAGE_SIZE = 20;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  // Preview pane: equipo seleccionado para detalle lateral (solo desktop ≥lg).
+  // Persistimos abierto/cerrado en localStorage para que el usuario no tenga
+  // que reabrirlo cada visita.
+  const [previewOpen, setPreviewOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem("rambla-preview-open");
+    return stored === null ? true : stored === "true";
+  });
+  const [previewId, setPreviewId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("rambla-preview-open", String(previewOpen));
+    }
+  }, [previewOpen]);
 
   // Reset paging when filters/search change
   useEffect(() => {
@@ -661,6 +750,20 @@ function ListMode({
   const visibleItems = filtered.slice(0, visibleCount);
   const hasMore = visibleCount < filtered.length;
 
+  const previewItem = useMemo(
+    () => (previewId ? allEquipos.find((e) => e.id === previewId) ?? null : null),
+    [previewId, allEquipos],
+  );
+
+  // Auto-seleccionar el primer item visible cuando el preview está abierto
+  // y todavía no hay nada elegido — así el pane no arranca vacío.
+  useEffect(() => {
+    if (!previewOpen) return;
+    if (previewId) return;
+    if (visibleItems.length === 0) return;
+    setPreviewId(visibleItems[0].id);
+  }, [previewOpen, previewId, visibleItems]);
+
   return (
     <>
       <ListFilters
@@ -673,50 +776,78 @@ function ListMode({
         onClear={onClear}
       />
 
-      <div className="px-3 py-4 pb-28 sm:px-6 sm:py-6 sm:pb-32 lg:px-12 lg:pb-32">
-        <ActiveFiltersChips
-          selectedCategories={selectedCats}
-          onToggleCategory={toggleCat}
-          selectedBrand={brand}
-          onBrand={setBrand}
-          query={query}
-          onQuery={setQuery}
-          onClear={onClear}
-        />
-        {filtered.length === 0 ? (
-          <div className="rounded-lg border hairline bg-surface px-6 py-16 text-center">
-            <div className="font-display text-2xl text-muted-foreground">Sin resultados</div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Probá con otra categoría, marca o término de búsqueda.
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-1.5">
-              {visibleItems.map((item) => (
-                <EquipmentRow
-                  key={item.id}
-                  item={item}
-                  disponible={getDisponible(item)}
-                />
-              ))}
-            </div>
-            {hasMore && (
+      <div className="flex">
+        <div className="flex-1 min-w-0 px-3 py-4 pb-28 sm:px-6 sm:py-6 sm:pb-32 lg:px-12 lg:pb-32">
+          <ActiveFiltersChips
+            selectedCategories={selectedCats}
+            onToggleCategory={toggleCat}
+            selectedBrand={brand}
+            onBrand={setBrand}
+            query={query}
+            onQuery={setQuery}
+            onClear={onClear}
+          />
+          {filtered.length === 0 ? (
+            <SearchEmptyState
+              query={query || "los filtros activos"}
+              categories={apiCategories.slice(0, 6)}
+              onSuggestCategory={onSuggestCategory}
+            />
+          ) : (
+            <>
               <div
-                ref={sentinelRef}
-                className="flex items-center justify-center py-6 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground"
+                className="space-y-1.5"
+                onClickCapture={(e) => {
+                  // Cuando el preview pane está abierto, click sobre una row
+                  // selecciona en el pane en vez de hacer expand inline.
+                  if (!previewOpen) return;
+                  const target = e.target as HTMLElement;
+                  // Permitir clicks en botones (add to cart, stepper) sin interferir.
+                  if (target.closest("button")?.getAttribute("aria-label")?.match(/agregar|quitar|cart/i)) return;
+                  const rowEl = target.closest("[id^='eq-']") as HTMLElement | null;
+                  if (!rowEl) return;
+                  const id = rowEl.id.slice(3);
+                  if (id) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setPreviewId(id);
+                  }
+                }}
               >
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />Cargando más equipos…
+                {visibleItems.map((item) => (
+                  <EquipmentRow
+                    key={item.id}
+                    item={item}
+                    disponible={getDisponible(item)}
+                  />
+                ))}
               </div>
-            )}
-            {!hasMore && filtered.length > PAGE_SIZE && (
-              <div className="py-6 text-center font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                Fin del catálogo · {filtered.length} equipos
-              </div>
-            )}
-          </>
-        )}
+              {hasMore && (
+                <div
+                  ref={sentinelRef}
+                  className="flex items-center justify-center py-6 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground"
+                >
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />Cargando más equipos…
+                </div>
+              )}
+              {!hasMore && filtered.length > PAGE_SIZE && (
+                <div className="py-6 text-center font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                  Fin del catálogo · {filtered.length} equipos
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <PreviewPane
+          item={previewItem}
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          onOpen={() => setPreviewOpen(true)}
+          disponible={previewItem ? getDisponible(previewItem) : undefined}
+        />
       </div>
+
       <CartMiniBar allEquipos={allEquipos} />
       <FlyToCartLayer />
     </>
