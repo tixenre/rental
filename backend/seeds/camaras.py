@@ -102,7 +102,7 @@ SPECS_CAMARAS = [
     ("sensor_crop",     "Sensor crop (35mm eq.)", "string", None, None, None),
     ("recording_limit_min", "Límite de grabación", "number", "min", None,
      "Algunos modelos tienen tope 29min59s"),
-    ("peso",            "Peso",                 "number", "g", None, None),
+    ("peso_g",          "Peso",                 "number", "g", None, "Peso del cuerpo solo, sin batería ni media (gramos)"),
 ]
 
 
@@ -121,7 +121,7 @@ SPEC_FLAGS_CAMARAS = {
     "estabilizacion":    (75,  False, True,  False, False),
     "autofocus":         (80,  False, True,  False, False),
     "netflix_approved":  (98,  True,  True,  False, False),
-    "peso":              (100, False, False, False, False),
+    "peso_g":            (100, False, False, False, False),
 }
 
 
@@ -290,29 +290,6 @@ def seed_camaras(conn, dry_run: bool = False) -> dict:
             nid = _upsert_subcat(name, prio, video_id)
             if nid is not None:
                 subcat_ids[name] = nid
-
-    # NOTA: el código viejo continuaba con SUBCATEGORIAS; ahora skipeamos
-    # la iteración antigua porque ya hicimos todo arriba.
-    for name, prio in []:  # placeholder vacío para mantener estructura
-        row = conn.execute("SELECT id FROM categorias WHERE nombre = %s", (name,)).fetchone()
-        if row:
-            subcat_ids[name] = row["id"]
-            continue
-        if dry_run:
-            subcat_ids[name] = -1
-            stats["subcategorias_creadas"] += 1
-            continue
-        cur = conn.execute("""
-            INSERT INTO categorias (nombre, prioridad, parent_id) VALUES (%s, %s, %s)
-            ON CONFLICT (nombre) DO UPDATE
-                SET parent_id = EXCLUDED.parent_id,
-                    prioridad = CASE WHEN categorias.prioridad = 100 THEN EXCLUDED.prioridad ELSE categorias.prioridad END
-            RETURNING id
-        """, (name, prio, parent_id))
-        new = cur.fetchone()
-        if new:
-            subcat_ids[name] = new[0] if isinstance(new, tuple) else new["id"]
-            stats["subcategorias_creadas"] += 1
 
     # 3. categoria_spec_templates (solo si la categoría no tiene asignaciones)
     existing = conn.execute(

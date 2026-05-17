@@ -69,7 +69,7 @@ SPECS_ILUMINACION = [
      ["AC","V-mount","Gold Mount","NP-F","D-Tap","USB-C","Batería integrada"], None),
     ("montaje",             "Montaje (modificador)",    "enum", None,
      ["Bowens","Propietario","Fresnel","Profoto","Elinchrom"], None),
-    ("peso",                "Peso",                     "number", "g", None, "Peso del fixture solo, sin accesorios"),
+    ("peso_g",              "Peso",                     "number", "g", None, "Peso del fixture solo, sin accesorios (gramos como base; UI computa kg/lb)"),
 ]
 
 
@@ -92,7 +92,7 @@ SPEC_FLAGS_ILUMINACION = {
     "control_inalambrico":(80, False, True,  False, False),
     "alimentacion":      (90,  False, True,  False, False),
     "montaje":           (100, False, True,  False, False),
-    "peso":              (110, False, False, False, False),
+    "peso_g":            (110, False, False, False, False),
 }
 
 

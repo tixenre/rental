@@ -1,307 +1,6 @@
 {
   "_meta": {
-    "version": "2.0",
-    "ultima_actualizacion": "2026-05-16",
-    "descripcion": "Dataset normalizado de luces del inventario. Cada producto tiene specs (comparables/filtrables), extras (ficha técnica), y ficha (raw B&H/manufacturer).",
-    "fuente_principal": "B&H Photo HTML guardado + JSON-LD structured data",
-    "fuente_alternativa": "manufacturer sites (arri.com, mole.com, aputure.com) vía WebFetch",
-    "ubicacion_htmls": "~/Desktop/Paginas/{Data Set, Inventario}/",
-    "schema": {
-      "specs": {
-        "descripcion": "Campos canónicos para comparación/filtros — TODOS numéricos o enum",
-        "campos": {
-          "tipo": {
-            "tipo": "enum",
-            "valores": [
-              "Flash",
-              "Bulb / Lamp",
-              "Panel",
-              "Tube Light",
-              "Flexible Mat",
-              "Monolight",
-              "COB Monolight",
-              "Spotlight",
-              "Fresnel",
-              "On-Camera"
-            ]
-          },
-          "potencia_w": {
-            "tipo": "int",
-            "unidad": "W"
-          },
-          "lumens_at_5600k": {
-            "tipo": "int",
-            "unidad": "lm",
-            "nota": "Algunos fabricantes no lo publican"
-          },
-          "lumens_at_3200k": {
-            "tipo": "int",
-            "unidad": "lm"
-          },
-          "lux_at_1m_5600k": {
-            "tipo": "int",
-            "unidad": "lx",
-            "nota": "Estándar cine — Lux a 1m"
-          },
-          "lux_at_1m_3200k": {
-            "tipo": "int",
-            "unidad": "lx"
-          },
-          "cri": {
-            "tipo": "int",
-            "rango": "0-100"
-          },
-          "tlci": {
-            "tipo": "int",
-            "rango": "0-100",
-            "nota": "Broadcast standard"
-          },
-          "r9": {
-            "tipo": "int",
-            "rango": "0-100",
-            "nota": "Deep red rendering"
-          },
-          "temperatura_k": {
-            "tipo": "objeto",
-            "shape": {
-              "min": "int",
-              "max": "int"
-            },
-            "unidad": "K",
-            "nota": "Si fijo: min==max"
-          },
-          "color_modes": {
-            "tipo": "array<enum>",
-            "valores": [
-              "RGB",
-              "Daylight",
-              "Tungsten",
-              "HSI",
-              "Bicolor variable"
-            ]
-          },
-          "dimming": {
-            "tipo": "bool"
-          },
-          "control_inalambrico": {
-            "tipo": "array<enum>",
-            "valores": [
-              "Bluetooth",
-              "DMX",
-              "RDM",
-              "Wi-Fi",
-              "CRMX",
-              "Lumenradio",
-              "Art-Net",
-              "sACN"
-            ]
-          },
-          "alimentacion": {
-            "tipo": "array<enum>",
-            "valores": [
-              "AC",
-              "V-mount",
-              "Gold Mount",
-              "NP-F",
-              "D-Tap",
-              "USB-C",
-              "Batería integrada"
-            ],
-            "orden": "canónico (AC primero)"
-          },
-          "montaje": {
-            "tipo": "enum",
-            "valores": [
-              "Bowens",
-              "Propietario",
-              "Fresnel",
-              "Profoto",
-              "Elinchrom"
-            ],
-            "nota": "Modificador de luz; null si no aplica"
-          },
-          "peso_g": {
-            "tipo": "int",
-            "unidad": "g",
-            "nota": "Base — UI computa kg/lb"
-          }
-        }
-      },
-      "extras": {
-        "descripcion": "Campos descriptivos / ficha técnica detallada — opcional, pero útil para producto",
-        "campos": {
-          "bulb_type": {
-            "tipo": "string",
-            "ejemplo": "GY9.5 — CP89 FRL 650W"
-          },
-          "base_type": {
-            "tipo": "string",
-            "ejemplo": "E26/E27"
-          },
-          "beam_angle": {
-            "tipo": "objeto",
-            "shape": {
-              "min": "float",
-              "max": "float"
-            },
-            "unidad": "°"
-          },
-          "beam_angle_note": {
-            "tipo": "string",
-            "nota": "Calificadores (ej. 'native vs con diffuser')"
-          },
-          "cooling": {
-            "tipo": "enum",
-            "valores": [
-              "Fan",
-              "Passive"
-            ]
-          },
-          "noise_db": {
-            "tipo": "objeto",
-            "shape": {
-              "silent": "int",
-              "medium": "int",
-              "high": "int"
-            },
-            "unidad": "dB"
-          },
-          "ip_rating": {
-            "tipo": "string",
-            "ejemplo": "IP54, IP65"
-          },
-          "dimensiones_cm": {
-            "tipo": "objeto",
-            "shape": {
-              "largo_cm": "float",
-              "ancho_cm": "float",
-              "alto_cm": "float"
-            }
-          },
-          "has_display": {
-            "tipo": "bool"
-          },
-          "display_type": {
-            "tipo": "enum",
-            "valores": [
-              "LCD",
-              "OLED",
-              "LED"
-            ]
-          },
-          "app_compatible": {
-            "tipo": "bool"
-          },
-          "app_platforms": {
-            "tipo": "array<enum>",
-            "valores": [
-              "Android",
-              "iOS"
-            ]
-          },
-          "tm30_rf": {
-            "tipo": "int",
-            "rango": "0-100",
-            "nota": "Modern color fidelity"
-          },
-          "tm30_rg": {
-            "tipo": "int",
-            "rango": "0-150",
-            "nota": "Modern color gamut"
-          },
-          "ssi": {
-            "tipo": "objeto",
-            "shape": {
-              "at_3200k": "int",
-              "at_5600k": "int"
-            },
-            "nota": "Sony Spectral Similarity"
-          },
-          "color_temp_ranges": {
-            "tipo": "array<string>",
-            "nota": "Si tiene múltiples rangos selectables"
-          },
-          "photometrics_full": {
-            "tipo": "array<string>",
-            "nota": "Todas las líneas de fc/Lux x angle x temp"
-          },
-          "wireless_range_m": {
-            "tipo": "int",
-            "unidad": "m"
-          },
-          "voltaje_v": {
-            "tipo": "array<int>",
-            "unidad": "V",
-            "ejemplo": "[120, 230]"
-          },
-          "vida_util_h": {
-            "tipo": "int",
-            "unidad": "h"
-          },
-          "included_accessories": {
-            "tipo": "array<string>"
-          },
-          "case_included": {
-            "tipo": "bool"
-          },
-          "yoke": {
-            "tipo": "string"
-          },
-          "fixture_mount": {
-            "tipo": "string",
-            "nota": "Imperial-native (5/8\" stud, etc.)"
-          },
-          "accessory_diameter": {
-            "tipo": "string",
-            "nota": "Imperial-native con métrico"
-          },
-          "io": {
-            "tipo": "array<string>"
-          },
-          "cable_length_m": {
-            "tipo": "float",
-            "unidad": "m"
-          },
-          "cable_specs": {
-            "tipo": "string",
-            "nota": "Tipo, plug, etc."
-          },
-          "materiales": {
-            "tipo": "string"
-          },
-          "certificaciones": {
-            "tipo": "string",
-            "ejemplo": "CE, UKCA, CB, GS"
-          },
-          "reflector": {
-            "tipo": "string"
-          },
-          "serie": {
-            "tipo": "string",
-            "ejemplo": "ARRI Junior, Nanlite Forza"
-          }
-        }
-      },
-      "ficha": {
-        "descripcion": "Raw del scrape — todas las secciones B&H tal cual aparecen. Para renderizar ficha técnica completa.",
-        "shape": "{ section_name: [{label, value}, ...] }"
-      },
-      "image_url": "URL de imagen principal (extraída de JSON-LD Product.image)",
-      "url_source": "URL canónica del producto (B&H, arri.com, mole.com)"
-    },
-    "convenciones": {
-      "ids": "{marca}_{modelo}, snake_case. Ej: aputure_nova_ii_2x1, godox_vl300ii",
-      "unidades": "Numéricos en base SI (g, m, cm, W, K). UI computa imperial.",
-      "imperial_native": "Pin sizes / fixture mounts en imperial (5/8\", 1/4\"-20) con equiv. métrico",
-      "ausencia": "null o campo ausente significa 'no aplica' o 'no publicado'"
-    },
-    "como_agregar_luz_nueva": [
-      "1. Guardar página B&H del producto en ~/Desktop/Paginas/Inventario/ (Cmd+S → Webpage Complete)",
-      "2. Agregar la ruta del HTML en tools/iluminacion_rebuild.sh",
-      "3. Correr: bash tools/iluminacion_rebuild.sh",
-      "4. Verificar resultado en docs/iluminacion.json",
-      "5. Si el HTML viene del sitio fabricante (no B&H), agregar entrada manual en tools/iluminacion_patches.py"
-    ]
+    "descripcion": "Specs curadas mapeadas a spec_keys del proyecto."
   },
   "products": {
     "amaran_f21x": {
@@ -309,24 +8,13 @@
       "modelo": "F21x 2x1",
       "url_source": "https://www.bhphotovideo.com/c/product/1698321-REG/amaran_ap20232a14_f21x_2x1_bi_color_led.html/specs",
       "specs": {
-        "tipo": "Flexible Mat",
         "potencia_w": 120,
-        "lux_at_1m_3200k": 3208,
         "cri": 95,
-        "tlci": 98,
-        "temperatura_k": {
-          "min": 2500,
-          "max": 7500
-        },
-        "color_modes": [
-          "Daylight",
-          "Tungsten"
-        ],
+        "temperatura_k": "2500-7500K",
+        "bicolor": true,
+        "rgb": false,
         "dimming": true,
-        "control_inalambrico": [
-          "Bluetooth",
-          "DMX"
-        ],
+        "control_inalambrico": "Bluetooth, DMX",
         "alimentacion": [
           "AC",
           "V-mount",
@@ -336,44 +24,20 @@
         "peso_g": 390
       },
       "extras": {
-        "beam_angle": {
-          "min": 180.0,
-          "max": 180.0
-        },
+        "tipo": "Flexible Mat",
+        "item_type": "1x LED Flexible Light",
+        "beam_angle": "180°",
         "cooling": "Passive",
-        "dimensiones_cm": {
-          "largo_cm": 60.0,
-          "ancho_cm": 30.0,
-          "alto_cm": 0.5
-        },
-        "has_display": true,
-        "display_type": "OLED",
+        "dimensiones": "60.0 × 30.0 × 0.5 cm",
+        "photometrics_1m": "3200K: 298 fc / 3208 Lux",
+        "display": "OLED",
         "app_compatible": true,
-        "app_platforms": [
-          "Android",
-          "iOS"
-        ],
-        "ssi": {
-          "at_5600k": 81
-        },
-        "photometrics_full": [
-          "3200K: 298 fc / 3208 Lux",
-          "5600K: 340 fc / 3670 Lux"
-        ],
-        "wireless_range_m": 80,
-        "vida_util_h": 50000,
-        "included_accessories": [
-          "Softbox with Removable Grid",
-          "Storage Case"
-        ],
-        "case_included": true,
+        "modificador_incluido": "1x Softbox with Removable Grid",
+        "case_incluido": "Yes",
+        "vida_util_horas": "50,000 Hours",
         "fixture_mount": "1x 5/8\" Receiver",
-        "io": [
-          "1x USB-C DMX Input",
-          "*Adapter Required (Not Included)",
-          "1x XLR 3-Pin Power Input",
-          "1x Proprietary Power Output"
-        ],
+        "wireless_range": "262.5' / 80 m (Bluetooth)",
+        "io": "1x USB-C DMX Input",
         "materiales": "Plastic (Housing)",
         "certificaciones": "CE"
       },
@@ -604,27 +268,18 @@
             "value": "26.7 x 15.7 x 5.2\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/amaran_ap20232a14_f21x_2x1_bi_color_led_1698321.jpg"
+      }
     },
     "godox_m1": {
       "marca": "Godox",
       "modelo": "RGB Mini Creative M1",
       "url_source": "https://www.bhphotovideo.com/c/product/1552705-REG/godox_rgb_mini_creative_m1.html",
       "specs": {
-        "tipo": "Panel",
         "potencia_w": 13,
         "cri": 97,
-        "tlci": 97,
-        "temperatura_k": {
-          "min": 2500,
-          "max": 8500
-        },
-        "color_modes": [
-          "RGB",
-          "Daylight",
-          "Tungsten"
-        ],
+        "temperatura_k": "2500-8500K",
+        "bicolor": true,
+        "rgb": true,
         "dimming": true,
         "alimentacion": [
           "Batería integrada"
@@ -632,25 +287,14 @@
         "peso_g": 240
       },
       "extras": {
+        "tipo": "Panel",
+        "item_type": "1x LED Light Panel",
         "cooling": "Passive",
-        "dimensiones_cm": {
-          "largo_cm": 14.5,
-          "ancho_cm": 7.0,
-          "alto_cm": 1.5
-        },
-        "has_display": true,
-        "display_type": "LCD",
-        "photometrics_full": [
-          "Not Specified by Manufacturer"
-        ],
-        "included_accessories": [
-          "Storage Case"
-        ],
-        "case_included": true,
+        "dimensiones": "14.5 × 7.0 × 1.5 cm",
+        "display": "LCD",
+        "case_incluido": "Yes",
         "fixture_mount": "Multiple x 1/4\"-20 Female Thread",
-        "io": [
-          "1x USB-C Power Input"
-        ],
+        "io": "1x USB-C Power Input",
         "materiales": "Aluminum (Housing)"
       },
       "ficha": {
@@ -834,30 +478,20 @@
             "value": "6.95 x 4.15 x 2.4\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/godox_rgb_mini_creative_m1_1552705.jpg"
+      }
     },
     "nanlite_fc500b": {
       "marca": "Nanlite",
       "modelo": "FC500B",
       "url_source": "https://www.bhphotovideo.com/c/product/1779322-REG/nanlite_fc500b_fc_500_led_spotlight.html",
       "specs": {
-        "tipo": "Monolight",
         "potencia_w": 520,
         "cri": 96,
-        "tlci": 98,
-        "temperatura_k": {
-          "min": 2700,
-          "max": 6500
-        },
-        "color_modes": [
-          "Daylight",
-          "Tungsten"
-        ],
+        "temperatura_k": "2700-6500K",
+        "bicolor": true,
+        "rgb": false,
         "dimming": true,
-        "control_inalambrico": [
-          "Bluetooth"
-        ],
+        "control_inalambrico": "Bluetooth",
         "alimentacion": [
           "AC"
         ],
@@ -865,32 +499,15 @@
         "peso_g": 3160
       },
       "extras": {
-        "beam_angle": {
-          "min": 120.0,
-          "max": 120.0
-        },
+        "tipo": "Monolight",
+        "item_type": "1x LED Monolight",
+        "beam_angle": "120°",
         "cooling": "Fan",
-        "dimensiones_cm": {
-          "largo_cm": 37.31,
-          "ancho_cm": 24.64,
-          "alto_cm": 14.91
-        },
-        "has_display": true,
+        "dimensiones": "37.31 × 24.64 × 14.91 cm",
+        "photometrics_1m": "2700K: 1516 fc / 16,320 Lux",
+        "display": "Yes",
         "app_compatible": true,
-        "app_platforms": [
-          "Android",
-          "iOS"
-        ],
-        "photometrics_full": [
-          "2700K: 1516 fc / 16,320 Lux",
-          "3200K: 1640 fc / 17,660 Lux",
-          "5600K: 1961 fc / 21,110 Lux",
-          "6500K: 1846 fc / 19,880 Lux"
-        ],
-        "included_accessories": [
-          "Storage Case"
-        ],
-        "case_included": true,
+        "case_incluido": "Yes",
         "yoke": "Manually-Operated Yoke",
         "fixture_mount": "1x 5/8\" Receiver (Via Yoke Mount)"
       },
@@ -1069,34 +686,21 @@
             "value": "23.1 x 18.6 x 18\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/nanlite_fc500b_fc_500_led_spotlight_1779322.jpg"
+      }
     },
     "amaran_360c": {
       "marca": "Amaran",
       "modelo": "Ray 360c",
       "url_source": "https://www.bhphotovideo.com/c/product/1930190-REG/amaran_mp00000191_ray_360c_rgb_led.html/specs",
       "specs": {
-        "tipo": "COB Monolight",
         "potencia_w": 410,
-        "lumens_at_5600k": 23174,
-        "lux_at_1m_3200k": 15900,
+        "lumens": 23174,
         "cri": 95,
-        "tlci": 95,
-        "temperatura_k": {
-          "min": 1800,
-          "max": 20000
-        },
-        "color_modes": [
-          "RGB",
-          "Daylight",
-          "Tungsten"
-        ],
+        "temperatura_k": "1800-20000K",
+        "bicolor": true,
+        "rgb": true,
         "dimming": true,
-        "control_inalambrico": [
-          "Bluetooth",
-          "DMX"
-        ],
+        "control_inalambrico": "Bluetooth, DMX",
         "alimentacion": [
           "AC"
         ],
@@ -1104,52 +708,20 @@
         "peso_g": 3300
       },
       "extras": {
-        "beam_angle": {
-          "min": 70.0,
-          "max": 70.0
-        },
+        "tipo": "COB Monolight",
+        "item_type": "1x COB LED Monolight",
+        "beam_angle": "70°",
         "cooling": "Fan",
         "ip_rating": "IP54",
-        "dimensiones_cm": {
-          "largo_cm": 25.5,
-          "ancho_cm": 16.51,
-          "alto_cm": 14.81
-        },
-        "has_display": true,
-        "display_type": "LCD",
+        "dimensiones": "25.5 × 16.51 × 14.81 cm",
+        "photometrics_1m": "70° at 3200K: 1477 fc / 15,900 Lux (Unmodified)",
+        "display": "LCD",
         "app_compatible": true,
-        "app_platforms": [
-          "Android",
-          "iOS"
-        ],
-        "tm30_rf": 94,
-        "tm30_rg": 100,
-        "ssi": {
-          "at_5600k": 80,
-          "at_3200k": 87
-        },
-        "color_temp_ranges": [
-          "1800 to 20,000K",
-          "2300 to 10,000K"
-        ],
-        "photometrics_full": [
-          "70° at 3200K: 1477 fc / 15,900 Lux (Unmodified)",
-          "45° at 3200K: 3883 fc / 41,800 Lux (with Reflector)",
-          "70° at 5600K: 1583 fc / 17,040 Lux (Unmodified)",
-          "45° at 5600K: 4143 fc / 44,600 Lux (with Reflector)"
-        ],
-        "wireless_range_m": 80,
-        "included_accessories": [
-          "Reflector",
-          "Storage Case"
-        ],
-        "case_included": true,
+        "modificador_incluido": "1x Reflector",
+        "case_incluido": "Yes",
         "fixture_mount": "1x 5/8\" Receiver (Via Swivel Mount)",
-        "io": [
-          "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)",
-          "1x USB-C DMX/Firmware Input",
-          "*Adapter Required (Not Included)"
-        ]
+        "wireless_range": "262.5' / 80 m (Bluetooth)",
+        "io": "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)"
       },
       "ficha": {
         "Key Specs": [
@@ -1358,34 +930,20 @@
             "value": "19.7 x 13.8 x 9.9\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/amaran_mp00000191_ray_360c_rgb_led_1930190.jpg"
+      }
     },
     "aputure_nova_ii_2x1": {
       "marca": "Aputure",
       "modelo": "NOVA II 2x1",
       "url_source": "https://www.bhphotovideo.com/c/product/1920544-REG/aputure_ap0400040j_nova_ii_2x1_rgb.html",
       "specs": {
-        "tipo": "Panel",
         "potencia_w": 1000,
-        "lux_at_1m_3200k": 194400,
         "cri": 95,
-        "tlci": 95,
-        "temperatura_k": {
-          "min": 1800,
-          "max": 20000
-        },
-        "color_modes": [
-          "RGB",
-          "Daylight",
-          "Tungsten"
-        ],
+        "temperatura_k": "1800-20000K",
+        "bicolor": true,
+        "rgb": true,
         "dimming": true,
-        "control_inalambrico": [
-          "Bluetooth",
-          "DMX",
-          "RDM"
-        ],
+        "control_inalambrico": "Bluetooth, DMX, RDM",
         "alimentacion": [
           "AC"
         ],
@@ -1393,54 +951,20 @@
         "peso_g": 16250
       },
       "extras": {
-        "beam_angle": {
-          "min": 35,
-          "max": 95
-        },
-        "beam_angle_note": "35° native / 95° with diffuser",
+        "tipo": "Panel",
+        "item_type": "1x LED Array LED Light Panel",
+        "beam_angle": "35°",
         "cooling": "Fan",
-        "noise_db": {
-          "silent": 0,
-          "medium": 35,
-          "high": 40
-        },
         "ip_rating": "IP65",
-        "dimensiones_cm": {
-          "largo_cm": 69.1,
-          "ancho_cm": 38.9,
-          "alto_cm": 13.7
-        },
-        "has_display": true,
+        "dimensiones": "69.1 × 38.9 × 13.7 cm",
+        "photometrics_1m": "35° at 3200K: 18,059 fc / 194,400 Lux (Unmodified)",
+        "display": "Yes",
         "app_compatible": true,
-        "app_platforms": [
-          "Android",
-          "iOS"
-        ],
-        "tm30_rf": 95,
-        "tm30_rg": 100,
-        "ssi": {
-          "at_3200k": 90,
-          "at_5600k": 86
-        },
-        "photometrics_full": [
-          "35° at 3200K: 18,059 fc / 194,400 Lux (Unmodified)",
-          "35° at 5600K: 18,329 fc / 197,300 Lux (Unmodified)",
-          "95° at 3200K: 3725 fc / 40,100 Lux (with Diffuser)",
-          "95° at 5600K: 3781 fc / 40,700 Lux (with Diffuser)"
-        ],
-        "wireless_range_m": 100,
-        "included_accessories": [
-          "Diffuser"
-        ],
+        "modificador_incluido": "1x Diffuser",
         "yoke": "Manually-Operated Yoke",
         "fixture_mount": "1x 1-1/8\" Stud (Via Yoke Mount)",
-        "io": [
-          "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)",
-          "1x XLR 5-Pin DMX Input",
-          "1x XLR 5-Pin DMX Output",
-          "2x RJ45 Network Input/Output",
-          "1x USB-A Firmware Input"
-        ]
+        "wireless_range": "328.1' / 100 m",
+        "io": "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)"
       },
       "ficha": {
         "Key Specs": [
@@ -1645,25 +1169,18 @@
             "value": "35.25 x 20 x 14\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/aputure_ap0400040j_nova_ii_2x1_rgb_1920544.jpg"
+      }
     },
     "molerichardson_juniorled_200": {
       "marca": "Mole-Richardson",
       "modelo": "JuniorLED 200W 8\"",
       "url_source": "https://www.bhphotovideo.com/c/product/979830-REG/mole_richardson_8941_50rev_junior_200w_8_junior.html",
       "specs": {
-        "tipo": "Fresnel",
         "potencia_w": 200,
-        "lux_at_1m_3200k": 15016,
         "cri": 95,
-        "temperatura_k": {
-          "min": 3200,
-          "max": 3200
-        },
-        "color_modes": [
-          "Tungsten"
-        ],
+        "temperatura_k": "3200K",
+        "bicolor": false,
+        "rgb": false,
         "dimming": true,
         "alimentacion": [
           "AC"
@@ -1672,28 +1189,16 @@
         "peso_g": 6400
       },
       "extras": {
-        "beam_angle": {
-          "min": 13.0,
-          "max": 54.0
-        },
+        "tipo": "Fresnel",
+        "item_type": "1x LED Fresnel",
+        "beam_angle": "13-54°",
         "cooling": "Passive",
         "ip_rating": "IP30",
-        "dimensiones_cm": {
-          "largo_cm": 52.3,
-          "ancho_cm": 35.6,
-          "alto_cm": 30.5
-        },
-        "photometrics_full": [
-          "Flood Beam at 3200K: 1394 fc / 15,016 Lux",
-          "Spot Beam at 3200K: 4049 fc / 43,594 Lux"
-        ],
+        "dimensiones": "52.3 × 35.6 × 30.5 cm",
+        "photometrics_1m": "Flood Beam at 3200K: 1394 fc / 15,016 Lux",
         "yoke": "Manually-Operated Yoke",
         "fixture_mount": "1x 1-1/8\" Stud (Via Yoke Mount)",
-        "io": [
-          "1x powerCON Power Input",
-          "1x XLR 5-Pin DMX Input",
-          "1x XLR 5-Pin DMX Output"
-        ],
+        "io": "1x powerCON Power Input",
         "materiales": "Aluminum, Steel (Housing)",
         "certificaciones": "RoHS"
       },
@@ -1874,33 +1379,20 @@
             "value": "14 lb / 6.4 kg"
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/mole_richardson_8941_50rev_junior_200w_8_junior_979830.jpg"
+      }
     },
     "godox_tl60": {
       "marca": "Godox",
       "modelo": "TL60",
       "url_source": "https://www.bhphotovideo.com/c/product/1611957-REG/godox_tl60_tube_light_2700_6500k.html",
       "specs": {
-        "tipo": "Tube Light",
         "potencia_w": 18,
-        "lux_at_1m_5600k": 421,
         "cri": 96,
-        "tlci": 98,
-        "temperatura_k": {
-          "min": 2700,
-          "max": 6500
-        },
-        "color_modes": [
-          "RGB",
-          "Daylight",
-          "Tungsten"
-        ],
+        "temperatura_k": "2700-6500K",
+        "bicolor": true,
+        "rgb": true,
         "dimming": true,
-        "control_inalambrico": [
-          "Bluetooth",
-          "DMX"
-        ],
+        "control_inalambrico": "Bluetooth, DMX",
         "alimentacion": [
           "AC",
           "Batería integrada"
@@ -1909,32 +1401,17 @@
         "peso_g": 726
       },
       "extras": {
+        "tipo": "Tube Light",
+        "item_type": "1x LED Light Tube/Wand",
         "cooling": "Passive",
-        "dimensiones_cm": {
-          "largo_cm": 75.0,
-          "ancho_cm": 4.8
-        },
-        "has_display": true,
-        "display_type": "LCD",
+        "dimensiones": "29.5 x 1.9\" / 75 x 4.8 cm (Fixture)",
+        "photometrics_1m": "5600K: 39 fc / 421 Lux",
+        "display": "LCD",
         "app_compatible": true,
-        "app_platforms": [
-          "Android",
-          "iOS"
-        ],
-        "photometrics_full": [
-          "5600K: 39 fc / 421 Lux"
-        ],
-        "wireless_range_m": 30,
-        "included_accessories": [
-          "Storage Case"
-        ],
-        "case_included": true,
+        "case_incluido": "Yes",
         "fixture_mount": "2x 1/4\"-20 Female Thread (Via Mounting Clip)",
-        "io": [
-          "1x Barrel / Coax Power Input (20 VDC at 2.4 A)",
-          "1x RJ45 DMX Input",
-          "1x RJ45 DMX Output"
-        ]
+        "wireless_range": "98.4' / 30 m (Bluetooth)",
+        "io": "1x Barrel / Coax Power Input (20 VDC at 2.4 A)"
       },
       "ficha": {
         "Key Specs": [
@@ -2143,27 +1620,19 @@
             "value": "31.1 x 3.7 x 3.1\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/godox_tl60_tube_light_2700_6500k_1611957.jpg"
+      }
     },
     "aputure_b7c": {
       "marca": "Aputure",
       "modelo": "Accent B7c",
       "url_source": "https://www.bhphotovideo.com/c/product/1595337-REG/aputure_aacbc7_accent_b7c_led_light.html",
       "specs": {
-        "tipo": "Bulb / Lamp",
         "potencia_w": 7,
-        "lumens_at_5600k": 570,
+        "lumens": 570,
         "cri": 95,
-        "temperatura_k": {
-          "min": 2000,
-          "max": 10000
-        },
-        "color_modes": [
-          "RGB",
-          "Daylight",
-          "Tungsten"
-        ],
+        "temperatura_k": "2000-10000K",
+        "bicolor": true,
+        "rgb": true,
         "dimming": true,
         "alimentacion": [
           "AC"
@@ -2171,17 +1640,10 @@
         "peso_g": 210
       },
       "extras": {
+        "tipo": "Bulb / Lamp",
+        "item_type": "1x  LED Lamp",
         "base_type": "E26/E27",
-        "beam_angle": {
-          "min": 360,
-          "max": 360
-        },
-        "beam_angle_note": "Omnidireccional (bulbo)",
-        "dimensiones_cm": {
-          "largo_cm": 11.5,
-          "ancho_cm": 7.0,
-          "alto_cm": 7.0
-        }
+        "dimensiones": "11.5 × 7 cm (alto × diámetro)"
       },
       "ficha": {
         "Specs": [
@@ -2224,7 +1686,9 @@
           {
             "label": "Maximum Overall Diameter (MOD)",
             "value": "2.74\" / 69.6 mm"
-          },
+          }
+        ],
+        "Packaging Info": [
           {
             "label": "Package Weight",
             "value": "0.915 lb"
@@ -2234,29 +1698,20 @@
             "value": "6.6 x 4.6 x 3.5\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/aputure_aacbc7_accent_b7c_led_light_1595337.jpg"
+      }
     },
     "godox_vl150": {
       "marca": "Godox",
       "modelo": "VL150",
       "url_source": "https://www.bhphotovideo.com/c/product/1513246-REG/godox_vl150_video_led_light.html?fromDisList=y",
       "specs": {
-        "tipo": "Monolight",
         "potencia_w": 150,
         "cri": 96,
-        "tlci": 95,
-        "temperatura_k": {
-          "min": 5600,
-          "max": 5600
-        },
-        "color_modes": [
-          "Daylight"
-        ],
+        "temperatura_k": "5600K",
+        "bicolor": false,
+        "rgb": false,
         "dimming": true,
-        "control_inalambrico": [
-          "Bluetooth"
-        ],
+        "control_inalambrico": "Bluetooth",
         "alimentacion": [
           "AC"
         ],
@@ -2264,26 +1719,12 @@
         "peso_g": 860
       },
       "extras": {
+        "tipo": "Monolight",
         "cooling": "Fan",
-        "dimensiones_cm": {
-          "largo_cm": 21.0,
-          "ancho_cm": 11.5,
-          "alto_cm": 3.6
-        },
-        "has_display": true,
-        "display_type": "LED",
-        "included_accessories": [
-          "Reflector"
-        ],
+        "dimensiones": "21.0 × 11.5 × 3.6 cm",
+        "display": "LED",
         "yoke": "Manually-Operated Yoke",
-        "io": [
-          "Light Fixture",
-          "To Power Supply/Controller: 1 x XLR 4-Pin  Input",
-          "Power Supply/Controller",
-          "To Light Fixture: 1 x XLR 4-Pin  Output",
-          "1 x XLR 4-Pin  Input",
-          "2 x Barrel / Coax Antenna Input"
-        ]
+        "io": "Light Fixture"
       },
       "ficha": {
         "Key Specs": [
@@ -2426,30 +1867,20 @@
             "value": "22.9 x 11.8 x 11.3\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/godox_vl150_video_led_light_1513246.jpg"
+      }
     },
     "godox_vl300ii": {
       "marca": "Godox",
       "modelo": "VL300II",
       "url_source": "https://www.bhphotovideo.com/c/product/1721572-REG/godox_vl300ii_series_300w_led.html/specs?fromDisList=y",
       "specs": {
-        "tipo": "COB Monolight",
         "potencia_w": 320,
-        "lux_at_1m_5600k": 11600,
         "cri": 96,
-        "tlci": 96,
-        "temperatura_k": {
-          "min": 5600,
-          "max": 5600
-        },
-        "color_modes": [
-          "Daylight"
-        ],
+        "temperatura_k": "5600K",
+        "bicolor": false,
+        "rgb": false,
         "dimming": true,
-        "control_inalambrico": [
-          "Bluetooth"
-        ],
+        "control_inalambrico": "Bluetooth",
         "alimentacion": [
           "AC",
           "V-mount",
@@ -2459,33 +1890,16 @@
         "peso_g": 2400
       },
       "extras": {
+        "tipo": "COB Monolight",
+        "item_type": "1x COB LED Monolight",
         "cooling": "Fan",
-        "dimensiones_cm": {
-          "largo_cm": 29.2,
-          "ancho_cm": 27.2,
-          "alto_cm": 17.6
-        },
-        "has_display": true,
+        "dimensiones": "29.2 × 27.2 × 17.6 cm",
+        "photometrics_1m": "5600K: 1077 fc / 11,600 Lux",
+        "display": "Yes",
         "app_compatible": true,
-        "app_platforms": [
-          "Android",
-          "iOS"
-        ],
-        "photometrics_full": [
-          "5600K: 1077 fc / 11,600 Lux"
-        ],
-        "included_accessories": [
-          "Storage Case"
-        ],
-        "case_included": true,
+        "case_incluido": "Yes",
         "fixture_mount": "Support Mount",
-        "io": [
-          "Light Fixture",
-          "1x Unspecified Power Input",
-          "Power Supply/Controller",
-          "1x Unspecified Power Output",
-          "1x Unspecified Power Input"
-        ]
+        "io": "Light Fixture"
       },
       "ficha": {
         "Key Specs": [
@@ -2682,29 +2096,21 @@
             "value": "22.9 x 12.2 x 10.8\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/godox_vl300ii_series_300w_led_1721572.jpg"
+      }
     },
     "nanlite_forza_500": {
       "marca": "Nanlite",
       "modelo": "Forza 500",
       "url_source": "https://www.bhphotovideo.com/c/product/1476382-REG/nanlite_12_2026_forza_500_led_monolight.html?fromDisList=y",
       "specs": {
-        "tipo": "Monolight",
         "potencia_w": 500,
-        "lumens_at_5600k": 46613,
+        "lumens": 46613,
         "cri": 98,
-        "temperatura_k": {
-          "min": 5600,
-          "max": 5600
-        },
-        "color_modes": [
-          "Daylight"
-        ],
+        "temperatura_k": "5600K",
+        "bicolor": false,
+        "rgb": false,
         "dimming": true,
-        "control_inalambrico": [
-          "Wi-Fi"
-        ],
+        "control_inalambrico": "Wi-Fi",
         "alimentacion": [
           "AC"
         ],
@@ -2712,35 +2118,13 @@
         "peso_g": 2490
       },
       "extras": {
-        "beam_angle": {
-          "min": 55.0,
-          "max": 55.0
-        },
+        "tipo": "Monolight",
+        "beam_angle": "55°",
         "cooling": "Fan",
-        "dimensiones_cm": {
-          "largo_cm": 30.7,
-          "ancho_cm": 20.6,
-          "alto_cm": 14.2
-        },
-        "has_display": true,
-        "photometrics_full": [
-          ":",
-          "8672 fc / 93,350 Lux at 3.3' / 1 m (with Reflector)*",
-          "*Standardized Measurement Supplied by the Manufacturer"
-        ],
-        "included_accessories": [
-          "Reflector"
-        ],
+        "dimensiones": "30.7 × 20.6 × 14.2 cm",
+        "display": "Yes",
         "yoke": "Manually-Operated Yoke",
-        "io": [
-          "Light Fixture",
-          "To Power Supply/Controller: 1 x Unspecified Power/DMX Input (48 VDC)",
-          "Power Supply/Controller",
-          "To Light Fixture: 1 x Unspecified Power/DMX Output",
-          "1 x XLR 5-Pin DMX Input (48 VDC)",
-          "1 x XLR 5-Pin DMX Output",
-          "1 x Unspecified Power Input (48 VDC)"
-        ]
+        "io": "Light Fixture"
       },
       "ficha": {
         "Key Specs": [
@@ -2897,31 +2281,20 @@
             "value": "23 x 13.3 x 11.2\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/nanlite_12_2026_forza_500_led_monolight_1476382.jpg"
+      }
     },
     "nanlite_forza_60b": {
       "marca": "Nanlite",
       "modelo": "Forza 60B II",
       "url_source": "https://www.bhphotovideo.com/c/product/1736656-REG/nanlite_forza60bii_forza_60b_ii_bi_color.html",
       "specs": {
-        "tipo": "Monolight",
         "potencia_w": 72,
-        "lux_at_1m_3200k": 2235,
         "cri": 96,
-        "tlci": 98,
-        "temperatura_k": {
-          "min": 2700,
-          "max": 6500
-        },
-        "color_modes": [
-          "Daylight",
-          "Tungsten"
-        ],
+        "temperatura_k": "2700-6500K",
+        "bicolor": true,
+        "rgb": false,
         "dimming": true,
-        "control_inalambrico": [
-          "Bluetooth"
-        ],
+        "control_inalambrico": "Bluetooth",
         "alimentacion": [
           "AC",
           "V-mount",
@@ -2931,38 +2304,18 @@
         "peso_g": 680
       },
       "extras": {
-        "beam_angle": {
-          "min": 45.0,
-          "max": 45.0
-        },
+        "tipo": "Monolight",
+        "item_type": "1x LED Monolight",
+        "beam_angle": "45°",
         "cooling": "Fan",
-        "dimensiones_cm": {
-          "largo_cm": 19.8,
-          "ancho_cm": 10.4,
-          "alto_cm": 8.4
-        },
-        "has_display": true,
-        "display_type": "OLED",
+        "dimensiones": "19.8 × 10.4 × 8.4 cm",
+        "photometrics_1m": "3200K: 207 fc / 2235 Lux",
+        "display": "OLED",
         "app_compatible": true,
-        "app_platforms": [
-          "Android",
-          "iOS"
-        ],
-        "photometrics_full": [
-          "3200K: 207 fc / 2235 Lux",
-          "5600K: 239 fc / 2577 Lux",
-          "55° at 3200K: 1130 fc / 12,170 Lux (with Reflector)",
-          "55° at 5600K: 1333 fc / 14,350 Lux (with Reflector)"
-        ],
-        "included_accessories": [
-          "Storage Case"
-        ],
-        "case_included": true,
+        "case_incluido": "Yes",
         "yoke": "Manually-Operated Yoke",
         "fixture_mount": "Support Mount",
-        "io": [
-          "1x Barrel / Coax Power Input"
-        ]
+        "io": "1x Barrel / Coax Power Input"
       },
       "ficha": {
         "Key Specs": [
@@ -3171,33 +2524,21 @@
             "value": "15.25 x 10 x 8\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/nanlite_forza60bii_forza_60b_ii_bi_color_1736656.jpg"
+      }
     },
     "amaran_300c": {
       "marca": "Amaran",
       "modelo": "300c",
       "url_source": "https://www.bhphotovideo.com/c/product/1762211-REG/amaran_ap30011a10_300c_rgb_led_monolight.html?fromDisList=y",
       "specs": {
-        "tipo": "Monolight",
         "potencia_w": 360,
-        "lumens_at_5600k": 19389,
-        "lux_at_1m_3200k": 7520,
+        "lumens": 19389,
         "cri": 95,
-        "tlci": 95,
-        "temperatura_k": {
-          "min": 2500,
-          "max": 7500
-        },
-        "color_modes": [
-          "RGB",
-          "Daylight",
-          "Tungsten"
-        ],
+        "temperatura_k": "2500-7500K",
+        "bicolor": true,
+        "rgb": true,
         "dimming": true,
-        "control_inalambrico": [
-          "Bluetooth"
-        ],
+        "control_inalambrico": "Bluetooth",
         "alimentacion": [
           "AC",
           "Batería integrada"
@@ -3206,44 +2547,18 @@
         "peso_g": 2600
       },
       "extras": {
-        "beam_angle": {
-          "min": 90.0,
-          "max": 90.0
-        },
+        "tipo": "Monolight",
+        "item_type": "1x LED Monolight",
+        "beam_angle": "90°",
         "cooling": "Fan",
-        "dimensiones_cm": {
-          "largo_cm": 25.1,
-          "ancho_cm": 24.9,
-          "alto_cm": 19.3
-        },
-        "has_display": true,
-        "display_type": "LCD",
+        "dimensiones": "25.1 × 24.9 × 19.3 cm",
+        "photometrics_1m": "90° at 3200K: 698 fc / 7520 Lux",
+        "display": "LCD",
         "app_compatible": true,
-        "app_platforms": [
-          "Android",
-          "iOS"
-        ],
-        "tm30_rf": 92,
-        "tm30_rg": 100,
-        "ssi": {
-          "at_3200k": 83,
-          "at_5600k": 71
-        },
-        "photometrics_full": [
-          "90° at 3200K: 698 fc / 7520 Lux",
-          "90° at 5600K: 870 fc / 9370 Lux",
-          "65° at 3200K: 1987 fc / 21,390 Lux (with Reflector)",
-          "65° at 5600K: 2469 fc / 26,580 Lux (with Reflector)"
-        ],
-        "wireless_range_m": 100,
-        "included_accessories": [
-          "Storage Case"
-        ],
-        "case_included": true,
+        "case_incluido": "Yes",
         "fixture_mount": "1x 5/8\" Receiver",
-        "io": [
-          "1x XLR 3-Pin Power Input"
-        ]
+        "wireless_range": "328.1' / 100 m (Bluetooth)",
+        "io": "1x XLR 3-Pin Power Input"
       },
       "ficha": {
         "Key Specs": [
@@ -3444,18 +2759,15 @@
             "value": "17.4 x 13.8 x 9.1\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/amaran_ap30011a10_300c_rgb_led_monolight_1762211.jpg"
+      }
     },
     "godox_v100": {
       "marca": "Godox",
       "modelo": "V100",
       "url_source": "https://www.bhphotovideo.com/c/product/1868006-REG/godox_v100s_v100_flash_for_sony.html",
       "specs": {
-        "tipo": "Flash",
-        "color_modes": [
-          "Daylight"
-        ],
+        "bicolor": false,
+        "rgb": false,
         "dimming": false,
         "alimentacion": [
           "AC"
@@ -3463,11 +2775,8 @@
         "peso_g": 635
       },
       "extras": {
-        "dimensiones_cm": {
-          "largo_cm": 7.59,
-          "ancho_cm": 20.6,
-          "alto_cm": 7.14
-        },
+        "tipo": "Flash",
+        "dimensiones": "7.59 × 20.6 × 7.14 cm",
         "app_compatible": false
       },
       "ficha": {
@@ -3593,24 +2902,18 @@
             "value": "9.8 x 7.8 x 3.9\""
           }
         ]
-      },
-      "image_url": "https://www.bhphotovideo.com/images/fb/godox_v100s_v100_flash_for_sony_1868006.jpg"
+      }
     },
     "arri_650plus": {
       "marca": "ARRI",
       "modelo": "650 Plus",
       "url_source": "https://www.arri.com/en/lighting/daylight-tungsten/tungsten/arri-junior/arri-650-plus",
       "specs": {
-        "tipo": "Fresnel",
         "potencia_w": 650,
         "cri": 100,
-        "temperatura_k": {
-          "min": 3200,
-          "max": 3200
-        },
-        "color_modes": [
-          "Tungsten"
-        ],
+        "temperatura_k": "3200K",
+        "bicolor": false,
+        "rgb": false,
         "dimming": true,
         "alimentacion": [
           "AC"
@@ -3619,24 +2922,16 @@
         "peso_g": 3000
       },
       "extras": {
+        "tipo": "Fresnel",
+        "item_type": "Tungsten Fresnel",
         "bulb_type": "GY9.5 — CP89 FRL/FRK 650W (acepta CP82 500W / CP81 300W)",
-        "beam_angle": {
-          "min": 12.0,
-          "max": 52.0
-        },
+        "beam_angle": "12-52°",
         "cooling": "Passive",
         "ip_rating": "IP20",
-        "dimensiones_cm": {
-          "largo_cm": 30.0,
-          "ancho_cm": 22.0,
-          "alto_cm": 19.0
-        },
-        "voltaje_v": [
-          120,
-          230
-        ],
+        "dimensiones": "30 × 22 × 19 cm",
         "fixture_mount": "Socket 5/8\" (16 mm)",
         "accessory_diameter": "168 mm / 6.6\"",
+        "voltaje": "230 V / 120 V",
         "certificaciones": "CE, UKCA, CB, GS, cNRTLus",
         "reflector": "Esférico especular de aluminio de alta pureza",
         "serie": "ARRI Junior"
@@ -3777,24 +3072,18 @@
           }
         ]
       },
-      "_nota": "Datos oficiales arri.com (33 campos exactos)",
-      "image_url": "https://www.arri.com/resource/blob/47018/d8bc3c1de27c2c64321f44d6e62fd9b8/650-junior-plus-blue-silver-data.jpg"
+      "_nota": "Datos oficiales arri.com (33 campos exactos)"
     },
     "molerichardson_1000w": {
       "marca": "Mole-Richardson",
       "modelo": "407 Baby Solarspot 1000W 6\"",
       "url_source": "https://www.mole.com/407-baby-solarspot",
       "specs": {
-        "tipo": "Fresnel",
         "potencia_w": 1000,
         "cri": 100,
-        "temperatura_k": {
-          "min": 3200,
-          "max": 3200
-        },
-        "color_modes": [
-          "Tungsten"
-        ],
+        "temperatura_k": "3200K",
+        "bicolor": false,
+        "rgb": false,
         "dimming": true,
         "alimentacion": [
           "AC"
@@ -3803,25 +3092,16 @@
         "peso_g": 6240
       },
       "extras": {
+        "tipo": "Fresnel",
+        "item_type": "Tungsten Fresnel Spotlight",
         "bulb_type": "Medium Bi-post (1000W tungsten)",
-        "beam_angle": {
-          "min": 15.0,
-          "max": 58.0
-        },
+        "beam_angle": "15-58°",
         "cooling": "Passive",
-        "dimensiones_cm": {
-          "largo_cm": 28.6,
-          "ancho_cm": 21.9,
-          "alto_cm": 26.7
-        },
-        "voltaje_v": [
-          120,
-          240
-        ],
+        "dimensiones": "28.6 × 21.9 × 26.7 cm",
         "fixture_mount": "Yoke con spud 5/8\" (16 mm)",
         "accessory_diameter": "6 5/8\" (168 mm)",
-        "cable_length_m": 7.6,
-        "cable_specs": "25 ft (7.6 m) Type SO"
+        "cable_length": "25 ft (7.6 m) Type SO",
+        "voltaje": "120 / 240 VAC"
       },
       "ficha": {
         "Technical Specifications": [
@@ -3875,8 +3155,7 @@
           }
         ]
       },
-      "_nota": "Datos oficiales mole.com",
-      "image_url": "https://www.mole.com/images/products/407.jpg"
+      "_nota": "Datos oficiales mole.com"
     }
   }
 }

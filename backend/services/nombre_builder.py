@@ -25,6 +25,7 @@ El override manual (template del admin con tokens {marca}, {modelo}, etc.)
 sigue funcionando — gana sobre el auto-build.
 """
 
+import json
 import re
 import unicodedata
 from typing import Optional
@@ -291,13 +292,29 @@ def render_spec_value(spec_key: str, value, variant: str = "short") -> str:
 
     Args:
         spec_key: clave canónica del spec (no label)
-        value: valor del spec (str, int, float, bool, dict con {min,max})
+        value: valor del spec (str, int, float, bool, dict con {min,max}, list)
         variant: "short" para nombres públicos (default), "long" para ficha técnica
 
     Si no hay template, devuelve el valor crudo como string.
+
+    Auto-deserializa: si value es un string que parece JSON array/object
+    (empieza con '[' o '{'), intenta json.loads() — esto permite que valores
+    almacenados en equipo_specs.value como JSON string (multi_enum como
+    color_modes, ranges como temperatura_k) se renderizen correctamente.
     """
     if value is None:
         return ""
+
+    # Auto-deserialize JSON arrays/objects almacenados como string
+    # (caso típico: equipo_specs.value = '["RGB","Daylight","Tungsten"]')
+    if isinstance(value, str):
+        v_stripped = value.strip()
+        if v_stripped.startswith(("[", "{")) and v_stripped.endswith(("]", "}")):
+            try:
+                value = json.loads(v_stripped)
+            except (json.JSONDecodeError, ValueError):
+                pass  # mantener como string si no parsea
+
     raw_tpl = SPEC_DISPLAY_TEMPLATES.get(spec_key)
 
     # Si es dict, elegir variante; si es string, usar para ambos

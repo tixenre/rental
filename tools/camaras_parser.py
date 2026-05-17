@@ -198,8 +198,15 @@ def _parse_sensor(secciones: dict) -> str | None:
 
 
 def _parse_codecs(secciones: dict) -> str | None:
-    """Codecs principales — extrae partes claves del 'Internal Recording' o 'Max Recording Modes'."""
-    val = _find_value(secciones, "Internal Recording", "Max Recording Modes") or ""
+    """Codecs principales — extrae partes claves de los campos B&H que listan codecs.
+
+    B&H usa distintos labels según la cámara:
+      - Mirrorless: "Internal Recording", "Max Recording Modes"
+      - Cinema (C200, etc.): "Video Format"
+    """
+    val = _find_value(
+        secciones, "Internal Recording", "Max Recording Modes", "Video Format"
+    ) or ""
     if not val:
         return None
     # Detectar codecs conocidos (devolvemos una lista compacta como string)
@@ -216,6 +223,10 @@ def _parse_codecs(secciones: dict) -> str | None:
         ("REDCODE", r"redcode|r3d"),
         ("Cinema RAW Light", r"cinema\s*raw\s*light"),
         ("Cinema RAW", r"cinema\s*raw(?!\s*light)"),
+        # Canon proprietary
+        ("XF-AVC", r"xf-?avc"),
+        ("XF-HEVC", r"xf-?hevc"),
+        # Genéricos
         ("MPEG-4 AVC", r"mpeg-?4\s*avc"),
         ("H.265 HEVC", r"h\.?265|hevc"),
         ("H.264", r"h\.?264"),
@@ -890,10 +901,51 @@ def save_raw(data: dict):
     RELEVAMIENTO_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+_CURADO_META_DEFAULT = {
+    "version": "1.0",
+    "descripcion": (
+        "Dataset normalizado de cámaras del inventario. Cada producto tiene specs "
+        "(comparables/filtrables), extras (ficha técnica), y ficha (raw B&H/manufacturer)."
+    ),
+    "fuente_principal": "B&H Photo HTML guardado + JSON-LD structured data",
+    "fuente_alternativa": "manufacturer sites (sony.com, canon.com, red.com, etc.) vía WebFetch",
+    "ubicacion_htmls": "~/Desktop/Paginas/Camaras/",
+    "schema": {
+        "specs": (
+            "21 spec_keys canónicos (tipo, lens_mount, formato, resolucion_max, "
+            "fps_max, codecs, megapixels, iso_nativo/extendido, rango_dinamico_stops, "
+            "estabilizacion, autofocus, fast_slow_motion, lens_communication, gps, "
+            "ip_streaming, netflix_approved, continuous_shooting_fps, max_aperture, "
+            "sensor_crop, recording_limit_min, peso_g)"
+        ),
+        "extras": "~80 campos estructurados (sensor, af_puntos, ISO range, video_io, audio_io, etc.)",
+        "ficha": "raw B&H — secciones tal cual aparecen"
+    },
+    "convenciones": {
+        "ids": "{marca}_{modelo}, snake_case. Ej: sony_fx3a, red_komodo, red_komodo_x",
+        "unidades": "Numéricos en base SI (g, K, fps, MP). UI computa display.",
+        "ausencia": "null o campo ausente = 'no aplica'. Ej. lens_mount=null para GoPro (lente fijo)",
+        "lens_mount": "null para action/fixed-lens. Enum: E, RF, EF, L, Z, X, MFT, PL, BMD, B4, M42"
+    },
+    "categorizacion": {
+        "nivel_1": "Foto / Video (contenedor) / Acción — por use case",
+        "nivel_2_video": "Sub-categorías por montura (Montura E, RF, EF, L, Z, PL, BMD)",
+        "multi_cat": "Mirrorless híbridas aparecen en Foto + Video/Montura X (ej. a7V)"
+    },
+    "como_agregar_camara_nueva": [
+        "1. Guardar página B&H del producto en ~/Desktop/Paginas/Camaras/ (Cmd+S → Webpage Complete)",
+        "2. Agregar la ruta del HTML en tools/camaras_rebuild.sh",
+        "3. Correr: bash tools/camaras_rebuild.sh",
+        "4. Verificar resultado en docs/camaras.json",
+        "5. Si el HTML viene del sitio fabricante (no B&H), agregar entrada manual en tools/camaras_patches.py"
+    ]
+}
+
+
 def load_curado() -> dict:
     if CURADO_PATH.exists():
         return json.loads(CURADO_PATH.read_text(encoding="utf-8"))
-    return {"_meta": {"descripcion": "Specs curadas de cámaras mapeadas a spec_keys del proyecto."}, "products": {}}
+    return {"_meta": _CURADO_META_DEFAULT, "products": {}}
 
 
 def save_curado(data: dict):

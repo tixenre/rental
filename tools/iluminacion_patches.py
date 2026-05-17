@@ -89,7 +89,7 @@ def apply_patches():
         "specs": {
             "potencia_w": 650, "cri": 100, "temperatura_k": "3200K",
             "bicolor": False, "rgb": False, "dimming": True,
-            "alimentacion": ["AC"], "montaje": "Fresnel", "peso": "3000 g",
+            "alimentacion": ["AC"], "montaje": "Fresnel", "peso_g": 3000,
         },
         "extras": {
             "tipo": "Fresnel",
@@ -127,7 +127,7 @@ def apply_patches():
         "specs": {
             "potencia_w": 1000, "cri": 100, "temperatura_k": "3200K",
             "bicolor": False, "rgb": False, "dimming": True,
-            "alimentacion": ["AC"], "montaje": "Fresnel", "peso": "6240 g",
+            "alimentacion": ["AC"], "montaje": "Fresnel", "peso_g": 6240,
         },
         "extras": {
             "tipo": "Fresnel",
@@ -159,6 +159,16 @@ def apply_patches():
     if "amaran_300c" in curado["products"]:
         curado["products"]["amaran_300c"]["specs"]["temperatura_k"] = "2500-7500K"
 
+    # ── Aputure B7c: HTML estaba incompleto, peso desde specs Aputure oficial ─
+    # B7c es un bulbo E26 — 4.54" alto × 2.74" diámetro, ~210g
+    if "aputure_b7c" in curado["products"]:
+        b7c_specs = curado["products"]["aputure_b7c"]["specs"]
+        if b7c_specs.get("peso_g") is None:
+            b7c_specs["peso_g"] = 210
+        b7c_extras = curado["products"]["aputure_b7c"].setdefault("extras", {})
+        if "dimensiones" not in b7c_extras:
+            b7c_extras["dimensiones"] = "11.5 × 7 cm (alto × diámetro)"
+
     with open(CURADO_PATH, "w") as f:
         json.dump(curado, f, indent=2, ensure_ascii=False)
         f.write("\n")
@@ -166,7 +176,7 @@ def apply_patches():
         json.dump(raw, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
-    print(f"  Parches aplicados: ARRI 650 Plus, Mole 1000W, amaran 300c (temp)")
+    print(f"  Parches aplicados: ARRI 650 Plus, Mole 1000W, amaran 300c (temp), Aputure B7c (peso)")
 
 
 if __name__ == "__main__":

@@ -487,22 +487,29 @@ def _parse_montaje(secciones: dict) -> str | None:
     return val.split("\n")[0].strip()
 
 
-def _parse_peso(secciones: dict) -> str | None:
+def _parse_peso_g(secciones: dict) -> int | None:
+    """Weight → int gramos (no string). El display lo computa la UI vía
+    SPEC_DISPLAY_TEMPLATES._smart_kg."""
     val = _find_value(secciones, "Weight")
     if not val:
         return None
-    # Preferir valor en kg: "0.86 lb / 0.39 kg (Fixture)" → "390 g"
-    # o "2.5 kg" → "2500 g"
+    # Preferir valor en kg: "0.86 lb / 0.39 kg (Fixture)" → 390 g
     m_kg = re.search(r"([\d.]+)\s*kg", val, re.IGNORECASE)
     if m_kg:
-        grams = round(float(m_kg.group(1)) * 1000)
-        return f"{grams} g"
+        return round(float(m_kg.group(1)) * 1000)
     # Si solo hay lb: convertir
     m_lb = re.search(r"([\d.]+)\s*lb", val, re.IGNORECASE)
     if m_lb:
-        grams = round(float(m_lb.group(1)) * 453.592)
-        return f"{grams} g"
-    return val.strip()
+        return round(float(m_lb.group(1)) * 453.592)
+    # Fallback: gramos directos
+    m_g = re.search(r"([\d.]+)\s*g\b", val, re.IGNORECASE)
+    if m_g:
+        return int(float(m_g.group(1)))
+    return None
+
+
+# Alias por compat hacia atrás (otros archivos podrían importar _parse_peso)
+_parse_peso = _parse_peso_g
 
 
 # ── Extras (campos estructurados extra para ficha técnica) ───────────────────
@@ -712,9 +719,9 @@ def map_luz_specs(secciones: dict, title: str = "") -> dict:
     if montaje:
         result["montaje"] = montaje
 
-    peso = _parse_peso(secciones)
-    if peso:
-        result["peso"] = peso
+    peso = _parse_peso_g(secciones)
+    if peso is not None:
+        result["peso_g"] = peso
 
     return result
 

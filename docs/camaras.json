@@ -1,6 +1,33 @@
 {
   "_meta": {
-    "descripcion": "Specs curadas de cámaras mapeadas a spec_keys del proyecto."
+    "version": "1.0",
+    "descripcion": "Dataset normalizado de cámaras del inventario. Cada producto tiene specs (comparables/filtrables), extras (ficha técnica), y ficha (raw B&H/manufacturer).",
+    "fuente_principal": "B&H Photo HTML guardado + JSON-LD structured data",
+    "fuente_alternativa": "manufacturer sites (sony.com, canon.com, red.com, etc.) vía WebFetch",
+    "ubicacion_htmls": "~/Desktop/Paginas/Camaras/",
+    "schema": {
+      "specs": "21 spec_keys canónicos (tipo, lens_mount, formato, resolucion_max, fps_max, codecs, megapixels, iso_nativo/extendido, rango_dinamico_stops, estabilizacion, autofocus, fast_slow_motion, lens_communication, gps, ip_streaming, netflix_approved, continuous_shooting_fps, max_aperture, sensor_crop, recording_limit_min, peso_g)",
+      "extras": "~80 campos estructurados (sensor, af_puntos, ISO range, video_io, audio_io, etc.)",
+      "ficha": "raw B&H — secciones tal cual aparecen"
+    },
+    "convenciones": {
+      "ids": "{marca}_{modelo}, snake_case. Ej: sony_fx3a, red_komodo, red_komodo_x",
+      "unidades": "Numéricos en base SI (g, K, fps, MP). UI computa display.",
+      "ausencia": "null o campo ausente = 'no aplica'. Ej. lens_mount=null para GoPro (lente fijo)",
+      "lens_mount": "null para action/fixed-lens. Enum: E, RF, EF, L, Z, X, MFT, PL, BMD, B4, M42"
+    },
+    "categorizacion": {
+      "nivel_1": "Foto / Video (contenedor) / Acción — por use case",
+      "nivel_2_video": "Sub-categorías por montura (Montura E, RF, EF, L, Z, PL, BMD)",
+      "multi_cat": "Mirrorless híbridas aparecen en Foto + Video/Montura X (ej. a7V)"
+    },
+    "como_agregar_camara_nueva": [
+      "1. Guardar página B&H del producto en ~/Desktop/Paginas/Camaras/ (Cmd+S → Webpage Complete)",
+      "2. Agregar la ruta del HTML en tools/camaras_rebuild.sh",
+      "3. Correr: bash tools/camaras_rebuild.sh",
+      "4. Verificar resultado en docs/camaras.json",
+      "5. Si el HTML viene del sitio fabricante (no B&H), agregar entrada manual en tools/camaras_patches.py"
+    ]
   },
   "products": {
     "sony_fx3a": {
@@ -549,7 +576,6 @@
         "focus_modes": "Continuous-Servo AF, Direct Manual Focus, Manual Focus, Single-Servo AF, Subject Tracking (Auto-Tracking/Animals/Birds/Eyes/Insects/People/Vehicles)",
         "focus_type": "Auto and Manual Focus",
         "image_file_format": "HEIF, JPEG, Raw",
-        "interval_recording": "Yes",
         "video_output_modes": "4:2:2 8/10-Bit\n3840 x 2160p at 23.98/25/29.97/50/59.94 fps\n1920 x 1080p at 23.98/50/59.94 fps\n1920 x 1080i at 50/59.94 fps",
         "bit_depth": "14-Bit",
         "aspect_ratio": "1:1, 3:2, 4:3, 16:9",
@@ -1266,7 +1292,6 @@
         "focus_modes": "Automatic, Direct Manual Focus, Manual Focus",
         "focus_type": "Auto and Manual Focus",
         "image_file_format": "HEIF, JPEG, Raw",
-        "interval_recording": "Yes",
         "video_output_modes": "4:2:2 10-Bit\n3840 x 2160 at 23.98/25/29.97/50/59.94 fps\n1920 x 1080i at 50/59.94 fps\n1920 x 1080 at 23.98/50/59.94 fps",
         "bit_depth": "10-Bit",
         "aspect_ratio": "1:1, 3:2, 4:3, 16:9",
@@ -1857,6 +1882,7 @@
         "formato": "Super 35",
         "resolucion_max": "4K",
         "fps_max": 98,
+        "codecs": "Cinema RAW Light",
         "megapixels": 8.85,
         "estabilizacion": false,
         "autofocus": true,
@@ -3463,7 +3489,6 @@
         "zoom": "Digital: 2x",
         "field_of_view": "156°",
         "pantalla": "Fixed Touchscreen LCD",
-        "memoria_tipo": "No",
         "audio_recording": "WAV:",
         "inputs_outputs": "1x USB-C Power Input/Output",
         "tripod_thread": "1/4\"-20 Female",

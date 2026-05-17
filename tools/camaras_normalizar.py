@@ -168,19 +168,17 @@ def canon_id(pid: str) -> str:
 # ── Limpieza de extras ──────────────────────────────────────────────────
 
 def clean_extras(extras: dict) -> dict:
+    """Filtra valores basura de extras. Misma lógica que iluminacion_normalizar."""
     cleaned = {}
+    GARBAGE = {"1 x", "1x", "n/a", "no", "none", ":", "yes", ""}
     for k, v in extras.items():
         if v is None or v == "" or v == "—":
             continue
         if isinstance(v, str):
             vc = v.strip()
-            if vc.lower() in ("1 x", "1x", "n/a", "no", "none", ":", "yes"):
-                # "yes" descartado porque sin contexto no aporta; "no" idem
-                if vc.lower() not in ("yes", "no"):
-                    continue
-                if vc.lower() in ("yes", "no"):
-                    # Algunos casos donde "Yes"/"No" sí importan (bool en spec_key dedicado)
-                    cleaned[k] = vc
+            if vc.lower() in GARBAGE:
+                continue
+            if vc.lower().startswith("not specified"):
                 continue
             cleaned[k] = vc
         else:
