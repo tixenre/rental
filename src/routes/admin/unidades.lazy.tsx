@@ -87,7 +87,7 @@ function UnidadesPage() {
       <header className="flex items-end justify-between gap-3">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            Back-office › Catálogo
+            Back-office › Specs
           </div>
           <h1 className="font-display text-3xl text-ink flex items-center gap-2">
             <Ruler className="h-6 w-6 text-amber" />
