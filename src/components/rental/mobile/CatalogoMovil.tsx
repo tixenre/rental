@@ -841,6 +841,18 @@ function EquipmentRow({ eq, inCart, isExpanded, jornadas, fechaDesde, onTap, onA
 
   const expansionTotal = formatARS(eq.pricePerDay * (inCart || 1) * jornadas);
 
+  const quickFacts = (
+    eq.specsDestacados && eq.specsDestacados.length > 0
+      ? eq.specsDestacados
+      : [
+          eq.montura && { label: "Montura", value: eq.montura },
+          eq.formato && { label: "Formato", value: eq.formato },
+          eq.resolucion && { label: "Resolución", value: eq.resolucion },
+          eq.peso && { label: "Peso", value: eq.peso },
+          eq.alimentacion && { label: "Alimentación", value: eq.alimentacion },
+        ].filter((x): x is { label: string; value: string } => !!x)
+  ).slice(0, 4);
+
   return (
     <div
       className={cn(
@@ -991,17 +1003,34 @@ function EquipmentRow({ eq, inCart, isExpanded, jornadas, fechaDesde, onTap, onA
                     >
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
-                    {item.name}
+                    {item.qty && item.qty > 1 ? `${item.qty}× ` : ""}{item.name}
                   </span>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Specs */}
-          <div className="font-sans text-[11px] text-muted-foreground leading-relaxed mb-2.5">
-            {eq.description || eq.specs.map((s) => `${s.label}: ${s.value}`).join(" · ") || "—"}
-          </div>
+          {/* Specs destacados (top 4) */}
+          {quickFacts.length > 0 && (
+            <div className="mb-2.5 flex flex-wrap gap-1">
+              {quickFacts.map((f) => {
+                const hasValue = !!f.value?.trim();
+                return (
+                  <span
+                    key={f.label}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-card px-2 py-0.5 font-sans text-[11px]"
+                  >
+                    <span className="font-mono uppercase tracking-wider text-[9px] text-muted-foreground">
+                      {f.label}
+                    </span>
+                    {hasValue && (
+                      <span className="font-medium text-ink">{f.value}</span>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+          )}
 
           {/* Ficha link */}
           <button
