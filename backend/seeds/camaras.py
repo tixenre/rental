@@ -22,28 +22,43 @@ DATASET_PATH = ROOT / "docs" / "camaras.json"
 CATEGORIA_RAIZ = "Cámaras"
 
 # Taxonomía de 2 niveles, alineada con cómo el cliente busca:
-#   Foto / Video / Acción son los "buckets" principales (use case).
-#   Video se sub-divide en Cine vs Híbrida (granularidad técnica).
+#   - Foto / Video / Acción son los "buckets" principales (use case)
+#   - Video se sub-divide por MONTURA para que el cliente filtre por
+#     compatibilidad de lentes que ya tiene (criterio #1 en rentals cine)
 #
-# El parent "Video" se crea sin productos directos — sus children son los
-# que contienen los equipos. La estructura final en categorias table:
+# Multi-categorización (M2M via equipo_categorias):
+#   - Cámaras híbridas tipo Sony a7V pueden estar en Foto Y Video/Montura E
+#   - El placeholder de categoría también respeta esto (un equipo → N cat)
+#
+# Estructura:
 #   Cámaras (raíz)
-#     ├─ Foto
-#     ├─ Video (intermediate)
-#     │     ├─ Cine
-#     │     └─ Híbrida
-#     └─ Acción
+#     ├─ Foto                — todo lo apto para stills (incluye híbridas)
+#     ├─ Video               — contenedor sin productos directos
+#     │     ├─ Montura E     — Sony cinema/mirrorless con E mount
+#     │     ├─ Montura RF    — Canon/RED RF
+#     │     ├─ Montura EF    — Canon EF cine (C200 used, etc.)
+#     │     ├─ Montura L     — Panasonic, Leica, Sigma L
+#     │     ├─ Montura Z     — Nikon Z
+#     │     ├─ Montura PL    — cine PL (Alexa, Sony Venice, RED PL)
+#     │     └─ Montura BMD   — Blackmagic Pocket
+#     └─ Acción              — GoPro, Insta360, DJI Action
 
 SUBCATEGORIAS_NIVEL1 = [
-    ("Foto",   10),   # DSLR, Medium Format, mirrorless stills-focused
-    ("Video",  20),   # contenedor (cine + híbrida abajo)
-    ("Acción", 30),   # GoPro, Insta360, DJI Action, etc.
+    ("Foto",   10),   # DSLR, Medium Format, mirrorless híbridas (también acá)
+    ("Video",  20),   # contenedor (sub-divide por montura)
+    ("Acción", 30),   # GoPro, Insta360, DJI Action
 ]
 
-# Sub-sub-categorías dentro de "Video"
+# Sub-categorías dentro de "Video", por montura del cuerpo
+# (criterio principal de compatibilidad para producción cine)
 SUBCATEGORIAS_NIVEL2_VIDEO = [
-    ("Cine",     10),  # FX3A, C200, KOMODO-X — cinema-grade dedicated
-    ("Híbrida",  20),  # a7V, ZV-E1 — mirrorless con buen video pero también stills
+    ("Montura E",   10),  # Sony cinema + mirrorless E (FX3A, a7V, ZV-E1, FX6, FX9, FX30)
+    ("Montura RF",  20),  # Canon R + RED KOMODO RF
+    ("Montura EF",  30),  # Canon EF cine (C200, C300, etc.)
+    ("Montura L",   40),  # Panasonic S series, Sigma fp, Leica
+    ("Montura Z",   50),  # Nikon Z series
+    ("Montura PL",  60),  # Cine PL — Alexa, Sony Venice, RED PL
+    ("Montura BMD", 70),  # Blackmagic Pocket
 ]
 
 
@@ -110,26 +125,52 @@ SPEC_FLAGS_CAMARAS = {
 }
 
 
-def categorize(producto: dict) -> str:
-    """Sub-categoría hoja (segundo nivel cuando aplica).
+def categorize(producto: dict) -> list[str]:
+    """Devuelve LISTA de sub-categorías donde va el producto (M2M).
 
-    Devuelve el nombre de la categoría más específica donde va el producto:
-      Acción      — action cams (GoPro, Insta360, DJI Action)
-      Foto        — DSLRs, Medium Format, mirrorless stills-focused
-      Cine        — cinema cameras dedicadas (FX3A, KOMODO-X, C200, Alexa)
-      Híbrida     — mirrorless full-frame / APS-C hybrid (a7V, ZV-E1, FX30)
+    Reglas:
+      - tipo Action Camera → ["Acción"]
+      - tipo DSLR / Medium Format / Compact → ["Foto"]
+      - tipo Cinema Camera → ["Video / Montura X"] solo (cinema = video)
+      - tipo Mirrorless / Vlogging → ["Foto", "Video / Montura X"]
+        (híbridas se rentan para ambos casos de uso)
 
-    El parent 'Video' agrupa Cine + Híbrida pero no recibe productos directos.
+    El segundo nivel para Video depende de lens_mount del equipo.
     """
-    tipo = producto.get("specs", {}).get("tipo", "")
+    specs = producto.get("specs", {})
+    tipo = specs.get("tipo", "")
+    mount = specs.get("lens_mount")
+
     if tipo == "Action Camera":
-        return "Acción"
+        return ["Acción"]
     if tipo in ("DSLR", "Medium Format", "Compact"):
-        return "Foto"
+        # Foto pura — pero si tiene buen video, mostrar también en Video
+        cats = ["Foto"]
+        if mount:
+            cats.append(_video_subcat_for_mount(mount))
+        return cats
+
+    # Video-primary (cinema) o Híbrida (mirrorless/vlogging)
+    cats = []
     if tipo == "Cinema Camera":
-        return "Cine"
-    # Mirrorless, Vlogging, Camera (genérico) → Híbrida por default
-    return "Híbrida"
+        # Cinema → solo Video
+        if mount:
+            cats.append(_video_subcat_for_mount(mount))
+    else:
+        # Mirrorless / Vlogging / Híbrida — sirve para foto Y video
+        cats.append("Foto")
+        if mount:
+            cats.append(_video_subcat_for_mount(mount))
+    return cats or ["Foto"]  # fallback razonable
+
+
+def _video_subcat_for_mount(mount: str) -> str:
+    """Mapea lens_mount → nombre de sub-categoría bajo Video."""
+    mount = (mount or "").strip().upper()
+    if mount in ("E", "RF", "EF", "L", "Z", "PL", "BMD"):
+        return f"Montura {mount}"
+    # Mount poco común — caer en E como default seguro
+    return f"Montura {mount}" if mount else "Montura E"
 
 
 def serialize_spec_value(spec_key: str, value) -> str | None:
@@ -324,6 +365,25 @@ def seed_camaras(conn, dry_run: bool = False) -> dict:
                 stats["equipos_creados"] += 1
 
         if equipo_id != -1 and not dry_run:
+            # 4a. Asignar a sub-categorías (multi-cat M2M)
+            for cat_name in categorize(prod):
+                cat_id = subcat_ids.get(cat_name)
+                if not cat_id:
+                    # Sub-categoría no estaba pre-creada (ej. Montura Z sin productos en SUBCATEGORIAS_NIVEL2_VIDEO)
+                    # La creamos on-the-fly como child de Video
+                    video_pid = nivel1_ids.get("Video")
+                    if cat_name.startswith("Montura ") and video_pid:
+                        cat_id = _upsert_subcat(cat_name, 99, video_pid)
+                        if cat_id:
+                            subcat_ids[cat_name] = cat_id
+                if cat_id and cat_id != -1:
+                    conn.execute("""
+                        INSERT INTO equipo_categorias (equipo_id, categoria_id)
+                        VALUES (%s, %s)
+                        ON CONFLICT (equipo_id, categoria_id) DO NOTHING
+                    """, (equipo_id, cat_id))
+
+            # 4b. Spec values
             specs = prod.get("specs", {})
             for spec_key, value in specs.items():
                 spec_def_id = spec_def_ids.get(spec_key)

@@ -51,26 +51,60 @@ Campos opcionales descriptivos:
 
 ## Sub-categorías (taxonomía de catálogo)
 
-Estructura de 2 niveles, alineada con cómo el cliente busca (use case + granularidad):
+Estructura de 2 niveles, **multi-categorización M2M** (un equipo en N categorías):
 
 ```
 Cámaras
-├─ Foto                      — DSLRs, Medium Format, mirrorless stills-focused
+├─ Foto                      — DSLRs, Medium Format, híbridas que también disparan stills
 ├─ Video                     — contenedor (sin productos directos)
-│   ├─ Cine                  — cinema cameras dedicadas (FX3A, KOMODO-X, C200, Alexa)
-│   └─ Híbrida               — mirrorless full-frame / APS-C híbridas (a7V, ZV-E1, FX30)
+│   ├─ Montura E             — Sony cinema/mirrorless (FX3A, FX6/9/30, a7V, a7S, ZV-E1)
+│   ├─ Montura RF            — Canon R + RED KOMODO RF
+│   ├─ Montura EF            — Canon EF cine (C200, C300, etc.)
+│   ├─ Montura L             — Panasonic S, Sigma fp, Leica
+│   ├─ Montura Z             — Nikon Z
+│   ├─ Montura PL            — cine PL (Alexa, Sony Venice, RED PL)
+│   └─ Montura BMD           — Blackmagic Pocket
 └─ Acción                    — GoPro, Insta360, DJI Action
 ```
 
-**Decisión de diseño:** "Video" es un parent intermedio sin productos. El cliente
-que busca "cámara de video" entra a Video y ve Cine + Híbrida como sub-opciones.
-Esto se alinea con el flujo de búsqueda real (use case primero, granularidad después).
+**Decisiones de diseño:**
+
+1. **Video sub-divide por MONTURA** (no por form factor) — el cliente cine busca
+   "necesito una cámara que use mis lentes Sigma EF" o "tengo lentes Sony E".
+   La montura es el criterio #1 de compatibilidad práctica.
+
+2. **Multi-categorización** — equipos pueden estar en N categorías a la vez
+   (`equipo_categorias` ya es M2M en el schema). Las híbridas tipo Sony a7V
+   aparecen en **Foto + Video/Montura E** porque sirven para los dos casos.
+
+3. **"Video" es parent intermedio** — sin productos directos, solo agrupa
+   sub-categorías de montura. El cliente entra a Video y ve cuáles montaras
+   están disponibles en el inventario.
 
 Lógica en `seeds/camaras.py::categorize()`:
-- `tipo == "Action Camera"` → Acción
-- `tipo in ("DSLR", "Medium Format", "Compact")` → Foto
-- `tipo == "Cinema Camera"` → Cine (bajo Video)
-- `Mirrorless`, `Vlogging`, default → Híbrida (bajo Video)
+
+| tipo (del producto) | Aparece en |
+|---|---|
+| `Action Camera` | `["Acción"]` |
+| `DSLR` / `Medium Format` / `Compact` | `["Foto", "Montura {X}"]` si tiene mount |
+| `Cinema Camera` | `["Montura {X}"]` solo (no Foto) |
+| `Mirrorless` / `Vlogging` / default | `["Foto", "Montura {X}"]` |
+
+Donde `{X}` es el `lens_mount` del producto.
+
+**Ejemplo distribución actual:**
+
+```
+Foto (2):           Sony a7V, Sony ZV-E1
+Video / Montura E (3):   Sony FX3A, Sony a7V, Sony ZV-E1
+Video / Montura RF (1):  RED KOMODO-X
+Video / Montura EF (1):  Canon EOS C200
+Acción (1):         GoPro HERO12 Black
+```
+
+Notar que **a7V y ZV-E1 aparecen 2 veces** (Foto + Video/Montura E) — es lo
+esperado para híbridas. El catálogo muestra un equipo único pero filtrable
+desde ambas categorías.
 
 ## Marcas canónicas
 
