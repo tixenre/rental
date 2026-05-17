@@ -101,23 +101,65 @@ export default function ClientePortal() {
 
   const userName = perfil ? `${perfil.nombre} ${perfil.apellido}` : undefined;
 
+  const ACTIVE_STATES = new Set(["solicitado", "confirmado", "entregado"]);
+  const HIST_STATES = new Set(["devuelto", "finalizado"]);
+  const activosPedidos = pedidos.filter((p) => ACTIVE_STATES.has(p.estado));
+  const totalActivos = activosPedidos.reduce((sum, p) => sum + (p.monto_total ?? 0), 0);
+  const pendientePago = activosPedidos.reduce(
+    (sum, p) => sum + Math.max(0, (p.monto_total ?? 0) - (p.monto_pagado ?? 0)),
+    0,
+  );
+  const historico = pedidos.filter((p) => HIST_STATES.has(p.estado)).length;
+
   return (
     <PublicLayout
       topBar={{ variant: "cliente", userName, onLogout: handleLogout }}
     >
       {/* Sub-header amarillo Rambla — saludo / título de página */}
       <div className="bg-amber border-b hairline">
-        <div className="max-w-2xl mx-auto px-4 py-5">
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/70">
+        <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
+          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/60">
             Portal de clientes
           </div>
-          <h1 className="font-display text-3xl text-ink mt-1">
+          <h1 className="font-display text-4xl sm:text-5xl font-black text-ink mt-1.5 leading-none tracking-tight">
             {perfil ? `Hola, ${perfil.nombre}` : "Mi cuenta"}
           </h1>
+          <p className="mt-3 text-sm text-ink/70">
+            Mirá tus pedidos, descargá documentos y consultá pagos.
+          </p>
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+        {/* Stats row */}
+        {pedidos.length > 0 && (
+          <div className="grid grid-cols-3 gap-2.5">
+            <div className="rounded-lg border hairline bg-surface px-4 py-3">
+              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Activos</div>
+              <div className="font-display text-2xl font-black text-ink tabular-nums leading-none mt-1.5">
+                {activosPedidos.length}
+              </div>
+              <div className="font-mono text-[10px] text-muted-foreground mt-1">{fmt(totalActivos)} en rentals</div>
+            </div>
+            <div className="rounded-lg border hairline bg-surface px-4 py-3">
+              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">A pagar</div>
+              <div className={`font-display text-2xl font-black tabular-nums leading-none mt-1.5 ${pendientePago > 0 ? "text-ink" : "text-verde"}`}>
+                {pendientePago > 0 ? fmt(pendientePago) : "$ 0"}
+              </div>
+              <div className="font-mono text-[10px] text-muted-foreground mt-1">
+                {pendientePago > 0 ? "saldo pendiente" : "todo al día"}
+              </div>
+            </div>
+            <div className="rounded-lg border hairline bg-surface px-4 py-3">
+              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Histórico</div>
+              <div className="font-display text-2xl font-black text-ink tabular-nums leading-none mt-1.5">
+                {historico}
+              </div>
+              <div className="font-mono text-[10px] text-muted-foreground mt-1">pedidos completados</div>
+            </div>
+          </div>
+        )}
+
         <h2 className="font-display text-xl text-ink">Mis pedidos</h2>
 
         {pedidos.length === 0 ? (

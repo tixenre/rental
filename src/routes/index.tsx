@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
-import { LayoutGrid, List, ArrowRight, Search, X, Sparkles, Loader2 } from "lucide-react";
+import { LayoutGrid, List, ArrowRight, Sparkles, Loader2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { MobileStickyBar } from "@/components/rental/MobileStickyBar";
@@ -21,6 +21,8 @@ import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const POPULAR_CHIPS = ["Sony FX3", "Aputure 600d", "RØDE", "Pack boda", "Pack entrevista"];
 
 type IndexSearch = {
   /** Modo de visualización compartible por URL. `?view=grid` o `?view=list`. */
@@ -179,7 +181,7 @@ function Index() {
   const getDisponible = (item: Equipment) => item.disponible;
 
   return (
-    <PublicLayout>
+    <PublicLayout searchValue={query} onSearch={setQuery}>
         <ViewIntroDialog onPick={(m) => setMode(m)} />
         {/* Hero amarillo brand */}
         <section className="relative overflow-hidden border-b hairline bg-amber text-ink">
@@ -271,26 +273,25 @@ function Index() {
               </button>
             </div>
 
-            {/* Col central: buscador (bajo el pill) */}
-            <div className="px-4">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar equipo, marca…"
-                  className="w-full rounded-full border-2 hairline bg-muted/50 py-2 pl-9 pr-9 text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none focus:bg-background transition"
-                />
-                {query && (
-                  <button
-                    onClick={() => setQuery("")}
-                    aria-label="Limpiar búsqueda"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-foreground/10 hover:text-ink"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
+            {/* Col central: popular chips (la búsqueda está en el TopBar en desktop) */}
+            <div className="flex items-center gap-2 overflow-x-auto px-2 scrollbar-none">
+              <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground shrink-0 select-none">
+                Popular
+              </span>
+              {POPULAR_CHIPS.map((chip) => (
+                <button
+                  key={chip}
+                  onClick={() => setQuery(query === chip ? "" : chip)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs font-medium whitespace-nowrap transition shrink-0",
+                    query === chip
+                      ? "border-amber/60 bg-amber/15 font-semibold text-ink"
+                      : "border-hairline bg-transparent text-ink hover:border-ink/40 hover:bg-muted/50",
+                  )}
+                >
+                  {chip}
+                </button>
+              ))}
             </div>
 
             {/* Col derecha: contador (bajo carrito/ingresar) */}
