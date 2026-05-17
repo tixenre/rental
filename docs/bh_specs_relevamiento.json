@@ -1,0 +1,634 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "descripcion": "Dataset crudo de specs reales de B&H Photo capturadas por screenshot manual + Firecrawl extract. Cada producto guarda: categoría, marca, modelo, secciones de B&H, y pares (label, value) tal cual aparecen. Se usa para análisis del catálogo normalizado v2 (backend/seeds/catalogo_v2.py).",
+    "metodo_captura": "Screenshots provistos por el dueño + extract via Firecrawl jsonOptions.schema",
+    "uso": "Cuando haya 5-10 productos por categoría, sintetizar para refinar catálogo: detectar specs nuevas, calibrar enum_options, identificar compuestos que necesitan parser o tabla.",
+    "convencion": {
+      "secciones": "B&H usa estas secciones por categoría: Key Specs / Light Fixture / Connectivity / Power & I/O / Mounting / General / Packaging Info (varía por dominio)",
+      "values_compuestos": "Cuando un value tiene formato 'X / Y (descripcion)', se preserva tal cual — el análisis decide si parsearlo en specs separadas o dejarlo como tabla.",
+      "categoria_inferida": "Inferida del Item Type + nombre del producto"
+    }
+  },
+
+  "products": [
+    {
+      "id": "amaran_300c",
+      "categoria_raiz": "Iluminación",
+      "subtipo": "LED Monolight RGB",
+      "marca": "Amaran",
+      "modelo": "300c RGB LED Monolight (Gray)",
+      "url_source": "https://www.bhphotovideo.com/c/product/1762211-REG/amaran_ap30011a10_300c_rgb_led_monolight.html",
+      "status_bh": "No Longer Available",
+      "fuente": "screenshot manual del dueño (16-may-2026)",
+      "secciones": {
+        "Light Fixture": [
+          {"label": "Item Type", "value": "1x LED Monolight"},
+          {"label": "Included Storage Case", "value": "Yes"},
+          {"label": "Lumens", "value": "19,389 (at 5600K)"},
+          {"label": "Photometrics", "value": "90° at 3200K:\n698 fc / 7520 Lux at 3.3' / 1 m\n85 fc / 915 Lux at 9.8' / 3 m\n90° at 5600K:\n870 fc / 9370 Lux at 3.3' / 1 m\n105 fc / 1140 Lux at 9.8' / 3 m\n65° at 3200K:\n1987 fc / 21,390 Lux at 3.3' / 1 m (with Reflector)\n1987 fc / 21,390 Lux at 9.8' / 3 m (with Reflector)\n65° at 5600K:\n2469 fc / 26,580 Lux at 3.3' / 1 m (with Reflector)\n218 fc / 2351 Lux at 9.8' / 3 m (with Reflector)"},
+          {"label": "Color Modes", "value": "RGB, Daylight, Tungsten"},
+          {"label": "Color Accuracy Standard", "value": "CRI 95\nTLCI 95\nCQS 97\nSSI 83 at 3200K\nSSI 71 at 5600K\nTM-30 Rf 92\nTM-30 Rg 100"},
+          {"label": "Dimming", "value": "App-Controlled / Built-In Dimmer (Continuous)\n• 0 to 100%"},
+          {"label": "Cooling System", "value": "Fan"},
+          {"label": "Preprogrammed Effects", "value": "Yes"},
+          {"label": "Umbrella Mount", "value": "Yes"},
+          {"label": "Front Accessory Mount", "value": "Bowens S"}
+        ],
+        "Connectivity": [
+          {"label": "Wireless Remote Control Type", "value": "Bluetooth"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nApp Name: Sidus Link\nFunctionality: Remote Control"},
+          {"label": "Wireless Range", "value": "328.1' / 100 m (Bluetooth)"}
+        ],
+        "Power & I/O": [
+          {"label": "Power Source", "value": "AC to DC Adapter (Included)\nBattery (Not Included)"},
+          {"label": "Inputs/Outputs", "value": "1x XLR 3-Pin Power Input"},
+          {"label": "Battery", "value": "1x Battery Power Station, 48 VDC (Not Included)"},
+          {"label": "Input Power", "value": "48 VDC at 7.5 A\n100 to 240 VAC, 50 / 60 Hz at 2.5 A"},
+          {"label": "Included Adapter / Cable", "value": "1x USA Type-A/B to XLR 3-Pin AC to DC Adapter (9.8' / 3 m)"},
+          {"label": "Inline Switch", "value": "No"},
+          {"label": "Power Pass-Thru", "value": "No"},
+          {"label": "Power Consumption", "value": "360 W (Maximum)"}
+        ],
+        "Mounting": [
+          {"label": "Fixture Mounting", "value": "1x 5/8\" Receiver"}
+        ],
+        "General": [
+          {"label": "Display", "value": "LCD"},
+          {"label": "Environmental Resistance", "value": "No"},
+          {"label": "Operating Conditions", "value": "14 to 104°F / -10 to 40°C"},
+          {"label": "Storage Conditions", "value": "-4 to 176°F / -20 to 80°C"},
+          {"label": "Dimensions", "value": "9.9 x 9.8 x 7.6\" / 25.1 x 24.9 x 19.3 cm (Fixture with Mount)"},
+          {"label": "Weight", "value": "5.8 lb / 2.6 kg (Fixture)\n7.76 lb / 3.52 kg (Overall Kit)"}
+        ],
+        "Packaging Info": [
+          {"label": "Package Weight", "value": "11.58 lb"},
+          {"label": "Box Dimensions (LxWxH)", "value": "17.4 x 13.8 x 9.1\""}
+        ]
+      }
+    },
+
+    {
+      "id": "amaran_ray_360c",
+      "categoria_raiz": "Iluminación",
+      "subtipo": "COB LED Monolight RGB",
+      "marca": "Amaran",
+      "modelo": "Ray 360c RGB LED Monolight",
+      "url_source": "https://www.bhphotovideo.com/c/product/1930190-REG/amaran_mp00000191_ray_360c_rgb_led.html",
+      "status_bh": "In Stock",
+      "fuente": "screenshot manual + Firecrawl extract",
+      "secciones": {
+        "Key Specs": [
+          {"label": "Item Type", "value": "1x COB LED Monolight"},
+          {"label": "Included Light Modifier", "value": "1x Reflector"},
+          {"label": "Included Storage Case", "value": "Yes"},
+          {"label": "Photometrics at 3.3' / 1 m", "value": "70° at 3200K: 1477 fc / 15,900 Lux (Unmodified)\n45° at 3200K: 3883 fc / 41,800 Lux (with Reflector)\n70° at 5600K: 1583 fc / 17,040 Lux (Unmodified)\n..."},
+          {"label": "Color Temperature", "value": "1800 to 20,000K\n2300 to 10,000K"},
+          {"label": "Color Modes", "value": "RGB, Daylight, Tungsten"},
+          {"label": "Color Accuracy Standard", "value": "CRI 95\nTLCI 95\nTM-30 Rf 94\nTM-30 Rg 100\nSSI 80 at 5600K\nSSI 87 at 3200K"},
+          {"label": "Dimming", "value": "App-Controlled / Built-In Dimmer / DMX\n• 0 to 100%"},
+          {"label": "Front Accessory Mount", "value": "Bowens S"},
+          {"label": "Wireless Remote Control Type", "value": "Bluetooth"},
+          {"label": "Power Source", "value": "AC Power (Cable Included)"},
+          {"label": "Input Power", "value": "100 to 240 VAC, 50 / 60 Hz"},
+          {"label": "Power Consumption", "value": "410 W (Maximum)"},
+          {"label": "Fixture Mounting", "value": "1x 5/8\" Receiver (Via Swivel Mount)"}
+        ],
+        "Light Fixture": [
+          {"label": "Item Type", "value": "1x COB LED Monolight"},
+          {"label": "Included Light Modifier", "value": "1x Reflector"},
+          {"label": "Included Storage Case", "value": "Yes"},
+          {"label": "Lumens", "value": "23,174"},
+          {"label": "Photometrics", "value": "70° at 3200K:\n1477 fc / 15,900 Lux at 3.3' / 1 m (Unmodified)\n171 fc / 1850 Lux at 9.8' / 3 m (Unmodified)\n45° at 3200K:\n3883 fc / 41,800 Lux at 3.3' / 1 m (with Reflector)\n388 fc / 4180 Lux at 9.8' / 3 m (with Reflector)\n70° at 5600K:\n1583 fc / 17,040 Lux at 3.3' / 1 m (Unmodified)\n183 fc / 1970 Lux at 9.8' / 3 m (Unmodified)\n45° at 5600K:\n4143 fc / 44,600 Lux at 3.3' / 1 m (with Reflector)\n405 fc / 4360 Lux at 9.8' / 3 m (with Reflector)"},
+          {"label": "Color Temperature", "value": "1800 to 20,000K\n2300 to 10,000K"},
+          {"label": "Color Modes", "value": "RGB, Daylight, Tungsten"},
+          {"label": "Color Accuracy Standard", "value": "CRI 95\nTLCI 95\nTM-30 Rf 94\nTM-30 Rg 100\nSSI 80 at 5600K\nSSI 87 at 3200K"},
+          {"label": "Dimming", "value": "App-Controlled / Built-In Dimmer / DMX\n• 0 to 100%"},
+          {"label": "Cooling System", "value": "Fan"},
+          {"label": "Beam Angle", "value": "70° Unmodified\n45° with Included Reflector"},
+          {"label": "Built-In Flash", "value": "No"},
+          {"label": "Preprogrammed Effects", "value": "Yes"},
+          {"label": "Umbrella Mount", "value": "Yes"},
+          {"label": "Front Accessory Mount", "value": "Bowens S"}
+        ],
+        "Connectivity": [
+          {"label": "Wireless Remote Control Type", "value": "Bluetooth"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nApp Name: amaran\nFunctionality: Firmware Update, Remote Control"},
+          {"label": "Wireless Range", "value": "262.5' / 80 m (Bluetooth)"}
+        ],
+        "Power & I/O": [
+          {"label": "Power Source", "value": "AC Power (Cable Included)"},
+          {"label": "Inputs/Outputs", "value": "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)\n1x USB-C DMX/Firmware Input\n*Adapter Required (Not Included)"},
+          {"label": "Input Power", "value": "100 to 240 VAC, 50 / 60 Hz"},
+          {"label": "Included Adapter / Cable", "value": "1x USA Type-A/B Plug to Unspecified Cable (16.4' / 5 m)"},
+          {"label": "Inline Switch", "value": "No"},
+          {"label": "Power Pass-Thru", "value": "No"},
+          {"label": "Power Consumption", "value": "410 W (Maximum)"}
+        ],
+        "Mounting": [
+          {"label": "Fixture Mounting", "value": "1x 5/8\" Receiver (Via Swivel Mount)"}
+        ],
+        "General": [
+          {"label": "Display", "value": "LCD"},
+          {"label": "Environmental Resistance", "value": "Dust/Water-Resistant (IP54)"},
+          {"label": "Operating Conditions", "value": "14 to 104°F / -10 to 40°C"},
+          {"label": "Storage Conditions", "value": "-4 to 176°F / -20 to 80°C"},
+          {"label": "Dimensions", "value": "10.04 x 6.5 x 5.83\" / 25.5 x 16.51 x 14.81 cm (Fixture)"},
+          {"label": "Weight", "value": "7.28 lb / 3.3 kg (Fixture)"}
+        ],
+        "Packaging Info": [
+          {"label": "Package Weight", "value": "11.26 lb"},
+          {"label": "Box Dimensions (LxWxH)", "value": "19.7 x 13.8 x 9.9\""}
+        ]
+      }
+    },
+
+    {
+      "id": "nanlite_fc500b",
+      "categoria_raiz": "Iluminación",
+      "subtipo": "LED Spotlight Bi-Color",
+      "marca": "Nanlite",
+      "modelo": "FC500B Bi-Color LED Spotlight",
+      "url_source": null,
+      "fuente": "screenshot manual del dueño (16-may-2026)",
+      "secciones": {
+        "Light Fixture": [
+          {"label": "Item Type", "value": "1x LED Monolight"},
+          {"label": "Included Storage Case", "value": "Yes"},
+          {"label": "Photometrics at 3.3' / 1 m", "value": "2700K: 1516 fc / 16,320 Lux\n3200K: 1640 fc / 17,660 Lux\n5600K: 1961 fc / 21,110 Lux\n6500K: 1846 fc / 19,880 Lux"},
+          {"label": "Photometrics (full)", "value": "2700K:\n1516 fc / 16,320 Lux at 3.3' / 1 m*\n4575 fc / 49,250 Lux at 3.3' / 1 m (with Reflector)\n3200K:\n1640 fc / 17,660 Lux at 3.3' / 1 m\n5065 fc / 54,530 Lux at 3.3' / 1 m (with Reflector)\n5600K:\n1961 fc / 21,110 Lux at 3.3' / 1 m\n6097 fc / 65,640 Lux at 3.3' / 1 m (with Reflector)\n6500K:\n1846 fc / 19,880 Lux at 3.3' / 1 m\n5923 fc / 63,760 Lux at 3.3' / 1 m (with Reflector)\n*Standardized Measurement Supplied by the Manufacturer"},
+          {"label": "Color Temperature", "value": "2700 to 6500K"},
+          {"label": "Color Modes", "value": "Daylight, Tungsten"},
+          {"label": "Color Accuracy Standard", "value": "CRI 96\nTLCI 98"},
+          {"label": "Dimming", "value": "• 0 to 100%"},
+          {"label": "Cooling System", "value": "Fan"},
+          {"label": "Beam Angle", "value": "120° Unmodified"},
+          {"label": "Built-In Flash", "value": "No"},
+          {"label": "Umbrella Mount", "value": "Yes"},
+          {"label": "Front Accessory Mount", "value": "Bowens S"}
+        ],
+        "Connectivity": [
+          {"label": "Wireless Remote Control Type", "value": "Bluetooth\nRadio/RF"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nApp Name: NANLINK"},
+          {"label": "Wireless Frequency", "value": "2.4 GHz"}
+        ],
+        "Power & I/O": [
+          {"label": "Power Source", "value": "AC Power (Cable Built-In)"},
+          {"label": "Input Power", "value": "100 to 240 VAC, 50 / 60 Hz"},
+          {"label": "Included Adapter / Cable", "value": "Yes"},
+          {"label": "Power Consumption", "value": "520 W"}
+        ],
+        "Mounting": [
+          {"label": "Yoke Type", "value": "Manually-Operated Yoke"},
+          {"label": "Fixture Mounting", "value": "1x 5/8\" Receiver (Via Yoke Mount)"}
+        ],
+        "General": [
+          {"label": "Display", "value": "Yes"},
+          {"label": "Environmental Resistance", "value": "No"},
+          {"label": "Dimensions", "value": "14.69 x 9.7 x 5.87\" / 37.31 x 24.64 x 14.91 cm (Fixture)\n11.09 x 4.45 x 3.58\" / 28.17 x 11.3 x 9.09 cm (Power Supply/Controller)"},
+          {"label": "Weight", "value": "6.97 lb / 3.16 kg (Fixture)\n4.94 lb / 2.24 kg (Power Supply/Controller)"}
+        ],
+        "Packaging Info": [
+          {"label": "Package Weight", "value": "16.4 lb"},
+          {"label": "Box Dimensions (LxWxH)", "value": "23.1 x 18.6 x 18\""}
+        ]
+      }
+    },
+
+    {
+      "id": "amaran_f21x",
+      "categoria_raiz": "Iluminación",
+      "subtipo": "LED Flexible Mat Bi-Color",
+      "marca": "Amaran",
+      "modelo": "F21X 2x1 Bi-Color LED Flexible Mat (V-Mount)",
+      "url_source": null,
+      "precio_usd": 399,
+      "status_bh": "In Stock",
+      "fuente": "screenshot manual del dueño (16-may-2026)",
+      "secciones": {
+        "Key Specs": [
+          {"label": "Item Type", "value": "Soft LED Flexible Light"},
+          {"label": "Included Light Modifier", "value": "1x Diffusion with Removable Side"},
+          {"label": "Included Storage Case", "value": "Yes"},
+          {"label": "Photometrics at 3.3' / 1 m", "value": "[ilegible en screenshot]"},
+          {"label": "Color Temperature", "value": "2800 to 7500K"},
+          {"label": "Color Modes", "value": "Daylight, Tungsten"},
+          {"label": "Color Accuracy Statement", "value": "[ilegible en screenshot]"},
+          {"label": "Dimming", "value": "[ilegible en screenshot]"},
+          {"label": "Wireless Remote Control Type", "value": "Bluetooth"},
+          {"label": "Power Source", "value": "AC to DC Adapter (Included)\nBattery (Not Included)"},
+          {"label": "Battery Plate Type", "value": "1x V-Mount"},
+          {"label": "Input Power", "value": "[ilegible en screenshot]"},
+          {"label": "Power Consumption", "value": "120W"},
+          {"label": "Fixture Mounting", "value": "[ilegible en screenshot]"}
+        ],
+        "Light Fixture": [
+          {"label": "Item Type", "value": "Soft LED Flexible Light"},
+          {"label": "Included Light Modifier", "value": "1x Diffusion with Removable Side"},
+          {"label": "Included Storage Case", "value": "Yes"},
+          {"label": "Photometrics", "value": "[ilegible en screenshot — compound multi-CCT]"},
+          {"label": "Color Temperature", "value": "2800 to 7500K"},
+          {"label": "Color Modes", "value": "Daylight, Tungsten"},
+          {"label": "Color Accuracy Standard", "value": "[ilegible en screenshot]"},
+          {"label": "Dimming", "value": "Controller-labeled (Continuous)\n• 0 to 100%"},
+          {"label": "Cooling System", "value": "Passive"},
+          {"label": "Flicker Avoidance", "value": "[ilegible en screenshot]"},
+          {"label": "Beam Angle", "value": "120°"},
+          {"label": "Built-In Flash", "value": "No"},
+          {"label": "Preprogrammed Effects", "value": "No"},
+          {"label": "Video-Assist Mount", "value": "No"},
+          {"label": "Front Accessory Mount", "value": "Proprietary"}
+        ],
+        "Connectivity": [
+          {"label": "Wireless Remote Control Type", "value": "Bluetooth"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nApp Name: Sidus Link\nFunctionality: Remote Control"},
+          {"label": "Wireless Range", "value": "[ilegible en screenshot]"}
+        ],
+        "Power & I/O": [
+          {"label": "Power Source", "value": "AC to DC Adapter (Included)\nBattery (Not Included)"},
+          {"label": "Inputs/Outputs", "value": "[ilegible en screenshot]"},
+          {"label": "Battery Plate Type", "value": "1x V-Mount"},
+          {"label": "Battery", "value": "[ilegible en screenshot]"},
+          {"label": "Input Power", "value": "[ilegible en screenshot]"},
+          {"label": "Power Pass-Thru", "value": "No"},
+          {"label": "Power Consumption", "value": "120W"}
+        ],
+        "Mounting": [
+          {"label": "Fixture Mounting", "value": "5/8\" Spigot"},
+          {"label": "Included Mount", "value": "[ilegible en screenshot]"}
+        ],
+        "General": [
+          {"label": "Display", "value": "OLED"},
+          {"label": "Environmental Resistance", "value": "[ilegible en screenshot]"},
+          {"label": "Cabinets", "value": "Fabric"},
+          {"label": "Dimensions", "value": "[ilegible en screenshot]"},
+          {"label": "Weight", "value": "[ilegible en screenshot]"}
+        ],
+        "Packaging Info": [
+          {"label": "Package Weight", "value": "[ilegible en screenshot]"},
+          {"label": "Box Dimensions (LxWxH)", "value": "[ilegible en screenshot]"}
+        ]
+      }
+    },
+
+    {
+      "id": "godox_tl60",
+      "categoria_raiz": "Iluminación",
+      "subtipo": "LED Tube/Wand RGB",
+      "marca": "Godox",
+      "modelo": "TL60 RGB LED Tube Light (2.5')",
+      "url_source": "https://www.bhphotovideo.com/c/product/1609996-REG/godox_vl150_led_video_3_light.html",
+      "fuente": "screenshot manual del dueño (16-may-2026)",
+      "secciones": {
+        "Light Fixture": [
+          {"label": "Item Type", "value": "1x LED Light Tube/Wand"},
+          {"label": "Included Storage Case", "value": "Yes"},
+          {"label": "Photometrics at 3.3' / 1 m", "value": "5600K: 39 fc / 421 Lux"},
+          {"label": "Photometrics (full)", "value": "5600K:\n39 fc / 421 Lux at 3.3' / 1 m"},
+          {"label": "Color Temperature", "value": "2700 to 6500K"},
+          {"label": "Color Modes", "value": "RGB, Daylight"},
+          {"label": "Color Accuracy Standard", "value": "CRI 96\nTLCI 98"},
+          {"label": "Dimming", "value": "App-Controlled / Built-In Dimmer / DMX\n• 0 to 100%"},
+          {"label": "Cooling System", "value": "Passive"},
+          {"label": "Built-In Flash", "value": "No"},
+          {"label": "Umbrella Mount", "value": "No"},
+          {"label": "Front Accessory Mount", "value": "Proprietary"}
+        ],
+        "Connectivity": [
+          {"label": "Wireless Remote Control Type", "value": "Bluetooth\nRadio/RF (*Remote Not Included)"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nApp Name: Godox Light"},
+          {"label": "Wireless Channels", "value": "32"},
+          {"label": "Wireless Groups", "value": "6"},
+          {"label": "Wireless Frequency", "value": "2.4 GHz"},
+          {"label": "Wireless Range", "value": "98.4' / 30 m (Bluetooth)\n164' / 50 m (Radio/RF)"}
+        ],
+        "Power & I/O": [
+          {"label": "Power Source", "value": "AC to DC Adapter (Included)\nBattery (Built-In)"},
+          {"label": "Inputs/Outputs", "value": "1x Barrel / Coax Power Input (20 VDC at 2.4 A)\n1x RJ45 DMX Input\n1x RJ45 DMX Output"},
+          {"label": "Battery", "value": "1x Rechargeable Lithium, 14.4 VDC, 2600 mAh (Built-In)\n• 2-Hour Runtime at 100% Brightness"},
+          {"label": "Battery Charging", "value": "AC to DC Adapter (Included)"},
+          {"label": "Input Power", "value": "20 VDC at 2.4 A\n120 to 240 VAC, 50 / 60 Hz"},
+          {"label": "Included Adapter / Cable", "value": "1x USA Type-A/B to Barrel / Coax AC to DC Adapter\n• 20 VDC at 2.4 A"},
+          {"label": "Inline Switch", "value": "No"},
+          {"label": "Power Pass-Thru", "value": "No"},
+          {"label": "Power Consumption", "value": "18 W"}
+        ],
+        "Mounting": [
+          {"label": "Fixture Mounting", "value": "2x 1/4\"-20 Female Thread (Via Mounting Clip)"}
+        ],
+        "General": [
+          {"label": "Display", "value": "LCD"},
+          {"label": "Environmental Resistance", "value": "No"},
+          {"label": "Operating Conditions", "value": "14 to 104°F / -10 to 40°C"},
+          {"label": "Dimensions", "value": "29.5 x 1.9\" / 75 x 4.8 cm (Fixture)"},
+          {"label": "Weight", "value": "1.6 lb / 730 g"}
+        ],
+        "Packaging Info": [
+          {"label": "Package Weight", "value": "3.77 lb"},
+          {"label": "Box Dimensions (LxWxH)", "value": "31.1 x 3.7 x 3.1\""}
+        ]
+      }
+    },
+
+    {
+      "id": "sony_fx3a",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Cinema Camera Full-Frame",
+      "marca": "Sony",
+      "modelo": "FX3A Full-Frame Cinema Camera",
+      "url_source": null,
+      "precio_usd": 4298,
+      "status_bh": "In Stock",
+      "fuente": "screenshot manual del dueño (16-may-2026)",
+      "secciones": {
+        "Key Specs": [
+          {"label": "Image Sensor", "value": "Full-Frame"},
+          {"label": "Effective Sensor Resolution", "value": "10.2 Megapixel"},
+          {"label": "Image Stabilization", "value": "Sensor-Shift"},
+          {"label": "ISO/Gain Sensitivity", "value": "Native: 80 to 102,400 (80 to 409,600 Extended)"},
+          {"label": "Max Recording Modes", "value": "MPEG-4 AVC/XAVC S-I 4:2:2 10-Bit\nUp to DCI 4K up to 23.98/24.00/29.97/48.00/59.94 fps\nH.265 Long GOP/XAVC HS 4:2:2 10-Bit\n(ver Internal Recording para lista completa)"},
+          {"label": "Max Video Output", "value": "Raw 16-Bit\nUp to 4.2K at 23.98/25/50/59.94 fps"},
+          {"label": "Media/Memory Card Slot", "value": "Dual Slot: CFexpress Type A / SDXC"},
+          {"label": "Video I/O", "value": "HDMI"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS"},
+          {"label": "Battery", "value": "NP-FZ100"}
+        ],
+        "Imaging": [
+          {"label": "Lens Communication", "value": "Yes: with Autofocus Support"},
+          {"label": "Image Sensor", "value": "35.6 x 23.8 mm (Full-Frame) CMOS"},
+          {"label": "Effective Sensor Resolution", "value": "Effective: 10.2 Megapixel\nActual: 12.1 Megapixel"},
+          {"label": "Image Stabilization", "value": "Sensor-Shift, 5-Axis"},
+          {"label": "Built-In ND Filter", "value": "No"},
+          {"label": "Built-In CC Filter", "value": "No"},
+          {"label": "Internal Filter Holder", "value": "No"},
+          {"label": "Capture Type", "value": "Stills & Video"}
+        ],
+        "Exposure Control": [
+          {"label": "Shutter Type", "value": "Mechanical Focal Plane Shutter and Electronic Rolling Shutter"},
+          {"label": "Shutter Speed", "value": "1/8000 to 1/4 Second"},
+          {"label": "ISO/Gain Sensitivity", "value": "Native: 80 to 102,400 (80 to 409,600 Extended)"},
+          {"label": "Signal-to-Noise Ratio", "value": "Not Specified by Manufacturer"},
+          {"label": "Advertised Dynamic Range", "value": "15 Stops"},
+          {"label": "White Balance", "value": "Range: 2500 to 9900K\nPresets: Auto, Cloudy, Daylight, Flash, Fluorescent, Incandescent, Shade, Underwater"}
+        ],
+        "Focus": [
+          {"label": "Focus Mode", "value": "Automatic, Continuous-Servo AF, Direct Manual Focus, Manual Focus"},
+          {"label": "Autofocus Points", "value": "Phase Detection: 759"}
+        ],
+        "Video Capture": [
+          {"label": "Internal Recording", "value": "MPEG-4 AVC/XAVC S-I 4:2:2 10-Bit\n4096 x 2160 up to 23.98/24.00/29.97/48.00/59.94 fps\n3840 x 2160 up to 23.98/25/29.97/59.94/100/120 fps (240 to 600 Mb/s)\n1920 x 1080p up to 23.98/25/29.97/50/59.94/100/120/200/240 fps (89 to 222 Mb/s)\nH.265 Long GOP/XAVC HS 4:2:2 10-Bit\n3840 x 2160 up to 23.98/25/29.97/50/59.94/100/120 fps (50 to 280 Mb/s)\nH.265 Long GOP/XAVC HS 4:2:0 10-Bit\n3840 x 2160 up to 23.98/25/29.97/50/59.94/100/120 fps (30 to 150 Mb/s)\nMPEG-4 AVC/XAVC S 4:2:2 10-Bit\n3840 x 2160 up to 23.98/25/29.97/50/59.94/100/120 fps (100 to 280 Mb/s)\n1920 x 1080p up to 23.98/25/29.97/50/59.94/100/120/200/240 fps (50 Mb/s)\nMPEG-4 AVC/XAVC S 4:2:0 8-Bit\n3840 x 2160 up to 23.98/25/29.97/50/59.94/100/120 fps (60 to 200 Mb/s)\n1920 x 1080p up to 23.98/25/29.97/50/59.94/100/120/200/240 fps (16 to 100 Mb/s)\nXAVC Proxy\n1920 x 1080 (9 to 16 Mb/s)\n1280 x 720 (6 Mb/s)"},
+          {"label": "Video Output", "value": "Raw 16-Bit\n4264 x 2408 at 23.98/25/50/59.94 fps\n3840 x 2160 at 23.98/25/50/59.94 fps\n1920 x 1080p at 23.98/25/50/59.94 fps\n1920 x 1080i at 50/59.94 fps"},
+          {"label": "Fast-/Slow-Motion Support", "value": "Yes"},
+          {"label": "Gamma Curve", "value": "HDR-HLG, S Cinetone, Sony S-Log 2, Sony S-Log 3, Standard"},
+          {"label": "Audio Recording", "value": "4-Channel, 24-Bit via LPCM Audio\n2-Channel, 24-Bit via LPCM Audio"},
+          {"label": "IP Streaming", "value": "Yes"}
+        ],
+        "Interface": [
+          {"label": "Media/Memory Card Slot", "value": "Dual Slot: CFexpress Type A / SDXC"},
+          {"label": "Internal Storage", "value": "No"},
+          {"label": "Video I/O", "value": "1x HDMI Output"},
+          {"label": "Audio I/O", "value": "1x 1/8\" / 3.5 mm TRS Stereo Microphone Input\n1x 1/8\" / 3.5 mm TRS Stereo Headphone Output"},
+          {"label": "Power I/O", "value": "1x USB-C Input"},
+          {"label": "Other I/O", "value": "1x Micro-USB"},
+          {"label": "Wireless", "value": "Wi-Fi 5 (802.11ac) / Bluetooth"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nApp Name: Creators' App"},
+          {"label": "Global Positioning (GPS, GLONASS, etc.)", "value": "No"}
+        ],
+        "Monitor": [
+          {"label": "Display Type", "value": "Primary Monitor: 180° Tilting 3\" Touchscreen LCD"}
+        ],
+        "Viewfinder": [
+          {"label": "Type", "value": "Optional, Not Included"}
+        ],
+        "Power": [
+          {"label": "Battery", "value": "NP-FZ100"},
+          {"label": "Power Consumption", "value": "7.3 W"}
+        ],
+        "Environmental": [
+          {"label": "Operating Conditions", "value": "32 to 104°F / 0 to 40°C"},
+          {"label": "Storage Conditions", "value": "-4 to 140°F / -20 to 60°C"}
+        ],
+        "General": [
+          {"label": "Shoe Mount", "value": "1x Intelligent Hot Shoe"},
+          {"label": "Tripod Mount", "value": "1/4\"-20 Female"},
+          {"label": "Accessory Mounting Thread", "value": "5x 1/4\"-20 on Camera Body\n3x 1/4\"-20 on Included Handle"},
+          {"label": "Netflix Approved", "value": "Yes"},
+          {"label": "Materials", "value": "Magnesium Alloy"},
+          {"label": "Dimensions (W x H x D)", "value": "5.1 x 3.3 x 3.1\" / 129.7 x 84.5 x 77.8 mm"},
+          {"label": "Weight", "value": "1.4 lb / 640 g (Body Only)\n1.6 lb / 715 g (With Battery, Recording Media)"}
+        ],
+        "Optics": [
+          {"label": "Lens Mount", "value": "Sony E"},
+          {"label": "Interchangeable Lens", "value": "Yes"}
+        ],
+        "Packaging Info": [
+          {"label": "Package Weight", "value": "3.665 lb"},
+          {"label": "Box Dimensions (LxWxH)", "value": "9.6 x 9 x 5.9\""}
+        ]
+      }
+    },
+
+    {
+      "id": "red_komodo_x_6k",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Cinema Camera Super35",
+      "marca": "RED DIGITAL CINEMA",
+      "modelo": "KOMODO-X 6K Digital Cinema Camera (Canon RF, Black)",
+      "url_source": null,
+      "precio_usd": null,
+      "status_bh": "[ilegible en screenshot]",
+      "fuente": "screenshot manual del dueño (16-may-2026)",
+      "secciones": {
+        "Key Specs": [
+          {"label": "Lens Mount", "value": "Canon RF"},
+          {"label": "Image Sensor", "value": "Super35"},
+          {"label": "Effective Sensor Resolution", "value": "19.9 Megapixel (6144 x 3240)"},
+          {"label": "Image Stabilization", "value": "No"},
+          {"label": "Max Recording Modes", "value": "REDCODE RAW\nUp to 6K up to 80 fps\nProRes 422/ProRes 422 HQ/ProRes 422LT\n(ver Internal Recording para lista completa)"},
+          {"label": "Max Video Output", "value": "4:2:2\nUp to DCI 4K up to 60.00 fps"},
+          {"label": "Media/Memory Card Slot", "value": "Single Slot: CFexpress Type B (CFexpress 2.0)"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nFunctionality: Remote Control"},
+          {"label": "Battery", "value": "V-Mount"}
+        ],
+        "Imaging": [
+          {"label": "Lens Mount", "value": "Canon RF"},
+          {"label": "Lens Communication", "value": "Yes: with Autofocus Support"},
+          {"label": "Image Sensor", "value": "27.03 x 14.26 mm (Super35) CMOS"},
+          {"label": "Effective Sensor Resolution", "value": "19.9 Megapixel (6144 x 3240)"},
+          {"label": "Image Stabilization", "value": "No"},
+          {"label": "Capture Type", "value": "Stills & Video"}
+        ],
+        "Exposure Control": [
+          {"label": "Shutter Type", "value": "Electronic Global Shutter"},
+          {"label": "Advertised Dynamic Range", "value": "16.5 Stops"}
+        ],
+        "Focus": [
+          {"label": "Focus Mode", "value": "Automatic, Manual Focus"}
+        ],
+        "Video Capture": [
+          {"label": "Internal Recording", "value": "REDCODE RAW\n6144 x 3240 up to 80 fps (560 Mb/s)\n5120 x 2700 up to 96 fps (560 Mb/s)\n4096 x 2160 up to 120 fps (560 Mb/s)\n2048 x 1080 up to 240 fps (560 Mb/s)\nProRes 422/ProRes 422 HQ/ProRes 422LT\n4096 x 2160 up to 120 fps (560 MB/s)\nProRes 4444 4:4:4\n4096 x 2160 up to 80 fps (560 MB/s)\nProRes 4444XQ 4:4:4\n4096 x 2160 up to 60.00 fps (560 MB/s)"},
+          {"label": "Video Output", "value": "4:2:2\n4096 x 2160 up to 60.00 fps\n2048 x 1080p up to 60.00 fps"},
+          {"label": "Fast-/Slow-Motion Support", "value": "Yes"},
+          {"label": "Built-In Microphone", "value": "Stereo"},
+          {"label": "Audio Recording", "value": "2-Channel, 24-Bit at 48 kHz"},
+          {"label": "IP Streaming", "value": "MJPEG\n1920 x 1080 (5000.00 Mb/s)"}
+        ],
+        "Interface": [
+          {"label": "Media/Memory Card Slot", "value": "Single Slot: CFexpress Type B (CFexpress 2.0)"},
+          {"label": "Internal Storage", "value": "No"},
+          {"label": "Video I/O", "value": "1x BNC (12G-SDI) Output"},
+          {"label": "Audio I/O", "value": "1x 5-Pin LEMO Line Input on Camera Body"},
+          {"label": "Power I/O", "value": "1x LEMO 6-Pin (11 to 17VDC) Input"},
+          {"label": "Other I/O", "value": "1x 9-Pin (Genlock, GPI, Timecode)\n1x USB-C (Camera Interface) Control/Data/Video Input/Output\n1x RED Cable-Free Monitor Connection Output"},
+          {"label": "Wireless", "value": "Wi-Fi"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nApp Name: RED Control\nFunctionality: Remote Control"},
+          {"label": "Global Positioning (GPS, GLONASS, etc.)", "value": "No"}
+        ],
+        "Monitor": [
+          {"label": "Display Type", "value": "Primary Monitor: Fixed 2.9\" Touchscreen LCD"},
+          {"label": "Resolution", "value": "Primary Monitor: 1440 x 1440"}
+        ],
+        "Viewfinder": [
+          {"label": "Type", "value": "Optional, Not Included"}
+        ],
+        "Power": [
+          {"label": "Battery", "value": "V-Mount"}
+        ],
+        "Environmental": [
+          {"label": "Operating Conditions", "value": "32 to 104°F / 0 to 40°C"},
+          {"label": "Storage Conditions", "value": "-4 to 122°F / -20 to 50°C up to 85% Humidity"}
+        ],
+        "General": [
+          {"label": "Tripod Mount", "value": "1/4\"-20 Female (Bottom)\n3/8\"-16 Female (Bottom)"},
+          {"label": "Accessory Mounting Thread", "value": "4x 1/4\"-20\n4x M4"},
+          {"label": "Netflix Approved", "value": "Yes"},
+          {"label": "Materials", "value": "Aluminum"},
+          {"label": "Dimensions (W x H x D)", "value": "5.09 x 3.99 x 3.75\" / 129.37 x 101.26 x 95.26 mm"},
+          {"label": "Weight", "value": "2.62 lb / 1.19 kg (Body Only)"}
+        ],
+        "Packaging Info": [
+          {"label": "Package Weight", "value": "7.165 lb"},
+          {"label": "Box Dimensions (LxWxH)", "value": "13.2 x 9.8 x 6\""}
+        ]
+      }
+    },
+
+    {
+      "id": "nikon_zr",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Cinema Camera Full-Frame",
+      "marca": "Nikon",
+      "modelo": "ZR Cinema Camera (Z Mount)",
+      "url_source": null,
+      "precio_usd": null,
+      "status_bh": "[ilegible en screenshot]",
+      "fuente": "screenshot manual del dueño (16-may-2026)",
+      "secciones": {
+        "Key Specs": [
+          {"label": "Image Sensor", "value": "Full-Frame"},
+          {"label": "Effective Sensor Resolution", "value": "24.5 Megapixel"},
+          {"label": "Image Stabilization", "value": "Sensor-Shift"},
+          {"label": "ISO/Gain Sensitivity", "value": "Dual Base: 800 / 6400\nNative: 100 to 64,000"},
+          {"label": "Max Recording Modes", "value": "ProRes RAW 12-Bit\nUp to 6K at 23.98/25/29.97 fps\nREDCODE RAW 12-Bit\n(ver Internal Recording para lista completa)"},
+          {"label": "Max Video Output", "value": "UHD 4K"},
+          {"label": "Media/Memory Card Slot", "value": "Slot 1: CFexpress Type B\nSlot 2: microSD/microSDHC/microSDXC (UHS-I)"},
+          {"label": "Video I/O", "value": "Micro-HDMI"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS"},
+          {"label": "Battery", "value": "Nikon EN-EL15c"}
+        ],
+        "Imaging": [
+          {"label": "Lens Communication", "value": "Yes: with Autofocus Support"},
+          {"label": "Image Sensor", "value": "35.9 x 23.9 mm (Full-Frame) CMOS"},
+          {"label": "Effective Sensor Resolution", "value": "24.5 Megapixel"},
+          {"label": "Image Stabilization", "value": "Sensor-Shift, 5-Axis"},
+          {"label": "Built-In ND Filter", "value": "No"},
+          {"label": "Built-In CC Filter", "value": "No"},
+          {"label": "Internal Filter Holder", "value": "No"},
+          {"label": "Capture Type", "value": "Stills & Video"}
+        ],
+        "Exposure Control": [
+          {"label": "Shutter Type", "value": "Electronic Rolling Shutter"},
+          {"label": "Shutter Speed", "value": "Electronic Shutter: 1/16000 to 900 Seconds"},
+          {"label": "Shutter Angle", "value": "5.6 to 360°"},
+          {"label": "ISO/Gain Sensitivity", "value": "Dual Base: 800 / 6400\nNative: 100 to 64,000"},
+          {"label": "Signal-to-Noise Ratio", "value": "Not Specified by Manufacturer"},
+          {"label": "Advertised Dynamic Range", "value": "15 Stops"},
+          {"label": "White Balance", "value": "Range: 2500 to 10,000K\nPresets: Auto, Cloudy, Color Temperature, Direct Sunlight, Flash, Fluorescent, Incandescent, Preset Manual, Shade"},
+          {"label": "Exposure Modes", "value": "Auto, Manual"}
+        ],
+        "Focus": [
+          {"label": "Focus Mode", "value": "Automatic, Continuous-Servo AF, Full-Time Servo, Manual Focus"}
+        ],
+        "Video Capture": [
+          {"label": "Internal Recording", "value": "ProRes RAW 12-Bit\n6048 x 3402 at 23.98/25/29.97 fps\n4030 x 2268 at 23.98/25/29.97/50/59.94 fps\nREDCODE RAW 12-Bit\n6048 x 3402 at 23.98/25/29.97/50/59.94 fps (780 to 1710 Mb/s)\n4030 x 2268 at 23.98/25/29.97/50/59.94 fps (700 to 1710 Mb/s)\n3984 x 2240 at 23.98/25/29.97/50/59.94/100/120 fps\nH.265 4:2:0 8/10-Bit\n5376 x 3024 at 23.98/25/29.97/50/59.94 fps\n3840 x 2160 at 23.98/25/29.97/50/59.94/100/120 fps\n1920 x 1080 at 23.98/25/29.97/50/59.94/100/120/200/240 fps\nProRes 422 HQ 4:2:2 10-Bit\n5376 x 3024 at 23.98/25/29.97 fps\n3840 x 2160 at 23.98/25/29.97/50/59.94 fps\n1920 x 1080 at 50/59.94/100/120 fps\nH.264 4:2:0 8-Bit\n1920 x 1080 at 23.98/25/29.97/50/59.94 fps"},
+          {"label": "Video Output", "value": "3840 x 2160"},
+          {"label": "Fast-/Slow-Motion Support", "value": "Yes"},
+          {"label": "Gamma Curve", "value": "Nikon N-Log, REDWideGamutRGB"},
+          {"label": "Built-In Microphone", "value": "Stereo"},
+          {"label": "Audio Recording", "value": "ProRes, Raw: 2-Channel, 32-Bit\nProRes, Raw: 2-Channel, 24-Bit"},
+          {"label": "IP Streaming", "value": "No"}
+        ],
+        "Interface": [
+          {"label": "Media/Memory Card Slot", "value": "Slot 1: CFexpress Type B\nSlot 2: microSD/microSDHC/microSDXC (UHS-I)"},
+          {"label": "Internal Storage", "value": "No"},
+          {"label": "Video I/O", "value": "1x Micro-HDMI Output"},
+          {"label": "Audio I/O", "value": "1x 1/8\" / 3.5 mm TRS Stereo Mic/Line Input\n1x 1/8\" / 3.5 mm TRS Stereo Headphone Output"},
+          {"label": "Power I/O", "value": "1x USB-C Input"},
+          {"label": "Other I/O", "value": "1x USB-C (USB 3.2 / 3.1 Gen 2) Data Output (Shared with Power Input)"},
+          {"label": "Wireless", "value": "Wi-Fi / Bluetooth"},
+          {"label": "Mobile App Compatible", "value": "Yes: Android & iOS\nApp Name: SnapBridge"},
+          {"label": "Global Positioning (GPS, GLONASS, etc.)", "value": "No"}
+        ],
+        "Monitor": [
+          {"label": "Display Type", "value": "Primary Monitor: Articulating 4\" Touchscreen LCD"},
+          {"label": "Resolution", "value": "Primary Monitor: 3,070,000 Dot"}
+        ],
+        "Viewfinder": [
+          {"label": "Type", "value": "[ilegible en screenshot]"}
+        ],
+        "Power": [
+          {"label": "Battery", "value": "Nikon EN-EL15c"}
+        ],
+        "Environmental": [
+          {"label": "Operating Conditions", "value": "[ilegible en screenshot]"},
+          {"label": "Storage Conditions", "value": "[ilegible en screenshot]"}
+        ],
+        "General": [
+          {"label": "Shoe Mount", "value": "1x Intelligent Hot Shoe"},
+          {"label": "Tripod Mount", "value": "1x 1/4\"-20 Female (Bottom)"},
+          {"label": "Accessory Mounting Thread", "value": "No"},
+          {"label": "Dimensions (W x H x D)", "value": "5.2 x 3.2 x 1.9\" / 133 x 80.5 x 48.7 mm"},
+          {"label": "Weight", "value": "1.19 lb / 540 g (Body Only)"}
+        ],
+        "Packaging Info": [
+          {"label": "Package Weight", "value": "2.27 lb"},
+          {"label": "Box Dimensions (LxWxH)", "value": "8 x 7 x 5.3\""}
+        ]
+      }
+    }
+  ],
+
+  "_analisis_pendiente": {
+    "lo_que_quiero_de_cada_categoria": {
+      "Iluminación": "Ya tengo 4 — falta variedad: panel LED (Aputure F22c, Litepanels Gemini), fresnel (Arri 300+/650), tungsteno (Mole Richardson), on-camera (Aputure F7), práctica/efecto (Astera Titan Tube)",
+      "Cámaras": "0 productos. Pasar: Sony FX3, Canon R5, RED Komodo, BMPCC 6K, GoPro HERO12, DJI Pocket 3",
+      "Lentes": "0 productos. Pasar: Sigma 50 Art, Sony 24-70 GM, Canon RF 70-200, lente cine (Zeiss/ARRI)",
+      "Monitores y Video": "0 productos. Pasar: SmallHD Indie 7, Atomos Ninja V, monitor de director (TVLogic), wireless TX/RX (Teradek)",
+      "Sonido": "0 productos. Pasar: Rode Wireless GO II, DJI Mic 2, Sennheiser MKH 416, mixer (Zoom F6), shotgun (Sennheiser MKE 600)",
+      "Soportes": "0 productos. Pasar: Manfrotto 504HD, Sachtler aktiv8, gimbal (DJI RS 4 Pro), slider (Edelkrone), C-stand (Avenger)",
+      "Energía": "0 productos. Pasar: Anton Bauer Titon, V-mount IDX, NP-F genérica, distribución (Hawk Woods)",
+      "Media y Datos": "0 productos. Pasar: SD V90, CFexpress Type A, SSD externo (Samsung T7), lector (ProGrade)",
+      "Modificadores": "0 productos. Pasar: softbox octogonal (Aputure Light Dome), bandera (Matthews), reflector, lantern (Astera Titan)",
+      "Grip": "0 productos. Pasar: magic arm, c-clamp, sopapa (Filmtools), apple box",
+      "Adaptadores y Filtros": "0 productos. Pasar: Sigma MC-11 (EF→E), filtro variable ND, polarizador circular"
+    },
+    "patrones_a_validar_cuando_haya_datos": [
+      "Item Type como enum por categoría (Iluminación tiene: LED Monolight, COB LED Monolight, Tube/Wand, ...)",
+      "Compuestos condicionales (Beam Angle, CCT multi-modo, Photometrics, SSI por temperatura) → tablas",
+      "Secciones por categoría (Cámaras debería tener: Image Sensor / Video / Audio / Power / Body / Packaging)",
+      "Specs nuevas que solo aparecen en N productos (descubrir aquellas tipo Yoke Type que faltaban en mi catálogo)",
+      "Aliases EN/ES adicionales (ampliar _SPEC_KEY_TRANSLATIONS)",
+      "Familias jerárquicas reales (HDMI 1.4/2.0/2.1, SDI 3G/6G/12G, USB-C 3.2 Gen 1/2/2x2, etc.)"
+    ]
+  }
+}

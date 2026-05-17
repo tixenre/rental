@@ -32,7 +32,12 @@ export type Equipment = {
   categorias?: CategoryRef[];
   pricePerDay: number;
   description: string;
-  specs: { label: string; value: string }[];
+  specs: {
+    label: string;
+    value: string;
+    value_raw?: string;
+    output_config?: { row_strategy?: "all" | "first" | "last" } | null;
+  }[];
   /** Specs marcadas como destacado en el template de la categoría. Se usan
    *  como "quick facts" en la fila del catálogo. Vacío → fallback a montura/
    *  formato/resolución hardcodeados. */

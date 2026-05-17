@@ -25,10 +25,13 @@ El override manual (template del admin con tokens {marca}, {modelo}, etc.)
 sigue funcionando — gana sobre el auto-build.
 """
 
-import json
 import re
-import unicodedata
 from typing import Optional
+
+from services.spec_render import (
+    norm_spec_label,
+    render_spec_placeholder,
+)
 
 
 # ── Mapeo de subcategoría → tipo legible (editable) ─────────────────────
@@ -192,186 +195,6 @@ def _cap_largo(s: str, max_chars: int) -> str:
     return cut + "…" if cut else s[:max_chars]
 
 
-# ── Display templates por spec ──────────────────────────────────────────
-# Renderiza un (spec_key, valor) → string bonito para placeholders y ficha.
-#
-# Cada spec puede tener DOS variantes:
-#   - "short": para nombres públicos (conciso, sin contexto extra)
-#              Ej: lumens_at_5600k=19389 → "19389 lumen"
-#   - "long":  para ficha técnica / comparador (con contexto explícito)
-#              Ej: lumens_at_5600k=19389 → "19389 lm a 5600K"
-#
-# Formato de cada variante:
-#   - "{value}<sufijo>"  interpolación simple
-#   - "_smart_kg"        gramos: <1000 → "Xg", >=1000 → "X.X kg"
-#   - "_rango_k_short"   rango K corto: solo el rango "X-YK"
-#   - "_rango_k_long"    rango K explícito (igual al short para luces)
-#   - "_iso_short"       "ISO X-Y" sin paréntesis
-#   - "_iso_long"        igual
-#   - "_iso_ext"         "ISO X-Y (ext)"
-#
-# Si tpl es un string plano, se usa para ambas variantes (backwards compat).
-# Si es dict {"short": ..., "long": ...}, se respeta cada uno.
-#
-# Keys: spec_key canónico (estable ante traducciones de label).
-
-SPEC_DISPLAY_TEMPLATES: dict[str, dict | str] = {
-    # ────────────────────────────────────────────────────────────────
-    # CONVENCIONES
-    # ────────────────────────────────────────────────────────────────
-    # Valor de spec_key → template. Cada uno puede ser:
-    #
-    #   a) string con "{value}"   → interpolación directa
-    #      ej. "{value}W" → "1000W"
-    #
-    #   b) dict {"short": ..., "long": ...}  → distintas variantes
-    #      ej. {"short": "{value} lumen", "long": "{value} lm a 5600K"}
-    #
-    #   c) string sin {value} (literal) → para BOOLEANS
-    #      Si bool true → devolver el literal. Si false → "".
-    #      ej. "GPS" → value=True → "GPS"; value=False → ""
-    #
-    #   d) handler especial (string que empieza con "_") → función dedicada
-    #      ej. "_smart_kg", "_rango_k", "_iso_short"
-    #
-    # KEYS: spec_key canónico (estable ante traducciones de label).
-
-    # ── Luces (Iluminación) ──────────────────────────────────────────
-    # Enums simples (tipo, montaje) → sin template, devuelve valor crudo
-    "potencia_w":        "{value}W",
-    "lumens_at_5600k":   {"short": "{value} lumen",            "long": "{value} lm a 5600K"},
-    "lumens_at_3200k":   {"short": "{value} lumen (tungsten)", "long": "{value} lm a 3200K"},
-    "lux_at_1m_5600k":   {"short": "{value} lux",              "long": "{value} lux a 1m (5600K)"},
-    "lux_at_1m_3200k":   {"short": "{value} lux (tungsten)",   "long": "{value} lux a 1m (3200K)"},
-    "cri":               "CRI {value}",
-    "tlci":              "TLCI {value}",
-    "r9":                "R9 {value}",
-    "temperatura_k":     "_rango_k",
-    "peso_g":            "_smart_kg",
-    # Booleans de capacidad
-    "dimming":           "Dimmer",
-    # color_modes (multi_enum) y control_inalambrico (multi_enum) y
-    # alimentacion (multi_enum) → sin template, render genérico join con ", "
-
-    # ── Cámaras ──────────────────────────────────────────────────────
-    # Enums simples (tipo, formato, resolucion_max) → valor crudo
-    "lens_mount":        {"short": "Montura {value}", "long": "Lens mount {value}"},
-    "megapixels":        "{value}MP",
-    "fps_max":           "{value}fps",
-    "continuous_shooting_fps": {"short": "{value}fps", "long": "{value}fps (ráfaga)"},
-    "iso_nativo":        "_iso_short",
-    "iso_extendido":     "_iso_ext",
-    "rango_dinamico_stops": "{value} stops",
-    "recording_limit_min": "{value} min",
-    "consumo_w":         "{value}W",
-    "max_aperture":      "{value}",   # ya viene como "f/2.5"
-    "sensor_crop":       "{value}",   # ya viene como "1.5x" o "Crop Factor: 1.5x"
-    # Booleans de capacidad (label-when-true)
-    "estabilizacion":    "IBIS",
-    "autofocus":         "AF",
-    "fast_slow_motion":  {"short": "S&Q", "long": "Slow/Fast motion"},
-    "lens_communication": {"short": "AF lente", "long": "Comunicación electrónica lente"},
-    "gps":               "GPS",
-    "ip_streaming":      {"short": "Streaming IP", "long": "IP Streaming"},
-    "netflix_approved":  {"short": "Netflix", "long": "Netflix approved"},
-    # codecs (string libre) → valor crudo
-
-    # ── Para próximas categorías ─────────────────────────────────────
-    # Lentes: lens_mount, distancia_focal (rango mm), apertura (rango f/),
-    #         formato, diametro_filtro, estabilizacion → templates similares
-    # Monitores: pulgadas (number "), resolucion (string), brillo_nits (number)
-    # Soportes: altura_max_m, altura_min_m, peso_max_kg
-    # Sonido: tipo, patron, banda_freq, canales
-    # Energía: capacidad_wh, voltaje
-    # Cuando agregues, sumá la entrada acá y al LABEL_TO_SPEC_KEY abajo.
-}
-
-
-def render_spec_value(spec_key: str, value, variant: str = "short") -> str:
-    """Renderiza un spec value con su display template.
-
-    Args:
-        spec_key: clave canónica del spec (no label)
-        value: valor del spec (str, int, float, bool, dict con {min,max}, list)
-        variant: "short" para nombres públicos (default), "long" para ficha técnica
-
-    Si no hay template, devuelve el valor crudo como string.
-
-    Auto-deserializa: si value es un string que parece JSON array/object
-    (empieza con '[' o '{'), intenta json.loads() — esto permite que valores
-    almacenados en equipo_specs.value como JSON string (multi_enum como
-    color_modes, ranges como temperatura_k) se renderizen correctamente.
-    """
-    if value is None:
-        return ""
-
-    # Auto-deserialize JSON arrays/objects almacenados como string
-    # (caso típico: equipo_specs.value = '["RGB","Daylight","Tungsten"]')
-    if isinstance(value, str):
-        v_stripped = value.strip()
-        if v_stripped.startswith(("[", "{")) and v_stripped.endswith(("]", "}")):
-            try:
-                value = json.loads(v_stripped)
-            except (json.JSONDecodeError, ValueError):
-                pass  # mantener como string si no parsea
-
-    raw_tpl = SPEC_DISPLAY_TEMPLATES.get(spec_key)
-
-    # Si es dict, elegir variante; si es string, usar para ambos
-    if isinstance(raw_tpl, dict):
-        tpl = raw_tpl.get(variant) or raw_tpl.get("short") or raw_tpl.get("long")
-    else:
-        tpl = raw_tpl
-
-    # Handlers especiales
-    if tpl == "_smart_kg":
-        try:
-            g = float(value)
-            return f"{round(g/1000, 2)} kg" if g >= 1000 else f"{int(g)}g"
-        except (TypeError, ValueError):
-            return str(value)
-    if tpl == "_rango_k":
-        if isinstance(value, dict) and "min" in value and "max" in value:
-            return f"{value['min']}K" if value["min"] == value["max"] else f"{value['min']}-{value['max']}K"
-        if isinstance(value, str):
-            return value if "K" in value.upper() else f"{value}K"
-        return f"{value}K"
-    if tpl in ("_iso_short", "_iso_range"):
-        if isinstance(value, dict) and "min" in value and "max" in value:
-            return f"ISO {value['min']}-{value['max']}"
-        return f"ISO {value}"
-    if tpl == "_iso_ext":
-        if isinstance(value, dict) and "min" in value and "max" in value:
-            return f"ISO {value['min']}-{value['max']} (ext)"
-        return f"ISO {value} (ext)"
-    if tpl == "_bool_yes":
-        return "Sí" if value in (True, "true", "1", "Sí", "Si", "yes") else "No"
-
-    # Boolean con template literal (label-when-true pattern)
-    # Ej. spec gps=true con tpl="GPS" → "GPS"; gps=false → ""
-    is_bool = isinstance(value, bool) or (
-        isinstance(value, str) and value.strip().lower() in ("true", "false", "yes", "no", "sí", "si")
-    )
-    if is_bool and tpl and "{value}" not in tpl and not tpl.startswith("_"):
-        truthy = value in (True, "true", "1", "yes", "Sí", "sí", "Si") if isinstance(value, (bool, str)) else bool(value)
-        return tpl if truthy else ""
-
-    # Template con {value}
-    if tpl and "{value}" in tpl:
-        return tpl.replace("{value}", str(value))
-
-    # Sin template: devolver crudo
-    if isinstance(value, bool):
-        return "Sí" if value else "No"
-    if isinstance(value, list):
-        return ", ".join(str(x) for x in value)
-    if isinstance(value, dict):
-        if "min" in value and "max" in value:
-            return f"{value['min']}-{value['max']}"
-        return str(value)
-    return str(value)
-
-
 # ── Render de specs (label + valor con formato bonito) ──────────────────
 
 def _spec_value_str(label: str, value: str, *, with_label: bool = True) -> Optional[str]:
@@ -428,100 +251,55 @@ def _specs_dict(specs_en_nombre: list[tuple[str, str]]) -> dict[str, str]:
 _TPL_SEP = r"[\s\-–—,/|·]"
 
 
-def _norm_label(s: str) -> str:
-    """Normaliza un label para lookup de specs: lowercase + sin tildes + trim.
-    Tiene que matchear el approach del frontend en `nombre-template.ts`."""
-    s = unicodedata.normalize("NFD", s or "")
-    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
-    return s.lower().strip()
-
-
-# Mapeo de label normalizado → spec_key para aplicar display templates.
-# Permite que `{spec:Lúmenes (5600K)}` aplique el template de `lumens_at_5600k`.
-# Convención: keys SIN tildes, lowercase, trim (matching de _norm_label).
-LABEL_TO_SPEC_KEY: dict[str, str] = {
-    # ── Luces (Iluminación) ──────────────────────────────────────────
-    "potencia":              "potencia_w",
-    "lumenes (5600k)":       "lumens_at_5600k",
-    "lumens (5600k)":        "lumens_at_5600k",
-    "lumenes (3200k)":       "lumens_at_3200k",
-    "lumens (3200k)":        "lumens_at_3200k",
-    "lux a 1m (5600k)":      "lux_at_1m_5600k",
-    "lux a 1m (3200k)":      "lux_at_1m_3200k",
-    "cri":                   "cri",
-    "tlci":                  "tlci",
-    "r9":                    "r9",
-    "temperatura color":     "temperatura_k",
-    "peso":                  "peso_g",
-    "dimmer":                "dimming",
-
-    # ── Cámaras ──────────────────────────────────────────────────────
-    "megapixels":            "megapixels",
-    "fps max":               "fps_max",
-    "rafaga (stills)":       "continuous_shooting_fps",
-    "iso nativo":            "iso_nativo",
-    "iso extendido":         "iso_extendido",
-    "rango dinamico":        "rango_dinamico_stops",
-    "limite de grabacion":   "recording_limit_min",
-    "consumo":               "consumo_w",
-    "apertura maxima (fixed-lens)": "max_aperture",
-    "apertura maxima":       "max_aperture",
-    "sensor crop (35mm eq.)": "sensor_crop",
-    "sensor crop":           "sensor_crop",
-    "estabilizacion optica": "estabilizacion",
-    "autofocus":             "autofocus",
-    "fast/slow motion":      "fast_slow_motion",
-    "comunicacion electronica lente": "lens_communication",
-    "gps":                   "gps",
-    "ip streaming":          "ip_streaming",
-    "netflix approved":      "netflix_approved",
-    "tipo":                  "tipo",          # general — tanto luces como cámaras
-    "lens mount":            "lens_mount",
-    "formato":               "formato",
-    "resolucion maxima":     "resolucion_max",
-}
-
-
 def _render_template(
     tpl: str,
     vars: dict[str, str],
-    specs: Optional[list[tuple[str, str]]] = None,
+    specs: Optional[list[dict]] = None,
 ) -> str:
     """Renderiza `{marca} {modelo} {spec:Lens mount}` con los vars dados.
 
     Tokens soportados:
       - `{marca}`, `{modelo}`, `{tipo}`, `{nombre}` → resueltos vía `vars`.
       - `{spec:Label}` → busca en `specs` por label normalizado (case+tilde
-        insensitive). Si el spec tiene un display template asociado vía
-        `LABEL_TO_SPEC_KEY` + `SPEC_DISPLAY_TEMPLATES`, se aplica el formato
-        bonito (ej. "8990" → "8990 lm @ 5600K").
+        insensitive). Si la spec es tabla, formatea con conectores.
+      - `{spec:Label.colKey}` → para specs tipo tabla, extrae la celda `colKey`
+        de la primera fila y la formatea como texto (valor + unidad). Para
+        elegir otra fila: `{spec:Label.colKey[1]}`.
+
+    `specs` es una lista de dicts {label, value, tipo, tabla_columnas, output_config?}.
     """
     lower = {k.lower(): (v or "").strip() for k, v in vars.items()}
-    spec_map: dict[str, str] = {}
+    spec_map: dict[str, dict] = {}
     if specs:
-        for label, value in specs:
-            spec_map[_norm_label(label)] = (value or "").strip()
+        for s in specs:
+            spec_map[norm_spec_label(s.get("label") or "")] = {
+                "value": (s.get("value") or "").strip(),
+                "tipo": s.get("tipo"),
+                "tabla_columnas": s.get("tabla_columnas"),
+                "output_config": s.get("output_config"),
+            }
 
     def replace_token(m: re.Match) -> str:
         before, key, after = m.group(1), m.group(2), m.group(3)
         key_stripped = key.strip()
         if key_stripped.lower().startswith("spec:"):
-            spec_part = key_stripped[len("spec:"):]
-            # Detectar variante: {spec:Label:long} → variant="long"
-            variant = "short"
-            if ":" in spec_part:
-                spec_label, variant = spec_part.rsplit(":", 1)
-                variant = variant.strip().lower()
-                if variant not in ("short", "long"):
-                    spec_label = spec_part  # no era variante, era parte del label
-                    variant = "short"
+            raw_key = key_stripped[len("spec:"):]
+            # Parsear "Label" o "Label.colPath" — el módulo canónico resuelve
+            # el path; acá solo separamos label de path.
+            dot_idx = raw_key.find(".")
+            label = raw_key if dot_idx == -1 else raw_key[:dot_idx]
+            path = "" if dot_idx == -1 else raw_key[dot_idx + 1:]
+            info = spec_map.get(norm_spec_label(label))
+            if info:
+                val = render_spec_placeholder(
+                    info.get("value", "") or "",
+                    info.get("tipo"),
+                    info.get("tabla_columnas"),
+                    info.get("output_config"),
+                    path,
+                )
             else:
-                spec_label = spec_part
-            norm = _norm_label(spec_label)
-            val = spec_map.get(norm, "")
-            spec_key = LABEL_TO_SPEC_KEY.get(norm)
-            if spec_key and val:
-                val = render_spec_value(spec_key, val, variant=variant)
+                val = ""
         else:
             val = lower.get(key_stripped.lower(), "")
         if val:
@@ -867,7 +645,7 @@ def construir_nombre_publico(
     modelo: Optional[str],
     categoria_raiz: Optional[str],
     categoria_sub: Optional[str] = None,
-    specs_en_nombre: list[tuple[str, str]],
+    specs_en_nombre: list[dict],
     template_override: Optional[str] = None,
     nombre_publico_override: Optional[str] = None,
 ) -> tuple[str, str]:
@@ -879,8 +657,8 @@ def construir_nombre_publico(
         categoria_raiz: ej. "Iluminación". None si el equipo no tiene
             categoría asignada → fallback a nombre interno.
         categoria_sub: ej. "LED daylight/bicolor". Refina el tipo.
-        specs_en_nombre: lista de tuplas (label, value) desde `equipo_specs`,
-            filtradas por `visible_en_nombre=TRUE`.
+        specs_en_nombre: lista de dicts {label, value, tipo, tabla_columnas}
+            desde `equipo_specs` (con metadata para formato).
         template_override: si la ficha tiene `nombre_publico_template`,
             se usa con tokens.
         nombre_publico_override: override manual del admin desde la UI de
@@ -911,14 +689,16 @@ def construir_nombre_publico(
     # 3. Auto-build: dispatch al formatter de la categoría raíz
     formatter = _FORMATTERS.get(categoria_raiz or "", _fmt_generico)
 
-    specs_d = _specs_dict(specs_en_nombre)
+    # Para path formatter usamos shape simple (label, value).
+    simple_pairs = [(s["label"], s["value"]) for s in specs_en_nombre]
+    specs_d = _specs_dict(simple_pairs)
     # Algunos formatters usan la lista ordenada en lugar de dict (porque
     # importa el orden de prioridad del template).
     parts_corto, parts_largo = formatter(
         marca=marca_s, modelo=modelo_s,
         subcat=categoria_sub, raiz=categoria_raiz,
         specs=specs_d,
-        specs_ordered=specs_en_nombre,
+        specs_ordered=simple_pairs,
     )
 
     corto = _join(parts_corto)

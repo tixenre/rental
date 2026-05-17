@@ -258,13 +258,45 @@ export type MarcaAdmin = {
 
 // ── Templates de specs por categoría (CRUD admin) ────────────────────────
 
-export type SpecTipo = "string" | "number" | "enum" | "bool" | "rango" | "wxh" | "wxhxd" | "multi_enum";
+export type SpecTipo = "string" | "number" | "enum" | "bool" | "rango" | "wxh" | "wxhxd" | "multi_enum" | "tabla";
+
+/** Tipo de una columna individual cuando spec_definitions.tipo='tabla'.
+ *  - `valor_unidad`: la celda tiene 2 sub-campos (número + unidad), permite
+ *    que la unidad varíe por fila (ej. 10000 lumen / 8000 lumen). */
+export type SpecTablaColTipo = "string" | "number" | "enum" | "bool" | "valor_unidad";
+
+/** Una columna de una spec tipo tabla. Define qué se carga en cada celda
+ *  y cómo se renderiza el input. */
+export type SpecTablaColumna = {
+  key: string;
+  label: string;
+  tipo: SpecTablaColTipo;
+  /** Para tipo='enum': opciones permitidas. */
+  options?: string[];
+  /** Sufijo visual (lm, °C, etc.). Solo para tipos escalares. */
+  unidad?: string | null;
+  /** Para tipo='valor_unidad': lista cerrada de unidades permitidas. Si está
+   *  definida, el input de unidad se renderiza como select. Si no, input libre. */
+  unidades_opciones?: string[];
+  /** Texto fijo que aparece ANTES del valor — sirve como conector textual
+   *  entre columnas. Ej. col2.prefijo="a" → "10000 lm a 5700 K". */
+  prefijo?: string | null;
+};
 
 /** Definición global de una spec (post refactor unificar_specs_definitions).
  *  Cada spec_key existe UNA sola vez en el sistema. Sus categorías la
  *  referencian via spec_def_id en la asignación. */
 export type CompatibilidadModo = "exacta" | "jerarquia";
 export type RolCompatibilidad = "contenedor" | "contenido" | null;
+
+/** Config declarativa de cómo se rinde la spec en un placeholder {spec:Label}.
+ *  Aplicada por backend/services/spec_render.py y mirroreada en
+ *  src/lib/equipment/nombre-template.ts. */
+export type SpecRowStrategy = "all" | "first" | "last";
+export type SpecOutputConfig = {
+  /** Solo aplica a tipo='tabla'. Default 'all'. */
+  row_strategy?: SpecRowStrategy;
+};
 
 /** Asignación de una spec a una categoría (con su template_id para poder
  *  desasignar desde el modal de edición). */
@@ -280,18 +312,39 @@ export type SpecDefinition = {
   label: string;
   tipo: SpecTipo;
   unidad: string | null;
+  /** FK al catálogo `unidades` (sync con el string `unidad` por el backend).
+   *  null si la spec no tiene unidad asociada. */
+  unidad_id: number | null;
   enum_options: string[] | null;
   ayuda: string | null;
   es_compatibilidad: boolean;
   compatibilidad_modo: CompatibilidadModo;
   /** Flag manual: el dueño la revisó y aprobó. Se ordenan arriba. */
   validado: boolean;
+  /** Solo para tipo='tabla': shape de las columnas. */
+  tabla_columnas: SpecTablaColumna[] | null;
+  /** Config declarativa de render del placeholder. Solo `row_strategy` por ahora. */
+  output_config: SpecOutputConfig | null;
   /** Solo en GET /admin/spec-definitions: cuántas categorías la asignaron. */
   uso_categorias?: number;
   /** Solo en GET /admin/spec-definitions: cuántos equipos tienen value. */
   uso_equipos?: number;
   /** Solo en GET: categorías que la asignan (con id + nombre + template_id). */
   categorias?: SpecDefinitionCategoriaAsign[];
+};
+
+/** Una unidad del catálogo global (lm, K, V…). */
+export type Unidad = {
+  id: number;
+  simbolo: string;
+  nombre: string;
+  dimension: string | null;
+};
+
+export type UnidadInput = {
+  simbolo: string;
+  nombre: string;
+  dimension?: string | null;
 };
 
 export type SpecDefinitionInput = {
@@ -304,6 +357,8 @@ export type SpecDefinitionInput = {
   es_compatibilidad?: boolean;
   compatibilidad_modo?: CompatibilidadModo;
   validado?: boolean;
+  tabla_columnas?: SpecTablaColumna[] | null;
+  output_config?: SpecOutputConfig | null;
 };
 
 /** Asignación de una spec_def a una categoría + flags propios. El backend
@@ -319,10 +374,13 @@ export type SpecTemplate = {
   label: string;
   tipo: SpecTipo;
   unidad: string | null;
+  unidad_id: number | null;
   enum_options: string[] | null;
+  tabla_columnas: SpecTablaColumna[] | null;
+  output_config: SpecOutputConfig | null;
   es_compatibilidad: boolean;
   compatibilidad_modo: CompatibilidadModo;
-  // Per-categoría:
+  // Per-categoría: (los flags aplicados por la asignación)
   prioridad: number;
   visible_en_card: boolean;
   visible_en_filtros: boolean;
@@ -885,6 +943,8 @@ export const adminApi = {
         spec_def_id: number;
         spec_key: string; label: string; tipo: string;
         unidad: string | null; enum_options: string[] | null;
+        tabla_columnas: SpecTablaColumna[] | null;
+        output_config: SpecOutputConfig | null;
         prioridad: number;
         visible_en_card: boolean; visible_en_filtros: boolean; visible_en_nombre: boolean;
         obligatorio: boolean; ayuda: string | null;
@@ -904,6 +964,55 @@ export const adminApi = {
       },
     ),
 
+  // ── Observatorio de specs (relevamiento de scrapes reales) ─────────
+  recomputeObservatorio: () =>
+    authedJson<{
+      equipos_procesados: number;
+      observaciones_insertadas: number;
+      labels_unicos: number;
+      sin_raw_json: number;
+    }>("/api/admin/specs/observatorio/recompute", { method: "POST" }),
+  observatorioStats: () =>
+    authedJson<{
+      total_obs: number;
+      equipos_cubiertos: number;
+      labels_unicos: number;
+      matched_count: number;
+      unmatched_count: number;
+      equipos_con_raw_json: number;
+      equipos_scrapeables_pendientes: number;
+      equipos_total: number;
+      last_observed_at: string | null;
+    }>("/api/admin/specs/observatorio/stats"),
+  observatorioScrapeablesPendientes: () =>
+    authedJson<{
+      total: number;
+      ids: number[];
+      items: Array<{ id: number; nombre: string; bh_url: string | null }>;
+    }>("/api/admin/specs/observatorio/scrapeables-pendientes"),
+  observatorioAgregado: (params: {
+    categoria?: string | null;
+    solo_unmapped?: boolean;
+    top_values?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.categoria) qs.set("categoria", params.categoria);
+    if (params.solo_unmapped) qs.set("solo_unmapped", "true");
+    if (params.top_values) qs.set("top_values", String(params.top_values));
+    return authedJson<{
+      total: number;
+      items: Array<{
+        categoria_raiz: string | null;
+        label_observado: string;
+        label_normalizado: string;
+        equipos_count: number;
+        matched_template: boolean;
+        spec_def_id: number | null;
+        top_values: Array<{ value: string; count: number }>;
+      }>;
+    }>(`/api/admin/specs/observatorio/agregado?${qs.toString()}`);
+  },
+
   // ── Catálogo global de spec_definitions ────────────────────────────
   listSpecDefinitions: () =>
     authedJson<{ items: SpecDefinition[] }>("/api/admin/spec-definitions"),
@@ -921,6 +1030,29 @@ export const adminApi = {
     }),
   deleteSpecDefinition: async (defId: number) => {
     const res = await authedFetch(`/api/admin/spec-definitions/${defId}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const body = await res.text();
+      throw new Error(body || `HTTP ${res.status}`);
+    }
+  },
+
+  // ── Catálogo global de unidades (lm, K, V, etc.) ───────────────────
+  listUnidades: () =>
+    authedJson<{ items: Unidad[] }>("/api/admin/unidades"),
+  createUnidad: (input: UnidadInput) =>
+    authedJson<Unidad>("/api/admin/unidades", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  updateUnidad: (unidadId: number, input: Partial<UnidadInput>) =>
+    authedJson<{ ok: true; id: number }>(`/api/admin/unidades/${unidadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteUnidad: async (unidadId: number) => {
+    const res = await authedFetch(`/api/admin/unidades/${unidadId}`, { method: "DELETE" });
     if (!res.ok && res.status !== 204) {
       const body = await res.text();
       throw new Error(body || `HTTP ${res.status}`);
@@ -1035,6 +1167,103 @@ export const adminApi = {
       `/api/admin/specs/propuestas/${propuestaId}/descartar`,
       {},
     ),
+  bulkPropuestas: (input: {
+    ids: number[];
+    accion: "apply" | "discard";
+    min_confianza?: number;
+  }) =>
+    authedPostJson<{
+      ok_count: number;
+      ok_ids: number[];
+      failed: Array<{ id: number; error: string }>;
+      skipped_by_confianza: number;
+    }>("/api/admin/specs/propuestas/bulk", input),
+
+  // ── Familias jerárquicas (HDMI 1.4 < 2.0 < 2.1, SDI, etc.) ────────
+  listSpecFamilias: () =>
+    authedJson<{
+      items: Array<{
+        familia: string;
+        items: Array<{
+          id: number;
+          valor: string;
+          posicion: number;
+          spec_def_id: number | null;
+        }>;
+      }>;
+    }>("/api/admin/spec-familias"),
+  createSpecFamiliaItem: (input: {
+    familia: string;
+    valor: string;
+    posicion: number;
+    spec_def_id?: number | null;
+  }) =>
+    authedJson<{ id: number; familia: string; valor: string; posicion: number }>(
+      "/api/admin/spec-familias",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    ),
+  updateSpecFamiliaItem: (
+    itemId: number,
+    input: { familia?: string; valor?: string; posicion?: number; spec_def_id?: number | null },
+  ) =>
+    authedJson<{ ok: true; id: number }>(`/api/admin/spec-familias/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteSpecFamiliaItem: async (itemId: number) => {
+    const res = await authedFetch(`/api/admin/spec-familias/${itemId}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+  },
+
+  // ── Dedup tool de specs duplicadas ─────────────────────────────────
+  listDedupCandidatos: () =>
+    authedJson<{
+      total: number;
+      items: Array<{
+        keep: {
+          id: number; spec_key: string; label: string; tipo: string;
+          unidad: string | null; validado: boolean;
+          uso_cat: number; uso_eq: number;
+        };
+        drop: {
+          id: number; spec_key: string; label: string; tipo: string;
+          unidad: string | null; validado: boolean;
+          uso_cat: number; uso_eq: number;
+        };
+        label_distance: number;
+      }>;
+    }>("/api/admin/specs/dedup/candidatos"),
+  mergeSpecs: (input: { keep_id: number; drop_id: number }) =>
+    authedPostJson<{ ok: true; keep_id: number; drop_id: number }>(
+      "/api/admin/specs/dedup/merge",
+      input,
+    ),
+
+  // ── Cleanup de specs legacy (equipo_fichas.specs_json) ───────────
+  listLegacyInventario: () =>
+    authedJson<{
+      total: number;
+      items: Array<{
+        equipo_id: number;
+        equipo_nombre: string;
+        total: number;
+        matched: number;
+        custom: number;
+      }>;
+    }>("/api/admin/specs/legacy/inventario"),
+  promoverLegacyEquipo: (equipoId: number) =>
+    authedPostJson<{
+      ok: true;
+      equipo_id: number;
+      promoted_count: number;
+      kept_count: number;
+      promoted: Array<{ label: string; spec_def_id: number }>;
+    }>(`/api/admin/specs/legacy/promover/${equipoId}`, {}),
 
   // ── Nombres públicos / validación ──────────────────────────────────
   regenerarNombres: (dry_run = true) =>

@@ -190,7 +190,10 @@ TEMPLATES: dict[str, list[dict]] = {
 
     # 4. Modificadores
     "Modificadores": [
-        {"key": "tipo", "label": "Tipo", "tipo": "enum",
+        # `<categoria>_subtipo`: cada categoría tiene su propia subdimensión
+        # para evitar colisión en spec_definitions global (todos los "tipo"
+        # mergeaban enum_options entre sí).
+        {"key": "modificador_subtipo", "label": "Tipo de modificador", "tipo": "enum",
          "enum_options": ["Softbox", "Frame de difusión", "Bandera", "Reflector",
                           "Octobox", "Strip", "Beauty Dish", "Fresnel", "Snoot"],
          "prioridad": 10, "obligatorio": True, "en_card": True, "en_nombre": True},
@@ -207,7 +210,7 @@ TEMPLATES: dict[str, list[dict]] = {
 
     # 5. Soportes
     "Soportes": [
-        {"key": "tipo", "label": "Tipo", "tipo": "enum",
+        {"key": "soporte_subtipo", "label": "Tipo de soporte", "tipo": "enum",
          "enum_options": ["Trípode video", "Trípode foto", "C-Stand", "Slider",
                           "Dolly", "Car Mount", "Camera Cage", "Gimbal"],
          "prioridad": 10, "obligatorio": True, "en_card": True, "en_nombre": True},
@@ -234,7 +237,7 @@ TEMPLATES: dict[str, list[dict]] = {
 
     # 6. Grip
     "Grip": [
-        {"key": "tipo", "label": "Tipo", "tipo": "enum",
+        {"key": "grip_subtipo", "label": "Tipo de grip", "tipo": "enum",
          "enum_options": ["Brazo", "Clamp", "Wall plate", "Pinza", "Línea de seguridad",
                           "Sopapa", "Lastre", "Cage", "Plate", "Junior pin", "Apple box"],
          "prioridad": 10, "obligatorio": True, "en_card": True, "en_nombre": True},
@@ -251,7 +254,7 @@ TEMPLATES: dict[str, list[dict]] = {
 
     # 7. Sonido
     "Sonido": [
-        {"key": "tipo", "label": "Tipo", "tipo": "enum",
+        {"key": "mic_subtipo", "label": "Tipo de micrófono", "tipo": "enum",
          "enum_options": ["Lavalier", "Shotgun", "On-camera", "Estudio",
                           "Inalámbrico", "Boom", "Intercom"],
          "prioridad": 10, "obligatorio": True, "en_card": True, "en_nombre": True},
@@ -275,7 +278,7 @@ TEMPLATES: dict[str, list[dict]] = {
 
     # 8. Monitores y Video
     "Monitores y Video": [
-        {"key": "tipo", "label": "Tipo", "tipo": "enum",
+        {"key": "monitor_subtipo", "label": "Tipo de monitor/video", "tipo": "enum",
          "enum_options": ["Monitor", "Grabador", "Tx wireless", "Rx wireless",
                           "Combo Tx/Rx", "Follow Focus", "Matebox"],
          "prioridad": 10, "obligatorio": True, "en_card": True, "en_nombre": True},
@@ -301,7 +304,7 @@ TEMPLATES: dict[str, list[dict]] = {
 
     # 9. Adaptadores y Filtros
     "Adaptadores y Filtros": [
-        {"key": "tipo", "label": "Tipo", "tipo": "enum",
+        {"key": "adaptador_subtipo", "label": "Tipo de adaptador/filtro", "tipo": "enum",
          "enum_options": ["Adaptador montura", "Speedbooster", "Filtro ND",
                           "Filtro polarizador", "Filtro UV", "Filtro variable",
                           "Macro tube"],
@@ -326,7 +329,7 @@ TEMPLATES: dict[str, list[dict]] = {
 
     # 10. Energía
     "Energía": [
-        {"key": "tipo", "label": "Tipo", "tipo": "enum",
+        {"key": "energia_subtipo", "label": "Tipo de energía", "tipo": "enum",
          "enum_options": ["V-mount", "NP-F", "LP-E6", "BP-U", "AA",
                           "Generador", "Distribución", "Cargador", "Alargue", "Zapatilla"],
          "prioridad": 10, "obligatorio": True, "en_card": True, "en_nombre": True},
@@ -345,7 +348,7 @@ TEMPLATES: dict[str, list[dict]] = {
 
     # 11. Media y Datos
     "Media y Datos": [
-        {"key": "tipo", "label": "Tipo", "tipo": "enum",
+        {"key": "media_subtipo", "label": "Tipo de media", "tipo": "enum",
          "enum_options": ["SD", "microSD", "CFexpress B", "CFexpress A", "CFast",
                           "SSD externo", "Lector"],
          "prioridad": 10, "obligatorio": True, "en_card": True, "en_nombre": True},

@@ -1,6 +1,8 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { LayoutGrid, List, ArrowRight, Search, X, Sparkles, Loader2 } from "lucide-react";
+import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
+import { LayoutGrid, List, ArrowRight, Sparkles, Loader2, Search, X } from "lucide-react";
+import { ViewToggle } from "@/components/rental/ViewToggle";
 import { Link } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { MobileStickyBar } from "@/components/rental/MobileStickyBar";
@@ -20,6 +22,8 @@ import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const POPULAR_CHIPS = ["Sony FX3", "Aputure 600d", "RØDE", "Pack boda", "Pack entrevista"];
 
 type IndexSearch = {
   /** Modo de visualización compartible por URL. `?view=grid` o `?view=list`. */
@@ -66,8 +70,22 @@ export const Route = createFileRoute("/")({
       { rel: "canonical", href: "https://ramblarental.com/" },
     ],
   }),
-  component: Index,
+  component: IndexOrMobile,
 });
+
+function IndexOrMobile() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)");
+    const onChange = () => setIsMobile(window.innerWidth < 768);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  if (isMobile) return <CatalogoMovil />;
+  return <Index />;
+}
 
 type Mode = "grid" | "list";
 
@@ -180,11 +198,29 @@ function Index() {
 
   const getDisponible = (item: Equipment) => item.disponible;
 
+  // Hero scroll-amber: calcula --amber-pct para que el TopBar se tiña
+  const heroRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    const onScroll = () => {
+      const heroH = hero.offsetHeight;
+      const pct = heroH > 0 ? Math.min(100, Math.round((window.scrollY / heroH) * 100)) : 0;
+      document.documentElement.style.setProperty("--amber-pct", pct + "%");
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      document.documentElement.style.setProperty("--amber-pct", "0%");
+    };
+  }, []);
+
   return (
-    <PublicLayout>
+    <PublicLayout topBar={{ amberOnScroll: true }}>
         <ViewIntroDialog onPick={(m) => setMode(m)} />
         {/* Hero amarillo brand */}
-        <section className="relative overflow-hidden border-b hairline bg-amber text-ink">
+        <section ref={heroRef} className="relative overflow-hidden border-b hairline bg-amber text-ink">
           <div className="absolute inset-0 grain opacity-40" />
           <div className="relative px-6 py-12 lg:px-12 lg:py-16">
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] sm:tracking-[0.3em] text-ink/70 break-words">
@@ -246,60 +282,65 @@ function Index() {
             />
           </div>
 
-          {/* Desktop: grid 3 cols alineado con el TopBar */}
-          <div className="hidden sm:grid sm:grid-cols-[auto_1fr_auto] sm:gap-4 sm:items-center sm:px-6 sm:py-2.5">
+          {/* Desktop: cat-bar con ViewToggle + popular chips + buscador */}
+          <div className="hidden sm:flex sm:items-center sm:gap-4 sm:px-6 sm:py-2.5">
 
-            {/* Col izquierda: toggle Explorar/Lista (bajo el logo) */}
-            <div className="flex items-center gap-1 rounded-full border hairline p-0.5 shrink-0">
-              <button
-                onClick={() => setMode("grid")}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
-                  mode === "grid" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
-                )}
-              >
-                <LayoutGrid className="h-3 w-3" />
-                <span>Explorar</span>
-              </button>
-              <button
-                onClick={() => setMode("list")}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider transition",
-                  mode === "list" ? "bg-ink text-amber" : "text-muted-foreground hover:text-ink",
-                )}
-              >
-                <List className="h-3 w-3" />
-                <span>Lista</span>
-              </button>
+            {/* ViewToggle con indicador deslizable */}
+            <ViewToggle
+              options={[
+                { value: "grid" as Mode, label: "Explorar", icon: <LayoutGrid className="h-3 w-3" /> },
+                { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
+              ]}
+              value={mode}
+              onChange={setMode}
+            />
+
+            {/* Popular chips */}
+            <div className="flex flex-1 items-center gap-2 overflow-x-auto scrollbar-none">
+              <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground shrink-0 select-none">
+                Popular
+              </span>
+              {POPULAR_CHIPS.map((chip) => (
+                <button
+                  key={chip}
+                  onClick={() => setQuery(query === chip ? "" : chip)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs font-medium whitespace-nowrap transition shrink-0",
+                    query === chip
+                      ? "border-amber/60 bg-amber/15 font-semibold text-ink"
+                      : "border-hairline bg-transparent text-ink hover:border-ink/40 hover:bg-muted/50",
+                  )}
+                >
+                  {chip}
+                </button>
+              ))}
             </div>
 
-            {/* Col central: buscador (bajo el pill) */}
-            <div className="px-4">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar equipo, marca…"
-                  className="w-full rounded-full border-2 hairline bg-muted/50 py-2 pl-9 pr-9 text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none focus:bg-background transition"
-                />
-                {query && (
-                  <button
-                    onClick={() => setQuery("")}
-                    aria-label="Limpiar búsqueda"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-foreground/10 hover:text-ink"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
+            {/* Buscador en la derecha del cat-bar */}
+            <div className="relative shrink-0 w-56">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar…"
+                className="w-full rounded-full border hairline bg-surface py-1.5 pl-8 pr-7 text-sm placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  aria-label="Limpiar"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
 
-            {/* Col derecha: contador (bajo carrito/ingresar) */}
+            {/* Contador */}
             <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular shrink-0">
               {query.trim() || mode === "list"
-                ? `${filtered.length} resultados`
-                : `${allEquipos.length} equipos`}
+                ? `${filtered.length}`
+                : `${allEquipos.length}`}
             </div>
           </div>
         </div>

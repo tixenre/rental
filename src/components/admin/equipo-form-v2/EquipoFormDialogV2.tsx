@@ -383,12 +383,26 @@ export function EquipoFormDialogV2({
   useEffect(() => {
     if (!nombrePublicoAuto) return;
     // Prioridad 1: template definido por el admin en la categoría (DB).
+    // Buscar el output_config de cada spec en el template (las definiciones
+    // viven en templateItems con tipo + output_config; los valores en specs).
+    const tmplByLabel = new Map(
+      (templateItems ?? []).map((t) => [t.label.trim().toLowerCase(), t] as const),
+    );
     const fromTemplate = renderNombrePublicoTemplate(categoriaTemplate, {
       marca: watchedMarca ?? "",
       modelo: watchedModelo ?? "",
       tipo: categoriaRoot ?? "",
       nombre: initial?.nombre ?? "",
-      specs: specs.map((s) => ({ label: s.label, value: s.value })),
+      specs: specs.map((s) => {
+        const tmpl = tmplByLabel.get(s.label.trim().toLowerCase());
+        const isTabla = tmpl?.tipo === "tabla";
+        return {
+          label: s.label,
+          value: s.value,
+          ...(isTabla && s.value ? { value_raw: s.value } : {}),
+          output_config: tmpl?.output_config ?? null,
+        };
+      }),
     });
     if (fromTemplate) {
       setNombrePublico(fromTemplate);

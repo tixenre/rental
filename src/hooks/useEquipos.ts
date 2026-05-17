@@ -175,6 +175,49 @@ function renderNameTemplate(tpl: string, vars: Record<string, string>): string {
   return out;
 }
 
+/**
+ * Formatea un value de spec para mostrar en el detalle público.
+ * Si el value es JSON parseable y es array de objetos tipo tabla
+ * (con celdas `{valor, unidad}` o escalares), se renderiza como texto
+ * legible: "19389 lm · 5700 K" por fila, filas separadas por salto de línea.
+ *
+ * Si no parece JSON tabla, se devuelve la string original tal cual.
+ */
+export function formatSpecValueForDisplay(raw: unknown): string {
+  if (raw == null) return "";
+  // Si ya es string que no parece JSON, return as-is.
+  const str = typeof raw === "string" ? raw : String(raw);
+  const trimmed = str.trim();
+  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return str;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!Array.isArray(parsed) || parsed.length === 0) return str;
+    const lines: string[] = [];
+    for (const row of parsed) {
+      if (!row || typeof row !== "object") continue;
+      const cells: string[] = [];
+      for (const v of Object.values(row)) {
+        if (v == null || v === "") continue;
+        if (typeof v === "object" && "valor" in v) {
+          const vv = v as { valor: unknown; unidad?: unknown };
+          const valor = vv.valor == null ? "" : String(vv.valor);
+          const unidad = vv.unidad ? String(vv.unidad).trim() : "";
+          const cell = unidad ? `${valor} ${unidad}` : valor;
+          if (cell.trim()) cells.push(cell);
+        } else {
+          const cell = String(v).trim();
+          if (cell) cells.push(cell);
+        }
+      }
+      if (cells.length > 0) lines.push(cells.join(" · "));
+    }
+    return lines.length > 0 ? lines.join("\n") : str;
+  } catch {
+    return str;
+  }
+}
+
+
 /* ─── Adaptador backend → tipo frontend ─────────────────────────────── */
 
 export function backendToEquipment(e: BackendEquipo): Equipment {
@@ -185,14 +228,29 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
   const name = publicName || fallbackName;
 
   const ficha = e.ficha;
-  let parsedSpecs: { label: string; value: string }[] = [];
+  type ParsedSpec = {
+    label: string;
+    value: string;
+    value_raw?: string;
+    output_config?: { row_strategy?: "all" | "first" | "last" } | null;
+  };
+  let parsedSpecs: ParsedSpec[] = [];
   if (ficha?.specs_json) {
     try {
       const arr = JSON.parse(ficha.specs_json);
       if (Array.isArray(arr)) {
         parsedSpecs = arr
-          .filter((s) => s && typeof s === "object" && s.label && s.value)
-          .map((s: { label: string; value: string }) => ({ label: String(s.label), value: String(s.value) }));
+          .filter((s) => s && typeof s === "object" && s.label && s.value != null && s.value !== "")
+          .map((s: { label: string; value: string; value_raw?: string; output_config?: ParsedSpec["output_config"] }) => ({
+            label: String(s.label),
+            value: formatSpecValueForDisplay(s.value),
+            // value_raw + output_config los agrega el backend para specs tipo
+            // tabla — los preservamos para que el placeholder
+            // {spec:Label.colKey} pueda parsear el JSON crudo y aplicar la
+            // row_strategy correcta al extraer celdas.
+            ...(s.value_raw ? { value_raw: String(s.value_raw) } : {}),
+            ...(s.output_config ? { output_config: s.output_config } : {}),
+          }));
       }
     } catch {
       /* ignore malformed specs */

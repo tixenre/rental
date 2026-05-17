@@ -72,6 +72,19 @@
 :root {
   --radius: 0.75rem;
 
+  /* Z-index scale */
+  --z-topbar: 50;
+  --z-topbar-amber: 49;
+  --z-cart-strip: 45;
+  --z-cat-bar: 40;
+  --z-sub-toolbar: 30;
+  --z-scrim: 60;
+  --z-drawer: 61;
+
+  /* Dynamic vars (set via JS) */
+  --amber-pct: 0%;      /* topbar scroll progress 0%→100% */
+  --cart-strip-h: 0px;  /* cart strip presence */
+
   /* Brand light palette */
   --background: oklch(0.985 0.005 90);          /* hueso casi blanco */
   --foreground: oklch(0.18 0.01 60);            /* tinta negra cálida */
@@ -247,4 +260,14 @@
   select {
     font-size: max(16px, 1em);
   }
+}
+
+/* ── Mobile catalog animations ────────────────────────────────────── */
+@keyframes expand-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
 }

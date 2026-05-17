@@ -1,8 +1,8 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Sparkles, Library, AlertCircle, ArrowLeftRight, ListOrdered, CheckCircle2, Circle, Search, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Sparkles, Library, AlertCircle, ArrowLeftRight, ListOrdered, CheckCircle2, Circle, Search, X, FolderTree, List } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -21,7 +22,10 @@ import {
   type CompatibilidadModo,
   type SpecDefinition,
   type SpecDefinitionInput,
+  type SpecTablaColTipo,
+  type SpecTablaColumna,
   type SpecTipo,
+  type Unidad,
 } from "@/lib/admin/api";
 
 export const Route = createLazyFileRoute("/admin/specs/definitions")({
@@ -44,6 +48,7 @@ const TIPO_LABEL: Record<SpecTipo, string> = {
   multi_enum: "Lista (varios)",
   enum: "Opciones",
   bool: "Sí/No",
+  tabla: "Tabla (columnas configurables)",
 };
 
 function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) {
@@ -202,6 +207,68 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
   const validadasCount = items.filter((d) => d.validado).length;
   const noValidadasCount = items.length - validadasCount;
 
+  // ── Tab "Por categoría": agrupar specs por categoría raíz ─────────────
+  // Cargar categorías para poder subir por parent_id hasta encontrar root.
+  // Una spec asignada a "Cámaras › Cinema" sube a "Cámaras".
+  const catsQ = useQuery({
+    queryKey: ["admin", "categorias-list"],
+    queryFn: () => adminApi.adminListCategorias(),
+    staleTime: 60_000,
+  });
+
+  const specsByRoot = useMemo(() => {
+    const all = catsQ.data ?? [];
+    const byId = new Map(all.map((c) => [c.id, c] as const));
+    const rootFor = (catId: number): number | null => {
+      let cur = byId.get(catId);
+      const seen = new Set<number>();
+      while (cur && cur.parent_id != null) {
+        if (seen.has(cur.id)) return null;  // safety: ciclo defensivo
+        seen.add(cur.id);
+        cur = byId.get(cur.parent_id);
+      }
+      return cur?.id ?? null;
+    };
+    const map = new Map<number, SpecDefinition[]>();
+    const sinCat: SpecDefinition[] = [];
+    for (const def of items) {
+      const cats = def.categorias ?? [];
+      if (cats.length === 0) {
+        sinCat.push(def);
+        continue;
+      }
+      const rootIds = new Set<number>();
+      for (const c of cats) {
+        const r = rootFor(c.id);
+        if (r != null) rootIds.add(r);
+      }
+      for (const r of rootIds) {
+        const arr = map.get(r) ?? [];
+        arr.push(def);
+        map.set(r, arr);
+      }
+    }
+    const roots = all
+      .filter((c) => c.parent_id == null)
+      .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
+    const sections = roots
+      .map((r) => ({ root: r, specs: (map.get(r.id) ?? []).slice().sort((a, b) => a.label.localeCompare(b.label)) }))
+      .filter((s) => s.specs.length > 0);
+    return { sections, sinCat };
+  }, [items, catsQ.data]);
+
+  // Estado de tab: persistir en localStorage para que la vista preferida
+  // del dueño se mantenga entre navegaciones.
+  const [activeTab, setActiveTab] = useState<"lista" | "porcat">(() => {
+    if (typeof window === "undefined") return "lista";
+    return (localStorage.getItem("specs-definitions:view") as "lista" | "porcat") ?? "lista";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("specs-definitions:view", activeTab);
+    }
+  }, [activeTab]);
+
   return (
     <div className={embedded ? "space-y-6" : "px-4 md:px-6 py-6 space-y-6 max-w-5xl mx-auto"}>
       <header className="flex items-end justify-between gap-3">
@@ -314,56 +381,107 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
       )}
 
       {items.length > 0 && (
-        <div className="rounded-md border hairline overflow-hidden">
-          <div className="grid grid-cols-[24px_1fr_140px_minmax(0,1.2fr)_72px_72px_72px] items-center gap-2 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            <span aria-hidden />
-            <span>Spec key / label</span>
-            <span>Tipo</span>
-            <span className="hidden md:block">Detalle / Categorías</span>
-            <span className="text-right">Usos</span>
-            <span className="text-right">Compat</span>
-            <span />
-          </div>
-          <div className="divide-y hairline">
-            {items.map((def, idx) => {
-              const prev = idx > 0 ? items[idx - 1] : null;
-              const showDivider = prev && prev.validado && !def.validado;
-              return (
-                <div key={def.id}>
-                  {showDivider && (
-                    <div className="px-3 py-1.5 bg-muted/20 border-y hairline">
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                        Sin validar ({noValidadasCount})
-                      </span>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "lista" | "porcat")}>
+          <TabsList className="w-full max-w-sm">
+            <TabsTrigger value="lista" className="flex-1 gap-1.5">
+              <List className="h-3.5 w-3.5" />
+              Lista
+            </TabsTrigger>
+            <TabsTrigger value="porcat" className="flex-1 gap-1.5">
+              <FolderTree className="h-3.5 w-3.5" />
+              Por categoría
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="lista" className="mt-3">
+            <div className="rounded-md border hairline overflow-hidden">
+              <div className="grid grid-cols-[24px_1fr_140px_minmax(0,1.2fr)_72px_72px_72px] items-center gap-2 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                <span aria-hidden />
+                <span>Spec key / label</span>
+                <span>Tipo</span>
+                <span className="hidden md:block">Detalle / Categorías</span>
+                <span className="text-right">Usos</span>
+                <span className="text-right">Compat</span>
+                <span />
+              </div>
+              <div className="divide-y hairline">
+                {items.map((def, idx) => {
+                  const prev = idx > 0 ? items[idx - 1] : null;
+                  const showDivider = prev && prev.validado && !def.validado;
+                  return (
+                    <div key={def.id}>
+                      {showDivider && (
+                        <div className="px-3 py-1.5 bg-muted/20 border-y hairline">
+                          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                            Sin validar ({noValidadasCount})
+                          </span>
+                        </div>
+                      )}
+                      {idx === 0 && def.validado && (
+                        <div className="px-3 py-1.5 bg-emerald-50/40 border-b hairline">
+                          <span className="font-mono text-[10px] uppercase tracking-widest text-emerald-800">
+                            ✓ Validadas ({validadasCount})
+                          </span>
+                        </div>
+                      )}
+                      {idx === 0 && !def.validado && (
+                        <div className="px-3 py-1.5 bg-muted/20 border-b hairline">
+                          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                            Sin validar ({noValidadasCount})
+                          </span>
+                        </div>
+                      )}
+                      <DefinitionRow
+                        def={def}
+                        onEdit={() => setEditing(def)}
+                        onDelete={() => setConfirmDelete(def)}
+                        onToggleCompat={() => toggleCompatMut.mutate(def)}
+                        togglingCompat={toggleCompatMut.isPending && toggleCompatMut.variables?.id === def.id}
+                        onToggleValidado={() => toggleValidadoMut.mutate(def)}
+                      />
                     </div>
-                  )}
-                  {idx === 0 && def.validado && (
-                    <div className="px-3 py-1.5 bg-emerald-50/40 border-b hairline">
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-emerald-800">
-                        ✓ Validadas ({validadasCount})
-                      </span>
-                    </div>
-                  )}
-                  {idx === 0 && !def.validado && (
-                    <div className="px-3 py-1.5 bg-muted/20 border-b hairline">
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                        Sin validar ({noValidadasCount})
-                      </span>
-                    </div>
-                  )}
-                  <DefinitionRow
-                    def={def}
-                    onEdit={() => setEditing(def)}
-                    onDelete={() => setConfirmDelete(def)}
-                    onToggleCompat={() => toggleCompatMut.mutate(def)}
-                    togglingCompat={toggleCompatMut.isPending && toggleCompatMut.variables?.id === def.id}
-                    onToggleValidado={() => toggleValidadoMut.mutate(def)}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                  );
+                })}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="porcat" className="mt-3 space-y-3">
+            {catsQ.isLoading && (
+              <div className="text-sm text-muted-foreground">Cargando categorías…</div>
+            )}
+            {!catsQ.isLoading && specsByRoot.sections.length === 0 && specsByRoot.sinCat.length === 0 && (
+              <div className="rounded-md border hairline border-dashed p-6 text-center text-sm text-muted-foreground">
+                Ningún resultado con los filtros actuales.
+              </div>
+            )}
+            {specsByRoot.sections.map((section) => (
+              <RootSection
+                key={section.root.id}
+                title={section.root.nombre}
+                specs={section.specs}
+                onEdit={(def) => setEditing(def)}
+                onDelete={(def) => setConfirmDelete(def)}
+                onToggleCompat={(def) => toggleCompatMut.mutate(def)}
+                togglingCompatId={toggleCompatMut.isPending ? (toggleCompatMut.variables?.id ?? null) : null}
+                onToggleValidado={(def) => toggleValidadoMut.mutate(def)}
+              />
+            ))}
+            {specsByRoot.sinCat.length > 0 && (
+              <RootSection
+                key="__sin__"
+                title="Sin categoría"
+                muted
+                specs={specsByRoot.sinCat}
+                onEdit={(def) => setEditing(def)}
+                onDelete={(def) => setConfirmDelete(def)}
+                onToggleCompat={(def) => toggleCompatMut.mutate(def)}
+                togglingCompatId={toggleCompatMut.isPending ? (toggleCompatMut.variables?.id ?? null) : null}
+                onToggleValidado={(def) => toggleValidadoMut.mutate(def)}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       )}
 
       {editing && (
@@ -410,6 +528,66 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// ── Sección de specs agrupadas por categoría raíz ──────────────────────
+
+function RootSection({
+  title, specs, onEdit, onDelete, onToggleCompat, togglingCompatId,
+  onToggleValidado, muted,
+}: {
+  title: string;
+  specs: SpecDefinition[];
+  onEdit: (def: SpecDefinition) => void;
+  onDelete: (def: SpecDefinition) => void;
+  onToggleCompat: (def: SpecDefinition) => void;
+  togglingCompatId: number | null;
+  onToggleValidado: (def: SpecDefinition) => void;
+  muted?: boolean;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="rounded-md border hairline overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={
+          "w-full flex items-center justify-between px-3 py-2 text-left transition " +
+          (muted
+            ? "bg-muted/20 hover:bg-muted/40"
+            : "bg-amber-soft/30 hover:bg-amber-soft/50")
+        }
+      >
+        <div className="flex items-center gap-2">
+          <FolderTree className={"h-3.5 w-3.5 " + (muted ? "text-muted-foreground" : "text-amber")} />
+          <span className={"font-display text-sm " + (muted ? "text-muted-foreground" : "text-ink")}>
+            {title}
+          </span>
+          <Badge variant="outline" className="text-[10px] h-5">
+            {specs.length}
+          </Badge>
+        </div>
+        <span className="text-[10px] text-muted-foreground font-mono">
+          {open ? "▾" : "▸"}
+        </span>
+      </button>
+      {open && (
+        <div className="divide-y hairline">
+          {specs.map((def) => (
+            <DefinitionRow
+              key={def.id}
+              def={def}
+              onEdit={() => onEdit(def)}
+              onDelete={() => onDelete(def)}
+              onToggleCompat={() => onToggleCompat(def)}
+              togglingCompat={togglingCompatId === def.id}
+              onToggleValidado={() => onToggleValidado(def)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -556,6 +734,8 @@ function DefinitionFormModal({
     ayuda: definition?.ayuda ?? "",
     es_compatibilidad: definition?.es_compatibilidad ?? false,
     compatibilidad_modo: definition?.compatibilidad_modo ?? "exacta",
+    tabla_columnas: definition?.tabla_columnas ?? [],
+    output_config: definition?.output_config ?? null,
   });
   const [enumInput, setEnumInput] = useState((definition?.enum_options ?? []).join(", "));
   const [busy, setBusy] = useState(false);
@@ -621,6 +801,30 @@ function DefinitionFormModal({
       toast.error("Para este tipo la unidad es obligatoria (mm, px, °, kg…).");
       return;
     }
+    if (form.tipo === "tabla") {
+      const cols = form.tabla_columnas ?? [];
+      if (cols.length === 0) {
+        toast.error("Para tipo tabla tenés que definir al menos una columna");
+        return;
+      }
+      const keys = new Set<string>();
+      for (const c of cols) {
+        const k = c.key?.trim();
+        if (!k || !c.label?.trim() || !c.tipo) {
+          toast.error("Cada columna necesita key, label y tipo");
+          return;
+        }
+        if (keys.has(k)) {
+          toast.error(`Columna key '${k}' duplicada`);
+          return;
+        }
+        keys.add(k);
+        if (c.tipo === "enum" && (!c.options || c.options.length === 0)) {
+          toast.error(`Columna '${k}' enum: hay que listar opciones`);
+          return;
+        }
+      }
+    }
     const modo: CompatibilidadModo = form.compatibilidad_modo ?? "exacta";
     if (form.es_compatibilidad && modo === "jerarquia" && form.tipo !== "enum") {
       toast.error("Modo jerárquico solo aplica a specs tipo enum (con opciones ordenadas)");
@@ -638,6 +842,8 @@ function DefinitionFormModal({
         ayuda: form.ayuda?.trim() || null,
         es_compatibilidad: form.es_compatibilidad,
         compatibilidad_modo: form.es_compatibilidad ? modo : "exacta",
+        tabla_columnas: form.tipo === "tabla" ? (form.tabla_columnas ?? []) : null,
+        output_config: form.tipo === "tabla" ? (form.output_config ?? null) : null,
       };
       let specDefId: number;
       if (isNew) {
@@ -691,10 +897,10 @@ function DefinitionFormModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl rounded-lg bg-background border hairline shadow-lg"
+        className="w-full max-w-xl max-h-[90vh] rounded-lg bg-background border hairline shadow-lg flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="border-b hairline px-4 py-3">
+        <header className="border-b hairline px-4 py-3 shrink-0">
           <div className="font-display text-base text-ink">
             {isNew ? "Nueva definición" : "Editar definición"}
           </div>
@@ -703,7 +909,7 @@ function DefinitionFormModal({
           </p>
         </header>
 
-        <div className="p-4 space-y-3">
+        <div className="p-4 space-y-3 overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Spec key (interno)</Label>
@@ -711,12 +917,21 @@ function DefinitionFormModal({
                 value={form.spec_key}
                 onChange={(e) => setForm({ ...form, spec_key: e.target.value })}
                 placeholder="ej. montura"
-                disabled={!isNew}
                 className="font-mono"
               />
               <p className="text-[10px] text-muted-foreground mt-1">
-                {isNew ? "Inmutable después. Solo a-z 0-9 _" : "No se puede cambiar después de creado"}
+                Solo a-z 0-9 _. Editable durante construcción.
               </p>
+              {!isNew && definition && form.spec_key.trim() !== definition.spec_key && (
+                <p className="text-[10px] text-amber-700 mt-1 flex items-start gap-1">
+                  <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
+                  <span>
+                    Estás renombrando <code className="font-mono">{definition.spec_key}</code> →{" "}
+                    <code className="font-mono">{form.spec_key.trim()}</code>. Verificá que no haya
+                    queries hardcoded en seeds/scripts que usen el nombre viejo.
+                  </span>
+                </p>
+              )}
             </div>
             <div>
               <Label className="text-xs">Label visible</Label>
@@ -736,12 +951,47 @@ function DefinitionFormModal({
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(["string", "number", "rango", "wxh", "wxhxd", "enum", "multi_enum", "bool"] as SpecTipo[]).map((t) => (
+                {(["string", "number", "rango", "wxh", "wxhxd", "enum", "multi_enum", "bool", "tabla"] as SpecTipo[]).map((t) => (
                   <SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {form.tipo === "tabla" && (
+            <>
+              <TablaColumnasEditor
+                columnas={form.tabla_columnas ?? []}
+                onChange={(cols) => setForm({ ...form, tabla_columnas: cols })}
+              />
+              <div>
+                <Label className="text-xs">
+                  Estrategia de filas en placeholder
+                </Label>
+                <Select
+                  value={form.output_config?.row_strategy ?? "all"}
+                  onValueChange={(v: "all" | "first" | "last") =>
+                    setForm({
+                      ...form,
+                      output_config: v === "all" ? null : { row_strategy: v },
+                    })
+                  }
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las filas (default)</SelectItem>
+                    <SelectItem value="first">Solo primera fila</SelectItem>
+                    <SelectItem value="last">Solo última fila</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Qué filas se rinden cuando aparece <code className="font-mono">{"{spec:Label}"}</code> en
+                  el nombre público (sin selector de columna). "Primera" / "última" sirven cuando el nombre
+                  es single-line y solo querés mostrar una fila representativa.
+                </p>
+              </div>
+            </>
+          )}
 
           {(form.tipo === "number" || form.tipo === "rango" || form.tipo === "wxh" || form.tipo === "wxhxd") && (
             <div>
@@ -915,7 +1165,7 @@ function DefinitionFormModal({
           )}
         </div>
 
-        <footer className="border-t hairline px-4 py-3 flex justify-end gap-2">
+        <footer className="border-t hairline px-4 py-3 flex justify-end gap-2 shrink-0">
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
           <Button onClick={handleSave} disabled={busy}>
             {busy ? "Guardando…" : isNew ? "Crear" : "Guardar"}
@@ -923,6 +1173,301 @@ function DefinitionFormModal({
         </footer>
       </div>
     </div>
+  );
+}
+
+// ── Picker de unidades del catálogo global ──────────────────────────────
+
+function UnidadesPicker({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const unidadesQ = useQuery({
+    queryKey: ["admin", "unidades"],
+    queryFn: () => adminApi.listUnidades(),
+    staleTime: 60_000,
+  });
+  const unidades: Unidad[] = unidadesQ.data?.items ?? [];
+  const selectedSet = new Set(selected);
+
+  // Agrupar por dimensión para que el dueño encuentre rápido.
+  const grupos = useMemo(() => {
+    const map = new Map<string, Unidad[]>();
+    for (const u of unidades) {
+      const d = u.dimension?.trim() || "_otras";
+      const arr = map.get(d) ?? [];
+      arr.push(u);
+      map.set(d, arr);
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => {
+        if (a === "_otras") return 1;
+        if (b === "_otras") return -1;
+        return a.localeCompare(b);
+      })
+      .map(([dim, us]) => ({
+        dimension: dim === "_otras" ? "Otras" : dim,
+        unidades: us.slice().sort((a, b) => a.simbolo.localeCompare(b.simbolo)),
+      }));
+  }, [unidades]);
+
+  function toggle(simbolo: string) {
+    if (selectedSet.has(simbolo)) {
+      onChange(selected.filter((s) => s !== simbolo));
+    } else {
+      onChange([...selected, simbolo]);
+    }
+  }
+
+  if (unidadesQ.isLoading) {
+    return <div className="text-[10px] text-muted-foreground italic">Cargando unidades…</div>;
+  }
+  if (unidades.length === 0) {
+    return (
+      <div className="text-[10px] text-muted-foreground italic">
+        No hay unidades en el catálogo.{" "}
+        <a href="/admin/unidades" className="underline hover:text-ink" target="_blank" rel="noreferrer">
+          Crear unidades →
+        </a>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1">
+      <div className="text-[10px] text-muted-foreground">
+        Unidades permitidas (click para seleccionar):{" "}
+        <span className="text-ink/70">{selected.length} de {unidades.length}</span>
+      </div>
+      <div className="max-h-32 overflow-y-auto border hairline rounded p-1 space-y-1 bg-background">
+        {grupos.map((g) => (
+          <div key={g.dimension}>
+            <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60 px-1 pt-0.5">
+              {g.dimension}
+            </div>
+            <div className="flex flex-wrap gap-0.5">
+              {g.unidades.map((u) => {
+                const isOn = selectedSet.has(u.simbolo);
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => toggle(u.simbolo)}
+                    className={
+                      "rounded-full px-1.5 py-0.5 text-[10px] border hairline transition " +
+                      (isOn
+                        ? "bg-amber-soft border-amber/40 text-ink"
+                        : "bg-background text-muted-foreground hover:text-ink hover:border-ink/30")
+                    }
+                    title={`${u.nombre} (${u.simbolo})`}
+                  >
+                    {u.simbolo}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+// ── Editor de columnas para spec tipo `tabla` ───────────────────────────
+
+const COL_TIPO_LABEL: Record<SpecTablaColTipo, string> = {
+  number: "Número",
+  valor_unidad: "Núm + Unidad",
+  string: "Texto",
+  enum: "Opciones",
+  bool: "Sí/No",
+};
+
+/** Slugifica un label a una key válida (a-z0-9_): lowercase, sin tildes,
+ *  espacios → "_". Si el resultado no empieza con letra, prepende "c_". */
+function slugifyKey(label: string): string {
+  const base = label
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (!base) return "";
+  return /^[a-z]/.test(base) ? base : `c_${base}`;
+}
+
+function TablaColumnasEditor({
+  columnas,
+  onChange,
+}: {
+  columnas: SpecTablaColumna[];
+  onChange: (cols: SpecTablaColumna[]) => void;
+}) {
+  // Tracking de qué columnas tienen key manual (override del autogen).
+  // Por default todas autogeneran. Si el dueño edita la key a mano, queda
+  // fijada (no la pisamos al cambiar label).
+  const [manualKey, setManualKey] = useState<Set<number>>(new Set());
+  const [showAdvanced, setShowAdvanced] = useState<Set<number>>(new Set());
+
+  function update(idx: number, patch: Partial<SpecTablaColumna>) {
+    onChange(columnas.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
+  }
+  function updateLabel(idx: number, label: string) {
+    const next: Partial<SpecTablaColumna> = { label };
+    if (!manualKey.has(idx)) next.key = slugifyKey(label);
+    update(idx, next);
+  }
+  function setKeyManual(idx: number, key: string) {
+    setManualKey((s) => new Set(s).add(idx));
+    update(idx, { key });
+  }
+  function toggleAdvanced(idx: number) {
+    setShowAdvanced((s) => {
+      const next = new Set(s);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }
+  function addCol() {
+    onChange([...columnas, { key: "", label: "", tipo: "number" }]);
+  }
+  function removeCol(idx: number) {
+    onChange(columnas.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <fieldset className="border hairline rounded-md p-2 space-y-2">
+      <legend className="px-1 text-xs text-muted-foreground">
+        Columnas de la tabla
+      </legend>
+      <p className="text-[10px] text-muted-foreground -mt-1">
+        Cada columna tiene un nombre y (opcional) una unidad. Al cargar un equipo
+        agregás filas con un valor por columna.
+      </p>
+      {columnas.length === 0 && (
+        <div className="text-[11px] text-muted-foreground italic py-1">
+          Sin columnas. Agregá al menos una.
+        </div>
+      )}
+      {columnas.length > 0 && (
+        <div className="flex items-stretch gap-1 overflow-x-auto pb-1">
+          {columnas.map((c, idx) => (
+            <Fragment key={idx}>
+              {idx > 0 && (
+                <Input
+                  value={c.prefijo ?? ""}
+                  onChange={(e) => update(idx, { prefijo: e.target.value || null })}
+                  placeholder="conector"
+                  className="h-auto self-center w-16 text-xs italic text-center px-1 border-dashed"
+                  title='Texto fijo entre columnas. Ej. "a" → "10000 lm a 5700 K"'
+                />
+              )}
+              <div className="border hairline rounded p-2 bg-muted/20 min-w-[180px] flex-1 space-y-1">
+                <div className="flex items-start justify-between gap-1">
+                  <Input
+                    value={c.label}
+                    onChange={(e) => updateLabel(idx, e.target.value)}
+                    placeholder="Nombre"
+                    className="h-7 text-xs font-medium border-0 bg-transparent shadow-none focus-visible:ring-1 px-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeCol(idx)}
+                    className="h-6 w-6 shrink-0 inline-flex items-center justify-center text-muted-foreground/60 hover:text-destructive rounded"
+                    title="Borrar columna"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-1">
+                  {c.tipo !== "valor_unidad" && (
+                    <Input
+                      value={c.unidad ?? ""}
+                      onChange={(e) => update(idx, { unidad: e.target.value || null })}
+                      placeholder="unidad fija"
+                      className="h-6 text-[11px] flex-1 px-1.5"
+                    />
+                  )}
+                  {c.tipo === "valor_unidad" && (
+                    <div className="flex-1 text-[10px] text-muted-foreground italic px-1">
+                      número + unidad por fila
+                    </div>
+                  )}
+                  <Select
+                    value={c.tipo}
+                    onValueChange={(v: SpecTablaColTipo) => update(idx, { tipo: v })}
+                  >
+                    <SelectTrigger className="h-6 text-[11px] w-[120px] px-1.5"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(["valor_unidad", "number", "string", "enum", "bool"] as SpecTablaColTipo[]).map((t) => (
+                        <SelectItem key={t} value={t} className="text-xs">{COL_TIPO_LABEL[t]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {c.tipo === "enum" && (
+                  <Input
+                    value={(c.options ?? []).join(", ")}
+                    onChange={(e) =>
+                      update(idx, {
+                        options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
+                      })
+                    }
+                    placeholder="opciones: 2700K, 3200K…"
+                    className="h-6 text-[11px] px-1.5"
+                  />
+                )}
+                {c.tipo === "valor_unidad" && (
+                  <UnidadesPicker
+                    selected={c.unidades_opciones ?? []}
+                    onChange={(opts) => update(idx, { unidades_opciones: opts })}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => toggleAdvanced(idx)}
+                  className="text-[9px] text-muted-foreground hover:text-ink font-mono w-full text-left px-1"
+                >
+                  {showAdvanced.has(idx) ? "▾" : "▸"} key: <span className="text-ink/70">{c.key || "(auto)"}</span>
+                </button>
+                {showAdvanced.has(idx) && (
+                  <Input
+                    value={c.key}
+                    onChange={(e) => setKeyManual(idx, e.target.value)}
+                    placeholder="key custom"
+                    className="font-mono h-6 text-[11px] px-1.5"
+                  />
+                )}
+              </div>
+            </Fragment>
+          ))}
+          <button
+            type="button"
+            onClick={addCol}
+            className="border hairline border-dashed rounded px-2 min-w-[80px] flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-ink hover:border-ink/30 transition"
+            title="Agregar columna"
+          >
+            <Plus className="h-3 w-3" /> col
+          </button>
+        </div>
+      )}
+      {columnas.length === 0 && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addCol}
+          className="h-7 text-xs gap-1"
+        >
+          <Plus className="h-3 w-3" /> Agregar columna
+        </Button>
+      )}
+    </fieldset>
   );
 }
 

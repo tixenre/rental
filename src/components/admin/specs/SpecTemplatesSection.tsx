@@ -58,6 +58,7 @@ const TIPO_LABEL: Record<SpecTipo, string> = {
   multi_enum: "Lista de opciones (varios valores, ej. Wi-Fi, USB-C, SDI)",
   enum: "Opciones (enum)",
   bool: "Sí/No",
+  tabla: "Tabla (filas con columnas configurables)",
 };
 
 export function SpecTemplatesSection({
