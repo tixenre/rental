@@ -1003,7 +1003,7 @@ function EquipmentRow({ eq, inCart, isExpanded, jornadas, fechaDesde, onTap, onA
                     >
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
-                    {item.qty && item.qty > 1 ? `${item.qty}× ` : ""}{item.name}
+                    {item.qty ?? 1}× {item.name}
                   </span>
                 ))}
               </div>
