@@ -191,6 +191,97 @@ def _cap_largo(s: str, max_chars: int) -> str:
     return cut + "…" if cut else s[:max_chars]
 
 
+# ── Display templates por spec ──────────────────────────────────────────
+# Renderiza un (spec_key, valor) → string bonito para usar en placeholders.
+# Ejemplo: lumens_at_5600k=19389 → "19389 lm @ 5600K"
+#
+# Templates:
+#   - "{value}" interpolación simple del valor crudo
+#   - "{value}<sufijo>" valor + sufijo literal
+#   - "_smart_kg"   valor int en gramos: <1000 → "Xg", >=1000 → "X.X kg"
+#   - "_rango_k"    rango Kelvin: {min,max} → "X-YK" o "XK" si fixed
+#   - "_iso_range"  rango ISO: {min,max} → "ISO X-Y"
+#   - "_bool_yes"   bool → "Sí"/"No" o label si True
+#
+# Keys: spec_key canónico (no label) para ser estable ante traducciones de label.
+SPEC_DISPLAY_TEMPLATES: dict[str, str] = {
+    # ── Luces (Iluminación) ──────────────────────────────────────────
+    "potencia_w":        "{value}W",
+    "lumens_at_5600k":   "{value} lm @ 5600K",
+    "lumens_at_3200k":   "{value} lm @ 3200K",
+    "lux_at_1m_5600k":   "{value} lux @ 1m (5600K)",
+    "lux_at_1m_3200k":   "{value} lux @ 1m (3200K)",
+    "cri":               "CRI {value}",
+    "tlci":              "TLCI {value}",
+    "r9":                "R9 {value}",
+    "temperatura_k":     "_rango_k",
+    "peso_g":            "_smart_kg",
+
+    # ── Cámaras ──────────────────────────────────────────────────────
+    "megapixels":        "{value}MP",
+    "fps_max":           "{value}fps",
+    "continuous_shooting_fps": "{value}fps (ráfaga)",
+    "iso_nativo":        "_iso_range",
+    "iso_extendido":     "_iso_range_ext",
+    "rango_dinamico_stops": "{value} stops",
+    "recording_limit_min": "{value} min",
+    "consumo_w":         "{value}W",
+
+    # ── Otros (lentes, modificadores, etc., crecerán con el dataset) ─
+}
+
+
+def render_spec_value(spec_key: str, value) -> str:
+    """Renderiza un spec value con su display template.
+
+    Si no hay template para `spec_key`, devuelve el valor crudo como string.
+    Soporta value de tipos: str, int, float, bool, dict (rangos {min, max}).
+    """
+    if value is None:
+        return ""
+    tpl = SPEC_DISPLAY_TEMPLATES.get(spec_key)
+
+    # Special handlers
+    if tpl == "_smart_kg":
+        try:
+            g = float(value)
+            return f"{round(g/1000, 2)} kg" if g >= 1000 else f"{int(g)}g"
+        except (TypeError, ValueError):
+            return str(value)
+    if tpl == "_rango_k":
+        if isinstance(value, dict) and "min" in value and "max" in value:
+            return f"{value['min']}K" if value["min"] == value["max"] else f"{value['min']}-{value['max']}K"
+        if isinstance(value, str):
+            # Ya viene tipo "3200K" o "1800-20000K"
+            return value if "K" in value.upper() else f"{value}K"
+        return f"{value}K"
+    if tpl == "_iso_range":
+        if isinstance(value, dict) and "min" in value and "max" in value:
+            return f"ISO {value['min']}-{value['max']}"
+        return f"ISO {value}"
+    if tpl == "_iso_range_ext":
+        if isinstance(value, dict) and "min" in value and "max" in value:
+            return f"ISO {value['min']}-{value['max']} (ext)"
+        return f"ISO {value} (ext)"
+    if tpl == "_bool_yes":
+        return "Sí" if value in (True, "true", "1", "Sí", "Si", "yes") else "No"
+
+    # Template con {value}
+    if tpl and "{value}" in tpl:
+        return tpl.replace("{value}", str(value))
+
+    # Sin template: devolver crudo
+    if isinstance(value, bool):
+        return "Sí" if value else "No"
+    if isinstance(value, list):
+        return ", ".join(str(x) for x in value)
+    if isinstance(value, dict):
+        if "min" in value and "max" in value:
+            return f"{value['min']}-{value['max']}"
+        return str(value)
+    return str(value)
+
+
 # ── Render de specs (label + valor con formato bonito) ──────────────────
 
 def _spec_value_str(label: str, value: str, *, with_label: bool = True) -> Optional[str]:
@@ -255,6 +346,34 @@ def _norm_label(s: str) -> str:
     return s.lower().strip()
 
 
+# Mapeo de label normalizado → spec_key para aplicar display templates.
+# Permite que `{spec:Lúmenes (5600K)}` aplique el template de `lumens_at_5600k`.
+LABEL_TO_SPEC_KEY: dict[str, str] = {
+    # Luces
+    "potencia":            "potencia_w",
+    "lumenes (5600k)":     "lumens_at_5600k",
+    "lumens (5600k)":      "lumens_at_5600k",
+    "lumenes (3200k)":     "lumens_at_3200k",
+    "lumens (3200k)":      "lumens_at_3200k",
+    "lux a 1m (5600k)":    "lux_at_1m_5600k",
+    "lux a 1m (3200k)":    "lux_at_1m_3200k",
+    "cri":                 "cri",
+    "tlci":                "tlci",
+    "r9":                  "r9",
+    "temperatura color":   "temperatura_k",
+    "peso":                "peso_g",
+    # Cámaras
+    "megapixels":          "megapixels",
+    "fps max":             "fps_max",
+    "rafaga (stills)":     "continuous_shooting_fps",
+    "iso nativo":          "iso_nativo",
+    "iso extendido":       "iso_extendido",
+    "rango dinamico":      "rango_dinamico_stops",
+    "limite de grabacion": "recording_limit_min",
+    "consumo":             "consumo_w",
+}
+
+
 def _render_template(
     tpl: str,
     vars: dict[str, str],
@@ -265,7 +384,9 @@ def _render_template(
     Tokens soportados:
       - `{marca}`, `{modelo}`, `{tipo}`, `{nombre}` → resueltos vía `vars`.
       - `{spec:Label}` → busca en `specs` por label normalizado (case+tilde
-        insensitive).
+        insensitive). Si el spec tiene un display template asociado vía
+        `LABEL_TO_SPEC_KEY` + `SPEC_DISPLAY_TEMPLATES`, se aplica el formato
+        bonito (ej. "8990" → "8990 lm @ 5600K").
     """
     lower = {k.lower(): (v or "").strip() for k, v in vars.items()}
     spec_map: dict[str, str] = {}
@@ -278,7 +399,12 @@ def _render_template(
         key_stripped = key.strip()
         if key_stripped.lower().startswith("spec:"):
             spec_label = key_stripped[len("spec:"):]
-            val = spec_map.get(_norm_label(spec_label), "")
+            norm = _norm_label(spec_label)
+            val = spec_map.get(norm, "")
+            # Aplicar display template si tenemos mapeo label → spec_key
+            spec_key = LABEL_TO_SPEC_KEY.get(norm)
+            if spec_key and val:
+                val = render_spec_value(spec_key, val)
         else:
             val = lower.get(key_stripped.lower(), "")
         if val:
