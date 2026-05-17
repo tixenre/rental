@@ -1220,30 +1220,6 @@ export const adminApi = {
     if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
   },
 
-  // ── Dedup tool de specs duplicadas ─────────────────────────────────
-  listDedupCandidatos: () =>
-    authedJson<{
-      total: number;
-      items: Array<{
-        keep: {
-          id: number; spec_key: string; label: string; tipo: string;
-          unidad: string | null; validado: boolean;
-          uso_cat: number; uso_eq: number;
-        };
-        drop: {
-          id: number; spec_key: string; label: string; tipo: string;
-          unidad: string | null; validado: boolean;
-          uso_cat: number; uso_eq: number;
-        };
-        label_distance: number;
-      }>;
-    }>("/api/admin/specs/dedup/candidatos"),
-  mergeSpecs: (input: { keep_id: number; drop_id: number }) =>
-    authedPostJson<{ ok: true; keep_id: number; drop_id: number }>(
-      "/api/admin/specs/dedup/merge",
-      input,
-    ),
-
   // ── Cleanup de specs legacy (equipo_fichas.specs_json) ───────────
   listLegacyInventario: () =>
     authedJson<{
