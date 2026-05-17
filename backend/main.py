@@ -52,7 +52,6 @@ from routes.marcas           import router as marcas_router
 from routes.specs            import router as specs_router
 from routes.specs_observatorio import router as specs_observatorio_router
 from routes.unidades         import router as unidades_router
-from routes.changelog        import router as changelog_router
 from routes.seo              import router as seo_router
 from routes.inventario       import router as inventario_router
 from middleware          import auth_middleware
@@ -133,7 +132,6 @@ app.include_router(marcas_router,         prefix="/api")
 app.include_router(specs_router,          prefix="/api")
 app.include_router(specs_observatorio_router, prefix="/api")
 app.include_router(unidades_router,       prefix="/api")
-app.include_router(changelog_router,      prefix="/api")
 app.include_router(inventario_router,     prefix="/api/admin")
 app.include_router(seo_router)  # /sitemap.xml (sin prefijo /api — debe estar en root)
 app.include_router(cliente_portal_router)
