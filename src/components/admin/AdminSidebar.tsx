@@ -23,6 +23,9 @@ import {
   Network,
   GitMerge,
   Archive,
+  Sun,
+  CalendarDays,
+  Check,
 } from "lucide-react";
 
 import {
@@ -54,6 +57,8 @@ type NavItem = {
 
 const items: NavItem[] = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard, exact: true },
+  { title: "Hoy",        url: "/admin/hoy",        icon: Sun },
+  { title: "Calendario", url: "/admin/calendario", icon: CalendarDays },
   {
     title: "Inventario",
     url: "/admin/equipos",
@@ -61,6 +66,8 @@ const items: NavItem[] = [
     children: [
       { title: "Equipos",             url: "/admin/equipos",            icon: List },
       { title: "Calidad",             url: "/admin/equipos/calidad",    icon: ShieldCheck },
+      { title: "Clasificar equipos",  url: "/admin/equipos/clasificar", icon: Sparkles },
+      { title: "Validar nombres",     url: "/admin/equipos/validacion", icon: Check },
       { title: "Categorías",          url: "/admin/equipos/categorias", icon: FolderTree },
       { title: "Marcas",              url: "/admin/equipos/marcas",     icon: Building2 },
       { title: "Etiquetas libres",    url: "/admin/equipos/etiquetas",  icon: Tag },
