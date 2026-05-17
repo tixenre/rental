@@ -7,12 +7,32 @@ import { type Equipment, type Category } from "@/data/equipment";
 const KNOWN_CATEGORIES: Category[] = [
   "Cámaras",
   "Lentes",
+  "Adaptadores",
+  "Filtros",
   "Iluminación",
   "Audio",
   "Soportes",
   "Accesorios",
-  "Adaptadores",
 ];
+
+// Agrupado visual del menú lateral: categorías raíz independientes en el
+// modelo de datos, pero renderizadas bajo un header común en el sidebar.
+// Cada entrada: [header, lista de categorías que cuelgan]. Las categorías
+// que no aparezcan acá se renderizan sueltas en su lugar habitual.
+//
+// Decisión: hard-coded — basta con 1 grupo por ahora ("Óptica"). Si surgen
+// más (ej. "Audio" agrupando Sonido + Monitores), migrar a metadata en
+// la tabla categorias.
+const CATEGORY_GROUPS: { header: string; categories: string[] }[] = [
+  { header: "Óptica", categories: ["Lentes", "Adaptadores", "Filtros"] },
+];
+
+// TODO: rendering de sub-cats (Montura E/EF/RF, 82mm, etc.) requiere expandir
+// Equipment.category (singular) → Equipment.categories (plural M2M). Hoy el
+// backend devuelve solo la categoría principal por equipo, pero los seeds
+// asignan a múltiples sub-cats vía `equipo_categorias`. Cuando se expanda
+// el contrato API, agregar render anidado: `<li>Lentes</li> → <ul><li>Zoom</li>
+// <li>Fijo</li> <li>Montura E</li> ...</ul>`.
 
 export function CategorySidebar({
   activeCategory,
@@ -60,10 +80,19 @@ export function CategorySidebar({
           Categorías
         </div>
         <ul className="space-y-1">
-          {(["Todos", ...categories] as const).map((c) => {
-            const active = activeCategory === c;
-            return (
-              <li key={c}>
+          {(() => {
+            // Render con soporte de grupos visuales (ver CATEGORY_GROUPS).
+            // Estructura semántica: cada grupo es un <li> con un header
+            // (`<div role="presentation">`) + `<ul>` anidada con sus items.
+            // Esto permite a screen readers entender la jerarquía. Si un grupo
+            // tiene 0 o 1 categorías en la API, NO emitimos el header (queda
+            // raro un grupo con una sola entrada).
+            const items: React.ReactNode[] = [];
+            const seen = new Set<string>();
+
+            const renderButton = (c: string) => {
+              const active = activeCategory === c;
+              return (
                 <button
                   onClick={() => onCategory(c)}
                   className={cn(
@@ -72,12 +101,14 @@ export function CategorySidebar({
                       ? "bg-amber-soft text-ink"
                       : "text-foreground/80 hover:bg-surface hover:text-foreground",
                   )}
+                  aria-pressed={active}
                 >
                   <span
                     className={cn(
                       "grid h-7 w-7 shrink-0 place-items-center rounded-md transition",
                       active ? "text-ink" : "text-foreground/40 group-hover:text-foreground/70",
                     )}
+                    aria-hidden="true"
                   >
                     {c === "Todos" ? (
                       <LayoutGrid className="h-4 w-4" strokeWidth={2} />
@@ -93,9 +124,51 @@ export function CategorySidebar({
                     {countByCategory(c)}
                   </span>
                 </button>
-              </li>
-            );
-          })}
+              );
+            };
+
+            for (const c of ["Todos", ...categories]) {
+              if (seen.has(c)) continue;
+              const group = CATEGORY_GROUPS.find((g) => g.categories.includes(c));
+              if (group) {
+                // Reunir TODAS las cats del grupo presentes en la API, en
+                // orden definido por CATEGORY_GROUPS (no en orden API).
+                const present = group.categories.filter((gc) => categories.includes(gc) && !seen.has(gc));
+                present.forEach((gc) => seen.add(gc));
+                // Solo emitimos header si hay ≥2 items en el grupo;
+                // sino el grupo se renderea como cats sueltas.
+                if (present.length >= 2) {
+                  items.push(
+                    <li key={`__group__${group.header}`}>
+                      <div
+                        id={`group-${group.header.toLowerCase()}`}
+                        className="pt-2 pb-1 px-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground/70"
+                      >
+                        {group.header}
+                      </div>
+                      <ul
+                        className="space-y-1 ml-2 pl-3 border-l hairline"
+                        aria-labelledby={`group-${group.header.toLowerCase()}`}
+                      >
+                        {present.map((gc) => (
+                          <li key={gc}>{renderButton(gc)}</li>
+                        ))}
+                      </ul>
+                    </li>,
+                  );
+                  continue;
+                }
+                // grupo con 1 sola cat → render plano
+                present.forEach((gc) => {
+                  items.push(<li key={gc}>{renderButton(gc)}</li>);
+                });
+                continue;
+              }
+              seen.add(c);
+              items.push(<li key={c}>{renderButton(c)}</li>);
+            }
+            return items;
+          })()}
         </ul>
       </div>
 

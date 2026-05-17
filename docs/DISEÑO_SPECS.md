@@ -1,6 +1,25 @@
 # Diseño — Sistema bulletproof de specs / categorías / relevancia / compatibilidad
 
-> **Estado**: borrador para revisión. **Fecha**: 2026-05-10.
+> **⚠ HISTÓRICO — 2026-05-17**
+>
+> Este documento fue el borrador del rediseño. **Ya implementado**, con cambios:
+>
+> 1. **"Adaptadores y Filtros" splitteado** en 2 raíces independientes (specs nativos).
+> 2. **Lentes** ya no usa sub-cats por montura. Ahora **por TIPO** (Zoom / Fijo /
+>    Vintage / Especiales) + monturas on-the-fly (Montura E, EF, M42, etc.).
+> 3. **Compatibilidades**: `spec_definitions.es_compatibilidad` + `compatibilidad_modo`
+>    + `rol_compatibilidad` (contenedor/contenido para formato jerárquico).
+> 4. **Keywords**: derivadas de specs vía `compute_keywords()` (no más LLM raro).
+> 5. **Merge dataset ↔ DB**: `docs/equipos_match.json` preserva `equipo.id` (FKs
+>    de pedidos intactas).
+>
+> **Fuente de verdad actual**:
+> - [`MANIFIESTO.md`](../MANIFIESTO.md) §6 (workflow) + §7 (sistema consolidado)
+> - [`docs/DATASET_*.md`](./) (detalle por categoría)
+> - [`backend/seeds/compat_config.py`](../backend/seeds/compat_config.py) (motor compat + helpers)
+> - [`backend/services/nombre_builder.py`](../backend/services/nombre_builder.py) (templates + keywords)
+
+> **Estado original**: borrador para revisión. **Fecha**: 2026-05-10.
 > Este documento NO se implementa hasta que esté revisado y aprobado.
 
 ## 0 · Objetivo

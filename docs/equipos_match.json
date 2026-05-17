@@ -1,0 +1,97 @@
+{
+  "_meta": {
+    "descripcion": "Mapeo dataset → equipos.id en DB para evitar duplicados y preservar FKs de pedidos históricos. Generado/curado manualmente (no por equipos_match_preview).",
+    "fuente": "API pública https://ramblarental.up.railway.app/api/equipos (130 visibles) + curación manual",
+    "fecha": "2026-05-17",
+    "acciones_soportadas": {
+      "update": "Match exacto/manual: el seed hace UPDATE sobre equipo_id existente. Preserva pedidos.",
+      "create": "No existe en DB: el seed crea equipo nuevo.",
+      "skip":   "No tocar (ni crear ni actualizar). Útil para casos como kit Zeiss que se manejan distinto en DB.",
+      "review": "Match sugerido pero requiere revisión manual antes de aplicar."
+    },
+    "overrides": "Si el match tiene override_marca/override_modelo, el seed PISA esos campos en la DB. Útil para corregir equipos mal-etiquetados (ej. Meike etiquetado como Canon)."
+  },
+  "Cámaras": {
+    "sony_fx3":           { "action": "update", "equipo_id": 3, "_note": "Sony FX3 (visible)" },
+    "sony_a7v":           { "action": "update", "equipo_id": 5, "_note": "Sony a7 V (visible)" },
+    "sony_zve1":          { "action": "update", "equipo_id": 6, "_note": "Sony ZV-E1 (visible)" },
+    "canon_c200":         { "action": "update", "equipo_id": 7, "_note": "Canon EOS C200 (visible)" },
+    "red_komodo":         { "action": "update", "equipo_id": 2, "_note": "RED Komodo 6K (visible)" },
+    "red_komodo_x":       { "action": "update", "equipo_id": 1, "_note": "RED KOMODO X (visible)" },
+    "gopro_hero12":       { "action": "update", "equipo_id": 8, "_note": "GoPro HERO12 Black (visible)" }
+  },
+  "Lentes": {
+    "sony_12_24_28_gm":          { "action": "update", "equipo_id": 11 },
+    "sony_24_70_28_gm_ii":       { "action": "update", "equipo_id": 12 },
+    "sony_70_200_28_gm_oss_ii":  { "action": "update", "equipo_id": 13 },
+    "sigma_18_35_18_art":        { "action": "update", "equipo_id": 15 },
+    "sigma_24_70_28_art":        { "action": "update", "equipo_id": 14 },
+    "sigma_35_14_art":           { "action": "update", "equipo_id": 17 },
+    "sigma_50_14_art":           { "action": "update", "equipo_id": 16 },
+    "canon_70_200_28":           { "action": "update", "equipo_id": 19, "_note": "Canon EF 70-200mm f/2.8L USM" },
+    "laowa_24_f14_probe":        { "action": "update", "equipo_id": 20 },
+    "zeiss_jena_pancolar_50_18": { "action": "skip", "_note": "En DB están los 3 Zeiss como UN equipo (id=21, 'Jena 20/35/50/135mm M42' — kit). El usuario prefiere mantener el kit y eventualmente implementar 'combos' con sub-equipos." },
+    "zeiss_jena_flektogon_35_24":{ "action": "skip", "_note": "Idem — quedan documentados en docs/lentes.json pero no se crean equipos separados." },
+    "zeiss_jena_sonnar_135_35":  { "action": "skip", "_note": "Idem." }
+  },
+  "Adaptadores": {
+    "sigma_ef_e_mc11":           { "action": "update", "equipo_id": 22, "_note": "Sigma MC-11" },
+    "canon_ef_rf_dropin":        { "action": "update", "equipo_id": 23, "_note": "Canon Drop-In Filter Mount Adapter EF-EOS R" },
+    "canon_ef_rf_speedbooster":  {
+      "action": "update", "equipo_id": 24,
+      "_note": "Canon Mount Adapter EF-EOS R 0.71x (speedbooster oficial Canon). En DB ya estaba como 'Canon Speedboster EF-RF' (id=24) — match correcto sin overrides."
+    },
+    "vello_m42_e":               {
+      "action": "update", "equipo_id": 26,
+      "override_marca":  "Vello",
+      "override_modelo": "M42 to Sony E-Mount Adapter LA-NEX-M42",
+      "_note": "En DB el equipo no tiene marca (id=26 'M42-E'). Le seteamos marca/modelo canónicos."
+    }
+  },
+  "Filtros": {
+    "tiffen_82_cpl":           { "action": "update", "equipo_id": 32, "_note": "Tiffen 82mm Circular Polarizing Filter" },
+    "tiffen_82_vnd":           { "action": "update", "equipo_id": 27, "_note": "Tiffen 82VND" },
+    "tiffen_82_promist_1_4":   { "action": "update", "equipo_id": 30, "_note": "Tiffen Black Pro-Mist (82mm, Grade 1/4)" },
+    "tiffen_82_promist_1_8":   { "action": "update", "equipo_id": 29, "_note": "Tiffen Black Pro-Mist (sin grado especificado en DB; usuario aclaró que cualquier grado sirve para el match)" }
+  },
+  "Iluminación": {
+    "amaran_300c":         { "action": "update", "equipo_id": 61,  "_note": "amaran 300c" },
+    "amaran_200x":         { "action": "update", "equipo_id": 62,  "_note": "amaran COB 200x S (HTML procesado recién)" },
+    "aputure_b7c":         { "action": "update", "equipo_id": 63,  "_note": "Aputure Accent B7c LED RGBWW Light" },
+    "godox_m1":            { "action": "update", "equipo_id": 65,  "_note": "Godox M1" },
+    "godox_v100":          { "action": "update", "equipo_id": 133, "_note": "Godox V100" },
+    "godox_vl300ii":       { "action": "update", "equipo_id": 59,  "_note": "Godox VL300II" },
+    "nanlite_forza_500":   { "action": "update", "equipo_id": 56,  "_note": "Nanlite Forza 500 daylight" },
+
+    "godox_tl60":          {
+      "action": "update", "equipo_id": 58,
+      "override_modelo": "TL60 RGB LED Tube Light",
+      "_note": "Usuario confirmó: tiene el TL60. En DB estaba mal etiquetado como TL120 (id=58). El seed corrige el modelo."
+    },
+    "godox_vl150":         {
+      "action": "update", "equipo_id": 60,
+      "override_modelo": "VL150 LED Video Light",
+      "_note": "Usuario confirmó: tiene VL150 (no la II). En DB estaba como VL150II (id=60). El seed corrige el modelo."
+    },
+    "nanlite_forza_60":    { "action": "update", "equipo_id": 57, "_note": "Nanlite Forza 60 daylight (HTML actualizado al correcto)." },
+
+    "arri_650plus":        {
+      "action": "update", "equipo_id": 55,
+      "override_marca":  "ARRI",
+      "override_modelo": "650 Plus",
+      "_note": "Confirmado por usuario: id=55 ('CineGearFactory CGF-FTS-650') es realmente una ARRI 650 Plus fresnel tungsten. El seed corrige marca y modelo."
+    },
+    "molerichardson_juniorled_200": { "action": "skip", "_note": "JuniorLED 200W no está en inventario. Se saca." },
+    "molerichardson_2000w":{
+      "action": "update", "equipo_id": 64,
+      "override_marca":  "Mole-Richardson",
+      "override_modelo": "407 Baby Solarspot 2000W 6\"",
+      "_note": "Chassis 407 (Baby Solarspot) operado con bulb 2000W. En DB estaba como 'Richardson Mole 2000w' (id=64) — el seed corrige marca y modelo. Specs del patch (manual): potencia 2000W, fresnel, peso 6.24kg."
+    },
+
+    "amaran_360c":         { "action": "skip", "_note": "Usuario NO tiene Ray 360c. Se saca." },
+    "amaran_f21x":         { "action": "skip", "_note": "Usuario NO tiene F21x. Se saca." },
+    "aputure_nova_ii_2x1": { "action": "skip", "_note": "Usuario NO tiene NOVA II. Se saca." },
+    "nanlite_fc500b":      { "action": "skip", "_note": "Usuario NO tiene FC500B (lo que tiene en DB es la Forza 500 que ya está matcheada en id=56). Se saca." }
+  }
+}

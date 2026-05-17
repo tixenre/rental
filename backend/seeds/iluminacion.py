@@ -28,6 +28,12 @@ import json
 import sys
 from pathlib import Path
 
+try:
+    from .compat_config import load_match_file, resolve_equipo_id, apply_overrides, write_keywords
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).parent))
+    from compat_config import load_match_file, resolve_equipo_id, write_keywords  # type: ignore
+
 ROOT = Path(__file__).parent.parent.parent
 DATASET_PATH = ROOT / "docs" / "iluminacion.json"
 
@@ -254,10 +260,11 @@ def seed_iluminacion(conn, dry_run: bool = False) -> dict:
     if not existing or existing["n"] == 0:
         for spec_key, flags in SPEC_FLAGS_ILUMINACION.items():
             spec_def_id = spec_def_ids.get(spec_key)
-            if not spec_def_id or spec_def_id == -1:
+            if not spec_def_id:
                 continue
             prio, en_card, en_filtros, en_nombre, destacado = flags
             if dry_run:
+                # En dry-run contamos como "se crearía" incluso si spec_def_id=-1
                 stats["asignaciones_creadas"] += 1
                 continue
             cur = conn.execute("""
@@ -272,6 +279,11 @@ def seed_iluminacion(conn, dry_run: bool = False) -> dict:
                 stats["asignaciones_creadas"] += 1
 
     # ── 4. Equipos + equipo_specs ─────────────────────────────────────
+    # Mapeo manual desde docs/equipos_match.json (si existe) para preservar
+    # equipo.id en updates — protege FKs de pedidos históricos.
+    match_map = load_match_file(CATEGORIA_RAIZ)
+    stats["matches_aplicados_desde_archivo"] = 0
+
     for prod_id, prod in products.items():
         marca = prod.get("marca", "")
         modelo = prod.get("modelo", "")
@@ -281,14 +293,20 @@ def seed_iluminacion(conn, dry_run: bool = False) -> dict:
         subcat_name = categorize(prod)
         subcat_id = subcat_ids.get(subcat_name)
 
-        # Match por (marca, modelo)
-        existing = conn.execute(
-            "SELECT id FROM equipos WHERE marca = %s AND modelo = %s LIMIT 1",
-            (marca, modelo)
-        ).fetchone()
+        # Resolver equipo_id: usa docs/equipos_match.json si existe, sino
+        # fallback a match por (marca, modelo). Preserva FKs de pedidos.
+        equipo_id, fuente = resolve_equipo_id(conn, prod_id, marca, modelo, match_map)
 
-        if existing:
-            equipo_id = existing["id"]
+        if fuente == "skip":
+            stats["skipped"] = stats.get("skipped", 0) + 1
+            continue
+
+        if equipo_id is not None:
+            if fuente == "match_file":
+                stats["matches_aplicados_desde_archivo"] += 1
+            applied = apply_overrides(conn, prod_id, equipo_id, match_map, dry_run=dry_run)
+            if applied:
+                stats["overrides_aplicados"] = stats.get("overrides_aplicados", 0) + 1
             if not dry_run:
                 # Actualizar foto_url/bh_url si están vacíos (no pisar admin)
                 conn.execute("""
@@ -329,6 +347,10 @@ def seed_iluminacion(conn, dry_run: bool = False) -> dict:
                         SET value = EXCLUDED.value
                 """, (equipo_id, spec_def_id, value_str))
                 stats["equipo_specs_insertados"] += 1
+
+            # Keywords derivadas (después de poblar specs)
+            n_kw = write_keywords(conn, equipo_id, prod.get("specs", {}), dry_run=dry_run)
+            stats["keywords_generadas"] = stats.get("keywords_generadas", 0) + n_kw
 
     return stats
 

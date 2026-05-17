@@ -1040,107 +1040,80 @@ def borrar_compatibilidad(compat_id: int, request: Request):
 # (exacta o jerarquia), agrega overrides manuales de equipo_compatibilidad y
 # devuelve un overall + razones.
 
-# Familias jerárquicas dentro de specs multi_enum. La lógica de compat aplica
-# "mínimo común" por familia cuando dos equipos comparten familia pero no
-# versión exacta (ej. cámara HDMI 2.1 + monitor HDMI 2.0 → ambos hablan 2.0).
-# Hardcodeado aquí porque el catálogo AV es estable; si crece, mover a metadata
-# en spec_definitions.
-_MULTI_ENUM_FAMILIES: dict[str, list[str]] = {
-    "HDMI": ["HDMI 1.4", "HDMI 2.0", "HDMI 2.1"],
-    "SDI":  ["SDI 3G", "SDI 6G", "SDI 12G"],
-}
+# NOTA: las "familias jerárquicas" para specs multi_enum (HDMI 2.0/2.1/etc,
+# SDI 3G/6G/12G) y el match cross-spec direccional video_out↔video_in fueron
+# REMOVIDAS en esta sesión. La implementación original (commits 444a351 +
+# code en _compute_multi_enum_compat) iba a confundir con el sistema canónico
+# nuevo (compat_config.py + apply_compat_config).
+#
+# Cuando entre la categoría "Monitores y Video" con datos reales, replantear:
+#   - Defin compat_config para HDMI/SDI/Thunderbolt (similar a FORMATO_ENUM)
+#   - Multi-enum match con jerarquía → handler en _compute_compat alineado
+#     al patrón actual de match exacto/jerárquico.
 
+def _prefetch_manual_overrides(conn, equipo_a_id: int) -> dict[int, dict]:
+    """Pre-carga TODOS los overrides manuales que involucran al equipo A.
 
-def _parse_multi_enum_value(value: str) -> list[str]:
-    """Parsea un value de multi_enum desde su storage TEXT. El frontend lo
-    guarda como string CSV-ish: 'HDMI 2.0, SDI 12G'. Aceptamos también JSON
-    array por si vino del autocompletar IA."""
-    if not value:
-        return []
-    v = value.strip()
-    if v.startswith("["):
-        try:
-            arr = json.loads(v)
-            return [str(x).strip() for x in arr if x]
-        except Exception:
-            pass
-    return [p.strip() for p in v.split(",") if p.strip()]
-
-
-def _compute_multi_enum_compat(label: str, a_val: str, b_val: str) -> dict:
-    """Lógica de compat para multi_enum (ej. video_out).
-
-    Orden de prioridad:
-      1. Match exacto: comparten al menos un valor idéntico → status='match'.
-      2. Match jerárquico intra-familia: comparten familia pero distintas
-         versiones → status='match' con mensaje "limitado a versión mínima común".
-      3. Sin overlap: distintas familias o sin valores comunes → status='mismatch'.
+    Útil para evitar N+1 en `listar_compatibles`: en vez de query por candidato,
+    una sola query y luego lookup por b_id. Devuelve dict {b_id: manual_data}.
     """
-    a_set = set(_parse_multi_enum_value(a_val))
-    b_set = set(_parse_multi_enum_value(b_val))
-    if not a_set or not b_set:
-        return {"spec": label, "status": "mismatch",
-                "mensaje": f"{label}: uno de los dos no tiene valores cargados"}
-
-    # 1. Intersection directa
-    common = a_set & b_set
-    if common:
-        return {"spec": label, "status": "match",
-                "mensaje": f"{label}: comparten {', '.join(sorted(common))}"}
-
-    # 2. Match jerárquico intra-familia
-    common_versions = []
-    for family_name, order in _MULTI_ENUM_FAMILIES.items():
-        a_in_fam = [v for v in a_set if v in order]
-        b_in_fam = [v for v in b_set if v in order]
-        if not (a_in_fam and b_in_fam):
-            continue
-        # "El mejor que cada uno tiene" en esa familia
-        a_best = max(a_in_fam, key=lambda v: order.index(v))
-        b_best = max(b_in_fam, key=lambda v: order.index(v))
-        # Versión común = el menor de los dos máximos
-        min_idx = min(order.index(a_best), order.index(b_best))
-        common_versions.append({
-            "family": family_name,
-            "version": order[min_idx],
-            "a_best": a_best, "b_best": b_best,
-        })
-
-    if common_versions:
-        partes = [
-            f"{cv['family']} a {cv['version']}"
-            + (f" (A: {cv['a_best']}, B: {cv['b_best']})"
-               if cv["a_best"] != cv["b_best"] else "")
-            for cv in common_versions
-        ]
-        return {"spec": label, "status": "match",
-                "mensaje": f"{label}: compatible vía {', '.join(partes)} (versión mínima común)"}
-
-    # 3. Sin overlap
-    return {"spec": label, "status": "mismatch",
-            "mensaje": f"{label}: sin conectores en común (A: {', '.join(sorted(a_set))} · B: {', '.join(sorted(b_set))})"}
+    rows = conn.execute(
+        """
+        SELECT
+          CASE WHEN ec.equipo_a_id = ? THEN ec.equipo_b_id ELSE ec.equipo_a_id END AS other_id,
+          ec.tipo, ec.nota, ec.adaptador_id,
+          a.nombre AS adaptador_nombre
+        FROM equipo_compatibilidad ec
+        LEFT JOIN equipos a ON a.id = ec.adaptador_id
+        WHERE ec.equipo_a_id = ? OR ec.equipo_b_id = ?
+        """,
+        (equipo_a_id, equipo_a_id, equipo_a_id),
+    ).fetchall()
+    out: dict[int, dict] = {}
+    for r in rows:
+        out[r["other_id"]] = {
+            "tipo": r["tipo"],
+            "nota": r["nota"],
+            "adaptador_id": r["adaptador_id"],
+            "adaptador_nombre": r["adaptador_nombre"],
+        }
+    return out
 
 
-def _compute_compat(conn, equipo_a_id: int, equipo_b_id: int) -> dict:
+def _compute_compat(
+    conn,
+    equipo_a_id: int,
+    equipo_b_id: int,
+    *,
+    manual_cache: dict[int, dict] | None = None,
+) -> dict:
     """Devuelve {overall, razones, adaptador?} para el par (A, B).
 
     overall ∈ {compatible, compatible_con_crop, parcial, incompatible,
                requiere_adaptador, sin_relacion}
     razones: lista de {spec, status, mensaje}
+
+    Args:
+        manual_cache: opcional. Si se pasa (output de `_prefetch_manual_overrides`),
+            evita una query por candidato. Caso típico: el endpoint
+            `listar_compatibles` lo pre-carga una vez para todos los pares.
     """
     # 1. Manual override (gana).
-    manual = conn.execute(
-        """
-        SELECT ec.tipo, ec.nota, ec.adaptador_id,
-               a.nombre AS adaptador_nombre
-        FROM equipo_compatibilidad ec
-        LEFT JOIN equipos a ON a.id = ec.adaptador_id
-        WHERE (ec.equipo_a_id = ? AND ec.equipo_b_id = ?)
-           OR (ec.equipo_a_id = ? AND ec.equipo_b_id = ?)
-        LIMIT 1
-        """,
-        (equipo_a_id, equipo_b_id, equipo_b_id, equipo_a_id),
-    ).fetchone()
+    if manual_cache is not None:
+        manual = manual_cache.get(equipo_b_id)
+    else:
+        manual = conn.execute(
+            """
+            SELECT ec.tipo, ec.nota, ec.adaptador_id,
+                   a.nombre AS adaptador_nombre
+            FROM equipo_compatibilidad ec
+            LEFT JOIN equipos a ON a.id = ec.adaptador_id
+            WHERE (ec.equipo_a_id = ? AND ec.equipo_b_id = ?)
+               OR (ec.equipo_a_id = ? AND ec.equipo_b_id = ?)
+            LIMIT 1
+            """,
+            (equipo_a_id, equipo_b_id, equipo_b_id, equipo_a_id),
+        ).fetchone()
 
     if manual and manual["tipo"] == "incompatible":
         return {
@@ -1192,10 +1165,19 @@ def _compute_compat(conn, equipo_a_id: int, equipo_b_id: int) -> dict:
         a_val, b_val = r["a_value"], r["b_value"]
         label = r["label"]
         if modo == "exacta":
-            # multi_enum tiene su propia lógica: intersection + jerarquía
-            # intra-familia (HDMI 2.1/2.0, SDI 12G/6G/3G).
+            # multi_enum: fallback simple a intersección. Si comparten ≥1 valor → match.
+            # El sistema antiguo de "familias jerárquicas" (HDMI 2.1>2.0, SDI 12G>6G)
+            # se removió — cuando entren los Monitores se replantea con compat_config.py.
             if tipo == "multi_enum":
-                razones.append(_compute_multi_enum_compat(label, a_val, b_val))
+                a_set = {v.strip() for v in (a_val or "").split(",") if v.strip()}
+                b_set = {v.strip() for v in (b_val or "").split(",") if v.strip()}
+                common = a_set & b_set
+                if common:
+                    razones.append({"spec": label, "status": "match",
+                                    "mensaje": f"{label}: comparten {', '.join(sorted(common))}"})
+                else:
+                    razones.append({"spec": label, "status": "mismatch",
+                                    "mensaje": f"{label}: sin valores comunes"})
             elif a_val == b_val:
                 razones.append({"spec": label, "status": "match", "mensaje": f"{label}: {a_val}"})
             else:
@@ -1243,54 +1225,16 @@ def _compute_compat(conn, equipo_a_id: int, equipo_b_id: int) -> dict:
                 razones.append({"spec": label, "status": "partial",
                                 "mensaje": f"{label}: {a_val} vs {b_val} — tamaños difieren"})
 
-    # 2.b. Cross-spec match: video_out (A) ↔ video_in (B), y video_in (A) ↔ video_out (B).
-    # Permite detectar conexiones direccionales sin necesidad de que ambos equipos
-    # tengan la misma spec. La cámara tiene solo video_out, el monitor solo video_in
-    # — el sistema debe match cross y entender "A puede salir hacia B".
-    cross_rows = conn.execute(
-        """
-        SELECT
-          sd_a.spec_key AS a_key, sd_a.label AS a_label, esa.value AS a_value,
-          sd_b.spec_key AS b_key, sd_b.label AS b_label, esb.value AS b_value
-        FROM equipo_specs esa
-        JOIN spec_definitions sd_a ON sd_a.id = esa.spec_def_id
-        JOIN equipo_specs esb ON esb.equipo_id = ?
-        JOIN spec_definitions sd_b ON sd_b.id = esb.spec_def_id
-        WHERE esa.equipo_id = ?
-          AND (
-            (sd_a.spec_key = 'video_out' AND sd_b.spec_key = 'video_in')
-            OR (sd_a.spec_key = 'video_in' AND sd_b.spec_key = 'video_out')
-          )
-        """,
-        (equipo_b_id, equipo_a_id),
-    ).fetchall()
-    cross_pairs_seen: set[tuple[str, str]] = set()
-    for cr in cross_rows:
-        # Procesamos ambas direcciones (out→in y in→out) porque ambos son
-        # conexiones reales. Dedup por par ordenado.
-        key = tuple(sorted([cr["a_key"], cr["b_key"]]))
-        if key in cross_pairs_seen:
-            continue
-        cross_pairs_seen.add(key)
-        # Determinar quién es out y quién es in para el mensaje direccional
-        if cr["a_key"] == "video_out":
-            out_val, in_val = cr["a_value"], cr["b_value"]
-            dir_label = "A→B"
-        else:
-            out_val, in_val = cr["b_value"], cr["a_value"]
-            dir_label = "B→A"
-        result = _compute_multi_enum_compat("Conexión video", out_val, in_val)
-        # Reescribimos el mensaje para reflejar la direccionalidad
-        if result["status"] == "match":
-            result["mensaje"] = result["mensaje"].replace(
-                "Conexión video: ", f"Conexión video: {dir_label} "
-            )
-        elif result["status"] == "mismatch":
-            result["mensaje"] = (
-                f"Conexión video: el out de {dir_label[0]} no matchea con "
-                f"el in de {dir_label[-1]} (posiblemente requiere adaptador/converter)"
-            )
-        razones.append(result)
+    # 2.b. (REMOVED) Cross-spec match video_out↔video_in
+    # El sistema original tenía aquí una rama para detectar conexiones
+    # direccionales cámara→monitor usando _compute_multi_enum_compat (HDMI/SDI
+    # con familias jerárquicas). Se removió en esta sesión por:
+    #   1. Los specs video_out/video_in NO están definidos hoy.
+    #   2. La función _compute_multi_enum_compat tenía lógica que iba a
+    #      colisionar con el sistema canónico nuevo (compat_config.py).
+    # Cuando entre la categoría "Monitores y Video" con datos reales, replantear
+    # esta sección integrada al patrón de compat_config (registrar specs
+    # multi_enum con familias en COMPAT_SPECS, similar a FORMATO_ENUM).
 
     # 3. Aggregate.
     statuses = {r["status"] for r in razones}
@@ -1384,9 +1328,12 @@ def listar_compatibles(
 
         candidates = conn.execute(candidates_sql, params).fetchall()
 
+        # Pre-cargar overrides manuales del equipo base (evita N queries)
+        manual_cache = _prefetch_manual_overrides(conn, equipo_id)
+
         items = []
         for c in candidates:
-            result = _compute_compat(conn, equipo_id, c["id"])
+            result = _compute_compat(conn, equipo_id, c["id"], manual_cache=manual_cache)
             items.append({
                 "equipo_id": c["id"],
                 "nombre": c["nombre"],

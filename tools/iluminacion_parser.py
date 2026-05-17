@@ -187,11 +187,17 @@ def _extract_id(title: str) -> str:
             model_token = clean
             break
 
-    # Prioridad 2: primer token no genérico (ej. "NOVA", "RAY", "ACCENT")
+    # Prioridad 2: primer token no genérico (ej. "NOVA", "RAY", "ACCENT", "Forza")
     if not model_token:
-        for w in candidates:
+        for i, w in enumerate(candidates):
             clean = re.sub(r"[^a-zA-Z0-9]", "", w).lower()
             if clean and clean not in _GENERIC_WORDS:
+                # Si el siguiente token es un número (ej. "Forza 500"), incorporarlo
+                # para diferenciar productos de la misma familia.
+                if i + 1 < len(candidates):
+                    next_w = re.sub(r"[^a-zA-Z0-9]", "", candidates[i + 1]).lower()
+                    if next_w.isdigit():
+                        clean = f"{clean}_{next_w}"
                 model_token = clean
                 break
 
@@ -488,23 +494,23 @@ def _parse_montaje(secciones: dict) -> str | None:
 
 
 def _parse_peso_g(secciones: dict) -> int | None:
-    """Weight → int gramos (no string). El display lo computa la UI vía
-    SPEC_DISPLAY_TEMPLATES._smart_kg."""
+    """Weight → int gramos. Prioridad de unidades: g (directo) > kg > lb.
+
+    B&H suele listar imperial+métrico ('1.5 lb / 695 g'). Preferimos siempre
+    el valor métrico directo — convertir desde lb pierde precisión
+    (1.5 lb → 680 g ≠ los 695 g del fabricante)."""
     val = _find_value(secciones, "Weight")
     if not val:
         return None
-    # Preferir valor en kg: "0.86 lb / 0.39 kg (Fixture)" → 390 g
-    m_kg = re.search(r"([\d.]+)\s*kg", val, re.IGNORECASE)
-    if m_kg:
-        return round(float(m_kg.group(1)) * 1000)
-    # Si solo hay lb: convertir
-    m_lb = re.search(r"([\d.]+)\s*lb", val, re.IGNORECASE)
-    if m_lb:
-        return round(float(m_lb.group(1)) * 453.592)
-    # Fallback: gramos directos
     m_g = re.search(r"([\d.]+)\s*g\b", val, re.IGNORECASE)
     if m_g:
         return int(float(m_g.group(1)))
+    m_kg = re.search(r"([\d.]+)\s*kg", val, re.IGNORECASE)
+    if m_kg:
+        return round(float(m_kg.group(1)) * 1000)
+    m_lb = re.search(r"([\d.]+)\s*lb", val, re.IGNORECASE)
+    if m_lb:
+        return round(float(m_lb.group(1)) * 453.592)
     return None
 
 

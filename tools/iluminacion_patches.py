@@ -59,9 +59,9 @@ ARRI_FICHA = {
 
 MOLE_FICHA = {
     "Technical Specifications": [
-        {"label": "Model", "value": "407 Baby Solarspot 1,000W 6\""},
-        {"label": "Power Rating", "value": "1000 Watts"},
-        {"label": "Voltage", "value": "120 / 240 VAC or DC, 8.3 A máx."},
+        {"label": "Model", "value": "407 Baby Solarspot 6\" — equipado con bulb 2000W"},
+        {"label": "Power Rating", "value": "2000 Watts (con bulb FCM/FFR-style 2kW; el chassis 407 oficialmente es 1000W pero el usuario lo opera con bulb 2kW)"},
+        {"label": "Voltage", "value": "120 / 240 VAC or DC"},
         {"label": "Lamp Socket", "value": "Medium Bi-post"},
         {"label": "Lens", "value": "Fresnel 6\" (152 mm), vidrio"},
         {"label": "Field Angle", "value": "15° to 58°"},
@@ -71,6 +71,7 @@ MOLE_FICHA = {
         {"label": "Dimensions", "value": "11¼\" × 8⅝\" × 10½\""},
         {"label": "Weight", "value": "13¾ lbs (6.24 kg) con cable"},
         {"label": "Cable", "value": "25 ft, Type SO, 3 cond #16/3 con Edison plug"},
+        {"label": "_nota_bulb", "value": "El chassis 407 es el 'Baby Solarspot' de Mole. Físicamente idéntico al 1000W (HTML de B&H/mole.com), pero el usuario lo opera con un bulb de 2000W. Specs físicos = del 1000W; specs eléctricos (potencia, lumens) escalan con bulb."},
     ]
 }
 
@@ -119,20 +120,23 @@ def apply_patches():
         "secciones": ARRI_FICHA,
     })
 
-    # ── Mole-Richardson 1000W ────────────────────────────────────────────
-    curado["products"]["molerichardson_1000w"] = {
+    # ── Mole-Richardson 2000W (chassis 407 Baby Solarspot + bulb 2kW) ─────
+    # Físicamente es el "407 Baby Solarspot 1000W" de Mole (HTML de mole.com)
+    # pero el inventario del usuario lo opera con bulb de 2000W. Chassis
+    # idéntico, distinta lámpara.
+    curado["products"]["molerichardson_2000w"] = {
         "marca": "Mole-Richardson",
-        "modelo": "407 Baby Solarspot 1000W 6\"",
+        "modelo": "407 Baby Solarspot 2000W 6\"",
         "url_source": "https://www.mole.com/407-baby-solarspot",
         "specs": {
-            "potencia_w": 1000, "cri": 100, "temperatura_k": "3200K",
+            "potencia_w": 2000, "cri": 100, "temperatura_k": "3200K",
             "bicolor": False, "rgb": False, "dimming": True,
             "alimentacion": ["AC"], "montaje": "Fresnel", "peso_g": 6240,
         },
         "extras": {
             "tipo": "Fresnel",
             "item_type": "Tungsten Fresnel Spotlight",
-            "bulb_type": "Medium Bi-post (1000W tungsten)",
+            "bulb_type": "Medium Bi-post (2000W tungsten) — el chassis 407 es nominal 1000W; el usuario opera con bulb 2kW",
             "beam_angle": "15-58°",
             "cooling": "Passive",
             "dimensiones": "28.6 × 21.9 × 26.7 cm",
@@ -142,16 +146,22 @@ def apply_patches():
             "cable_length": "25 ft (7.6 m) Type SO",
         },
         "ficha": MOLE_FICHA,
-        "_nota": "Datos oficiales mole.com",
+        "_nota": "Chassis 407 Baby Solarspot de Mole-Richardson (HTML/mole.com lo lista como 1000W). Usuario lo opera con bulb 2000W. Specs físicos vienen del chassis 1000W; potencia y bulb_type reflejan el bulb real.",
     }
-    raw["products"] = [p for p in raw["products"] if p.get("id") != "molerichardson_1000w"]
+    # También limpio si quedó 'molerichardson_1000w' de versiones previas del seed
+    if "molerichardson_1000w" in curado["products"]:
+        del curado["products"]["molerichardson_1000w"]
+    raw["products"] = [
+        p for p in raw["products"]
+        if p.get("id") not in ("molerichardson_1000w", "molerichardson_2000w")
+    ]
     raw["products"].append({
-        "id": "molerichardson_1000w", "categoria_raiz": "Iluminación",
+        "id": "molerichardson_2000w", "categoria_raiz": "Iluminación",
         "subtipo": "Tungsten Fresnel", "marca": "Mole-Richardson",
-        "modelo": "407 Baby Solarspot 1000W 6\"",
+        "modelo": "407 Baby Solarspot 2000W 6\"",
         "url_source": "https://www.mole.com/407-baby-solarspot",
-        "status_bh": "N/A — sitio fabricante",
-        "fuente": "Mole-Richardson oficial (web fetch)",
+        "status_bh": "N/A — chassis del 1000W operado con bulb 2kW",
+        "fuente": "mole.com (web fetch del chassis 1000W) + override bulb",
         "secciones": MOLE_FICHA,
     })
 

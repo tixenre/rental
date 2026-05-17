@@ -545,8 +545,9 @@ def init_db():
     SEED_TREE = [] if existing_cat_count > 0 else [
         # (prioridad, nombre_padre, [hijos…])
         (10,  "Cámaras",              ["Video", "Foto", "Acción"]),
-        (20,  "Lentes",               ["Zoom E-mount", "Zoom EF", "Fijos EF", "Especiales", "Vintage"]),
-        (25,  "Adaptadores y Filtros",["Adaptadores de montura", "Filtros 82mm"]),
+        (20,  "Lentes",               ["Zoom", "Fijo", "Vintage", "Especiales"]),
+        (25,  "Adaptadores",          []),  # sub-cats por montura (E/RF/EF/M42) on-the-fly
+        (27,  "Filtros",              []),  # sub-cats por diámetro (82mm/77mm) on-the-fly
         (30,  "Iluminación",          ["LED daylight/bicolor", "LED RGB", "Tungsteno",
                                        "Fluorescente", "On-camera / Flash", "Práctica / efecto"]),
         (40,  "Modificadores",        ["Softbox", "Difusión / Frame", "Reflectores", "Banderas"]),

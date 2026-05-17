@@ -16,6 +16,30 @@ import json
 import sys
 from pathlib import Path
 
+try:
+    from .compat_config import (
+        FORMATO_ENUM,
+        apply_compat_config,
+        apply_overrides,
+        apply_rol_compat,
+        ensure_categoria_raiz,
+        load_match_file,
+        resolve_equipo_id,
+        write_keywords,
+    )
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).parent))
+    from compat_config import (  # type: ignore
+        FORMATO_ENUM,
+        apply_compat_config,
+        apply_overrides,
+        apply_rol_compat,
+        ensure_categoria_raiz,
+        load_match_file,
+        resolve_equipo_id,
+        write_keywords,
+    )
+
 ROOT = Path(__file__).parent.parent.parent
 DATASET_PATH = ROOT / "docs" / "camaras.json"
 
@@ -71,9 +95,7 @@ SPECS_CAMARAS = [
     ("lens_mount",      "Lens mount",           "enum", None,
      ["E", "RF", "EF", "L", "Z", "X", "MFT", "PL", "BMD", "B4", "M42"],
      "Null para cámaras con lente fijo (action cams, smartphones)"),
-    ("formato",         "Formato",              "enum", None,
-     ["Full-frame", "Super 35", "APS-C", "MFT", "M4/3", "Medium Format", "1\""],
-     None),
+    ("formato",         "Formato",              "enum", None, FORMATO_ENUM, None),
     ("resolucion_max",  "Resolución máxima",    "enum", None,
      ["FHD", "2K", "4K", "5K", "5.7K", "6K", "8K", "12K"], None),
     ("fps_max",         "FPS máx",              "number", "fps", None,
@@ -240,14 +262,16 @@ def seed_camaras(conn, dry_run: bool = False) -> dict:
             row = conn.execute("SELECT id FROM spec_definitions WHERE spec_key = %s", (spec_key,)).fetchone()
             if row: spec_def_ids[spec_key] = row["id"]
 
-    # 2. Sub-categorías de Cámaras
-    parent_row = conn.execute(
-        "SELECT id FROM categorias WHERE nombre = %s AND parent_id IS NULL",
-        (CATEGORIA_RAIZ,)
-    ).fetchone()
-    if not parent_row:
-        return {"error": f"Categoría raíz '{CATEGORIA_RAIZ}' no existe."}
-    parent_id = parent_row["id"]
+    # 1b. Marcar specs de compatibilidad (lens_mount, formato)
+    stats["compat_specs_marcadas"] = apply_compat_config(
+        conn, spec_def_ids, dry_run=dry_run,
+        expected_keys={"lens_mount", "formato"},
+    )
+
+    # 2. Sub-categorías de Cámaras — auto-crea raíz si falta
+    parent_id = ensure_categoria_raiz(conn, CATEGORIA_RAIZ, prioridad=10, dry_run=dry_run)
+    if parent_id is None and not dry_run:
+        return {"error": f"No se pudo asegurar la categoría raíz '{CATEGORIA_RAIZ}'."}
 
     subcat_ids: dict[str, int] = {}
 
@@ -299,10 +323,11 @@ def seed_camaras(conn, dry_run: bool = False) -> dict:
     if not existing or existing["n"] == 0:
         for spec_key, flags in SPEC_FLAGS_CAMARAS.items():
             spec_def_id = spec_def_ids.get(spec_key)
-            if not spec_def_id or spec_def_id == -1:
+            if not spec_def_id:
                 continue
             prio, en_card, en_filtros, en_nombre, destacado = flags
             if dry_run:
+                # En dry-run contamos como "se crearía" incluso si spec_def_id=-1
                 stats["asignaciones_creadas"] += 1
                 continue
             cur = conn.execute("""
@@ -315,7 +340,15 @@ def seed_camaras(conn, dry_run: bool = False) -> dict:
             if cur.fetchone():
                 stats["asignaciones_creadas"] += 1
 
+    # 3b. Setear rol_compatibilidad (Cámaras = contenido para formato)
+    stats["rol_compat_marcados"] = apply_rol_compat(
+        conn, CATEGORIA_RAIZ, spec_def_ids, parent_id, dry_run=dry_run
+    )
+
     # 4. Equipos + equipo_specs
+    match_map = load_match_file(CATEGORIA_RAIZ)
+    stats["matches_aplicados_desde_archivo"] = 0
+
     for prod_id, prod in products.items():
         marca = prod.get("marca", "")
         modelo = prod.get("modelo", "")
@@ -323,13 +356,18 @@ def seed_camaras(conn, dry_run: bool = False) -> dict:
         foto_url = prod.get("image_url", "")
         bh_url = prod.get("url_source", "")
 
-        existing = conn.execute(
-            "SELECT id FROM equipos WHERE marca = %s AND modelo = %s LIMIT 1",
-            (marca, modelo)
-        ).fetchone()
+        equipo_id, fuente = resolve_equipo_id(conn, prod_id, marca, modelo, match_map)
 
-        if existing:
-            equipo_id = existing["id"]
+        if fuente == "skip":
+            stats["skipped"] = stats.get("skipped", 0) + 1
+            continue
+
+        if equipo_id is not None:
+            if fuente == "match_file":
+                stats["matches_aplicados_desde_archivo"] += 1
+            applied = apply_overrides(conn, prod_id, equipo_id, match_map, dry_run=dry_run)
+            if applied:
+                stats["overrides_aplicados"] = stats.get("overrides_aplicados", 0) + 1
             if not dry_run:
                 conn.execute("""
                     UPDATE equipos
@@ -385,6 +423,10 @@ def seed_camaras(conn, dry_run: bool = False) -> dict:
                     ON CONFLICT (equipo_id, spec_def_id) DO UPDATE SET value = EXCLUDED.value
                 """, (equipo_id, spec_def_id, value_str))
                 stats["equipo_specs_insertados"] += 1
+
+            # Keywords derivadas (después de poblar specs)
+            n_kw = write_keywords(conn, equipo_id, prod.get("specs", {}), dry_run=dry_run)
+            stats["keywords_generadas"] = stats.get("keywords_generadas", 0) + n_kw
 
     return stats
 

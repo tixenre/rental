@@ -2054,12 +2054,12 @@
       }
     },
     {
-      "id": "nanlite_forza_60b",
+      "id": "nanlite_forza_60",
       "categoria_raiz": "Iluminación",
       "subtipo": "LED Monolight",
       "marca": "Nanlite",
-      "modelo": "Forza 60B II Bi-Color LED Monolight",
-      "url_source": "https://www.bhphotovideo.com/c/product/1736656-REG/nanlite_forza60bii_forza_60b_ii_bi_color.html",
+      "modelo": "Forza 60 LED Monolight",
+      "url_source": "https://www.bhphotovideo.com/c/product/1476380-REG/nanlite_12_2022_forza_60_led_monolight.html",
       "status_bh": "Desconocido",
       "fuente": "html guardado manual (2026-05-17)",
       "secciones": {
@@ -2070,23 +2070,19 @@
           },
           {
             "label": "Included Storage Case",
-            "value": "Yes"
+            "value": "1x Case"
           },
           {
             "label": "Photometrics at 3.3' / 1 m",
-            "value": "3200K: 207 fc / 2235 Lux"
-          },
-          {
-            "label": "Color Temperature",
-            "value": "2700 to 6500K"
+            "value": "5600K: 1748 fc / 18,820 Lux (with Reflector)"
           },
           {
             "label": "Color Modes",
-            "value": "Daylight, Tungsten"
+            "value": "Daylight"
           },
           {
             "label": "Color Accuracy Standard",
-            "value": "CRI 96"
+            "value": "CRI 98"
           },
           {
             "label": "Dimming",
@@ -2098,7 +2094,7 @@
           },
           {
             "label": "Wireless Remote Control Type",
-            "value": "Bluetooth"
+            "value": "Radio/RF"
           },
           {
             "label": "Power Source",
@@ -2106,23 +2102,23 @@
           },
           {
             "label": "Battery Plate Type",
-            "value": "1x V-Mount (Included)"
+            "value": "2x Sony L-Series / NP-F (Not Included)"
           },
           {
             "label": "Battery",
-            "value": "1x V-Mount Rechargeable (Not Included)"
+            "value": "2x Sony-Type L-Series / NP-F Rechargeable (Not Included)"
           },
           {
-            "label": "Input Power",
-            "value": "15 VDC"
+            "label": "AC Input Power",
+            "value": "110 to 240 VAC, 50 / 60 Hz"
           },
           {
             "label": "Power Consumption",
-            "value": "72 W  (Maximum)"
+            "value": "60 W  (Maximum)"
           },
           {
             "label": "Fixture Mounting",
-            "value": "Support Mount"
+            "value": "1x 5/8\" Receiver"
           }
         ],
         "Light Fixture": [
@@ -2132,23 +2128,23 @@
           },
           {
             "label": "Included Storage Case",
-            "value": "Yes"
+            "value": "1x Case"
+          },
+          {
+            "label": "Lumens",
+            "value": "6732"
           },
           {
             "label": "Photometrics",
-            "value": "3200K:"
-          },
-          {
-            "label": "Color Temperature",
-            "value": "2700 to 6500K"
+            "value": "5600K: 1748 fc / 18,820 Lux at 3.3' / 1 m (with Reflector)"
           },
           {
             "label": "Color Modes",
-            "value": "Daylight, Tungsten"
+            "value": "Daylight"
           },
           {
             "label": "Color Accuracy Standard",
-            "value": "CRI 96"
+            "value": "CRI 98"
           },
           {
             "label": "Dimming",
@@ -2159,20 +2155,12 @@
             "value": "Fan"
           },
           {
-            "label": "Beam Angle",
-            "value": "45° with Included Reflector"
-          },
-          {
             "label": "Built-In Flash",
             "value": "No"
           },
           {
-            "label": "Preprogrammed Effects",
-            "value": "Yes"
-          },
-          {
             "label": "Umbrella Mount",
-            "value": "Yes"
+            "value": "No"
           },
           {
             "label": "Front Accessory Mount",
@@ -2182,15 +2170,11 @@
         "Connectivity": [
           {
             "label": "Wireless Remote Control Type",
-            "value": "Bluetooth"
+            "value": "Radio/RF"
           },
           {
             "label": "Mobile App Compatible",
-            "value": "Yes: Android & iOS"
-          },
-          {
-            "label": "Wireless Frequency",
-            "value": "2.4 GHz"
+            "value": "*As of August, 2022: Check with manufacturer for the most up-to-date compatibility"
           }
         ],
         "Power & I/O": [
@@ -2199,32 +2183,24 @@
             "value": "AC to DC Adapter (Included)"
           },
           {
-            "label": "Inputs/Outputs",
-            "value": "1x Barrel / Coax Power Input"
-          },
-          {
             "label": "Battery Plate Type",
-            "value": "1x V-Mount (Included)"
+            "value": "2x Sony L-Series / NP-F (Not Included)"
           },
           {
             "label": "Battery",
-            "value": "1x V-Mount Rechargeable, 14.8 VDC (Not Included)"
+            "value": "2x Sony-Type L-Series / NP-F Rechargeable (Not Included)"
           },
           {
-            "label": "Input Power",
-            "value": "15 VDC"
+            "label": "AC Input Power",
+            "value": "110 to 240 VAC, 50 / 60 Hz"
           },
           {
-            "label": "Inline Switch",
-            "value": "No"
-          },
-          {
-            "label": "Power Pass-Thru",
-            "value": "No"
+            "label": "Included Adapter / Cable",
+            "value": "1x USA Type-A/B to Barrel / Coax AC to DC Adapter"
           },
           {
             "label": "Power Consumption",
-            "value": "72 W  (Maximum)"
+            "value": "60 W  (Maximum)"
           }
         ],
         "Mounting": [
@@ -2234,39 +2210,31 @@
           },
           {
             "label": "Fixture Mounting",
-            "value": "Support Mount"
+            "value": "1x 5/8\" Receiver"
           }
         ],
         "General": [
           {
             "label": "Display",
-            "value": "OLED"
-          },
-          {
-            "label": "Environmental Resistance",
-            "value": "No"
-          },
-          {
-            "label": "Operating Conditions",
-            "value": "Up to 104°F / 40.0°C"
+            "value": "Yes"
           },
           {
             "label": "Dimensions",
-            "value": "7.8 x 4.1 x 3.3\" / 19.8 x 10.4 x 8.4 cm"
+            "value": "7.83 x 4.13 x 3.35\" / 19.89 x 8.51 x 10.49 cm"
           },
           {
             "label": "Weight",
-            "value": "1.5 lb / 680 g"
+            "value": "1.83 lb / 0.83 kg"
           }
         ],
         "Packaging Info": [
           {
             "label": "Package Weight",
-            "value": "8.55 lb"
+            "value": "7.3 lb"
           },
           {
             "label": "Box Dimensions (LxWxH)",
-            "value": "15.25 x 10 x 8\""
+            "value": "15 x 9.5 x 7.5\""
           }
         ]
       }
@@ -2477,6 +2445,240 @@
           {
             "label": "Box Dimensions (LxWxH)",
             "value": "17.4 x 13.8 x 9.1\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "amaran_200x",
+      "categoria_raiz": "Iluminación",
+      "subtipo": "COB LED Monolight",
+      "marca": "Amaran",
+      "modelo": "COB 200x S Bi-Color LED Monolight",
+      "url_source": "https://www.bhphotovideo.com/c/product/1753990-REG/amaran_apm022xa10_amaran_cob_200x_s.html?fromDisList=y",
+      "status_bh": "Desconocido",
+      "fuente": "html guardado manual (2026-05-17)",
+      "secciones": {
+        "Key Specs": [
+          {
+            "label": "Item Type",
+            "value": "1x COB LED Monolight"
+          },
+          {
+            "label": "Included Light Modifier",
+            "value": "1x Reflector"
+          },
+          {
+            "label": "Included Storage Case",
+            "value": "No"
+          },
+          {
+            "label": "Photometrics at 3.3' / 1 m",
+            "value": "111° at 3200K: 523 fc / 5630 Lux (Unmodified)"
+          },
+          {
+            "label": "Color Temperature",
+            "value": "2700 to 6500K"
+          },
+          {
+            "label": "Color Modes",
+            "value": "Daylight, Tungsten"
+          },
+          {
+            "label": "Color Accuracy Standard",
+            "value": "CRI 95"
+          },
+          {
+            "label": "Dimming",
+            "value": "Built-In Dimmer (Continuous)"
+          },
+          {
+            "label": "Front Accessory Mount",
+            "value": "Bowens S"
+          },
+          {
+            "label": "Wireless Remote Control Type",
+            "value": "Bluetooth"
+          },
+          {
+            "label": "Power Source",
+            "value": "AC to DC Adapter (Included)"
+          },
+          {
+            "label": "Battery Plate Type",
+            "value": "2x V-Mount (Not Included)"
+          },
+          {
+            "label": "Battery",
+            "value": "2x V-Mount Rechargeable (Not Included)"
+          },
+          {
+            "label": "Input Power",
+            "value": "48 VDC"
+          },
+          {
+            "label": "Power Consumption",
+            "value": "229 W  (Maximum)"
+          },
+          {
+            "label": "Fixture Mounting",
+            "value": "1x 5/8\" Receiver"
+          }
+        ],
+        "Light Fixture": [
+          {
+            "label": "Item Type",
+            "value": "1x COB LED Monolight"
+          },
+          {
+            "label": "Included Light Modifier",
+            "value": "1x Reflector"
+          },
+          {
+            "label": "Included Storage Case",
+            "value": "No"
+          },
+          {
+            "label": "Lumens",
+            "value": "17,000"
+          },
+          {
+            "label": "Photometrics",
+            "value": "111° at 3200K:"
+          },
+          {
+            "label": "Color Temperature",
+            "value": "2700 to 6500K"
+          },
+          {
+            "label": "Color Modes",
+            "value": "Daylight, Tungsten"
+          },
+          {
+            "label": "Color Accuracy Standard",
+            "value": "CRI 95"
+          },
+          {
+            "label": "Dimming",
+            "value": "Built-In Dimmer (Continuous)"
+          },
+          {
+            "label": "Cooling System",
+            "value": "Fan"
+          },
+          {
+            "label": "Beam Angle",
+            "value": "26° with Included Reflector"
+          },
+          {
+            "label": "Built-In Flash",
+            "value": "No"
+          },
+          {
+            "label": "Preprogrammed Effects",
+            "value": "Yes"
+          },
+          {
+            "label": "Umbrella Mount",
+            "value": "Yes"
+          },
+          {
+            "label": "Front Accessory Mount",
+            "value": "Bowens S"
+          }
+        ],
+        "Connectivity": [
+          {
+            "label": "Wireless Remote Control Type",
+            "value": "Bluetooth"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Wireless Range",
+            "value": "328.1' / 100 m (Bluetooth)"
+          }
+        ],
+        "Power & I/O": [
+          {
+            "label": "Power Source",
+            "value": "AC to DC Adapter (Included)"
+          },
+          {
+            "label": "Inputs/Outputs",
+            "value": "1x XLR 4-Pin Power Input"
+          },
+          {
+            "label": "Battery Plate Type",
+            "value": "2x V-Mount (Not Included)"
+          },
+          {
+            "label": "Battery",
+            "value": "2x V-Mount Rechargeable (Not Included)"
+          },
+          {
+            "label": "Input Power",
+            "value": "48 VDC"
+          },
+          {
+            "label": "Included Adapter / Cable",
+            "value": "1x USA Type-A/B to Unspecified AC to DC Adapter"
+          },
+          {
+            "label": "Inline Switch",
+            "value": "No"
+          },
+          {
+            "label": "Power Pass-Thru",
+            "value": "No"
+          },
+          {
+            "label": "Power Consumption",
+            "value": "229 W  (Maximum)"
+          }
+        ],
+        "Mounting": [
+          {
+            "label": "Fixture Mounting",
+            "value": "1x 5/8\" Receiver"
+          }
+        ],
+        "General": [
+          {
+            "label": "Display",
+            "value": "LCD"
+          },
+          {
+            "label": "Environmental Resistance",
+            "value": "No"
+          },
+          {
+            "label": "Operating Conditions",
+            "value": "14 to 104°F / -10 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 176°F / -20 to 80°C"
+          },
+          {
+            "label": "Dimensions",
+            "value": "8 x 5 x 5\" / 20.32 x 12.7 x 12.7 cm"
+          },
+          {
+            "label": "Weight",
+            "value": "3.44 lb / 1.56 kg (Fixture)"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "9.85 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "15.6 x 11.7 x 10.6\""
           }
         ]
       }
@@ -2762,27 +2964,27 @@
       }
     },
     {
-      "id": "molerichardson_1000w",
+      "id": "molerichardson_2000w",
       "categoria_raiz": "Iluminación",
       "subtipo": "Tungsten Fresnel",
       "marca": "Mole-Richardson",
-      "modelo": "407 Baby Solarspot 1000W 6\"",
+      "modelo": "407 Baby Solarspot 2000W 6\"",
       "url_source": "https://www.mole.com/407-baby-solarspot",
-      "status_bh": "N/A — sitio fabricante",
-      "fuente": "Mole-Richardson oficial (web fetch)",
+      "status_bh": "N/A — chassis del 1000W operado con bulb 2kW",
+      "fuente": "mole.com (web fetch del chassis 1000W) + override bulb",
       "secciones": {
         "Technical Specifications": [
           {
             "label": "Model",
-            "value": "407 Baby Solarspot 1,000W 6\""
+            "value": "407 Baby Solarspot 6\" — equipado con bulb 2000W"
           },
           {
             "label": "Power Rating",
-            "value": "1000 Watts"
+            "value": "2000 Watts (con bulb FCM/FFR-style 2kW; el chassis 407 oficialmente es 1000W pero el usuario lo opera con bulb 2kW)"
           },
           {
             "label": "Voltage",
-            "value": "120 / 240 VAC or DC, 8.3 A máx."
+            "value": "120 / 240 VAC or DC"
           },
           {
             "label": "Lamp Socket",
@@ -2819,6 +3021,10 @@
           {
             "label": "Cable",
             "value": "25 ft, Type SO, 3 cond #16/3 con Edison plug"
+          },
+          {
+            "label": "_nota_bulb",
+            "value": "El chassis 407 es el 'Baby Solarspot' de Mole. Físicamente idéntico al 1000W (HTML de B&H/mole.com), pero el usuario lo opera con un bulb de 2000W. Specs físicos = del 1000W; specs eléctricos (potencia, lumens) escalan con bulb."
           }
         ]
       }
