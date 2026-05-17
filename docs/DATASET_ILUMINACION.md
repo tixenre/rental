@@ -5,12 +5,12 @@ Fuente fundamental para construir el catálogo de iluminación en la web.
 ficha técnica completa.
 
 Archivos:
-- `docs/bh_luces_curado.json` — fuente de verdad (specs + extras + ficha + image)
-- `docs/bh_specs_relevamiento.json` — raw del scrape original (auditoría)
-- `tools/bh_luz_parser.py` — extractor desde HTMLs B&H (DOM + JSON-LD)
-- `tools/bh_luz_patches.py` — overrides manuales para productos no parseables
-- `tools/bh_luz_normalizar.py` — canonicaliza marcas/modelos/IDs
-- `tools/bh_luz_rebuild.sh` — pipeline completo (rm → parse → patch → normalize)
+- `docs/iluminacion_dataset.json` — fuente de verdad (specs + extras + ficha + image)
+- `docs/iluminacion_raw.json` — raw del scrape original (auditoría)
+- `tools/iluminacion_parser.py` — extractor desde HTMLs B&H (DOM + JSON-LD)
+- `tools/iluminacion_patches.py` — overrides manuales para productos no parseables
+- `tools/iluminacion_normalizar.py` — canonicaliza marcas/modelos/IDs
+- `tools/iluminacion_rebuild.sh` — pipeline completo (rm → parse → patch → normalize)
 
 ## Estructura por producto
 
@@ -93,17 +93,17 @@ Campos opcionales pero útiles. Los más relevantes:
 
 2. Si NO está en B&H (manufacturer-only como ARRI):
    - Buscar su spec sheet oficial
-   - Agregar entrada manual en `tools/bh_luz_patches.py`
+   - Agregar entrada manual en `tools/iluminacion_patches.py`
 
-3. Agregar la ruta del HTML en `tools/bh_luz_rebuild.sh`
+3. Agregar la ruta del HTML en `tools/iluminacion_rebuild.sh`
 
 4. Correr el pipeline:
    ```bash
-   bash tools/bh_luz_rebuild.sh
+   bash tools/iluminacion_rebuild.sh
    ```
 
-5. Verificar en `docs/bh_luces_curado.json` que:
-   - Marca aparece en la lista canónica (sino, agregar a `BRAND_CANON` en `bh_luz_normalizar.py`)
+5. Verificar en `docs/iluminacion_dataset.json` que:
+   - Marca aparece en la lista canónica (sino, agregar a `BRAND_CANON` en `iluminacion_normalizar.py`)
    - Modelo está limpio (sin "LED Light", "(Gray)", SKUs duplicados)
    - `tipo` está bien clasificado
    - `color_modes` matchea lo real
@@ -176,4 +176,4 @@ INSERT INTO equipo_specs (equipo_id, spec_def_id, value) VALUES
 ```
 
 Cuando llegue el momento de importar a la DB, escribir
-`backend/seeds/seed_luces_from_dataset.py` que lee el JSON y hace los INSERTs.
+`backend/seeds/seed_iluminacion_from_dataset.py` que lee el JSON y hace los INSERTs.

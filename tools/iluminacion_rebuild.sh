@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# tools/bh_luz_rebuild.sh — Reconstruye el dataset completo de luces.
+# tools/iluminacion_rebuild.sh — Reconstruye el dataset completo de luces.
 #
-# Uso: bash tools/bh_luz_rebuild.sh
+# Uso: bash tools/iluminacion_rebuild.sh
 # Pre: HTMLs guardados en ~/Desktop/Paginas/{Data Set,Inventario}/
 #
 # Pasos:
@@ -19,10 +19,10 @@ DATASET="$PAGINAS/Data Set"
 INVENTARIO="$PAGINAS/Inventario"
 
 echo "▸ Limpiando outputs anteriores"
-rm -f docs/bh_specs_relevamiento.json docs/bh_luces_curado.json
+rm -f docs/iluminacion_raw.json docs/iluminacion_dataset.json
 
 echo "▸ Parseando HTMLs de B&H"
-python3 tools/bh_luz_parser.py \
+python3 tools/iluminacion_parser.py \
   "$DATASET/amaran F21x 2x1 Bi-Color LED Flexible Mat (V-Mount) AP20232A14.html" \
   "$DATASET/Godox RGB Mini Creative M1 On-Camera Video LED Light (Gray) M1.html" \
   "$DATASET/Nanlite FC500B Bi-Color LED Spotlight FC500B B&H Photo Video.html" \
@@ -42,16 +42,16 @@ python3 tools/bh_luz_parser.py \
 echo "  → $(grep -c 'agregado' /tmp/parser.log) productos parseados"
 
 echo "▸ Aplicando parches manuales (ARRI 650 Plus, Mole 1000W, amaran 300c)"
-python3 tools/bh_luz_patches.py
+python3 tools/iluminacion_patches.py
 
 echo "▸ Normalizando marcas, modelos, IDs, extras"
-python3 tools/bh_luz_normalizar.py
+python3 tools/iluminacion_normalizar.py
 
 echo ""
 echo "Dataset reconstruido."
 python3 -c "
 import json
-with open('docs/bh_luces_curado.json') as f:
+with open('docs/iluminacion_dataset.json') as f:
     d = json.load(f)
 print(f'  Total: {len(d[\"products\"])} productos')
 "

@@ -1,7 +1,7 @@
 """
-seeds/luces_iluminacion.py — Importa el dataset curado de luces a la DB.
+seeds/iluminacion.py — Importa el dataset curado de iluminación a la DB.
 
-Lee `docs/bh_luces_curado.json` y popula:
+Lee `docs/iluminacion_dataset.json` y popula:
   1. categorias: sub-categorías de Iluminación (LED Daylight, LED Bicolor,
      LED RGB, Tungsteno, Flash)
   2. spec_definitions: specs específicas de iluminación (tipo, color_modes,
@@ -17,8 +17,8 @@ Idempotente:
   - Asignaciones: ON CONFLICT (categoria_id, spec_def_id) DO NOTHING
 
 Uso:
-  - Auto-import: agregar `seed_luces(conn)` en main.py post-migrations
-  - Manual: `python backend/seeds/luces_iluminacion.py [--dry-run]`
+  - Auto-import: agregar `seed_iluminacion(conn)` en main.py post-migrations
+  - Manual: `python backend/seeds/iluminacion.py [--dry-run]`
 
 Este es el patrón que se va a usar para cámaras, lentes, etc.:
   docs/bh_<categoria>_curado.json + backend/seeds/<categoria>.py
@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent.parent
-DATASET_PATH = ROOT / "docs" / "bh_luces_curado.json"
+DATASET_PATH = ROOT / "docs" / "iluminacion_dataset.json"
 
 CATEGORIA_RAIZ = "Iluminación"
 SUBCATEGORIAS = [
@@ -154,8 +154,8 @@ def serialize_spec_value(spec_key: str, value) -> str | None:
 
 # ── Seed principal ──────────────────────────────────────────────────────
 
-def seed_luces(conn, dry_run: bool = False) -> dict:
-    """Importa el dataset curado de luces. Devuelve stats {creados, actualizados, ...}."""
+def seed_iluminacion(conn, dry_run: bool = False) -> dict:
+    """Importa el dataset curado de iluminación. Devuelve stats {creados, actualizados, ...}."""
     if not DATASET_PATH.exists():
         return {"error": f"Dataset no encontrado: {DATASET_PATH}"}
 
@@ -342,12 +342,12 @@ if __name__ == "__main__":
         from database import get_db  # type: ignore
     except ImportError as e:
         print(f"Error importando database: {e}")
-        print("Correr desde root: python -m backend.seeds.luces_iluminacion [--dry-run]")
+        print("Correr desde root: python -m backend.seeds.iluminacion [--dry-run]")
         sys.exit(1)
 
     conn = get_db()
     try:
-        stats = seed_luces(conn, dry_run=dry_run)
+        stats = seed_iluminacion(conn, dry_run=dry_run)
         if not dry_run:
             conn.commit()
         print(f"\n{'═' * 50}")

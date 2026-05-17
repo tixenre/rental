@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-tools/bh_luz_parser.py — Parser de HTMLs de B&H para productos de iluminación.
+tools/iluminacion_parser.py — Parser de HTMLs de B&H para productos de iluminación.
 
 Uso:
-    python tools/bh_luz_parser.py ~/Desktop/paginas/*.html
-    python tools/bh_luz_parser.py ~/Desktop/paginas/amaran*.html
+    python tools/iluminacion_parser.py ~/Desktop/paginas/*.html
+    python tools/iluminacion_parser.py ~/Desktop/paginas/amaran*.html
 
 Qué hace:
   1. Parsea los HTMLs (guardados con Cmd+S desde B&H /specs) y extrae los pares
      label/value usando los atributos data-selenium del DOM.
-  2. Guarda el raw (secciones B&H originales) en docs/bh_specs_relevamiento.json.
+  2. Guarda el raw (secciones B&H originales) en docs/iluminacion_raw.json.
   3. Mapea a los spec_keys del proyecto (Iluminación) y guarda el curado en
-     docs/bh_luces_curado.json.
+     docs/iluminacion_dataset.json.
 
 Idempotente: si un producto (por id) ya existe en el JSON no lo pisa.
 Si se quiere re-procesar un producto, borrar su entrada primero.
@@ -28,8 +28,8 @@ from pathlib import Path
 # ── Rutas de output ──────────────────────────────────────────────────────────
 
 ROOT = Path(__file__).parent.parent
-RELEVAMIENTO_PATH = ROOT / "docs" / "bh_specs_relevamiento.json"
-CURADO_PATH = ROOT / "docs" / "bh_luces_curado.json"
+RELEVAMIENTO_PATH = ROOT / "docs" / "iluminacion_raw.json"
+CURADO_PATH = ROOT / "docs" / "iluminacion_dataset.json"
 
 # ── Parser HTML → secciones raw ─────────────────────────────────────────────
 
@@ -862,7 +862,7 @@ def main(html_paths: list[Path]):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Uso: python tools/bh_luz_parser.py <archivo.html> [archivo2.html ...]")
+        print("Uso: python tools/iluminacion_parser.py <archivo.html> [archivo2.html ...]")
         sys.exit(1)
 
     paths = []

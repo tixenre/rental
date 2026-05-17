@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-tools/bh_luz_normalizar.py — Normalización post-parse del dataset de luces.
+tools/iluminacion_normalizar.py — Normalización post-parse del dataset de luces.
 
-Toma docs/bh_luces_curado.json y docs/bh_specs_relevamiento.json,
+Toma docs/iluminacion_dataset.json y docs/iluminacion_raw.json,
 aplica reglas de canonicalización y guarda los archivos normalizados.
 
 Reglas que aplica:
@@ -18,8 +18,8 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-CURADO_PATH = ROOT / "docs" / "bh_luces_curado.json"
-RAW_PATH = ROOT / "docs" / "bh_specs_relevamiento.json"
+CURADO_PATH = ROOT / "docs" / "iluminacion_dataset.json"
+RAW_PATH = ROOT / "docs" / "iluminacion_raw.json"
 
 
 # ── Marcas canónicas ────────────────────────────────────────────────────────

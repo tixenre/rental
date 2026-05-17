@@ -220,6 +220,10 @@ Puntos de entrada para no grepear:
 
 > **Cuándo se usa:** poblar una categoría entera del catálogo de una sola pasada — typically el setup inicial o cuando entra un sub-segmento nuevo. **NO confundir** con autocompletar (que es por equipo, on-demand desde el form). Coexisten: el seed pone la base, autocompletar agrega ad-hoc o re-enriquece.
 
+**Por qué un archivo por categoría (no unificado):** cada categoría tiene specs muy distintas (cámaras: `lens_mount`, `fps_max`; lentes: `distancia_focal`, `apertura`; luces: `potencia_w`, `color_modes`). Forzar un schema unificado pierde tipado fuerte. Per-categoría: cada archivo enfocado, pequeño, con su propio parser/seed/doc. Git history limpio. Escala bien (categoría nueva = archivo nuevo, no riesgo de romper las existentes).
+
+**Por qué el naming dropea `bh_`:** B&H es la fuente primaria pero no la única. ARRI y Mole vienen de sus sitios fabricante (vía WebFetch). Futuras categorías van a usar Adorama, screenshots manuales, PDFs, etc. El dataset es **agnóstico de fuente** — la fuente queda registrada en `url_source` y `_meta.fuentes` de cada producto.
+
 **Workflow:**
 
 1. **Capturar HTMLs** de B&H (o site fabricante para casos como ARRI/Mole) → `~/Desktop/Paginas/Inventario/<Categoria>/`.
@@ -246,12 +250,21 @@ Puntos de entrada para no grepear:
 
 | Categoría | Estado | Doc |
 |---|---|---|
-| Iluminación | ✅ 16 luces curadas, seed listo | [`docs/BH_LUCES_DATASET.md`](docs/BH_LUCES_DATASET.md) |
+| Iluminación | ✅ 16 luces curadas, seed listo | [`docs/DATASET_ILUMINACION.md`](docs/DATASET_ILUMINACION.md) |
 | Cámaras | ⏳ pendiente | — |
 | Lentes | ⏳ pendiente | — |
 | (otras) | ⏳ pendiente | — |
 
 **Por qué el seed coexiste con `categoria_spec_templates`:** ese table sigue siendo necesario porque define UI metadata (qué specs van en card/filtros/nombre, prioridad de display) — eso no se deriva del dato del equipo. Lo que el seed automatiza es que el admin no la pueble a mano: el script lo hace en una pasada idempotente.
+
+**Back-office después del seed:** una vez corrido, el dataset JSON queda como bootstrap/archivo (no se consulta en runtime). La DB es la fuente de verdad. Todo lo importado se ve y se edita desde el back-office existente:
+
+- **Equipos** (`/admin/equipos`) — lista admin, form `EquipoFormDialogV2`. Edita precio_jornada, foto_url, marca, modelo, nombre_publico, etc.
+- **Specs values por equipo** — en la sección Specs del form admin del equipo.
+- **Spec definitions globales** (`/admin/equipos/specs`) — catálogo de specs (potencia_w, cri, etc.). Edita label, enum_options, ayuda.
+- **Categorías** — admin las gestiona en la UI existente de categorías.
+
+El JSON del dataset NO se edita desde el back-office (es dev artifact). Para tunear datos post-seed: editar en la UI admin. Para re-importar ajustes masivos: editar el JSON, re-correr el seed (idempotente, actualiza valores sin pisar campos manuales como precio).
 
 ### Bulk actions en lista admin
 
@@ -305,7 +318,7 @@ Si una funcionalidad existe en código y no en issues, es un gap → crear el is
 | [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md) | Deploy y rollback |
 | [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md) | Checklist mobile + status por ruta |
 | [`docs/DISEÑO_SPECS.md`](docs/DISEÑO_SPECS.md) | Sistema de specs / templates |
-| [`docs/BH_LUCES_DATASET.md`](docs/BH_LUCES_DATASET.md) | Dataset curado de luces + workflow seed por categoría |
+| [`docs/DATASET_ILUMINACION.md`](docs/DATASET_ILUMINACION.md) | Dataset curado de luces + workflow seed por categoría |
 | [`docs/ISSUE_LABELS.md`](docs/ISSUE_LABELS.md) | Convención de labels |
 
 ### Cosas que NO existen todavía

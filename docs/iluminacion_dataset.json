@@ -297,10 +297,10 @@
     },
     "como_agregar_luz_nueva": [
       "1. Guardar página B&H del producto en ~/Desktop/Paginas/Inventario/ (Cmd+S → Webpage Complete)",
-      "2. Agregar la ruta del HTML en tools/bh_luz_rebuild.sh",
-      "3. Correr: bash tools/bh_luz_rebuild.sh",
-      "4. Verificar resultado en docs/bh_luces_curado.json",
-      "5. Si el HTML viene del sitio fabricante (no B&H), agregar entrada manual en tools/bh_luz_patches.py"
+      "2. Agregar la ruta del HTML en tools/iluminacion_rebuild.sh",
+      "3. Correr: bash tools/iluminacion_rebuild.sh",
+      "4. Verificar resultado en docs/iluminacion_dataset.json",
+      "5. Si el HTML viene del sitio fabricante (no B&H), agregar entrada manual en tools/iluminacion_patches.py"
     ]
   },
   "products": {

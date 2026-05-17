@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tools/bh_luz_patches.py — Parches manuales para productos que no se pueden
+tools/iluminacion_patches.py — Parches manuales para productos que no se pueden
 parsear automáticamente desde HTMLs de B&H.
 
 Casos cubiertos:
@@ -15,8 +15,8 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-CURADO_PATH = ROOT / "docs" / "bh_luces_curado.json"
-RAW_PATH = ROOT / "docs" / "bh_specs_relevamiento.json"
+CURADO_PATH = ROOT / "docs" / "iluminacion_dataset.json"
+RAW_PATH = ROOT / "docs" / "iluminacion_raw.json"
 
 
 ARRI_FICHA = {
