@@ -236,22 +236,26 @@ def init_db_bg():
     except Exception as e:
         logger.error("Falló alembic upgrade: %s. La app sigue arrancando — revisar manualmente.", e, exc_info=True)
 
-    # Seed de spec_templates DESPUÉS de alembic — la migración
-    # `unificar_specs_definitions` necesita haber corrido antes para que las
-    # tablas tengan spec_def_id.
+    # Seed de specs DESPUÉS de alembic — corre el registry seeder por cada
+    # categoría declarada en backend/specs/registry.py. Idempotente.
     try:
         from database import get_db
-        from seeds.spec_templates import seed_spec_templates
+        from seeds.registry_seeder import seed_all_categorias
         conn = get_db()
         try:
-            n = seed_spec_templates(conn)
+            result = seed_all_categorias(conn)
             conn.commit()
-            if n > 0:
-                logger.info("%d asignaciones de specs seedeadas", n)
+            total_specs = sum(
+                r["stats"].get("specs_creadas", 0)
+                for r in result["categorias"].values()
+            )
+            if total_specs > 0:
+                logger.info("Registry seedeado: %d specs en %d categorías",
+                            total_specs, len(result["categorias"]))
         finally:
             conn.close()
     except Exception as e:
-        logger.warning("Seed de spec_templates falló (no crítico): %s", e)
+        logger.warning("Registry seeder falló (no crítico): %s", e)
 
     # Auto-run del ranking si nunca corrió (popularidad_score=0 en todos
     # los equipos). Después de eso, queda en manos del admin desde
