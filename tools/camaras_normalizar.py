@@ -189,7 +189,7 @@ def clean_extras(extras: dict) -> dict:
 # ── Reorden ─────────────────────────────────────────────────────────────
 
 SPECS_ORDER = [
-    "tipo", "lens_mount", "formato",
+    "camera_subtipo", "lens_mount", "formato",
     "resolucion_max", "fps_max", "codecs",
     "megapixels", "continuous_shooting_fps",
     "iso_nativo", "iso_extendido", "rango_dinamico_stops",

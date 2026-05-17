@@ -1,0 +1,373 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "descripcion": "Dataset normalizado de filtros frontales: ND, polarizador, variable, difusión (Pro-Mist) y UV. Vinculados al frente del lente por su diámetro de filter thread (67mm, 77mm, 82mm).",
+    "fuente_principal": "B&H Photo HTML guardado + JSON-LD structured data",
+    "ubicacion_htmls": "~/Desktop/Paginas/Lentes/ (mixta con lentes/adaptadores)",
+    "schema": {
+      "specs": "6 spec_keys (tipo enum, diametro_filtro [obligatorio], densidad [ND/variable], material [vidrio/resina], grade [solo difusión: 1/4, 1/8...], peso_g)"
+    },
+    "convenciones": {
+      "tipo_enum": "Filtro ND | Filtro polarizador | Filtro UV | Filtro variable | Filtro difusión",
+      "diametro_canonical": "Siempre mm. El diámetro define la sub-categoría (ej. '82mm', '77mm')."
+    }
+  },
+  "products": [
+    {
+      "id": "tiffen_82_cpl",
+      "categoria_raiz": "Filtros",
+      "subtipo": "filtro",
+      "marca": "Tiffen",
+      "modelo": "Polarizador circular 82mm",
+      "url_source": "https://www.bhphotovideo.com/c/product/56638-REG/Tiffen_82CP_82mm_Circular_Polarizing.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/Tiffen_82CP_82mm_Circular_Polarizing_56638.jpg",
+      "status_bh": "OK",
+      "fuente": "B&H HTML guardado (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Filter Type",
+            "value": "Circular Polarizer"
+          },
+          {
+            "label": "Exposure Reduction",
+            "value": "1.2-Stop"
+          },
+          {
+            "label": "Size",
+            "value": "82 mm Rear Filter Thread"
+          },
+          {
+            "label": "Front Accessory Thread / Bayonet",
+            "value": "82 mm"
+          },
+          {
+            "label": "Coating",
+            "value": "No"
+          },
+          {
+            "label": "Filter Thickness",
+            "value": "0.2\" / 5 mm"
+          },
+          {
+            "label": "Filter Material",
+            "value": "Glass"
+          },
+          {
+            "label": "Ring Material",
+            "value": "Aluminum"
+          },
+          {
+            "label": "Package Weight",
+            "value": "0.18 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "4.35 x 3.55 x 0.6\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Filter Type",
+            "value": "Circular Polarizer"
+          },
+          {
+            "label": "Exposure Reduction",
+            "value": "1.2-Stop"
+          },
+          {
+            "label": "Size",
+            "value": "82 mm Rear Filter Thread"
+          },
+          {
+            "label": "Front Accessory Thread / Bayonet",
+            "value": "82 mm"
+          },
+          {
+            "label": "Coating",
+            "value": "No"
+          },
+          {
+            "label": "Filter Thickness",
+            "value": "0.2\" / 5 mm"
+          },
+          {
+            "label": "Filter Material",
+            "value": "Glass"
+          },
+          {
+            "label": "Ring Material",
+            "value": "Aluminum"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "0.18 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "4.35 x 3.55 x 0.6\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "tiffen_82_promist_1_4",
+      "categoria_raiz": "Filtros",
+      "subtipo": "filtro",
+      "marca": "Tiffen",
+      "modelo": "Black Pro-Mist 1/4 82mm",
+      "url_source": "https://www.bhphotovideo.com/c/product/55645-REG/Tiffen_82BPM14_82mm_Black_Pro_Mist_1_4.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/Tiffen_82BPM14_82mm_Black_Pro_Mist_1_4_55645.jpg",
+      "status_bh": "OK",
+      "fuente": "B&H HTML guardado (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Filter Type",
+            "value": "Black Mist (Grade 1/4)"
+          },
+          {
+            "label": "Size",
+            "value": "82 mm Rear Filter Thread"
+          },
+          {
+            "label": "Front Accessory Thread / Bayonet",
+            "value": "82 mm"
+          },
+          {
+            "label": "Coating",
+            "value": "No"
+          },
+          {
+            "label": "Filter Material",
+            "value": "Glass"
+          },
+          {
+            "label": "Ring Material",
+            "value": "Aluminum"
+          },
+          {
+            "label": "Package Weight",
+            "value": "0.19 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "4.35 x 3.6 x 0.6\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Filter Type",
+            "value": "Black Mist (Grade 1/4)"
+          },
+          {
+            "label": "Size",
+            "value": "82 mm Rear Filter Thread"
+          },
+          {
+            "label": "Front Accessory Thread / Bayonet",
+            "value": "82 mm"
+          },
+          {
+            "label": "Coating",
+            "value": "No"
+          },
+          {
+            "label": "Filter Material",
+            "value": "Glass"
+          },
+          {
+            "label": "Ring Material",
+            "value": "Aluminum"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "0.19 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "4.35 x 3.6 x 0.6\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "tiffen_82_promist_1_8",
+      "categoria_raiz": "Filtros",
+      "subtipo": "filtro",
+      "marca": "Tiffen",
+      "modelo": "Black Pro-Mist 1/8 82mm",
+      "url_source": "https://www.bhphotovideo.com/c/product/55692-REG/Tiffen_82BPM18_82mm_Black_Pro_Mist_1_8.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/Tiffen_82BPM18_82mm_Black_Pro_Mist_1_8_55692.jpg",
+      "status_bh": "OK",
+      "fuente": "B&H HTML guardado (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Filter Type",
+            "value": "Black Mist (Grade 1/8)"
+          },
+          {
+            "label": "Size",
+            "value": "82 mm Rear Filter Thread"
+          },
+          {
+            "label": "Front Accessory Thread / Bayonet",
+            "value": "82 mm"
+          },
+          {
+            "label": "Coating",
+            "value": "No"
+          },
+          {
+            "label": "Filter Material",
+            "value": "Glass"
+          },
+          {
+            "label": "Ring Material",
+            "value": "Aluminum"
+          },
+          {
+            "label": "Package Weight",
+            "value": "0.185 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "4.35 x 3.6 x 0.6\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Filter Type",
+            "value": "Black Mist (Grade 1/8)"
+          },
+          {
+            "label": "Size",
+            "value": "82 mm Rear Filter Thread"
+          },
+          {
+            "label": "Front Accessory Thread / Bayonet",
+            "value": "82 mm"
+          },
+          {
+            "label": "Coating",
+            "value": "No"
+          },
+          {
+            "label": "Filter Material",
+            "value": "Glass"
+          },
+          {
+            "label": "Ring Material",
+            "value": "Aluminum"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "0.185 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "4.35 x 3.6 x 0.6\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "tiffen_82_vnd",
+      "categoria_raiz": "Filtros",
+      "subtipo": "filtro",
+      "marca": "Tiffen",
+      "modelo": "Variable ND 2 to 8-Stop 82mm",
+      "url_source": "https://www.bhphotovideo.com/c/product/821128-REG/Tiffen_82VND_82mm_Variable_Neutral_Density.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/Tiffen_82VND_82mm_Variable_Neutral_Density_821128.jpg",
+      "status_bh": "OK",
+      "fuente": "B&H HTML guardado (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Filter Type",
+            "value": "Variable ND"
+          },
+          {
+            "label": "Exposure Reduction",
+            "value": "2 to 8-Stop"
+          },
+          {
+            "label": "Size",
+            "value": "82 mm Rear Filter Thread"
+          },
+          {
+            "label": "Front Accessory Thread / Bayonet",
+            "value": "No"
+          },
+          {
+            "label": "Filter Thickness",
+            "value": "0.35\" / 9 mm"
+          },
+          {
+            "label": "Filter Material",
+            "value": "Glass"
+          },
+          {
+            "label": "Ring Material",
+            "value": "Aluminum"
+          },
+          {
+            "label": "Package Weight",
+            "value": "0.35 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "6 x 5.6 x 1.15\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Filter Type",
+            "value": "Variable ND"
+          },
+          {
+            "label": "Exposure Reduction",
+            "value": "2 to 8-Stop"
+          },
+          {
+            "label": "Size",
+            "value": "82 mm Rear Filter Thread"
+          },
+          {
+            "label": "Front Accessory Thread / Bayonet",
+            "value": "No"
+          },
+          {
+            "label": "Filter Thickness",
+            "value": "0.35\" / 9 mm"
+          },
+          {
+            "label": "Filter Material",
+            "value": "Glass"
+          },
+          {
+            "label": "Ring Material",
+            "value": "Aluminum"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "0.35 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "6 x 5.6 x 1.15\""
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -528,7 +528,7 @@ def map_camara_specs(secciones: dict, title: str = "") -> dict:
             result[key] = val
 
     # Core identity
-    _add("tipo", _parse_tipo(secciones, title))
+    _add("camera_subtipo", _parse_tipo(secciones, title))
     _add("lens_mount", _parse_lens_mount(secciones, title))
     _add("formato", _parse_formato(secciones))
 

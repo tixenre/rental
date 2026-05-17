@@ -115,17 +115,33 @@ def canon_modelo(modelo: str) -> str:
 
 # ── IDs canónicos ───────────────────────────────────────────────────────────
 
-# Mapeo manual de IDs ambiguos a IDs específicos
-ID_REMAP = {
-    "nanlite_forza": "nanlite_forza_500",
+# Mapeo manual de IDs ambiguos a IDs específicos.
+# El mapping de "nanlite_forza" depende del MODELO real (no podemos hardcodear).
+# Para los demás (un solo producto por familia) sí mapeamos directo.
+STATIC_ID_REMAP = {
     "nanlite_60b": "nanlite_forza_60b",
     "aputure_nova": "aputure_nova_ii_2x1",
     "molerichardson_juniorled": "molerichardson_juniorled_200",
 }
 
 
-def canon_id(pid: str) -> str:
-    return ID_REMAP.get(pid, pid)
+def canon_id(pid: str, modelo: str = "") -> str:
+    """Devuelve el id canónico. Usa STATIC_ID_REMAP + reglas contextuales
+    para resolver IDs ambiguos como `nanlite_forza` que pueden referirse
+    a Forza 500, Forza 60, etc."""
+    if pid in STATIC_ID_REMAP:
+        return STATIC_ID_REMAP[pid]
+    # Caso especial: nanlite_forza* — desambiguamos por modelo
+    if pid.startswith("nanlite_forza"):
+        m = modelo.lower()
+        if "500" in m:
+            return "nanlite_forza_500"
+        if "60b" in m or "60 b" in m:
+            return "nanlite_forza_60b"
+        if "60" in m:
+            return "nanlite_forza_60"
+        return "nanlite_forza_500"  # fallback histórico
+    return pid
 
 
 # ── Limpieza de extras ──────────────────────────────────────────────────────
@@ -151,13 +167,14 @@ def clean_extras(extras: dict) -> dict:
 # ── Reordenar specs (orden visual canónico) ──────────────────────────────────
 
 SPECS_ORDER = [
+    "iluminacion_subtipo",
     "potencia_w", "lumens", "cri", "temperatura_k",
     "bicolor", "rgb", "dimming",
     "control_inalambrico", "alimentacion", "montaje", "peso",
 ]
 
 EXTRAS_ORDER = [
-    "tipo", "item_type", "bulb_type", "base_type",
+    "item_type", "bulb_type", "base_type",
     "beam_angle", "cooling", "ip_rating",
     "dimensiones", "photometrics_1m",
     "cri", "tlci",
@@ -194,7 +211,7 @@ def normalizar():
     id_remaps_applied = []
 
     for old_id, p in curado["products"].items():
-        new_id = canon_id(old_id)
+        new_id = canon_id(old_id, modelo=p.get("modelo", ""))
         if new_id != old_id:
             id_remaps_applied.append((old_id, new_id))
 

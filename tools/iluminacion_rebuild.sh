@@ -7,7 +7,7 @@
 # Pasos:
 #   1. Limpia outputs
 #   2. Corre parser sobre todos los HTMLs de B&H
-#   3. Aplica parches manuales (ARRI, Mole 1000W, amaran 300c temp)
+#   3. Aplica parches manuales (ARRI 650 Plus, Mole 2000W, amaran 300c temp)
 #   4. Normaliza marcas / modelos / IDs / extras
 
 set -euo pipefail
@@ -34,14 +34,15 @@ python3 tools/iluminacion_parser.py \
   "$INVENTARIO/Godox VL150 LED Video Light VL150 B&H Photo Video.html" \
   "$INVENTARIO/Godox VL300II Daylight LED Monolight (320W) VL300II B&H Photo.html" \
   "$INVENTARIO/Nanlite Forza 500 Daylight LED Monolight 12-2026 B&H Photo Video.html" \
-  "$INVENTARIO/Nanlite Forza 60B II Bi-Color LED Monolight FORZA60BII B&H Photo.html" \
+  "$INVENTARIO/Nanlite Forza 60 LED Monolight 12-2022 B&H Photo Video.html" \
   "$INVENTARIO/amaran 300c RGB LED Monolight (Gray) AP30011A99 B&H Photo Video.html" \
+  "$INVENTARIO/amaran COB 200x S Bi-Color LED Monolight APM022XA99 B&H Photo.html" \
   "$INVENTARIO/Godox V100 Flash for Sony V100S B&H Photo Video.html" \
   > /tmp/parser.log
 
 echo "  → $(grep -c 'agregado' /tmp/parser.log) productos parseados"
 
-echo "▸ Aplicando parches manuales (ARRI 650 Plus, Mole 1000W, amaran 300c)"
+echo "▸ Aplicando parches manuales (ARRI 650 Plus, Mole 2000W, amaran 300c)"
 python3 tools/iluminacion_patches.py
 
 echo "▸ Normalizando marcas, modelos, IDs, extras"

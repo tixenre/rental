@@ -1,0 +1,357 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "descripcion": "Dataset normalizado de adaptadores de montura: convierten una rosca body (E/RF/L/Z) a recibir lentes de otra montura (EF/M42/etc.). Incluye speedboosters (Meike, Metabones) y drop-in filter adapters (Canon EF→RF con ND variable interno).",
+    "fuente_principal": "B&H Photo HTML guardado + JSON-LD structured data",
+    "ubicacion_htmls": "~/Desktop/Paginas/Lentes/ (mixta con lentes/filtros)",
+    "schema": {
+      "specs": "7 spec_keys (tipo enum, lens_mount [body], lens_mount_out [lens], electronica [bool], incluye_iris [bool], magnificacion [string, solo speedboosters], peso_g)"
+    },
+    "convenciones": {
+      "lens_mount_dual": "lens_mount=lado body (cámara); lens_mount_out=lado lente. Ej. Sigma MC-11 EF→E: lens_mount=E, lens_mount_out=EF",
+      "tipo_enum": "Adaptador montura | Speedbooster | Macro tube"
+    }
+  },
+  "products": [
+    {
+      "id": "sigma_ef_e_mc11",
+      "categoria_raiz": "Adaptadores",
+      "subtipo": "adaptador",
+      "marca": "Sigma",
+      "modelo": "MC-11 EF → E",
+      "url_source": "https://www.bhphotovideo.com/c/product/1234034-REG/sigma_89e965_mc_11_mount_adapter_for.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/sigma_89e965_mc_11_mount_adapter_for_1234034.jpg",
+      "status_bh": "OK",
+      "fuente": "B&H HTML guardado (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Item Type",
+            "value": "1x Lens Mount Adapter"
+          },
+          {
+            "label": "Camera Compatibility",
+            "value": "Sony E Mount"
+          },
+          {
+            "label": "Lens Compatibility",
+            "value": "Canon EF Mount"
+          },
+          {
+            "label": "Electronic Communication",
+            "value": "Yes"
+          },
+          {
+            "label": "Inputs/Outputs",
+            "value": "1x Unspecified USB Input"
+          },
+          {
+            "label": "Materials",
+            "value": "Metal"
+          },
+          {
+            "label": "Package Weight",
+            "value": "0.705 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "4.95 x 4.25 x 2.65\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Item Type",
+            "value": "1x Lens Mount Adapter"
+          },
+          {
+            "label": "Camera Compatibility",
+            "value": "Sony E Mount"
+          },
+          {
+            "label": "Lens Compatibility",
+            "value": "Canon EF Mount"
+          },
+          {
+            "label": "Electronic Communication",
+            "value": "Yes"
+          },
+          {
+            "label": "Inputs/Outputs",
+            "value": "1x Unspecified USB Input"
+          },
+          {
+            "label": "Materials",
+            "value": "Metal"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "0.705 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "4.95 x 4.25 x 2.65\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "canon_ef_rf_speedbooster",
+      "categoria_raiz": "Adaptadores",
+      "subtipo": "adaptador",
+      "marca": "Canon",
+      "modelo": "Speedbooster 0.71x EF → RF",
+      "url_source": "https://www.bhphotovideo.com/c/product/1595393-REG/canon_mount_adapter_ef_eos_r.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/canon_mount_adapter_ef_eos_r_1595393.jpg",
+      "status_bh": "OK",
+      "fuente": "B&H HTML guardado (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Item Type",
+            "value": "1x Reducing Lens Mount Adapter"
+          },
+          {
+            "label": "Camera Compatibility",
+            "value": "Canon RF Mount"
+          },
+          {
+            "label": "Lens Compatibility",
+            "value": "Canon EF Mount"
+          },
+          {
+            "label": "Magnification",
+            "value": "0.71x"
+          },
+          {
+            "label": "Electronic Communication",
+            "value": "Yes"
+          },
+          {
+            "label": "Exposure Change",
+            "value": "1-Stop Light Gain"
+          },
+          {
+            "label": "Materials",
+            "value": "Metal"
+          },
+          {
+            "label": "Package Weight",
+            "value": "0.98 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "7.3 x 5.4 x 4.8\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Item Type",
+            "value": "1x Reducing Lens Mount Adapter"
+          },
+          {
+            "label": "Camera Compatibility",
+            "value": "Canon RF Mount"
+          },
+          {
+            "label": "Lens Compatibility",
+            "value": "Canon EF Mount"
+          },
+          {
+            "label": "Magnification",
+            "value": "0.71x"
+          },
+          {
+            "label": "Electronic Communication",
+            "value": "Yes"
+          },
+          {
+            "label": "Exposure Change",
+            "value": "1-Stop Light Gain"
+          },
+          {
+            "label": "Materials",
+            "value": "Metal"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "0.98 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "7.3 x 5.4 x 4.8\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "canon_ef_rf_dropin",
+      "categoria_raiz": "Adaptadores",
+      "subtipo": "adaptador",
+      "marca": "Canon",
+      "modelo": "Drop-In Filter Adapter EF → RF",
+      "url_source": "https://www.bhphotovideo.com/c/product/1433719-REG/canon_mount_adapter_ef_rf_with.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/canon_mount_adapter_ef_rf_with_1433719.jpg",
+      "status_bh": "OK",
+      "fuente": "B&H HTML guardado (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Item Type",
+            "value": "1x Lens Mount Adapter with Drop-In Filter Support (1.5 to 9-Stop Variable ND Included)"
+          },
+          {
+            "label": "Camera Compatibility",
+            "value": "Canon RF Mount"
+          },
+          {
+            "label": "Lens Compatibility",
+            "value": "Canon EF/EF-S Mount"
+          },
+          {
+            "label": "Electronic Communication",
+            "value": "Yes"
+          },
+          {
+            "label": "Materials",
+            "value": "Metal"
+          },
+          {
+            "label": "Dimensions",
+            "value": "Diameter: 2.9\" / 73.66 mm\nDepth: 1\" / 25.4 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "4.27 oz / 121 g"
+          },
+          {
+            "label": "Package Weight",
+            "value": "0.635 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "13.5 x 4.9 x 3.7\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Item Type",
+            "value": "1x Lens Mount Adapter with Drop-In Filter Support ("
+          },
+          {
+            "label": "Camera Compatibility",
+            "value": "Canon RF Mount"
+          },
+          {
+            "label": "Lens Compatibility",
+            "value": "Canon EF/EF-S Mount"
+          },
+          {
+            "label": "Electronic Communication",
+            "value": "Yes"
+          },
+          {
+            "label": "Materials",
+            "value": "Metal"
+          },
+          {
+            "label": "Dimensions",
+            "value": "Diameter: 2.9\" / 73.66 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "4.27 oz / 121 g"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "0.635 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "13.5 x 4.9 x 3.7\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "vello_m42_e",
+      "categoria_raiz": "Adaptadores",
+      "subtipo": "adaptador",
+      "marca": "Vello",
+      "modelo": "Adaptador M42 → E",
+      "url_source": "https://www.bhphotovideo.com/c/product/1349617-REG/vello_la_nex_m42_m42_lens_mount_adapter.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/vello_la_nex_m42_m42_lens_mount_adapter_1349617.jpg",
+      "status_bh": "OK",
+      "fuente": "B&H HTML guardado (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Item Type",
+            "value": "1x Lens Mount Adapter"
+          },
+          {
+            "label": "Camera Compatibility",
+            "value": "Sony E Mount"
+          },
+          {
+            "label": "Lens Compatibility",
+            "value": "M42 Mount"
+          },
+          {
+            "label": "Electronic Communication",
+            "value": "No"
+          },
+          {
+            "label": "Materials",
+            "value": "Zinc Alloy"
+          },
+          {
+            "label": "Package Weight",
+            "value": "0.24 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "2.9 x 2.8 x 1.75\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Item Type",
+            "value": "1x Lens Mount Adapter"
+          },
+          {
+            "label": "Camera Compatibility",
+            "value": "Sony E Mount"
+          },
+          {
+            "label": "Lens Compatibility",
+            "value": "M42 Mount"
+          },
+          {
+            "label": "Electronic Communication",
+            "value": "No"
+          },
+          {
+            "label": "Materials",
+            "value": "Zinc Alloy"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "0.24 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "2.9 x 2.8 x 1.75\""
+          }
+        ]
+      }
+    }
+  ]
+}

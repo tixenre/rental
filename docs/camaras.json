@@ -36,21 +36,20 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1894322-REG/sony_ilme_fx3a_fx3_full_frame_cinema_camera.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/sony_ilme_fx3a_fx3_full_frame_cinema_camera_1894322.jpg",
       "specs": {
-        "tipo": "Cinema Camera",
         "lens_mount": "E",
         "formato": "Full-frame",
         "resolucion_max": "4K",
         "fps_max": 120,
         "codecs": "XAVC HS, XAVC S-I 4:2:2, XAVC S 4:2:2, MPEG-4 AVC, H.265 HEVC",
         "megapixels": 10.2,
-        "iso_nativo": {
-          "min": 80,
-          "max": 102400
-        },
-        "iso_extendido": {
-          "min": 80,
-          "max": 409600
-        },
+        "iso_nativo": [
+          80,
+          102400
+        ],
+        "iso_extendido": [
+          80,
+          409600
+        ],
         "rango_dinamico_stops": 15,
         "estabilizacion": true,
         "autofocus": true,
@@ -59,7 +58,8 @@
         "gps": false,
         "ip_streaming": true,
         "netflix_approved": true,
-        "peso_g": 640
+        "peso_g": 640,
+        "camera_subtipo": "Cinema Camera"
       },
       "extras": {
         "sensor": "Full-Frame — 10.2 Megapixel",
@@ -548,7 +548,6 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1935439-REG/sony_a7_v_mirrorless_camera.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/sony_a7_v_mirrorless_camera_1935439.jpg",
       "specs": {
-        "tipo": "Mirrorless",
         "lens_mount": "E",
         "formato": "Full-frame",
         "resolucion_max": "4K",
@@ -556,17 +555,18 @@
         "codecs": "XAVC HS, XAVC S-I 4:2:2, XAVC S 4:2:2, H.265 HEVC, H.264",
         "megapixels": 33.0,
         "continuous_shooting_fps": 30,
-        "iso_extendido": {
-          "min": 50,
-          "max": 204800
-        },
+        "iso_extendido": [
+          50,
+          204800
+        ],
         "estabilizacion": true,
         "autofocus": true,
         "fast_slow_motion": true,
         "gps": true,
         "ip_streaming": false,
         "sensor_crop": "Crop Factor: 1x\nAdditional Modes: 1.5x\n*Additional Crop Occurs in Select Video Modes",
-        "peso_g": 610
+        "peso_g": 610,
+        "camera_subtipo": "Mirrorless"
       },
       "extras": {
         "sensor": "Full-Frame — 33 Megapixel",
@@ -1260,7 +1260,6 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1759472-REG/sony_zv_e1_mirrorless_camera_black.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/sony_zv_e1_mirrorless_camera_black_1759472.jpg",
       "specs": {
-        "tipo": "Vlogging",
         "lens_mount": "E",
         "formato": "Full-frame",
         "resolucion_max": "4K",
@@ -1268,21 +1267,22 @@
         "codecs": "XAVC HS, XAVC S-I 4:2:2, XAVC S 4:2:2",
         "megapixels": 12.1,
         "continuous_shooting_fps": 10,
-        "iso_nativo": {
-          "min": 80,
-          "max": 102400
-        },
-        "iso_extendido": {
-          "min": 80,
-          "max": 409600
-        },
+        "iso_nativo": [
+          80,
+          102400
+        ],
+        "iso_extendido": [
+          80,
+          409600
+        ],
         "estabilizacion": true,
         "autofocus": true,
         "fast_slow_motion": true,
         "gps": true,
         "ip_streaming": false,
         "sensor_crop": "Crop Factor: 1x\nAdditional Modes: 1.5x\n*Additional Crop Occurs in Select Video Modes",
-        "peso_g": 399
+        "peso_g": 399,
+        "camera_subtipo": "Vlogging"
       },
       "extras": {
         "sensor": "Full-Frame — 12.1 Megapixel",
@@ -1877,7 +1877,6 @@
       "url_source": "https://www.bhphotovideo.com/c/product/803403398-USE/canon_2215c002_eos_c200_cinema_camera.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/canon_2215c002_eos_c200_cinema_camera_1340800.jpg",
       "specs": {
-        "tipo": "Cinema Camera",
         "lens_mount": "EF",
         "formato": "Super 35",
         "resolucion_max": "4K",
@@ -1890,7 +1889,8 @@
         "lens_communication": true,
         "gps": false,
         "ip_streaming": false,
-        "peso_g": 1500
+        "peso_g": 1500,
+        "camera_subtipo": "Cinema Camera"
       },
       "extras": {
         "sensor": "Super35 — 8.85 Megapixel",
@@ -2449,7 +2449,6 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1768344-REG/red_digital_cinema_komodo_x_6k_digital_cinema.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/red_digital_cinema_komodo_x_6k_digital_cinema_1768344.jpg",
       "specs": {
-        "tipo": "Cinema Camera",
         "lens_mount": "RF",
         "formato": "Super 35",
         "resolucion_max": "6K",
@@ -2464,7 +2463,8 @@
         "gps": false,
         "ip_streaming": false,
         "netflix_approved": true,
-        "peso_g": 1190
+        "peso_g": 1190,
+        "camera_subtipo": "Cinema Camera"
       },
       "extras": {
         "sensor": "Super35 — 19.9 Megapixel",
@@ -2878,17 +2878,16 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1598392-REG/red_digital_cinema_710_0340_komodo_6k_camera_production.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/red_digital_cinema_710_0340_komodo_6k_camera_production_1598392.jpg",
       "specs": {
-        "tipo": "Cinema Camera",
         "lens_mount": "RF",
         "formato": "Super 35",
         "resolucion_max": "6K",
         "fps_max": 120,
         "codecs": "ProRes, REDCODE",
         "megapixels": 19.9,
-        "iso_nativo": {
-          "min": 250,
-          "max": 12800
-        },
+        "iso_nativo": [
+          250,
+          12800
+        ],
         "rango_dinamico_stops": 16,
         "estabilizacion": false,
         "autofocus": true,
@@ -2896,7 +2895,8 @@
         "lens_communication": true,
         "gps": false,
         "netflix_approved": true,
-        "peso_g": 1000
+        "peso_g": 1000,
+        "camera_subtipo": "Cinema Camera"
       },
       "extras": {
         "sensor": "Super35 — 19.9 Megapixel",
@@ -3462,20 +3462,20 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1781065-REG/gopro_chdhx_121_cn_hero12_black_action_camera.html",
       "image_url": "https://www.bhphotovideo.com/images/fb/gopro_chdhx_121_cn_hero12_black_action_camera_1781065.jpg",
       "specs": {
-        "tipo": "Action Camera",
         "formato": "1\"",
         "resolucion_max": "5K",
         "fps_max": 240,
         "codecs": "H.265 HEVC",
         "megapixels": 27.6,
-        "iso_nativo": {
-          "min": 100,
-          "max": 3200
-        },
+        "iso_nativo": [
+          100,
+          3200
+        ],
         "estabilizacion": true,
         "ip_streaming": false,
         "max_aperture": "f/2.5",
-        "peso_g": 154
+        "peso_g": 154,
+        "camera_subtipo": "Action Camera"
       },
       "extras": {
         "sensor": "1/1.9\"-Type CMOS — 27.6 Megapixel",

@@ -46,16 +46,13 @@ SUBCATEGORIA_A_TIPO: dict[str, str] = {
     "Foto": "Cámara",
     "Acción": "Cámara Acción",
 
-    # Lentes — todas se llaman "Lente" pero podríamos refinar
-    "Zoom E-mount": "Lente",
-    "Zoom EF": "Lente",
-    "Fijos EF": "Lente",
+    # Lentes — todas se llaman "Lente"; la montura va por filtro spec
+    "Zoom": "Lente",
+    "Fijos": "Lente",
     "Especiales": "Lente",
     "Vintage": "Lente",
 
-    # Adaptadores y Filtros
-    "Adaptadores de montura": "Adaptador",
-    "Filtros 82mm": "Filtro",
+    # Adaptadores / Filtros (raíces separadas)
 
     # Iluminación — el subtipo es importante
     "LED daylight/bicolor": "Luz LED",
@@ -120,7 +117,8 @@ SUBCATEGORIA_A_TIPO: dict[str, str] = {
 RAIZ_A_TIPO: dict[str, str] = {
     "Cámaras": "Cámara",
     "Lentes": "Lente",
-    "Adaptadores y Filtros": "Adaptador",
+    "Adaptadores": "Adaptador",
+    "Filtros": "Filtro",
     "Iluminación": "Luz",
     "Modificadores": "Modificador",
     "Soportes": "Soporte",
@@ -369,36 +367,36 @@ def _fmt_lente(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], l
     """Lente Prime Sigma 35mm f/1.4 Art Montura EF
        Lente Zoom Sony FE 24-70mm f/2.8 GM II Montura E
 
-    Detecta Zoom vs Prime desde las specs de focal (si están) o desde el
-    modelo (fallback heurístico). Agrega focal y apertura solo si no
-    están ya en el modelo (para no duplicar)."""
+    Usa schema canónico: distancia_focal=[v] o [min,max], apertura=[v] o
+    [min,max], lens_mount enum. Fallback a claves legacy (focal mín/máx,
+    apertura máx, montura) si el equipo viene de un esquema viejo."""
     tipo = "Lente"
     modelo_lc = (modelo or "").lower()
 
-    # ── Detección Zoom vs Prime ──
-    focal_min = specs.get("focal mín") or specs.get("focal min")
-    focal_max = specs.get("focal máx") or specs.get("focal max")
+    # ── Schema canónico: distancia_focal como lista ──
+    focal = specs.get("distancia_focal")
+    if not focal:
+        fmin = specs.get("focal mín") or specs.get("focal min")
+        fmax = specs.get("focal máx") or specs.get("focal max")
+        if fmin and fmax:
+            focal = [fmin, fmax] if str(fmin) != str(fmax) else [fmin]
+        elif fmin:
+            focal = [fmin]
+
+    es_zoom = isinstance(focal, list) and len(focal) >= 2 and focal[0] != focal[-1]
+    es_prime = isinstance(focal, list) and len(focal) == 1
 
     sub_tipo = None
-    # focal_min puede venir como "24" + focal_max "70" (campos separados)
-    # o como "24-70mm" en un solo campo (caso enriquecimiento legacy).
-    def _es_rango(v: str | None) -> bool:
-        return bool(v and re.search(r"\d+\s*-\s*\d+", str(v)))
-
-    if focal_min and focal_max:
-        sub_tipo = "Zoom" if str(focal_min) != str(focal_max) else "Prime"
-    elif _es_rango(focal_min) or _es_rango(focal_max):
+    if es_zoom:
         sub_tipo = "Zoom"
-    elif focal_min:
+    elif es_prime:
         sub_tipo = "Prime"
     else:
-        # Fallback: deducir del modelo. "24-70mm" → Zoom, "35mm" → Prime.
         if re.search(r"\d+\s*-\s*\d+\s*mm", modelo_lc):
             sub_tipo = "Zoom"
         elif re.search(r"\b\d+\s*mm\b", modelo_lc):
             sub_tipo = "Prime"
 
-    # ── Ensamblar ──
     base: list[str] = [tipo]
     if sub_tipo:
         base.append(sub_tipo)
@@ -407,36 +405,45 @@ def _fmt_lente(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], l
     extras_corto: list[str] = []
     extras_largo: list[str] = []
 
-    # Focal: solo si el modelo no la tiene
-    if focal_min and "mm" not in modelo_lc:
-        if focal_max and str(focal_max) != str(focal_min):
-            extras_corto.append(f"{focal_min}-{focal_max}mm")
-        else:
-            extras_corto.append(f"{focal_min}mm")
+    if focal and "mm" not in modelo_lc:
+        if isinstance(focal, list) and len(focal) >= 2 and focal[0] != focal[-1]:
+            extras_corto.append(f"{_fmt_num(focal[0])}-{_fmt_num(focal[-1])}mm")
+        elif isinstance(focal, list):
+            extras_corto.append(f"{_fmt_num(focal[0])}mm")
 
-    # Apertura: solo si el modelo no la tiene
-    apertura = (
-        specs.get("apertura máx")
-        or specs.get("apertura max")
-        or specs.get("apertura")
-    )
+    apertura = specs.get("apertura")
+    if not apertura:
+        apertura = specs.get("apertura máx") or specs.get("apertura max")
     if apertura and "f/" not in modelo_lc and "t/" not in modelo_lc:
-        v = str(apertura).strip()
-        if v.lower().startswith("t"):
-            # Cine: T-stops (T3, T2.1). Dejar tal cual, sin prefijo f/.
-            pass
-        elif not v.lower().startswith("f/"):
-            v = re.sub(r"^f\s*", "", v, flags=re.IGNORECASE)
-            v = f"f/{v}"
-        extras_corto.append(v)
+        if isinstance(apertura, list) and apertura:
+            if len(apertura) >= 2 and apertura[0] != apertura[-1]:
+                extras_corto.append(f"f/{_fmt_num(apertura[0])}-{_fmt_num(apertura[-1])}")
+            else:
+                extras_corto.append(f"f/{_fmt_num(apertura[0])}")
+        else:
+            v = str(apertura).strip()
+            if not v.lower().startswith(("f/", "t/")):
+                clean = re.sub(r"^f\s*", "", v, flags=re.IGNORECASE)
+                v = f"f/{clean}"
+            extras_corto.append(v)
 
-    # Montura (lens_mount canónico, con fallback a montura legacy).
+    # Línea (Art / GM / L) — antes de la montura
+    linea = specs.get("linea")
+    if linea and str(linea).lower() not in modelo_lc:
+        extras_corto.append(str(linea))
+
+    # Montura — saltear si el valor ya aparece en el modelo (ej. "M42")
     mount_val = specs.get("lens_mount") or specs.get("montura")
-    if mount_val and "montura" not in modelo_lc and "mount" not in modelo_lc:
-        extras_corto.append(f"Montura {mount_val}")
-        extras_largo.append(f"Montura {mount_val}")
+    if mount_val:
+        mount_lc = str(mount_val).lower()
+        ya_en_modelo = (
+            "montura" in modelo_lc
+            or "mount" in modelo_lc
+            or re.search(rf"\b{re.escape(mount_lc)}\b", modelo_lc)
+        )
+        if not ya_en_modelo:
+            extras_corto.append(f"Montura {mount_val}")
 
-    # Formato solo en el largo
     if specs.get("formato"):
         extras_largo.append(specs["formato"])
 
@@ -471,146 +478,55 @@ def _fmt_luz(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], lis
     return base + extras_corto, base + extras_largo
 
 
-def _fmt_modificador(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Softbox Aputure 90cm
-       Bandera Negra 35x40cm"""
-    # Si hay spec "tipo" en specs, lo preferimos sobre subcategoría
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Modificador")
-    )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    if specs.get("medidas"):
-        extras_corto.append(specs["medidas"])
-    extras_largo = list(extras_corto)
-    if specs.get("material"):
-        extras_largo.append(specs["material"])
-    return base + extras_corto, base + extras_largo
-
-
-def _fmt_soporte(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Trípode video Manfrotto 504 Carga 12kg
-       C-Stand Avenger A2030D
-       Gimbal Tilta Gravity G2X 3 ejes"""
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Soporte")
-    )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    extras_largo = []
-    # Solo gimbal: ejes
-    if (specs.get("tipo") == "Gimbal" or "gimbal" in (subcat or "").lower()) and specs.get("ejes"):
-        extras_corto.append(f"{specs['ejes']} ejes")
-    if specs.get("carga máx") or specs.get("carga max"):
-        v = specs.get("carga máx") or specs.get("carga max")
-        extras_largo.append(f"Carga {v}kg")
-    return base + extras_corto, base + extras_largo
-
-
-def _fmt_grip(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Brazo Avenger D200
-       Lastre Impact 15 lb
-       Cage Tilta para FX3"""
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Grip")
-    )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    extras_largo = []
-    if specs.get("medidas"):
-        extras_corto.append(specs["medidas"])
-    return base + extras_corto, base + extras_largo
-
-
 def _fmt_adaptador(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Adaptador Sigma MC-11 EF→E
-       Filtro ND Tiffen 82mm Variable"""
+    """Adaptador Sigma MC-11 EF → E
+       Filtro polarizador Tiffen 82mm
+       Filtro variable Tiffen 82mm 2-8 stops
+
+    Schema canónico (lens_mount/lens_mount_out/diametro_filtro/densidad).
+    Lee filtro_subtipo / adaptador_subtipo según corresponda; fallback al
+    nombre de sub-categoría."""
     tipo = (
-        specs.get("tipo")
+        specs.get("filtro_subtipo")
+        or specs.get("adaptador_subtipo")
         or SUBCATEGORIA_A_TIPO.get(subcat or "", "Adaptador")
     )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    in_m = specs.get("montura entrada")
-    out_m = specs.get("montura salida")
-    if in_m and out_m:
-        extras_corto.append(f"{in_m}→{out_m}")
-    elif in_m:
-        extras_corto.append(in_m)
-    if specs.get("diámetro") or specs.get("diametro"):
-        v = specs.get("diámetro") or specs.get("diametro")
-        extras_corto.append(f"{v}mm")
-    if specs.get("densidad nd") or specs.get("densidad"):
-        v = specs.get("densidad nd") or specs.get("densidad")
-        extras_corto.append(v)
-    return base + extras_corto, base + extras_corto
+    modelo_lc = (modelo or "").lower()
 
-
-def _fmt_sonido(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Lavalier Rode Wireless GO II
-       Shotgun Sennheiser MKE 600"""
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Audio")
+    # Solo eliminamos el tipo si el modelo ARRANCA con la primera palabra del tipo
+    tipo_str = str(tipo).strip().lower()
+    primer_word = tipo_str.split()[0] if tipo_str else ""
+    tipo_redundante = bool(
+        tipo_str and (
+            tipo_str in modelo_lc
+            or (primer_word and modelo_lc.startswith(primer_word + " "))
+        )
     )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    extras_largo = []
-    if specs.get("banda"):
-        extras_largo.append(specs["banda"])
-    return base + extras_corto, base + extras_largo
+    base = ([] if tipo_redundante else [tipo]) + [marca or "", modelo or ""]
+    extras_corto: list[str] = []
 
+    # Adaptadores: mount_out → mount (lens → body)
+    mount_out = specs.get("lens_mount_out") or specs.get("montura salida")
+    mount = specs.get("lens_mount") or specs.get("montura entrada") or specs.get("montura")
+    if mount_out and mount and f"{mount_out} → {mount}".lower() not in modelo_lc:
+        extras_corto.append(f"{mount_out} → {mount}")
+    elif mount and "montura" not in modelo_lc and "mount" not in modelo_lc and not mount_out:
+        extras_corto.append(f"Montura {mount}")
 
-def _fmt_monitor(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Monitor SmallHD 7" 1080p
-       Grabador Atomos Ninja V"""
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Monitor")
+    # Filtros: diámetro (spec canónica diametro_filtro; fallback legacy)
+    diam = (
+        specs.get("diametro_filtro")
+        or specs.get("diametro_mm")
+        or specs.get("diámetro")
+        or specs.get("diametro")
     )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    if specs.get("pulgadas"):
-        extras_corto.append(f"{specs['pulgadas']}\"")
-    extras_largo = list(extras_corto)
-    if specs.get("resolución") or specs.get("resolucion"):
-        v = specs.get("resolución") or specs.get("resolucion")
-        extras_largo.append(v)
-    return base + extras_corto, base + extras_largo
+    if diam and f"{diam}mm".lower() not in modelo_lc:
+        extras_corto.append(f"{diam}mm")
 
+    densidad = specs.get("densidad") or specs.get("densidad nd")
+    if densidad and str(densidad).lower() not in modelo_lc:
+        extras_corto.append(str(densidad))
 
-def _fmt_energia(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Batería V-mount 150Wh
-       Distribución V-mount 4 canales"""
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Batería")
-    )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    if specs.get("capacidad"):
-        extras_corto.append(f"{specs['capacidad']}Wh")
-    if specs.get("canales"):
-        extras_corto.append(f"{specs['canales']} canales")
-    return base + extras_corto, base + extras_corto
-
-
-def _fmt_media(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Tarjeta SD SanDisk 256GB V90
-       Lector CFexpress Sony MRW-G2"""
-    tipo = (
-        specs.get("tipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Media")
-    )
-    base = [tipo, marca, modelo]
-    extras_corto = []
-    if specs.get("capacidad"):
-        extras_corto.append(f"{specs['capacidad']}GB")
-    if specs.get("clase"):
-        extras_corto.append(specs["clase"])
     return base + extras_corto, base + extras_corto
 
 
@@ -625,14 +541,8 @@ _FORMATTERS = {
     "Cámaras": _fmt_camara,
     "Lentes": _fmt_lente,
     "Iluminación": _fmt_luz,
-    "Modificadores": _fmt_modificador,
-    "Soportes": _fmt_soporte,
-    "Grip": _fmt_grip,
-    "Adaptadores y Filtros": _fmt_adaptador,
-    "Sonido": _fmt_sonido,
-    "Monitores y Video": _fmt_monitor,
-    "Energía": _fmt_energia,
-    "Media y Datos": _fmt_media,
+    "Adaptadores": _fmt_adaptador,
+    "Filtros": _fmt_adaptador,  # mismo formatter (rama filtro detecta por specs)
 }
 
 
@@ -714,3 +624,164 @@ def construir_nombre_publico(
         largo = corto or nombre_s
 
     return corto, largo
+
+
+# ════════════════════════════════════════════════════════════════════════
+# Keywords derivadas de specs canónicos
+# ════════════════════════════════════════════════════════════════════════
+#
+# `compute_keywords(specs)` reemplaza al sistema legacy de keywords LLM
+# (que generaba strings raros). Genera lista canónica deduplicada limitada
+# a ~12 términos por equipo, derivada de specs como lens_mount, formato,
+# tipo, resolución, bicolor, etc.
+#
+# Reemplaza:
+#   - LLM-output en `equipo_fichas.keywords_json` (autocompletar)
+#   - El admin podía editar keywords manualmente — ahora se generan
+#     determinísticamente en seeds + autocompletar HTML upload.
+#
+# Para que un spec genere keywords, agregarlo a SPEC_KEYWORDS_TEMPLATES.
+# Las que NO están (peso_g, magnificacion, iso, etc.) NO aportan keywords
+# porque nadie busca por ellas.
+
+
+def _fmt_num(n) -> str:
+    """123.0 → '123'; 2.8 → '2.8'; 1.4 → '1.4'. Drops trailing .0 from ints-as-float."""
+    if n is None:
+        return ""
+    try:
+        f = float(n)
+        return str(int(f)) if f.is_integer() else str(f)
+    except (TypeError, ValueError):
+        return str(n)
+
+
+def _coerce_rango(value) -> list[float]:
+    """Normaliza `value` a una lista de floats para handlers de rango.
+
+    Acepta:
+      - list / tuple de números
+      - string "24-70" o "24-70mm" / "f/2.8" / "63.4°"
+      - número solo → [valor]
+      - dict {min, max} → [min, max]
+      - None / vacío → []
+    """
+    if value is None or value == "":
+        return []
+    if isinstance(value, (list, tuple)):
+        out = []
+        for v in value:
+            try:
+                out.append(float(v))
+            except (TypeError, ValueError):
+                pass
+        return out
+    if isinstance(value, dict):
+        if "min" in value and "max" in value:
+            try:
+                return [float(value["min"]), float(value["max"])]
+            except (TypeError, ValueError):
+                return []
+        return []
+    if isinstance(value, (int, float)):
+        return [float(value)]
+    if isinstance(value, str):
+        nums = re.findall(r"\d+(?:\.\d+)?", value)
+        return [float(n) for n in nums]
+    return []
+
+
+# spec_key → template para keywords. "_handler" → handler dedicado.
+SPEC_KEYWORDS_TEMPLATES: dict[str, str] = {
+    "lens_mount":     "{value}, {value}-mount, montura {value}",
+    "lens_mount_out": "{value}, {value}-mount",
+    "formato": "_formato_keywords",
+    "resolucion_max": "_resolucion_keywords",
+    "tipo": "{value}",
+    "linea": "{value}",
+    "diametro_filtro": "{value}mm, {value} mm, filter {value}",
+    # Booleans útiles (solo si True)
+    "bicolor":          "bicolor, bi-color, dual color",
+    "rgb":              "RGB, color, full color, multi color",
+    "dimming":          "dimmer, dimmable, regulable",
+    "estabilizacion":   "estabilización, OSS, IS, stabilization",
+    "autofocus":        "autofocus, AF",
+    "netflix_approved": "Netflix, netflix approved",
+    "ip_streaming":     "streaming, IP streaming, NDI, broadcast",
+    "fast_slow_motion": "slow motion, S&Q, high frame rate",
+    "electronica":      "comunicación electrónica, AF compatible",
+    "incluye_iris":     "iris incluido, variable ND, drop-in",
+    "densidad": "ND {value}, {value}",
+    "grade": "grado {value}, {value}",
+}
+
+_FORMATO_KW: dict[str, list[str]] = {
+    "Full-frame":    ["Full-frame", "FF", "full frame", "35mm"],
+    "Super 35":      ["Super 35", "S35", "super35"],
+    "APS-C":         ["APS-C", "APSC", "crop sensor"],
+    "MFT":           ["MFT", "Micro Four Thirds", "M4/3"],
+    "M4/3":          ["M4/3", "MFT", "Micro Four Thirds"],
+    "Medium Format": ["Medium Format", "MF", "medium format"],
+    "1\"":           ["1 pulgada", "1 inch sensor"],
+}
+
+_RESOLUCION_KW: dict[str, list[str]] = {
+    "12K": ["12K"],
+    "8K":  ["8K", "8K video"],
+    "6K":  ["6K", "6K video"],
+    "5.7K":["5.7K"],
+    "5K":  ["5K"],
+    "4K":  ["4K", "UHD", "4K UHD", "video 4K"],
+    "2K":  ["2K"],
+    "FHD": ["FHD", "1080p", "Full HD", "HD"],
+}
+
+
+def _expand_keyword_template(tpl: str, value) -> list[str]:
+    """Resuelve un template a la lista de keywords concretas."""
+    if not tpl:
+        return []
+    if tpl == "_formato_keywords":
+        return _FORMATO_KW.get(str(value), [str(value)])
+    if tpl == "_resolucion_keywords":
+        return _RESOLUCION_KW.get(str(value), [str(value)])
+    text = tpl.replace("{value}", str(value))
+    return [p.strip() for p in text.split(",") if p.strip()]
+
+
+def compute_keywords(specs: dict, max_total: int = 12) -> list[str]:
+    """Genera keywords canónicas derivadas de los specs de un equipo.
+
+    Determinística, deduplicada (case-insensitive), limitada a `max_total`.
+    Devuelve lista de strings — guardar como JSON en `equipo_fichas.keywords_json`.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+
+    for spec_key, tpl in SPEC_KEYWORDS_TEMPLATES.items():
+        value = specs.get(spec_key)
+        if value is None or value == "" or value == []:
+            continue
+
+        if isinstance(value, bool):
+            if not value:
+                continue
+            keywords = [p.strip() for p in tpl.split(",") if p.strip()]
+        else:
+            if isinstance(value, list):
+                keywords = []
+                for v in value:
+                    keywords.extend(_expand_keyword_template(tpl, v))
+            else:
+                keywords = _expand_keyword_template(tpl, value)
+
+        for kw in keywords:
+            key = kw.lower()
+            if key in seen or not kw:
+                continue
+            seen.add(key)
+            out.append(kw)
+            if len(out) >= max_total:
+                return out
+
+    return out

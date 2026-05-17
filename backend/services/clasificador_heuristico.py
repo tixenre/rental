@@ -35,13 +35,17 @@ PATRONES: list[tuple[str, str, Optional[str], float, str]] = [
      "Cámaras", "Video", 0.95, "Cuerpo de cine"),
     (r"\bc[aá]mara\b", "Cámaras", "Video", 0.8, "Cámara genérica"),
 
-    # ── Adaptadores y Filtros ───────────────────────────────────────────
+    # ── Adaptadores (categoría raíz; sub-cats por montura on-the-fly) ───
     (r"\badaptador\b.*\b(ef-?e|ef-?rf|ef-?l|m42-?e|speedbooster|metabones)",
-     "Adaptadores y Filtros", "Adaptadores de montura", 0.95, "Adaptador montura"),
-    (r"\badaptador\b", "Adaptadores y Filtros", "Adaptadores de montura", 0.85, "Adaptador"),
+     "Adaptadores", None, 0.95, "Adaptador montura"),
+    (r"\badaptador\b|\bspeedbooster\b|\bmc-?11\b",
+     "Adaptadores", None, 0.85, "Adaptador genérico"),
+
+    # ── Filtros (categoría raíz; sub-cats por diámetro on-the-fly) ──────
     (r"\bfiltro\b.*\b(82|77|72|67|58|52)\s*mm",
-     "Adaptadores y Filtros", "Filtros 82mm", 0.9, "Filtro con diámetro"),
-    (r"\bfiltro\b", "Adaptadores y Filtros", "Filtros 82mm", 0.7, "Filtro genérico"),
+     "Filtros", None, 0.9, "Filtro con diámetro"),
+    (r"\bfiltro\b|\bpro-?mist\b|\bvariable\s*nd\b",
+     "Filtros", None, 0.7, "Filtro genérico"),
 
     # ── Soportes ────────────────────────────────────────────────────────
     (r"\bgimbal\b|\bsteadicam\b|\bglidecam\b|\bronin\b",
@@ -148,17 +152,13 @@ PATRONES: list[tuple[str, str, Optional[str], float, str]] = [
     (r"^avenger\b", "Grip", None, 0.6, "Avenger genérico"),
 
     # ── Lentes (al final para no pisar adaptadores que mencionan montura) ──
-    (r"kit\s*lentes\s*vintage|carl\s*zeiss\s*jena|helios",
+    # Taxonomía: Zoom / Fijos / Vintage / Especiales. La montura va por filtro spec.
+    (r"kit\s*lentes\s*vintage|carl\s*zeiss\s*jena|helios|\bm42\b",
      "Lentes", "Vintage", 0.95, "Lente vintage"),
-    (r"\blente\b.*\bmacro\b|\bprobe\b", "Lentes", "Especiales", 0.85, "Lente macro/especial"),
-    (r"\blente\b.*(montura\s*e|\be-?mount\b)|\blente\b.*sony.*\d+-\d+mm",
-     "Lentes", "Zoom E-mount", 0.85, "Lente E-mount zoom"),
-    (r"\blente\b.*sony.*\d+mm",
-     "Lentes", "Zoom E-mount", 0.8, "Lente E-mount"),
-    (r"\blente\b.*(montura\s*ef|\bef\b).*\d+-\d+mm",
-     "Lentes", "Zoom EF", 0.85, "Lente EF zoom"),
-    (r"\blente\b.*(montura\s*ef|\bef\b)",
-     "Lentes", "Fijos EF", 0.8, "Lente EF fijo"),
+    (r"\bprobe\b|\blente\b.*\bmacro\b|cinema\s*pl|master\s*prime",
+     "Lentes", "Especiales", 0.85, "Lente macro/probe/cinema especial"),
+    (r"\blente\b.*\d+-\d+\s*mm", "Lentes", "Zoom", 0.85, "Lente zoom"),
+    (r"\blente\b.*\d+\s*mm",     "Lentes", "Fijos", 0.8, "Lente fijo"),
     (r"\blente\b", "Lentes", None, 0.6, "Lente genérico"),
 
     # ── Estudio y Producción ────────────────────────────────────────────

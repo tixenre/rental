@@ -254,8 +254,10 @@ Puntos de entrada para no grepear:
 | Categoría | Estado | Doc |
 |---|---|---|
 | Iluminación | Listo — 16 luces curadas, seed funcional, HTML upload wireado al admin | [`docs/DATASET_ILUMINACION.md`](docs/DATASET_ILUMINACION.md) |
-| Cámaras | Listo — 6 cámaras curadas + seed funcional. **HTML upload UI aún apunta solo a iluminacion_html_extractor** — falta dispatcher por categoría | [`docs/DATASET_CAMARAS.md`](docs/DATASET_CAMARAS.md) |
-| Lentes | Pendiente | — |
+| Cámaras | Listo — 7 cámaras curadas + seed funcional. **HTML upload UI aún apunta solo a iluminacion_html_extractor** — falta dispatcher por categoría | [`docs/DATASET_CAMARAS.md`](docs/DATASET_CAMARAS.md) |
+| Lentes | Listo — 12 lentes curados (Sony GM, Sigma Art, Canon L, Laowa Probe, Zeiss Jena M42) + seed funcional. Taxonomía por TIPO (Zoom/Fijo/Vintage/Especiales) + monturas on-the-fly. HTML upload pendiente del dispatcher | [`docs/DATASET_LENTES.md`](docs/DATASET_LENTES.md) |
+| Adaptadores | Listo — 4 adaptadores curados (Sigma MC-11, Canon Drop-In, Meike speedbooster, Vello M42→E) + seed funcional. Categoría raíz independiente; sub-cats por montura (Montura E/RF/EF) on-the-fly | [`docs/DATASET_LENTES.md`](docs/DATASET_LENTES.md) |
+| Filtros | Listo — 4 filtros curados (Tiffen CPL, Variable ND, Pro-Mist 1/4 y 1/8) + seed funcional. Categoría raíz independiente; sub-cats por diámetro (82mm/77mm) on-the-fly | [`docs/DATASET_LENTES.md`](docs/DATASET_LENTES.md) |
 | (otras) | Pendiente | — |
 
 **Por qué el seed coexiste con `categoria_spec_templates`:** ese table sigue siendo necesario porque define UI metadata (qué specs van en card/filtros/nombre, prioridad de display) — eso no se deriva del dato del equipo. Lo que el seed automatiza es que el admin no la pueble a mano: el script lo hace en una pasada idempotente.
@@ -273,20 +275,55 @@ Puntos de entrada para no grepear:
 |---|---|---|
 | Agregar 1 luz nueva — URL paste (Firecrawl OK) | Sí — calidad seed automática (parser embebido) | — |
 | Agregar 1 luz nueva — URL paste falla (Firecrawl rate-limit / bot-detection) | Sí — subir HTML guardado (Cmd+S → upload) | — |
-| Agregar equipo no-luz (cámara, lente) — categoría existente | Sí — admin UI + autocompletar (LLM extract) | — |
+| Agregar equipo no-luz (cámara, lente, accesorio) — categoría existente | Sí — admin UI + autocompletar (LLM extract). Para calidad seed: bulk via Claude hasta wirear dispatcher HTML por categoría | — |
 | Editar precio / foto / nombre / spec value | Sí — admin UI | — |
 | Agregar spec key nueva al catálogo global | Sí — `/admin/equipos/specs` | — |
 | Importar bulk de una categoría NUEVA (ej. cámaras) — primera vez | — | Sí — curar HTMLs + parser específico + seed |
 | Refactor del schema (ej. partir `peso` en sub-campos) | — | Sí — plan + migration |
 
 **Limitaciones:**
-- El parser determinístico hoy solo cubre **luces** (`iluminacion_parser`). Para cámaras/lentes/etc. el URL paste cae al LLM extract hasta que armemos el parser específico por categoría (`camaras_parser.py`, etc. — patrón replicable).
+- El parser determinístico hoy solo cubre **luces** (`iluminacion_parser`) en el endpoint del admin. Cámaras/lentes/accesorios YA tienen parsers determinísticos propios (`tools/camaras_parser.py`, `tools/lentes_parser.py`) usados para el seed bulk, pero el endpoint `/admin/equipos/autocompletar-from-html` todavía hardcodea `luces_html_extractor`. Falta dispatcher por categoría (sniff por content o param explícito).
 - El parser asume estructura B&H. Otros sites (Adorama, manufacturer pages) caen al LLM extract.
 - Si Firecrawl no puede acceder al URL (bot-detection más agresivo de B&H, sitio caído), fallback a HTML upload.
 
 El JSON del dataset NO se edita post-seed (es dev artifact). Para cambios puntuales: admin UI. Para reseed masivo (raro): editar JSON + re-correr seed (idempotente, no pisa campos manuales como `precio_jornada`).
 
 **El JSON queda "congelado" después del seed.** Si querés un export del estado actual de la DB → JSON otra vez (por backup o re-importar a otro ambiente), se arma un script `dump_<categoria>.py` cuando haga falta. Por defecto no es necesario.
+
+### Compatibilidades cross-categoría
+
+Los equipos se relacionan entre sí por **specs compartidos** — el motor de compatibilidad (`backend/routes/specs.py::_compute_compat`) decide si dos equipos son compatibles, parciales o incompatibles según sus valores en specs marcadas con `es_compatibilidad=TRUE`.
+
+**Tres specs compartidos hoy** (declarados en [`backend/seeds/compat_config.py`](backend/seeds/compat_config.py)):
+
+| Spec | Modo | Aplica a | Resuelve |
+|---|---|---|---|
+| `lens_mount` | exacta | Cámaras, Lentes, Adaptadores | "¿La rosca del lente entra en el body / adaptador?" |
+| `diametro_filtro` | exacta | Lentes, Filtros | "¿Este filtro 82mm rosquea en este lente?" |
+| `formato` | jerarquia | Cámaras (rol contenido), Lentes (rol contenedor) | "¿Cubre el lente todo el sensor o queda crop / viñetea?" |
+
+**Cómo se conecta** (operativa):
+
+1. Los seeds importan `seeds/compat_config.py` y llaman `apply_compat_config(conn, spec_def_ids)` después de crear `spec_definitions` → marca cada spec con `es_compatibilidad=TRUE` + `compatibilidad_modo` + (si jerárquico) `enum_options` ordenadas.
+2. Lentes y Cámaras además llaman `apply_rol_compat(...)` después de crear `categoria_spec_templates` → setea `rol_compatibilidad` (`contenedor` o `contenido`) para que el motor sepa quién proyecta y quién recibe.
+3. El endpoint `GET /admin/equipos/{id}/compatibles` cruza specs de ambos equipos y devuelve overall ∈ `{compatible, compatible_con_crop, parcial, incompatible, requiere_adaptador, sin_relacion}` + razones por spec.
+
+**Casos típicos resueltos automáticamente** (sin tocar el motor):
+
+- Sony FX3 (E) + Sony GM 24-70 (E) → `compatible` ✓ (lens_mount match exacto)
+- Sony FX3 (E) + Sigma 50 Art (EF) → `sin_relacion` directo, pero como ambos tienen lens_mount, queda `incompatible` por mismatch — UI puede sugerir adaptadores con `lens_mount=E, lens_mount_out=EF` (Sigma MC-11).
+- Sony 24-70 GM (Full-frame) + Sony a7V (Full-frame) → `compatible` (formato match exacto en jerarquía).
+- Sony 24-70 GM (Full-frame) + cámara APS-C → `compatible_con_crop` (lente proyecta más grande, sensor usa crop central).
+- Sigma 18-35 Art (APS-C) + Sony a7V (Full-frame) → `parcial` con `partial_vignette` (lente APS-C no cubre sensor FF).
+- Tiffen 82mm Variable ND + Sony GM 24-70 (diametro_filtro=82) → `compatible` (diametro_filtro match).
+- Tiffen 82mm + Sigma 35 Art (diametro_filtro=67) → `incompatible` (diámetros distintos).
+
+**Override manual** (`equipo_compatibilidad` table): para casos que el auto no maneja bien — ej. "este combo viñetea solo a f/1.4 abierto" → marca como `parcial` con nota custom.
+
+**Lo que NO está auto hoy** (pendiente):
+
+- Sugerencia automática de "requiere_adaptador" cuando A.lens_mount ≠ B.lens_mount pero existe un adaptador que conecta los dos. Hoy requiere `equipo_compatibilidad` manual con `adaptador_id`. El skill IA `gear-compatibility` (propuestas pendientes) lo cubre parcialmente.
+- UI del catálogo público — las compatibilidades se ven solo en admin (`/admin/gear-compatibility` + tab por equipo).
 
 ### Display templates por spec (placeholders del nombre público)
 
@@ -450,7 +487,154 @@ Cuando agregamos un spec_key nuevo a una categoría (en seed `backend/seeds/<cat
 
 ---
 
-## 7. Dónde encontrar cosas
+## 7. Sistema de specs / categorías / keywords / compat (fuente de verdad)
+
+> **Fecha**: 2026-05-17. Esta sección reemplaza el borrador histórico
+> `docs/DISEÑO_SPECS.md`. Cuando hay duda, esto manda.
+
+### Single source of truth: `backend/specs/registry.py`
+
+Pydantic v2 registry. Todas las cats, sub-cats y specs están declaradas
+en un solo archivo. Cualquier consumer (seeds, parsers, API, UI metadata)
+lo importa.
+
+```python
+from specs import REGISTRY, get_categoria, get_spec, validate_dataset
+```
+
+**Cambios estructurales (PR feat/specs-registry)**:
+- Borrados: `seeds/spec_templates.py::TEMPLATES`, `seeds/<cat>.py::SPECS_X` (eran duplicados — generaban drift)
+- DB: `spec_definitions` ahora tiene UNIQUE `(categoria_raiz_id, spec_key)` (antes era UNIQUE global → colisión "tipo" cross-cat)
+- Cada cat tiene su `<cat>_subtipo` propio (camera_subtipo, iluminacion_subtipo, adaptador_subtipo, filtro_subtipo)
+- Datasets validan contra el registry en parse-time (`specs.validation.validate_dataset`)
+
+### El stack en una imagen
+
+```
+backend/specs/registry.py  (REGISTRY: dict[str, CategoriaRegistry])
+    │
+    ├──► seeds/registry_seeder.py  → DB (spec_definitions + categoria_spec_templates)
+    │                                ↑ idempotente, walks REGISTRY
+    │
+    └──► specs/validation.py  → valida docs/<cat>.json en parse
+
+HTMLs B&H (~/Desktop/Paginas/<categoría>/)
+    │ tools/<categoría>_parser.py  (emite keys del registry)
+    ▼
+docs/<categoría>.json  (dataset canónico, validado contra registry)
+    │
+    ▼
+backend/seeds/<categoría>.py
+    ├── seed_categoria_from_registry()  → specs + sub-cats
+    ├── resolve_equipo_id() + apply_overrides()  → preserva equipo.id
+    └── write_keywords()  → equipo_fichas.keywords_json
+    ▼
+DB Postgres
+```
+
+### Specs por categoría (5 activas)
+
+| Categoría | # specs | Subtipo canónico | Specs core |
+|---|---|---|---|
+| Cámaras | 22 | `camera_subtipo` | lens_mount, formato, resolucion_max, fps_max, codecs, iso_*, peso_g |
+| Lentes | 15 | — | lens_mount, distancia_focal (rango), apertura (rango), formato, linea, diametro_filtro |
+| Adaptadores | 7 | `adaptador_subtipo` | lens_mount, lens_mount_out, electronica, magnificacion |
+| Filtros | 6 | `filtro_subtipo` | diametro_filtro, densidad, material, grade |
+| Iluminación | 17 | `iluminacion_subtipo` | potencia_w, color_modes (multi_enum), temperatura_k (rango), cri, alimentacion (multi_enum) |
+
+**Specs compartidas semánticamente** (mismo `spec_key` declarado en varias cats con metadata idéntica):
+- `lens_mount` — Cámaras ↔ Lentes ↔ Adaptadores (match exacto)
+- `formato` — Cámaras ↔ Lentes (jerárquico: FF > Super 35 > APS-C > MFT)
+- `diametro_filtro` — Lentes ↔ Filtros (match exacto)
+- `peso_g` — todas
+
+El motor de compat matchea por **string-equality del spec_key + value**. La composite key en DB las separa físicamente (cada cat es dueña de su fila) pero conceptualmente representan la misma propiedad. Esto elimina la colisión que tenía la arquitectura vieja sin sacrificar el matching cross-categoría.
+
+**Single source de enum jerárquico** (`specs.FORMATO_ENUM`):
+```
+1" → MFT → M4/3 → APS-C → Super 35 → Full-frame → Medium Format
+```
+
+**Roles de compat (jerarquía)**:
+- Lentes.formato = `contenedor` (proyecta sobre el sensor)
+- Cámaras.formato = `contenido` (recibe el círculo de imagen)
+
+**Convenciones de naming**:
+- `peso_g`: int gramos
+- Rangos (`distancia_focal`, `apertura`, `angulo_vision`, `iso_nativo`, `temperatura_k`): listas — `[v]` fijo, `[min, max]` variable
+- `multi_enum`: JSON array. Usados en `color_modes`, `control_inalambrico`, `alimentacion`
+- IDs estables del dataset: `marca_modelo_apertura[_linea]`
+
+### Sub-categorías por raíz
+
+```
+Cámaras    → Foto | Video > {Montura E, RF, EF, L, Z, PL, BMD} | Acción     (multi-cat)
+Lentes     → Zoom | Fijo | Vintage | Especiales | Montura {E, EF, M42, ...}  (multi-cat)
+Adaptadores→ Montura {E, RF, EF, ...}                                         (única, por body mount)
+Filtros    → {82mm, 77mm, ...}                                                (única, por diámetro)
+Iluminación→ LED daylight/bicolor | LED RGB | Tungsteno | Flash | ...         (única)
+```
+
+Las sub-cats de **montura** y **diámetro** se crean on-the-fly al primer equipo. En el catálogo público (`CategorySidebar.tsx`), Lentes + Adaptadores + Filtros se agrupan visualmente bajo **"Óptica"**.
+
+### Keywords automáticas
+
+`nombre_builder.compute_keywords(specs)` genera 6–12 keywords canónicas por equipo desde `SPEC_KEYWORDS_TEMPLATES`. Reemplaza al LLM-output legacy (que daba strings raros). Ejemplos:
+
+- Sony FX3 → `E, E-mount, montura E, Full-frame, FF, full frame, 35mm, 4K, UHD, video 4K, Cinema Camera`
+- Tiffen 82mm Variable ND → `Filtro variable, 82mm, filter 82, ND 2 to 8-Stop`
+
+### Merge dataset ↔ DB existente (preservar pedidos)
+
+`docs/equipos_match.json` mapea `dataset_id → equipo.id` con action:
+- `update`: el seed pisa specs/keywords/categorías sobre el equipo existente
+- `create`: insert nuevo (el equipo no existe)
+- `skip`: no tocar (ej. kit Zeiss, equipos no aplicables)
+- `override_marca/override_modelo`: corregir DB mal-etiquetada (5 casos detectados)
+
+Esto garantiza **0 duplicados, 0 pedidos huérfanos**.
+
+### Flow operativo
+
+```bash
+# 1. Bulk inicial / re-importar dataset entero
+bash tools/<categoría>_rebuild.sh                  # parser → docs/<cat>.json
+python -m tools.equipos_match_preview              # opcional: fuzzy match contra DB
+# editar docs/equipos_match.json (manual)
+python -m tools.specs_reset --dry-run              # ver qué se borraría
+python -m tools.specs_reset --apply                # limpia specs/keywords viejas
+python -m backend.seeds.{camaras,lentes,adaptadores,filtros,iluminacion}
+
+# 2. Agregar 1 equipo nuevo a categoría existente (cuando esté wireado)
+# Admin sube HTML B&H → endpoint usa el mismo parser → inserta canónico
+```
+
+### Agregar specs / cats / sub-cats
+
+1. **Editar** `backend/specs/registry.py` — agregar al `CategoriaRegistry` correspondiente
+2. **Validar** localmente: `python -m pytest backend/tests/test_specs_registry.py`
+3. **Reseed** (o esperar al próximo deploy — el lifecycle DB corre `seed_all_categorias`):
+   ```bash
+   python -m backend.seeds.camaras  # o la cat que corresponda
+   ```
+
+Si una spec_key debe ser compartida con otra cat (compat matching): declararla idénticamente en ambas (mismo `tipo`, mismas `enum_options`, misma `unidad`). El test `test_shared_keys_consistentes_entre_cats` lo enforcea.
+
+### Cuando se rompa o falte algo
+
+| Síntoma | Dónde mirar |
+|---|---|
+| Specs no aparecen como compatibilidad | `SpecDef.es_compatibilidad` en el registry; reseed |
+| Match jerárquico no funciona | `SpecDef.compatibilidad_modo` + `rol_compatibilidad` en el registry |
+| Dataset rompe seed con error de validación | Output de `specs.validation.validate_dataset()` — el dataset desalineó del registry |
+| Equipos duplicados al re-seed | `docs/equipos_match.json` debe tener entry con `action: update` |
+| Keywords salen mal | `SPEC_KEYWORDS_TEMPLATES` en `nombre_builder.py` |
+| Falta sub-cat de montura/diámetro en sidebar | Sub-cats on-the-fly por stock — verificar `categorize_*()` en el seed |
+| Spec "tipo" cruza enums entre cats | No debería ocurrir: cada cat tiene `<cat>_subtipo`. Si pasa, el registry tiene drift |
+
+---
+
+## 8. Dónde encontrar cosas
 
 ### Backlog, changelog, decisiones puntuales
 

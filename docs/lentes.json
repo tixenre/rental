@@ -1,0 +1,1963 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "descripcion": "Dataset normalizado de lentes (zoom, fijos, vintage M42). Cada producto tiene specs (comparables/filtrables), extras (ficha técnica), y ficha (raw).",
+    "fuente_principal": "B&H Photo HTML guardado + JSON-LD structured data",
+    "fuente_alternativa": "eBay listings para Zeiss Jena vintage (vía patches manuales)",
+    "ubicacion_htmls": "~/Desktop/Paginas/Lentes/",
+    "schema": {
+      "specs": "15 spec_keys canónicos (lens_mount, distancia_focal [rango mm], apertura [rango f/], formato, diametro_filtro, linea, angulo_vision, distancia_minima_m, magnificacion, hojas_diafragma, estabilizacion, autofocus, construccion_optica, peso_g, dimensiones)",
+      "extras": "~15 campos estructurados (focus_type, optical_design_raw, etc.)",
+      "ficha": "raw B&H/eBay — secciones tal cual aparecen"
+    },
+    "convenciones": {
+      "ids": "{marca}_{modelo}, snake_case. Ej: sony_fe2470gm2, sigma_18-35",
+      "rangos": "distancia_focal/apertura son LISTA: [v] fijo, [min, max] zoom/variable",
+      "peso": "peso_g como INT en gramos (no string). Display lo computa la UI.",
+      "lens_mount": "Enum: E, RF, EF, L, Z, X, MFT, PL, BMD, B4, M42"
+    },
+    "como_agregar_lente_nueva": [
+      "1. Guardar página B&H en ~/Desktop/Paginas/Lentes/ (Cmd+S → Webpage Complete)",
+      "2. Agregar la ruta en tools/lentes_rebuild.sh",
+      "3. Correr: bash tools/lentes_rebuild.sh",
+      "4. Si es lente vintage de eBay / sitio fabricante: editar tools/lentes_patches.py"
+    ]
+  },
+  "products": {
+    "sony_12_24_28_gm": {
+      "marca": "Sony",
+      "modelo": "FE 12-24mm f/2.8 GM",
+      "url_source": "https://www.bhphotovideo.com/c/product/1573884-REG/sony_sel1224gm_12_24mm_f_2_8_gm_lens.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/sony_sel1224gm_12_24mm_f_2_8_gm_lens_1573884.jpg",
+      "specs": {
+        "lens_mount": "E",
+        "distancia_focal": [
+          12,
+          24
+        ],
+        "apertura": [
+          2.8
+        ],
+        "formato": "Full-frame",
+        "linea": "GM",
+        "angulo_vision": [
+          84,
+          122
+        ],
+        "distancia_minima_m": 28.0,
+        "magnificacion": "0.14x",
+        "hojas_diafragma": 9,
+        "estabilizacion": false,
+        "autofocus": true,
+        "construccion_optica": "17 elementos / 14 grupos",
+        "peso_g": 847,
+        "dimensiones": "Ø97.6 × 137 mm"
+      },
+      "extras": {
+        "focus_type": "Autofocus",
+        "format_coverage_raw": "Full-Frame",
+        "aperture_raw": "Maximum: f/2.8\nMinimum: f/22",
+        "iris_blades_raw": "9, Rounded",
+        "optical_design_raw": "17 Elements in 14 Groups",
+        "angle_of_view_raw": "122° to 84°",
+        "filter_size_raw": "Gel Filter (Rear)",
+        "min_focus_raw": "11.02\" / 28 cm",
+        "magnificacion_raw": "1:7 Macro Reproduction Ratio\n0.14x Magnification",
+        "dimensions_raw": "ø: 3.84 x L: 5.39\" / ø: 97.6 x L: 137 mm",
+        "weight_raw": "1.86 lb / 847 g",
+        "package_weight": "2.92 lb",
+        "box_dimensions": "9.8 x 5.6 x 5.1\""
+      },
+      "ficha": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Focal Length",
+            "value": "12 to 24mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/2.8\nMinimum: f/22"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Sony E"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "122° to 84°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "11.02\" / 28 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:7 Macro Reproduction Ratio\n0.14x Magnification"
+          },
+          {
+            "label": "Optical Design",
+            "value": "17 Elements in 14 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "9, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Filter Size",
+            "value": "Gel Filter (Rear)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.84 x L: 5.39\" / ø: 97.6 x L: 137 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.86 lb / 847 g"
+          },
+          {
+            "label": "Package Weight",
+            "value": "2.92 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "9.8 x 5.6 x 5.1\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Focal Length",
+            "value": "12 to 24mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/2.8"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Sony E"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "122° to 84°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "11.02\" / 28 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:7 Macro Reproduction Ratio"
+          },
+          {
+            "label": "Optical Design",
+            "value": "17 Elements in 14 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "9, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Filter Size",
+            "value": "Gel Filter (Rear)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.84 x L: 5.39\" / ø: 97.6 x L: 137 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.86 lb / 847 g"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "2.92 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "9.8 x 5.6 x 5.1\""
+          }
+        ]
+      }
+    },
+    "sony_24_70_28_gm_ii": {
+      "marca": "Sony",
+      "modelo": "FE 24-70mm f/2.8 GM II",
+      "url_source": "https://www.bhphotovideo.com/c/product/1702384-REG/sony_fe_24_70mm_f_2_8_gm.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/sony_fe_24_70mm_f_2_8_gm_1702384.jpg",
+      "specs": {
+        "lens_mount": "E",
+        "distancia_focal": [
+          24,
+          70
+        ],
+        "apertura": [
+          2.8
+        ],
+        "formato": "Full-frame",
+        "diametro_filtro": 82,
+        "linea": "GM II",
+        "angulo_vision": [
+          34,
+          84
+        ],
+        "distancia_minima_m": 21.0,
+        "magnificacion": "0.32x",
+        "hojas_diafragma": 11,
+        "estabilizacion": false,
+        "autofocus": true,
+        "construccion_optica": "20 elementos / 15 grupos",
+        "peso_g": 695,
+        "dimensiones": "Ø87.8 × 119.9 mm"
+      },
+      "extras": {
+        "focus_type": "Autofocus",
+        "format_coverage_raw": "Full-Frame",
+        "aperture_raw": "Maximum: f/2.8\nMinimum: f/22",
+        "iris_blades_raw": "11, Rounded",
+        "optical_design_raw": "20 Elements in 15 Groups",
+        "angle_of_view_raw": "84° to 34°",
+        "filter_size_raw": "82 mm (Front)",
+        "min_focus_raw": "8.3\" / 21 cm",
+        "magnificacion_raw": "1:3.13 Macro Reproduction Ratio\n0.32x Magnification",
+        "dimensions_raw": "ø: 3.5 x L: 4.7\" / ø: 87.8 x L: 119.9 mm",
+        "weight_raw": "1.5 lb / 695 g",
+        "package_weight": "2.595 lb",
+        "box_dimensions": "8.4 x 5.8 x 5\""
+      },
+      "ficha": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Focal Length",
+            "value": "24 to 70mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/2.8\nMinimum: f/22"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Sony E"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "84° to 34°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "8.3\" / 21 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:3.13 Macro Reproduction Ratio\n0.32x Magnification"
+          },
+          {
+            "label": "Optical Design",
+            "value": "20 Elements in 15 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "11, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Filter Size",
+            "value": "82 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.5 x L: 4.7\" / ø: 87.8 x L: 119.9 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.5 lb / 695 g"
+          },
+          {
+            "label": "Package Weight",
+            "value": "2.595 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "8.4 x 5.8 x 5\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Focal Length",
+            "value": "24 to 70mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/2.8"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Sony E"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "84° to 34°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "8.3\" / 21 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:3.13 Macro Reproduction Ratio"
+          },
+          {
+            "label": "Optical Design",
+            "value": "20 Elements in 15 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "11, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Filter Size",
+            "value": "82 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.5 x L: 4.7\" / ø: 87.8 x L: 119.9 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.5 lb / 695 g"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "2.595 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "8.4 x 5.8 x 5\""
+          }
+        ]
+      }
+    },
+    "sony_70_200_28_gm_oss_ii": {
+      "marca": "Sony",
+      "modelo": "FE 70-200mm f/2.8 GM OSS II",
+      "url_source": "https://www.bhphotovideo.com/c/product/1666363-REG/sony_fe_70_200mm_f_2_8_gm.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/sony_fe_70_200mm_f_2_8_gm_1666363.jpg",
+      "specs": {
+        "lens_mount": "E",
+        "distancia_focal": [
+          70,
+          200
+        ],
+        "apertura": [
+          2.8
+        ],
+        "formato": "Full-frame",
+        "diametro_filtro": 77,
+        "linea": "GM OSS II",
+        "angulo_vision": [
+          12,
+          34
+        ],
+        "distancia_minima_m": 40.0,
+        "hojas_diafragma": 11,
+        "estabilizacion": true,
+        "autofocus": true,
+        "construccion_optica": "17 elementos / 14 grupos",
+        "peso_g": 1045,
+        "dimensiones": "Ø88 × 200 mm"
+      },
+      "extras": {
+        "focus_type": "Autofocus",
+        "format_coverage_raw": "Full-Frame",
+        "aperture_raw": "Maximum: f/2.8\nMinimum: f/22",
+        "iris_blades_raw": "11, Rounded",
+        "optical_design_raw": "17 Elements in 14 Groups",
+        "angle_of_view_raw": "34° to 12° 30'",
+        "filter_size_raw": "77 mm (Front)",
+        "min_focus_raw": "15.7\" / 40 cm",
+        "tripod_mounting": "Removable and Rotating Collar",
+        "dimensions_raw": "ø: 3.46 x L: 7.87\" / ø: 88 x L: 200 mm",
+        "weight_raw": "2.3 lb / 1045 g",
+        "package_weight": "4.13 lb",
+        "box_dimensions": "12 x 6.2 x 5.5\""
+      },
+      "ficha": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Focal Length",
+            "value": "70 to 200mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/2.8\nMinimum: f/22"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Sony E"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "34° to 12° 30'"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "15.7\" / 40 cm"
+          },
+          {
+            "label": "Optical Design",
+            "value": "17 Elements in 14 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "11, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Yes"
+          },
+          {
+            "label": "Tripod Mounting",
+            "value": "Removable and Rotating Collar"
+          },
+          {
+            "label": "Filter Size",
+            "value": "77 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.46 x L: 7.87\" / ø: 88 x L: 200 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "2.3 lb / 1045 g"
+          },
+          {
+            "label": "Package Weight",
+            "value": "4.13 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "12 x 6.2 x 5.5\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Focal Length",
+            "value": "70 to 200mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/2.8"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Sony E"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "34° to 12° 30'"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "15.7\" / 40 cm"
+          },
+          {
+            "label": "Optical Design",
+            "value": "17 Elements in 14 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "11, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Yes"
+          },
+          {
+            "label": "Tripod Mounting",
+            "value": "Removable and Rotating Collar"
+          },
+          {
+            "label": "Filter Size",
+            "value": "77 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.46 x L: 7.87\" / ø: 88 x L: 200 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "2.3 lb / 1045 g"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "4.13 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "12 x 6.2 x 5.5\""
+          }
+        ]
+      }
+    },
+    "sigma_18_35_18_art": {
+      "marca": "Sigma",
+      "modelo": "18-35mm f/1.8 DC HSM Art",
+      "url_source": "https://www.bhphotovideo.com/c/product/967344-REG/sigma_18_35mm_f1_8_dc_hsm.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/sigma_18_35mm_f1_8_dc_hsm_967344.jpg",
+      "specs": {
+        "lens_mount": "EF",
+        "distancia_focal": [
+          18,
+          35
+        ],
+        "apertura": [
+          1.8
+        ],
+        "formato": "APS-C",
+        "diametro_filtro": 72,
+        "linea": "Art",
+        "angulo_vision": [
+          44.2,
+          76.5
+        ],
+        "distancia_minima_m": 28.0,
+        "magnificacion": "0.23x",
+        "hojas_diafragma": 9,
+        "estabilizacion": false,
+        "autofocus": true,
+        "construccion_optica": "17 elementos / 12 grupos",
+        "peso_g": 810,
+        "dimensiones": "Ø78 × 121 mm"
+      },
+      "extras": {
+        "focus_type": "Autofocus",
+        "format_coverage_raw": "APS-C",
+        "aperture_raw": "Maximum: f/1.8\nMinimum: f/16",
+        "iris_blades_raw": "9, Rounded",
+        "optical_design_raw": "17 Elements in 12 Groups",
+        "angle_of_view_raw": "76.5° to 44.2°",
+        "filter_size_raw": "72 mm (Front)",
+        "min_focus_raw": "11.02\" / 28 cm",
+        "magnificacion_raw": "1:4.3 Macro Reproduction Ratio\n0.23x Magnification",
+        "dimensions_raw": "ø: 3.07 x L: 4.76\" / ø: 78 x L: 121 mm",
+        "weight_raw": "1.78 lb / 810 g",
+        "package_weight": "2.465 lb",
+        "box_dimensions": "7.1 x 5.5 x 4.8\""
+      },
+      "ficha": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Focal Length",
+            "value": "18 to 35mm (35mm Equivalent: 28.8 to 56mm)"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/1.8\nMinimum: f/16"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Canon EF"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "APS-C"
+          },
+          {
+            "label": "Angle of View",
+            "value": "76.5° to 44.2°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "11.02\" / 28 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:4.3 Macro Reproduction Ratio\n0.23x Magnification"
+          },
+          {
+            "label": "Optical Design",
+            "value": "17 Elements in 12 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "9, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Filter Size",
+            "value": "72 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.07 x L: 4.76\" / ø: 78 x L: 121 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.78 lb / 810 g"
+          },
+          {
+            "label": "Package Weight",
+            "value": "2.465 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "7.1 x 5.5 x 4.8\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Focal Length",
+            "value": "18 to 35mm (35mm Equivalent: 28.8 to 56mm)"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/1.8"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Canon EF"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "APS-C"
+          },
+          {
+            "label": "Angle of View",
+            "value": "76.5° to 44.2°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "11.02\" / 28 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:4.3 Macro Reproduction Ratio"
+          },
+          {
+            "label": "Optical Design",
+            "value": "17 Elements in 12 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "9, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Filter Size",
+            "value": "72 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.07 x L: 4.76\" / ø: 78 x L: 121 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.78 lb / 810 g"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "2.465 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "7.1 x 5.5 x 4.8\""
+          }
+        ]
+      }
+    },
+    "sigma_24_70_28_art": {
+      "marca": "Sigma",
+      "modelo": "24-70mm f/2.8 DG OS HSM Art",
+      "url_source": "https://www.bhphotovideo.com/c/product/1321309-REG/sigma_24_70mm_f_2_8_dg_os.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/sigma_24_70mm_f_2_8_dg_os_1321309.jpg",
+      "specs": {
+        "lens_mount": "EF",
+        "distancia_focal": [
+          24,
+          70
+        ],
+        "apertura": [
+          2.8
+        ],
+        "formato": "Full-frame",
+        "diametro_filtro": 82,
+        "linea": "Art",
+        "angulo_vision": [
+          34.3,
+          84.1
+        ],
+        "distancia_minima_m": 37.0,
+        "magnificacion": "0.21x",
+        "hojas_diafragma": 9,
+        "estabilizacion": true,
+        "autofocus": true,
+        "construccion_optica": "19 elementos / 14 grupos",
+        "peso_g": 1020,
+        "dimensiones": "Ø88 × 107.6 mm"
+      },
+      "extras": {
+        "focus_type": "Autofocus",
+        "format_coverage_raw": "Full-Frame",
+        "aperture_raw": "Maximum: f/2.8\nMinimum: f/22",
+        "iris_blades_raw": "9, Rounded",
+        "optical_design_raw": "19 Elements in 14 Groups",
+        "angle_of_view_raw": "84.1° to 34.3°",
+        "filter_size_raw": "82 mm (Front)",
+        "min_focus_raw": "1.21' / 37 cm",
+        "magnificacion_raw": "1:4.8 Macro Reproduction Ratio\n0.21x Magnification",
+        "dimensions_raw": "ø: 3.46 x L: 4.24\" / ø: 88 x L: 107.6 mm",
+        "weight_raw": "2.24 lb / 1020 g",
+        "package_weight": "2.93 lb",
+        "box_dimensions": "7.4 x 4.8 x 4.7\""
+      },
+      "ficha": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Focal Length",
+            "value": "24 to 70mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/2.8\nMinimum: f/22"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Canon EF"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "84.1° to 34.3°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "1.21' / 37 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:4.8 Macro Reproduction Ratio\n0.21x Magnification"
+          },
+          {
+            "label": "Optical Design",
+            "value": "19 Elements in 14 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "9, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Yes"
+          },
+          {
+            "label": "Filter Size",
+            "value": "82 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.46 x L: 4.24\" / ø: 88 x L: 107.6 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "2.24 lb / 1020 g"
+          },
+          {
+            "label": "Package Weight",
+            "value": "2.93 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "7.4 x 4.8 x 4.7\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Focal Length",
+            "value": "24 to 70mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/2.8"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Canon EF"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "84.1° to 34.3°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "1.21' / 37 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:4.8 Macro Reproduction Ratio"
+          },
+          {
+            "label": "Optical Design",
+            "value": "19 Elements in 14 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "9, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Yes"
+          },
+          {
+            "label": "Filter Size",
+            "value": "82 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.46 x L: 4.24\" / ø: 88 x L: 107.6 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "2.24 lb / 1020 g"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "2.93 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "7.4 x 4.8 x 4.7\""
+          }
+        ]
+      }
+    },
+    "sigma_35_14_art": {
+      "marca": "Sigma",
+      "modelo": "35mm f/1.4 DG HSM Art",
+      "url_source": "https://www.bhphotovideo.com/c/product/898831-REG/Sigma_340_101_35mm_f_1_4_DG_HSM.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/Sigma_340_101_35mm_f_1_4_DG_HSM_898831.jpg",
+      "specs": {
+        "lens_mount": "EF",
+        "distancia_focal": [
+          35
+        ],
+        "apertura": [
+          1.4
+        ],
+        "formato": "Full-frame",
+        "diametro_filtro": 67,
+        "linea": "Art",
+        "angulo_vision": [
+          63.4
+        ],
+        "distancia_minima_m": 30.0,
+        "magnificacion": "0.19x",
+        "hojas_diafragma": 9,
+        "estabilizacion": false,
+        "autofocus": true,
+        "construccion_optica": "13 elementos / 11 grupos",
+        "peso_g": 665,
+        "dimensiones": "Ø77 × 94 mm"
+      },
+      "extras": {
+        "focus_type": "Autofocus",
+        "format_coverage_raw": "Full-Frame",
+        "aperture_raw": "Maximum: f/1.4\nMinimum: f/16",
+        "iris_blades_raw": "9, Rounded",
+        "optical_design_raw": "13 Elements in 11 Groups",
+        "angle_of_view_raw": "63.4°",
+        "filter_size_raw": "67 mm (Front)",
+        "min_focus_raw": "11.81\" / 30 cm",
+        "magnificacion_raw": "1:5.26 Macro Reproduction Ratio\n0.19x Magnification",
+        "dimensions_raw": "ø: 3.03 x L: 3.7\" / ø: 77 x L: 94 mm",
+        "weight_raw": "1.46 lb / 665 g",
+        "package_weight": "2.11 lb",
+        "box_dimensions": "5.7 x 5.4 x 4.6\""
+      },
+      "ficha": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Focal Length",
+            "value": "35mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/1.4\nMinimum: f/16"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Canon EF"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "63.4°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "11.81\" / 30 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:5.26 Macro Reproduction Ratio\n0.19x Magnification"
+          },
+          {
+            "label": "Optical Design",
+            "value": "13 Elements in 11 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "9, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Filter Size",
+            "value": "67 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.03 x L: 3.7\" / ø: 77 x L: 94 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.46 lb / 665 g"
+          },
+          {
+            "label": "Package Weight",
+            "value": "2.11 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "5.7 x 5.4 x 4.6\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Focal Length",
+            "value": "35mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/1.4"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Canon EF"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "63.4°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "11.81\" / 30 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:5.26 Macro Reproduction Ratio"
+          },
+          {
+            "label": "Optical Design",
+            "value": "13 Elements in 11 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "9, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Filter Size",
+            "value": "67 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.03 x L: 3.7\" / ø: 77 x L: 94 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.46 lb / 665 g"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "2.11 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "5.7 x 5.4 x 4.6\""
+          }
+        ]
+      }
+    },
+    "sigma_50_14_art": {
+      "marca": "Sigma",
+      "modelo": "50mm f/1.4 DG HSM Art",
+      "url_source": "https://www.bhphotovideo.com/c/product/1045458-REG/sigma_311101_50mm_f_1_4_dg_hsm.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/sigma_311101_50mm_f_1_4_dg_hsm_1045458.jpg",
+      "specs": {
+        "lens_mount": "EF",
+        "distancia_focal": [
+          50
+        ],
+        "apertura": [
+          1.4
+        ],
+        "formato": "Full-frame",
+        "diametro_filtro": 77,
+        "linea": "Art",
+        "angulo_vision": [
+          46.8
+        ],
+        "distancia_minima_m": 40.0,
+        "magnificacion": "0.18x",
+        "hojas_diafragma": 9,
+        "estabilizacion": false,
+        "autofocus": true,
+        "construccion_optica": "13 elementos / 8 grupos",
+        "peso_g": 815,
+        "dimensiones": "Ø85.34 × 99.82 mm"
+      },
+      "extras": {
+        "focus_type": "Autofocus",
+        "format_coverage_raw": "Full-Frame",
+        "aperture_raw": "Maximum: f/1.4\nMinimum: f/16",
+        "iris_blades_raw": "9, Rounded",
+        "optical_design_raw": "13 Elements in 8 Groups",
+        "angle_of_view_raw": "46.8°",
+        "filter_size_raw": "77 mm (Front)",
+        "min_focus_raw": "1.31' / 40 cm",
+        "magnificacion_raw": "1:5.55 Macro Reproduction Ratio\n0.18x Magnification",
+        "dimensions_raw": "ø: 3.36 x L: 3.93\" / ø: 85.34 x L: 99.82 mm",
+        "weight_raw": "1.79 lb / 815 g",
+        "package_weight": "2.54 lb",
+        "box_dimensions": "7.5 x 4.9 x 4.7\""
+      },
+      "ficha": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Focal Length",
+            "value": "50mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/1.4\nMinimum: f/16"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Canon EF"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "46.8°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "1.31' / 40 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:5.55 Macro Reproduction Ratio\n0.18x Magnification"
+          },
+          {
+            "label": "Optical Design",
+            "value": "13 Elements in 8 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "9, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Filter Size",
+            "value": "77 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.36 x L: 3.93\" / ø: 85.34 x L: 99.82 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.79 lb / 815 g"
+          },
+          {
+            "label": "Package Weight",
+            "value": "2.54 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "7.5 x 4.9 x 4.7\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Focal Length",
+            "value": "50mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/1.4"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Canon EF"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "46.8°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "1.31' / 40 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:5.55 Macro Reproduction Ratio"
+          },
+          {
+            "label": "Optical Design",
+            "value": "13 Elements in 8 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "9, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Filter Size",
+            "value": "77 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.36 x L: 3.93\" / ø: 85.34 x L: 99.82 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.79 lb / 815 g"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "2.54 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "7.5 x 4.9 x 4.7\""
+          }
+        ]
+      }
+    },
+    "canon_70_200_28": {
+      "marca": "Canon",
+      "modelo": "EF 70-200mm f/2.8L USM",
+      "url_source": "https://www.bhphotovideo.com/c/product/91680-USA/Canon_2569A004_70_200mm_f_2_8L_USM_Autofocus.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/Canon_2569A004_70_200mm_f_2_8L_USM_Autofocus_91680.jpg",
+      "specs": {
+        "lens_mount": "EF",
+        "distancia_focal": [
+          70,
+          200
+        ],
+        "apertura": [
+          2.8
+        ],
+        "formato": "Full-frame",
+        "diametro_filtro": 77,
+        "angulo_vision": [
+          12,
+          34
+        ],
+        "distancia_minima_m": 150.0,
+        "magnificacion": "0.16x",
+        "hojas_diafragma": 8,
+        "estabilizacion": false,
+        "autofocus": true,
+        "construccion_optica": "18 elementos / 15 grupos",
+        "peso_g": 1310,
+        "dimensiones": "Ø84.6 × 193.6 mm"
+      },
+      "extras": {
+        "focus_type": "Autofocus",
+        "format_coverage_raw": "Full-Frame",
+        "aperture_raw": "Maximum: f/2.8\nMinimum: f/32",
+        "iris_blades_raw": "8, Rounded",
+        "optical_design_raw": "18 Elements in 15 Groups",
+        "angle_of_view_raw": "34° to 12°",
+        "filter_size_raw": "77 mm (Front)",
+        "min_focus_raw": "4.9' / 1.5 m",
+        "magnificacion_raw": "1:6.25 Macro Reproduction Ratio\n0.16x Magnification",
+        "tripod_mounting": "Removable and Rotating Collar",
+        "dimensions_raw": "ø: 3.33 x L: 7.62\" / ø: 84.6 x L: 193.6 mm",
+        "weight_raw": "2.9 lb / 1310 g",
+        "package_weight": "4.16 lb",
+        "box_dimensions": "12.1 x 6 x 5.9\""
+      },
+      "ficha": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Focal Length",
+            "value": "70 to 200mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/2.8\nMinimum: f/32"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Canon EF"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "34° to 12°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "4.9' / 1.5 m"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:6.25 Macro Reproduction Ratio\n0.16x Magnification"
+          },
+          {
+            "label": "Optical Design",
+            "value": "18 Elements in 15 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "8, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Tripod Mounting",
+            "value": "Removable and Rotating Collar"
+          },
+          {
+            "label": "Filter Size",
+            "value": "77 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.33 x L: 7.62\" / ø: 84.6 x L: 193.6 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "2.9 lb / 1310 g"
+          },
+          {
+            "label": "Package Weight",
+            "value": "4.16 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "12.1 x 6 x 5.9\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Focal Length",
+            "value": "70 to 200mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/2.8"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Canon EF"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "34° to 12°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "4.9' / 1.5 m"
+          },
+          {
+            "label": "Magnification",
+            "value": "1:6.25 Macro Reproduction Ratio"
+          },
+          {
+            "label": "Optical Design",
+            "value": "18 Elements in 15 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "8, Rounded"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Autofocus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Tripod Mounting",
+            "value": "Removable and Rotating Collar"
+          },
+          {
+            "label": "Filter Size",
+            "value": "77 mm (Front)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 3.33 x L: 7.62\" / ø: 84.6 x L: 193.6 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "2.9 lb / 1310 g"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "4.16 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "12.1 x 6 x 5.9\""
+          }
+        ]
+      }
+    },
+    "laowa_24_f14_probe": {
+      "marca": "Venus",
+      "modelo": "Optics Laowa 24mm f/14 Probe",
+      "url_source": "https://www.bhphotovideo.com/c/product/1430594-REG/venus_optics_laowa_24mm_f_14_probe.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/venus_optics_laowa_24mm_f_14_probe_1430594.jpg",
+      "specs": {
+        "lens_mount": "EF",
+        "distancia_focal": [
+          24
+        ],
+        "apertura": [
+          14.0
+        ],
+        "formato": "Full-frame",
+        "linea": "Probe",
+        "angulo_vision": [
+          85
+        ],
+        "distancia_minima_m": 47.0,
+        "magnificacion": "2x",
+        "hojas_diafragma": 7,
+        "estabilizacion": false,
+        "autofocus": false,
+        "construccion_optica": "27 elementos / 19 grupos",
+        "peso_g": 474,
+        "dimensiones": "Ø38 × 408 mm"
+      },
+      "extras": {
+        "focus_type": "Manual Focus",
+        "format_coverage_raw": "Full-Frame",
+        "aperture_raw": "Maximum: f/14\nMinimum: f/40",
+        "iris_blades_raw": "7",
+        "optical_design_raw": "27 Elements in 19 Groups",
+        "angle_of_view_raw": "85°",
+        "min_focus_raw": "1.54' / 47 cm",
+        "magnificacion_raw": "2:1 Macro Reproduction Ratio\n2x Magnification",
+        "dimensions_raw": "ø: 1.5 x L: 16.06\" / ø: 38 x L: 408 mm",
+        "weight_raw": "1 lb / 474 g",
+        "package_weight": "4.65 lb",
+        "box_dimensions": "20.1 x 7.3 x 6.2\""
+      },
+      "ficha": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Focal Length",
+            "value": "24mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/14\nMinimum: f/40"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Canon EF"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "85°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "1.54' / 47 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "2:1 Macro Reproduction Ratio\n2x Magnification"
+          },
+          {
+            "label": "Optical Design",
+            "value": "27 Elements in 19 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "7"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Manual Focus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 1.5 x L: 16.06\" / ø: 38 x L: 408 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1 lb / 474 g"
+          },
+          {
+            "label": "Package Weight",
+            "value": "4.65 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "20.1 x 7.3 x 6.2\""
+          }
+        ],
+        "Specs": [
+          {
+            "label": "Focal Length",
+            "value": "24mm"
+          },
+          {
+            "label": "Aperture",
+            "value": "Maximum: f/14"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "Canon EF"
+          },
+          {
+            "label": "Lens Format Coverage",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Angle of View",
+            "value": "85°"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "1.54' / 47 cm"
+          },
+          {
+            "label": "Magnification",
+            "value": "2:1 Macro Reproduction Ratio"
+          },
+          {
+            "label": "Optical Design",
+            "value": "27 Elements in 19 Groups"
+          },
+          {
+            "label": "Aperture/Iris Blades",
+            "value": "7"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Manual Focus"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 1.5 x L: 16.06\" / ø: 38 x L: 408 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1 lb / 474 g"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "4.65 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "20.1 x 7.3 x 6.2\""
+          }
+        ]
+      }
+    },
+    "zeiss_jena_pancolar_50_18": {
+      "marca": "Carl Zeiss",
+      "modelo": "Jena Pancolar 50mm f/1.8 M42 (Thorium)",
+      "url_source": "https://www.ebay.com/itm/227292058682",
+      "image_url": "",
+      "specs": {
+        "lens_mount": "M42",
+        "distancia_focal": [
+          50
+        ],
+        "apertura": [
+          1.8
+        ],
+        "formato": "Full-frame",
+        "diametro_filtro": 49,
+        "linea": "Pancolar",
+        "distancia_minima_m": 35.0,
+        "hojas_diafragma": 8,
+        "estabilizacion": false,
+        "autofocus": false,
+        "construccion_optica": "6 elementos / 5 grupos",
+        "peso_g": 250,
+        "dimensiones": "Ø63 × 55 mm"
+      },
+      "extras": {
+        "coating": "Single-coated (mono)",
+        "anio_produccion": "~1965-1975 (versión temprana 'auto')",
+        "tipo_diseno": "Planar-type (doble Gauss)",
+        "particularidad": "Versión Thorium: vidrio radiactivo (común en óptica alemana de los 60s/70s). Genera cast amarillento por degradación radiactiva del torio — reversible con exposición UV prolongada (varios días al sol).",
+        "construccion": "Metal + glass (sin plástico)",
+        "variantes_versiones": "Pancolar tuvo varias versiones: zebra (1965-71), early auto (1971-78) — esta versión con 8 hojas y thorium. La MC tardía (post-1978) tiene 6 hojas y vidrio no radiactivo."
+      },
+      "ficha": {
+        "Specs Carl Zeiss Jena (oficiales)": [
+          {
+            "label": "Modelo",
+            "value": "Carl Zeiss Jena Pancolar 50mm f/1.8 M42 (Thorium)"
+          },
+          {
+            "label": "Año producción",
+            "value": "~1965-1975 (versión temprana 'auto', con thorium)"
+          },
+          {
+            "label": "Focal Length",
+            "value": "50mm"
+          },
+          {
+            "label": "Aperture máxima",
+            "value": "f/1.8"
+          },
+          {
+            "label": "Aperture mínima",
+            "value": "f/22"
+          },
+          {
+            "label": "Optical Design",
+            "value": "6 elementos en 5 grupos (Planar-type doble Gauss)"
+          },
+          {
+            "label": "Iris Blades",
+            "value": "8 (versión Thorium temprana). Las MC tardías tienen 6 hojas."
+          },
+          {
+            "label": "Filter Size",
+            "value": "49 mm"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "35 cm"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "M42 (Praktica thread mount)"
+          },
+          {
+            "label": "Weight",
+            "value": "~250 g"
+          },
+          {
+            "label": "Dimensions",
+            "value": "Ø63 × 55 mm aprox."
+          },
+          {
+            "label": "Coating",
+            "value": "Single-coated (mono); las versiones posteriores son MC (multi-coated)"
+          },
+          {
+            "label": "Construction",
+            "value": "Metal + glass (sin plástico)"
+          },
+          {
+            "label": "Format Coverage",
+            "value": "Full-frame (35mm)"
+          },
+          {
+            "label": "Particularidad",
+            "value": "Vidrio con torio radiactivo → cast amarillento por degradación; reversible con exposición UV prolongada"
+          }
+        ]
+      },
+      "_nota": "Datos curados manualmente (HTML eBay no tiene tabla técnica). Fuentes: allphotolenses.com, lens-db.com, JAPB, MIR Photography. Verificado mayo 2026."
+    },
+    "zeiss_jena_flektogon_35_24": {
+      "marca": "Carl Zeiss",
+      "modelo": "Jena MC Flektogon 35mm f/2.4 M42",
+      "url_source": "https://www.ebay.com/",
+      "image_url": "",
+      "specs": {
+        "lens_mount": "M42",
+        "distancia_focal": [
+          35
+        ],
+        "apertura": [
+          2.4
+        ],
+        "formato": "Full-frame",
+        "diametro_filtro": 49,
+        "linea": "Flektogon",
+        "distancia_minima_m": 20.0,
+        "hojas_diafragma": 6,
+        "estabilizacion": false,
+        "autofocus": false,
+        "construccion_optica": "6 elementos / 6 grupos",
+        "peso_g": 240,
+        "dimensiones": "Ø63 × 56 mm"
+      },
+      "extras": {
+        "coating": "MC (multi-coated)",
+        "anio_produccion": "~1976-1990 (MC late)",
+        "tipo_diseno": "Retrofocus — primer Zeiss en usar este esquema (anterior al Distagon de Oberkochen)",
+        "particularidad": "Récord de close-focus para 35mm de la época (~20 cm). Versión MC mejorada sobre la mono-coated original. Muy buscada para vídeo digital adaptado con anillo M42→E/RF.",
+        "construccion": "Metal + glass (sin plástico)"
+      },
+      "ficha": {
+        "Specs Carl Zeiss Jena (oficiales)": [
+          {
+            "label": "Modelo",
+            "value": "Carl Zeiss Jena MC Flektogon 35mm f/2.4 M42"
+          },
+          {
+            "label": "Año producción",
+            "value": "~1976-1990 (versión MC multi-coated)"
+          },
+          {
+            "label": "Focal Length",
+            "value": "35mm"
+          },
+          {
+            "label": "Aperture máxima",
+            "value": "f/2.4"
+          },
+          {
+            "label": "Aperture mínima",
+            "value": "f/22"
+          },
+          {
+            "label": "Optical Design",
+            "value": "6 elementos en 6 grupos (retrofocus — primer Zeiss en usar este esquema, anterior al Distagon de Oberkochen)"
+          },
+          {
+            "label": "Iris Blades",
+            "value": "6"
+          },
+          {
+            "label": "Filter Size",
+            "value": "49 mm"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "~20 cm (récord para 35mm de la época)"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "M42 (Praktica thread mount)"
+          },
+          {
+            "label": "Weight",
+            "value": "240 g"
+          },
+          {
+            "label": "Dimensions",
+            "value": "Ø63 × 56 mm"
+          },
+          {
+            "label": "Coating",
+            "value": "MC (multi-coated)"
+          },
+          {
+            "label": "Construction",
+            "value": "Metal + glass (sin plástico)"
+          },
+          {
+            "label": "Format Coverage",
+            "value": "Full-frame (35mm)"
+          }
+        ]
+      },
+      "_nota": "Datos curados manualmente (HTML eBay no tiene tabla técnica). Fuentes: phillipreeve.net, allphotolenses.com, lens-db.com, kamerastore.com. Verificado mayo 2026."
+    },
+    "zeiss_jena_sonnar_135_35": {
+      "marca": "Carl Zeiss",
+      "modelo": "Jena MC Sonnar 135mm f/3.5 M42 (DDR)",
+      "url_source": "https://www.ebay.com/",
+      "image_url": "",
+      "specs": {
+        "lens_mount": "M42",
+        "distancia_focal": [
+          135
+        ],
+        "apertura": [
+          3.5
+        ],
+        "formato": "Full-frame",
+        "diametro_filtro": 49,
+        "linea": "Sonnar",
+        "angulo_vision": [
+          18
+        ],
+        "distancia_minima_m": 100.0,
+        "hojas_diafragma": 6,
+        "estabilizacion": false,
+        "autofocus": false,
+        "construccion_optica": "4 elementos / 3 grupos",
+        "peso_g": 365,
+        "dimensiones": "Ø51 × 89 mm"
+      },
+      "extras": {
+        "coating": "MC (multi-coated)",
+        "anio_produccion": "1967-1990 (MC late)",
+        "tipo_diseno": "Sonnar clásico (4 elementos / 3 grupos)",
+        "particularidad": "Diseño Sonnar de 4 elementos — bokeh suave característico, ideal para retrato y telefoto adaptado a mirrorless via anillo M42→E/RF. Algunas variantes tardías llegan a 430g.",
+        "construccion": "Metal + glass (versión DDR — alemana oriental)"
+      },
+      "ficha": {
+        "Specs Carl Zeiss Jena (oficiales)": [
+          {
+            "label": "Modelo",
+            "value": "Carl Zeiss Jena MC Sonnar 135mm f/3.5 M42"
+          },
+          {
+            "label": "Año producción",
+            "value": "1967-1990 (versión MC late, DDR)"
+          },
+          {
+            "label": "Focal Length",
+            "value": "135mm"
+          },
+          {
+            "label": "Aperture máxima",
+            "value": "f/3.5"
+          },
+          {
+            "label": "Aperture mínima",
+            "value": "f/22"
+          },
+          {
+            "label": "Optical Design",
+            "value": "4 elementos en 3 grupos (Sonnar clásico)"
+          },
+          {
+            "label": "Angular Field",
+            "value": "18°"
+          },
+          {
+            "label": "Iris Blades",
+            "value": "6"
+          },
+          {
+            "label": "Filter Size",
+            "value": "49 mm"
+          },
+          {
+            "label": "Minimum Focus Distance",
+            "value": "1.0 m"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "M42 (Praktica thread mount)"
+          },
+          {
+            "label": "Weight",
+            "value": "~365 g (algunas variantes hasta 430 g)"
+          },
+          {
+            "label": "Dimensions",
+            "value": "Ø51 × 89 mm"
+          },
+          {
+            "label": "Coating",
+            "value": "MC (multi-coated)"
+          },
+          {
+            "label": "Construction",
+            "value": "Metal + glass — versión DDR (Carl Zeiss Jena, alemana oriental)"
+          },
+          {
+            "label": "Format Coverage",
+            "value": "Full-frame (35mm)"
+          },
+          {
+            "label": "Uso típico",
+            "value": "Retrato y telefoto suave; bokeh característico Sonnar"
+          }
+        ]
+      },
+      "_nota": "Datos curados manualmente (HTML eBay no tiene tabla técnica). Fuentes: phillipreeve.net, allphotolenses.com, JAPB, lens-db.com. Verificado mayo 2026."
+    }
+  }
+}

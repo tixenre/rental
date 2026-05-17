@@ -2106,15 +2106,16 @@ _RULES_LEAF = [
     ("Foto",           ["a7 v", "zv-e1"]),  # mirrorless híbridas → también foto
     ("Video",          ["a7 v", "zv-e1", "fx3", "komodo", "c200"]),
     ("Acción",         ["gopro", "insta360"]),
-    # ── LENTES ─────────────────────────────────────────────────────────
-    ("Vintage",        ["vintage", "carl zeiss jena"]),
-    ("Especiales",     ["laowa", "probe macro"]),
-    ("Zoom E-mount",   ["sony gm", "montura e"]),
-    ("Zoom EF",        ["sigma art 18-35", "sigma art 24-70", "tokina 11-16", "canon 70-200"]),
-    ("Fijos EF",       ["sigma art 35mm", "sigma art 50mm"]),
-    # ── ADAPTADORES Y FILTROS ──────────────────────────────────────────
-    ("Adaptadores de montura", ["adaptador "]),
-    ("Filtros 82mm",   ["filtro "]),
+    # ── LENTES (taxonomía: Zoom / Fijos / Vintage / Especiales; montura es filtro) ─
+    ("Vintage",        ["vintage", "carl zeiss jena", "m42"]),
+    ("Especiales",     ["laowa", "probe macro", "cinema pl", "master prime"]),
+    ("Zoom",           ["sony gm", "sigma art 18-35", "sigma art 24-70",
+                        "tokina 11-16", "canon 70-200"]),
+    ("Fijos",          ["sigma art 35mm", "sigma art 50mm"]),
+    # ── ADAPTADORES (raíz separada) ────────────────────────────────────
+    ("Adaptadores",    ["adaptador ", "speedbooster", "mc-11"]),
+    # ── FILTROS (raíz separada) ────────────────────────────────────────
+    ("Filtros",        ["filtro ", "pro-mist", "tiffen"]),
     # ── ILUMINACIÓN ────────────────────────────────────────────────────
     ("LED RGB",        ["rgb", "tl60", "m1 mini", "amaran 300c", "accent b7c"]),
     ("LED daylight/bicolor", ["led", "amaran", "nanlite", "godox vl", "spotlight"]),
@@ -2740,27 +2741,29 @@ def admin_autocompletar_equipo(payload: EnriquecerInput, request: Request):
 async def admin_autocompletar_from_html(
     request: Request,
     file: UploadFile = File(...),
+    categoria_hint: Optional[str] = None,
 ) -> dict:
-    """Acepta un HTML guardado de B&H (u otro site con structured data),
-    devuelve specs normalizados igualados al pipeline del seed.
+    """Acepta un HTML guardado de B&H y devuelve specs canónicos normalizados.
 
     Workaround para el bot-detection de B&H que bloquea scrapers server-side:
     el admin guarda la página con Cmd+S → Webpage Complete y sube el .html acá.
 
-    Usa el MISMO pipeline que el seed (tools/iluminacion_parser.py +
-    iluminacion_normalizar.py) — calidad idéntica al dataset curado. Lee
-    JSON-LD structured data + DOM data-selenium attrs + title canónico.
+    Usa los mismos parsers que el seed (tools/{iluminacion,camaras,lentes}_parser.py)
+    via el dispatcher `services/equipo_html_extractor.py`. Calidad idéntica al
+    dataset curado en todas las categorías:
 
-    Returns dict con shape compatible al AutocompletarResult del endpoint URL:
-        {
-          "marca": "Aputure",
-          "modelo": "NOVA II 2x1",
-          "foto_url": "https://...",
-          "bh_url": "https://...",
-          "specs": [{"label": "Potencia", "value": "1000 W"}, ...],
-          "extras": {"tipo": "Panel", "cooling": "Fan", ...},
-          "fuente": "html-upload",
-        }
+      - Cámaras → camaras_parser
+      - Lentes / Adaptadores / Filtros → lentes_parser (clasifica internamente)
+      - Iluminación → iluminacion_parser (vía luces_html_extractor)
+
+    Args:
+        file: HTML B&H (.html guardado completo).
+        categoria_hint: opcional ("Cámaras", "Lentes", etc.) — si el frontend
+            ya sabe la categoría (ej. usuario la eligió antes), evita la
+            detección automática.
+
+    Returns: AutocompletarResult con specs canónicos + keywords derivadas
+    de specs (no LLM) + `categoria_sugerida`.
     """
     require_admin(request)
 
@@ -2776,8 +2779,8 @@ async def admin_autocompletar_from_html(
         raise HTTPException(400, "HTML inválido (no es UTF-8)")
 
     try:
-        from services.luces_html_extractor import extract_from_html
-        result = extract_from_html(html_content)
+        from services.equipo_html_extractor import extract_from_html
+        result = extract_from_html(html_content, categoria_hint=categoria_hint)
     except Exception as e:
         logger.exception("Error extrayendo specs del HTML")
         raise HTTPException(500, f"Error parseando HTML: {e}")
@@ -3091,11 +3094,12 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         luego og:image, twitter:image, dedupe).
 
         Si el URL es de B&H, también solicitamos `rawHtml` para correr el
-        parser determinístico del seed (services/luces_html_extractor.py).
-        Si el parser detecta data de iluminación (>=3 specs canónicos), su
-        resultado OVERRIDE marca/modelo/specs/foto del LLM extract — calidad
-        idéntica al seed. Si no detecta nada (no es luz, o parser falla),
-        se mantiene el flujo LLM intacto.
+        dispatcher determinístico (services/equipo_html_extractor.py) que
+        cubre TODAS las categorías activas (Cámaras / Lentes / Adaptadores /
+        Filtros / Iluminación). Si el parser detecta ≥3 specs canónicos, su
+        resultado OVERRIDE marca/modelo/specs/keywords/foto del LLM extract.
+        Si no detecta nada (parser falla o categoría desconocida), se
+        mantiene el flujo LLM intacto como fallback.
         """
         try:
             # rawHtml es necesario para correr iluminacion_parser sobre el HTML
@@ -3130,31 +3134,33 @@ def admin_enriquecer_equipo(payload: EnriquecerInput, request: Request):
         # la brecha entre URL-based autocompletar y HTML upload.
         if raw_html and len(raw_html) > 5000:
             try:
-                from services.luces_html_extractor import extract_from_html
+                # Dispatcher por categoría (cámaras/lentes/adaptadores/filtros/iluminación)
+                from services.equipo_html_extractor import extract_from_html
                 parser_result = extract_from_html(raw_html)
                 if parser_result and len(parser_result.get("specs", [])) >= 3:
-                    # Override fields con calidad seed (mantener LLM-only fields
-                    # como descripcion y keywords)
+                    # Override fields con calidad seed (incluye keywords canónicas)
                     if parser_result.get("marca"):
                         extracted["marca"] = parser_result["marca"]
                     if parser_result.get("modelo"):
                         extracted["modelo"] = parser_result["modelo"]
                     if parser_result.get("specs"):
                         extracted["specs"] = parser_result["specs"]
+                    # Keywords canónicas (override del LLM-output)
+                    if parser_result.get("keywords"):
+                        extracted["keywords"] = parser_result["keywords"]
                     if parser_result.get("foto_url"):
-                        # Prepend al array de foto_urls
                         foto = parser_result["foto_url"]
                         existing_fotos = extracted.get("foto_urls") or []
                         if foto not in existing_fotos:
                             extracted["foto_urls"] = [foto] + existing_fotos
                     # Ficha extendida del parser
-                    for k in ("peso", "dimensiones", "alimentacion", "incluye"):
+                    for k in ("peso", "dimensiones", "alimentacion", "incluye", "montura", "formato", "resolucion"):
                         v = parser_result.get(k)
                         if v and not extracted.get(k):
                             extracted[k] = v
-                    extracted["_parser_source"] = "iluminacion_parser"
+                    extracted["_parser_source"] = parser_result.get("enriquecido_fuente", "equipo_html_extractor")
             except Exception as e:
-                logger.warning("iluminacion_parser falló sobre rawHtml de %s: %s", url, e)
+                logger.warning("equipo_html_extractor falló sobre rawHtml de %s: %s", url, e)
                 # Silenciosamente seguimos con el extracted LLM
                 pass
 
