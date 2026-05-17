@@ -1,4 +1,5 @@
-import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Image as ImageIcon, FileText, Link as LinkIcon, CloudUpload } from "lucide-react";
+import { useRef } from "react";
+import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Image as ImageIcon, FileText, Link as LinkIcon, CloudUpload, Upload } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -67,8 +68,10 @@ export function AutocompletarEquipoDialog({
     searchingPhotos,
     customUrl, setCustomUrl,
     fichaExtendidaTieneDatos,
-    buscarFoto, runSearch, aplicarSoloFoto, buscarMasFotos, addKeyword, removeKeyword, setAll, aplicar,
+    buscarFoto, runSearch, runSearchFromHtml, aplicarSoloFoto, buscarMasFotos, addKeyword, removeKeyword, setAll, aplicar,
   } = useAutocompletar({ equipo, open, onApplied, onOpenChange });
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isInitial = !result && !fotoUrl && !loading && !loadingFoto && !error;
   const isFotoOnly = !!fotoUrl && !result && !loading && !loadingFoto;
@@ -126,6 +129,41 @@ export function AutocompletarEquipoDialog({
               <strong>Buscar foto</strong> agarra la imagen del producto (~5s).{" "}
               <strong>+ Specs también</strong> extrae ficha técnica, precio y más (~15s).
             </p>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                <div className="w-full border-t border-muted" />
+              </div>
+              <div className="relative flex justify-center text-[11px] uppercase tracking-wide">
+                <span className="bg-background px-2 text-muted-foreground">o si B&H bloquea el scraper</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".html,.htm,text/html"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void runSearchFromHtml(f);
+                  e.target.value = "";  // reset para permitir re-subir mismo archivo
+                }}
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                className="w-full"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Subir HTML guardado
+              </Button>
+              <p className="text-[11px] text-muted-foreground">
+                Workflow: en la página B&H/manufacturer hacer <kbd>Cmd+S</kbd> → <em>Webpage Complete</em> → subir el <code>.html</code>.
+                Calidad idéntica al seed (JSON-LD + normalizer).
+              </p>
+            </div>
           </div>
         )}
 

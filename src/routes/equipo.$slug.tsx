@@ -9,7 +9,7 @@
  * equipo cargado antes del render — mejor UX y SEO friendly.
  */
 
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
@@ -258,7 +258,22 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
         <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground flex-wrap">
           <span>{item.brand}</span>
           <span>·</span>
-          <span>{item.category}</span>
+          {/* Categorías como chips: clickeables, deep-link al catálogo
+           *  filtrado. Si el equipo tiene refs M2M (root + sub-cats),
+           *  mostramos todas; si no, caemos al `category` (root inferido). */}
+          {(item.categorias && item.categorias.length > 0
+            ? item.categorias
+            : [{ id: -1, nombre: item.category, parent_id: null }]
+          ).map((c) => (
+            <Link
+              key={`${c.id}-${c.nombre}`}
+              to="/"
+              search={{ cat: c.nombre }}
+              className="rounded-full border hairline px-2 py-0.5 normal-case tracking-normal text-muted-foreground hover:border-foreground/40 hover:text-ink transition"
+            >
+              {c.nombre}
+            </Link>
+          ))}
           {item.isNew && (
             <span className="inline-flex items-center gap-0.5 rounded-full bg-ink px-1.5 py-0.5 text-amber">
               <Sparkles className="h-2.5 w-2.5" /> nuevo

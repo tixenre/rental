@@ -1,0 +1,3444 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "descripcion": "Dataset crudo de specs reales de B&H Photo (cámaras) capturadas por html guardado manual. Mismo workflow que docs/iluminacion_raw.json — fuente agnóstica, B&H primario + manufacturer sites como fallback.",
+    "metodo_captura": "HTML guardado manual (Cmd+S → Webpage Complete)",
+    "convencion": "secciones B&H + JSON-LD merged"
+  },
+  "products": [
+    {
+      "id": "sony_fx3a",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Cinema Camera",
+      "marca": "Sony",
+      "modelo": "FX3A Full-Frame Cinema Camera",
+      "url_source": "https://www.bhphotovideo.com/c/product/1894322-REG/sony_ilme_fx3a_fx3_full_frame_cinema_camera.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/sony_ilme_fx3a_fx3_full_frame_cinema_camera_1894322.jpg",
+      "status_bh": "Desconocido",
+      "fuente": "html guardado manual (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Image Sensor",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "10.2 Megapixel"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Sensor-Shift"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Native: 80 to 102,400 (80 to 409,600 Extended)"
+          },
+          {
+            "label": "Max Recording Modes",
+            "value": "MPEG-4 AVC/XAVC S-I 4:2:2 10-Bit\nUp to DCI 4K up to 23.98/24.00/29.97/48.00/59.94 fps\nH.265 Long GOP/XAVC HS 4:2:2 10-Bit\nUHD 4K up to 23.98/25/29.97/50/59.94/100/120 fps\nH.265 Long GOP/XAVC HS 4:2:0 10-Bit\nUHD 4K up to 23.98/25/29.97/50/59.94/100/120 fps\nMPEG-4 AVC/XAVC S 4:2:2 10-Bit\nUp to UHD 4K up to 23.98/25/29.97/50/59.94/100/120 fps\nMPEG-4 AVC/XAVC S 4:2:0 8-Bit\nUp to UHD 4K up to 23.98/25/29.97/50/59.94/100/120 fps\nXAVC Proxy\nUp to 1080p"
+          },
+          {
+            "label": "Max Video Output",
+            "value": "Raw 16-Bit\nUp to 4.2K at 23.98/25/50/59.94 fps"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Dual Slot: CFexpress Type A / SDXC"
+          },
+          {
+            "label": "Video I/O",
+            "value": "HDMI"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Battery",
+            "value": "NP-FZ100"
+          },
+          {
+            "label": "Lens Communication",
+            "value": "Yes: with Autofocus Support"
+          },
+          {
+            "label": "Built-In ND Filter",
+            "value": "No"
+          },
+          {
+            "label": "Built-In CC Filter",
+            "value": "No"
+          },
+          {
+            "label": "Internal Filter Holder",
+            "value": "No"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          },
+          {
+            "label": "Shutter Type",
+            "value": "Mechanical Focal Plane Shutter and Electronic Rolling Shutter"
+          },
+          {
+            "label": "Shutter Speed",
+            "value": "1/8000 to 1/4 Second"
+          },
+          {
+            "label": "Advertised Dynamic Range",
+            "value": "15 Stops"
+          },
+          {
+            "label": "White Balance",
+            "value": "Range: 2500 to 9900K\nPresets: Auto, Cloudy, Daylight, Flash, Fluorescent, Incandescent, Shade, Underwater"
+          },
+          {
+            "label": "Focus Mode",
+            "value": "Automatic, Continuous-Servo AF, Direct Manual Focus, Manual Focus"
+          },
+          {
+            "label": "Autofocus Points",
+            "value": "Phase Detection: 759"
+          },
+          {
+            "label": "Internal Recording",
+            "value": "MPEG-4 AVC/XAVC S-I 4:2:2 10-Bit\n4096 x 2160 up to 23.98/24.00/29.97/48.00/59.94 fps\n3840 x 2160 up to 23.98/25/29.97/59.94/100/120 fps (240 to 600 Mb/s)\n1920 x 1080p up to 23.98/25/29.97/50/59.94/100/120/200/240 fps (89 to 222 Mb/s)\nH.265 Long GOP/XAVC HS 4:2:2 10-Bit\n3840 x 2160 up to 23.98/25/29.97/50/59.94/100/120 fps (50 to 280 Mb/s)\nH.265 Long GOP/XAVC HS 4:2:0 10-Bit\n3840 x 2160 up to 23.98/25/29.97/50/59.94/100/120 fps (30 to 150 Mb/s)\nMPEG-4 AVC/XAVC S 4:2:2 10-Bit\n3840 x 2160 up to 23.98/25/29.97/50/59.94/100/120 fps (100 to 280 Mb/s)\n1920 x 1080p up to 23.98/25/29.97/50/59.94/100/120/200/240 fps (50 Mb/s)\nMPEG-4 AVC/XAVC S 4:2:0 8-Bit\n3840 x 2160 up to 23.98/25/29.97/50/59.94/100/120 fps (60 to 200 Mb/s)\n1920 x 1080p up to 23.98/25/29.97/50/59.94/100/120/200/240 fps (16 to 100 Mb/s)\nXAVC Proxy\n1920 x 1080 (9 to 16 Mb/s)\n1280 x 720 (6 Mb/s)"
+          },
+          {
+            "label": "Video Output",
+            "value": "Raw 16-Bit\n4264 x 2408 at 23.98/25/50/59.94 fps\n3840 x 2160 at 23.98/25/50/59.94 fps\n1920 x 1080p at 23.98/25/50/59.94 fps\n1920 x 1080i at 50/59.94 fps"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Gamma Curve",
+            "value": "HDR-HLG, S Cinetone, Sony S-Log 2, Sony S-Log 3, Standard"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Stereo"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "4-Channel, 24-Bit via LPCM Audio\n2-Channel, 24-Bit via LPCM Audio"
+          },
+          {
+            "label": "IP Streaming",
+            "value": "Yes"
+          },
+          {
+            "label": "Internal Storage",
+            "value": "No"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 1/8\" / 3.5 mm TRS Stereo Microphone Input\n1x 1/8\" / 3.5 mm TRS Stereo Headphone Output"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x USB-C Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x Micro-USB"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi 5 (802.11ac) / Bluetooth"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "No"
+          },
+          {
+            "label": "Display Type",
+            "value": "Primary Monitor: 180° Tilting 3\" Touchscreen LCD"
+          },
+          {
+            "label": "Type",
+            "value": "Optional, Not Included"
+          },
+          {
+            "label": "Power Consumption",
+            "value": "7.3 W"
+          },
+          {
+            "label": "Operating Conditions",
+            "value": "32 to 104°F / 0 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 140°F / -20 to 60°C"
+          },
+          {
+            "label": "Shoe Mount",
+            "value": "1x Intelligent Hot Shoe"
+          },
+          {
+            "label": "Tripod Mount",
+            "value": "1/4\"-20 Female"
+          },
+          {
+            "label": "Accessory Mounting Thread",
+            "value": "5x 1/4\"-20 on Camera Body\n3x 1/4\"-20 on Included Handle"
+          },
+          {
+            "label": "Netflix Approved",
+            "value": "Yes"
+          },
+          {
+            "label": "Materials",
+            "value": "Magnesium Alloy"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "5.1 x 3.3 x 3.1\" / 129.7 x 84.5 x 77.8 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.4 lb / 640 g (Body Only)\n1.6 lb / 715 g (With Battery, Recording Media)"
+          },
+          {
+            "label": "Package Weight",
+            "value": "3.665 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "9.6 x 9 x 5.9\""
+          }
+        ],
+        "Key Specs": [
+          {
+            "label": "Image Sensor",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "10.2 Megapixel"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Sensor-Shift"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Native: 80 to 102,400 (80 to 409,600 Extended)"
+          },
+          {
+            "label": "Max Recording Modes",
+            "value": "MPEG-4 AVC/XAVC S-I 4:2:2 10-Bit"
+          },
+          {
+            "label": "Max Video Output",
+            "value": "Raw 16-Bit"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Dual Slot: CFexpress Type A / SDXC"
+          },
+          {
+            "label": "Video I/O",
+            "value": "HDMI"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Battery",
+            "value": "NP-FZ100"
+          }
+        ],
+        "Imaging": [
+          {
+            "label": "Lens Communication",
+            "value": "Yes: with Autofocus Support"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "35.6 x 23.8 mm (Full-Frame) CMOS"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "Effective: 10.2 Megapixel"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Sensor-Shift, 5-Axis"
+          },
+          {
+            "label": "Built-In ND Filter",
+            "value": "No"
+          },
+          {
+            "label": "Built-In CC Filter",
+            "value": "No"
+          },
+          {
+            "label": "Internal Filter Holder",
+            "value": "No"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          }
+        ],
+        "Exposure Control": [
+          {
+            "label": "Shutter Type",
+            "value": "Mechanical Focal Plane Shutter and Electronic Rolling Shutter"
+          },
+          {
+            "label": "Shutter Speed",
+            "value": "1/8000 to 1/4 Second"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Native: 80 to 102,400 (80 to 409,600 Extended)"
+          },
+          {
+            "label": "Advertised Dynamic Range",
+            "value": "15 Stops"
+          },
+          {
+            "label": "White Balance",
+            "value": "Range: 2500 to 9900K"
+          }
+        ],
+        "Focus": [
+          {
+            "label": "Focus Mode",
+            "value": "Automatic, Continuous-Servo AF, Direct Manual Focus, Manual Focus"
+          },
+          {
+            "label": "Autofocus Points",
+            "value": "Phase Detection: 759"
+          }
+        ],
+        "Video Capture": [
+          {
+            "label": "Internal Recording",
+            "value": "MPEG-4 AVC/XAVC S-I 4:2:2 10-Bit"
+          },
+          {
+            "label": "Video Output",
+            "value": "Raw 16-Bit"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Gamma Curve",
+            "value": "HDR-HLG, S Cinetone, Sony S-Log 2, Sony S-Log 3, Standard"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Stereo"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "4-Channel, 24-Bit via LPCM Audio"
+          },
+          {
+            "label": "IP Streaming",
+            "value": "Yes"
+          }
+        ],
+        "Interface": [
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Dual Slot: CFexpress Type A / SDXC"
+          },
+          {
+            "label": "Internal Storage",
+            "value": "No"
+          },
+          {
+            "label": "Video I/O",
+            "value": "1x  HDMI Output"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 1/8\" / 3.5 mm TRS Stereo Microphone Input"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x USB-C Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x Micro-USB"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi 5 (802.11ac)"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "No"
+          }
+        ],
+        "Monitor": [
+          {
+            "label": "Display Type",
+            "value": "Primary Monitor: 180° Tilting 3\" Touchscreen LCD"
+          }
+        ],
+        "Viewfinder": [
+          {
+            "label": "Type",
+            "value": "Optional, Not Included"
+          }
+        ],
+        "Power": [
+          {
+            "label": "Battery",
+            "value": "NP-FZ100"
+          },
+          {
+            "label": "Power Consumption",
+            "value": "7.3 W"
+          }
+        ],
+        "Environmental": [
+          {
+            "label": "Operating Conditions",
+            "value": "32 to 104°F / 0 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 140°F / -20 to 60°C"
+          }
+        ],
+        "General": [
+          {
+            "label": "Shoe Mount",
+            "value": "1x Intelligent Hot Shoe"
+          },
+          {
+            "label": "Tripod Mount",
+            "value": "1/4\"-20 Female"
+          },
+          {
+            "label": "Accessory Mounting Thread",
+            "value": "5x 1/4\"-20 on Camera Body"
+          },
+          {
+            "label": "Netflix Approved",
+            "value": "Yes"
+          },
+          {
+            "label": "Materials",
+            "value": "Magnesium Alloy"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "5.1 x 3.3 x 3.1\" / 129.7 x 84.5 x 77.8 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.4 lb / 640 g (Body Only)"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "3.665 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "9.6 x 9 x 5.9\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "sony_a7v",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Mirrorless",
+      "marca": "Sony",
+      "modelo": "a7V Mirrorless Camera ILCE-7M5/B a75",
+      "url_source": "https://www.bhphotovideo.com/c/product/1935439-REG/sony_a7_v_mirrorless_camera.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/sony_a7_v_mirrorless_camera_1935439.jpg",
+      "status_bh": "Desconocido",
+      "fuente": "html guardado manual (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Lens Mount",
+            "value": "Sony E"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "33 Megapixel (7008 x 4672)"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Sensor-Shift"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Photo\nNative in Manual Mode: 100 to 51,200 (50 to 204,800 Extended)\nNative in Auto Mode: 100 to 12,800\nVideo\nNative in Manual Mode: 100 to 51,200 (100 to 102,400 Extended)\nNative in Auto Mode: 100 to 12,800"
+          },
+          {
+            "label": "Max Recording Modes",
+            "value": "H.264/XAVC S 4:2:2/4:2:0 8/10-Bit\nUp to UHD 4K at 23.98/25/29.97/50/59.94/100/120 fps\nH.265/XAVC HS 4:2:2/4:2:0 10-Bit\nUHD 4K at 23.98/50/59.94/100/120 fps\nXAVC S-I 4:2:2 10-Bit\nUp to UHD 4K at 23.98/25/29.97/50/59.94 fps\nH.264/XAVC S 4:2:0 8-Bit\n1080p at 100/120 fps"
+          },
+          {
+            "label": "Max Video Output",
+            "value": "4:2:2 8/10-Bit\nUp to UHD 4K at 23.98/25/29.97/50/59.94 fps"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Slot 1: CFexpress Type A / SDXC (UHS-II)\nSlot 2: SD/SDHC/SDXC (UHS-II)"
+          },
+          {
+            "label": "Video I/O",
+            "value": "1x HDMI Output"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 1/8\" / 3.5 mm TRS Stereo Headphone Output\n1x 1/8\" / 3.5 mm TRS Stereo Microphone Input"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x USB-C Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x USB-C 3.1/3.2 Gen 2 (Data) Output"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi 6 (802.11ax) / Bluetooth 5.3"
+          },
+          {
+            "label": "Display Type",
+            "value": "4-Axis Tilting 3.2\" Touchscreen LCD"
+          },
+          {
+            "label": "Battery",
+            "value": "1x NP-FZ100 Rechargeable Lithium-Ion, 7.2 VDC, 2280 mAh (Included)\n • Approx. 630 Shots"
+          },
+          {
+            "label": "Sensor Crop (35mm Equivalent)",
+            "value": "Crop Factor: 1x\nAdditional Modes: 1.5x\n*Additional Crop Occurs in Select Video Modes"
+          },
+          {
+            "label": "Built-In ND Filter",
+            "value": "No"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          },
+          {
+            "label": "Shutter Type",
+            "value": "Mechanical Focal Plane Shutter and Electronic Rolling Shutter"
+          },
+          {
+            "label": "Shutter Speed",
+            "value": "Electronic Shutter\n1/16000 to 30 Seconds\nMechanical Shutter\n1/8000 to 30 Seconds\n1 to 1/8000 Second in Movie Mode"
+          },
+          {
+            "label": "Bulb/Time Mode",
+            "value": "Bulb Mode"
+          },
+          {
+            "label": "Metering Method",
+            "value": "Center-Weighted Average, Highlight Weighted, Multi-Zone, Spot"
+          },
+          {
+            "label": "Exposure Modes",
+            "value": "Aperture Priority, Manual, Program, Shutter Priority"
+          },
+          {
+            "label": "Exposure Compensation",
+            "value": "-5 to +5 EV (1/3, 1/2 EV Steps)"
+          },
+          {
+            "label": "Metering Range",
+            "value": "-3 to 20 EV"
+          },
+          {
+            "label": "White Balance",
+            "value": "2500 to 9900K\nPresets: ATW, AWB, Auto, Cloudy, Color Temperature, Color Temperature Filter, Custom, Daylight, Flash, Fluorescent (Cool White), Fluorescent (Day White), Fluorescent (Daylight), Fluorescent (Warm White), Incandescent, Shade, Underwater"
+          },
+          {
+            "label": "Continuous Shooting",
+            "value": "Up to 30 fps at Maximum Resolution for up to 95 Frames (Raw) / 85 Frames (Raw, JPEG) / 185 Frames (JPEG)"
+          },
+          {
+            "label": "Interval Recording",
+            "value": "Yes"
+          },
+          {
+            "label": "Self-Timer",
+            "value": "2/5/10-Second Delay"
+          },
+          {
+            "label": "Aspect Ratio",
+            "value": "1:1, 3:2, 4:3, 16:9"
+          },
+          {
+            "label": "Image File Format",
+            "value": "HEIF, JPEG, Raw"
+          },
+          {
+            "label": "Bit Depth",
+            "value": "14-Bit"
+          },
+          {
+            "label": "Internal Recording",
+            "value": "H.264/XAVC S 4:2:2/4:2:0 8/10-Bit\n3840 x 2160 at 23.98/25/29.97/50/59.94/100/120 fps (60 to 280 Mb/s)\n1920 x 1080 at 23.98/25/29.97/50/59.94 fps (50 Mb/s)\nH.265/XAVC HS 4:2:2/4:2:0 10-Bit\n3840 x 2160 at 23.98/50/59.94/100/120 fps (30 to 280 Mb/s)\nXAVC S-I 4:2:2 10-Bit\n3840 x 2160 at 23.98/25/29.97/50/59.94 fps (240 to 222 Mb/s)\n1920 x 1080 at 23.98/25/29.97/50/59.94 fps (89 to 222 Mb/s)\nH.264/XAVC S 4:2:0 8-Bit\n1920 x 1080 at 100/120 fps (100 Mb/s)"
+          },
+          {
+            "label": "Video Output",
+            "value": "4:2:2 8/10-Bit\n3840 x 2160p at 23.98/25/29.97/50/59.94 fps\n1920 x 1080p at 23.98/50/59.94 fps\n1920 x 1080i at 50/59.94 fps"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Gamma Curve",
+            "value": "HDR-HLG, S Cinetone, Sony S-Log 3"
+          },
+          {
+            "label": "Recording Limit",
+            "value": "No"
+          },
+          {
+            "label": "IP Streaming",
+            "value": "No"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Stereo"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "2-Channel 16-Bit 48 kHz LPCM Audio"
+          },
+          {
+            "label": "Internal Storage",
+            "value": "No"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS\nApp Name: Creators' App\nFunctionality: Access Stored Files, Adjust Settings, Remote Control, Setup"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "GPS\n*Via Connected Smartphone"
+          },
+          {
+            "label": "Resolution",
+            "value": "2,095,104 Dot"
+          },
+          {
+            "label": "Type",
+            "value": "Electronic (OLED)"
+          },
+          {
+            "label": "Size",
+            "value": "0.5\""
+          },
+          {
+            "label": "Eye Point",
+            "value": "23 mm"
+          },
+          {
+            "label": "Coverage",
+            "value": "100%"
+          },
+          {
+            "label": "Magnification",
+            "value": "Approx. 0.78x"
+          },
+          {
+            "label": "Diopter Adjustment",
+            "value": "-4 to +3"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Auto and Manual Focus"
+          },
+          {
+            "label": "Focus Mode",
+            "value": "Continuous-Servo AF, Direct Manual Focus, Manual Focus, Single-Servo AF, Subject Tracking (Auto-Tracking/Animals/Birds/Eyes/Insects/People/Vehicles)"
+          },
+          {
+            "label": "Autofocus Points",
+            "value": "Phase Detection: 759\nContrast Detection: 425"
+          },
+          {
+            "label": "Autofocus Sensitivity",
+            "value": "-4 to +20 EV"
+          },
+          {
+            "label": "Built-In Flash/Light",
+            "value": "No"
+          },
+          {
+            "label": "Flash Modes",
+            "value": "Auto, Fill Flash, Hi-Speed Sync, Off, Rear Sync, Red-Eye Reduction, Slow Sync"
+          },
+          {
+            "label": "Maximum Sync Speed",
+            "value": "1/250 Second"
+          },
+          {
+            "label": "Flash Compensation",
+            "value": "-3 to +3 EV (1/3, 1/2 EV Steps)"
+          },
+          {
+            "label": "Dedicated Flash System",
+            "value": "TTL"
+          },
+          {
+            "label": "External Flash Connection",
+            "value": "Shoe Mount"
+          },
+          {
+            "label": "Shoe Mount",
+            "value": "1x Intelligent Hot Shoe"
+          },
+          {
+            "label": "Tripod Mount",
+            "value": "1x 1/4\"-20 Female (Bottom)"
+          },
+          {
+            "label": "Materials",
+            "value": "Magnesium Alloy"
+          },
+          {
+            "label": "Operating Conditions",
+            "value": "32 to 104°F / 0 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 131°F / -20 to 55°C"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "5.1 x 3.8 x 3.2\" / 130.3 x 96.4 x 82.4 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.3 lb / 610 g (Body Only)\n1.5 lb / 695 g (With Battery, Recording Media)"
+          },
+          {
+            "label": "Package Weight",
+            "value": "2.115 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "6.8 x 4.3 x 2.6\""
+          }
+        ],
+        "Key Specs": [
+          {
+            "label": "Lens Mount",
+            "value": "Sony E"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "33 Megapixel (7008 x 4672)"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Sensor-Shift"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Photo"
+          },
+          {
+            "label": "Max Recording Modes",
+            "value": "H.264/XAVC S 4:2:2/4:2:0 8/10-Bit"
+          },
+          {
+            "label": "Max Video Output",
+            "value": "4:2:2 8/10-Bit"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Slot 1: CFexpress Type A / SDXC (UHS-II)"
+          },
+          {
+            "label": "Video I/O",
+            "value": "1x HDMI Output"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 1/8\" / 3.5 mm TRS Stereo Headphone Output"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x USB-C Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x USB-C 3.1/3.2 Gen 2 (Data) Output"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi 6 (802.11ax)"
+          },
+          {
+            "label": "Display Type",
+            "value": "4-Axis Tilting 3.2\" Touchscreen LCD"
+          },
+          {
+            "label": "Battery",
+            "value": "1x NP-FZ100 Rechargeable Lithium-Ion, 7.2 VDC, 2280 mAh (Included)"
+          }
+        ],
+        "Imaging": [
+          {
+            "label": "Lens Mount",
+            "value": "Sony E"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "Effective: 33 Megapixel (7008 x 4672)"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "35.9 x 23.9 mm (Full-Frame) Partially Stacked CMOS"
+          },
+          {
+            "label": "Sensor Crop (35mm Equivalent)",
+            "value": "Crop Factor: 1x"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Sensor-Shift, 5-Axis"
+          },
+          {
+            "label": "Built-In ND Filter",
+            "value": "No"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          }
+        ],
+        "Exposure Control": [
+          {
+            "label": "Shutter Type",
+            "value": "Mechanical Focal Plane Shutter and Electronic Rolling Shutter"
+          },
+          {
+            "label": "Shutter Speed",
+            "value": "Electronic Shutter"
+          },
+          {
+            "label": "Bulb/Time Mode",
+            "value": "Bulb Mode"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Photo"
+          },
+          {
+            "label": "Metering Method",
+            "value": "Center-Weighted Average, Highlight Weighted, Multi-Zone, Spot"
+          },
+          {
+            "label": "Exposure Modes",
+            "value": "Aperture Priority, Manual, Program, Shutter Priority"
+          },
+          {
+            "label": "Exposure Compensation",
+            "value": "-5 to +5 EV (1/3, 1/2 EV Steps)"
+          },
+          {
+            "label": "Metering Range",
+            "value": "-3 to 20 EV"
+          },
+          {
+            "label": "White Balance",
+            "value": "2500 to 9900K"
+          },
+          {
+            "label": "Continuous Shooting",
+            "value": "Up to 30 fps at Maximum Resolution for up to"
+          },
+          {
+            "label": "Interval Recording",
+            "value": "Yes"
+          },
+          {
+            "label": "Self-Timer",
+            "value": "2/5/10-Second Delay"
+          }
+        ],
+        "Still Image Capture": [
+          {
+            "label": "Aspect Ratio",
+            "value": "1:1, 3:2, 4:3, 16:9"
+          },
+          {
+            "label": "Image File Format",
+            "value": "HEIF, JPEG, Raw"
+          },
+          {
+            "label": "Bit Depth",
+            "value": "14-Bit"
+          }
+        ],
+        "Video Capture": [
+          {
+            "label": "Internal Recording",
+            "value": "H.264/XAVC S 4:2:2/4:2:0 8/10-Bit"
+          },
+          {
+            "label": "Video Output",
+            "value": "4:2:2 8/10-Bit"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Gamma Curve",
+            "value": "HDR-HLG, S Cinetone, Sony S-Log 3"
+          },
+          {
+            "label": "Recording Limit",
+            "value": "No"
+          },
+          {
+            "label": "IP Streaming",
+            "value": "No"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Stereo"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "2-Channel 16-Bit 48 kHz LPCM Audio"
+          }
+        ],
+        "Interface": [
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Slot 1: CFexpress Type A / SDXC (UHS-II)"
+          },
+          {
+            "label": "Internal Storage",
+            "value": "No"
+          },
+          {
+            "label": "Video I/O",
+            "value": "1x HDMI Output"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 1/8\" / 3.5 mm TRS Stereo Headphone Output"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x USB-C Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x USB-C 3.1/3.2 Gen 2 (Data) Output"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi 6 (802.11ax)"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "GPS"
+          }
+        ],
+        "Monitor": [
+          {
+            "label": "Display Type",
+            "value": "4-Axis Tilting 3.2\" Touchscreen LCD"
+          },
+          {
+            "label": "Resolution",
+            "value": "2,095,104 Dot"
+          }
+        ],
+        "Viewfinder": [
+          {
+            "label": "Type",
+            "value": "Electronic (OLED)"
+          },
+          {
+            "label": "Size",
+            "value": "0.5\""
+          },
+          {
+            "label": "Resolution",
+            "value": "3,686,400 Dot"
+          },
+          {
+            "label": "Eye Point",
+            "value": "23 mm"
+          },
+          {
+            "label": "Coverage",
+            "value": "100%"
+          },
+          {
+            "label": "Magnification",
+            "value": "Approx. 0.78x"
+          },
+          {
+            "label": "Diopter Adjustment",
+            "value": "-4 to +3"
+          }
+        ],
+        "Focus": [
+          {
+            "label": "Focus Type",
+            "value": "Auto and Manual Focus"
+          },
+          {
+            "label": "Focus Mode",
+            "value": "Continuous-Servo AF, Direct Manual Focus, Manual Focus, Single-Servo AF, Subject Tracking (Auto-Tracking/Animals/Birds/Eyes/Insects/People/Vehicles)"
+          },
+          {
+            "label": "Autofocus Points",
+            "value": "Phase Detection: 759"
+          },
+          {
+            "label": "Autofocus Sensitivity",
+            "value": "-4 to +20 EV"
+          }
+        ],
+        "Flash": [
+          {
+            "label": "Built-In Flash/Light",
+            "value": "No"
+          },
+          {
+            "label": "Flash Modes",
+            "value": "Auto, Fill Flash, Hi-Speed Sync, Off, Rear Sync, Red-Eye Reduction, Slow Sync"
+          },
+          {
+            "label": "Maximum Sync Speed",
+            "value": "1/250 Second"
+          },
+          {
+            "label": "Flash Compensation",
+            "value": "-3 to +3 EV (1/3, 1/2 EV Steps)"
+          },
+          {
+            "label": "Dedicated Flash System",
+            "value": "TTL"
+          },
+          {
+            "label": "External Flash Connection",
+            "value": "Shoe Mount"
+          }
+        ],
+        "General": [
+          {
+            "label": "Battery",
+            "value": "1x NP-FZ100 Rechargeable Lithium-Ion, 7.2 VDC, 2280 mAh (Included)"
+          },
+          {
+            "label": "Shoe Mount",
+            "value": "1x Intelligent Hot Shoe"
+          },
+          {
+            "label": "Tripod Mount",
+            "value": "1x 1/4\"-20 Female (Bottom)"
+          },
+          {
+            "label": "Materials",
+            "value": "Magnesium Alloy"
+          },
+          {
+            "label": "Operating Conditions",
+            "value": "32 to 104°F / 0 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 131°F / -20 to 55°C"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "5.1 x 3.8 x 3.2\" / 130.3 x 96.4 x 82.4 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.3 lb / 610 g (Body Only)"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "2.115 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "6.8 x 4.3 x 2.6\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "sony_zve1",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Vlogging",
+      "marca": "Sony",
+      "modelo": "ZVE1 Mirrorless Camera (ZV-E1 Camera Body Black)",
+      "url_source": "https://www.bhphotovideo.com/c/product/1759472-REG/sony_zv_e1_mirrorless_camera_black.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/sony_zv_e1_mirrorless_camera_black_1759472.jpg",
+      "status_bh": "Desconocido",
+      "fuente": "html guardado manual (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Lens Mount",
+            "value": "Sony E"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "12.1 Megapixel (4240 x 2832)"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Sensor-Shift"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Native: 80 to 102,400 (80 to 409,600 Extended)"
+          },
+          {
+            "label": "Max Recording Modes",
+            "value": "XAVC HS 4:2:2/4:2:0 10-Bit\nUHD 4K at 23.98/50/59.94 fps\nXAVC S 4:2:2/4:2:0 8/10-Bit\nUp to UHD 4K at 23.98/25/29.97/50/59.94 fps\nXAVC S-I 4:2:2 10-Bit\nUp to UHD 4K at 23.98/25/29.97/50/59.94 fps"
+          },
+          {
+            "label": "Max Video Output",
+            "value": "4:2:2 10-Bit\nUp to UHD 4K at 23.98/25/29.97/50/59.94 fps"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: SD/SDHC/SDXC (UHS-II)"
+          },
+          {
+            "label": "Video I/O",
+            "value": "1x Micro-HDMI Output"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 1/8\" / 3.5 mm TRS Stereo Headphone Output\n1x 1/8\" / 3.5 mm TRS Stereo Microphone Input"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x USB-C Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x USB-C 3.0 / 3.1/3.2 Gen 1 (Data) Output (Shared with Power Input)"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi 5 (802.11ac) / Bluetooth 4.2"
+          },
+          {
+            "label": "Display Type",
+            "value": "Articulating 3\" Touchscreen LCD"
+          },
+          {
+            "label": "Battery",
+            "value": "1x NP-FZ100 Rechargeable Lithium-Ion (Included)\n • Approx. 570 Shots"
+          },
+          {
+            "label": "Sensor Crop (35mm Equivalent)",
+            "value": "Crop Factor: 1x\nAdditional Modes: 1.5x\n*Additional Crop Occurs in Select Video Modes"
+          },
+          {
+            "label": "Built-In ND Filter",
+            "value": "No"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          },
+          {
+            "label": "Shutter Type",
+            "value": "Mechanical Focal Plane Shutter and Electronic Rolling Shutter"
+          },
+          {
+            "label": "Shutter Speed",
+            "value": "1/8000 to 30 Second\n1 to 1/8000 Second in Movie Mode"
+          },
+          {
+            "label": "Bulb/Time Mode",
+            "value": "No"
+          },
+          {
+            "label": "Metering Method",
+            "value": "Center-Weighted Average, Highlight Weighted, Multiple, Spot"
+          },
+          {
+            "label": "Exposure Modes",
+            "value": "Aperture Priority, Auto, Manual, Program, Shutter Priority"
+          },
+          {
+            "label": "Exposure Compensation",
+            "value": "-5 to +5 EV (1/3, 1/2 EV Steps)"
+          },
+          {
+            "label": "Metering Range",
+            "value": "-3 to 20 EV"
+          },
+          {
+            "label": "White Balance",
+            "value": "Presets: ATW, AWB, Cloudy, Color Temperature Filter, Custom, Daylight, Flash, Fluorescent (Cool White), Fluorescent (Day White), Fluorescent (Warm White), Incandescent, Shade, Underwater"
+          },
+          {
+            "label": "Continuous Shooting",
+            "value": "Up to 10 fps at Maximum Resolution for up to 1000 Frames (Raw) / 1000 Frames (JPEG)"
+          },
+          {
+            "label": "Interval Recording",
+            "value": "Yes"
+          },
+          {
+            "label": "Self-Timer",
+            "value": "2/5/10-Second Delay"
+          },
+          {
+            "label": "Aspect Ratio",
+            "value": "1:1, 3:2, 4:3, 16:9"
+          },
+          {
+            "label": "Image File Format",
+            "value": "HEIF, JPEG, Raw"
+          },
+          {
+            "label": "Bit Depth",
+            "value": "10-Bit"
+          },
+          {
+            "label": "Internal Recording",
+            "value": "XAVC HS 4:2:2/4:2:0 10-Bit\n3840 x 2160 at 23.98/50/59.94 fps (30 to 150 Mb/s VBR)\nXAVC S 4:2:2/4:2:0 8/10-Bit\n3840 x 2160 at 23.98/25/29.97/50/59.94 fps (60 to 200 Mb/s VBR)\n1920 x 1080 at 23.98/25/29.97/50/59.94/100/120 fps (16 to 100 Mb/s VBR)\nXAVC S-I 4:2:2 10-Bit\n3840 x 2160 at 23.98/25/29.97/50/59.94 fps (240 to 222 Mb/s VBR)\n1920 x 1080 at 23.98/25/29.97/50/59.94 fps (89 to 222 Mb/s VBR)"
+          },
+          {
+            "label": "Video Output",
+            "value": "4:2:2 10-Bit\n3840 x 2160 at 23.98/25/29.97/50/59.94 fps\n1920 x 1080i at 50/59.94 fps\n1920 x 1080 at 23.98/50/59.94 fps"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Gamma Curve",
+            "value": "S Cinetone, Sony S-Log 3"
+          },
+          {
+            "label": "Recording Limit",
+            "value": "No"
+          },
+          {
+            "label": "IP Streaming",
+            "value": "No"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Stereo"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "MPEG4:  16-Bit 48 kHz LPCM Audio"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS\nApp Name: Creators' App\nFunctionality: Access Stored Files, Adjust Settings, Firmware Update, Remote Control"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "GPS\n*Via Connected Smartphone"
+          },
+          {
+            "label": "Resolution",
+            "value": "1,036,800 Dot"
+          },
+          {
+            "label": "Focus Type",
+            "value": "Auto and Manual Focus"
+          },
+          {
+            "label": "Focus Mode",
+            "value": "Automatic, Direct Manual Focus, Manual Focus"
+          },
+          {
+            "label": "Autofocus Points",
+            "value": "Photo\nPhase Detection: 759\nVideo\nPhase Detection: 627"
+          },
+          {
+            "label": "Autofocus Sensitivity",
+            "value": "6 to +20 EV"
+          },
+          {
+            "label": "Built-In Flash/Light",
+            "value": "No"
+          },
+          {
+            "label": "Maximum Sync Speed",
+            "value": "1/30 Second"
+          },
+          {
+            "label": "External Flash Connection",
+            "value": "Shoe Mount"
+          },
+          {
+            "label": "Shoe Mount",
+            "value": "1x Intelligent Hot Shoe"
+          },
+          {
+            "label": "Tripod Mount",
+            "value": "1x 1/4\"-20 Female"
+          },
+          {
+            "label": "Operating Conditions",
+            "value": "32 to 104°F / 0 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 131°F / -20 to 55°C"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "4.8 x 2.8 x 2.1\" / 121 x 71.9 x 54.3 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "14.1 oz / 399 g (Body Only)\n1.1 lb / 483 g (With Battery, Recording Media)"
+          },
+          {
+            "label": "Package Weight",
+            "value": "1.535 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "5.9 x 5.8 x 4.8\""
+          }
+        ],
+        "Key Specs": [
+          {
+            "label": "Lens Mount",
+            "value": "Sony E"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "12.1 Megapixel (4240 x 2832)"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "Full-Frame"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Sensor-Shift"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Native: 80 to 102,400 (80 to 409,600 Extended)"
+          },
+          {
+            "label": "Max Recording Modes",
+            "value": "XAVC HS 4:2:2/4:2:0 10-Bit"
+          },
+          {
+            "label": "Max Video Output",
+            "value": "4:2:2 10-Bit"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: SD/SDHC/SDXC (UHS-II)"
+          },
+          {
+            "label": "Video I/O",
+            "value": "1x Micro-HDMI Output"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 1/8\" / 3.5 mm TRS Stereo Headphone Output"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x USB-C Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x USB-C 3.0 / 3.1/3.2 Gen 1 (Data) Output (Shared with Power Input)"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi 5 (802.11ac)"
+          },
+          {
+            "label": "Display Type",
+            "value": "Articulating 3\" Touchscreen LCD"
+          },
+          {
+            "label": "Battery",
+            "value": "1x NP-FZ100 Rechargeable Lithium-Ion (Included)"
+          }
+        ],
+        "Imaging": [
+          {
+            "label": "Lens Mount",
+            "value": "Sony E"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "Effective: 12.1 Megapixel (4240 x 2832)"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "35.6 x 23.8 mm (Full-Frame) CMOS"
+          },
+          {
+            "label": "Sensor Crop (35mm Equivalent)",
+            "value": "Crop Factor: 1x"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Sensor-Shift, 5-Axis"
+          },
+          {
+            "label": "Built-In ND Filter",
+            "value": "No"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          }
+        ],
+        "Exposure Control": [
+          {
+            "label": "Shutter Type",
+            "value": "Mechanical Focal Plane Shutter and Electronic Rolling Shutter"
+          },
+          {
+            "label": "Shutter Speed",
+            "value": "1/8000 to 30 Second"
+          },
+          {
+            "label": "Bulb/Time Mode",
+            "value": "No"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Native: 80 to 102,400 (80 to 409,600 Extended)"
+          },
+          {
+            "label": "Metering Method",
+            "value": "Center-Weighted Average, Highlight Weighted, Multiple, Spot"
+          },
+          {
+            "label": "Exposure Modes",
+            "value": "Aperture Priority, Auto, Manual, Program, Shutter Priority"
+          },
+          {
+            "label": "Exposure Compensation",
+            "value": "-5 to +5 EV (1/3, 1/2 EV Steps)"
+          },
+          {
+            "label": "Metering Range",
+            "value": "-3 to 20 EV"
+          },
+          {
+            "label": "White Balance",
+            "value": "Presets:"
+          },
+          {
+            "label": "Continuous Shooting",
+            "value": "Up to 10 fps at Maximum Resolution for up to"
+          },
+          {
+            "label": "Interval Recording",
+            "value": "Yes"
+          },
+          {
+            "label": "Self-Timer",
+            "value": "2/5/10-Second Delay"
+          }
+        ],
+        "Still Image Capture": [
+          {
+            "label": "Aspect Ratio",
+            "value": "1:1, 3:2, 4:3, 16:9"
+          },
+          {
+            "label": "Image File Format",
+            "value": "HEIF, JPEG, Raw"
+          },
+          {
+            "label": "Bit Depth",
+            "value": "10-Bit"
+          }
+        ],
+        "Video Capture": [
+          {
+            "label": "Internal Recording",
+            "value": "XAVC HS 4:2:2/4:2:0 10-Bit"
+          },
+          {
+            "label": "Video Output",
+            "value": "4:2:2 10-Bit"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Gamma Curve",
+            "value": "S Cinetone, Sony S-Log 3"
+          },
+          {
+            "label": "Recording Limit",
+            "value": "No"
+          },
+          {
+            "label": "IP Streaming",
+            "value": "No"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Stereo"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "MPEG4:  16-Bit 48 kHz LPCM Audio"
+          }
+        ],
+        "Interface": [
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: SD/SDHC/SDXC (UHS-II)"
+          },
+          {
+            "label": "Video I/O",
+            "value": "1x Micro-HDMI Output"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 1/8\" / 3.5 mm TRS Stereo Headphone Output"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x USB-C Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x USB-C 3.0 / 3.1/3.2 Gen 1 (Data) Output (Shared with Power Input)"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi 5 (802.11ac)"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "GPS"
+          }
+        ],
+        "Monitor": [
+          {
+            "label": "Display Type",
+            "value": "Articulating 3\" Touchscreen LCD"
+          },
+          {
+            "label": "Resolution",
+            "value": "1,036,800 Dot"
+          }
+        ],
+        "Focus": [
+          {
+            "label": "Focus Type",
+            "value": "Auto and Manual Focus"
+          },
+          {
+            "label": "Focus Mode",
+            "value": "Automatic, Direct Manual Focus, Manual Focus"
+          },
+          {
+            "label": "Autofocus Points",
+            "value": "Photo"
+          },
+          {
+            "label": "Autofocus Sensitivity",
+            "value": "6 to +20 EV"
+          }
+        ],
+        "Flash": [
+          {
+            "label": "Built-In Flash/Light",
+            "value": "No"
+          },
+          {
+            "label": "Maximum Sync Speed",
+            "value": "1/30 Second"
+          },
+          {
+            "label": "External Flash Connection",
+            "value": "Shoe Mount"
+          }
+        ],
+        "General": [
+          {
+            "label": "Battery",
+            "value": "1x NP-FZ100 Rechargeable Lithium-Ion (Included)"
+          },
+          {
+            "label": "Shoe Mount",
+            "value": "1x Intelligent Hot Shoe"
+          },
+          {
+            "label": "Tripod Mount",
+            "value": "1x 1/4\"-20 Female"
+          },
+          {
+            "label": "Operating Conditions",
+            "value": "32 to 104°F / 0 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 131°F / -20 to 55°C"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "4.8 x 2.8 x 2.1\" / 121 x 71.9 x 54.3 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "14.1 oz / 399 g (Body Only)"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "1.535 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "5.9 x 5.8 x 4.8\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "canon_c200",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Cinema Camera",
+      "marca": "Canon",
+      "modelo": "EOS C200 Cinema Camera (EF-Mount)",
+      "url_source": "https://www.bhphotovideo.com/c/product/803403398-USE/canon_2215c002_eos_c200_cinema_camera.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/canon_2215c002_eos_c200_cinema_camera_1340800.jpg",
+      "status_bh": "Desconocido",
+      "fuente": "html guardado manual (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Image Sensor",
+            "value": "Super35"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "8.85 Megapixel (4096 x 2160)"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: CFast (CFast 2.0)\nDual Slot: SD/SDHC/SDXC"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "No"
+          },
+          {
+            "label": "Battery",
+            "value": "Canon BP-A Series"
+          },
+          {
+            "label": "Lens Communication",
+            "value": "Yes: with Autofocus Support"
+          },
+          {
+            "label": "Type",
+            "value": "CMOS"
+          },
+          {
+            "label": "Color Filter System",
+            "value": "RGB Primary filter (Bayer array)"
+          },
+          {
+            "label": "Sensor Size",
+            "value": "Super 35\n24.6 x 13.8 mm effective size / 6.4 x 6.4µm pixel pitch"
+          },
+          {
+            "label": "Total Pixels",
+            "value": "Approx. 9.84 MP (4206 x 2340)"
+          },
+          {
+            "label": "Built-In ND Filter",
+            "value": "Mechanical Filter Wheel with 2-Stop (1/4), 4-Stop (1/16), 6-Stop (1/64) ND Filters"
+          },
+          {
+            "label": "Effective Pixels",
+            "value": "4096 x 2160 / 2048 x 1080: approx. 8.85 MP (4096 x 2160)\n3840 x 2160 / 1920 x 1080: approx. 8.29 MP (3840 x 2160)"
+          },
+          {
+            "label": "Scanning System",
+            "value": "Progressive"
+          },
+          {
+            "label": "Dynamic Range",
+            "value": "Canon Log 3: 1600% (ISO 800 or above)\nCanon Log/Wide DR: 800% (ISO 400 or above)"
+          },
+          {
+            "label": "Processor",
+            "value": "2 x DIGIC DV 6"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          },
+          {
+            "label": "Lens Mount",
+            "value": "EF"
+          },
+          {
+            "label": "Shutter Type",
+            "value": "Electronic Rolling Shutter"
+          },
+          {
+            "label": "Built-In ND Filters",
+            "value": "Standard: 2, 4, 6 stops\nExpanded: 2, 4, 6, 8, 10 stops"
+          },
+          {
+            "label": "Exposure Modes",
+            "value": "Manual\nPush Auto\nAuto"
+          },
+          {
+            "label": "Gain",
+            "value": "Normal: -2 dB to 42 dB\nExpanded: -6 to 54 dB"
+          },
+          {
+            "label": "ISO Range",
+            "value": "Standard: 160 to 25,600\nExpanded: 100 to 102,400"
+          },
+          {
+            "label": "Shutter Modes",
+            "value": "Off, Speed, Angle, Slow Shutter, Clear Scan"
+          },
+          {
+            "label": "Focus Modes",
+            "value": "Manual\nAuto"
+          },
+          {
+            "label": "Autofocus System",
+            "value": "Focus Guide\nPlease note: the below modes require lenses that support AF functions\nDual Pixel CMOS AF (DAF) supported\nManual focus\nOne-shot AF\nContinuous AF\nAF-Boosted MF\nFace Detection AF"
+          },
+          {
+            "label": "Signal System",
+            "value": "NTSC/PAL"
+          },
+          {
+            "label": "System Frequency Selection",
+            "value": "59.94 Hz\n50 Hz\n24 Hz"
+          },
+          {
+            "label": "Video Format",
+            "value": "Cinema Raw Light\nResolution: 4096 x 2160\nBit Depth: 12-bit (29.97P/23.98P/25P/24P), 10-bit (59.94P/50P)\nBit Rate: 1 Gb/s\nMP4\nResolution / Color Sampling: 3840 x 2160 YCC420 8-bit, 1920 x 1080 YCC420 8-bit\nFrame Rates 3840 x 2160: 60p, 30p, 24p\nFrame Rates 1920 x 1080: 120p, 60p, 30p, 24p\nBit Rate: 150 Mb/s (3840 x 2160), 35 Mb/s (1920 x 1080)\nMP4 (Proxy)\nResolution / Color Sampling: 2048 x 1080 YCC420 8-bit\nBit Rate: 35 Mb/s (2048 x 1080)"
+          },
+          {
+            "label": "Recording Media",
+            "value": "CFast Card: 1 x slot (raw recording)\nSD Card: 2 x slots (MP4 and JPEG recording)"
+          },
+          {
+            "label": "Frame Rate",
+            "value": "59.94 Hz Mode\n59.94i/p, 29.97p, 23.98p\n50 Hz Mode\n50i/p, 25p\n24 Hz Mode\n24p"
+          },
+          {
+            "label": "Time Code",
+            "value": "Drop Frame (in 59.94/29.97 mode only) or Non-Drop Frame\nRec run, free run, regeneration"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "Raw: Linear PCM 16-bit 48 kHz 4-ch\nMP4: MPEG-4 AAC-LC 16-bit 48 kHz 2-channel, Linear PCM 16-bit 48 kHz 4-ch"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "None"
+          },
+          {
+            "label": "Audio Inputs",
+            "value": "2 x XLR\n1 x Mic jack"
+          },
+          {
+            "label": "Phantom Power",
+            "value": "+48V"
+          },
+          {
+            "label": "IP Streaming",
+            "value": "No"
+          },
+          {
+            "label": "General",
+            "value": "Connectors\n1 x Remote\n1 x Ethernet\n1 x USB\n1 x Video"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "2x XLR 3-Pin Microphone Input  (+48 V Phantom Power)\n1x 1/8\" / 3.5 mm TRS Stereo Microphone Input\n1x 1/8\" / 3.5 mm TRS Stereo Headphone Output"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x LEMO 4-Pin Input"
+          },
+          {
+            "label": "SDI",
+            "value": "SDI: 1 x BNC (output)"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x 2.5 mm Sub-Mini (LANC) Control Input\n1x RJ45 (LAN)"
+          },
+          {
+            "label": "HDMI Output",
+            "value": "1 x HDMI Type A (Supports UHD 4K Output)"
+          },
+          {
+            "label": "Audio Input Terminals",
+            "value": "2 x Balanced 3-pin XLR (Mic Level, Mic Level with phantom power and Line Level) 1 x 3.5 mm microphone jack"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "No"
+          },
+          {
+            "label": "Headphone Connector",
+            "value": "3.5 mm stereo mini-jack"
+          },
+          {
+            "label": "Power Supply ",
+            "value": "14.4 VDC (battery pack)\n16.7 VDC (DC input)"
+          },
+          {
+            "label": "Resolution",
+            "value": "1,770,000 Dot"
+          },
+          {
+            "label": "Dimensions",
+            "value": "5.7 x 6 x 7\" / 14.48 x 15.24 x 17.78 cm (body only)\n7 x 6 x 8\" / 17.78 x 15.24 x 20.32 cm (with camera grip)\n13.2 x 10.8 x 10.8\" / 33.53 x 27.43 x 27.43 cm (camera grip + LCD Monitor LM-V1 + LCD Attachment Unit LA-V1 + Handle Unit HDU-2 + mic holder)"
+          },
+          {
+            "label": "Weight",
+            "value": "3.2 lb / 1.5 kg (approximately)"
+          },
+          {
+            "label": "Shoe Mount",
+            "value": "1x Cold Shoe"
+          },
+          {
+            "label": "Accessory Mounting Thread",
+            "value": "1x 1/4\"-20"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "7 x 6 x 8\" / 17.78 x 15.24 x 20.32 cm (With Grip)\n5.7 x 6 x 7\" / 14.48 x 15.24 x 17.78 cm (Without Grip)"
+          }
+        ],
+        "Key Specs": [
+          {
+            "label": "Image Sensor",
+            "value": "Super35"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "8.85 Megapixel (4096 x 2160)"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: CFast (CFast 2.0)"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "No"
+          },
+          {
+            "label": "Battery",
+            "value": "Canon BP-A Series"
+          }
+        ],
+        "Image Sensor": [
+          {
+            "label": "Lens Communication",
+            "value": "Yes: with Autofocus Support"
+          },
+          {
+            "label": "Type",
+            "value": "CMOS"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "24.6 x 13.8 mm (Super35) CMOS"
+          },
+          {
+            "label": "Color Filter System",
+            "value": "RGB Primary filter (Bayer array)"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "Effective: 8.85 Megapixel (4096 x 2160)"
+          },
+          {
+            "label": "Sensor Size",
+            "value": "Super 35"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Total Pixels",
+            "value": "Approx. 9.84 MP (4206 x 2340)"
+          },
+          {
+            "label": "Built-In ND Filter",
+            "value": "Mechanical Filter Wheel with 2-Stop (1/4), 4-Stop (1/16), 6-Stop (1/64) ND Filters"
+          },
+          {
+            "label": "Effective Pixels",
+            "value": "4096 x 2160 / 2048 x 1080: approx. 8.85 MP (4096 x 2160)"
+          },
+          {
+            "label": "Scanning System",
+            "value": "Progressive"
+          },
+          {
+            "label": "Dynamic Range",
+            "value": "Canon Log 3: 1600% (ISO 800 or above)"
+          },
+          {
+            "label": "Processor",
+            "value": "2 x DIGIC DV 6"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          }
+        ],
+        "Lens System": [
+          {
+            "label": "Lens Mount",
+            "value": "EF"
+          },
+          {
+            "label": "Shutter Type",
+            "value": "Electronic Rolling Shutter"
+          },
+          {
+            "label": "Built-In ND Filters",
+            "value": "Standard: 2, 4, 6 stops"
+          }
+        ],
+        "Exposure and Metering": [
+          {
+            "label": "Exposure Modes",
+            "value": "Manual"
+          },
+          {
+            "label": "Gain",
+            "value": "Normal: -2 dB to 42 dB"
+          },
+          {
+            "label": "ISO Range",
+            "value": "Standard: 160 to 25,600"
+          },
+          {
+            "label": "Shutter Modes",
+            "value": "Off, Speed, Angle, Slow Shutter, Clear Scan"
+          }
+        ],
+        "Focus Control": [
+          {
+            "label": "Focus Modes",
+            "value": "Manual"
+          },
+          {
+            "label": "Autofocus System",
+            "value": "Focus Guide"
+          }
+        ],
+        "Video": [
+          {
+            "label": "Signal System",
+            "value": "NTSC/PAL"
+          },
+          {
+            "label": "System Frequency Selection",
+            "value": "59.94 Hz"
+          },
+          {
+            "label": "Video Format",
+            "value": "Cinema Raw Light"
+          },
+          {
+            "label": "Recording Media",
+            "value": "CFast Card: 1 x slot (raw recording)"
+          },
+          {
+            "label": "Frame Rate",
+            "value": "59.94 Hz Mode"
+          }
+        ],
+        "Focus": [
+          {
+            "label": "Time Code",
+            "value": "Drop Frame (in 59.94/29.97 mode only) or Non-Drop Frame"
+          }
+        ],
+        "Audio": [],
+        "Video Capture": [
+          {
+            "label": "Audio Recording",
+            "value": "Raw: Linear PCM 16-bit 48 kHz 4-ch"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "None"
+          },
+          {
+            "label": "Audio Inputs",
+            "value": "2 x XLR"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Mono"
+          },
+          {
+            "label": "Phantom Power",
+            "value": "+48V"
+          },
+          {
+            "label": "IP Streaming",
+            "value": "No"
+          }
+        ],
+        "Viewfinder": [
+          {
+            "label": "Type",
+            "value": "Built-In: 0.46\" / 1.32 cm diagonal, color"
+          },
+          {
+            "label": "General",
+            "value": "Connectors"
+          },
+          {
+            "label": "Type",
+            "value": "Built-In Electronic"
+          }
+        ],
+        "LCD Display": [
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: CFast (CFast 2.0)"
+          },
+          {
+            "label": "Type",
+            "value": "Rotating color LCD"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "2x XLR 3-Pin Microphone Input  (+48 V Phantom Power)"
+          }
+        ],
+        "Inputs/Outputs": [
+          {
+            "label": "Power I/O",
+            "value": "1x LEMO 4-Pin Input"
+          },
+          {
+            "label": "SDI",
+            "value": "SDI: 1 x BNC (output)"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x 2.5 mm Sub-Mini (LANC) Control Input"
+          },
+          {
+            "label": "HDMI Output",
+            "value": "1 x HDMI Type A (Supports UHD 4K Output)"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "No"
+          },
+          {
+            "label": "Audio Input Terminals",
+            "value": "2 x Balanced 3-pin XLR (Mic Level, Mic Level with phantom power and Line Level) 1 x 3.5 mm microphone jack"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "No"
+          }
+        ],
+        "Monitor": [
+          {
+            "label": "Headphone Connector",
+            "value": "3.5 mm stereo mini-jack"
+          }
+        ],
+        "General": [
+          {
+            "label": "Power Supply",
+            "value": "14.4 VDC (battery pack)"
+          },
+          {
+            "label": "Resolution",
+            "value": "1,770,000 Dot"
+          },
+          {
+            "label": "Battery",
+            "value": "Canon BP-A Series"
+          },
+          {
+            "label": "Dimensions",
+            "value": "5.7 x 6 x 7\" / 14.48 x 15.24 x 17.78 cm (body only)"
+          },
+          {
+            "label": "Weight",
+            "value": "3.2 lb / 1.5 kg (approximately)"
+          },
+          {
+            "label": "Shoe Mount",
+            "value": "1x Cold Shoe"
+          },
+          {
+            "label": "Accessory Mounting Thread",
+            "value": "1x 1/4\"-20"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "7 x 6 x 8\" / 17.78 x 15.24 x 20.32 cm (With Grip)"
+          },
+          {
+            "label": "Weight",
+            "value": "3.2 lb / 1.5 kg"
+          }
+        ]
+      }
+    },
+    {
+      "id": "red_komodo_x",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Cinema Camera",
+      "marca": "RED",
+      "modelo": "KOMODO-X DIGITAL CINEMA KOMODO-X 6K Digital Cinema Camera",
+      "url_source": "https://www.bhphotovideo.com/c/product/1768344-REG/red_digital_cinema_komodo_x_6k_digital_cinema.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/red_digital_cinema_komodo_x_6k_digital_cinema_1768344.jpg",
+      "status_bh": "Desconocido",
+      "fuente": "html guardado manual (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Lens Mount",
+            "value": "Canon RF"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "Super35"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "19.9 Megapixel (6144 x 3240)"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Max Recording Modes",
+            "value": "REDCODE RAW\nUp to 6K up to 80 fps\nProRes 422/ProRes 422 HQ/ProRes 422LT\nDCI 4K up to 120 fps\nProRes 4444 4:4:4\nDCI 4K up to 80 fps\nProRes 4444XQ 4:4:4\nDCI 4K up to 60.00 fps"
+          },
+          {
+            "label": "Max Video Output",
+            "value": "4:2:2\nUp to DCI 4K up to 60.00 fps"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: CFexpress Type B (CFexpress 2.0)"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS\nFunctionality: Remote Control"
+          },
+          {
+            "label": "Battery",
+            "value": "V-Mount"
+          },
+          {
+            "label": "Lens Communication",
+            "value": "Yes: with Autofocus Support"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          },
+          {
+            "label": "Shutter Type",
+            "value": "Electronic Global Shutter"
+          },
+          {
+            "label": "Advertised Dynamic Range",
+            "value": "16.5 Stops"
+          },
+          {
+            "label": "Focus Mode",
+            "value": "Automatic, Manual Focus"
+          },
+          {
+            "label": "Internal Recording",
+            "value": "REDCODE RAW\n6144 x 3240 up to 80 fps (560 Mb/s)\n5120 x 2700 up to 96 fps (560 Mb/s)\n4096 x 2160 up to 120 fps (560 Mb/s)\n2048 x 1080 up to 240 fps (560 Mb/s)\nProRes 422/ProRes 422 HQ/ProRes 422LT\n4096 x 2160 up to 120 fps (560 MB/s)\nProRes 4444 4:4:4\n4096 x 2160 up to 80 fps (560 MB/s)\nProRes 4444XQ 4:4:4\n4096 x 2160 up to 60.00 fps (560 MB/s)"
+          },
+          {
+            "label": "Video Output",
+            "value": "4:2:2\n4096 x 2160 up to 60.00 fps\n2048 x 1080p up to 60.00 fps"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Stereo"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "2-Channel, 24-Bit at 48 kHz"
+          },
+          {
+            "label": "IP Streaming",
+            "value": "MJPEG\n1920 x 1080 (5000.00 Mb/s)"
+          },
+          {
+            "label": "Internal Storage",
+            "value": "No"
+          },
+          {
+            "label": "Video I/O",
+            "value": "1x  BNC (12G-SDI) Output"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 5-Pin LEMO Line Input on Camera Body"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x LEMO 6-Pin (11 to 17VDC) Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x 9-Pin (Genlock, GPI, Timecode)\n1x USB-C (Camera Interface) Control/Data/Video Input/Output\n1x RED Cable-Free Monitor Connection Output"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "No"
+          },
+          {
+            "label": "Display Type",
+            "value": "Primary Monitor: Fixed 2.9\" Touchscreen LCD"
+          },
+          {
+            "label": "Resolution",
+            "value": "Primary Monitor: 1440 x 1440"
+          },
+          {
+            "label": "Type",
+            "value": "Optional, Not Included"
+          },
+          {
+            "label": "Operating Conditions",
+            "value": "32 to 104°F / 0 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 122°F / -20 to 50°C up to 85% Humidity"
+          },
+          {
+            "label": "Tripod Mount",
+            "value": "1/4\"-20 Female (Bottom)\n3/8\"-16 Female (Bottom)"
+          },
+          {
+            "label": "Accessory Mounting Thread",
+            "value": "4x 1/4\"-20\n4x M4"
+          },
+          {
+            "label": "Netflix Approved",
+            "value": "Yes"
+          },
+          {
+            "label": "Materials",
+            "value": "Aluminum"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "5.09 x 3.99 x 3.75\" / 129.37 x 101.26 x 95.26 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "2.62 lb / 1.19 kg (Body Only)"
+          },
+          {
+            "label": "Package Weight",
+            "value": "7.165 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "13.2 x 9.8 x 6\""
+          }
+        ],
+        "Key Specs": [
+          {
+            "label": "Lens Mount",
+            "value": "Canon RF"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "Super35"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "19.9 Megapixel (6144 x 3240)"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Max Recording Modes",
+            "value": "REDCODE RAW"
+          },
+          {
+            "label": "Max Video Output",
+            "value": "4:2:2"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: CFexpress Type B (CFexpress 2.0)"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Battery",
+            "value": "V-Mount"
+          }
+        ],
+        "Imaging": [
+          {
+            "label": "Lens Mount",
+            "value": "Canon RF"
+          },
+          {
+            "label": "Lens Communication",
+            "value": "Yes: with Autofocus Support"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "27.03 x 14.26 mm (Super35) CMOS"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "19.9 Megapixel (6144 x 3240)"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          }
+        ],
+        "Exposure Control": [
+          {
+            "label": "Shutter Type",
+            "value": "Electronic Global Shutter"
+          },
+          {
+            "label": "Advertised Dynamic Range",
+            "value": "16.5 Stops"
+          }
+        ],
+        "Focus": [
+          {
+            "label": "Focus Mode",
+            "value": "Automatic, Manual Focus"
+          }
+        ],
+        "Video Capture": [
+          {
+            "label": "Internal Recording",
+            "value": "REDCODE RAW"
+          },
+          {
+            "label": "Video Output",
+            "value": "4:2:2"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Stereo"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "2-Channel, 24-Bit at 48 kHz"
+          },
+          {
+            "label": "IP Streaming",
+            "value": "MJPEG"
+          }
+        ],
+        "Interface": [
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: CFexpress Type B (CFexpress 2.0)"
+          },
+          {
+            "label": "Internal Storage",
+            "value": "No"
+          },
+          {
+            "label": "Video I/O",
+            "value": "1x  BNC (12G-SDI) Output"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 5-Pin LEMO Line Input on Camera Body"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x LEMO 6-Pin (11 to 17VDC) Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x 9-Pin (Genlock, GPI, Timecode)"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "No"
+          }
+        ],
+        "Monitor": [
+          {
+            "label": "Display Type",
+            "value": "Primary Monitor: Fixed 2.9\" Touchscreen LCD"
+          },
+          {
+            "label": "Resolution",
+            "value": "Primary Monitor: 1440 x 1440"
+          }
+        ],
+        "Viewfinder": [
+          {
+            "label": "Type",
+            "value": "Optional, Not Included"
+          }
+        ],
+        "Power": [
+          {
+            "label": "Battery",
+            "value": "V-Mount"
+          }
+        ],
+        "Environmental": [
+          {
+            "label": "Operating Conditions",
+            "value": "32 to 104°F / 0 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 122°F / -20 to 50°C up to 85% Humidity"
+          }
+        ],
+        "General": [
+          {
+            "label": "Tripod Mount",
+            "value": "1/4\"-20 Female (Bottom)"
+          },
+          {
+            "label": "Accessory Mounting Thread",
+            "value": "4x 1/4\"-20"
+          },
+          {
+            "label": "Netflix Approved",
+            "value": "Yes"
+          },
+          {
+            "label": "Materials",
+            "value": "Aluminum"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "5.09 x 3.99 x 3.75\" / 129.37 x 101.26 x 95.26 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "2.62 lb / 1.19 kg (Body Only)"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "7.165 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "13.2 x 9.8 x 6\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "red_komodo",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Cinema Camera",
+      "marca": "RED",
+      "modelo": "DIGITAL CINEMA KOMODO 6K Camera Production Pack",
+      "url_source": "https://www.bhphotovideo.com/c/product/1598392-REG/red_digital_cinema_710_0340_komodo_6k_camera_production.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/red_digital_cinema_710_0340_komodo_6k_camera_production_1598392.jpg",
+      "status_bh": "Desconocido",
+      "fuente": "html guardado manual (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Lens Mount",
+            "value": "Canon RF with Included Canon EF  Adapter"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "Super35"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "19.9 Megapixel (6144 x 3240)"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Native: 250 to 12,800"
+          },
+          {
+            "label": "Max Recording Modes",
+            "value": "REDCODE RAW\nUp to 6K up to 40 fps\nProRes 422/ProRes 422 HQ\nDCI 4K up to 59.94 fps\nProRes 422\nDCI 2K up to 120 fps"
+          },
+          {
+            "label": "Max Video Output",
+            "value": "4:2:2 10-Bit\nUp to DCI 4K at 25/24.00/29.97/50/59.94/23.98 fps"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: CFast (CFast 2.0)"
+          },
+          {
+            "label": "Video I/O",
+            "value": "</b<"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS\nFunctionality: Remote Control"
+          },
+          {
+            "label": "Battery",
+            "value": "Canon BP-9 Series"
+          },
+          {
+            "label": "Lens Communication",
+            "value": "Yes: with Autofocus Support"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          },
+          {
+            "label": "Shutter Type",
+            "value": "Electronic Global Shutter"
+          },
+          {
+            "label": "Shutter Speed",
+            "value": "1 to 1/8000 Second"
+          },
+          {
+            "label": "Shutter Angle",
+            "value": "0 to 360°"
+          },
+          {
+            "label": "Advertised Dynamic Range",
+            "value": "16 Stops"
+          },
+          {
+            "label": "White Balance",
+            "value": "Range: 1700 to 10,000K"
+          },
+          {
+            "label": "Focus Mode",
+            "value": "Automatic, Manual Focus"
+          },
+          {
+            "label": "Internal Recording",
+            "value": "REDCODE RAW\n6144 x 3240 up to 40 fps (280 MB/s)\n5120 x 2700 up to 48.00 fps (280 MB/s)*\n4096 x 2160 up to 59.94 fps (280 MB/s)*\n2048 x 1080 up to 120 fps (280 MB/s)*\n*Sensor Crops During Recording\nProRes 422/ProRes 422 HQ\n4096 x 2160 up to 59.94 fps\nProRes 422\n2048 x 1080 up to 120 fps"
+          },
+          {
+            "label": "Video Output",
+            "value": "4:2:2 10-Bit\n4096 x 2160 at 25/24.00/29.97/50/59.94/23.98 fps\n3840 x 2160 at 59.94/23.98/24.00/25/29.97/50 fps\n1920 x 1080p at 59.94/23.98/24.00/25/29.97/50 fps\n2048 x 1080 at 59.94/23.98/24.00/25/29.97/50 fps"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Gamma Curve",
+            "value": "DCI-P3, Rec709, Rec2020, REDWideGamutRGB"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Stereo"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "2-Channel, 24-Bit at 48 kHz"
+          },
+          {
+            "label": "Internal Storage",
+            "value": "No"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 1/8\" / 3.5 mm TRS Stereo Microphone Input"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x LEMO 2-Pin (7 to 17VDC) Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x 9-Pin (RS-232, Genlock, GPI, Timecode)"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi 5 (802.11ac)"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "No"
+          },
+          {
+            "label": "Display Type",
+            "value": "Primary Monitor: Fixed 2.9\" Touchscreen LCD"
+          },
+          {
+            "label": "Resolution",
+            "value": "Primary Monitor: 1440 x 1440"
+          },
+          {
+            "label": "Type",
+            "value": "Optional, Not Included"
+          },
+          {
+            "label": "Power Consumption",
+            "value": "≤37 W"
+          },
+          {
+            "label": "Operating Conditions",
+            "value": "32 to 104°F / 0 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 122°F / -20 to 50°C up to 85% Humidity"
+          },
+          {
+            "label": "Tripod Mount",
+            "value": "1/4\"-20 Female (Bottom)\n3/8\"-16 Female (Bottom)"
+          },
+          {
+            "label": "Netflix Approved",
+            "value": "Yes"
+          },
+          {
+            "label": "Materials",
+            "value": "Aluminum"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "4 x 4 x 4\" / 10.2 x 10.2 x 10.2 cm"
+          },
+          {
+            "label": "Weight",
+            "value": "2.1 lb / 1 kg (Body Only)"
+          },
+          {
+            "label": "Package Weight",
+            "value": "4.45 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "12.1 x 6.9 x 5.4\""
+          },
+          {
+            "label": "Item Type",
+            "value": "1x Handgrip for Right Side"
+          },
+          {
+            "label": "Rotation",
+            "value": "Yes:  360° Adjustable via Screw/Twist Lock"
+          },
+          {
+            "label": "Built-In Controls",
+            "value": "Remote Trigger"
+          },
+          {
+            "label": "Main Attachment",
+            "value": "2x 1/4\"-20 Male Screw (Built-In)\nCamera Compatibility\nRED KOMODO"
+          },
+          {
+            "label": "Additional Mounting",
+            "value": "2x 1/4\"-20 Female Thread"
+          },
+          {
+            "label": "Inputs/Outputs",
+            "value": "1x Pogo Remote Output"
+          },
+          {
+            "label": "Dimensions",
+            "value": "7.5 x 5 x 2.5\" / 191 x 127 x 64 mm"
+          },
+          {
+            "label": "Connections",
+            "value": "Genlock: 1 x BNC\nGPI: 1 x BNC\nTimecode In: 1 x BNC\nControl: 1 x 4-Pin"
+          },
+          {
+            "label": "Accessory Mounting Threads",
+            "value": "Multiple: 1/4\"-20\nMultiple: 3/8\"-16\nMultiple: ARRI-Style Anti-Twist"
+          },
+          {
+            "label": "Material of Construction",
+            "value": "Aluminum Alloy"
+          },
+          {
+            "label": "Quantity",
+            "value": "1"
+          },
+          {
+            "label": "Card Type",
+            "value": "CFast 2.0"
+          },
+          {
+            "label": "Storage Capacity",
+            "value": "512 GB"
+          },
+          {
+            "label": "Speed (X-rating)",
+            "value": "3500x"
+          },
+          {
+            "label": "Media Card Reader",
+            "value": "1x CFast (CFast 2.0 / SATA III [6 Gb/s])"
+          },
+          {
+            "label": "Host Connection",
+            "value": "USB-C 3.0 / 3.1/3.2 Gen 1 via Integrated Cable"
+          },
+          {
+            "label": "Power Source",
+            "value": "Bus Powered"
+          },
+          {
+            "label": "Connector 1",
+            "value": "1x 2-Pin"
+          },
+          {
+            "label": "Connector 2",
+            "value": "1x D-Tap"
+          },
+          {
+            "label": "Voltage Control",
+            "value": "Regulated"
+          },
+          {
+            "label": "Voltage",
+            "value": "7 to 17 VDC"
+          },
+          {
+            "label": "Cable Length",
+            "value": "6' / 1.83 m"
+          },
+          {
+            "label": "Camera Compatibility",
+            "value": "Canon RF Mount"
+          },
+          {
+            "label": "Lens Compatibility",
+            "value": "Canon EF/EF-S Mount"
+          },
+          {
+            "label": "Electronic Communication",
+            "value": "Yes"
+          },
+          {
+            "label": "Filter Type",
+            "value": "Clear"
+          },
+          {
+            "label": "Size",
+            "value": "Dedicated"
+          },
+          {
+            "label": "Front Accessory Thread / Bayonet",
+            "value": "No"
+          },
+          {
+            "label": "Filter Material",
+            "value": "Glass"
+          }
+        ],
+        "Key Specs": [
+          {
+            "label": "Lens Mount",
+            "value": "Canon RF with Included Canon EF  Adapter"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "Super35"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "19.9 Megapixel (6144 x 3240)"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Native: 250 to 12,800"
+          },
+          {
+            "label": "Max Recording Modes",
+            "value": "REDCODE RAW"
+          },
+          {
+            "label": "Max Video Output",
+            "value": "4:2:2 10-Bit"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: CFast (CFast 2.0)"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Battery",
+            "value": "Canon BP-9 Series"
+          }
+        ],
+        "Imaging": [
+          {
+            "label": "Lens Mount",
+            "value": "Canon RF with Included Canon EF  Adapter"
+          },
+          {
+            "label": "Lens Communication",
+            "value": "Yes: with Autofocus Support"
+          },
+          {
+            "label": "Image Sensor",
+            "value": "27.03 x 14.26 mm (Super35) CMOS"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "19.9 Megapixel (6144 x 3240)"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "No"
+          },
+          {
+            "label": "Capture Type",
+            "value": "Stills & Video"
+          }
+        ],
+        "Exposure Control": [
+          {
+            "label": "Shutter Type",
+            "value": "Electronic Global Shutter"
+          },
+          {
+            "label": "Shutter Speed",
+            "value": "1 to 1/8000 Second"
+          },
+          {
+            "label": "Shutter Angle",
+            "value": "0 to 360°"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Native: 250 to 12,800"
+          },
+          {
+            "label": "Advertised Dynamic Range",
+            "value": "16 Stops"
+          },
+          {
+            "label": "White Balance",
+            "value": "Range: 1700 to 10,000K"
+          }
+        ],
+        "Focus": [
+          {
+            "label": "Focus Mode",
+            "value": "Automatic, Manual Focus"
+          }
+        ],
+        "Video Capture": [
+          {
+            "label": "Internal Recording",
+            "value": "REDCODE RAW"
+          },
+          {
+            "label": "Video Output",
+            "value": "4:2:2 10-Bit"
+          },
+          {
+            "label": "Fast-/Slow-Motion Support",
+            "value": "Yes"
+          },
+          {
+            "label": "Gamma Curve",
+            "value": "DCI-P3, Rec709, Rec2020, REDWideGamutRGB"
+          },
+          {
+            "label": "Built-In Microphone",
+            "value": "Stereo"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "2-Channel, 24-Bit at 48 kHz"
+          }
+        ],
+        "Interface": [
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: CFast (CFast 2.0)"
+          },
+          {
+            "label": "Internal Storage",
+            "value": "No"
+          },
+          {
+            "label": "Audio I/O",
+            "value": "1x 1/8\" / 3.5 mm TRS Stereo Microphone Input"
+          },
+          {
+            "label": "Power I/O",
+            "value": "1x LEMO 2-Pin (7 to 17VDC) Input"
+          },
+          {
+            "label": "Other I/O",
+            "value": "1x 9-Pin (RS-232, Genlock, GPI, Timecode)"
+          },
+          {
+            "label": "Wireless",
+            "value": "Wi-Fi 5 (802.11ac)"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Global Positioning (GPS, GLONASS, etc.)",
+            "value": "No"
+          }
+        ],
+        "Monitor": [
+          {
+            "label": "Display Type",
+            "value": "Primary Monitor: Fixed 2.9\" Touchscreen LCD"
+          },
+          {
+            "label": "Resolution",
+            "value": "Primary Monitor: 1440 x 1440"
+          }
+        ],
+        "Viewfinder": [
+          {
+            "label": "Type",
+            "value": "Optional, Not Included"
+          }
+        ],
+        "Power": [
+          {
+            "label": "Battery",
+            "value": "Canon BP-9 Series"
+          },
+          {
+            "label": "Power Consumption",
+            "value": "≤37 W"
+          }
+        ],
+        "Environmental": [
+          {
+            "label": "Operating Conditions",
+            "value": "32 to 104°F / 0 to 40°C"
+          },
+          {
+            "label": "Storage Conditions",
+            "value": "-4 to 122°F / -20 to 50°C up to 85% Humidity"
+          }
+        ],
+        "General": [
+          {
+            "label": "Tripod Mount",
+            "value": "1/4\"-20 Female (Bottom)"
+          },
+          {
+            "label": "Netflix Approved",
+            "value": "Yes"
+          },
+          {
+            "label": "Materials",
+            "value": "Aluminum"
+          },
+          {
+            "label": "Dimensions (W x H x D)",
+            "value": "4 x 4 x 4\" / 10.2 x 10.2 x 10.2 cm"
+          },
+          {
+            "label": "Weight",
+            "value": "2.1 lb / 1 kg (Body Only)"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "4.45 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "12.1 x 6.9 x 5.4\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "gopro_hero12",
+      "categoria_raiz": "Cámaras",
+      "subtipo": "Action Camera",
+      "marca": "GoPro",
+      "modelo": "HERO12 Black",
+      "url_source": "https://www.bhphotovideo.com/c/product/1781065-REG/gopro_chdhx_121_cn_hero12_black_action_camera.html",
+      "image_url": "https://www.bhphotovideo.com/images/fb/gopro_chdhx_121_cn_hero12_black_action_camera_1781065.jpg",
+      "status_bh": "Desconocido",
+      "fuente": "html guardado manual (2026-05-17)",
+      "secciones": {
+        "Specs (JSON-LD)": [
+          {
+            "label": "Image Sensor",
+            "value": "1/1.9\"-Type CMOS"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Digital"
+          },
+          {
+            "label": "Maximum Aperture",
+            "value": "f/2.5"
+          },
+          {
+            "label": "Internal Recording",
+            "value": "MP4 via  H.265/HEVC\n5312 x 2988 at 23.98/25/29.97/50/59.94 fps\n3840 x 2160 at 23.98/25/29.97/50/59.94/100/120 fps\n2704 x 1520 at 50/59.94/100/120/200/240 fps\n1920 x 1080 at 23.98/25/29.97/50/59.94/100/120/200/240 fps"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "27.6 Megapixel (5599 x 4927)"
+          },
+          {
+            "label": "Focal Length",
+            "value": "12 to 39mm (35mm Equivalent)"
+          },
+          {
+            "label": "Field of View",
+            "value": "156°"
+          },
+          {
+            "label": "Zoom",
+            "value": "Digital: 2x"
+          },
+          {
+            "label": "Still Image Support",
+            "value": "Raw\n27.13 MP (5568 x 4872)"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "WAV:"
+          },
+          {
+            "label": "Built-In Mic",
+            "value": "Yes"
+          },
+          {
+            "label": "IP Streaming",
+            "value": "H.265\n1920 x 1080"
+          },
+          {
+            "label": "Internal Storage",
+            "value": "No"
+          },
+          {
+            "label": "Shutter Speed",
+            "value": "1/480 to 1/30 Second"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Photo\nNative: 100 to 3200\nVideo\nNative: 100 to 6400"
+          },
+          {
+            "label": "Exposure Modes",
+            "value": "Auto, Manual"
+          },
+          {
+            "label": "White Balance",
+            "value": "Range: 2300 to 6500K"
+          },
+          {
+            "label": "Wireless",
+            "value": "Bluetooth"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS\nApp Name: GoPro Quik"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: microSD/microSDHC/microSDXC (UHS-I) [512 GB Maximum / U3/V30 or Faster Recommended]"
+          },
+          {
+            "label": "Inputs/Outputs",
+            "value": "1x USB-C Power Input/Output"
+          },
+          {
+            "label": "Battery Type",
+            "value": "Rechargeable Lithium-Ion Battery Pack (1720 mAh)"
+          },
+          {
+            "label": "Charging Time",
+            "value": "3 Hours"
+          },
+          {
+            "label": "Estimated Battery Life",
+            "value": "100 Minutes"
+          },
+          {
+            "label": "Environmental Resistance",
+            "value": "Water-Resistant to 32.8' / 10 m (Unrated)"
+          },
+          {
+            "label": "Operating Conditions",
+            "value": "14 to 95°F / -10 to 35°C"
+          },
+          {
+            "label": "Impact Resistance",
+            "value": "Impact-Resistant (Unrated)"
+          },
+          {
+            "label": "Display Type",
+            "value": "Fixed Touchscreen LCD\nFixed LCD"
+          },
+          {
+            "label": "Built-In Light",
+            "value": "No"
+          },
+          {
+            "label": "Built-In Speaker",
+            "value": "No"
+          },
+          {
+            "label": "Creative Effects",
+            "value": "Horizon Lock\nLight Painting\nStar Trails\nTime-Lapse\nVehicle Light Trails"
+          },
+          {
+            "label": "Tripod Mounting Thread",
+            "value": "1/4\"-20 Female"
+          },
+          {
+            "label": "Dimensions (W x D x H)",
+            "value": "2.8 x 2.0 x 1.3\" / 71.8 x 50.8 x 33.6 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "5.4 oz / 154 g"
+          },
+          {
+            "label": "Package Weight",
+            "value": "0.775 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "9.3 x 5.2 x 3\""
+          }
+        ],
+        "Key Specs": [
+          {
+            "label": "Image Sensor",
+            "value": "1/1.9\"-Type CMOS"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Digital"
+          },
+          {
+            "label": "Maximum Aperture",
+            "value": "f/2.5"
+          },
+          {
+            "label": "Internal Recording",
+            "value": "MP4"
+          }
+        ],
+        "Imaging": [
+          {
+            "label": "Image Sensor",
+            "value": "1/1.9\"-Type CMOS"
+          },
+          {
+            "label": "Effective Sensor Resolution",
+            "value": "27.6 Megapixel (5599 x 4927)"
+          },
+          {
+            "label": "Image Stabilization",
+            "value": "Digital"
+          }
+        ],
+        "Optics per Lens": [
+          {
+            "label": "Focal Length",
+            "value": "12 to 39mm (35mm Equivalent)"
+          },
+          {
+            "label": "Maximum Aperture",
+            "value": "f/2.5"
+          },
+          {
+            "label": "Field of View",
+            "value": "156°"
+          },
+          {
+            "label": "Zoom",
+            "value": "Digital: 2x"
+          }
+        ],
+        "Video Capture": [
+          {
+            "label": "Internal Recording",
+            "value": "MP4"
+          },
+          {
+            "label": "Still Image Support",
+            "value": "Raw"
+          },
+          {
+            "label": "Audio Recording",
+            "value": "WAV:"
+          },
+          {
+            "label": "Built-In Mic",
+            "value": "Yes"
+          },
+          {
+            "label": "IP Streaming",
+            "value": "H.265"
+          },
+          {
+            "label": "Internal Storage",
+            "value": "No"
+          }
+        ],
+        "Exposure Control": [
+          {
+            "label": "Shutter Speed",
+            "value": "1/480 to 1/30 Second"
+          },
+          {
+            "label": "ISO/Gain Sensitivity",
+            "value": "Photo"
+          },
+          {
+            "label": "Exposure Modes",
+            "value": "Auto, Manual"
+          },
+          {
+            "label": "White Balance",
+            "value": "Range: 2300 to 6500K"
+          }
+        ],
+        "Connectivity": [
+          {
+            "label": "Wireless",
+            "value": "Bluetooth"
+          },
+          {
+            "label": "Mobile App Compatible",
+            "value": "Yes: Android & iOS"
+          },
+          {
+            "label": "Media/Memory Card Slot",
+            "value": "Single Slot: microSD/microSDHC/microSDXC (UHS-I) [512 GB Maximum / U3/V30 or Faster Recommended]"
+          },
+          {
+            "label": "Inputs/Outputs",
+            "value": "1x USB-C Power Input/Output"
+          }
+        ],
+        "Power": [
+          {
+            "label": "Battery Type",
+            "value": "Rechargeable Lithium-Ion Battery Pack (1720 mAh)"
+          },
+          {
+            "label": "Charging Time",
+            "value": "3 Hours"
+          },
+          {
+            "label": "Estimated Battery Life",
+            "value": "100 Minutes"
+          }
+        ],
+        "Environmental": [
+          {
+            "label": "Environmental Resistance",
+            "value": "Water-Resistant to 32.8' / 10 m (Unrated)"
+          },
+          {
+            "label": "Operating Conditions",
+            "value": "14 to 95°F / -10 to 35°C"
+          },
+          {
+            "label": "Impact Resistance",
+            "value": "Impact-Resistant (Unrated)"
+          }
+        ],
+        "General": [
+          {
+            "label": "Display Type",
+            "value": "Fixed Touchscreen LCD"
+          },
+          {
+            "label": "Built-In Light",
+            "value": "No"
+          },
+          {
+            "label": "Built-In Speaker",
+            "value": "No"
+          },
+          {
+            "label": "Creative Effects",
+            "value": "Horizon Lock"
+          },
+          {
+            "label": "Tripod Mounting Thread",
+            "value": "1/4\"-20 Female"
+          },
+          {
+            "label": "Dimensions (W x D x H)",
+            "value": "2.8 x 2.0 x 1.3\" / 71.8 x 50.8 x 33.6 mm"
+          },
+          {
+            "label": "Weight",
+            "value": "5.4 oz / 154 g"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "0.775 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "9.3 x 5.2 x 3\""
+          }
+        ]
+      }
+    }
+  ]
+}
