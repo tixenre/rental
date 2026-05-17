@@ -206,13 +206,52 @@ Puntos de entrada para no grepear:
 - **EquipoFormDialogV2** es EL form. Sin tabs, scroll lineal con secciones colapsables. Mismo flow CREATE / EDIT.
 - El form viejo (`EquipoFormDialog.tsx`) fue borrado — no resucitar.
 
-### Autocompletar de specs
+### Autocompletar de specs (admin UI, por equipo)
+
+> **Cuándo se usa:** admin agrega un equipo nuevo individual en el form y pega la URL B&H. Equipo a equipo, on-demand, vía UI. **NO confundir** con el seed bulk inicial (ver "Dataset y seed por categoría" más abajo).
 
 - **URL única** en la autocompletar bar: bindeada al campo `bh_url` del form, con botones copy/abrir inline.
 - **Backend**: endpoint canónico `POST /admin/equipos/autocompletar` (alias deprecated `/enriquecer`). Scrape con Firecrawl + extract con LLM. Devuelve `AutocompletarResult` normalizado.
 - **Normalizer de specs**: backend traduce labels EN→ES (Weight→Peso, Lens Mount→Montura, etc.) y convierte unidades (lbs→kg, in→cm, °F→°C, ranges, dimensiones N×N×N).
 - **Cache del scrape**: el `AutocompletarResult` completo se guarda en `equipo_fichas.raw_json`. Habilita botones ✨ por sección en el form V2 que re-aplican campos sin volver a scrapear.
 - **Batch**: `POST /admin/equipos/batch-enriquecer` procesa hasta 3 equipos por request (cap defensivo, max 50 ids en body). Frontend re-batchea hasta terminar. Resultado se persiste en raw_json (cache). Sleep 1s entre scrapes para no rate-limitear B&H.
+
+### Dataset y seed por categoría (bulk inicial)
+
+> **Cuándo se usa:** poblar una categoría entera del catálogo de una sola pasada — typically el setup inicial o cuando entra un sub-segmento nuevo. **NO confundir** con autocompletar (que es por equipo, on-demand desde el form). Coexisten: el seed pone la base, autocompletar agrega ad-hoc o re-enriquece.
+
+**Workflow:**
+
+1. **Capturar HTMLs** de B&H (o site fabricante para casos como ARRI/Mole) → `~/Desktop/Paginas/Inventario/<Categoria>/`.
+2. **Parsear con `tools/bh_<categoria>_parser.py`** — extrae DOM + JSON-LD structured data, salida raw a `docs/bh_<categoria>_relevamiento.json` y curada a `docs/bh_<categoria>_curado.json`.
+3. **Curar manualmente** lo que el parser no puede inferir (overrides en `tools/bh_<categoria>_patches.py` — usado para sitios fabricante o HTMLs incompletos).
+4. **Normalizar** marcas/modelos/IDs con `tools/bh_<categoria>_normalizar.py` (canonicaliza brand, modelo limpio, IDs estables).
+5. **Importar** vía `backend/seeds/<categoria>.py` — idempotente, popula `spec_definitions` + `categoria_spec_templates` + sub-categorías + `equipos` + `equipo_specs` en una pasada.
+
+**Convenciones del dataset curado** (los 3 niveles por producto):
+
+- **`specs`**: campos canónicos para filtros/comparación. Todos numéricos o enum estrictos. Ej: `potencia_w: 410`, `temperatura_k: {min: 1800, max: 20000}`, `color_modes: ["RGB","Daylight","Tungsten"]`. Unidades en field name (`_w`, `_g`, `_k`).
+- **`extras`**: ficha técnica detallada. Strings descriptivos + algunos numéricos estructurados (ej. `dimensiones_cm: {largo_cm, ancho_cm, alto_cm}`, `noise_db: {silent, medium, high}`).
+- **`ficha`**: raw del scrape (todas las secciones B&H tal cual). Para renderizar ficha técnica completa sin perder data.
+
+**Convenciones cross-cutting:**
+
+- Métrico como base de DB (g, cm, m, K, W). UI computa imperial desde el base.
+- Excepción: pins/studs/accessory diameter en imperial-native (5/8″, 6.6″) — estándar industria cine.
+- Marcas canónicas con casing fijo (`ARRI`, `Amaran`, `Mole-Richardson`, `Nanlite`, etc.) — definido en `bh_<categoria>_normalizar.py::BRAND_CANON`.
+- IDs estables `marca_modelo` snake_case (ej. `aputure_nova_ii_2x1`).
+- Ausencia = `null` o campo ausente. NO usar strings `"N/A"`, `"None"`, `"—"`.
+
+**Estado del dataset por categoría:**
+
+| Categoría | Estado | Doc |
+|---|---|---|
+| Iluminación | ✅ 16 luces curadas, seed listo | [`docs/BH_LUCES_DATASET.md`](docs/BH_LUCES_DATASET.md) |
+| Cámaras | ⏳ pendiente | — |
+| Lentes | ⏳ pendiente | — |
+| (otras) | ⏳ pendiente | — |
+
+**Por qué el seed coexiste con `categoria_spec_templates`:** ese table sigue siendo necesario porque define UI metadata (qué specs van en card/filtros/nombre, prioridad de display) — eso no se deriva del dato del equipo. Lo que el seed automatiza es que el admin no la pueble a mano: el script lo hace en una pasada idempotente.
 
 ### Bulk actions en lista admin
 
@@ -266,6 +305,7 @@ Si una funcionalidad existe en código y no en issues, es un gap → crear el is
 | [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md) | Deploy y rollback |
 | [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md) | Checklist mobile + status por ruta |
 | [`docs/DISEÑO_SPECS.md`](docs/DISEÑO_SPECS.md) | Sistema de specs / templates |
+| [`docs/BH_LUCES_DATASET.md`](docs/BH_LUCES_DATASET.md) | Dataset curado de luces + workflow seed por categoría |
 | [`docs/ISSUE_LABELS.md`](docs/ISSUE_LABELS.md) | Convención de labels |
 
 ### Cosas que NO existen todavía
