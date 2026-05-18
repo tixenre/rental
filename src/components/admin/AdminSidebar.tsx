@@ -57,8 +57,15 @@ type NavItem = {
 };
 
 const items: NavItem[] = [
-  { title: "Dashboard", url: "/admin", icon: LayoutDashboard, exact: true },
-  { title: "Hoy",        url: "/admin/hoy",        icon: Sun },
+  {
+    title: "Dashboard",
+    url: "/admin",
+    icon: LayoutDashboard,
+    exact: true,
+    children: [
+      { title: "Hoy", url: "/admin/hoy", icon: Sun },
+    ],
+  },
   { title: "Calendario", url: "/admin/calendario", icon: CalendarDays },
   {
     title: "Inventario",
