@@ -2,7 +2,7 @@
 routes/cliente_portal.py — Portal de clientes (solo Google OAuth).
 """
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from typing import Optional
@@ -207,7 +207,9 @@ class PedidoClienteCreate(BaseModel):
 
 
 @router.post("/api/cliente/pedidos", status_code=201)
-def cliente_crear_pedido(data: PedidoClienteCreate, request: Request):
+def cliente_crear_pedido(
+    data: PedidoClienteCreate, request: Request, background: BackgroundTasks,
+):
     """Crea un pedido (estado 'presupuesto') ligado al cliente autenticado."""
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
@@ -233,7 +235,7 @@ def cliente_crear_pedido(data: PedidoClienteCreate, request: Request):
             for i in data.items
         ],
     )
-    return create_pedido(payload)
+    return create_pedido(payload, background=background)
 
 
 @router.patch("/api/cliente/pedidos/{id}/cancelar")

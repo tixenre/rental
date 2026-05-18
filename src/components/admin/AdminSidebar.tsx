@@ -26,6 +26,7 @@ import {
   Check,
   Database,
   Bot,
+  Mail,
 } from "lucide-react";
 
 import {
@@ -85,6 +86,7 @@ const items: NavItem[] = [
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
   { title: "Diseño",      url: "/admin/diseno",      icon: Palette },
   { title: "Novedades",   url: "/admin/novedades",   icon: Sparkles },
+  { title: "Emails",      url: "/admin/email-templates", icon: Mail },
   { title: "Settings",    url: "/admin/settings",    icon: Settings },
 ];
 
