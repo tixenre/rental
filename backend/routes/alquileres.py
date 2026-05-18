@@ -7,13 +7,15 @@ import logging
 from math import ceil
 from typing import Optional
 
-from fastapi import APIRouter, Query, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Query, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin
+from services.email import send_email
+from services.email.service import get_admin_to
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -295,15 +297,70 @@ def get_disponibilidad(
 
 # ── Rutas de pedidos ─────────────────────────────────────────────────────────
 
+def _pedido_email_context(pedido: dict) -> dict:
+    """Arma el dict de variables disponibles a todos los templates de
+    pedido. Mantener en sincronía con la lista de variables que se muestra
+    en el editor del frontend (`/admin/email-templates`).
+    """
+    items = pedido.get("items") or []
+    items_text = "\n".join(
+        f"- {it.get('equipo_nombre') or ''} × {it.get('cantidad', 1)}"
+        for it in items
+    )
+    items_html = "<ul>" + "".join(
+        f"<li>{it.get('equipo_nombre') or ''} × {it.get('cantidad', 1)}</li>"
+        for it in items
+    ) + "</ul>"
+    return {
+        "cliente_nombre": pedido.get("cliente_nombre") or "",
+        "cliente_email": pedido.get("cliente_email") or "",
+        "cliente_telefono": pedido.get("cliente_telefono") or "",
+        "numero_pedido": pedido.get("numero_pedido") or pedido.get("id"),
+        "fecha_desde": pedido.get("fecha_desde") or "",
+        "fecha_hasta": pedido.get("fecha_hasta") or "",
+        "total": pedido.get("monto_total") or 0,
+        "notas": pedido.get("notas") or "",
+        "items_html": items_html,
+        "items_text": items_text,
+        "admin_url": f"/admin/pedidos/{pedido.get('id')}",
+    }
+
+
+def _dispatch_pedido_creado_emails(background: Optional[BackgroundTasks], pedido: dict):
+    """Encola los mails de 'pedido creado' (cliente + admin) como
+    background tasks. Si no hay BackgroundTasks (llamada desde script),
+    los corre síncrono — el send_email() jamás propaga errores."""
+    ctx = _pedido_email_context(pedido)
+    pedido_id = pedido.get("id")
+    cliente_email = pedido.get("cliente_email")
+
+    if cliente_email:
+        if background is not None:
+            background.add_task(
+                send_email, "pedido_creado_cliente", cliente_email, ctx, pedido_id,
+            )
+        else:
+            send_email("pedido_creado_cliente", cliente_email, ctx, pedido_id)
+
+    admin_to = get_admin_to()
+    if admin_to:
+        if background is not None:
+            background.add_task(
+                send_email, "pedido_creado_admin", admin_to, ctx, pedido_id,
+            )
+        else:
+            send_email("pedido_creado_admin", admin_to, ctx, pedido_id)
+
+
 @router.post("/alquileres", status_code=201)
-def create_pedido_endpoint(data: PedidoCreate, request: Request):
+def create_pedido_endpoint(data: PedidoCreate, request: Request, background: BackgroundTasks):
     """Endpoint admin para crear pedido. La lógica está en `create_pedido`,
     así el portal cliente (cliente_portal.py) la reutiliza sin pasar por admin guard."""
     require_admin(request)
-    return create_pedido(data)
+    return create_pedido(data, background=background)
 
 
-def create_pedido(data: PedidoCreate):
+def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = None):
     """Lógica interna de creación de pedido. Llamada por el endpoint admin
     (`create_pedido_endpoint`) y también por `cliente_portal.cliente_crear_pedido`
     que tiene su propio `require_cliente`."""
@@ -378,13 +435,19 @@ def create_pedido(data: PedidoCreate):
 
         conn.commit()
         pedido = _get_alquiler_detail(conn, pedido_id)
-        return pedido
     except Exception:
         logger.error("Error creando pedido", exc_info=True)
         conn.rollback()
         raise
     finally:
         conn.close()
+
+    # Mails fuera del try/finally del DB: si fallan no rollbackean el pedido
+    # (igual send_email no propaga, pero por las dudas). Solo se mandan si
+    # el pedido salió de borrador — drafts no notifican.
+    if pedido and pedido.get("estado") != "borrador":
+        _dispatch_pedido_creado_emails(background, pedido)
+    return pedido
 
 
 SORT_COLS = {
@@ -568,7 +631,7 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
 
 
 @router.patch("/alquileres/{id}")
-def update_pedido(id: int, data: PedidoEstado, request: Request):
+def update_pedido(id: int, data: PedidoEstado, request: Request, background: BackgroundTasks):
     require_admin(request)
     if data.estado not in ESTADOS_VALIDOS:
         raise HTTPException(400, f"Estado inválido. Usar: {', '.join(sorted(ESTADOS_VALIDOS))}")
@@ -624,13 +687,27 @@ def update_pedido(id: int, data: PedidoEstado, request: Request):
         conn.commit()
 
         pedido = _get_alquiler_detail(conn, id)
-        return pedido
     except Exception:
         logger.error("Error actualizando estado del pedido %s", id, exc_info=True)
         conn.rollback()
         raise
     finally:
         conn.close()
+
+    # Notif al cliente cuando pasamos a 'confirmado' (solo si veníamos de
+    # otro estado — no re-mandamos si ya estaba confirmado).
+    if (
+        pedido
+        and data.estado == "confirmado"
+        and estado_anterior != "confirmado"
+        and pedido.get("cliente_email")
+    ):
+        ctx = _pedido_email_context(pedido)
+        background.add_task(
+            send_email, "pedido_confirmado_cliente",
+            pedido["cliente_email"], ctx, pedido.get("id"),
+        )
+    return pedido
 
 
 @router.patch("/alquileres/{id}/pago")

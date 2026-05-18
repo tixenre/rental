@@ -1442,6 +1442,57 @@ export const adminApi = {
     if (!res.ok) throw new Error(json?.detail ?? `Upload logo → ${res.status}`);
     return json as { ok: true; url: string };
   },
+
+  // ── Email templates ─────────────────────────────────────────────────
+  listEmailTemplates: () =>
+    authedJson<{ items: EmailTemplateSummary[] }>("/api/admin/email-templates"),
+  getEmailTemplate: (key: string) =>
+    authedJson<EmailTemplate>(`/api/admin/email-templates/${encodeURIComponent(key)}`),
+  updateEmailTemplate: (key: string, input: EmailTemplateInput) =>
+    authedJson<EmailTemplate>(`/api/admin/email-templates/${encodeURIComponent(key)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  previewEmailTemplate: (key: string, context?: Record<string, unknown>) =>
+    authedJson<{ subject: string; html: string; text: string }>(
+      `/api/admin/email-templates/${encodeURIComponent(key)}/preview`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context: context ?? null }),
+      },
+    ),
+  testEmailTemplate: (key: string, to: string, context?: Record<string, unknown>) =>
+    authedJson<{
+      ok: boolean;
+      provider?: string;
+      provider_id?: string;
+      error?: string;
+      log_id?: number;
+    }>(`/api/admin/email-templates/${encodeURIComponent(key)}/test`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to, context: context ?? null }),
+    }),
+};
+
+export type EmailTemplateSummary = {
+  key: string;
+  subject: string;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+export type EmailTemplate = EmailTemplateSummary & {
+  body_html: string;
+  body_text: string;
+};
+
+export type EmailTemplateInput = {
+  subject: string;
+  body_html: string;
+  body_text: string;
 };
 
 export type ClientePedidoRow = {

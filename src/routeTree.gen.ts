@@ -40,6 +40,9 @@ const AdminGearCompatibilityLazyRouteImport = createFileRoute(
 const AdminEstadisticasLazyRouteImport = createFileRoute(
   '/admin/estadisticas',
 )()
+const AdminEmailTemplatesLazyRouteImport = createFileRoute(
+  '/admin/email-templates',
+)()
 const AdminDisenoLazyRouteImport = createFileRoute('/admin/diseno')()
 const AdminClientesLazyRouteImport = createFileRoute('/admin/clientes')()
 const AdminCalendarioLazyRouteImport = createFileRoute('/admin/calendario')()
@@ -164,6 +167,13 @@ const AdminEstadisticasLazyRoute = AdminEstadisticasLazyRouteImport.update({
   getParentRoute: () => AdminRoute,
 } as any).lazy(() =>
   import('./routes/admin/estadisticas.lazy').then((d) => d.Route),
+)
+const AdminEmailTemplatesLazyRoute = AdminEmailTemplatesLazyRouteImport.update({
+  id: '/email-templates',
+  path: '/email-templates',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/email-templates.lazy').then((d) => d.Route),
 )
 const AdminDisenoLazyRoute = AdminDisenoLazyRouteImport.update({
   id: '/diseno',
@@ -361,6 +371,7 @@ export interface FileRoutesByFullPath {
   '/admin/calendario': typeof AdminCalendarioLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
+  '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
   '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
   '/admin/hoy': typeof AdminHoyLazyRoute
@@ -402,6 +413,7 @@ export interface FileRoutesByTo {
   '/admin/calendario': typeof AdminCalendarioLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
+  '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
   '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
   '/admin/hoy': typeof AdminHoyLazyRoute
@@ -447,6 +459,7 @@ export interface FileRoutesById {
   '/admin/calendario': typeof AdminCalendarioLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
+  '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
   '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
   '/admin/hoy': typeof AdminHoyLazyRoute
@@ -493,6 +506,7 @@ export interface FileRouteTypes {
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/diseno'
+    | '/admin/email-templates'
     | '/admin/estadisticas'
     | '/admin/gear-compatibility'
     | '/admin/hoy'
@@ -534,6 +548,7 @@ export interface FileRouteTypes {
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/diseno'
+    | '/admin/email-templates'
     | '/admin/estadisticas'
     | '/admin/gear-compatibility'
     | '/admin/hoy'
@@ -578,6 +593,7 @@ export interface FileRouteTypes {
     | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/diseno'
+    | '/admin/email-templates'
     | '/admin/estadisticas'
     | '/admin/gear-compatibility'
     | '/admin/hoy'
@@ -720,6 +736,13 @@ declare module '@tanstack/react-router' {
       path: '/estadisticas'
       fullPath: '/admin/estadisticas'
       preLoaderRoute: typeof AdminEstadisticasLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/email-templates': {
+      id: '/admin/email-templates'
+      path: '/email-templates'
+      fullPath: '/admin/email-templates'
+      preLoaderRoute: typeof AdminEmailTemplatesLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/diseno': {
@@ -947,6 +970,7 @@ interface AdminRouteChildren {
   AdminCalendarioLazyRoute: typeof AdminCalendarioLazyRoute
   AdminClientesLazyRoute: typeof AdminClientesLazyRoute
   AdminDisenoLazyRoute: typeof AdminDisenoLazyRoute
+  AdminEmailTemplatesLazyRoute: typeof AdminEmailTemplatesLazyRoute
   AdminEstadisticasLazyRoute: typeof AdminEstadisticasLazyRoute
   AdminGearCompatibilityLazyRoute: typeof AdminGearCompatibilityLazyRoute
   AdminHoyLazyRoute: typeof AdminHoyLazyRoute
@@ -970,6 +994,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCalendarioLazyRoute: AdminCalendarioLazyRoute,
   AdminClientesLazyRoute: AdminClientesLazyRoute,
   AdminDisenoLazyRoute: AdminDisenoLazyRoute,
+  AdminEmailTemplatesLazyRoute: AdminEmailTemplatesLazyRoute,
   AdminEstadisticasLazyRoute: AdminEstadisticasLazyRoute,
   AdminGearCompatibilityLazyRoute: AdminGearCompatibilityLazyRoute,
   AdminHoyLazyRoute: AdminHoyLazyRoute,

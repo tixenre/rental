@@ -53,6 +53,8 @@ ALLOWED_SETTINGS_KEYS = {
     "roi_pct_default",   # % default para nuevos equipos. Float.
     "shipping_usd",      # Envío default en USD para cálculo de reposición. Float.
     "logo_url",          # URL pública del logo (imagen). String.
+    "email_from",        # From address de mails ('Rambla <pedidos@rambla.com.uy>'). Pisado por env EMAIL_FROM.
+    "email_admin_to",    # Destinatario de notif al admin cuando entra un pedido. Pisado por env EMAIL_ADMIN_TO.
 }
 
 

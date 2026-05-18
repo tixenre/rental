@@ -55,6 +55,7 @@ from routes.unidades         import router as unidades_router
 from routes.changelog        import router as changelog_router
 from routes.seo              import router as seo_router
 from routes.inventario       import router as inventario_router
+from routes.email_templates  import router as email_templates_router
 from middleware          import auth_middleware
 
 logger = logging.getLogger(__name__)
@@ -135,6 +136,7 @@ app.include_router(specs_observatorio_router, prefix="/api")
 app.include_router(unidades_router,       prefix="/api")
 app.include_router(changelog_router,      prefix="/api")
 app.include_router(inventario_router,     prefix="/api/admin")
+app.include_router(email_templates_router, prefix="/api")
 app.include_router(seo_router)  # /sitemap.xml (sin prefijo /api — debe estar en root)
 app.include_router(cliente_portal_router)
 
