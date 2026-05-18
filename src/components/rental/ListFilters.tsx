@@ -25,7 +25,7 @@ export function ListFilters({
   onClear: () => void;
 }) {
   return (
-    <div className="hidden md:block sticky top-[124px] z-20 border-b hairline bg-background/90 backdrop-blur-xl">
+    <div className="hidden md:block border-b hairline bg-background">
       <div className="px-4 py-3 lg:px-12">
         <FilterControls
           layout="inline"
@@ -36,6 +36,7 @@ export function ListFilters({
           selectedBrand={selectedBrand}
           onBrand={onBrand}
           onClear={onClear}
+          showCategories={false}
         />
       </div>
     </div>

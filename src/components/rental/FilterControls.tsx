@@ -22,6 +22,7 @@ export function FilterControls({
   onBrand,
   onClear,
   showClear = true,
+  showCategories = true,
 }: {
   layout: "inline" | "stacked";
   categories: string[];
@@ -32,6 +33,7 @@ export function FilterControls({
   onBrand: (b: string | null) => void;
   onClear: () => void;
   showClear?: boolean;
+  showCategories?: boolean;
 }) {
   const hasFilters = selectedCategories.size > 0 || !!selectedBrand;
 
@@ -44,7 +46,7 @@ export function FilterControls({
           onBrand={onBrand}
           className="shrink-0 px-3 py-1.5 text-xs"
         />
-        {categories.map((c) => (
+        {showCategories && categories.map((c) => (
           <CategoryChip
             key={c}
             label={c}

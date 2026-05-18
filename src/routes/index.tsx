@@ -290,85 +290,142 @@ function Index() {
             />
           </div>
 
-          {/* Desktop: cat-bar con ViewToggle + popular chips + buscador */}
-          <div className="hidden sm:flex sm:items-center sm:gap-4 sm:px-6 sm:py-2.5">
-
-            {/* ViewToggle con indicador deslizable */}
-            <ViewToggle
-              options={[
-                { value: "grid" as Mode, label: "Explorar", icon: <LayoutGrid className="h-3 w-3" /> },
-                { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
-              ]}
-              value={mode}
-              onChange={setMode}
-            />
-
-            {/* Popular chips */}
-            <div className="flex flex-1 items-center gap-2 overflow-x-auto scrollbar-none">
-              <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground shrink-0 select-none">
-                Popular
-              </span>
-              {POPULAR_CHIPS.map((chip) => (
-                <button
-                  key={chip}
-                  onClick={() => setQuery(query === chip ? "" : chip)}
-                  className={cn(
-                    "rounded-full border px-3 py-1 text-xs font-medium whitespace-nowrap transition shrink-0",
-                    query === chip
-                      ? "border-amber/60 bg-amber/15 font-semibold text-ink"
-                      : "border-hairline bg-transparent text-ink hover:border-ink/40 hover:bg-muted/50",
-                  )}
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
-
-            {/* Buscador en la derecha del cat-bar */}
-            <div className="relative shrink-0 w-56">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar…"
-                className="w-full rounded-full border hairline bg-surface py-1.5 pl-8 pr-7 text-sm placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
+          {/* Desktop: cat-bar 2 filas (toggle+buscador / cat-tabs+disponibles)
+              siguiendo design handoff. Popular chips en su propia fila debajo
+              (solo en modo lista). */}
+          <div className="hidden sm:block">
+            {/* Fila 1: ViewToggle (izq) + Buscador (der) */}
+            <div className="flex items-center gap-4 px-6 py-2.5 border-b hairline">
+              <ViewToggle
+                options={[
+                  { value: "grid" as Mode, label: "Explorar", icon: <LayoutGrid className="h-3 w-3" /> },
+                  { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
+                ]}
+                value={mode}
+                onChange={setMode}
               />
-              {query && (
-                <button
-                  onClick={() => setQuery("")}
-                  aria-label="Limpiar"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
+
+              <div className="flex-1" />
+
+              {/* Buscador en la derecha del cat-bar */}
+              <div className="relative shrink-0 w-72">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar equipo, marca…"
+                  className="w-full rounded-full border hairline bg-surface py-1.5 pl-8 pr-7 text-sm placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
+                />
+                {query && (
+                  <button
+                    onClick={() => setQuery("")}
+                    aria-label="Limpiar"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Filtro Disponibles — solo tiene efecto con fechas pickeadas */}
-            <button
-              type="button"
-              onClick={() => setDisponiblesOnly((v) => !v)}
-              className={cn(
-                "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
-                disponiblesOnly
-                  ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
-                  : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
-              )}
-              aria-pressed={disponiblesOnly}
-              title="Mostrar solo equipos disponibles para las fechas elegidas"
-            >
-              <Check className="h-3 w-3" />
-              Disponibles
-            </button>
+            {/* Fila 2: Cat-tabs (izq, scroll horizontal) + Disponibles (der) */}
+            <div className="flex items-center gap-3 pl-4 pr-6 overflow-x-auto scrollbar-none">
+              <div className="flex shrink-0">
+                {["Todo", ...apiCategories].map((cat) => {
+                  const isActive =
+                    cat === "Todo"
+                      ? selectedCats.size === 0
+                      : selectedCats.has(cat);
+                  const count =
+                    cat === "Todo"
+                      ? allEquipos.length
+                      : allEquipos.filter(
+                          (e) =>
+                            e.category === cat ||
+                            (e.categorias ?? []).some((cc) => cc.nombre === cat),
+                        ).length;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => {
+                        if (cat === "Todo") setSelectedCats(new Set());
+                        else setSelectedCats(new Set([cat]));
+                      }}
+                      className={cn(
+                        "flex items-baseline gap-1.5 px-3.5 pt-2.5 pb-2 whitespace-nowrap shrink-0 border-b-[2.5px] transition",
+                        isActive ? "border-amber" : "border-transparent hover:border-hairline",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "font-sans text-sm",
+                          isActive ? "font-bold text-ink" : "font-medium text-muted-foreground",
+                        )}
+                      >
+                        {cat}
+                      </span>
+                      <span className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground tabular">
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
 
-            {/* Contador */}
-            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular shrink-0">
-              {query.trim() || mode === "list"
-                ? `${filtered.length}`
-                : `${allEquipos.length}`}
+              <div className="flex-1 min-w-2" />
+
+              {/* Filtro Disponibles — solo tiene efecto con fechas pickeadas */}
+              <button
+                type="button"
+                onClick={() => setDisponiblesOnly((v) => !v)}
+                className={cn(
+                  "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
+                  disponiblesOnly
+                    ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
+                    : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
+                )}
+                aria-pressed={disponiblesOnly}
+                title="Mostrar solo equipos disponibles para las fechas elegidas"
+              >
+                <Check className="h-3 w-3" />
+                Disponibles
+              </button>
+
+              {/* Contador */}
+              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular shrink-0 pl-1">
+                {query.trim() || mode === "list"
+                  ? `${filtered.length}`
+                  : `${allEquipos.length}`}
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Popular bar — fila separada bajo el cat-bar, solo en modo lista.
+            No sticky: scrollea fuera con el contenido (mismo patrón que el
+            móvil — los populares no tienen sentido después de empezar a
+            scrollear). */}
+        {mode === "list" && (
+          <div className="hidden sm:flex items-center gap-2 px-6 py-2 border-b hairline bg-background overflow-x-auto scrollbar-none">
+            <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground shrink-0">
+              Populares:
+            </span>
+            {POPULAR_CHIPS.map((chip) => (
+              <button
+                key={chip}
+                onClick={() => setQuery(query === chip ? "" : chip)}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-medium whitespace-nowrap transition shrink-0",
+                  query === chip
+                    ? "border-amber/60 bg-amber/15 font-semibold text-ink"
+                    : "border-hairline bg-surface text-ink hover:border-ink/40 hover:bg-muted/50",
+                )}
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Loading / Error states */}
         {isLoading ? (
