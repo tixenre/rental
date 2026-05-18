@@ -1249,8 +1249,10 @@ export function CatalogoMovil() {
   );
 
   // Height of compact search (used for category tabs top offset)
-  // Cat-tabs sticky bajo el topbar (54px de altura incluyendo borde).
-  const CAT_TABS_STICKY_TOP = 53;
+  // Cat-tabs sticky bajo el topbar (54px) + barra de búsqueda sticky (~65px).
+  const TOPBAR_HEIGHT = 53;
+  const SEARCH_BAR_HEIGHT = 65;
+  const CAT_TABS_STICKY_TOP = TOPBAR_HEIGHT + SEARCH_BAR_HEIGHT;
 
   // h-dvh (dynamic viewport) respeta la URL bar de safari iOS — antes
   // h-screen dejaba el cart-bar tapado cuando safari mostraba su UI.
@@ -1309,27 +1311,40 @@ export function CatalogoMovil() {
             Anclado al heroRef del amber-on-scroll del topbar. */}
         <HeroBanner heroRef={heroRef} equipCount={allEquipos?.length ?? 0} />
 
-        {/* SearchSection — scrollea con el contenido. Antes se ponía
-            sticky al pasar el threshold (overlapeaba con la cat-bar al
-            tener ambas top:53 durante el frame de transición). Mejor
-            UX: solo la cat-bar queda sticky bajo el topbar. */}
-        <div className="px-4 pt-3 pb-2">
+        {/* Search bar — sticky bajo el topbar. Los chips de "Populares"
+            scrollean fuera (no son sticky). */}
+        <div
+          className="sticky z-[39] px-4 pt-3 pb-2 backdrop-blur"
+          style={{ top: TOPBAR_HEIGHT, background: TABS_BG }}
+        >
           <div className="relative">
             <Search
               size={15}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
             />
             <input
-              className="w-full rounded-[var(--radius-lg)] border-[1.5px] border-hairline bg-surface font-sans text-sm py-[11px] pl-[38px] pr-3 text-ink placeholder:text-muted-foreground outline-none transition-all focus:border-amber"
+              className="w-full rounded-[var(--radius-lg)] border-[1.5px] border-hairline bg-surface font-sans text-sm py-[11px] pl-[38px] pr-9 text-ink placeholder:text-muted-foreground outline-none transition-all focus:border-amber"
               style={{ fontFamily: "var(--font-sans)" }}
               placeholder="Buscar equipo, marca, pack…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-2 top-1/2 -translate-y-1/2 grid h-6 w-6 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-ink transition-colors"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
+        </div>
 
-          {/* Popular chips */}
-          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
+        {/* Popular chips — scrollean fuera con el contenido */}
+        <div className="px-4 pt-1 pb-2">
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
             <span className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground whitespace-nowrap self-center shrink-0">
               Populares:
             </span>
