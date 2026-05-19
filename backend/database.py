@@ -960,13 +960,17 @@ def init_db():
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS solicitudes_modificacion (
-            id          SERIAL PRIMARY KEY,
-            pedido_id   INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
-            cliente_id  INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
-            mensaje     TEXT NOT NULL,
-            estado      TEXT NOT NULL DEFAULT 'pendiente',
-            respuesta   TEXT,
-            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            id           SERIAL PRIMARY KEY,
+            pedido_id    INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
+            cliente_id   INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            mensaje      TEXT,
+            estado       TEXT NOT NULL DEFAULT 'pendiente',
+            respuesta    TEXT,
+            cambios_json JSONB,
+            tipo         TEXT NOT NULL DEFAULT 'aprobacion',
+            resolved_at  TIMESTAMPTZ,
+            resolved_by  TEXT,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.execute("""
@@ -996,6 +1000,13 @@ def init_db():
     conn.execute("""
         INSERT INTO app_settings (key, value, updated_by)
         VALUES ('usd_rate', '1000', 'system-seed')
+        ON CONFLICT (key) DO NOTHING
+    """)
+    # Horas mínimas de antelación para que el cliente pueda solicitar
+    # una modificación al pedido desde el portal.
+    conn.execute("""
+        INSERT INTO app_settings (key, value, updated_by)
+        VALUES ('modificacion_ventana_horas', '24', 'system-seed')
         ON CONFLICT (key) DO NOTHING
     """)
 

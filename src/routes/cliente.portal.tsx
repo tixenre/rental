@@ -1,10 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
+import { clienteApi } from "@/lib/cliente/api";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { StatCard } from "@/components/rental/StatCard";
 import { EstadoBadge } from "@/components/rental/EstadoBadge";
-import { ArrowRight, ChevronDown, ShoppingBag } from "lucide-react";
+import { ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cliente/portal")({
@@ -29,6 +31,12 @@ type Item = {
   nombre_publico_largo?: string | null;
 };
 type Pago = { monto: number; concepto?: string | null; fecha: string };
+type SolicitudPortal = {
+  id: number;
+  estado: "pendiente" | "aprobada" | "rechazada" | "cancelada";
+  respuesta?: string | null;
+  created_at: string;
+};
 type Pedido = {
   id: number; numero_pedido: string; estado: string;
   fecha_desde?: string; fecha_hasta?: string;
@@ -37,11 +45,16 @@ type Pedido = {
   notas?: string | null;
   items: Item[];
   pagos?: Pago[];
+  solicitudes?: SolicitudPortal[];
   documentos_disponibles: { remito: boolean; contrato: boolean; albaran: boolean };
 };
 
-const ACTIVE_STATES = new Set(["solicitado", "confirmado", "entregado"]);
+// Estados activos según el back-office. Mantenemos "solicitado"/"entregado"
+// por retrocompatibilidad con pedidos viejos importados; los reales son
+// "presupuesto" y "retirado".
+const ACTIVE_STATES = new Set(["solicitado", "presupuesto", "confirmado", "entregado", "retirado"]);
 const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
+const MODIFICABLE_STATES = new Set(["presupuesto", "solicitado", "confirmado"]);
 
 type Filtro = "todos" | "activos" | "historial";
 
@@ -76,6 +89,13 @@ export default function ClientePortal() {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [tab, setTab] = useState<Filtro>("todos");
+  const [ventanaHoras, setVentanaHoras] = useState<number>(24);
+
+  function reloadPedidos() {
+    authedFetch("/api/cliente/pedidos").then(async (r) => {
+      if (r.ok) setPedidos(await r.json());
+    });
+  }
 
   useEffect(() => {
     let alive = true;
@@ -89,6 +109,11 @@ export default function ClientePortal() {
       setPedidos(await ro.json());
     }).catch(() => navigate({ to: "/cliente/login" }))
       .finally(() => alive && setLoading(false));
+
+    clienteApi.modificacionConfig()
+      .then((c) => { if (alive) setVentanaHoras(c.ventana_horas); })
+      .catch(() => { /* default 24 */ });
+
     return () => { alive = false; };
   }, [navigate]);
 
@@ -227,6 +252,8 @@ export default function ClientePortal() {
                 pedido={p}
                 expanded={expanded === p.id}
                 onToggle={() => setExpanded(expanded === p.id ? null : p.id)}
+                ventanaHoras={ventanaHoras}
+                onChanged={reloadPedidos}
               />
             ))}
           </div>
@@ -264,10 +291,42 @@ function jornadasEntre(desde?: string, hasta?: string): number {
   return Math.max(1, Math.ceil((d2 - d1) / 86_400_000) + 1);
 }
 
-function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: boolean; onToggle: () => void }) {
+function PedidoCard({
+  pedido, expanded, onToggle, ventanaHoras, onChanged,
+}: {
+  pedido: Pedido;
+  expanded: boolean;
+  onToggle: () => void;
+  ventanaHoras: number;
+  onChanged: () => void;
+}) {
+  const navigate = useNavigate();
   const { documentos_disponibles: docs } = pedido;
   const numero = pedido.numero_pedido ?? pedido.id;
   const jornadas = jornadasEntre(pedido.fecha_desde, pedido.fecha_hasta);
+
+  const pendiente = (pedido.solicitudes ?? []).find((s) => s.estado === "pendiente");
+
+  const dentroVentana = (() => {
+    if (!pedido.fecha_desde) return true;
+    const desde = new Date(pedido.fecha_desde.slice(0, 10) + "T00:00:00").getTime();
+    const ms = ventanaHoras * 60 * 60 * 1000;
+    return desde - Date.now() >= ms;
+  })();
+
+  const puedeModificar =
+    MODIFICABLE_STATES.has(pedido.estado) && !pendiente && dentroVentana;
+
+  async function cancelarSolicitud() {
+    if (!pendiente) return;
+    try {
+      await clienteApi.cancelarSolicitud(pedido.id, pendiente.id);
+      toast.success("Solicitud cancelada");
+      onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
 
   const subtotalItems = pedido.items.reduce((acc, it) => acc + it.subtotal, 0);
   const descuentoPct = pedido.descuento_pct ?? 0;
@@ -317,6 +376,53 @@ function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: 
 
       {expanded && (
         <div className="border-t border-dashed border-[var(--hairline)] px-4 sm:px-[18px] pt-[18px] pb-[22px] flex flex-col gap-5 animate-[expand-in_.22s_ease-out]">
+
+          {pendiente && (
+            <section className="rounded-md border border-amber bg-amber-soft px-3.5 py-3 flex items-start gap-2.5">
+              <Clock className="h-4 w-4 text-amber mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="font-sans text-[13px] font-semibold text-ink">
+                  Solicitud de modificación pendiente
+                </div>
+                <div className="font-sans text-xs text-ink/70 mt-0.5">
+                  Estamos revisando los cambios que pediste. Te avisamos por mail cuando los resolvamos.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={cancelarSolicitud}
+                className="rounded-full px-3 py-1.5 font-sans text-xs font-semibold text-ink border border-ink/20 hover:border-ink transition shrink-0 inline-flex items-center gap-1"
+              >
+                <XIcon className="h-3 w-3" /> Cancelar
+              </button>
+            </section>
+          )}
+
+          {puedeModificar && (
+            <section>
+              <button
+                type="button"
+                onClick={() => navigate({
+                  to: "/cliente/pedidos/$id/editar",
+                  params: { id: String(pedido.id) },
+                })}
+                className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 font-sans text-[13px] font-bold text-amber hover:bg-amber hover:text-ink transition"
+              >
+                <Pencil className="h-3.5 w-3.5" /> Modificar pedido
+              </button>
+              {pedido.estado === "confirmado" && (
+                <p className="mt-2 font-sans text-xs text-muted-foreground">
+                  Los cambios necesitarán nuestra aprobación.
+                </p>
+              )}
+            </section>
+          )}
+
+          {!puedeModificar && MODIFICABLE_STATES.has(pedido.estado) && !pendiente && !dentroVentana && (
+            <section className="rounded-md border border-dashed border-[var(--hairline)] px-3.5 py-2.5 font-sans text-xs text-muted-foreground">
+              No es posible modificar este pedido a menos de {ventanaHoras} h del retiro. Contactanos directamente.
+            </section>
+          )}
 
           <section className="grid grid-cols-3 gap-2">
             <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">

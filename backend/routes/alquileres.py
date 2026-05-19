@@ -814,73 +814,121 @@ def eliminar_pago(id: int, pago_id: int, request: Request):
         conn.close()
 
 
+def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
+    """Aplica un cambio parcial de datos (cliente/fechas/notas/descuento) al pedido.
+
+    Lógica compartida entre el endpoint admin (`update_pedido_datos`) y la
+    aplicación de propuestas del cliente (cliente_portal). Recibe una conexión
+    abierta; el caller hace commit/rollback y close.
+    """
+    p = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+    if not p:
+        raise HTTPException(404, "Pedido no encontrado")
+
+    payload = {k: v for k, v in data.model_dump(exclude_unset=True).items()}
+
+    cliente_cambio = "cliente_id" in payload and payload["cliente_id"]
+    if cliente_cambio:
+        c = conn.execute("SELECT * FROM clientes WHERE id=?", (payload["cliente_id"],)).fetchone()
+        if c:
+            payload.setdefault("cliente_nombre",   f"{c['apellido']}, {c['nombre']}")
+            payload.setdefault("cliente_email",    c["email"])
+            payload.setdefault("cliente_telefono", c["telefono"])
+            if "descuento_pct" not in payload:
+                payload["descuento_pct"] = c["descuento"] or 0.0
+
+    if "fecha_desde" in payload or "fecha_hasta" in payload:
+        nueva_desde = payload.get("fecha_desde") or p["fecha_desde"]
+        nueva_hasta = payload.get("fecha_hasta") or p["fecha_hasta"]
+        if nueva_desde and nueva_hasta:
+            d0 = datetime.datetime.fromisoformat(nueva_desde)
+            d1 = datetime.datetime.fromisoformat(nueva_hasta)
+            hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+            if d0 >= d1:
+                raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
+            if d0 < hoy:
+                raise HTTPException(400, "fecha_desde no puede ser en el pasado")
+
+    if not payload:
+        return _get_alquiler_detail(conn, id)
+
+    cols = ", ".join(f"{k}=?" for k in payload)
+    conn.execute(f"UPDATE alquileres SET {cols} WHERE id=?", (*payload.values(), id))
+
+    if "fecha_desde" in payload or "fecha_hasta" in payload or cliente_cambio:
+        p2 = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+        if p2["fecha_desde"] and p2["fecha_hasta"]:
+            d0 = datetime.datetime.fromisoformat(p2["fecha_desde"])
+            d1 = datetime.datetime.fromisoformat(p2["fecha_hasta"])
+            jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
+        else:
+            jornadas = 1
+        items = conn.execute(
+            "SELECT id, cantidad, precio_jornada FROM alquiler_items WHERE pedido_id=?", (id,)
+        ).fetchall()
+        bruto = 0
+        for it in items:
+            sub = it["precio_jornada"] * it["cantidad"] * jornadas
+            conn.execute("UPDATE alquiler_items SET subtotal=? WHERE id=?", (sub, it["id"]))
+            bruto += sub
+        descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+        descuento_total = max(p2["descuento_pct"] or 0, descuento_jornadas_pct)
+        monto_total = _aplicar_descuento(bruto, descuento_total)
+        conn.execute(
+            "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
+            (monto_total, descuento_jornadas_pct, id)
+        )
+
+    return _get_alquiler_detail(conn, id)
+
+
+def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
+    """Reemplaza los ítems del pedido por `items`. Recalcula subtotales y monto.
+
+    No valida stock — el caller debe llamar a `_check_stock` si corresponde.
+    Lógica compartida entre admin y portal cliente.
+    """
+    p = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+    if not p:
+        raise HTTPException(404, "Pedido no encontrado")
+    if not items:
+        raise HTTPException(400, "Debe tener al menos un ítem")
+
+    if p["fecha_desde"] and p["fecha_hasta"]:
+        d0 = datetime.datetime.fromisoformat(p["fecha_desde"])
+        d1 = datetime.datetime.fromisoformat(p["fecha_hasta"])
+        jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
+    else:
+        jornadas = 1
+
+    bruto = 0
+    rows = []
+    for it in items:
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (it.equipo_id,)).fetchone():
+            raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado")
+        subtotal = it.precio_jornada * it.cantidad * jornadas
+        bruto += subtotal
+        rows.append((id, it.equipo_id, it.cantidad, it.precio_jornada, subtotal))
+    monto_total = _aplicar_descuento(bruto, p["descuento_pct"] or 0)
+
+    conn.execute("DELETE FROM alquiler_items WHERE pedido_id=?", (id,))
+    conn.executemany("""
+        INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
+        VALUES (?,?,?,?,?)
+    """, rows)
+    conn.execute("UPDATE alquileres SET monto_total=? WHERE id=?", (monto_total, id))
+
+    return _get_alquiler_detail(conn, id)
+
+
 @router.patch("/alquileres/{id}/datos")
 def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
     require_admin(request)
     conn = get_db()
     try:
-        p = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
-        if not p:
-            raise HTTPException(404, "Pedido no encontrado")
-
-        payload = {k: v for k, v in data.model_dump(exclude_unset=True).items()}
-
-        cliente_cambio = "cliente_id" in payload and payload["cliente_id"]
-        if cliente_cambio:
-            c = conn.execute("SELECT * FROM clientes WHERE id=?", (payload["cliente_id"],)).fetchone()
-            if c:
-                payload.setdefault("cliente_nombre",   f"{c['apellido']}, {c['nombre']}")
-                payload.setdefault("cliente_email",    c["email"])
-                payload.setdefault("cliente_telefono", c["telefono"])
-                # Solo usar descuento del cliente si no vino uno manual en el payload
-                if "descuento_pct" not in payload:
-                    payload["descuento_pct"] = c["descuento"] or 0.0
-
-        # Validar fechas si se están actualizando
-        if "fecha_desde" in payload or "fecha_hasta" in payload:
-            nueva_desde = payload.get("fecha_desde") or p["fecha_desde"]
-            nueva_hasta = payload.get("fecha_hasta") or p["fecha_hasta"]
-            if nueva_desde and nueva_hasta:
-                d0 = datetime.datetime.fromisoformat(nueva_desde)
-                d1 = datetime.datetime.fromisoformat(nueva_hasta)
-                hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-
-                if d0 >= d1:
-                    raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
-                if d0 < hoy:
-                    raise HTTPException(400, "fecha_desde no puede ser en el pasado")
-
-        if payload:
-            cols = ", ".join(f"{k}=?" for k in payload)
-            conn.execute(f"UPDATE alquileres SET {cols} WHERE id=?", (*payload.values(), id))
-
-            if "fecha_desde" in payload or "fecha_hasta" in payload or cliente_cambio:
-                p2 = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
-                if p2["fecha_desde"] and p2["fecha_hasta"]:
-                    d0 = datetime.datetime.fromisoformat(p2["fecha_desde"])
-                    d1 = datetime.datetime.fromisoformat(p2["fecha_hasta"])
-                    jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
-                else:
-                    jornadas = 1
-                items = conn.execute(
-                    "SELECT id, cantidad, precio_jornada FROM alquiler_items WHERE pedido_id=?", (id,)
-                ).fetchall()
-                bruto = 0
-                for it in items:
-                    sub = it["precio_jornada"] * it["cantidad"] * jornadas
-                    conn.execute("UPDATE alquiler_items SET subtotal=? WHERE id=?", (sub, it["id"]))
-                    bruto += sub
-                descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
-                descuento_total = max(p2["descuento_pct"] or 0, descuento_jornadas_pct)
-                monto_total = _aplicar_descuento(bruto, descuento_total)
-                conn.execute(
-                    "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
-                    (monto_total, descuento_jornadas_pct, id)
-                )
-
-            conn.commit()
-
-        pedido = _get_alquiler_detail(conn, id)
+        pedido = _apply_pedido_datos(conn, id, data)
+        conn.commit()
         return pedido
     except Exception:
         logger.error("Error actualizando datos del pedido %s", id, exc_info=True)
@@ -895,38 +943,8 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
     require_admin(request)
     conn = get_db()
     try:
-        p = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
-        if not p:
-            raise HTTPException(404, "Pedido no encontrado")
-        if not data.items:
-            raise HTTPException(400, "Debe tener al menos un ítem")
-
-        if p["fecha_desde"] and p["fecha_hasta"]:
-            d0 = datetime.datetime.fromisoformat(p["fecha_desde"])
-            d1 = datetime.datetime.fromisoformat(p["fecha_hasta"])
-            jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
-        else:
-            jornadas = 1
-
-        bruto = 0
-        rows = []
-        for it in data.items:
-            if not conn.execute("SELECT id FROM equipos WHERE id=?", (it.equipo_id,)).fetchone():
-                raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado")
-            subtotal = it.precio_jornada * it.cantidad * jornadas
-            bruto += subtotal
-            rows.append((id, it.equipo_id, it.cantidad, it.precio_jornada, subtotal))
-        monto_total = _aplicar_descuento(bruto, p["descuento_pct"] or 0)
-
-        conn.execute("DELETE FROM alquiler_items WHERE pedido_id=?", (id,))
-        conn.executemany("""
-            INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
-            VALUES (?,?,?,?,?)
-        """, rows)
-        conn.execute("UPDATE alquileres SET monto_total=? WHERE id=?", (monto_total, id))
+        pedido = _apply_pedido_items(conn, id, data.items)
         conn.commit()
-
-        pedido = _get_alquiler_detail(conn, id)
         return pedido
     except Exception:
         logger.error("Error actualizando items del pedido %s", id, exc_info=True)

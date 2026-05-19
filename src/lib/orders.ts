@@ -293,9 +293,3 @@ export async function cancelOrder(id: string): Promise<void> {
   }
 }
 
-export async function createChangeRequest(orderId: string, message: string) {
-  await authedPostJson(
-    `/api/cliente/pedidos/${orderId}/solicitar-modificacion`,
-    { mensaje: message },
-  );
-}

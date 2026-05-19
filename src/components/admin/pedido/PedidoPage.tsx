@@ -36,11 +36,12 @@ import {
   adminApi, ESTADO_LABEL, pedidoPdfUrl,
   type PedidoEstado, type Equipo, type Cliente,
 } from "@/lib/admin/api";
+import { clienteApi } from "@/lib/cliente/api";
 import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
   usePedidoDraft, jornadasEntre,
-  type DraftItem, type DraftDatos, type SaveStatus,
+  type DraftItem, type DraftDatos, type SaveStatus, type PedidoMode,
 } from "./usePedidoDraft";
 
 // ── Formatters ────────────────────────────────────────────────────────────
@@ -131,17 +132,38 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export function PedidoPage({ pedidoId }: { pedidoId: number }) {
+export type PedidoPageProps = {
+  pedidoId: number;
+  /** Modo de la vista. 'admin' (default) o 'cliente' (portal). */
+  mode?: PedidoMode;
+  /** Mensaje opcional para acompañar la solicitud (sólo cliente). */
+  mensaje?: string;
+  /** Callback al volver desde la vista cliente. */
+  onClose?: () => void;
+};
+
+export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: PedidoPageProps) {
   const router = useRouter();
   const qc = useQueryClient();
+  const isCliente = mode === "cliente";
 
   const pedidoQ = useQuery({
-    queryKey: ["admin", "pedido", pedidoId],
-    queryFn: () => adminApi.getPedido(pedidoId),
+    queryKey: isCliente ? ["cliente", "pedido", pedidoId] : ["admin", "pedido", pedidoId],
+    queryFn: () => (isCliente ? clienteApi.getPedido(pedidoId) : adminApi.getPedido(pedidoId)),
   });
 
   const pedido = pedidoQ.data;
-  const draft = usePedidoDraft(pedido);
+
+  // En modo cliente el submitMode depende del estado del pedido:
+  //  - presupuesto: autosave (se aplica directo)
+  //  - confirmado:  propose   (genera solicitud pendiente de aprobación)
+  const clienteSubmitMode = pedido?.estado === "confirmado" ? "propose" : "autosave";
+
+  const draft = usePedidoDraft(pedido, {
+    mode,
+    submitMode: isCliente ? clienteSubmitMode : "autosave",
+    mensaje,
+  });
 
   const [askDelete, setAskDelete] = useState(false);
   const [openActionMenu, setOpenActionMenu] = useState(false);
@@ -200,10 +222,23 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 bg-background border-b hairline px-4 md:px-6 py-3 flex items-center gap-3">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <Link to="/admin/pedidos" className="text-muted-foreground hover:text-ink transition shrink-0">
-            <ChevronLeft className="h-4 w-4" />
-          </Link>
-          <span className="text-muted-foreground text-sm hidden sm:inline">Pedidos</span>
+          {isCliente ? (
+            <button
+              type="button"
+              onClick={() => onClose?.() ?? router.navigate({ to: "/cliente/portal" })}
+              className="text-muted-foreground hover:text-ink transition shrink-0"
+              aria-label="Volver"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          ) : (
+            <Link to="/admin/pedidos" className="text-muted-foreground hover:text-ink transition shrink-0">
+              <ChevronLeft className="h-4 w-4" />
+            </Link>
+          )}
+          <span className="text-muted-foreground text-sm hidden sm:inline">
+            {isCliente ? "Mis pedidos" : "Pedidos"}
+          </span>
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground hidden sm:inline shrink-0" />
           <span className="font-semibold text-sm text-ink truncate">{numero}</span>
           <Badge variant={pedidoEstadoVariant(pedido.estado)} className="ml-1 shrink-0">
@@ -213,21 +248,23 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
 
         <div className="flex items-center gap-2 shrink-0">
           <SaveIndicator status={draft.saveStatus} />
-          <WhatsAppButton
-            pedido={{
-              numero_pedido: pedido.numero_pedido,
-              numero_remito: pedido.numero_remito,
-              cliente_nombre: draft.datos.cliente_nombre,
-              fecha_desde: draft.datos.fecha_desde,
-              fecha_hasta: draft.datos.fecha_hasta,
-              monto_total: total,
-              monto_pagado: pagado,
-              estado: pedido.estado,
-            }}
-            phone={draft.datos.cliente_telefono}
-            variant="icon"
-          />
-          {nextAction && (
+          {!isCliente && (
+            <WhatsAppButton
+              pedido={{
+                numero_pedido: pedido.numero_pedido,
+                numero_remito: pedido.numero_remito,
+                cliente_nombre: draft.datos.cliente_nombre,
+                fecha_desde: draft.datos.fecha_desde,
+                fecha_hasta: draft.datos.fecha_hasta,
+                monto_total: total,
+                monto_pagado: pagado,
+                estado: pedido.estado,
+              }}
+              phone={draft.datos.cliente_telefono}
+              variant="icon"
+            />
+          )}
+          {!isCliente && nextAction && (
             <Button
               size="sm"
               onClick={() => draft.estadoMut.mutate(nextAction.estado)}
@@ -237,31 +274,45 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
               <Check className="h-3.5 w-3.5 mr-1" /> {nextAction.label}
             </Button>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="hidden sm:inline-flex">
-                <MoreHorizontal className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                disabled={pedido.estado === "cancelado"}
-                onClick={() => draft.estadoMut.mutate("cancelado")}
-              >
-                Cancelar pedido
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={() => setAskDelete(true)}
-              >
-                <Trash2 className="h-4 w-4 mr-2" /> Eliminar
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button size="icon" variant="ghost" className="sm:hidden" onClick={() => setOpenActionMenu(true)}>
-            <MoreHorizontal className="h-5 w-5" />
-          </Button>
+          {isCliente && clienteSubmitMode === "propose" && (
+            <Button
+              size="sm"
+              onClick={() => draft.submitProposal()}
+              disabled={draft.isSubmitting || draft.saveStatus !== "dirty"}
+              className="hidden sm:inline-flex"
+            >
+              <Check className="h-3.5 w-3.5 mr-1" /> Enviar solicitud
+            </Button>
+          )}
+          {!isCliente && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" className="hidden sm:inline-flex">
+                  <MoreHorizontal className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  disabled={pedido.estado === "cancelado"}
+                  onClick={() => draft.estadoMut.mutate("cancelado")}
+                >
+                  Cancelar pedido
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setAskDelete(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {!isCliente && (
+            <Button size="icon" variant="ghost" className="sm:hidden" onClick={() => setOpenActionMenu(true)}>
+              <MoreHorizontal className="h-5 w-5" />
+            </Button>
+          )}
         </div>
       </header>
 
@@ -286,7 +337,7 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
                         <div className="text-xs text-muted-foreground truncate">{draft.datos.cliente_email}</div>
                       )}
                     </div>
-                    {draft.datos.cliente_id && (
+                    {!isCliente && draft.datos.cliente_id && (
                       <button
                         type="button"
                         onClick={() => draft.setDatos({ ...draft.datos!, cliente_id: null })}
@@ -298,43 +349,52 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
                     )}
                   </div>
                 )}
-                <ClienteAutocomplete
-                  datos={draft.datos}
-                  onPick={(c) => draft.setDatos({
-                    ...draft.datos!,
-                    cliente_id: c.id,
-                    cliente_nombre: `${c.apellido}, ${c.nombre}`,
-                    cliente_email: c.email ?? "",
-                    cliente_telefono: c.telefono ?? "",
-                    descuento_pct: c.descuento ?? draft.datos!.descuento_pct,
-                  })}
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Nombre</Label>
-                    <Input
-                      value={draft.datos.cliente_nombre}
-                      onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_nombre: e.target.value })}
-                      className="h-8 text-sm text-base sm:text-sm"
+                {!isCliente && (
+                  <>
+                    <ClienteAutocomplete
+                      datos={draft.datos}
+                      onPick={(c) => draft.setDatos({
+                        ...draft.datos!,
+                        cliente_id: c.id,
+                        cliente_nombre: `${c.apellido}, ${c.nombre}`,
+                        cliente_email: c.email ?? "",
+                        cliente_telefono: c.telefono ?? "",
+                        descuento_pct: c.descuento ?? draft.datos!.descuento_pct,
+                      })}
                     />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs">Nombre</Label>
+                        <Input
+                          value={draft.datos.cliente_nombre}
+                          onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_nombre: e.target.value })}
+                          className="h-8 text-sm text-base sm:text-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Email</Label>
+                        <Input
+                          value={draft.datos.cliente_email}
+                          onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_email: e.target.value })}
+                          className="h-8 text-sm text-base sm:text-sm"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-xs">Teléfono</Label>
+                        <Input
+                          value={draft.datos.cliente_telefono}
+                          onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_telefono: e.target.value })}
+                          className="h-8 text-sm text-base sm:text-sm"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+                {isCliente && (
+                  <div className="text-xs text-muted-foreground">
+                    Para actualizar tus datos, andá a <Link to="/cliente/perfil" className="underline">tu perfil</Link>.
                   </div>
-                  <div>
-                    <Label className="text-xs">Email</Label>
-                    <Input
-                      value={draft.datos.cliente_email}
-                      onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_email: e.target.value })}
-                      className="h-8 text-sm text-base sm:text-sm"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label className="text-xs">Teléfono</Label>
-                    <Input
-                      value={draft.datos.cliente_telefono}
-                      onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_telefono: e.target.value })}
-                      className="h-8 text-sm text-base sm:text-sm"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Recogida */}
@@ -393,6 +453,7 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
             fechaDesde={draft.datos.fecha_desde}
             fechaHasta={draft.datos.fecha_hasta}
             pedidoId={pedido.id}
+            mode={mode}
           />
 
           {/* Totales */}
@@ -404,36 +465,68 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
             setDescuentoPct={(v) => draft.setDatos({ ...draft.datos!, descuento_pct: v })}
             pagado={pagado}
             saldo={saldo}
+            mode={mode}
           />
         </div>
 
         {/* ── Sidebar: Pagos + Docs + Notas — todo el alto ── */}
         <div className="rounded-lg border hairline bg-background overflow-hidden lg:sticky lg:top-16">
-          <SidebarSection title="Pagos" defaultOpen>
-            <PagosSidebar
-              pedidoId={pedido.id}
-              total={total}
-              pagado={pagado}
-              saldo={saldo}
-              pagos={pedido.pagos ?? []}
-            />
-          </SidebarSection>
+          {!isCliente && (
+            <SidebarSection title="Pagos" defaultOpen>
+              <PagosSidebar
+                pedidoId={pedido.id}
+                total={total}
+                pagado={pagado}
+                saldo={saldo}
+                pagos={pedido.pagos ?? []}
+              />
+            </SidebarSection>
+          )}
 
-          <SidebarSection title="Documentos" defaultOpen>
-            <DocumentosSidebar pedidoId={pedido.id} />
-          </SidebarSection>
+          {!isCliente && (
+            <SidebarSection title="Documentos" defaultOpen>
+              <DocumentosSidebar pedidoId={pedido.id} />
+            </SidebarSection>
+          )}
 
-          <SidebarSection title="Notas" defaultOpen={false}>
-            <Textarea
-              rows={4}
-              value={draft.datos.notas}
-              onChange={(e) => draft.setDatos({ ...draft.datos!, notas: e.target.value })}
-              placeholder="Visibles solo en el back-office"
-              className="text-sm resize-none text-base sm:text-sm"
-            />
-          </SidebarSection>
+          {!isCliente && (
+            <SidebarSection title="Notas" defaultOpen={false}>
+              <Textarea
+                rows={4}
+                value={draft.datos.notas}
+                onChange={(e) => draft.setDatos({ ...draft.datos!, notas: e.target.value })}
+                placeholder="Visibles solo en el back-office"
+                className="text-sm resize-none text-base sm:text-sm"
+              />
+            </SidebarSection>
+          )}
 
-          {pedido.fuente && pedido.fuente !== "historico" && (
+          {isCliente && (
+            <SidebarSection title="Resumen" defaultOpen>
+              <div className="text-sm text-muted-foreground space-y-2">
+                <div className="flex justify-between">
+                  <span>Pagado</span>
+                  <span className="tabular-nums text-ink">{fmtArs(pagado)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Saldo</span>
+                  <span className="tabular-nums text-ink">{fmtArs(saldo)}</span>
+                </div>
+                {clienteSubmitMode === "propose" && (
+                  <p className="pt-3 text-xs">
+                    Tu pedido está confirmado. Los cambios se enviarán como solicitud para que los aprobemos.
+                  </p>
+                )}
+                {clienteSubmitMode === "autosave" && (
+                  <p className="pt-3 text-xs">
+                    Los cambios se guardan automáticamente.
+                  </p>
+                )}
+              </div>
+            </SidebarSection>
+          )}
+
+          {!isCliente && pedido.fuente && pedido.fuente !== "historico" && (
             <SidebarSection title="Etiquetas" badge={1} defaultOpen>
               <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2.5 py-1 text-xs font-medium text-ink">
                 {pedido.fuente.toUpperCase()}
@@ -444,7 +537,7 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
       </div>
 
       {/* Mobile: acción primaria flotante */}
-      {nextAction && (
+      {!isCliente && nextAction && (
         <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-background border-t hairline px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] z-20">
           <Button
             className="w-full"
@@ -456,29 +549,43 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
         </div>
       )}
 
-      <ActionMenu
-        open={openActionMenu}
-        onOpenChange={setOpenActionMenu}
-        title={numero}
-        actions={[
-          ...(nextAction ? [{
-            label: nextAction.label,
-            icon: <Check className="h-4 w-4" />,
-            onClick: () => draft.estadoMut.mutate(nextAction.estado),
-          }] : []),
-          ...(pedido.estado !== "cancelado" ? [{
-            label: "Cancelar pedido",
-            icon: <X className="h-4 w-4" />,
-            onClick: () => draft.estadoMut.mutate("cancelado"),
-          }] : []),
-          {
-            label: "Eliminar pedido",
-            icon: <Trash2 className="h-4 w-4" />,
-            variant: "destructive" as const,
-            onClick: () => setAskDelete(true),
-          },
-        ]}
-      />
+      {isCliente && clienteSubmitMode === "propose" && (
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-background border-t hairline px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] z-20">
+          <Button
+            className="w-full"
+            onClick={() => draft.submitProposal()}
+            disabled={draft.isSubmitting || draft.saveStatus !== "dirty"}
+          >
+            <Check className="h-4 w-4 mr-1" /> Enviar solicitud
+          </Button>
+        </div>
+      )}
+
+      {!isCliente && (
+        <ActionMenu
+          open={openActionMenu}
+          onOpenChange={setOpenActionMenu}
+          title={numero}
+          actions={[
+            ...(nextAction ? [{
+              label: nextAction.label,
+              icon: <Check className="h-4 w-4" />,
+              onClick: () => draft.estadoMut.mutate(nextAction.estado),
+            }] : []),
+            ...(pedido.estado !== "cancelado" ? [{
+              label: "Cancelar pedido",
+              icon: <X className="h-4 w-4" />,
+              onClick: () => draft.estadoMut.mutate("cancelado"),
+            }] : []),
+            {
+              label: "Eliminar pedido",
+              icon: <Trash2 className="h-4 w-4" />,
+              variant: "destructive" as const,
+              onClick: () => setAskDelete(true),
+            },
+          ]}
+        />
+      )}
 
       <AlertDialog open={askDelete} onOpenChange={setAskDelete}>
         <AlertDialogContent>
@@ -508,7 +615,7 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
 // ─────────────────────────────────────────────────────────────────────────
 
 function ItemsCard({
-  items, setItems, jornadas, fechaDesde, fechaHasta, pedidoId,
+  items, setItems, jornadas, fechaDesde, fechaHasta, pedidoId, mode = "admin",
 }: {
   items: DraftItem[];
   setItems: (v: DraftItem[]) => void;
@@ -516,15 +623,30 @@ function ItemsCard({
   fechaDesde: string;
   fechaHasta: string;
   pedidoId: number;
+  mode?: PedidoMode;
 }) {
   const [openSearch, setOpenSearch] = useState(false);
+  const isCliente = mode === "cliente";
 
-  const dispoQ = useQuery({
+  // El admin recibe un objeto con cantidad/reservado; el cliente recibe un mapa
+  // {equipo_id: disponible} ya calculado. Normalizamos a { cantidad, reservado }.
+  const adminDispoQ = useQuery({
     queryKey: ["admin", "disponibilidad", fechaDesde, fechaHasta, pedidoId],
     queryFn: () => adminApi.getDisponibilidad(fechaDesde, fechaHasta, pedidoId),
-    enabled: !!fechaDesde && !!fechaHasta,
+    enabled: !isCliente && !!fechaDesde && !!fechaHasta,
   });
-  const stockMap = dispoQ.data ?? {};
+  const clienteDispoQ = useQuery({
+    queryKey: ["cliente", "disponibilidad", pedidoId, fechaDesde, fechaHasta],
+    queryFn: () => clienteApi.getDisponibilidad(pedidoId, fechaDesde, fechaHasta),
+    enabled: isCliente && !!fechaDesde && !!fechaHasta,
+  });
+  const stockMap: Record<string, { cantidad: number; reservado: number }> = isCliente
+    ? Object.fromEntries(
+        Object.entries(clienteDispoQ.data ?? {}).map(([k, v]) => [
+          k, { cantidad: v as number, reservado: 0 },
+        ])
+      )
+    : (adminDispoQ.data ?? {});
 
   const updateItem = (equipoId: number, patch: Partial<DraftItem>) =>
     setItems(items.map((it) => it.equipo_id === equipoId ? { ...it, ...patch } : it));
@@ -633,12 +755,18 @@ function ItemsCard({
                   </Button>
                 </div>
                 <div className="flex items-center gap-1 ml-2">
-                  <Input
-                    type="number" min={0}
-                    value={it.precio_jornada}
-                    onChange={(e) => updateItem(it.equipo_id, { precio_jornada: parseInt(e.target.value) || 0 })}
-                    className="h-9 w-24 text-sm text-base sm:text-sm sm:h-7"
-                  />
+                  {isCliente ? (
+                    <div className="h-9 sm:h-7 px-2 inline-flex items-center text-sm text-muted-foreground tabular-nums">
+                      {fmtArs(it.precio_jornada)}
+                    </div>
+                  ) : (
+                    <Input
+                      type="number" min={0}
+                      value={it.precio_jornada}
+                      onChange={(e) => updateItem(it.equipo_id, { precio_jornada: parseInt(e.target.value) || 0 })}
+                      className="h-9 w-24 text-sm text-base sm:text-sm sm:h-7"
+                    />
+                  )}
                   <span className="text-xs text-muted-foreground whitespace-nowrap">/día</span>
                 </div>
                 {overstock && (
@@ -686,7 +814,7 @@ function ItemsCard({
 // ─────────────────────────────────────────────────────────────────────────
 
 function TotalesCard({
-  bruto, total, jornadas, descuentoPct, setDescuentoPct, pagado, saldo,
+  bruto, total, jornadas, descuentoPct, setDescuentoPct, pagado, saldo, mode = "admin",
 }: {
   bruto: number;
   total: number;
@@ -695,7 +823,9 @@ function TotalesCard({
   setDescuentoPct: (v: number) => void;
   pagado: number;
   saldo: number;
+  mode?: PedidoMode;
 }) {
+  const isCliente = mode === "cliente";
   return (
     <section className="rounded-lg border hairline bg-background overflow-hidden">
       <div className="px-4 py-3 space-y-2.5 text-sm">
@@ -703,16 +833,25 @@ function TotalesCard({
           <span>Subtotal</span>
           <span className="tabular-nums">{fmtArs(bruto)}</span>
         </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-muted-foreground">Descuento %</span>
-          <Input
-            type="number" min={0} max={100} step="0.5"
-            value={descuentoPct}
-            onChange={(e) => setDescuentoPct(parseFloat(e.target.value) || 0)}
-            className="h-7 w-20 text-right text-sm"
-          />
-        </div>
-        {descuentoPct > 0 && (
+        {isCliente ? (
+          descuentoPct > 0 && (
+            <div className="flex items-center justify-between gap-3 text-muted-foreground">
+              <span>Descuento {descuentoPct}%</span>
+              <span className="tabular-nums">−{fmtArs(bruto - total)}</span>
+            </div>
+          )
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">Descuento %</span>
+            <Input
+              type="number" min={0} max={100} step="0.5"
+              value={descuentoPct}
+              onChange={(e) => setDescuentoPct(parseFloat(e.target.value) || 0)}
+              className="h-7 w-20 text-right text-sm"
+            />
+          </div>
+        )}
+        {!isCliente && descuentoPct > 0 && (
           <div className="flex justify-between text-muted-foreground">
             <span>−{descuentoPct}%</span>
             <span className="tabular-nums">−{fmtArs(bruto - total)}</span>

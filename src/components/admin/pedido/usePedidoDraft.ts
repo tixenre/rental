@@ -3,12 +3,12 @@
  *
  * Patrón:
  *  - Lee el pedido desde el server (react-query) y hace de "fuente de verdad" inicial.
- *  - Mantiene un draft local mutable; cada cambio dispara un auto-save debounced.
- *  - Persiste por separado:
- *     · datos (cliente, fechas, notas, descuento)  → PATCH /datos
- *     · items                                       → PUT  /items   (≥1 ítem)
- *     · estado                                      → PATCH         (manual)
- *  - Status de guardado expuesto para indicador "Guardando…/Guardado".
+ *  - Mantiene un draft local mutable; cada cambio dispara un auto-save debounced
+ *    (en `submitMode='autosave'`) o queda pendiente hasta que el caller invoque
+ *    `submitProposal()` (en `submitMode='propose'`).
+ *  - Persiste por separado (admin) o vía endpoint unificado (cliente):
+ *     · admin    → PATCH /datos + PUT /items (separados)
+ *     · cliente  → POST /api/cliente/pedidos/{id}/modificacion (unificado)
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -19,6 +19,7 @@ import {
   type Pedido,
   type PedidoEstado,
 } from "@/lib/admin/api";
+import { clienteApi } from "@/lib/cliente/api";
 
 export type DraftItem = {
   equipo_id: number;
@@ -39,6 +40,9 @@ export type DraftDatos = {
   notas: string;
   descuento_pct: number;
 };
+
+export type PedidoMode = "admin" | "cliente";
+export type SubmitMode = "autosave" | "propose";
 
 const DEBOUNCE_MS = 700;
 
@@ -93,7 +97,22 @@ function shallowItemsEq(a: DraftItem[], b: DraftItem[]): boolean {
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
-export function usePedidoDraft(pedido: Pedido | undefined) {
+export type UsePedidoDraftOptions = {
+  /** 'admin' (default) usa endpoints /api/alquileres/...; 'cliente' usa /api/cliente/... */
+  mode?: PedidoMode;
+  /** 'autosave' (default) guarda con debounce; 'propose' acumula hasta submitProposal(). */
+  submitMode?: SubmitMode;
+  /** Mensaje opcional que viaja en submit del cliente (sólo modo cliente). */
+  mensaje?: string;
+  /** Callback cuando una propuesta se envía con éxito. Sólo modo cliente+propose. */
+  onProposalSent?: (tipo: "directo" | "aprobacion") => void;
+};
+
+export function usePedidoDraft(
+  pedido: Pedido | undefined,
+  opts: UsePedidoDraftOptions = {},
+) {
+  const { mode = "admin", submitMode = "autosave", mensaje, onProposalSent } = opts;
   const qc = useQueryClient();
 
   // Snapshot del server (lo que está persistido)
@@ -113,7 +132,7 @@ export function usePedidoDraft(pedido: Pedido | undefined) {
     setItems((cur) => (cur && shallowItemsEq(cur, it) ? cur : it));
   }, [pedido]);
 
-  // Mutations
+  // ── Mutations (admin) ──────────────────────────────────────────────────
   const datosMut = useMutation({
     mutationFn: (d: DraftDatos) =>
       adminApi.updatePedidoDatos(pedido!.id, {
@@ -155,6 +174,29 @@ export function usePedidoDraft(pedido: Pedido | undefined) {
     onError: (e: Error) => toast.error(`Equipos: ${e.message}`),
   });
 
+  // ── Mutation (cliente) — envía datos+items combinados ──────────────────
+  const clienteMut = useMutation({
+    mutationFn: (payload: { d: DraftDatos; its: DraftItem[] }) =>
+      clienteApi.enviarModificacion(pedido!.id, {
+        fecha_desde: payload.d.fecha_desde || null,
+        fecha_hasta: payload.d.fecha_hasta || null,
+        items: payload.its.map((it) => ({
+          equipo_id: it.equipo_id, cantidad: it.cantidad,
+        })),
+        mensaje: mensaje || null,
+      }),
+    onSuccess: (resp) => {
+      qc.invalidateQueries({ queryKey: ["cliente", "pedido", pedido!.id] });
+      qc.invalidateQueries({ queryKey: ["cliente", "pedidos"] });
+      if (resp.tipo === "directo" && "pedido" in resp && serverRef.current) {
+        serverRef.current.datos = pedidoToDatos(resp.pedido);
+        serverRef.current.items = pedidoToItems(resp.pedido);
+      }
+      onProposalSent?.(resp.tipo);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const estadoMut = useMutation({
     mutationFn: (estado: PedidoEstado) => adminApi.setPedidoEstado(pedido!.id, estado),
     onSuccess: (p) => {
@@ -165,39 +207,69 @@ export function usePedidoDraft(pedido: Pedido | undefined) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Autosave debounced para datos
+  // ── Autosave debounced ─────────────────────────────────────────────────
+  // Admin: dos efectos separados (datos / items) que dispatchean a sus mutations.
+  // Cliente + autosave: un solo efecto que dispatchea a clienteMut con todo.
+  const autosaveAdmin = mode === "admin" && submitMode === "autosave";
+  const autosaveCliente = mode === "cliente" && submitMode === "autosave";
+
   useEffect(() => {
+    if (!autosaveAdmin) return;
     if (!pedido || !datos || !serverRef.current) return;
     if (shallowDatosEq(datos, serverRef.current.datos)) return;
-    const t = setTimeout(() => {
-      datosMut.mutate(datos);
-    }, DEBOUNCE_MS);
+    const t = setTimeout(() => { datosMut.mutate(datos); }, DEBOUNCE_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datos, pedido?.id]);
+  }, [datos, pedido?.id, autosaveAdmin]);
 
-  // Autosave debounced para items (solo si hay ≥1)
   useEffect(() => {
+    if (!autosaveAdmin) return;
     if (!pedido || !items || !serverRef.current) return;
     if (shallowItemsEq(items, serverRef.current.items)) return;
-    if (items.length === 0) return; // backend no permite vaciar
-    const t = setTimeout(() => {
-      itemsMut.mutate(items);
-    }, DEBOUNCE_MS);
+    if (items.length === 0) return;
+    const t = setTimeout(() => { itemsMut.mutate(items); }, DEBOUNCE_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, pedido?.id]);
+  }, [items, pedido?.id, autosaveAdmin]);
+
+  useEffect(() => {
+    if (!autosaveCliente) return;
+    if (!pedido || !datos || !items || !serverRef.current) return;
+    const dirty =
+      !shallowDatosEq(datos, serverRef.current.datos) ||
+      !shallowItemsEq(items, serverRef.current.items);
+    if (!dirty) return;
+    if (items.length === 0) return;
+    const t = setTimeout(() => { clienteMut.mutate({ d: datos, its: items }); }, DEBOUNCE_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datos, items, pedido?.id, autosaveCliente]);
+
+  // ── Submit explícito (propose) ─────────────────────────────────────────
+  async function submitProposal() {
+    if (!pedido || !datos || !items) return;
+    if (items.length === 0) {
+      toast.error("El pedido debe tener al menos un equipo");
+      return;
+    }
+    await clienteMut.mutateAsync({ d: datos, its: items });
+  }
+
+  const isPending =
+    datosMut.isPending || itemsMut.isPending || clienteMut.isPending;
+  const isError =
+    datosMut.isError || itemsMut.isError || clienteMut.isError;
 
   const saveStatus: SaveStatus = useMemo(() => {
-    if (datosMut.isPending || itemsMut.isPending) return "saving";
-    if (datosMut.isError || itemsMut.isError) return "error";
+    if (isPending) return "saving";
+    if (isError) return "error";
     if (!datos || !items || !serverRef.current) return "idle";
     const dirty =
       !shallowDatosEq(datos, serverRef.current.datos) ||
       !shallowItemsEq(items, serverRef.current.items);
     if (dirty) return "dirty";
     return "saved";
-  }, [datos, items, datosMut.isPending, datosMut.isError, itemsMut.isPending, itemsMut.isError]);
+  }, [datos, items, isPending, isError]);
 
   return {
     datos,
@@ -206,6 +278,8 @@ export function usePedidoDraft(pedido: Pedido | undefined) {
     setItems,
     saveStatus,
     estadoMut,
+    submitProposal,
+    isSubmitting: clienteMut.isPending,
   };
 }
 
