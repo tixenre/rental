@@ -1634,6 +1634,9 @@ export type Pedido = {
   created_at?: string;
   items: PedidoItem[];
   pagos?: PedidoPago[];
+  /** True si hay una `solicitudes_modificacion` con estado='pendiente' para
+   * este pedido. Sólo viene en el listado, no en el detalle. */
+  tiene_solicitud_pendiente?: boolean;
 };
 
 export type PedidosListResp = {

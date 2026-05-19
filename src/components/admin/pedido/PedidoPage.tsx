@@ -5,8 +5,8 @@
  * Mobile: columna única con las mismas secciones apiladas.
  */
 
-import { useState, useMemo } from "react";
-import { Link, useRouter } from "@tanstack/react-router";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { Link, useRouter, useBlocker } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft, ChevronDown, ChevronRight,
@@ -167,6 +167,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
 
   const [askDelete, setAskDelete] = useState(false);
   const [openActionMenu, setOpenActionMenu] = useState(false);
+  const [showDiffConfirm, setShowDiffConfirm] = useState(false);
 
   const deleteMut = useMutation({
     mutationFn: () => adminApi.deletePedido(pedidoId),
@@ -176,6 +177,32 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
       router.navigate({ to: "/admin/pedidos" });
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Warning si el cliente intenta salir con cambios sin enviar en modo
+  // propose (confirmado). En autosave no hace falta — ya está guardado.
+  const dirtyInPropose =
+    isCliente && pedido?.estado === "confirmado" && draft.saveStatus === "dirty";
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirtyInPropose;
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (dirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
+  useBlocker({
+    shouldBlockFn: () => {
+      if (!dirtyRef.current) return false;
+      return !window.confirm(
+        "Tenés cambios sin enviar. ¿Querés salir y perderlos?"
+      );
+    },
+    enableBeforeUnload: false,
   });
 
   if (pedidoQ.isLoading) {
@@ -201,6 +228,35 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
   const saldo = total - pagado;
   const numero = pedido.numero_pedido ? `#${pedido.numero_pedido}` : `(borrador #${pedido.id})`;
   const clienteNombre = draft.datos.cliente_nombre || "Sin cliente";
+
+  // Disponibilidad — usada por ItemsCard y por el gate del botón "Enviar".
+  // En cliente se usa el endpoint con ownership; en admin el normal.
+  const adminDispoQ = useQuery({
+    queryKey: ["admin", "disponibilidad", draft.datos.fecha_desde, draft.datos.fecha_hasta, pedido.id],
+    queryFn: () => adminApi.getDisponibilidad(draft.datos!.fecha_desde, draft.datos!.fecha_hasta, pedido.id),
+    enabled: !isCliente && !!draft.datos.fecha_desde && !!draft.datos.fecha_hasta,
+  });
+  const clienteDispoQ = useQuery({
+    queryKey: ["cliente", "disponibilidad", pedido.id, draft.datos.fecha_desde, draft.datos.fecha_hasta],
+    queryFn: () => clienteApi.getDisponibilidad(pedido.id, draft.datos!.fecha_desde, draft.datos!.fecha_hasta),
+    enabled: isCliente && !!draft.datos.fecha_desde && !!draft.datos.fecha_hasta,
+  });
+  const stockMap: Record<string, { cantidad: number; reservado: number }> = isCliente
+    ? Object.fromEntries(
+        Object.entries(clienteDispoQ.data ?? {}).map(([k, v]) => [
+          k, { cantidad: Number(v) || 0, reservado: 0 },
+        ])
+      )
+    : (adminDispoQ.data ?? {});
+
+  const hasOverstock = draft.items.some((it) => {
+    const s = stockMap[String(it.equipo_id)];
+    if (!s) return false;
+    const max = Math.max(0, s.cantidad - s.reservado);
+    return it.cantidad > max;
+  });
+
+  const submitBlocked = draft.submitBlockedReason ?? (hasOverstock ? "Algún equipo excede el stock disponible" : null);
 
   const nextAction = (() => {
     switch (pedido.estado) {
@@ -277,8 +333,9 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
           {isCliente && clienteSubmitMode === "propose" && (
             <Button
               size="sm"
-              onClick={() => draft.submitProposal()}
-              disabled={draft.isSubmitting || draft.saveStatus !== "dirty"}
+              onClick={() => setShowDiffConfirm(true)}
+              disabled={draft.isSubmitting || draft.saveStatus !== "dirty" || !!submitBlocked}
+              title={submitBlocked ?? undefined}
               className="hidden sm:inline-flex"
             >
               <Check className="h-3.5 w-3.5 mr-1" /> Enviar solicitud
@@ -450,9 +507,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
             items={draft.items}
             setItems={draft.setItems}
             jornadas={jornadas}
-            fechaDesde={draft.datos.fecha_desde}
-            fechaHasta={draft.datos.fecha_hasta}
-            pedidoId={pedido.id}
+            stockMap={stockMap}
             mode={mode}
           />
 
@@ -551,10 +606,13 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
 
       {isCliente && clienteSubmitMode === "propose" && (
         <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-background border-t hairline px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] z-20">
+          {submitBlocked && draft.saveStatus === "dirty" && (
+            <div className="text-xs text-destructive mb-2 text-center">{submitBlocked}</div>
+          )}
           <Button
             className="w-full"
-            onClick={() => draft.submitProposal()}
-            disabled={draft.isSubmitting || draft.saveStatus !== "dirty"}
+            onClick={() => setShowDiffConfirm(true)}
+            disabled={draft.isSubmitting || draft.saveStatus !== "dirty" || !!submitBlocked}
           >
             <Check className="h-4 w-4 mr-1" /> Enviar solicitud
           </Button>
@@ -587,6 +645,21 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
         />
       )}
 
+      {isCliente && (
+        <SolicitudDiffDialog
+          open={showDiffConfirm}
+          onOpenChange={setShowDiffConfirm}
+          original={pedido}
+          datos={draft.datos}
+          items={draft.items}
+          isSubmitting={draft.isSubmitting}
+          onConfirm={async () => {
+            await draft.submitProposal();
+            setShowDiffConfirm(false);
+          }}
+        />
+      )}
+
       <AlertDialog open={askDelete} onOpenChange={setAskDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -615,38 +688,16 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
 // ─────────────────────────────────────────────────────────────────────────
 
 function ItemsCard({
-  items, setItems, jornadas, fechaDesde, fechaHasta, pedidoId, mode = "admin",
+  items, setItems, jornadas, stockMap, mode = "admin",
 }: {
   items: DraftItem[];
   setItems: (v: DraftItem[]) => void;
   jornadas: number;
-  fechaDesde: string;
-  fechaHasta: string;
-  pedidoId: number;
+  stockMap: Record<string, { cantidad: number; reservado: number }>;
   mode?: PedidoMode;
 }) {
   const [openSearch, setOpenSearch] = useState(false);
   const isCliente = mode === "cliente";
-
-  // El admin recibe un objeto con cantidad/reservado; el cliente recibe un mapa
-  // {equipo_id: disponible} ya calculado. Normalizamos a { cantidad, reservado }.
-  const adminDispoQ = useQuery({
-    queryKey: ["admin", "disponibilidad", fechaDesde, fechaHasta, pedidoId],
-    queryFn: () => adminApi.getDisponibilidad(fechaDesde, fechaHasta, pedidoId),
-    enabled: !isCliente && !!fechaDesde && !!fechaHasta,
-  });
-  const clienteDispoQ = useQuery({
-    queryKey: ["cliente", "disponibilidad", pedidoId, fechaDesde, fechaHasta],
-    queryFn: () => clienteApi.getDisponibilidad(pedidoId, fechaDesde, fechaHasta),
-    enabled: isCliente && !!fechaDesde && !!fechaHasta,
-  });
-  const stockMap: Record<string, { cantidad: number; reservado: number }> = isCliente
-    ? Object.fromEntries(
-        Object.entries(clienteDispoQ.data ?? {}).map(([k, v]) => [
-          k, { cantidad: v as number, reservado: 0 },
-        ])
-      )
-    : (adminDispoQ.data ?? {});
 
   const updateItem = (equipoId: number, patch: Partial<DraftItem>) =>
     setItems(items.map((it) => it.equipo_id === equipoId ? { ...it, ...patch } : it));
@@ -1228,5 +1279,116 @@ function ClienteAutocomplete({
         </div>
       )}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Modal de confirmación con diff (cliente, modo propose)
+// ─────────────────────────────────────────────────────────────────────────
+
+function SolicitudDiffDialog({
+  open, onOpenChange, original, datos, items, isSubmitting, onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  original: { fecha_desde: string | null; fecha_hasta: string | null; items: { equipo_id: number; cantidad: number; nombre: string; nombre_publico?: string | null }[] };
+  datos: DraftDatos;
+  items: DraftItem[];
+  isSubmitting: boolean;
+  onConfirm: () => void;
+}) {
+  const origDesde = (original.fecha_desde ?? "").slice(0, 10);
+  const origHasta = (original.fecha_hasta ?? "").slice(0, 10);
+  const fechasCambian = origDesde !== datos.fecha_desde || origHasta !== datos.fecha_hasta;
+
+  const beforeQty = new Map<number, number>();
+  for (const it of original.items) beforeQty.set(it.equipo_id, it.cantidad);
+  const afterQty = new Map<number, number>();
+  for (const it of items) afterQty.set(it.equipo_id, it.cantidad);
+  const nombres = new Map<number, string>();
+  for (const it of original.items) nombres.set(it.equipo_id, it.nombre_publico || it.nombre);
+  for (const it of items) {
+    if (!nombres.has(it.equipo_id)) nombres.set(it.equipo_id, it.nombre_publico || it.nombre);
+  }
+  const equipoIds = new Set<number>([...beforeQty.keys(), ...afterQty.keys()]);
+  const itemsDiff = Array.from(equipoIds)
+    .map((id) => ({
+      id,
+      antes: beforeQty.get(id) ?? 0,
+      despues: afterQty.get(id) ?? 0,
+      nombre: nombres.get(id) ?? `equipo #${id}`,
+    }))
+    .filter((d) => d.antes !== d.despues);
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="max-w-lg">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirmar solicitud de modificación</AlertDialogTitle>
+          <AlertDialogDescription>
+            Estos son los cambios que vas a pedirnos. Te avisamos por mail cuando los revisemos.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+          {fechasCambian && (
+            <div className="rounded-md border hairline px-3 py-2.5 text-sm">
+              <div className="text-xs text-muted-foreground mb-1">Fechas</div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <div className="text-muted-foreground">Antes</div>
+                  <div className="text-ink tabular-nums">
+                    {fmtFecha(origDesde)} → {fmtFecha(origHasta)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Nuevas</div>
+                  <div className="text-ink font-medium tabular-nums">
+                    {fmtFecha(datos.fecha_desde)} → {fmtFecha(datos.fecha_hasta)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {itemsDiff.length > 0 && (
+            <div className="rounded-md border hairline px-3 py-2.5 text-sm">
+              <div className="text-xs text-muted-foreground mb-2">Equipos</div>
+              <ul className="divide-y hairline -mx-3">
+                {itemsDiff.map((d) => {
+                  const delta = d.despues - d.antes;
+                  const cls = delta > 0 ? "text-emerald-600" : "text-rose-600";
+                  return (
+                    <li key={d.id} className="px-3 py-1.5 flex items-center gap-2">
+                      <span className="flex-1 text-ink truncate">{d.nombre}</span>
+                      <span className="text-muted-foreground tabular-nums">{d.antes}</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className={`font-medium tabular-nums ${cls}`}>{d.despues}</span>
+                      <span className={`text-xs tabular-nums w-10 text-right ${cls}`}>
+                        {delta > 0 ? `+${delta}` : delta}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {!fechasCambian && itemsDiff.length === 0 && (
+            <div className="text-sm text-muted-foreground">Sin cambios detectados.</div>
+          )}
+        </div>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isSubmitting}>Volver</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => { e.preventDefault(); onConfirm(); }}
+            disabled={isSubmitting || (!fechasCambian && itemsDiff.length === 0)}
+          >
+            {isSubmitting ? "Enviando…" : "Enviar solicitud"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

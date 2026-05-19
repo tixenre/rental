@@ -97,6 +97,23 @@ function shallowItemsEq(a: DraftItem[], b: DraftItem[]): boolean {
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
+/** Devuelve un string con la razón por la que el draft no se puede enviar,
+ * o null si está OK. Usado para gatear el botón de "Enviar solicitud". */
+function validateForSubmit(d: DraftDatos, its: DraftItem[]): string | null {
+  if (its.length === 0) return "Agregá al menos un equipo";
+  for (const it of its) {
+    if (!Number.isFinite(it.cantidad) || it.cantidad <= 0) {
+      return `La cantidad de "${it.nombre}" debe ser mayor a 0`;
+    }
+  }
+  if (d.fecha_desde && d.fecha_hasta) {
+    if (d.fecha_desde >= d.fecha_hasta) {
+      return "La fecha de devolución debe ser posterior a la de retiro";
+    }
+  }
+  return null;
+}
+
 export type UsePedidoDraftOptions = {
   /** 'admin' (default) usa endpoints /api/alquileres/...; 'cliente' usa /api/cliente/... */
   mode?: PedidoMode;
@@ -248,8 +265,9 @@ export function usePedidoDraft(
   // ── Submit explícito (propose) ─────────────────────────────────────────
   async function submitProposal() {
     if (!pedido || !datos || !items) return;
-    if (items.length === 0) {
-      toast.error("El pedido debe tener al menos un equipo");
+    const reason = validateForSubmit(datos, items);
+    if (reason) {
+      toast.error(reason);
       return;
     }
     await clienteMut.mutateAsync({ d: datos, its: items });
@@ -271,6 +289,9 @@ export function usePedidoDraft(
     return "saved";
   }, [datos, items, isPending, isError]);
 
+  const submitBlockedReason =
+    datos && items ? validateForSubmit(datos, items) : "Cargando…";
+
   return {
     datos,
     setDatos,
@@ -280,6 +301,8 @@ export function usePedidoDraft(
     estadoMut,
     submitProposal,
     isSubmitting: clienteMut.isPending,
+    /** null si se puede enviar; string con la razón si no. */
+    submitBlockedReason,
   };
 }
 

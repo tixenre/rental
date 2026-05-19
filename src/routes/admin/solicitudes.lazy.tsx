@@ -157,7 +157,7 @@ function SolicitudCard({
   }
 
   const itemsDiff = (() => {
-    if (!pedido || !cambios) return [];
+    if (!pedido || !cambios || !Array.isArray(cambios.items)) return [];
     const before = new Map<number, number>();
     for (const it of pedido.items) before.set(it.equipo_id, it.cantidad);
     const after = new Map<number, number>();
@@ -171,11 +171,12 @@ function SolicitudCard({
     })).filter((d) => d.antes !== d.despues);
   })();
 
-  const fechasCambian =
+  const fechasCambian = !!(
     cambios && (
-      cambios.fecha_desde !== solicitud.pedido_fecha_desde?.slice(0, 10) ||
-      cambios.fecha_hasta !== solicitud.pedido_fecha_hasta?.slice(0, 10)
-    );
+      (cambios.fecha_desde ?? null) !== (solicitud.pedido_fecha_desde?.slice(0, 10) ?? null) ||
+      (cambios.fecha_hasta ?? null) !== (solicitud.pedido_fecha_hasta?.slice(0, 10) ?? null)
+    )
+  );
 
   return (
     <article className="rounded-lg border hairline bg-background p-4 space-y-4">

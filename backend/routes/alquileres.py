@@ -506,8 +506,22 @@ def list_pedidos(
 
         pedidos    = [row_to_dict(r) for r in rows]
         items_map  = _batch_get_alquiler_items(conn, [p["id"] for p in pedidos])
+
+        # Pedidos con solicitud de modificación pendiente — para badge en UI.
+        pedido_ids = [p["id"] for p in pedidos]
+        pendientes: set[int] = set()
+        if pedido_ids:
+            ph = ",".join(["?"] * len(pedido_ids))
+            for r in conn.execute(
+                f"""SELECT DISTINCT pedido_id FROM solicitudes_modificacion
+                    WHERE estado = 'pendiente' AND pedido_id IN ({ph})""",
+                pedido_ids,
+            ).fetchall():
+                pendientes.add(r["pedido_id"])
+
         for p in pedidos:
             p["items"] = items_map.get(p["id"], [])
+            p["tiene_solicitud_pendiente"] = p["id"] in pendientes
 
         return {"total": total, "page": page, "per_page": per_page, "items": pedidos}
     finally:

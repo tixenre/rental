@@ -5,8 +5,12 @@ import { clienteApi } from "@/lib/cliente/api";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { StatCard } from "@/components/rental/StatCard";
 import { EstadoBadge } from "@/components/rental/EstadoBadge";
-import { ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon } from "lucide-react";
+import { ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cliente/portal")({
@@ -305,11 +309,18 @@ function PedidoCard({
   const numero = pedido.numero_pedido ?? pedido.id;
   const jornadas = jornadasEntre(pedido.fecha_desde, pedido.fecha_hasta);
 
+  const [askCancel, setAskCancel] = useState(false);
   const pendiente = (pedido.solicitudes ?? []).find((s) => s.estado === "pendiente");
+  // Última solicitud resuelta (aprobada/rechazada) sin pendiente: mostrar respuesta
+  // del admin como info al cliente. Cancelada no se muestra (la inició el cliente).
+  const ultimaResuelta = !pendiente ? (pedido.solicitudes ?? [])
+    .filter((s) => s.estado === "aprobada" || s.estado === "rechazada")
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] : undefined;
 
   const dentroVentana = (() => {
-    if (!pedido.fecha_desde) return true;
+    if (!pedido.fecha_desde) return true; // pedido sin fechas: permitir editar
     const desde = new Date(pedido.fecha_desde.slice(0, 10) + "T00:00:00").getTime();
+    if (Number.isNaN(desde)) return true; // fecha inválida: no bloqueamos
     const ms = ventanaHoras * 60 * 60 * 1000;
     return desde - Date.now() >= ms;
   })();
@@ -390,11 +401,36 @@ function PedidoCard({
               </div>
               <button
                 type="button"
-                onClick={cancelarSolicitud}
+                onClick={() => setAskCancel(true)}
                 className="rounded-full px-3 py-1.5 font-sans text-xs font-semibold text-ink border border-ink/20 hover:border-ink transition shrink-0 inline-flex items-center gap-1"
               >
                 <XIcon className="h-3 w-3" /> Cancelar
               </button>
+            </section>
+          )}
+
+          {ultimaResuelta && (
+            <section
+              className={cn(
+                "rounded-md border px-3.5 py-3 flex items-start gap-2.5",
+                ultimaResuelta.estado === "aprobada"
+                  ? "border-emerald-300 bg-emerald-50"
+                  : "border-rose-300 bg-rose-50",
+              )}
+            >
+              {ultimaResuelta.estado === "aprobada"
+                ? <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
+                : <XCircle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />}
+              <div className="flex-1 min-w-0">
+                <div className="font-sans text-[13px] font-semibold text-ink">
+                  Tu última solicitud fue {ultimaResuelta.estado === "aprobada" ? "aprobada" : "rechazada"}
+                </div>
+                {ultimaResuelta.respuesta && (
+                  <div className="font-sans text-xs text-ink/80 mt-0.5 whitespace-pre-wrap">
+                    {ultimaResuelta.respuesta}
+                  </div>
+                )}
+              </div>
             </section>
           )}
 
@@ -565,6 +601,23 @@ function PedidoCard({
           )}
         </div>
       )}
+
+      <AlertDialog open={askCancel} onOpenChange={setAskCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar solicitud de modificación</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vamos a descartar los cambios que pediste. El pedido va a quedar como estaba.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setAskCancel(false); cancelarSolicitud(); }}>
+              Cancelar solicitud
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

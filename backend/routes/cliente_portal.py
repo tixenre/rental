@@ -12,6 +12,7 @@ from typing import Optional
 
 from database import get_db, row_to_dict
 from routes.auth import get_session, signer, COOKIE_SECURE, SESSION_MAX_AGE
+from admin_guard import require_admin
 from itsdangerous import BadSignature, SignatureExpired
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 
@@ -392,8 +393,16 @@ def cliente_pedido_detalle(id: int, request: Request):
 # ── Solicitud de modificación ─────────────────────────────────────────────────
 
 class ModificacionItemIn(BaseModel):
+    from pydantic import field_validator as _fv
     equipo_id: int
     cantidad:  int
+
+    @_fv("cantidad")
+    @classmethod
+    def _cantidad_positive(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("cantidad debe ser mayor a 0")
+        return v
 
 
 class ModificacionIn(BaseModel):
@@ -406,6 +415,30 @@ class ModificacionIn(BaseModel):
     fecha_hasta: Optional[str] = None
     items:       list[ModificacionItemIn]
     mensaje:     Optional[str] = None  # comentario opcional del cliente
+
+
+def _validar_fechas_propuestas(
+    fecha_desde: Optional[str], fecha_hasta: Optional[str],
+    fallback_desde: Optional[str], fallback_hasta: Optional[str],
+) -> None:
+    """Valida que las fechas propuestas sean coherentes: futuras y bien ordenadas.
+
+    Usa los valores actuales del pedido como fallback si el cliente no las envía.
+    """
+    nueva_desde = fecha_desde if fecha_desde is not None else fallback_desde
+    nueva_hasta = fecha_hasta if fecha_hasta is not None else fallback_hasta
+    if not nueva_desde or not nueva_hasta:
+        return  # Pedido sin fechas (caso raro de borrador) — no validamos
+    try:
+        d0 = datetime.datetime.fromisoformat(nueva_desde)
+        d1 = datetime.datetime.fromisoformat(nueva_hasta)
+    except ValueError:
+        raise HTTPException(400, "Formato de fechas inválido")
+    if d0 >= d1:
+        raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
+    hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    if d0 < hoy:
+        raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 
 
 def _validar_modificacion_estado(estado: str) -> None:
@@ -505,6 +538,10 @@ def cliente_modificar_pedido(
         _validar_modificacion_estado(pedido["estado"])
         _validar_ventana_corte(conn, pedido["fecha_desde"])
         _check_solicitud_pendiente(conn, id)
+        _validar_fechas_propuestas(
+            data.fecha_desde, data.fecha_hasta,
+            pedido["fecha_desde"], pedido["fecha_hasta"],
+        )
 
         # Rellenar precios desde el pedido actual o catálogo (el cliente no
         # puede definir precios).
@@ -534,14 +571,34 @@ def cliente_modificar_pedido(
                 if problemas:
                     raise HTTPException(409, "Sin stock: " + "; ".join(problemas))
 
-            # Auditoría: registramos la modificación directa.
-            conn.execute(
-                """INSERT INTO solicitudes_modificacion
-                   (pedido_id, cliente_id, mensaje, cambios_json, tipo, estado, resolved_at, resolved_by)
-                   VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP,?)""",
-                (id, cliente_id, data.mensaje, json.dumps(data.model_dump()),
-                 "directo", "aprobada", session.get("email") or "cliente")
-            )
+            # Auditoría: dedup. Si hay un row `directo` reciente para este
+            # pedido (≤ 5 min), lo actualizamos en lugar de insertar uno
+            # nuevo — sino el autosave llena la tabla con N rows por sesión.
+            actor = session.get("email") or "cliente"
+            reciente = conn.execute(
+                """SELECT id FROM solicitudes_modificacion
+                   WHERE pedido_id = ? AND cliente_id = ? AND tipo = 'directo'
+                     AND resolved_at >= CURRENT_TIMESTAMP - INTERVAL '5 minutes'
+                   ORDER BY resolved_at DESC LIMIT 1""",
+                (id, cliente_id)
+            ).fetchone()
+            cambios_str = json.dumps(data.model_dump())
+            if reciente:
+                conn.execute(
+                    """UPDATE solicitudes_modificacion
+                       SET mensaje = ?, cambios_json = ?,
+                           resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
+                       WHERE id = ?""",
+                    (data.mensaje, cambios_str, actor, reciente["id"])
+                )
+            else:
+                conn.execute(
+                    """INSERT INTO solicitudes_modificacion
+                       (pedido_id, cliente_id, mensaje, cambios_json, tipo, estado, resolved_at, resolved_by)
+                       VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP,?)""",
+                    (id, cliente_id, data.mensaje, cambios_str,
+                     "directo", "aprobada", actor)
+                )
             conn.commit()
 
             pedido_actualizado = _get_alquiler_detail(conn, id)
@@ -572,15 +629,25 @@ def cliente_modificar_pedido(
 
 
 @router.delete("/api/cliente/pedidos/{id}/modificacion/{sm_id}")
-def cliente_cancelar_solicitud(id: int, sm_id: int, request: Request):
+def cliente_cancelar_solicitud(
+    id: int, sm_id: int, request: Request, background: BackgroundTasks,
+):
     """El cliente cancela su propia solicitud pendiente."""
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
     conn = get_db()
     try:
+        # Lock + filtro atómico: si dos pestañas cancelan a la vez, sólo
+        # una ve `estado='pendiente'`.
         sm = conn.execute(
-            """SELECT id, estado FROM solicitudes_modificacion
-               WHERE id = ? AND pedido_id = ? AND cliente_id = ?""",
+            """SELECT sm.id, sm.estado, sm.pedido_id,
+                      a.numero_pedido, c.nombre AS cliente_nombre,
+                      c.email AS cliente_email
+               FROM solicitudes_modificacion sm
+               JOIN alquileres a ON a.id = sm.pedido_id
+               JOIN clientes c ON c.id = sm.cliente_id
+               WHERE sm.id = ? AND sm.pedido_id = ? AND sm.cliente_id = ?
+               FOR UPDATE OF sm""",
             (sm_id, id, cliente_id)
         ).fetchone()
         if not sm:
@@ -594,9 +661,34 @@ def cliente_cancelar_solicitud(id: int, sm_id: int, request: Request):
             (session.get("email") or "cliente", sm_id)
         )
         conn.commit()
+
+        # Notificar al admin para cerrar el loop (no propaga si falla).
+        background.add_task(
+            _enviar_email_cancelacion_admin,
+            sm["pedido_id"], sm["numero_pedido"],
+            sm["cliente_nombre"], sm["cliente_email"],
+        )
         return {"ok": True}
     finally:
         conn.close()
+
+
+def _enviar_email_cancelacion_admin(
+    pedido_id: int, numero_pedido, cliente_nombre: str, cliente_email: str,
+) -> None:
+    """Background task: notifica al admin que el cliente canceló su solicitud."""
+    from services.email import send_email
+    from services.email.service import get_admin_to
+    admin_to = get_admin_to()
+    if not admin_to:
+        return
+    ctx = {
+        "cliente_nombre": cliente_nombre or "",
+        "cliente_email":  cliente_email or "",
+        "numero_pedido":  numero_pedido or pedido_id,
+        "admin_url":      f"/admin/pedidos/{pedido_id}",
+    }
+    send_email("modificacion_cancelada_admin", admin_to, ctx, pedido_id)
 
 
 @router.get("/api/cliente/pedidos/{id}/disponibilidad")
@@ -719,10 +811,7 @@ def _enviar_email_resolucion_cliente(
 @router.get("/api/admin/solicitudes")
 def admin_solicitudes(request: Request):
     """Lista de solicitudes de modificación (solo admins)."""
-    session = get_session(request)
-    if not session or session.get("role") != "admin":
-        raise HTTPException(401, "Acceso denegado")
-
+    require_admin(request)
     conn = get_db()
     try:
         rows = conn.execute("""
@@ -764,14 +853,16 @@ def admin_responder_solicitud(
         PedidoDatos, _apply_pedido_datos, _apply_pedido_items, _check_stock,
     )
 
-    session = get_session(request)
-    if not session or session.get("role") != "admin":
-        raise HTTPException(401, "Acceso denegado")
+    admin = require_admin(request)
+    admin_email = admin.get("email") or "admin"
     if data.estado not in ("aprobada", "rechazada"):
         raise HTTPException(400, "Estado debe ser 'aprobada' o 'rechazada'")
 
     conn = get_db()
     try:
+        # Lock pesimista de la fila para evitar que dos admins (o admin +
+        # cancelación del cliente) corran en paralelo sobre la misma
+        # solicitud y ambos pasen el check de "pendiente".
         sm = conn.execute(
             """SELECT sm.*, a.cliente_id, a.fecha_desde, a.estado AS pedido_estado,
                       a.numero_pedido, c.email AS cliente_email,
@@ -779,7 +870,8 @@ def admin_responder_solicitud(
                FROM solicitudes_modificacion sm
                JOIN alquileres a ON a.id = sm.pedido_id
                JOIN clientes c ON c.id = sm.cliente_id
-               WHERE sm.id = ?""",
+               WHERE sm.id = ?
+               FOR UPDATE OF sm""",
             (id,)
         ).fetchone()
         if not sm:
@@ -833,7 +925,7 @@ def admin_responder_solicitud(
                SET estado = ?, respuesta = ?,
                    resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
                WHERE id = ?""",
-            (data.estado, data.respuesta, session.get("email") or "admin", id)
+            (data.estado, data.respuesta, admin_email, id)
         )
         conn.commit()
 

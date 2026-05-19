@@ -66,6 +66,16 @@ Podés ver el detalle en tu portal.
 — El equipo de Rambla""",
 )
 
+_TEMPLATE_CANCELACION_ADMIN = (
+    "modificacion_cancelada_admin",
+    "El cliente canceló su solicitud — pedido #{{ numero_pedido }}",
+    """<p>El cliente <strong>{{ cliente_nombre }}</strong> ({{ cliente_email }}) canceló su solicitud de modificación del pedido <strong>#{{ numero_pedido }}</strong>.</p>
+<p><a href="{{ admin_url }}">Ver pedido</a></p>""",
+    """El cliente {{ cliente_nombre }} ({{ cliente_email }}) canceló su solicitud de modificación del pedido #{{ numero_pedido }}.
+
+Ver pedido: {{ admin_url }}""",
+)
+
 
 def upgrade() -> None:
     # Columnas nuevas en solicitudes_modificacion (idempotentes vía IF NOT EXISTS).
@@ -86,7 +96,9 @@ def upgrade() -> None:
     """)
 
     # Plantillas de email.
-    for key, subject, body_html, body_text in (_TEMPLATE_ADMIN, _TEMPLATE_CLIENTE):
+    for key, subject, body_html, body_text in (
+        _TEMPLATE_ADMIN, _TEMPLATE_CLIENTE, _TEMPLATE_CANCELACION_ADMIN,
+    ):
         op.execute(
             f"""
             INSERT INTO email_templates (key, subject, body_html, body_text, updated_by)
@@ -97,7 +109,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DELETE FROM email_templates WHERE key IN ('modificacion_solicitada_admin', 'modificacion_resuelta_cliente')")
+    op.execute("DELETE FROM email_templates WHERE key IN ('modificacion_solicitada_admin', 'modificacion_resuelta_cliente', 'modificacion_cancelada_admin')")
     op.execute("DELETE FROM app_settings WHERE key = 'modificacion_ventana_horas'")
     op.execute("ALTER TABLE solicitudes_modificacion DROP COLUMN IF EXISTS resolved_by")
     op.execute("ALTER TABLE solicitudes_modificacion DROP COLUMN IF EXISTS resolved_at")
