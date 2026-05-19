@@ -53,12 +53,9 @@ type Pedido = {
   documentos_disponibles: { remito: boolean; contrato: boolean; albaran: boolean };
 };
 
-// Estados activos según el back-office. Mantenemos "solicitado"/"entregado"
-// por retrocompatibilidad con pedidos viejos importados; los reales son
-// "presupuesto" y "retirado".
-const ACTIVE_STATES = new Set(["solicitado", "presupuesto", "confirmado", "entregado", "retirado"]);
+const ACTIVE_STATES = new Set(["borrador", "presupuesto", "confirmado", "retirado"]);
 const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
-const MODIFICABLE_STATES = new Set(["presupuesto", "solicitado", "confirmado"]);
+const MODIFICABLE_STATES = new Set(["presupuesto", "confirmado"]);
 
 type Filtro = "todos" | "activos" | "historial";
 

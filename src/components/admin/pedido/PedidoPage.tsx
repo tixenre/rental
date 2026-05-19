@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 
 import {
   adminApi, ESTADO_LABEL, pedidoPdfUrl,
-  type PedidoEstado, type Equipo, type Cliente,
+  type PedidoEstado, type Equipo, type Cliente, type PedidoHistorialItem,
 } from "@/lib/admin/api";
 import { clienteApi } from "@/lib/cliente/api";
 import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
@@ -578,6 +578,16 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                   </p>
                 )}
               </div>
+            </SidebarSection>
+          )}
+
+          {!isCliente && (pedido.historial_modificaciones?.length ?? 0) > 0 && (
+            <SidebarSection
+              title="Historial cliente"
+              badge={pedido.historial_modificaciones?.length}
+              defaultOpen={false}
+            >
+              <HistorialModificaciones items={pedido.historial_modificaciones ?? []} />
             </SidebarSection>
           )}
 
@@ -1279,6 +1289,78 @@ function ClienteAutocomplete({
         </div>
       )}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Historial de modificaciones del cliente (sidebar admin)
+// ─────────────────────────────────────────────────────────────────────────
+
+const HIST_ESTADO_VARIANT: Record<PedidoHistorialItem["estado"], "default" | "secondary" | "destructive" | "outline"> = {
+  pendiente: "secondary",
+  aprobada: "default",
+  rechazada: "destructive",
+  cancelada: "outline",
+};
+
+const HIST_ESTADO_LABEL: Record<PedidoHistorialItem["estado"], string> = {
+  pendiente: "Pendiente",
+  aprobada: "Aprobada",
+  rechazada: "Rechazada",
+  cancelada: "Cancelada",
+};
+
+function HistorialModificaciones({ items }: { items: PedidoHistorialItem[] }) {
+  return (
+    <ol className="space-y-2.5">
+      {items.map((h) => {
+        const c = h.cambios_json;
+        const itemDeltas = Array.isArray(c?.items) ? (c?.items ?? []) : [];
+        const isDirecto = h.tipo === "directo";
+        return (
+          <li key={h.id} className="rounded border hairline bg-card px-2.5 py-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Badge variant={HIST_ESTADO_VARIANT[h.estado]} className="text-[10px]">
+                {HIST_ESTADO_LABEL[h.estado]}
+              </Badge>
+              {isDirecto && (
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Auto
+                </span>
+              )}
+              <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
+                {fmtFecha(h.created_at)}
+              </span>
+            </div>
+            {(c?.fecha_desde || c?.fecha_hasta) && (
+              <div className="text-xs text-muted-foreground mt-1.5 tabular-nums">
+                Fechas: {fmtFecha(c?.fecha_desde ?? "")} → {fmtFecha(c?.fecha_hasta ?? "")}
+              </div>
+            )}
+            {itemDeltas.length > 0 && (
+              <div className="text-xs text-muted-foreground mt-1">
+                {itemDeltas.length} item{itemDeltas.length !== 1 ? "s" : ""} en la propuesta
+              </div>
+            )}
+            {h.mensaje && (
+              <div className="text-xs text-ink mt-1.5 whitespace-pre-wrap line-clamp-3">
+                {h.mensaje}
+              </div>
+            )}
+            {h.respuesta && (
+              <div className="text-xs text-muted-foreground mt-1.5 italic line-clamp-2">
+                Respuesta: {h.respuesta}
+              </div>
+            )}
+            {h.resolved_by && h.resolved_at && (
+              <div className="text-[10px] text-muted-foreground mt-1">
+                {h.resolved_by} · {fmtFecha(h.resolved_at)}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

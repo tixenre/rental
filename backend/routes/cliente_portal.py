@@ -50,11 +50,11 @@ def _ventana_cumple(fecha_desde: Optional[str], ventana_horas: int) -> bool:
 def _documentos_disponibles(estado: str) -> dict:
     """Devuelve qué PDFs puede descargar el cliente según el estado del pedido."""
     e = (estado or "").lower()
-    confirmado_o_mas = e in ("confirmado", "entregado", "devuelto", "finalizado")
+    confirmado_o_mas = e in ("confirmado", "retirado", "devuelto", "finalizado")
     return {
         "remito": confirmado_o_mas,
         "contrato": confirmado_o_mas,
-        "albaran": e in ("entregado", "devuelto", "finalizado"),
+        "albaran": e in ("retirado", "devuelto", "finalizado"),
     }
 
 
@@ -280,7 +280,7 @@ def cliente_cancelar_pedido(id: int, request: Request):
         ).fetchone()
         if not p:
             raise HTTPException(404, "Pedido no encontrado")
-        if p["estado"] not in ("borrador", "presupuesto", "solicitado"):
+        if p["estado"] not in ("borrador", "presupuesto"):
             raise HTTPException(400, "Este pedido ya no se puede cancelar")
         conn.execute("UPDATE alquileres SET estado = 'cancelado' WHERE id = ?", (id,))
         conn.commit()
@@ -453,9 +453,31 @@ def _validar_modificacion_estado(estado: str) -> None:
         )
 
 
-def _validar_ventana_corte(conn, fecha_desde_actual: Optional[str]) -> int:
-    """Valida ventana de corte. Retorna las horas configuradas (para mensajes)."""
+def _validar_ventana_corte(
+    conn,
+    fecha_desde_actual: Optional[str],
+    fecha_desde_propuesta: Optional[str] = None,
+) -> int:
+    """Valida la ventana de corte para cambios en el pedido.
+
+    Pull-out (empujar `fecha_desde` hacia más adelante) está permitido aún
+    dentro de la ventana: el cliente avisa que no necesita el equipo tan
+    pronto, lo que descongestiona logística. Pull-in (acercar la fecha) sí
+    se bloquea.
+
+    Retorna las horas configuradas (útil para mensajes).
+    """
     ventana = _modificacion_ventana_horas(conn)
+
+    if fecha_desde_propuesta and fecha_desde_actual:
+        try:
+            d_prop = datetime.datetime.fromisoformat(fecha_desde_propuesta)
+            d_act = datetime.datetime.fromisoformat(fecha_desde_actual)
+            if d_prop >= d_act:
+                return ventana  # pull-out: permitido sin chequeo
+        except ValueError:
+            pass
+
     if not _ventana_cumple(fecha_desde_actual, ventana):
         raise HTTPException(
             400,
@@ -539,7 +561,7 @@ def cliente_modificar_pedido(
             raise HTTPException(404, "Pedido no encontrado")
 
         _validar_modificacion_estado(pedido["estado"])
-        _validar_ventana_corte(conn, pedido["fecha_desde"])
+        _validar_ventana_corte(conn, pedido["fecha_desde"], data.fecha_desde)
         _check_solicitud_pendiente(conn, id)
         _validar_fechas_propuestas(
             data.fecha_desde, data.fecha_hasta,
@@ -837,9 +859,23 @@ def admin_solicitudes(request: Request):
         conn.close()
 
 
+class SolicitudOverrideItem(BaseModel):
+    equipo_id: int
+    cantidad:  int
+
+
+class SolicitudOverride(BaseModel):
+    """Contrapropuesta del admin. Si se envía al aprobar, se aplica en lugar
+    de la propuesta original del cliente."""
+    fecha_desde: Optional[str] = None
+    fecha_hasta: Optional[str] = None
+    items:       list[SolicitudOverrideItem]
+
+
 class SolicitudRespuesta(BaseModel):
     estado: str     # aprobada / rechazada
     respuesta: str = ""
+    cambios_override: Optional[SolicitudOverride] = None
 
 
 @router.patch("/api/admin/solicitudes/{id}")
@@ -887,11 +923,30 @@ def admin_responder_solicitud(
                 raise HTTPException(
                     400, f"El pedido está en estado '{sm['pedido_estado']}' y ya no admite cambios"
                 )
-            _validar_ventana_corte(conn, sm["fecha_desde"])
 
-            cambios = sm["cambios_json"] or {}
-            if isinstance(cambios, str):
-                cambios = json.loads(cambios)
+            cambios_pre = sm["cambios_json"] or {}
+            if isinstance(cambios_pre, str):
+                cambios_pre = json.loads(cambios_pre)
+
+            # Contrapropuesta del admin: si se envió, sobreescribe la del cliente.
+            if data.cambios_override is not None:
+                cambios = data.cambios_override.model_dump()
+                if not cambios.get("items"):
+                    raise HTTPException(400, "La contrapropuesta debe incluir items")
+                _validar_fechas_propuestas(
+                    cambios.get("fecha_desde"), cambios.get("fecha_hasta"),
+                    sm["fecha_desde"],
+                    conn.execute(
+                        "SELECT fecha_hasta FROM alquileres WHERE id=?",
+                        (sm["pedido_id"],),
+                    ).fetchone()["fecha_hasta"],
+                )
+            else:
+                cambios = cambios_pre
+
+            _validar_ventana_corte(
+                conn, sm["fecha_desde"], cambios.get("fecha_desde"),
+            )
 
             precios = _precios_actuales(conn, sm["pedido_id"])
             for it in cambios.get("items") or []:

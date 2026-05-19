@@ -171,7 +171,24 @@ def _get_alquiler_detail(conn, id: int) -> dict:
     pedido = row_to_dict(row)
     pedido["items"] = _get_alquiler_items(conn, id)
     pedido["pagos"] = _get_alquiler_pagos(conn, id)
+    pedido["historial_modificaciones"] = _get_historial_modificaciones(conn, id)
     return pedido
+
+
+def _get_historial_modificaciones(conn, pedido_id: int) -> list[dict]:
+    """Timeline de cambios solicitados por el cliente sobre el pedido.
+
+    Incluye tanto solicitudes de aprobación como cambios directos
+    (autosave en `presupuesto`) — el admin se beneficia de ver todo.
+    """
+    rows = conn.execute("""
+        SELECT id, mensaje, estado, respuesta, cambios_json, tipo,
+               resolved_at, resolved_by, created_at
+        FROM solicitudes_modificacion
+        WHERE pedido_id = ?
+        ORDER BY created_at DESC
+    """, (pedido_id,)).fetchall()
+    return [row_to_dict(r) for r in rows]
 
 
 # ── Modelos ──────────────────────────────────────────────────────────────────

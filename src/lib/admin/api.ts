@@ -1637,6 +1637,26 @@ export type Pedido = {
   /** True si hay una `solicitudes_modificacion` con estado='pendiente' para
    * este pedido. Sólo viene en el listado, no en el detalle. */
   tiene_solicitud_pendiente?: boolean;
+  /** Solo presente en el detalle (`getPedido`). Timeline de cambios del
+   * cliente desde el portal. */
+  historial_modificaciones?: PedidoHistorialItem[];
+};
+
+export type PedidoHistorialItem = {
+  id: number;
+  mensaje: string | null;
+  estado: "pendiente" | "aprobada" | "rechazada" | "cancelada";
+  respuesta: string | null;
+  cambios_json: {
+    fecha_desde?: string | null;
+    fecha_hasta?: string | null;
+    items?: { equipo_id: number; cantidad: number }[];
+    mensaje?: string | null;
+  } | null;
+  tipo: "directo" | "aprobacion";
+  resolved_at: string | null;
+  resolved_by: string | null;
+  created_at: string;
 };
 
 export type PedidosListResp = {

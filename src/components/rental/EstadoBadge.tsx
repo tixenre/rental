@@ -3,6 +3,7 @@ const ESTADO_MAP: Record<string, { label: string; cls: string }> = {
   presupuesto: { label: "Presupuesto", cls: "bg-blue-50 text-blue-700 border-blue-200" },
   solicitado:  { label: "Solicitado",  cls: "bg-amber-50 text-amber-700 border-amber-200" },
   confirmado:  { label: "Confirmado",  cls: "bg-green-50 text-green-700 border-green-200" },
+  retirado:    { label: "Retirado",    cls: "bg-green-100 text-green-800 border-green-300" },
   entregado:   { label: "Entregado",   cls: "bg-green-100 text-green-800 border-green-300" },
   devuelto:    { label: "Devuelto",    cls: "bg-slate-100 text-slate-600 border-slate-300" },
   finalizado:  { label: "Finalizado",  cls: "bg-slate-100 text-slate-600 border-slate-300" },

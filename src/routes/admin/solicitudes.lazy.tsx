@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
-import { Check, X as XIcon, MessageSquare, Calendar, Package as PackageIcon } from "lucide-react";
+import { Check, X as XIcon, MessageSquare, Calendar, Package as PackageIcon, Pencil, Plus, Minus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { authedFetch, authedJson } from "@/lib/authedFetch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -67,11 +69,21 @@ function SolicitudesPage() {
   });
 
   const resolverMut = useMutation({
-    mutationFn: async (args: { id: number; estado: "aprobada" | "rechazada"; respuesta: string }) => {
+    mutationFn: async (args: {
+      id: number;
+      estado: "aprobada" | "rechazada";
+      respuesta: string;
+      cambios_override?: CambiosJson;
+    }) => {
+      const body: Record<string, unknown> = {
+        estado: args.estado,
+        respuesta: args.respuesta,
+      };
+      if (args.cambios_override) body.cambios_override = args.cambios_override;
       const res = await authedFetch(`/api/admin/solicitudes/${args.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ estado: args.estado, respuesta: args.respuesta }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const detail = await res.json().catch(() => ({}));
@@ -79,7 +91,11 @@ function SolicitudesPage() {
       }
     },
     onSuccess: (_d, vars) => {
-      toast.success(vars.estado === "aprobada" ? "Solicitud aprobada" : "Solicitud rechazada");
+      const label =
+        vars.estado === "aprobada"
+          ? (vars.cambios_override ? "Aprobada con cambios del admin" : "Solicitud aprobada")
+          : "Solicitud rechazada";
+      toast.success(label);
       qc.invalidateQueries({ queryKey: ["admin", "solicitudes"] });
       qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
     },
@@ -136,11 +152,17 @@ function SolicitudCard({
   solicitud, onResolve, isPending,
 }: {
   solicitud: Solicitud;
-  onResolve: (args: { id: number; estado: "aprobada" | "rechazada"; respuesta: string }) => void;
+  onResolve: (args: {
+    id: number;
+    estado: "aprobada" | "rechazada";
+    respuesta: string;
+    cambios_override?: CambiosJson;
+  }) => void;
   isPending: boolean;
 }) {
   const [respuesta, setRespuesta] = useState("");
   const [ask, setAsk] = useState<null | "aprobada" | "rechazada">(null);
+  const [showEdit, setShowEdit] = useState(false);
 
   const pedidoQ = useQuery({
     queryKey: ["admin", "pedido", solicitud.pedido_id],
@@ -150,7 +172,19 @@ function SolicitudCard({
   const cambios = solicitud.cambios_json;
   const pedido = pedidoQ.data;
 
-  // Mapa equipo_id → nombre para resolver labels en el diff.
+  // Contrapropuesta editable del admin (precargada con la del cliente).
+  const [overrideItems, setOverrideItems] = useState<Map<number, number>>(new Map());
+  const [overrideDesde, setOverrideDesde] = useState<string>("");
+  const [overrideHasta, setOverrideHasta] = useState<string>("");
+  useEffect(() => {
+    if (!cambios) return;
+    const m = new Map<number, number>();
+    for (const it of cambios.items ?? []) m.set(it.equipo_id, it.cantidad);
+    setOverrideItems(m);
+    setOverrideDesde(cambios.fecha_desde ?? solicitud.pedido_fecha_desde?.slice(0, 10) ?? "");
+    setOverrideHasta(cambios.fecha_hasta ?? solicitud.pedido_fecha_hasta?.slice(0, 10) ?? "");
+  }, [cambios, solicitud.id]);
+
   const equipos = new Map<number, { nombre: string; nombre_publico?: string | null }>();
   for (const it of pedido?.items ?? []) {
     equipos.set(it.equipo_id, { nombre: it.nombre, nombre_publico: it.nombre_publico ?? null });
@@ -177,6 +211,50 @@ function SolicitudCard({
       (cambios.fecha_hasta ?? null) !== (solicitud.pedido_fecha_hasta?.slice(0, 10) ?? null)
     )
   );
+
+  // Detectar si el admin tweakeó algo (genera contrapropuesta).
+  const hayOverride = (() => {
+    if (!cambios) return false;
+    if ((cambios.fecha_desde ?? "") !== overrideDesde) return true;
+    if ((cambios.fecha_hasta ?? "") !== overrideHasta) return true;
+    const clienteMap = new Map<number, number>();
+    for (const it of cambios.items ?? []) clienteMap.set(it.equipo_id, it.cantidad);
+    if (clienteMap.size !== overrideItems.size) return true;
+    for (const [k, v] of overrideItems) {
+      if (clienteMap.get(k) !== v) return true;
+    }
+    return false;
+  })();
+
+  function buildOverridePayload(): CambiosJson | undefined {
+    if (!hayOverride) return undefined;
+    return {
+      fecha_desde: overrideDesde || null,
+      fecha_hasta: overrideHasta || null,
+      items: Array.from(overrideItems.entries())
+        .filter(([, c]) => c > 0)
+        .map(([equipo_id, cantidad]) => ({ equipo_id, cantidad })),
+    };
+  }
+
+  function updateOverrideCantidad(equipo_id: number, delta: number) {
+    setOverrideItems((prev) => {
+      const next = new Map(prev);
+      const cur = next.get(equipo_id) ?? 0;
+      const nv = Math.max(0, cur + delta);
+      next.set(equipo_id, nv);
+      return next;
+    });
+  }
+
+  function resetOverride() {
+    if (!cambios) return;
+    const m = new Map<number, number>();
+    for (const it of cambios.items ?? []) m.set(it.equipo_id, it.cantidad);
+    setOverrideItems(m);
+    setOverrideDesde(cambios.fecha_desde ?? "");
+    setOverrideHasta(cambios.fecha_hasta ?? "");
+  }
 
   return (
     <article className="rounded-lg border hairline bg-background p-4 space-y-4">
@@ -223,7 +301,7 @@ function SolicitudCard({
               </div>
             </div>
             <div>
-              <div className="text-muted-foreground">Propuesta</div>
+              <div className="text-muted-foreground">Propuesta del cliente</div>
               <div className="text-ink tabular-nums font-medium">
                 {fmtFecha(cambios?.fecha_desde)} → {fmtFecha(cambios?.fecha_hasta)}
               </div>
@@ -262,6 +340,114 @@ function SolicitudCard({
         <div className="text-xs text-muted-foreground">Sin cambios estructurales detectados.</div>
       )}
 
+      {/* Contraoferta del admin */}
+      <div className="rounded-md border hairline px-3 py-2.5 text-sm">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2">
+            <Pencil className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-ink">Aprobar con cambios</span>
+            {hayOverride && <Badge variant="outline" className="text-[10px]">Modificada</Badge>}
+          </div>
+          <div className="flex items-center gap-1">
+            {hayOverride && (
+              <button
+                type="button"
+                onClick={resetOverride}
+                className="text-xs text-muted-foreground hover:text-ink transition inline-flex items-center gap-1"
+                title="Volver a la propuesta del cliente"
+              >
+                <RotateCcw className="h-3 w-3" /> Reset
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowEdit((v) => !v)}
+              className="text-xs text-muted-foreground hover:text-ink transition"
+            >
+              {showEdit ? "Ocultar" : "Editar"}
+            </button>
+          </div>
+        </div>
+
+        {showEdit && cambios && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Desde</Label>
+                <Input
+                  type="date"
+                  value={overrideDesde}
+                  onChange={(e) => setOverrideDesde(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Hasta</Label>
+                <Input
+                  type="date"
+                  value={overrideHasta}
+                  min={overrideDesde || undefined}
+                  onChange={(e) => setOverrideHasta(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+            <ul className="divide-y hairline -mx-3">
+              {Array.from(overrideItems.entries()).map(([equipo_id, cant]) => {
+                const nombre = equipos.get(equipo_id)?.nombre_publico
+                  ?? equipos.get(equipo_id)?.nombre
+                  ?? `equipo #${equipo_id}`;
+                const original = (cambios.items ?? []).find((it) => it.equipo_id === equipo_id)?.cantidad ?? 0;
+                const dirty = cant !== original;
+                return (
+                  <li key={equipo_id} className="px-3 py-1.5 flex items-center gap-2">
+                    <span className="flex-1 text-ink truncate text-sm">{nombre}</span>
+                    {dirty && (
+                      <span className="text-[10px] text-amber-700">cliente: {original}</span>
+                    )}
+                    <div className="flex items-center gap-0.5">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-7 w-7"
+                        onClick={() => updateOverrideCantidad(equipo_id, -1)}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={cant}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value || "0", 10);
+                          setOverrideItems((prev) => {
+                            const next = new Map(prev);
+                            next.set(equipo_id, Math.max(0, Number.isNaN(v) ? 0 : v));
+                            return next;
+                          });
+                        }}
+                        className="h-7 w-12 text-center text-sm"
+                      />
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-7 w-7"
+                        onClick={() => updateOverrideCantidad(equipo_id, +1)}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              Si cambiás algo, al aprobar se aplica tu versión en lugar de la del cliente. Cantidades en 0 quitan el equipo del pedido.
+            </p>
+          </div>
+        )}
+      </div>
+
       <div>
         <Textarea
           placeholder="Respuesta opcional para el cliente…"
@@ -286,7 +472,8 @@ function SolicitudCard({
           onClick={() => setAsk("aprobada")}
           disabled={isPending}
         >
-          <Check className="h-4 w-4 mr-1" /> Aprobar
+          <Check className="h-4 w-4 mr-1" />
+          {hayOverride ? "Aprobar con cambios" : "Aprobar"}
         </Button>
       </div>
 
@@ -294,11 +481,15 @@ function SolicitudCard({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {ask === "aprobada" ? "Aprobar solicitud" : "Rechazar solicitud"}
+              {ask === "aprobada"
+                ? (hayOverride ? "Aprobar con tus cambios" : "Aprobar solicitud")
+                : "Rechazar solicitud"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {ask === "aprobada"
-                ? "Se aplicarán los cambios al pedido y se notificará al cliente."
+                ? (hayOverride
+                    ? "Se aplicará TU versión modificada en lugar de la del cliente, y se le notificará."
+                    : "Se aplicarán los cambios al pedido y se notificará al cliente.")
                 : "Se notificará al cliente que la solicitud fue rechazada. El pedido no se modifica."}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -307,7 +498,12 @@ function SolicitudCard({
             <AlertDialogAction
               onClick={() => {
                 if (!ask) return;
-                onResolve({ id: solicitud.id, estado: ask, respuesta });
+                onResolve({
+                  id: solicitud.id,
+                  estado: ask,
+                  respuesta,
+                  cambios_override: ask === "aprobada" ? buildOverridePayload() : undefined,
+                });
                 setAsk(null);
               }}
             >
