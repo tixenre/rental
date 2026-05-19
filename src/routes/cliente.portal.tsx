@@ -5,7 +5,7 @@ import { clienteApi } from "@/lib/cliente/api";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { StatCard } from "@/components/rental/StatCard";
 import { EstadoBadge } from "@/components/rental/EstadoBadge";
-import { ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon, CheckCircle2, XCircle, Info } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -39,6 +39,8 @@ type SolicitudPortal = {
   id: number;
   estado: "pendiente" | "aprobada" | "rechazada" | "cancelada";
   respuesta?: string | null;
+  resolved_by?: string | null;
+  resolved_at?: string | null;
   created_at: string;
 };
 type Pedido = {
@@ -308,11 +310,17 @@ function PedidoCard({
 
   const [askCancel, setAskCancel] = useState(false);
   const pendiente = (pedido.solicitudes ?? []).find((s) => s.estado === "pendiente");
-  // Última solicitud resuelta (aprobada/rechazada) sin pendiente: mostrar respuesta
-  // del admin como info al cliente. Cancelada no se muestra (la inició el cliente).
+  // Última solicitud que el cliente debe ver: aprobada, rechazada, o
+  // cancelada por el sistema (cuando el pedido cambia de estado). Las
+  // canceladas por el propio cliente las ocultamos: él la canceló.
   const ultimaResuelta = !pendiente ? (pedido.solicitudes ?? [])
-    .filter((s) => s.estado === "aprobada" || s.estado === "rechazada")
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] : undefined;
+    .filter((s) => {
+      if (s.estado === "aprobada" || s.estado === "rechazada") return true;
+      if (s.estado === "cancelada" && s.resolved_by === "system") return true;
+      return false;
+    })
+    .sort((a, b) => (b.resolved_at ?? b.created_at).localeCompare(a.resolved_at ?? a.created_at))[0]
+    : undefined;
 
   const dentroVentana = (() => {
     if (!pedido.fecha_desde) return true; // pedido sin fechas: permitir editar
@@ -406,30 +414,39 @@ function PedidoCard({
             </section>
           )}
 
-          {ultimaResuelta && (
-            <section
-              className={cn(
-                "rounded-md border px-3.5 py-3 flex items-start gap-2.5",
-                ultimaResuelta.estado === "aprobada"
-                  ? "border-emerald-300 bg-emerald-50"
-                  : "border-rose-300 bg-rose-50",
-              )}
-            >
-              {ultimaResuelta.estado === "aprobada"
-                ? <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
-                : <XCircle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />}
-              <div className="flex-1 min-w-0">
-                <div className="font-sans text-[13px] font-semibold text-ink">
-                  Tu última solicitud fue {ultimaResuelta.estado === "aprobada" ? "aprobada" : "rechazada"}
-                </div>
-                {ultimaResuelta.respuesta && (
-                  <div className="font-sans text-xs text-ink/80 mt-0.5 whitespace-pre-wrap">
-                    {ultimaResuelta.respuesta}
-                  </div>
+          {ultimaResuelta && (() => {
+            const isAprobada  = ultimaResuelta.estado === "aprobada";
+            const isRechazada = ultimaResuelta.estado === "rechazada";
+            const isSystemCancel = ultimaResuelta.estado === "cancelada"; // ya filtramos por resolved_by='system'
+            const titulo =
+              isAprobada  ? "Tu última solicitud fue aprobada"
+              : isRechazada ? "Tu última solicitud fue rechazada"
+              : "Tu solicitud quedó sin efecto";
+            return (
+              <section
+                className={cn(
+                  "rounded-md border px-3.5 py-3 flex items-start gap-2.5",
+                  isAprobada  ? "border-emerald-300 bg-emerald-50"
+                  : isRechazada ? "border-rose-300 bg-rose-50"
+                  : "border-violet-300 bg-violet-50",
                 )}
-              </div>
-            </section>
-          )}
+              >
+                {isAprobada  ? <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
+                : isRechazada ? <XCircle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />
+                : <Info className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <div className="font-sans text-[13px] font-semibold text-ink">
+                    {titulo}
+                  </div>
+                  {ultimaResuelta.respuesta && (
+                    <div className="font-sans text-xs text-ink/80 mt-0.5 whitespace-pre-wrap">
+                      {isSystemCancel ? ultimaResuelta.respuesta : ultimaResuelta.respuesta}
+                    </div>
+                  )}
+                </div>
+              </section>
+            );
+          })()}
 
           {puedeModificar && (
             <section>

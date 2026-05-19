@@ -983,6 +983,14 @@ def init_db():
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_solicitudes_cliente ON solicitudes_modificacion(cliente_id)
     """)
+    # Garantía atómica de "una sola solicitud pendiente por pedido": previene
+    # races multi-tab donde dos requests pasan el check optimista y ambos
+    # insertan.
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uniq_solicitud_pendiente_por_pedido
+        ON solicitudes_modificacion (pedido_id)
+        WHERE estado = 'pendiente'
+    """)
 
     # Configuración global de la app (tipo de cambio, defaults, etc.).
     # Es un key-value simple: clave única + valor (string serializado).

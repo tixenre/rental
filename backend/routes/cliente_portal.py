@@ -336,7 +336,8 @@ def cliente_pedidos(request: Request):
             # de aprobación (las `directo` son auditoría interna del autosave
             # en presupuesto, no relevantes para el cliente).
             solic = conn.execute("""
-                SELECT id, mensaje, estado, respuesta, created_at
+                SELECT id, mensaje, estado, respuesta, resolved_by,
+                       resolved_at, created_at
                 FROM solicitudes_modificacion
                 WHERE pedido_id = ? AND tipo = 'aprobacion'
                 ORDER BY created_at DESC
@@ -385,7 +386,8 @@ def cliente_pedido_detalle(id: int, request: Request):
         d["pagos"] = [row_to_dict(p) for p in pagos]
 
         solicitudes = conn.execute("""
-            SELECT id, mensaje, estado, respuesta, created_at
+            SELECT id, mensaje, estado, respuesta, resolved_by,
+                   resolved_at, created_at
             FROM solicitudes_modificacion
             WHERE pedido_id = ? AND tipo = 'aprobacion'
             ORDER BY created_at DESC
@@ -726,14 +728,23 @@ def cliente_modificar_pedido(
         if problemas:
             raise HTTPException(409, "Sin stock para tu propuesta: " + "; ".join(problemas))
 
-        conn.execute(
-            """INSERT INTO solicitudes_modificacion
-               (pedido_id, cliente_id, mensaje, cambios_json, tipo, estado)
-               VALUES (?,?,?,?,?,'pendiente')""",
-            (id, cliente_id, data.mensaje, json.dumps(data.model_dump()),
-             "aprobacion")
-        )
-        conn.commit()
+        try:
+            conn.execute(
+                """INSERT INTO solicitudes_modificacion
+                   (pedido_id, cliente_id, mensaje, cambios_json, tipo, estado)
+                   VALUES (?,?,?,?,?,'pendiente')""",
+                (id, cliente_id, data.mensaje, json.dumps(data.model_dump()),
+                 "aprobacion")
+            )
+            conn.commit()
+        except Exception as e:
+            # Si el partial unique index agarra una race con otra pestaña del
+            # mismo cliente, devolvemos 409 igual que el pre-check optimista.
+            # Re-mapeamos para que la respuesta sea consistente.
+            msg = str(e).lower()
+            if "uniq_solicitud_pendiente_por_pedido" in msg or "unique" in msg:
+                raise HTTPException(409, "Ya hay una solicitud pendiente para este pedido")
+            raise
 
         background.add_task(_enviar_email_solicitud_admin, id, data.model_dump())
 

@@ -212,11 +212,17 @@ export function usePedidoDraft(
       onProposalSent?.(resp.tipo);
     },
     onError: (e: Error) => {
-      toast.error(e.message);
-      // Si falla el autosave (típicamente 409 sin stock), forzamos un refetch
-      // del server-state para evitar dejar el draft "dirty" indefinidamente.
-      // El useEffect de sincronización aplicará lo que diga el server.
-      qc.invalidateQueries({ queryKey: ["cliente", "pedido", pedido!.id] });
+      // Importante: NO invalidamos la query. El refetch + useEffect reset
+      // pisaría los cambios locales del cliente sin que se dé cuenta. En
+      // su lugar dejamos el draft "dirty" y mostramos el error claro.
+      // El SaveIndicator muestra "Error al guardar" hasta que vuelva a
+      // editar y disparar otro autosave.
+      const m = e.message || "";
+      const friendly =
+        m.includes("Sin stock") ? `${m} — ajustá las cantidades o las fechas y volvemos a guardar.`
+        : m.includes("ventana") ? m
+        : `No pudimos guardar: ${m}`;
+      toast.error(friendly);
     },
   });
 
@@ -255,18 +261,43 @@ export function usePedidoDraft(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, pedido?.id, autosaveAdmin]);
 
+  // Payload pendiente de enviar (autosave cliente). Si el cliente navega
+  // antes del debounce, el efecto de unmount lo flushea — sino se pierde
+  // el cambio silenciosamente.
+  const pendingFlushRef = useRef<{ d: DraftDatos; its: DraftItem[] } | null>(null);
+
   useEffect(() => {
     if (!autosaveCliente) return;
     if (!pedido || !datos || !items || !serverRef.current) return;
     const dirty =
       !shallowDatosEq(datos, serverRef.current.datos) ||
       !shallowItemsEq(items, serverRef.current.items);
-    if (!dirty) return;
+    if (!dirty) {
+      pendingFlushRef.current = null;
+      return;
+    }
     if (items.length === 0) return;
-    const t = setTimeout(() => { clienteMut.mutate({ d: datos, its: items }); }, DEBOUNCE_MS);
+    pendingFlushRef.current = { d: datos, its: items };
+    const t = setTimeout(() => {
+      clienteMut.mutate({ d: datos, its: items });
+      pendingFlushRef.current = null;
+    }, DEBOUNCE_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datos, items, pedido?.id, autosaveCliente]);
+
+  // Flush en unmount: si quedó un cambio sin enviar (el cliente navegó
+  // antes del debounce), lo disparamos best-effort sin debounce. El
+  // efecto se monta una vez; el cleanup corre sólo al desmontar.
+  useEffect(() => {
+    return () => {
+      if (pendingFlushRef.current) {
+        clienteMut.mutate(pendingFlushRef.current);
+        pendingFlushRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Submit explícito (propose) ─────────────────────────────────────────
   async function submitProposal() {
