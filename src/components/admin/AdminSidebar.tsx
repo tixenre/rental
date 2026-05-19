@@ -25,7 +25,6 @@ import {
   CalendarDays,
   Check,
   Database,
-  Bot,
   Mail,
   Inbox,
 } from "lucide-react";
@@ -82,7 +81,6 @@ const items: NavItem[] = [
       { title: "Etiquetas libres",    url: "/admin/equipos/etiquetas",  icon: Tag },
       { title: "Specs por categoría", url: "/admin/equipos/specs",      icon: Wrench },
       { title: "Catálogo global de specs", url: "/admin/specs/definitions", icon: Database },
-      { title: "Propuestas IA",       url: "/admin/specs/propuestas",   icon: Bot },
       { title: "Gear Compatibility",  url: "/admin/gear-compatibility", icon: Sparkles },
       { title: "Observatorio de specs", url: "/admin/specs/observatorio", icon: Telescope },
       { title: "Familias jerárquicas", url: "/admin/specs/familias",     icon: Network },
