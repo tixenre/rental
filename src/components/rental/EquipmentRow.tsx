@@ -96,6 +96,7 @@ export function EquipmentRow({
                 alt={item.name}
                 className="h-full w-full object-contain p-1.5"
                 loading="lazy"
+                decoding="async"
                 onError={() => setImgFailed(true)}
               />
             ) : (
