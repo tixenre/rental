@@ -53,7 +53,7 @@ const TIPO_LABEL: Record<SpecTipo, string> = {
 };
 
 function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) {
-  useDocumentTitle("Catálogo de specs · Back Office");
+  useDocumentTitle("Catálogo global de specs · Back Office");
   const qc = useQueryClient();
   const [editing, setEditing] = useState<SpecDefinition | "new" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SpecDefinition | null>(null);

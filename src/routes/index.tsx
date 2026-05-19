@@ -19,6 +19,7 @@ import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { ViewIntroDialog } from "@/components/rental/ViewIntroDialog";
 import { PreviewPane } from "@/components/rental/PreviewPane";
 import { useEquipos, useCategorias, useMarcas } from "@/hooks/useEquipos";
+import type { BackendMarca } from "@/lib/api";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
@@ -526,7 +527,7 @@ function GridMode({
 }: {
   allEquipos: Equipment[];
   apiCategories: string[];
-  marcas: any[];
+  marcas: BackendMarca[];
   selectedBrand?: string | null;
   onBrandSelect: (brandName: string | null) => void;
   onJumpToCategory: (c: string) => void;
@@ -752,7 +753,7 @@ function ListMode({
 }: {
   allEquipos: Equipment[];
   apiCategories: string[];
-  marcas: any[];
+  marcas: BackendMarca[];
   query: string;
   setQuery: (v: string) => void;
   selectedCats: Set<string>;
