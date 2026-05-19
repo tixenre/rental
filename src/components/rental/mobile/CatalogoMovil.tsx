@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
+import { BUSINESS_PHONE } from "@/lib/business";
 import { apiGetDescuentosJornada, interpolarDescuento } from "@/lib/api";
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
@@ -404,7 +405,7 @@ interface CartSheetProps {
   horaHasta: string;
 }
 
-const WA_PHONE = "+5492235852510";
+const WA_PHONE = BUSINESS_PHONE;
 
 function CartSheet({
   onClose, onOpenDateSheet, equipos, cartItems, jornadas,

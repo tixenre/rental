@@ -27,6 +27,7 @@ import {
   Database,
   Bot,
   Mail,
+  Inbox,
 } from "lucide-react";
 
 import {
@@ -82,6 +83,7 @@ const items: NavItem[] = [
     ],
   },
   { title: "Pedidos",     url: "/admin/pedidos",     icon: ClipboardList },
+  { title: "Solicitudes", url: "/admin/solicitudes", icon: Inbox },
   { title: "Clientes",    url: "/admin/clientes",    icon: Users },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
   { title: "Diseño",      url: "/admin/diseno",      icon: Palette },

@@ -5,8 +5,8 @@
  * Mobile: columna única con las mismas secciones apiladas.
  */
 
-import { useState, useMemo } from "react";
-import { Link, useRouter } from "@tanstack/react-router";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { Link, useRouter, useBlocker } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft, ChevronDown, ChevronRight,
@@ -34,13 +34,14 @@ import { cn } from "@/lib/utils";
 
 import {
   adminApi, ESTADO_LABEL, pedidoPdfUrl,
-  type PedidoEstado, type Equipo, type Cliente,
+  type PedidoEstado, type Equipo, type Cliente, type PedidoHistorialItem,
 } from "@/lib/admin/api";
+import { clienteApi } from "@/lib/cliente/api";
 import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
   usePedidoDraft, jornadasEntre,
-  type DraftItem, type DraftDatos, type SaveStatus,
+  type DraftItem, type DraftDatos, type SaveStatus, type PedidoMode,
 } from "./usePedidoDraft";
 
 // ── Formatters ────────────────────────────────────────────────────────────
@@ -131,20 +132,52 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export function PedidoPage({ pedidoId }: { pedidoId: number }) {
+export type PedidoPageProps = {
+  pedidoId: number;
+  /** Modo de la vista. 'admin' (default) o 'cliente' (portal). */
+  mode?: PedidoMode;
+  /** Mensaje opcional para acompañar la solicitud (sólo cliente). */
+  mensaje?: string;
+  /** Callback al volver desde la vista cliente. */
+  onClose?: () => void;
+};
+
+export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: PedidoPageProps) {
   const router = useRouter();
   const qc = useQueryClient();
+  const isCliente = mode === "cliente";
 
   const pedidoQ = useQuery({
-    queryKey: ["admin", "pedido", pedidoId],
-    queryFn: () => adminApi.getPedido(pedidoId),
+    queryKey: isCliente ? ["cliente", "pedido", pedidoId] : ["admin", "pedido", pedidoId],
+    queryFn: () => (isCliente ? clienteApi.getPedido(pedidoId) : adminApi.getPedido(pedidoId)),
   });
 
   const pedido = pedidoQ.data;
-  const draft = usePedidoDraft(pedido);
+
+  // En modo cliente el submitMode depende del estado del pedido:
+  //  - presupuesto: autosave (se aplica directo)
+  //  - confirmado:  propose   (genera solicitud pendiente de aprobación)
+  const clienteSubmitMode = pedido?.estado === "confirmado" ? "propose" : "autosave";
+
+  const draft = usePedidoDraft(pedido, {
+    mode,
+    submitMode: isCliente ? clienteSubmitMode : "autosave",
+    mensaje,
+    onProposalSent: (tipo) => {
+      if (tipo === "aprobacion") {
+        toast.success("Tu solicitud fue enviada. Te avisamos cuando la revisemos.");
+        // Limpiamos el draft contra el server actual (que sigue intacto) y
+        // volvemos al portal: el cliente no debe quedarse en el editor con
+        // estado `dirty` después de enviar.
+        if (onClose) onClose();
+        else router.navigate({ to: "/cliente/portal" });
+      }
+    },
+  });
 
   const [askDelete, setAskDelete] = useState(false);
   const [openActionMenu, setOpenActionMenu] = useState(false);
+  const [showDiffConfirm, setShowDiffConfirm] = useState(false);
 
   const deleteMut = useMutation({
     mutationFn: () => adminApi.deletePedido(pedidoId),
@@ -154,6 +187,37 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
       router.navigate({ to: "/admin/pedidos" });
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Warning si el cliente intenta salir con cambios sin enviar en modo
+  // propose (confirmado). En autosave no hace falta — ya está guardado.
+  const dirtyInPropose =
+    isCliente && pedido?.estado === "confirmado" && draft.saveStatus === "dirty";
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirtyInPropose;
+  // One-shot bypass del blocker: lo setea `onProposalSent` para que la
+  // navegación post-submit no dispare el confirm de "cambios sin enviar".
+  const skipBlockerRef = useRef(false);
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (skipBlockerRef.current) return;
+      if (dirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
+  useBlocker({
+    shouldBlockFn: () => {
+      if (skipBlockerRef.current) return false;
+      if (!dirtyRef.current) return false;
+      return !window.confirm(
+        "Tenés cambios sin enviar. ¿Querés salir y perderlos?"
+      );
+    },
+    enableBeforeUnload: false,
   });
 
   if (pedidoQ.isLoading) {
@@ -180,6 +244,35 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
   const numero = pedido.numero_pedido ? `#${pedido.numero_pedido}` : `(borrador #${pedido.id})`;
   const clienteNombre = draft.datos.cliente_nombre || "Sin cliente";
 
+  // Disponibilidad — usada por ItemsCard y por el gate del botón "Enviar".
+  // En cliente se usa el endpoint con ownership; en admin el normal.
+  const adminDispoQ = useQuery({
+    queryKey: ["admin", "disponibilidad", draft.datos.fecha_desde, draft.datos.fecha_hasta, pedido.id],
+    queryFn: () => adminApi.getDisponibilidad(draft.datos!.fecha_desde, draft.datos!.fecha_hasta, pedido.id),
+    enabled: !isCliente && !!draft.datos.fecha_desde && !!draft.datos.fecha_hasta,
+  });
+  const clienteDispoQ = useQuery({
+    queryKey: ["cliente", "disponibilidad", pedido.id, draft.datos.fecha_desde, draft.datos.fecha_hasta],
+    queryFn: () => clienteApi.getDisponibilidad(pedido.id, draft.datos!.fecha_desde, draft.datos!.fecha_hasta),
+    enabled: isCliente && !!draft.datos.fecha_desde && !!draft.datos.fecha_hasta,
+  });
+  const stockMap: Record<string, { cantidad: number; reservado: number }> = isCliente
+    ? Object.fromEntries(
+        Object.entries(clienteDispoQ.data ?? {}).map(([k, v]) => [
+          k, { cantidad: Number(v) || 0, reservado: 0 },
+        ])
+      )
+    : (adminDispoQ.data ?? {});
+
+  const hasOverstock = draft.items.some((it) => {
+    const s = stockMap[String(it.equipo_id)];
+    if (!s) return false;
+    const max = Math.max(0, s.cantidad - s.reservado);
+    return it.cantidad > max;
+  });
+
+  const submitBlocked = draft.submitBlockedReason ?? (hasOverstock ? "Algún equipo excede el stock disponible" : null);
+
   const nextAction = (() => {
     switch (pedido.estado) {
       case "borrador":    return { label: "Confirmar presupuesto", estado: "presupuesto" as PedidoEstado, needsItems: true };
@@ -200,12 +293,32 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 bg-background border-b hairline px-4 md:px-6 py-3 flex items-center gap-3">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <Link to="/admin/pedidos" className="text-muted-foreground hover:text-ink transition shrink-0">
-            <ChevronLeft className="h-4 w-4" />
-          </Link>
-          <span className="text-muted-foreground text-sm hidden sm:inline">Pedidos</span>
+          {isCliente ? (
+            <button
+              type="button"
+              onClick={() => onClose?.() ?? router.navigate({ to: "/cliente/portal" })}
+              className="text-muted-foreground hover:text-ink transition shrink-0"
+              aria-label="Volver"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          ) : (
+            <Link to="/admin/pedidos" className="text-muted-foreground hover:text-ink transition shrink-0">
+              <ChevronLeft className="h-4 w-4" />
+            </Link>
+          )}
+          <span className="text-muted-foreground text-sm hidden sm:inline">
+            {isCliente ? "Mis pedidos" : "Pedidos"}
+          </span>
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground hidden sm:inline shrink-0" />
           <span className="font-semibold text-sm text-ink truncate">{numero}</span>
+          {isCliente && clienteSubmitMode === "propose" && draft.saveStatus === "dirty" && (
+            <span
+              className="sm:hidden h-2 w-2 rounded-full bg-amber shrink-0"
+              title="Tenés cambios sin enviar"
+              aria-label="Cambios sin enviar"
+            />
+          )}
           <Badge variant={pedidoEstadoVariant(pedido.estado)} className="ml-1 shrink-0">
             {ESTADO_LABEL[pedido.estado]}
           </Badge>
@@ -213,21 +326,23 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
 
         <div className="flex items-center gap-2 shrink-0">
           <SaveIndicator status={draft.saveStatus} />
-          <WhatsAppButton
-            pedido={{
-              numero_pedido: pedido.numero_pedido,
-              numero_remito: pedido.numero_remito,
-              cliente_nombre: draft.datos.cliente_nombre,
-              fecha_desde: draft.datos.fecha_desde,
-              fecha_hasta: draft.datos.fecha_hasta,
-              monto_total: total,
-              monto_pagado: pagado,
-              estado: pedido.estado,
-            }}
-            phone={draft.datos.cliente_telefono}
-            variant="icon"
-          />
-          {nextAction && (
+          {!isCliente && (
+            <WhatsAppButton
+              pedido={{
+                numero_pedido: pedido.numero_pedido,
+                numero_remito: pedido.numero_remito,
+                cliente_nombre: draft.datos.cliente_nombre,
+                fecha_desde: draft.datos.fecha_desde,
+                fecha_hasta: draft.datos.fecha_hasta,
+                monto_total: total,
+                monto_pagado: pagado,
+                estado: pedido.estado,
+              }}
+              phone={draft.datos.cliente_telefono}
+              variant="icon"
+            />
+          )}
+          {!isCliente && nextAction && (
             <Button
               size="sm"
               onClick={() => draft.estadoMut.mutate(nextAction.estado)}
@@ -237,31 +352,46 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
               <Check className="h-3.5 w-3.5 mr-1" /> {nextAction.label}
             </Button>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="hidden sm:inline-flex">
-                <MoreHorizontal className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                disabled={pedido.estado === "cancelado"}
-                onClick={() => draft.estadoMut.mutate("cancelado")}
-              >
-                Cancelar pedido
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={() => setAskDelete(true)}
-              >
-                <Trash2 className="h-4 w-4 mr-2" /> Eliminar
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button size="icon" variant="ghost" className="sm:hidden" onClick={() => setOpenActionMenu(true)}>
-            <MoreHorizontal className="h-5 w-5" />
-          </Button>
+          {isCliente && clienteSubmitMode === "propose" && (
+            <Button
+              size="sm"
+              onClick={() => setShowDiffConfirm(true)}
+              disabled={draft.isSubmitting || draft.saveStatus !== "dirty" || !!submitBlocked}
+              title={submitBlocked ?? undefined}
+              className="hidden sm:inline-flex"
+            >
+              <Check className="h-3.5 w-3.5 mr-1" /> Enviar solicitud
+            </Button>
+          )}
+          {!isCliente && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" className="hidden sm:inline-flex">
+                  <MoreHorizontal className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  disabled={pedido.estado === "cancelado"}
+                  onClick={() => draft.estadoMut.mutate("cancelado")}
+                >
+                  Cancelar pedido
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setAskDelete(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {!isCliente && (
+            <Button size="icon" variant="ghost" className="sm:hidden" onClick={() => setOpenActionMenu(true)}>
+              <MoreHorizontal className="h-5 w-5" />
+            </Button>
+          )}
         </div>
       </header>
 
@@ -286,7 +416,7 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
                         <div className="text-xs text-muted-foreground truncate">{draft.datos.cliente_email}</div>
                       )}
                     </div>
-                    {draft.datos.cliente_id && (
+                    {!isCliente && draft.datos.cliente_id && (
                       <button
                         type="button"
                         onClick={() => draft.setDatos({ ...draft.datos!, cliente_id: null })}
@@ -298,43 +428,52 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
                     )}
                   </div>
                 )}
-                <ClienteAutocomplete
-                  datos={draft.datos}
-                  onPick={(c) => draft.setDatos({
-                    ...draft.datos!,
-                    cliente_id: c.id,
-                    cliente_nombre: `${c.apellido}, ${c.nombre}`,
-                    cliente_email: c.email ?? "",
-                    cliente_telefono: c.telefono ?? "",
-                    descuento_pct: c.descuento ?? draft.datos!.descuento_pct,
-                  })}
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Nombre</Label>
-                    <Input
-                      value={draft.datos.cliente_nombre}
-                      onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_nombre: e.target.value })}
-                      className="h-8 text-sm text-base sm:text-sm"
+                {!isCliente && (
+                  <>
+                    <ClienteAutocomplete
+                      datos={draft.datos}
+                      onPick={(c) => draft.setDatos({
+                        ...draft.datos!,
+                        cliente_id: c.id,
+                        cliente_nombre: `${c.apellido}, ${c.nombre}`,
+                        cliente_email: c.email ?? "",
+                        cliente_telefono: c.telefono ?? "",
+                        descuento_pct: c.descuento ?? draft.datos!.descuento_pct,
+                      })}
                     />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs">Nombre</Label>
+                        <Input
+                          value={draft.datos.cliente_nombre}
+                          onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_nombre: e.target.value })}
+                          className="h-8 text-sm text-base sm:text-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Email</Label>
+                        <Input
+                          value={draft.datos.cliente_email}
+                          onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_email: e.target.value })}
+                          className="h-8 text-sm text-base sm:text-sm"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-xs">Teléfono</Label>
+                        <Input
+                          value={draft.datos.cliente_telefono}
+                          onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_telefono: e.target.value })}
+                          className="h-8 text-sm text-base sm:text-sm"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+                {isCliente && (
+                  <div className="text-xs text-muted-foreground">
+                    Para actualizar tus datos, andá a <Link to="/cliente/perfil" className="underline">tu perfil</Link>.
                   </div>
-                  <div>
-                    <Label className="text-xs">Email</Label>
-                    <Input
-                      value={draft.datos.cliente_email}
-                      onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_email: e.target.value })}
-                      className="h-8 text-sm text-base sm:text-sm"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label className="text-xs">Teléfono</Label>
-                    <Input
-                      value={draft.datos.cliente_telefono}
-                      onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_telefono: e.target.value })}
-                      className="h-8 text-sm text-base sm:text-sm"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Recogida */}
@@ -357,7 +496,7 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
                           draft.setDatos({ ...draft.datos!, fecha_desde: v });
                         }
                       }}
-                      className="mt-2 h-8 text-sm text-base sm:text-sm"
+                      className="mt-2 h-11 sm:h-8 text-base sm:text-sm"
                     />
                   </div>
                 </div>
@@ -372,7 +511,7 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
                       value={draft.datos.fecha_hasta}
                       min={draft.datos.fecha_desde || undefined}
                       onChange={(e) => draft.setDatos({ ...draft.datos!, fecha_hasta: e.target.value })}
-                      className="mt-2 h-8 text-sm text-base sm:text-sm"
+                      className="mt-2 h-11 sm:h-8 text-base sm:text-sm"
                     />
                   </div>
                 </div>
@@ -390,9 +529,8 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
             items={draft.items}
             setItems={draft.setItems}
             jornadas={jornadas}
-            fechaDesde={draft.datos.fecha_desde}
-            fechaHasta={draft.datos.fecha_hasta}
-            pedidoId={pedido.id}
+            stockMap={stockMap}
+            mode={mode}
           />
 
           {/* Totales */}
@@ -404,36 +542,83 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
             setDescuentoPct={(v) => draft.setDatos({ ...draft.datos!, descuento_pct: v })}
             pagado={pagado}
             saldo={saldo}
+            mode={mode}
           />
         </div>
 
-        {/* ── Sidebar: Pagos + Docs + Notas — todo el alto ── */}
-        <div className="rounded-lg border hairline bg-background overflow-hidden lg:sticky lg:top-16">
-          <SidebarSection title="Pagos" defaultOpen>
-            <PagosSidebar
-              pedidoId={pedido.id}
-              total={total}
-              pagado={pagado}
-              saldo={saldo}
-              pagos={pedido.pagos ?? []}
-            />
-          </SidebarSection>
+        {/* ── Sidebar: Pagos + Docs + Notas — todo el alto ──
+            En modo cliente sólo trae "Resumen" — info redundante con
+            TotalesCard. Lo ocultamos en mobile y se ve en desktop. */}
+        <div className={cn(
+          "rounded-lg border hairline bg-background overflow-hidden lg:sticky lg:top-16",
+          isCliente && "hidden lg:block",
+        )}>
+          {!isCliente && (
+            <SidebarSection title="Pagos" defaultOpen>
+              <PagosSidebar
+                pedidoId={pedido.id}
+                total={total}
+                pagado={pagado}
+                saldo={saldo}
+                pagos={pedido.pagos ?? []}
+              />
+            </SidebarSection>
+          )}
 
-          <SidebarSection title="Documentos" defaultOpen>
-            <DocumentosSidebar pedidoId={pedido.id} />
-          </SidebarSection>
+          {!isCliente && (
+            <SidebarSection title="Documentos" defaultOpen>
+              <DocumentosSidebar pedidoId={pedido.id} />
+            </SidebarSection>
+          )}
 
-          <SidebarSection title="Notas" defaultOpen={false}>
-            <Textarea
-              rows={4}
-              value={draft.datos.notas}
-              onChange={(e) => draft.setDatos({ ...draft.datos!, notas: e.target.value })}
-              placeholder="Visibles solo en el back-office"
-              className="text-sm resize-none text-base sm:text-sm"
-            />
-          </SidebarSection>
+          {!isCliente && (
+            <SidebarSection title="Notas" defaultOpen={false}>
+              <Textarea
+                rows={4}
+                value={draft.datos.notas}
+                onChange={(e) => draft.setDatos({ ...draft.datos!, notas: e.target.value })}
+                placeholder="Visibles solo en el back-office"
+                className="text-sm resize-none text-base sm:text-sm"
+              />
+            </SidebarSection>
+          )}
 
-          {pedido.fuente && pedido.fuente !== "historico" && (
+          {isCliente && (
+            <SidebarSection title="Resumen" defaultOpen>
+              <div className="text-sm text-muted-foreground space-y-2">
+                <div className="flex justify-between">
+                  <span>Pagado</span>
+                  <span className="tabular-nums text-ink">{fmtArs(pagado)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Saldo</span>
+                  <span className="tabular-nums text-ink">{fmtArs(saldo)}</span>
+                </div>
+                {clienteSubmitMode === "propose" && (
+                  <p className="pt-3 text-xs">
+                    Tu pedido está confirmado. Los cambios se enviarán como solicitud para que los aprobemos.
+                  </p>
+                )}
+                {clienteSubmitMode === "autosave" && (
+                  <p className="pt-3 text-xs">
+                    Los cambios se guardan automáticamente.
+                  </p>
+                )}
+              </div>
+            </SidebarSection>
+          )}
+
+          {!isCliente && (pedido.historial_modificaciones?.length ?? 0) > 0 && (
+            <SidebarSection
+              title="Historial cliente"
+              badge={pedido.historial_modificaciones?.length}
+              defaultOpen={false}
+            >
+              <HistorialModificaciones items={pedido.historial_modificaciones ?? []} />
+            </SidebarSection>
+          )}
+
+          {!isCliente && pedido.fuente && pedido.fuente !== "historico" && (
             <SidebarSection title="Etiquetas" badge={1} defaultOpen>
               <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2.5 py-1 text-xs font-medium text-ink">
                 {pedido.fuente.toUpperCase()}
@@ -444,7 +629,7 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
       </div>
 
       {/* Mobile: acción primaria flotante */}
-      {nextAction && (
+      {!isCliente && nextAction && (
         <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-background border-t hairline px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] z-20">
           <Button
             className="w-full"
@@ -456,29 +641,61 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
         </div>
       )}
 
-      <ActionMenu
-        open={openActionMenu}
-        onOpenChange={setOpenActionMenu}
-        title={numero}
-        actions={[
-          ...(nextAction ? [{
-            label: nextAction.label,
-            icon: <Check className="h-4 w-4" />,
-            onClick: () => draft.estadoMut.mutate(nextAction.estado),
-          }] : []),
-          ...(pedido.estado !== "cancelado" ? [{
-            label: "Cancelar pedido",
-            icon: <X className="h-4 w-4" />,
-            onClick: () => draft.estadoMut.mutate("cancelado"),
-          }] : []),
-          {
-            label: "Eliminar pedido",
-            icon: <Trash2 className="h-4 w-4" />,
-            variant: "destructive" as const,
-            onClick: () => setAskDelete(true),
-          },
-        ]}
-      />
+      {isCliente && clienteSubmitMode === "propose" && (
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-background border-t hairline px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] z-20">
+          {submitBlocked && draft.saveStatus === "dirty" && (
+            <div className="text-xs text-destructive mb-2 text-center">{submitBlocked}</div>
+          )}
+          <Button
+            className="w-full"
+            onClick={() => setShowDiffConfirm(true)}
+            disabled={draft.isSubmitting || draft.saveStatus !== "dirty" || !!submitBlocked}
+          >
+            <Check className="h-4 w-4 mr-1" /> Enviar solicitud
+          </Button>
+        </div>
+      )}
+
+      {!isCliente && (
+        <ActionMenu
+          open={openActionMenu}
+          onOpenChange={setOpenActionMenu}
+          title={numero}
+          actions={[
+            ...(nextAction ? [{
+              label: nextAction.label,
+              icon: <Check className="h-4 w-4" />,
+              onClick: () => draft.estadoMut.mutate(nextAction.estado),
+            }] : []),
+            ...(pedido.estado !== "cancelado" ? [{
+              label: "Cancelar pedido",
+              icon: <X className="h-4 w-4" />,
+              onClick: () => draft.estadoMut.mutate("cancelado"),
+            }] : []),
+            {
+              label: "Eliminar pedido",
+              icon: <Trash2 className="h-4 w-4" />,
+              variant: "destructive" as const,
+              onClick: () => setAskDelete(true),
+            },
+          ]}
+        />
+      )}
+
+      {isCliente && (
+        <SolicitudDiffDialog
+          open={showDiffConfirm}
+          onOpenChange={setShowDiffConfirm}
+          original={pedido}
+          datos={draft.datos}
+          items={draft.items}
+          isSubmitting={draft.isSubmitting}
+          onConfirm={async () => {
+            await draft.submitProposal();
+            setShowDiffConfirm(false);
+          }}
+        />
+      )}
 
       <AlertDialog open={askDelete} onOpenChange={setAskDelete}>
         <AlertDialogContent>
@@ -508,23 +725,16 @@ export function PedidoPage({ pedidoId }: { pedidoId: number }) {
 // ─────────────────────────────────────────────────────────────────────────
 
 function ItemsCard({
-  items, setItems, jornadas, fechaDesde, fechaHasta, pedidoId,
+  items, setItems, jornadas, stockMap, mode = "admin",
 }: {
   items: DraftItem[];
   setItems: (v: DraftItem[]) => void;
   jornadas: number;
-  fechaDesde: string;
-  fechaHasta: string;
-  pedidoId: number;
+  stockMap: Record<string, { cantidad: number; reservado: number }>;
+  mode?: PedidoMode;
 }) {
   const [openSearch, setOpenSearch] = useState(false);
-
-  const dispoQ = useQuery({
-    queryKey: ["admin", "disponibilidad", fechaDesde, fechaHasta, pedidoId],
-    queryFn: () => adminApi.getDisponibilidad(fechaDesde, fechaHasta, pedidoId),
-    enabled: !!fechaDesde && !!fechaHasta,
-  });
-  const stockMap = dispoQ.data ?? {};
+  const isCliente = mode === "cliente";
 
   const updateItem = (equipoId: number, patch: Partial<DraftItem>) =>
     setItems(items.map((it) => it.equipo_id === equipoId ? { ...it, ...patch } : it));
@@ -633,12 +843,18 @@ function ItemsCard({
                   </Button>
                 </div>
                 <div className="flex items-center gap-1 ml-2">
-                  <Input
-                    type="number" min={0}
-                    value={it.precio_jornada}
-                    onChange={(e) => updateItem(it.equipo_id, { precio_jornada: parseInt(e.target.value) || 0 })}
-                    className="h-9 w-24 text-sm text-base sm:text-sm sm:h-7"
-                  />
+                  {isCliente ? (
+                    <div className="h-9 sm:h-7 px-2 inline-flex items-center text-sm text-muted-foreground tabular-nums">
+                      {fmtArs(it.precio_jornada)}
+                    </div>
+                  ) : (
+                    <Input
+                      type="number" min={0}
+                      value={it.precio_jornada}
+                      onChange={(e) => updateItem(it.equipo_id, { precio_jornada: parseInt(e.target.value) || 0 })}
+                      className="h-9 w-24 text-sm text-base sm:text-sm sm:h-7"
+                    />
+                  )}
                   <span className="text-xs text-muted-foreground whitespace-nowrap">/día</span>
                 </div>
                 {overstock && (
@@ -686,7 +902,7 @@ function ItemsCard({
 // ─────────────────────────────────────────────────────────────────────────
 
 function TotalesCard({
-  bruto, total, jornadas, descuentoPct, setDescuentoPct, pagado, saldo,
+  bruto, total, jornadas, descuentoPct, setDescuentoPct, pagado, saldo, mode = "admin",
 }: {
   bruto: number;
   total: number;
@@ -695,7 +911,9 @@ function TotalesCard({
   setDescuentoPct: (v: number) => void;
   pagado: number;
   saldo: number;
+  mode?: PedidoMode;
 }) {
+  const isCliente = mode === "cliente";
   return (
     <section className="rounded-lg border hairline bg-background overflow-hidden">
       <div className="px-4 py-3 space-y-2.5 text-sm">
@@ -703,16 +921,25 @@ function TotalesCard({
           <span>Subtotal</span>
           <span className="tabular-nums">{fmtArs(bruto)}</span>
         </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-muted-foreground">Descuento %</span>
-          <Input
-            type="number" min={0} max={100} step="0.5"
-            value={descuentoPct}
-            onChange={(e) => setDescuentoPct(parseFloat(e.target.value) || 0)}
-            className="h-7 w-20 text-right text-sm"
-          />
-        </div>
-        {descuentoPct > 0 && (
+        {isCliente ? (
+          descuentoPct > 0 && (
+            <div className="flex items-center justify-between gap-3 text-muted-foreground">
+              <span>Descuento {descuentoPct}%</span>
+              <span className="tabular-nums">−{fmtArs(bruto - total)}</span>
+            </div>
+          )
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">Descuento %</span>
+            <Input
+              type="number" min={0} max={100} step="0.5"
+              value={descuentoPct}
+              onChange={(e) => setDescuentoPct(parseFloat(e.target.value) || 0)}
+              className="h-7 w-20 text-right text-sm"
+            />
+          </div>
+        )}
+        {!isCliente && descuentoPct > 0 && (
           <div className="flex justify-between text-muted-foreground">
             <span>−{descuentoPct}%</span>
             <span className="tabular-nums">−{fmtArs(bruto - total)}</span>
@@ -1089,5 +1316,210 @@ function ClienteAutocomplete({
         </div>
       )}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Historial de modificaciones del cliente (sidebar admin)
+// ─────────────────────────────────────────────────────────────────────────
+
+const HIST_ESTADO_VARIANT: Record<PedidoHistorialItem["estado"], "default" | "secondary" | "destructive" | "outline"> = {
+  pendiente: "secondary",
+  aprobada: "default",
+  rechazada: "destructive",
+  cancelada: "outline",
+};
+
+const HIST_ESTADO_LABEL: Record<PedidoHistorialItem["estado"], string> = {
+  pendiente: "Pendiente",
+  aprobada: "Aprobada",
+  rechazada: "Rechazada",
+  cancelada: "Cancelada",
+};
+
+function HistorialModificaciones({ items }: { items: PedidoHistorialItem[] }) {
+  return (
+    <ol className="space-y-2.5">
+      {items.map((h) => {
+        const c = h.cambios_json;
+        const a = h.cambios_aplicados;
+        const itemDeltas = Array.isArray(c?.items) ? (c?.items ?? []) : [];
+        const isDirecto = h.tipo === "directo";
+        // Si lo aplicado difiere de lo propuesto, marcamos "Modificada por admin".
+        const overrideAplicado = !!(
+          a && c && (
+            (a.fecha_desde ?? null) !== (c.fecha_desde ?? null) ||
+            (a.fecha_hasta ?? null) !== (c.fecha_hasta ?? null) ||
+            (a.items?.length ?? 0) !== (c.items?.length ?? 0) ||
+            (a.items ?? []).some((ai) => {
+              const ci = (c.items ?? []).find((x) => x.equipo_id === ai.equipo_id);
+              return !ci || ci.cantidad !== ai.cantidad;
+            })
+          )
+        );
+        return (
+          <li key={h.id} className="rounded border hairline bg-card px-2.5 py-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Badge variant={HIST_ESTADO_VARIANT[h.estado]} className="text-[10px]">
+                {HIST_ESTADO_LABEL[h.estado]}
+              </Badge>
+              {isDirecto && (
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Auto
+                </span>
+              )}
+              {overrideAplicado && (
+                <span className="text-[10px] text-amber-700">modificada al aprobar</span>
+              )}
+              <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
+                {fmtFecha(h.created_at)}
+              </span>
+            </div>
+            {(c?.fecha_desde || c?.fecha_hasta) && (
+              <div className="text-xs text-muted-foreground mt-1.5 tabular-nums">
+                Fechas: {fmtFecha(c?.fecha_desde ?? "")} → {fmtFecha(c?.fecha_hasta ?? "")}
+              </div>
+            )}
+            {itemDeltas.length > 0 && (
+              <div className="text-xs text-muted-foreground mt-1">
+                {itemDeltas.length} item{itemDeltas.length !== 1 ? "s" : ""} en la propuesta
+              </div>
+            )}
+            {overrideAplicado && a && (
+              <div className="text-xs text-amber-700 mt-1 tabular-nums">
+                Aplicado: {fmtFecha(a.fecha_desde ?? "")} → {fmtFecha(a.fecha_hasta ?? "")}
+                {a.items && ` · ${a.items.length} item${a.items.length !== 1 ? "s" : ""}`}
+              </div>
+            )}
+            {h.mensaje && (
+              <div className="text-xs text-ink mt-1.5 whitespace-pre-wrap line-clamp-3">
+                {h.mensaje}
+              </div>
+            )}
+            {h.respuesta && (
+              <div className="text-xs text-muted-foreground mt-1.5 italic line-clamp-2">
+                Respuesta: {h.respuesta}
+              </div>
+            )}
+            {h.resolved_by && h.resolved_at && (
+              <div className="text-[10px] text-muted-foreground mt-1">
+                {h.resolved_by} · {fmtFecha(h.resolved_at)}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Modal de confirmación con diff (cliente, modo propose)
+// ─────────────────────────────────────────────────────────────────────────
+
+function SolicitudDiffDialog({
+  open, onOpenChange, original, datos, items, isSubmitting, onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  original: { fecha_desde: string | null; fecha_hasta: string | null; items: { equipo_id: number; cantidad: number; nombre: string; nombre_publico?: string | null }[] };
+  datos: DraftDatos;
+  items: DraftItem[];
+  isSubmitting: boolean;
+  onConfirm: () => void;
+}) {
+  const origDesde = (original.fecha_desde ?? "").slice(0, 10);
+  const origHasta = (original.fecha_hasta ?? "").slice(0, 10);
+  const fechasCambian = origDesde !== datos.fecha_desde || origHasta !== datos.fecha_hasta;
+
+  const beforeQty = new Map<number, number>();
+  for (const it of original.items) beforeQty.set(it.equipo_id, it.cantidad);
+  const afterQty = new Map<number, number>();
+  for (const it of items) afterQty.set(it.equipo_id, it.cantidad);
+  const nombres = new Map<number, string>();
+  for (const it of original.items) nombres.set(it.equipo_id, it.nombre_publico || it.nombre);
+  for (const it of items) {
+    if (!nombres.has(it.equipo_id)) nombres.set(it.equipo_id, it.nombre_publico || it.nombre);
+  }
+  const equipoIds = new Set<number>([...beforeQty.keys(), ...afterQty.keys()]);
+  const itemsDiff = Array.from(equipoIds)
+    .map((id) => ({
+      id,
+      antes: beforeQty.get(id) ?? 0,
+      despues: afterQty.get(id) ?? 0,
+      nombre: nombres.get(id) ?? `equipo #${id}`,
+    }))
+    .filter((d) => d.antes !== d.despues);
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirmar solicitud de modificación</AlertDialogTitle>
+          <AlertDialogDescription>
+            Estos son los cambios que vas a pedirnos. Te avisamos por mail cuando los revisemos.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+          {fechasCambian && (
+            <div className="rounded-md border hairline px-3 py-2.5 text-sm">
+              <div className="text-xs text-muted-foreground mb-1">Fechas</div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <div className="text-muted-foreground">Antes</div>
+                  <div className="text-ink tabular-nums">
+                    {fmtFecha(origDesde)} → {fmtFecha(origHasta)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Nuevas</div>
+                  <div className="text-ink font-medium tabular-nums">
+                    {fmtFecha(datos.fecha_desde)} → {fmtFecha(datos.fecha_hasta)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {itemsDiff.length > 0 && (
+            <div className="rounded-md border hairline px-3 py-2.5 text-sm">
+              <div className="text-xs text-muted-foreground mb-2">Equipos</div>
+              <ul className="divide-y hairline -mx-3">
+                {itemsDiff.map((d) => {
+                  const delta = d.despues - d.antes;
+                  const cls = delta > 0 ? "text-emerald-600" : "text-rose-600";
+                  return (
+                    <li key={d.id} className="px-3 py-1.5 flex items-center gap-2">
+                      <span className="flex-1 text-ink truncate">{d.nombre}</span>
+                      <span className="text-muted-foreground tabular-nums">{d.antes}</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className={`font-medium tabular-nums ${cls}`}>{d.despues}</span>
+                      <span className={`text-xs tabular-nums w-10 text-right ${cls}`}>
+                        {delta > 0 ? `+${delta}` : delta}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {!fechasCambian && itemsDiff.length === 0 && (
+            <div className="text-sm text-muted-foreground">Sin cambios detectados.</div>
+          )}
+        </div>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isSubmitting}>Volver</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => { e.preventDefault(); onConfirm(); }}
+            disabled={isSubmitting || (!fechasCambian && itemsDiff.length === 0)}
+          >
+            {isSubmitting ? "Enviando…" : "Enviar solicitud"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

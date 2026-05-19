@@ -960,13 +960,18 @@ def init_db():
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS solicitudes_modificacion (
-            id          SERIAL PRIMARY KEY,
-            pedido_id   INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
-            cliente_id  INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
-            mensaje     TEXT NOT NULL,
-            estado      TEXT NOT NULL DEFAULT 'pendiente',
-            respuesta   TEXT,
-            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            id                SERIAL PRIMARY KEY,
+            pedido_id         INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
+            cliente_id        INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            mensaje           TEXT,
+            estado            TEXT NOT NULL DEFAULT 'pendiente',
+            respuesta         TEXT,
+            cambios_json      JSONB,
+            cambios_aplicados JSONB,
+            tipo              TEXT NOT NULL DEFAULT 'aprobacion',
+            resolved_at       TIMESTAMPTZ,
+            resolved_by       TEXT,
+            created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.execute("""
@@ -977,6 +982,14 @@ def init_db():
     """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_solicitudes_cliente ON solicitudes_modificacion(cliente_id)
+    """)
+    # Garantía atómica de "una sola solicitud pendiente por pedido": previene
+    # races multi-tab donde dos requests pasan el check optimista y ambos
+    # insertan.
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uniq_solicitud_pendiente_por_pedido
+        ON solicitudes_modificacion (pedido_id)
+        WHERE estado = 'pendiente'
     """)
 
     # Configuración global de la app (tipo de cambio, defaults, etc.).
@@ -996,6 +1009,13 @@ def init_db():
     conn.execute("""
         INSERT INTO app_settings (key, value, updated_by)
         VALUES ('usd_rate', '1000', 'system-seed')
+        ON CONFLICT (key) DO NOTHING
+    """)
+    # Horas mínimas de antelación para que el cliente pueda solicitar
+    # una modificación al pedido desde el portal.
+    conn.execute("""
+        INSERT INTO app_settings (key, value, updated_by)
+        VALUES ('modificacion_ventana_horas', '24', 'system-seed')
         ON CONFLICT (key) DO NOTHING
     """)
 

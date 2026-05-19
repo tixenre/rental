@@ -185,9 +185,16 @@ function PedidosPage() {
                 title={p.cliente_nombre || "Sin cliente"}
                 subtitle={p.cliente_email ?? undefined}
                 badge={
-                  <Badge variant="outline" className={ESTADO_CLASS[p.estado] ?? ""}>
-                    {ESTADO_LABEL[p.estado]}
-                  </Badge>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Badge variant="outline" className={ESTADO_CLASS[p.estado] ?? ""}>
+                      {ESTADO_LABEL[p.estado]}
+                    </Badge>
+                    {p.tiene_solicitud_pendiente && (
+                      <Badge variant="outline" className="border-amber text-amber-700 bg-amber-50">
+                        Modificación pendiente
+                      </Badge>
+                    )}
+                  </div>
                 }
               />
               <AdminCardMeta>
@@ -278,12 +285,19 @@ function PedidosPage() {
                     {fmtArs(saldo)}
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={ESTADO_CLASS[p.estado] ?? ""}
-                    >
-                      {ESTADO_LABEL[p.estado]}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge
+                        variant="outline"
+                        className={ESTADO_CLASS[p.estado] ?? ""}
+                      >
+                        {ESTADO_LABEL[p.estado]}
+                      </Badge>
+                      {p.tiene_solicitud_pendiente && (
+                        <Badge variant="outline" className="border-amber text-amber-700 bg-amber-50">
+                          Mod. pendiente
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="inline-flex gap-1 items-center">

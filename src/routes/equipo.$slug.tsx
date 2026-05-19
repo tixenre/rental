@@ -20,6 +20,10 @@ import {
   Share2,
   Check,
   ChevronDown,
+  Maximize2,
+  X as XIcon,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
@@ -78,7 +82,10 @@ export const Route = createFileRoute("/equipo/$slug")({
     // le decimos a Google que indexe /equipo/<slug>-47.
     const canonicalSlug = buildEquipoSlug(equipo);
     const url = `${SITE_URL}/equipo/${canonicalSlug}`;
-    const image = equipo.fotoUrl || `${SITE_URL}/icon-512.png`;
+    // Si fotoUrl es absoluta (Supabase Storage la devuelve así) la usamos
+    // directo; si por alguna razón vino relativa, le ponemos el host.
+    const rawImage = equipo.fotoUrl || `${SITE_URL}/icon-512.png`;
+    const image = rawImage.startsWith("http") ? rawImage : `${SITE_URL}${rawImage}`;
 
     return {
       meta: [
@@ -90,6 +97,11 @@ export const Route = createFileRoute("/equipo/$slug")({
         { property: "og:title", content: title },
         { property: "og:description", content: truncatedDesc },
         { property: "og:image", content: image },
+        // Dimensiones explícitas: WhatsApp e Instagram las usan para
+        // generar el preview sin tener que descargar la imagen primero.
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { property: "og:image:alt", content: `${equipo.brand} ${equipo.name}` },
         { property: "og:locale", content: "es_AR" },
         { property: "og:site_name", content: "Rambla Rental" },
         // Twitter Cards
@@ -215,6 +227,21 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const [specsOpen, setSpecsOpen] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  // Galería del lightbox: foto principal + fotos de los items del kit (si
+  // los hay). Permite al cliente explorar el equipo en detalle. Se filtran
+  // los items sin foto.
+  const lightboxPhotos: Array<{ url: string; alt: string }> = (() => {
+    const out: Array<{ url: string; alt: string }> = [];
+    if (item.fotoUrl) out.push({ url: item.fotoUrl, alt: item.name });
+    for (const inc of item.includes ?? []) {
+      if (inc.fotoUrl) out.push({ url: inc.fotoUrl, alt: inc.name });
+    }
+    return out;
+  })();
+
   const DESC_LIMIT = 320;
   const desc = item.description ?? "";
   const isLongDesc = desc.length > DESC_LIMIT;
@@ -300,18 +327,32 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
         </div>
       </header>
 
-      {/* Foto */}
-      <div className="relative aspect-[4/3] md:aspect-[16/9] overflow-hidden rounded-lg bg-white border hairline">
+      {/* Foto — hero image: fetchPriority alta para LCP, abre lightbox al tap */}
+      <button
+        type="button"
+        onClick={() => setLightboxOpen(true)}
+        disabled={!item.fotoUrl}
+        className="relative aspect-[4/3] md:aspect-[16/9] overflow-hidden rounded-lg bg-white border hairline group cursor-zoom-in disabled:cursor-default"
+        aria-label={item.fotoUrl ? `Ver foto ampliada de ${item.name}` : item.name}
+      >
         {item.fotoUrl ? (
-          <img
-            src={item.fotoUrl}
-            alt={item.name}
-            className="h-full w-full object-contain p-6"
-          />
+          <>
+            <img
+              src={item.fotoUrl}
+              alt={item.name}
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+              className="h-full w-full object-contain p-6 transition group-hover:scale-[1.01]"
+            />
+            <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink/70 text-white text-[10px] font-medium px-2 py-1 opacity-0 group-hover:opacity-100 transition pointer-events-none">
+              <Maximize2 className="h-3 w-3" /> Ampliar
+            </span>
+          </>
         ) : (
           <EmptyImage category={item.category} brand={item.brand} />
         )}
-      </div>
+      </button>
 
       {/* "Incluye" arriba de todo (foto → incluye → descripción → specs).
        *  Lo más útil para el cliente al decidir el alquiler: ver qué kit
@@ -422,6 +463,14 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           onRemove={() => remove(item.id)}
         />
       </div>
+
+      <Lightbox
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        photos={lightboxPhotos}
+        index={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+      />
     </article>
   );
 }
@@ -583,5 +632,133 @@ function YouTubeEmbed({ url }: { url: string }) {
         />
       </div>
     </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Lightbox — visor de fotos con zoom táctil y nav entre componentes del kit
+// ─────────────────────────────────────────────────────────────────────────
+
+function Lightbox({
+  open, onClose, photos, index, onIndexChange,
+}: {
+  open: boolean;
+  onClose: () => void;
+  photos: Array<{ url: string; alt: string }>;
+  index: number;
+  onIndexChange: (i: number) => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft" && index > 0) onIndexChange(index - 1);
+      if (e.key === "ArrowRight" && index < photos.length - 1) onIndexChange(index + 1);
+    };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [open, index, photos.length, onClose, onIndexChange]);
+
+  if (!open || photos.length === 0) return null;
+  const current = photos[Math.min(index, photos.length - 1)];
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] bg-black/95 flex flex-col"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <header className="flex items-center justify-between px-3 sm:px-4 py-3 shrink-0 text-white/90">
+        <span className="font-mono text-xs tabular-nums">
+          {photos.length > 1 ? `${index + 1} / ${photos.length}` : ""}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 transition"
+          aria-label="Cerrar"
+        >
+          <XIcon className="h-5 w-5" />
+        </button>
+      </header>
+
+      {/* Imagen — pinch-zoom nativo en mobile (touch-action: pinch-zoom). */}
+      <div
+        className="flex-1 flex items-center justify-center overflow-auto px-2"
+        onClick={(e) => e.stopPropagation()}
+        style={{ touchAction: "pinch-zoom" }}
+      >
+        <img
+          src={current.url}
+          alt={current.alt}
+          loading="eager"
+          decoding="async"
+          className="max-h-full max-w-full object-contain select-none"
+          draggable={false}
+        />
+      </div>
+
+      <div
+        className="px-4 py-2 text-center text-white/80 text-xs sm:text-sm shrink-0"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {current.alt}
+      </div>
+
+      {photos.length > 1 && (
+        <>
+          {index > 0 && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onIndexChange(index - 1); }}
+              className="hidden sm:grid absolute left-3 top-1/2 -translate-y-1/2 h-12 w-12 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+              aria-label="Foto anterior"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+          )}
+          {index < photos.length - 1 && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onIndexChange(index + 1); }}
+              className="hidden sm:grid absolute right-3 top-1/2 -translate-y-1/2 h-12 w-12 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+              aria-label="Foto siguiente"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          )}
+
+          <div
+            className="shrink-0 flex gap-1.5 overflow-x-auto px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {photos.map((p, i) => (
+              <button
+                key={`${p.url}-${i}`}
+                type="button"
+                onClick={() => onIndexChange(i)}
+                className={`h-14 w-14 shrink-0 rounded-md overflow-hidden border-2 transition ${
+                  i === index ? "border-amber" : "border-transparent opacity-60 hover:opacity-100"
+                }`}
+                aria-label={`Ver ${p.alt}`}
+              >
+                <img
+                  src={p.url}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover bg-white"
+                />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
