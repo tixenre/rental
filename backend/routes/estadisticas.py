@@ -3,8 +3,7 @@ routes/estadisticas.py — Análisis y estadísticas de alquileres.
 Lee directo de pedidos + alquiler_items + equipos. Sin tablas intermedias.
 """
 
-from fastapi import APIRouter, Query, Request
-from typing import Optional
+from fastapi import APIRouter, Request
 from database import get_db, row_to_dict
 from admin_guard import require_admin
 
@@ -180,54 +179,4 @@ def get_estadisticas(request: Request):
         conn.close()
 
 
-@router.get("/estadisticas/pedidos")
-def list_pedidos_stats(
-    request:  Request,
-    q:        Optional[str] = Query(None),
-    dueno:    Optional[str] = Query(None),
-    page:     int = Query(1, ge=1),
-    per_page: int = Query(80, ge=1, le=500),
-):
-    require_admin(request)
-    """Lista de pedidos confirmados con sus items para la tabla de detalle."""
-    conn   = get_db()
-    offset = (page - 1) * per_page
-    where  = "WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')"
-    params: list = []
 
-    if q:
-        like = f"%{q}%"
-        where += " AND (p.cliente_nombre LIKE ? OR CAST(p.numero_pedido AS TEXT) LIKE ? OR e.nombre LIKE ?)"
-        params += [like, like, like]
-    if dueno:
-        where += " AND e.dueno = ?"
-        params.append(dueno)
-
-    join_eq = "JOIN alquiler_items pi ON pi.pedido_id = p.id JOIN equipos e ON e.id = pi.equipo_id" if (dueno or q) else ""
-
-    try:
-        total = conn.execute(
-            f"SELECT COUNT(DISTINCT p.id) FROM alquileres p {join_eq} {where}", params
-        ).fetchone()[0]
-
-        rows = conn.execute(f"""
-            SELECT DISTINCT
-                p.id, p.numero_pedido, p.numero_remito, p.estado,
-                p.fecha_desde, p.fecha_hasta, p.monto_total, p.descuento_pct,
-                COALESCE(c.apellido || ', ' || c.nombre, p.cliente_nombre) AS cliente
-            FROM alquileres p
-            LEFT JOIN clientes c ON c.id = p.cliente_id
-            {join_eq}
-            {where}
-            ORDER BY p.fecha_desde DESC
-            LIMIT ? OFFSET ?
-        """, params + [per_page, offset]).fetchall()
-
-        return {
-            "total":    total,
-            "page":     page,
-            "per_page": per_page,
-            "items":    [row_to_dict(r) for r in rows],
-        }
-    finally:
-        conn.close()
