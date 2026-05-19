@@ -5,12 +5,16 @@ import { clienteApi } from "@/lib/cliente/api";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { StatCard } from "@/components/rental/StatCard";
 import { EstadoBadge } from "@/components/rental/EstadoBadge";
-import { ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon, CheckCircle2, XCircle, Info } from "lucide-react";
+import { ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon, CheckCircle2, XCircle, Info, FileText, FileSignature, Truck } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cliente/portal")({
@@ -59,6 +63,38 @@ const ACTIVE_STATES = new Set(["borrador", "presupuesto", "confirmado", "retirad
 const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
 const MODIFICABLE_STATES = new Set(["presupuesto", "confirmado"]);
 
+// ── Documentos: aclaraciones + notificación one-shot ─────────────────────
+
+type DocTipo = "remito" | "contrato" | "albaran";
+
+const DOC_LABEL: Record<DocTipo, string> = {
+  remito: "Remito",
+  contrato: "Contrato",
+  albaran: "Albarán",
+};
+
+const DOC_DESCRIPTION: Partial<Record<DocTipo, string>> = {
+  contrato: "Es el documento de alquiler firmado entre vos y nosotros.",
+  albaran:  "Te sirve para tener constancia ante tu aseguradora.",
+};
+
+// Sólo Contrato y Albarán disparan el popup one-shot. Remito se incluye en el
+// listado de docs pero no es trigger (mismo evento que Contrato).
+const DOC_NOTIFICABLE: DocTipo[] = ["contrato", "albaran"];
+
+const docSeenKey = (pedidoId: number, tipo: DocTipo) =>
+  `rambla.doc_seen.${pedidoId}.${tipo}`;
+
+function wasDocSeen(pedidoId: number, tipo: DocTipo): boolean {
+  try { return localStorage.getItem(docSeenKey(pedidoId, tipo)) === "1"; }
+  catch { return false; }
+}
+
+function markDocSeen(pedidoId: number, tipo: DocTipo): void {
+  try { localStorage.setItem(docSeenKey(pedidoId, tipo), "1"); }
+  catch { /* ignore */ }
+}
+
 type Filtro = "todos" | "activos" | "historial";
 
 const TAB_OPTIONS: { value: Filtro; label: string }[] = [
@@ -93,6 +129,9 @@ export default function ClientePortal() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [tab, setTab] = useState<Filtro>("todos");
   const [ventanaHoras, setVentanaHoras] = useState<number>(24);
+  const [docsNuevos, setDocsNuevos] = useState<
+    Array<{ pedidoId: number; numero: string; tipo: DocTipo }>
+  >([]);
 
   function reloadPedidos() {
     authedFetch("/api/cliente/pedidos").then(async (r) => {
@@ -119,6 +158,37 @@ export default function ClientePortal() {
 
     return () => { alive = false; };
   }, [navigate]);
+
+  // Calculamos los documentos "nuevos" (disponibles + no vistos antes) cada
+  // vez que cambia la lista. Disparan el popup one-shot.
+  useEffect(() => {
+    const nuevos: Array<{ pedidoId: number; numero: string; tipo: DocTipo }> = [];
+    for (const p of pedidos) {
+      const docs = p.documentos_disponibles;
+      if (!docs) continue;
+      for (const tipo of DOC_NOTIFICABLE) {
+        if (docs[tipo] && !wasDocSeen(p.id, tipo)) {
+          nuevos.push({ pedidoId: p.id, numero: String(p.numero_pedido ?? p.id), tipo });
+        }
+      }
+    }
+    setDocsNuevos(nuevos);
+  }, [pedidos]);
+
+  function dismissDocsPopup() {
+    for (const d of docsNuevos) markDocSeen(d.pedidoId, d.tipo);
+    setDocsNuevos([]);
+  }
+
+  function verPedido(pedidoId: number) {
+    setExpanded(pedidoId);
+    dismissDocsPopup();
+    // Scroll a la card después de renderizar la expansión.
+    setTimeout(() => {
+      const el = document.getElementById(`pedido-${pedidoId}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }
 
   async function handleLogout() {
     await authedFetch("/auth/logout", { method: "POST" }).catch(() => {});
@@ -262,6 +332,12 @@ export default function ClientePortal() {
           </div>
         )}
       </div>
+
+      <DocAvailablePopup
+        nuevos={docsNuevos}
+        onDismiss={dismissDocsPopup}
+        onVerPedido={verPedido}
+      />
     </PublicLayout>
   );
 }
@@ -356,8 +432,9 @@ function PedidoCard({
 
   return (
     <div
+      id={`pedido-${pedido.id}`}
       className={cn(
-        "rounded-xl border bg-surface overflow-hidden transition-[border-color,box-shadow]",
+        "rounded-xl border bg-surface overflow-hidden transition-[border-color,box-shadow] scroll-mt-4",
         expanded
           ? "border-amber shadow-[0_0_0_1px_var(--amber)]"
           : "border-[var(--hairline)] hover:border-ink/30",
@@ -596,10 +673,16 @@ function PedidoCard({
                   <DocActions pedidoId={pedido.id} numero={numero} tipo="remito" label="Remito" />
                 )}
                 {docs.contrato && (
-                  <DocActions pedidoId={pedido.id} numero={numero} tipo="contrato" label="Contrato" />
+                  <DocActions
+                    pedidoId={pedido.id} numero={numero} tipo="contrato" label="Contrato"
+                    description={DOC_DESCRIPTION.contrato}
+                  />
                 )}
                 {docs.albaran && (
-                  <DocActions pedidoId={pedido.id} numero={numero} tipo="albaran" label="Albarán" />
+                  <DocActions
+                    pedidoId={pedido.id} numero={numero} tipo="albaran" label="Albarán"
+                    description={DOC_DESCRIPTION.albaran}
+                  />
                 )}
               </div>
             </section>
@@ -663,11 +746,13 @@ function DocActions({
   numero,
   tipo,
   label,
+  description,
 }: {
   pedidoId: number;
   numero: string;
   tipo: "remito" | "contrato" | "albaran";
   label: string;
+  description?: string;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -684,9 +769,15 @@ function DocActions({
           </div>
           <div className="min-w-0">
             <div className="font-sans text-xs font-semibold text-ink leading-tight">{label}</div>
-            <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
-              Ver · PDF
-            </div>
+            {description ? (
+              <div className="font-sans text-[11px] text-muted-foreground leading-tight mt-0.5 line-clamp-2">
+                {description}
+              </div>
+            ) : (
+              <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                Ver · PDF
+              </div>
+            )}
           </div>
         </button>
         <a
@@ -782,5 +873,72 @@ function DocPreviewModal({
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * Popup one-shot que notifica al cliente cuando un documento nuevo
+ * (Contrato/Albarán) está disponible. Cada (pedido, doc) se persiste en
+ * localStorage al cerrar para no volver a aparecer.
+ */
+function DocAvailablePopup({
+  nuevos, onDismiss, onVerPedido,
+}: {
+  nuevos: Array<{ pedidoId: number; numero: string; tipo: DocTipo }>;
+  onDismiss: () => void;
+  onVerPedido: (pedidoId: number) => void;
+}) {
+  const open = nuevos.length > 0;
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onDismiss(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Tenés documentos nuevos disponibles</DialogTitle>
+          <DialogDescription>
+            Estos documentos quedaron habilitados en tu portal. Podés verlos cuando quieras.
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="space-y-2.5 my-2">
+          {nuevos.map((d) => {
+            const Icon =
+              d.tipo === "contrato" ? FileSignature
+              : d.tipo === "albaran" ? Truck
+              : FileText;
+            return (
+              <li
+                key={`${d.pedidoId}-${d.tipo}`}
+                className="flex items-start gap-3 rounded-md border hairline px-3 py-2.5"
+              >
+                <div className="grid h-9 w-9 place-items-center rounded-sm bg-amber-soft text-amber shrink-0">
+                  <Icon className="h-4 w-4" strokeWidth={1.7} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-sans text-sm font-semibold text-ink">
+                    {DOC_LABEL[d.tipo]}
+                    <span className="text-muted-foreground font-mono text-xs ml-1.5">#{d.numero}</span>
+                  </div>
+                  {DOC_DESCRIPTION[d.tipo] && (
+                    <div className="font-sans text-xs text-muted-foreground mt-0.5">
+                      {DOC_DESCRIPTION[d.tipo]}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={() => onVerPedido(d.pedidoId)}
+                >
+                  Ver pedido
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
+        <DialogFooter>
+          <Button onClick={onDismiss}>Entendido</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
