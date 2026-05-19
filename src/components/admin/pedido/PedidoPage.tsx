@@ -312,6 +312,13 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
           </span>
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground hidden sm:inline shrink-0" />
           <span className="font-semibold text-sm text-ink truncate">{numero}</span>
+          {isCliente && clienteSubmitMode === "propose" && draft.saveStatus === "dirty" && (
+            <span
+              className="sm:hidden h-2 w-2 rounded-full bg-amber shrink-0"
+              title="Tenés cambios sin enviar"
+              aria-label="Cambios sin enviar"
+            />
+          )}
           <Badge variant={pedidoEstadoVariant(pedido.estado)} className="ml-1 shrink-0">
             {ESTADO_LABEL[pedido.estado]}
           </Badge>
@@ -489,7 +496,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                           draft.setDatos({ ...draft.datos!, fecha_desde: v });
                         }
                       }}
-                      className="mt-2 h-8 text-sm text-base sm:text-sm"
+                      className="mt-2 h-11 sm:h-8 text-base sm:text-sm"
                     />
                   </div>
                 </div>
@@ -504,7 +511,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                       value={draft.datos.fecha_hasta}
                       min={draft.datos.fecha_desde || undefined}
                       onChange={(e) => draft.setDatos({ ...draft.datos!, fecha_hasta: e.target.value })}
-                      className="mt-2 h-8 text-sm text-base sm:text-sm"
+                      className="mt-2 h-11 sm:h-8 text-base sm:text-sm"
                     />
                   </div>
                 </div>
@@ -539,8 +546,13 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
           />
         </div>
 
-        {/* ── Sidebar: Pagos + Docs + Notas — todo el alto ── */}
-        <div className="rounded-lg border hairline bg-background overflow-hidden lg:sticky lg:top-16">
+        {/* ── Sidebar: Pagos + Docs + Notas — todo el alto ──
+            En modo cliente sólo trae "Resumen" — info redundante con
+            TotalesCard. Lo ocultamos en mobile y se ve en desktop. */}
+        <div className={cn(
+          "rounded-lg border hairline bg-background overflow-hidden lg:sticky lg:top-16",
+          isCliente && "hidden lg:block",
+        )}>
           {!isCliente && (
             <SidebarSection title="Pagos" defaultOpen>
               <PagosSidebar
@@ -1441,7 +1453,7 @@ function SolicitudDiffDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-lg">
+      <AlertDialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <AlertDialogHeader>
           <AlertDialogTitle>Confirmar solicitud de modificación</AlertDialogTitle>
           <AlertDialogDescription>

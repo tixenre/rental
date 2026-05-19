@@ -5,7 +5,7 @@ import { clienteApi } from "@/lib/cliente/api";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { StatCard } from "@/components/rental/StatCard";
 import { EstadoBadge } from "@/components/rental/EstadoBadge";
-import { ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon, CheckCircle2, XCircle, Info, FileText, FileSignature, Truck } from "lucide-react";
+import { ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon, CheckCircle2, XCircle, Info, FileText, FileSignature, Truck, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -15,6 +15,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { businessWhatsappLink } from "@/lib/business";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cliente/portal")({
@@ -198,8 +199,17 @@ export default function ClientePortal() {
   if (loading) {
     return (
       <PublicLayout topBar={{ variant: "cliente" }}>
-        <div className="grid place-items-center py-24 text-sm text-muted-foreground">
-          Cargando…
+        <div className="max-w-[760px] mx-auto px-6 pt-8 pb-20">
+          <div className="grid grid-cols-3 gap-2 sm:gap-2.5 mb-8">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-[88px] rounded-md border hairline bg-muted/30 animate-pulse" />
+            ))}
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-14 rounded-xl border border-[var(--hairline)] bg-muted/20 animate-pulse" />
+            ))}
+          </div>
         </div>
       </PublicLayout>
     );
@@ -246,7 +256,7 @@ export default function ClientePortal() {
 
       <div className="max-w-[760px] mx-auto px-6 pt-8 pb-20">
         {pedidos.length > 0 && (
-          <div className="grid grid-cols-3 gap-2.5 mb-8">
+          <div className="grid grid-cols-3 gap-2 sm:gap-2.5 mb-8">
             <StatCard
               label="Activos"
               value={String(activosPedidos.length)}
@@ -440,32 +450,51 @@ function PedidoCard({
           : "border-[var(--hairline)] hover:border-ink/30",
       )}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center gap-3.5 px-4 sm:px-[18px] py-3.5 transition hover:bg-[color-mix(in_oklch,var(--ink)_2%,transparent)]"
-      >
-        <span className="font-mono text-[11px] font-bold text-ink tracking-[0.05em]">
-          #{pedido.numero_pedido}
-        </span>
-        <EstadoBadge estado={pedido.estado} />
-        <span className="font-sans text-[13px] text-muted-foreground flex-1 min-w-0 truncate text-left">
-          {fmtDate(pedido.fecha_desde)}
-          <span className="opacity-40 mx-1">→</span>
-          {fmtDate(pedido.fecha_hasta)}
-        </span>
-        {pedido.monto_total != null && (
-          <span className="font-display text-lg font-extrabold text-ink tabular-nums shrink-0">
-            {fmt(pedido.monto_total)}
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex-1 min-w-0 flex items-center gap-3.5 px-4 sm:px-[18px] py-3.5 transition hover:bg-[color-mix(in_oklch,var(--ink)_2%,transparent)] text-left"
+        >
+          <span className="font-mono text-[11px] font-bold text-ink tracking-[0.05em]">
+            #{pedido.numero_pedido}
           </span>
-        )}
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 shrink-0 transition-[transform,color] duration-200",
-            expanded ? "rotate-180 text-ink" : "text-muted-foreground",
+          <EstadoBadge estado={pedido.estado} />
+          <span className="font-sans text-[13px] text-muted-foreground flex-1 min-w-0 truncate">
+            {fmtDate(pedido.fecha_desde)}
+            <span className="opacity-40 mx-1">→</span>
+            {fmtDate(pedido.fecha_hasta)}
+          </span>
+          {pedido.monto_total != null && (
+            <span className="font-display text-lg font-extrabold text-ink tabular-nums shrink-0">
+              {fmt(pedido.monto_total)}
+            </span>
           )}
-        />
-      </button>
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 shrink-0 transition-[transform,color] duration-200",
+              expanded ? "rotate-180 text-ink" : "text-muted-foreground",
+            )}
+          />
+        </button>
+        {!expanded && puedeModificar && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate({
+                to: "/cliente/pedidos/$id/editar",
+                params: { id: String(pedido.id) },
+              });
+            }}
+            className="shrink-0 px-3 sm:px-4 border-l border-[var(--hairline)] text-ink hover:bg-amber-soft transition inline-flex items-center gap-1.5"
+            aria-label="Modificar pedido"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            <span className="font-sans text-xs font-semibold hidden sm:inline">Modificar</span>
+          </button>
+        )}
+      </div>
 
       {expanded && (
         <div className="border-t border-dashed border-[var(--hairline)] px-4 sm:px-[18px] pt-[18px] pb-[22px] flex flex-col gap-5 animate-[expand-in_.22s_ease-out]">
@@ -484,9 +513,9 @@ function PedidoCard({
               <button
                 type="button"
                 onClick={() => setAskCancel(true)}
-                className="rounded-full px-3 py-1.5 font-sans text-xs font-semibold text-ink border border-ink/20 hover:border-ink transition shrink-0 inline-flex items-center gap-1"
+                className="rounded-full px-4 py-2 font-sans text-sm font-semibold text-ink border border-ink/20 hover:border-ink transition shrink-0 inline-flex items-center gap-1.5 min-h-[40px]"
               >
-                <XIcon className="h-3 w-3" /> Cancelar
+                <XIcon className="h-3.5 w-3.5" /> Cancelar
               </button>
             </section>
           )}
@@ -696,6 +725,26 @@ function PedidoCard({
               </div>
             </section>
           )}
+
+          {(() => {
+            const waHref = businessWhatsappLink(
+              `Hola, consulta sobre el pedido #${numero}`
+            );
+            if (!waHref) return null;
+            return (
+              <section>
+                <a
+                  href={waHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#25D366] text-white px-4 py-2.5 font-sans text-sm font-semibold hover:brightness-95 transition min-h-[44px]"
+                >
+                  <MessageCircle className="h-4 w-4" strokeWidth={2.2} />
+                  Consulta por WhatsApp
+                </a>
+              </section>
+            );
+          })()}
         </div>
       )}
 
@@ -755,15 +804,33 @@ function DocActions({
   description?: string;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  // Badge "Nuevo" si todavía no se vio. Sólo para contrato/albaran (los
+  // notificables). El estado vive en localStorage; lo trackeamos con un
+  // ref local para que el badge desaparezca instantáneamente al tocar.
+  const [seen, setSeen] = useState<boolean>(() =>
+    tipo === "remito" ? true : wasDocSeen(pedidoId, tipo)
+  );
+  const showNewBadge = !seen;
+
+  function markSeen() {
+    if (tipo === "remito") return;
+    markDocSeen(pedidoId, tipo);
+    setSeen(true);
+  }
 
   return (
     <>
       <div className="flex items-stretch gap-1">
         <button
           type="button"
-          onClick={() => setPreviewOpen(true)}
-          className="flex-1 flex items-center gap-2.5 rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5 text-left transition hover:border-ink hover:bg-muted"
+          onClick={() => { markSeen(); setPreviewOpen(true); }}
+          className="flex-1 relative flex items-center gap-2.5 rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5 text-left transition hover:border-ink hover:bg-muted"
         >
+          {showNewBadge && (
+            <span className="absolute -top-1.5 -right-1.5 rounded-full bg-rose-500 text-white text-[9px] font-bold tracking-wide px-1.5 py-0.5 leading-none shadow">
+              Nuevo
+            </span>
+          )}
           <div className="grid h-8 w-8 place-items-center rounded-sm bg-amber-soft text-amber shrink-0">
             <DocPath tipo={tipo} />
           </div>
@@ -783,6 +850,7 @@ function DocActions({
         <a
           href={`/api/cliente/pedidos/${pedidoId}/${tipo}.pdf`}
           download={`${tipo}-${numero}.pdf`}
+          onClick={markSeen}
           className="grid place-items-center w-10 rounded-md border border-[var(--hairline)] bg-card text-muted-foreground transition hover:border-ink hover:text-ink"
           title={`Descargar ${label} en PDF`}
           aria-label={`Descargar ${label} en PDF`}
@@ -846,15 +914,17 @@ function DocPreviewModal({
         className="bg-background w-full sm:max-w-4xl sm:max-h-[90vh] h-full sm:h-auto flex flex-col sm:rounded-lg overflow-hidden shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between gap-2 border-b hairline px-4 py-3 shrink-0">
-          <h2 className="font-display text-base text-ink">{title}</h2>
-          <div className="flex items-center gap-2">
+        <header className="flex items-center justify-between gap-2 border-b hairline px-3 sm:px-4 py-3 shrink-0">
+          <h2 className="font-display text-base text-ink truncate min-w-0">{title}</h2>
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <a
               href={downloadUrl}
               download={downloadFilename}
-              className="inline-flex items-center gap-1.5 rounded-md bg-ink text-amber px-3 py-2 text-xs font-medium hover:brightness-110 transition"
+              className="inline-flex items-center gap-1.5 rounded-md bg-ink text-amber px-2.5 sm:px-3 py-2 text-xs font-medium hover:brightness-110 transition"
+              aria-label="Descargar PDF"
             >
-              ⬇ Descargar PDF
+              <span aria-hidden>⬇</span>
+              <span className="hidden sm:inline">Descargar PDF</span>
             </a>
             <button
               type="button"
