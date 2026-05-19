@@ -326,11 +326,13 @@ def cliente_pedidos(request: Request):
             """, (p["id"],)).fetchall()
             d["pagos"] = [row_to_dict(pg) for pg in pagos]
 
-            # Solicitudes de modificación pendientes
+            # Solicitudes de modificación que el cliente debe ver — sólo las
+            # de aprobación (las `directo` son auditoría interna del autosave
+            # en presupuesto, no relevantes para el cliente).
             solic = conn.execute("""
                 SELECT id, mensaje, estado, respuesta, created_at
                 FROM solicitudes_modificacion
-                WHERE pedido_id = ?
+                WHERE pedido_id = ? AND tipo = 'aprobacion'
                 ORDER BY created_at DESC
             """, (p["id"],)).fetchall()
             d["solicitudes"] = [row_to_dict(s) for s in solic]
@@ -379,7 +381,8 @@ def cliente_pedido_detalle(id: int, request: Request):
         solicitudes = conn.execute("""
             SELECT id, mensaje, estado, respuesta, created_at
             FROM solicitudes_modificacion
-            WHERE pedido_id = ? ORDER BY created_at DESC
+            WHERE pedido_id = ? AND tipo = 'aprobacion'
+            ORDER BY created_at DESC
         """, (id,)).fetchall()
         d["solicitudes"] = [row_to_dict(s) for s in solicitudes]
 
