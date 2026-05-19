@@ -180,10 +180,12 @@ def _get_historial_modificaciones(conn, pedido_id: int) -> list[dict]:
 
     Incluye tanto solicitudes de aprobación como cambios directos
     (autosave en `presupuesto`) — el admin se beneficia de ver todo.
+    `cambios_aplicados` puede diferir de `cambios_json` cuando el admin
+    aprobó con contrapropuesta.
     """
     rows = conn.execute("""
-        SELECT id, mensaje, estado, respuesta, cambios_json, tipo,
-               resolved_at, resolved_by, created_at
+        SELECT id, mensaje, estado, respuesta, cambios_json, cambios_aplicados,
+               tipo, resolved_at, resolved_by, created_at
         FROM solicitudes_modificacion
         WHERE pedido_id = ?
         ORDER BY created_at DESC
@@ -714,6 +716,20 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
         set_clause = ", ".join(f"{k}=?" for k in updates)
         conn.execute(f"UPDATE alquileres SET {set_clause} WHERE id=?", (*updates.values(), id))
 
+        # Si el pedido se va a un estado fuera de los modificables, las
+        # solicitudes pendientes quedan huérfanas. Las cancelamos en la
+        # misma transacción para no confundir al cliente ni al admin.
+        # Import diferido para evitar ciclo con cliente_portal.
+        from routes.cliente_portal import (
+            ESTADOS_MODIFICABLES, _cancelar_solicitudes_pendientes,
+        )
+        if data.estado not in ESTADOS_MODIFICABLES:
+            _cancelar_solicitudes_pendientes(
+                conn, id,
+                motivo=f"El pedido pasó a estado '{data.estado}'.",
+                actor="system",
+            )
+
         _maybe_finalizar(conn, id)
         conn.commit()
 
@@ -933,14 +949,34 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
     else:
         jornadas = 1
 
+    # Consolidar duplicados del mismo equipo (sumar cantidades) antes de
+    # insertar. Sino dos rows con cantidad=2 cada una pasan el check de
+    # stock (que sí consolida) pero quedan 2 rows en `alquiler_items`.
+    consolidado: dict[int, dict] = {}
+    for it in items:
+        key = it.equipo_id
+        if key in consolidado:
+            consolidado[key]["cantidad"] += it.cantidad
+            # Si vienen precios distintos para el mismo equipo, usamos el
+            # mayor (defensivo — no debería pasar).
+            consolidado[key]["precio_jornada"] = max(
+                consolidado[key]["precio_jornada"], it.precio_jornada,
+            )
+        else:
+            consolidado[key] = {
+                "equipo_id": it.equipo_id,
+                "cantidad": it.cantidad,
+                "precio_jornada": it.precio_jornada,
+            }
+
     bruto = 0
     rows = []
-    for it in items:
-        if not conn.execute("SELECT id FROM equipos WHERE id=?", (it.equipo_id,)).fetchone():
-            raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado")
-        subtotal = it.precio_jornada * it.cantidad * jornadas
+    for it in consolidado.values():
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (it["equipo_id"],)).fetchone():
+            raise HTTPException(404, f"Equipo {it['equipo_id']} no encontrado")
+        subtotal = it["precio_jornada"] * it["cantidad"] * jornadas
         bruto += subtotal
-        rows.append((id, it.equipo_id, it.cantidad, it.precio_jornada, subtotal))
+        rows.append((id, it["equipo_id"], it["cantidad"], it["precio_jornada"], subtotal))
     monto_total = _aplicar_descuento(bruto, p["descuento_pct"] or 0)
 
     conn.execute("DELETE FROM alquiler_items WHERE pedido_id=?", (id,))

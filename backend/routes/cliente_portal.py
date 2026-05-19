@@ -7,7 +7,7 @@ import json
 import logging
 from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from database import get_db, row_to_dict
@@ -283,6 +283,12 @@ def cliente_cancelar_pedido(id: int, request: Request):
         if p["estado"] not in ("borrador", "presupuesto"):
             raise HTTPException(400, "Este pedido ya no se puede cancelar")
         conn.execute("UPDATE alquileres SET estado = 'cancelado' WHERE id = ?", (id,))
+        # Si había alguna solicitud pendiente, cancelarla también para no
+        # dejarla huérfana.
+        _cancelar_solicitudes_pendientes(
+            conn, id, motivo="El pedido fue cancelado.",
+            actor=session.get("email") or "cliente",
+        )
         conn.commit()
         return {"ok": True}
     finally:
@@ -416,8 +422,8 @@ class ModificacionIn(BaseModel):
     """
     fecha_desde: Optional[str] = None
     fecha_hasta: Optional[str] = None
-    items:       list[ModificacionItemIn]
-    mensaje:     Optional[str] = None  # comentario opcional del cliente
+    items:       list[ModificacionItemIn] = Field(..., max_length=100)
+    mensaje:     Optional[str] = Field(None, max_length=2000)
 
 
 def _validar_fechas_propuestas(
@@ -494,6 +500,87 @@ def _check_solicitud_pendiente(conn, pedido_id: int) -> None:
     ).fetchone()
     if pendiente:
         raise HTTPException(409, "Ya hay una solicitud pendiente para este pedido")
+
+
+def _check_stock_hipotetico(
+    conn, pedido_id: int, fecha_desde: str, fecha_hasta: str,
+    items: "list",
+) -> list[str]:
+    """Verifica stock para un set HIPOTÉTICO de items + fechas (no toca DB).
+
+    Usado en el path `confirmado`/propose: el cliente envía una propuesta y
+    queremos rechazarla si no hay stock, sin pasar antes por aplicar nada.
+    Excluye el pedido actual del cálculo de reservas existentes (sus items
+    actuales no compiten con los propuestos para el mismo rango).
+    """
+    from routes.alquileres import ESTADOS_RESERVADO, _consolidar_items_por_equipo
+    if not items or not fecha_desde or not fecha_hasta:
+        return []
+
+    # Resolver nombre + stock total + agrupar por equipo_id.
+    enriched = []
+    for it in items:
+        row = conn.execute(
+            "SELECT nombre, cantidad FROM equipos WHERE id = ?", (it.equipo_id,)
+        ).fetchone()
+        if not row:
+            enriched.append({
+                "equipo_id": it.equipo_id, "cantidad": it.cantidad,
+                "nombre": f"equipo #{it.equipo_id}", "stock_total": 0,
+            })
+        else:
+            enriched.append({
+                "equipo_id": it.equipo_id, "cantidad": it.cantidad,
+                "nombre": row["nombre"], "stock_total": row["cantidad"],
+            })
+
+    consolidated = _consolidar_items_por_equipo(enriched)
+
+    problemas: list[str] = []
+    for it in consolidated.values():
+        lock = conn.execute(
+            "SELECT cantidad FROM equipos WHERE id = ? FOR UPDATE",
+            (it["equipo_id"],)
+        ).fetchone()
+        if not lock:
+            problemas.append(f"{it['nombre']} (no encontrado)")
+            continue
+        stock_total = lock["cantidad"]
+        reservado = conn.execute(f"""
+            SELECT COALESCE(SUM(pi2.cantidad), 0)
+            FROM alquiler_items pi2
+            JOIN alquileres p ON p.id = pi2.pedido_id
+            WHERE pi2.equipo_id = ?
+              AND p.id != ?
+              AND p.estado IN {ESTADOS_RESERVADO}
+              AND p.fecha_desde < ?
+              AND p.fecha_hasta > ?
+        """, (it["equipo_id"], pedido_id, fecha_hasta, fecha_desde)).fetchone()[0]
+        disponible = stock_total - reservado
+        if disponible < it["cantidad"]:
+            problemas.append(
+                f"{it['nombre']} (necesitás {it['cantidad']}, disponible: {max(0, disponible)})"
+            )
+    return problemas
+
+
+def _cancelar_solicitudes_pendientes(
+    conn, pedido_id: int, motivo: str, actor: str = "system",
+) -> int:
+    """Cancela todas las solicitudes pendientes de un pedido. Retorna
+    cuántas se cancelaron. Usado cuando el pedido cambia a un estado no
+    modificable o se cancela: las solicitudes pendientes quedan huérfanas
+    y debemos limpiarlas para no confundir al cliente y al admin.
+    """
+    rows = conn.execute(
+        """UPDATE solicitudes_modificacion
+           SET estado = 'cancelada', respuesta = ?,
+               resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
+           WHERE pedido_id = ? AND estado = 'pendiente'
+           RETURNING id""",
+        (motivo, actor, pedido_id)
+    ).fetchall()
+    return len(rows)
 
 
 def _items_payload_to_pedido_items(items: list[ModificacionItemIn], precios: dict[int, int]) -> list:
@@ -630,6 +717,15 @@ def cliente_modificar_pedido(
             return {"ok": True, "tipo": "directo", "pedido": pedido_actualizado}
 
         # ── Caso `confirmado`: guardar propuesta ─────────────────────────
+        # Validar stock hipotéticamente: rechazar antes de que el admin la vea
+        # si la propuesta es imposible. Las fechas a chequear son las que el
+        # cliente propone, con fallback a las actuales del pedido.
+        fd = data.fecha_desde or pedido["fecha_desde"]
+        fh = data.fecha_hasta or pedido["fecha_hasta"]
+        problemas = _check_stock_hipotetico(conn, id, fd, fh, data.items)
+        if problemas:
+            raise HTTPException(409, "Sin stock para tu propuesta: " + "; ".join(problemas))
+
         conn.execute(
             """INSERT INTO solicitudes_modificacion
                (pedido_id, cliente_id, mensaje, cambios_json, tipo, estado)
@@ -841,8 +937,8 @@ def admin_solicitudes(request: Request):
     try:
         rows = conn.execute("""
             SELECT sm.id, sm.pedido_id, sm.mensaje, sm.estado, sm.respuesta,
-                   sm.cambios_json, sm.tipo, sm.resolved_at, sm.resolved_by,
-                   sm.created_at,
+                   sm.cambios_json, sm.cambios_aplicados, sm.tipo,
+                   sm.resolved_at, sm.resolved_by, sm.created_at,
                    c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
                    c.email AS cliente_email,
                    a.numero_pedido, a.fecha_desde AS pedido_fecha_desde,
@@ -860,8 +956,16 @@ def admin_solicitudes(request: Request):
 
 
 class SolicitudOverrideItem(BaseModel):
+    from pydantic import field_validator as _fv
     equipo_id: int
     cantidad:  int
+
+    @_fv("cantidad")
+    @classmethod
+    def _cantidad_positiva(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("cantidad debe ser mayor a 0 (para quitar un equipo, omitilo del array)")
+        return v
 
 
 class SolicitudOverride(BaseModel):
@@ -869,12 +973,12 @@ class SolicitudOverride(BaseModel):
     de la propuesta original del cliente."""
     fecha_desde: Optional[str] = None
     fecha_hasta: Optional[str] = None
-    items:       list[SolicitudOverrideItem]
+    items:       list[SolicitudOverrideItem] = Field(..., max_length=100)
 
 
 class SolicitudRespuesta(BaseModel):
     estado: str     # aprobada / rechazada
-    respuesta: str = ""
+    respuesta: str = Field("", max_length=2000)
     cambios_override: Optional[SolicitudOverride] = None
 
 
@@ -903,9 +1007,9 @@ def admin_responder_solicitud(
         # cancelación del cliente) corran en paralelo sobre la misma
         # solicitud y ambos pasen el check de "pendiente".
         sm = conn.execute(
-            """SELECT sm.*, a.cliente_id, a.fecha_desde, a.estado AS pedido_estado,
-                      a.numero_pedido, c.email AS cliente_email,
-                      c.nombre AS cliente_nombre
+            """SELECT sm.*, a.cliente_id, a.fecha_desde, a.fecha_hasta,
+                      a.estado AS pedido_estado, a.numero_pedido,
+                      c.email AS cliente_email, c.nombre AS cliente_nombre
                FROM solicitudes_modificacion sm
                JOIN alquileres a ON a.id = sm.pedido_id
                JOIN clientes c ON c.id = sm.cliente_id
@@ -917,6 +1021,8 @@ def admin_responder_solicitud(
             raise HTTPException(404, "Solicitud no encontrada")
         if sm["estado"] != "pendiente":
             raise HTTPException(400, "Esta solicitud ya fue resuelta")
+
+        cambios_aplicados_str: Optional[str] = None
 
         if data.estado == "aprobada" and sm["tipo"] == "aprobacion":
             if sm["pedido_estado"] not in ESTADOS_MODIFICABLES:
@@ -935,11 +1041,7 @@ def admin_responder_solicitud(
                     raise HTTPException(400, "La contrapropuesta debe incluir items")
                 _validar_fechas_propuestas(
                     cambios.get("fecha_desde"), cambios.get("fecha_hasta"),
-                    sm["fecha_desde"],
-                    conn.execute(
-                        "SELECT fecha_hasta FROM alquileres WHERE id=?",
-                        (sm["pedido_id"],),
-                    ).fetchone()["fecha_hasta"],
+                    sm["fecha_desde"], sm["fecha_hasta"],
                 )
             else:
                 cambios = cambios_pre
@@ -978,12 +1080,16 @@ def admin_responder_solicitud(
                 if problemas:
                     raise HTTPException(409, "Sin stock: " + "; ".join(problemas))
 
+            # Snapshot de lo que efectivamente se aplicó (≠ a la propuesta del
+            # cliente si admin usó override). Para auditoría.
+            cambios_aplicados_str = json.dumps(cambios)
+
         conn.execute(
             """UPDATE solicitudes_modificacion
-               SET estado = ?, respuesta = ?,
+               SET estado = ?, respuesta = ?, cambios_aplicados = ?,
                    resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
                WHERE id = ?""",
-            (data.estado, data.respuesta, admin_email, id)
+            (data.estado, data.respuesta, cambios_aplicados_str, admin_email, id)
         )
         conn.commit()
 

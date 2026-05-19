@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { Check, X as XIcon, MessageSquare, Calendar, Package as PackageIcon, Pencil, Plus, Minus, RotateCcw } from "lucide-react";
@@ -172,18 +172,32 @@ function SolicitudCard({
   const cambios = solicitud.cambios_json;
   const pedido = pedidoQ.data;
 
-  // Contrapropuesta editable del admin (precargada con la del cliente).
-  const [overrideItems, setOverrideItems] = useState<Map<number, number>>(new Map());
-  const [overrideDesde, setOverrideDesde] = useState<string>("");
-  const [overrideHasta, setOverrideHasta] = useState<string>("");
-  useEffect(() => {
-    if (!cambios) return;
+  // Snapshot del estado "inicial" que ve el admin al abrir la solicitud
+  // por primera vez. Sirve como baseline para calcular `hayOverride` y para
+  // el botón "Reset". Estable a través de refetches de la solicitud (sólo
+  // depende de `solicitud.id`), así un refresh de la lista no descarta lo
+  // que el admin estuvo tipeando.
+  const snapshot = (() => {
     const m = new Map<number, number>();
-    for (const it of cambios.items ?? []) m.set(it.equipo_id, it.cantidad);
-    setOverrideItems(m);
-    setOverrideDesde(cambios.fecha_desde ?? solicitud.pedido_fecha_desde?.slice(0, 10) ?? "");
-    setOverrideHasta(cambios.fecha_hasta ?? solicitud.pedido_fecha_hasta?.slice(0, 10) ?? "");
-  }, [cambios, solicitud.id]);
+    for (const it of cambios?.items ?? []) m.set(it.equipo_id, it.cantidad);
+    return {
+      desde: cambios?.fecha_desde ?? solicitud.pedido_fecha_desde?.slice(0, 10) ?? "",
+      hasta: cambios?.fecha_hasta ?? solicitud.pedido_fecha_hasta?.slice(0, 10) ?? "",
+      items: m,
+    };
+  })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const snapshotMemo = useMemo(() => snapshot, [solicitud.id]);
+
+  // Contrapropuesta editable del admin (precargada con el snapshot).
+  const [overrideItems, setOverrideItems] = useState<Map<number, number>>(snapshotMemo.items);
+  const [overrideDesde, setOverrideDesde] = useState<string>(snapshotMemo.desde);
+  const [overrideHasta, setOverrideHasta] = useState<string>(snapshotMemo.hasta);
+  useEffect(() => {
+    setOverrideItems(snapshotMemo.items);
+    setOverrideDesde(snapshotMemo.desde);
+    setOverrideHasta(snapshotMemo.hasta);
+  }, [snapshotMemo]);
 
   const equipos = new Map<number, { nombre: string; nombre_publico?: string | null }>();
   for (const it of pedido?.items ?? []) {
@@ -213,27 +227,34 @@ function SolicitudCard({
   );
 
   // Detectar si el admin tweakeó algo (genera contrapropuesta).
+  // Comparamos contra el snapshot inicial (no contra `cambios` directo) para
+  // que campos null de la propuesta del cliente que se pre-llenan con las
+  // fechas actuales del pedido no cuenten como override.
   const hayOverride = (() => {
-    if (!cambios) return false;
-    if ((cambios.fecha_desde ?? "") !== overrideDesde) return true;
-    if ((cambios.fecha_hasta ?? "") !== overrideHasta) return true;
-    const clienteMap = new Map<number, number>();
-    for (const it of cambios.items ?? []) clienteMap.set(it.equipo_id, it.cantidad);
-    if (clienteMap.size !== overrideItems.size) return true;
+    if (snapshotMemo.desde !== overrideDesde) return true;
+    if (snapshotMemo.hasta !== overrideHasta) return true;
+    if (snapshotMemo.items.size !== overrideItems.size) return true;
     for (const [k, v] of overrideItems) {
-      if (clienteMap.get(k) !== v) return true;
+      if (snapshotMemo.items.get(k) !== v) return true;
     }
     return false;
   })();
+
+  // Items efectivos del override (filtrados, equipo_id → cantidad > 0).
+  const overrideItemsEfectivos = Array.from(overrideItems.entries())
+    .filter(([, c]) => c > 0)
+    .map(([equipo_id, cantidad]) => ({ equipo_id, cantidad }));
+
+  // Si el admin tweakeó algo pero el resultado quedaría sin items, el
+  // backend rechazaría con 400. Bloqueamos el botón Aprobar en ese caso.
+  const overrideVacio = hayOverride && overrideItemsEfectivos.length === 0;
 
   function buildOverridePayload(): CambiosJson | undefined {
     if (!hayOverride) return undefined;
     return {
       fecha_desde: overrideDesde || null,
       fecha_hasta: overrideHasta || null,
-      items: Array.from(overrideItems.entries())
-        .filter(([, c]) => c > 0)
-        .map(([equipo_id, cantidad]) => ({ equipo_id, cantidad })),
+      items: overrideItemsEfectivos,
     };
   }
 
@@ -248,12 +269,9 @@ function SolicitudCard({
   }
 
   function resetOverride() {
-    if (!cambios) return;
-    const m = new Map<number, number>();
-    for (const it of cambios.items ?? []) m.set(it.equipo_id, it.cantidad);
-    setOverrideItems(m);
-    setOverrideDesde(cambios.fecha_desde ?? "");
-    setOverrideHasta(cambios.fecha_hasta ?? "");
+    setOverrideItems(new Map(snapshotMemo.items));
+    setOverrideDesde(snapshotMemo.desde);
+    setOverrideHasta(snapshotMemo.hasta);
   }
 
   return (
@@ -470,12 +488,19 @@ function SolicitudCard({
         <Button
           className="flex-1"
           onClick={() => setAsk("aprobada")}
-          disabled={isPending}
+          disabled={isPending || overrideVacio}
+          title={overrideVacio ? "El pedido debe quedar con al menos un equipo" : undefined}
         >
           <Check className="h-4 w-4 mr-1" />
           {hayOverride ? "Aprobar con cambios" : "Aprobar"}
         </Button>
       </div>
+
+      {overrideVacio && (
+        <p className="text-xs text-destructive -mt-2">
+          Tu contrapropuesta deja al pedido sin equipos. Subí al menos uno a cantidad ≥ 1.
+        </p>
+      )}
 
       <AlertDialog open={!!ask} onOpenChange={(o) => !o && setAsk(null)}>
         <AlertDialogContent>

@@ -211,7 +211,13 @@ export function usePedidoDraft(
       }
       onProposalSent?.(resp.tipo);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e.message);
+      // Si falla el autosave (típicamente 409 sin stock), forzamos un refetch
+      // del server-state para evitar dejar el draft "dirty" indefinidamente.
+      // El useEffect de sincronización aplicará lo que diga el server.
+      qc.invalidateQueries({ queryKey: ["cliente", "pedido", pedido!.id] });
+    },
   });
 
   const estadoMut = useMutation({

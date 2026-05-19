@@ -960,17 +960,18 @@ def init_db():
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS solicitudes_modificacion (
-            id           SERIAL PRIMARY KEY,
-            pedido_id    INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
-            cliente_id   INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
-            mensaje      TEXT,
-            estado       TEXT NOT NULL DEFAULT 'pendiente',
-            respuesta    TEXT,
-            cambios_json JSONB,
-            tipo         TEXT NOT NULL DEFAULT 'aprobacion',
-            resolved_at  TIMESTAMPTZ,
-            resolved_by  TEXT,
-            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            id                SERIAL PRIMARY KEY,
+            pedido_id         INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
+            cliente_id        INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            mensaje           TEXT,
+            estado            TEXT NOT NULL DEFAULT 'pendiente',
+            respuesta         TEXT,
+            cambios_json      JSONB,
+            cambios_aplicados JSONB,
+            tipo              TEXT NOT NULL DEFAULT 'aprobacion',
+            resolved_at       TIMESTAMPTZ,
+            resolved_by       TEXT,
+            created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.execute("""

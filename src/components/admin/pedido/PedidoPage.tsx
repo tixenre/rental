@@ -163,6 +163,16 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
     mode,
     submitMode: isCliente ? clienteSubmitMode : "autosave",
     mensaje,
+    onProposalSent: (tipo) => {
+      if (tipo === "aprobacion") {
+        toast.success("Tu solicitud fue enviada. Te avisamos cuando la revisemos.");
+        // Limpiamos el draft contra el server actual (que sigue intacto) y
+        // volvemos al portal: el cliente no debe quedarse en el editor con
+        // estado `dirty` después de enviar.
+        if (onClose) onClose();
+        else router.navigate({ to: "/cliente/portal" });
+      }
+    },
   });
 
   const [askDelete, setAskDelete] = useState(false);
@@ -185,8 +195,12 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
     isCliente && pedido?.estado === "confirmado" && draft.saveStatus === "dirty";
   const dirtyRef = useRef(false);
   dirtyRef.current = dirtyInPropose;
+  // One-shot bypass del blocker: lo setea `onProposalSent` para que la
+  // navegación post-submit no dispare el confirm de "cambios sin enviar".
+  const skipBlockerRef = useRef(false);
   useEffect(() => {
     function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (skipBlockerRef.current) return;
       if (dirtyRef.current) {
         e.preventDefault();
         e.returnValue = "";
@@ -197,6 +211,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
   }, []);
   useBlocker({
     shouldBlockFn: () => {
+      if (skipBlockerRef.current) return false;
       if (!dirtyRef.current) return false;
       return !window.confirm(
         "Tenés cambios sin enviar. ¿Querés salir y perderlos?"
@@ -1315,8 +1330,21 @@ function HistorialModificaciones({ items }: { items: PedidoHistorialItem[] }) {
     <ol className="space-y-2.5">
       {items.map((h) => {
         const c = h.cambios_json;
+        const a = h.cambios_aplicados;
         const itemDeltas = Array.isArray(c?.items) ? (c?.items ?? []) : [];
         const isDirecto = h.tipo === "directo";
+        // Si lo aplicado difiere de lo propuesto, marcamos "Modificada por admin".
+        const overrideAplicado = !!(
+          a && c && (
+            (a.fecha_desde ?? null) !== (c.fecha_desde ?? null) ||
+            (a.fecha_hasta ?? null) !== (c.fecha_hasta ?? null) ||
+            (a.items?.length ?? 0) !== (c.items?.length ?? 0) ||
+            (a.items ?? []).some((ai) => {
+              const ci = (c.items ?? []).find((x) => x.equipo_id === ai.equipo_id);
+              return !ci || ci.cantidad !== ai.cantidad;
+            })
+          )
+        );
         return (
           <li key={h.id} className="rounded border hairline bg-card px-2.5 py-2">
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -1327,6 +1355,9 @@ function HistorialModificaciones({ items }: { items: PedidoHistorialItem[] }) {
                 <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   Auto
                 </span>
+              )}
+              {overrideAplicado && (
+                <span className="text-[10px] text-amber-700">modificada al aprobar</span>
               )}
               <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
                 {fmtFecha(h.created_at)}
@@ -1340,6 +1371,12 @@ function HistorialModificaciones({ items }: { items: PedidoHistorialItem[] }) {
             {itemDeltas.length > 0 && (
               <div className="text-xs text-muted-foreground mt-1">
                 {itemDeltas.length} item{itemDeltas.length !== 1 ? "s" : ""} en la propuesta
+              </div>
+            )}
+            {overrideAplicado && a && (
+              <div className="text-xs text-amber-700 mt-1 tabular-nums">
+                Aplicado: {fmtFecha(a.fecha_desde ?? "")} → {fmtFecha(a.fecha_hasta ?? "")}
+                {a.items && ` · ${a.items.length} item${a.items.length !== 1 ? "s" : ""}`}
               </div>
             )}
             {h.mensaje && (

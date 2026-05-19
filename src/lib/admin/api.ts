@@ -1642,17 +1642,22 @@ export type Pedido = {
   historial_modificaciones?: PedidoHistorialItem[];
 };
 
+export type PedidoCambiosSnapshot = {
+  fecha_desde?: string | null;
+  fecha_hasta?: string | null;
+  items?: { equipo_id: number; cantidad: number }[];
+  mensaje?: string | null;
+};
+
 export type PedidoHistorialItem = {
   id: number;
   mensaje: string | null;
   estado: "pendiente" | "aprobada" | "rechazada" | "cancelada";
   respuesta: string | null;
-  cambios_json: {
-    fecha_desde?: string | null;
-    fecha_hasta?: string | null;
-    items?: { equipo_id: number; cantidad: number }[];
-    mensaje?: string | null;
-  } | null;
+  cambios_json: PedidoCambiosSnapshot | null;
+  /** Lo que efectivamente se aplicó al aprobar (≠ cambios_json si admin
+   *  envió contrapropuesta). null si la solicitud no se aprobó. */
+  cambios_aplicados: PedidoCambiosSnapshot | null;
   tipo: "directo" | "aprobacion";
   resolved_at: string | null;
   resolved_by: string | null;
