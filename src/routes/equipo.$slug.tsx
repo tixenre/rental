@@ -34,6 +34,7 @@ import { KeywordChips } from "@/components/rental/KeywordChips";
 import { backendToEquipment } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { formatARS } from "@/lib/format";
+import { useClienteSession, aplicaIva, IVA_RATE } from "@/lib/iva";
 import { priceBreakdown } from "@/lib/pricing";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { type Equipment } from "@/data/equipment";
@@ -486,21 +487,24 @@ function PriceBlock({
   showPeriodTotal: boolean;
   large?: boolean;
 }) {
+  const { data: clienteSession } = useClienteSession();
+  const conIva = aplicaIva(clienteSession?.perfil_impuestos);
+  const totalConIva = conIva ? Math.round(price.total * (1 + IVA_RATE)) : price.total;
   return (
     <div>
       <div className={`font-display ${large ? "text-3xl" : "text-xl"} tabular text-ink`}>
         {formatARS(item.pricePerDay)}
       </div>
       <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-        / jornada
+        / jornada{conIva ? " +IVA" : ""}
       </div>
       {showPeriodTotal && (
         <div className="mt-1 flex items-baseline gap-1.5">
           <span className={`font-display ${large ? "text-lg" : "text-sm"} tabular text-amber`}>
-            {formatARS(price.total)}
+            {formatARS(totalConIva)}
           </span>
           <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            · {price.jornadas} jornadas
+            · {price.jornadas} jornadas{conIva ? " · IVA incluído" : ""}
           </span>
         </div>
       )}

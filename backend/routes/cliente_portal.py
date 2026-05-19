@@ -79,6 +79,10 @@ class RegistroCreate(BaseModel):
     cuit:     str
     perfil_impuestos:   Optional[str] = "consumidor_final"
     direccion_maps_url: Optional[str] = None
+    # Datos para Factura A — sólo relevantes si perfil = responsable_inscripto.
+    razon_social:       Optional[str] = None
+    domicilio_fiscal:   Optional[str] = None
+    email_facturacion:  Optional[str] = None
 
 
 @router.get("/api/cliente/registro-info")
@@ -121,9 +125,16 @@ def cliente_registro(data: RegistroCreate):
         if existente:
             cliente_id = existente["id"]
         else:
+            # Sólo guardamos datos de Factura A si el perfil es responsable
+            # inscripto — el resto los puede tener vacíos en DB.
+            perfil = data.perfil_impuestos or "consumidor_final"
+            es_ri = perfil == "responsable_inscripto"
             conn.execute("""
-                INSERT INTO clientes (nombre, apellido, email, telefono, direccion, cuit, perfil_impuestos, direccion_maps_url)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO clientes (
+                    nombre, apellido, email, telefono, direccion, cuit,
+                    perfil_impuestos, direccion_maps_url,
+                    razon_social, domicilio_fiscal, email_facturacion
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 data.nombre.strip(),
                 data.apellido.strip(),
@@ -131,8 +142,11 @@ def cliente_registro(data: RegistroCreate):
                 data.telefono.strip(),
                 data.direccion.strip() or "-",
                 data.cuit.strip() or "-",
-                data.perfil_impuestos or "consumidor_final",
+                perfil,
                 data.direccion_maps_url or None,
+                (data.razon_social or "").strip() or None if es_ri else None,
+                (data.domicilio_fiscal or "").strip() or None if es_ri else None,
+                (data.email_facturacion or "").strip().lower() or None if es_ri else None,
             ))
             conn.commit()
             cliente_id = conn.execute(
@@ -158,7 +172,10 @@ def cliente_me(request: Request):
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT id, nombre, apellido, email, telefono, direccion, cuit, perfil_impuestos, descuento, direccion_maps_url FROM clientes WHERE id = ?",
+            """SELECT id, nombre, apellido, email, telefono, direccion, cuit,
+                      perfil_impuestos, descuento, direccion_maps_url,
+                      razon_social, domicilio_fiscal, email_facturacion
+               FROM clientes WHERE id = ?""",
             (cliente_id,)
         ).fetchone()
         if not row:
@@ -174,6 +191,11 @@ class PerfilUpdate(BaseModel):
     telefono:  Optional[str] = None
     direccion: Optional[str] = None
     cuit:      Optional[str] = None
+    # Datos fiscales (cliente puede actualizar para Factura A).
+    perfil_impuestos:  Optional[str] = None
+    razon_social:      Optional[str] = None
+    domicilio_fiscal:  Optional[str] = None
+    email_facturacion: Optional[str] = None
 
 
 @router.patch("/api/cliente/me")
@@ -197,6 +219,18 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
         sets.append("direccion = ?"); vals.append(data.direccion.strip())
     if data.cuit is not None:
         sets.append("cuit = ?"); vals.append(data.cuit.strip() or None)
+    if data.perfil_impuestos is not None:
+        p = data.perfil_impuestos.strip()
+        if p not in ("consumidor_final", "responsable_inscripto", "monotributo", "exento"):
+            raise HTTPException(400, "Perfil impositivo inválido")
+        sets.append("perfil_impuestos = ?"); vals.append(p)
+    if data.razon_social is not None:
+        sets.append("razon_social = ?"); vals.append(data.razon_social.strip() or None)
+    if data.domicilio_fiscal is not None:
+        sets.append("domicilio_fiscal = ?"); vals.append(data.domicilio_fiscal.strip() or None)
+    if data.email_facturacion is not None:
+        sets.append("email_facturacion = ?")
+        vals.append(data.email_facturacion.strip().lower() or None)
 
     if not sets:
         raise HTTPException(400, "Sin cambios")
@@ -207,7 +241,10 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
         conn.execute(f"UPDATE clientes SET {', '.join(sets)} WHERE id = ?", tuple(vals))
         conn.commit()
         row = conn.execute(
-            "SELECT id, nombre, apellido, email, telefono, direccion, cuit, perfil_impuestos, descuento, direccion_maps_url FROM clientes WHERE id = ?",
+            """SELECT id, nombre, apellido, email, telefono, direccion, cuit,
+                      perfil_impuestos, descuento, direccion_maps_url,
+                      razon_social, domicilio_fiscal, email_facturacion
+               FROM clientes WHERE id = ?""",
             (cliente_id,),
         ).fetchone()
         return row_to_dict(row) if row else {}
@@ -1155,9 +1192,12 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
         """, (item['equipo_id'],)).fetchall()
         item['componentes'] = [row_to_dict(c) for c in comp_rows]
 
-    # Datos del cliente para el contrato
+    # Datos del cliente para el contrato + Factura A si aplica
     cli = conn.execute(
-        "SELECT nombre, apellido, email, telefono, direccion, cuit, perfil_impuestos FROM clientes WHERE id = ?",
+        """SELECT nombre, apellido, email, telefono, direccion, cuit,
+                  perfil_impuestos, razon_social, domicilio_fiscal,
+                  email_facturacion
+           FROM clientes WHERE id = ?""",
         (cliente_id,),
     ).fetchone()
     if cli:
@@ -1168,6 +1208,9 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
         pedido["cliente_direccion"] = c.get("direccion")
         pedido["cliente_cuit"] = c.get("cuit")
         pedido["cliente_perfil_impuestos"] = c.get("perfil_impuestos")
+        pedido["cliente_razon_social"] = c.get("razon_social")
+        pedido["cliente_domicilio_fiscal"] = c.get("domicilio_fiscal")
+        pedido["cliente_email_facturacion"] = c.get("email_facturacion")
 
     return pedido
 

@@ -6,6 +6,7 @@ import { useCart } from "@/lib/cart-store";
 import { useFlyToCart } from "@/lib/fly-to-cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
+import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { priceBreakdown } from "@/lib/pricing";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { EmptyImage } from "./EmptyImage";
@@ -42,6 +43,8 @@ export function EquipmentCard({
   const jornadas = useCart((s) => s.days());
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
   const selected = qty > 0;
+  const { data: clienteSession } = useClienteSession();
+  const conIva = aplicaIva(clienteSession?.perfil_impuestos);
   // Cuando hay fechas y > 1 jornada, mostramos el total del período además
   // del precio por jornada. TODO #73: cuando haya descuentos, priceBreakdown
   // ya entrega effectivePerDay para mostrar el valor real por jornada.
@@ -139,7 +142,7 @@ export function EquipmentCard({
               {formatARS(item.pricePerDay)}
             </span>
             <span className="font-mono text-[8px] uppercase tracking-widest text-muted-foreground">
-              /jornada
+              /jornada{conIva ? " +IVA" : ""}
             </span>
             {disponible !== undefined && (
               <span

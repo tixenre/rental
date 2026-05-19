@@ -26,6 +26,7 @@ export const Route = createFileRoute("/cliente/portal")({
 type Perfil = {
   nombre: string; apellido: string; email: string;
   telefono: string; direccion: string;
+  perfil_impuestos?: string | null;
 };
 
 type Item = {
@@ -337,6 +338,7 @@ export default function ClientePortal() {
                 onToggle={() => setExpanded(expanded === p.id ? null : p.id)}
                 ventanaHoras={ventanaHoras}
                 onChanged={reloadPedidos}
+                perfilImpuestos={perfil?.perfil_impuestos ?? null}
               />
             ))}
           </div>
@@ -381,13 +383,14 @@ function jornadasEntre(desde?: string, hasta?: string): number {
 }
 
 function PedidoCard({
-  pedido, expanded, onToggle, ventanaHoras, onChanged,
+  pedido, expanded, onToggle, ventanaHoras, onChanged, perfilImpuestos,
 }: {
   pedido: Pedido;
   expanded: boolean;
   onToggle: () => void;
   ventanaHoras: number;
   onChanged: () => void;
+  perfilImpuestos: string | null;
 }) {
   const navigate = useNavigate();
   const { documentos_disponibles: docs } = pedido;
@@ -433,7 +436,10 @@ function PedidoCard({
   const subtotalItems = pedido.items.reduce((acc, it) => acc + it.subtotal, 0);
   const descuentoPct = pedido.descuento_pct ?? 0;
   const descuentoMonto = Math.round(subtotalItems * (descuentoPct / 100));
-  const total = pedido.monto_total ?? (subtotalItems - descuentoMonto);
+  const totalNeto = pedido.monto_total ?? (subtotalItems - descuentoMonto);
+  const conIva = perfilImpuestos === "responsable_inscripto";
+  const ivaMonto = conIva ? Math.round(totalNeto * 0.21) : 0;
+  const total = totalNeto + ivaMonto;
   const pagado = pedido.monto_pagado ?? 0;
   const balance = Math.max(0, total - pagado);
 
@@ -656,8 +662,22 @@ function PedidoCard({
                 </span>
               </div>
             )}
+            {conIva && (
+              <>
+                <div className="flex justify-between items-baseline font-sans text-[13px]">
+                  <span className="text-muted-foreground">Subtotal neto</span>
+                  <span className="font-mono font-semibold text-ink tabular-nums">{fmt(totalNeto)}</span>
+                </div>
+                <div className="flex justify-between items-baseline font-sans text-[13px]">
+                  <span className="text-muted-foreground">IVA 21%</span>
+                  <span className="font-mono font-semibold text-ink tabular-nums">+{fmt(ivaMonto)}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between items-baseline pt-1.5 mt-1 border-t border-[var(--hairline)]">
-              <span className="font-sans text-[15px] font-bold text-ink">Total</span>
+              <span className="font-sans text-[15px] font-bold text-ink">
+                Total{conIva ? " · IVA incluído" : ""}
+              </span>
               <span className="font-display text-[22px] font-black text-ink tabular-nums">{fmt(total)}</span>
             </div>
             {pagado > 0 && (

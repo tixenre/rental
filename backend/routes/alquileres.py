@@ -175,6 +175,31 @@ def _get_alquiler_detail(conn, id: int) -> dict:
     return pedido
 
 
+def _enriquecer_pedido_con_cliente_fiscal(conn, pedido: dict) -> dict:
+    """Mergea perfil_impuestos + datos de Factura A del cliente en el pedido.
+
+    Usado por los endpoints de PDF para que `_pedido_html` pueda decidir si
+    discriminar IVA (Factura A para Responsable Inscripto).
+    """
+    cid = pedido.get("cliente_id")
+    if not cid:
+        return pedido
+    row = conn.execute(
+        """SELECT perfil_impuestos, razon_social, domicilio_fiscal,
+                  email_facturacion
+           FROM clientes WHERE id = ?""",
+        (cid,),
+    ).fetchone()
+    if not row:
+        return pedido
+    c = row_to_dict(row)
+    pedido["cliente_perfil_impuestos"] = c.get("perfil_impuestos")
+    pedido["cliente_razon_social"] = c.get("razon_social")
+    pedido["cliente_domicilio_fiscal"] = c.get("domicilio_fiscal")
+    pedido["cliente_email_facturacion"] = c.get("email_facturacion")
+    return pedido
+
+
 def _get_historial_modificaciones(conn, pedido_id: int) -> list[dict]:
     """Timeline de cambios solicitados por el cliente sobre el pedido.
 
@@ -1034,6 +1059,7 @@ async def pedido_pdf(id: int, request: Request, format: str = "pdf"):
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
         pedido["items"] = _get_alquiler_items(conn, id)
+        _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
     finally:
         conn.close()
 
@@ -1103,6 +1129,7 @@ async def pedido_contrato(id: int, request: Request, format: str = "pdf"):
     conn    = get_db()
     try:
         pedido  = _get_alquiler_detail(conn, id)
+        _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
 
         # Agregar componentes a cada item
         for item in pedido["items"]:
