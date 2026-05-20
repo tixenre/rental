@@ -42,6 +42,19 @@ def _build_equipo_slug(marca: str | None, nombre: str | None, equipo_id: int) ->
         return str(equipo_id)
     return f"{slug}-{equipo_id}"
 
+
+def _build_categoria_slug(nombre: str | None) -> str:
+    """Slugifica el nombre de una categoría. Equivalente al helper frontend
+    `buildCategoriaSlug()` — mantener sincronizado.
+
+    Ej: "Iluminación" → "iluminacion"
+    """
+    if not nombre:
+        return ""
+    normalized = unicodedata.normalize("NFD", nombre)
+    no_accents = normalized.encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", "-", no_accents.lower()).strip("-")
+
 # URL pública del sitio. Override con env var SITE_URL si se cambia el dominio.
 SITE_URL = os.getenv("SITE_URL", "https://ramblarental.com").rstrip("/")
 
@@ -61,23 +74,36 @@ def sitemap():
         {"loc": f"{SITE_URL}/preguntas-frecuentes", "lastmod": today, "changefreq": "monthly", "priority": "0.6"},
     ]
 
-    # Detalle por equipo: URL canónica = slug-id (`/equipo/sony-fx3-cuerpo-47`).
-    # Keywords en URL = mejor SEO. Si la BD no está disponible, devolvemos
-    # sitemap parcial con solo estáticas — Google reintenta.
+    # Detalle por equipo + páginas de categoría. Si la BD no está disponible,
+    # devolvemos sitemap parcial con solo estáticas — Google reintenta.
     try:
         conn = get_db()
         try:
-            rows = conn.execute("""
+            equipos = conn.execute("""
                 SELECT id, marca, nombre,
                        COALESCE(updated_at, created_at) AS lastmod
                 FROM equipos
                 WHERE COALESCE(visible_catalogo, true) = true
                 ORDER BY id
             """).fetchall()
+            # Categorías visibles. Filtramos las que no tienen equipos para no
+            # listar URLs con resultado vacío.
+            categorias = conn.execute("""
+                SELECT c.nombre
+                FROM categorias c
+                WHERE COALESCE(c.visible, true) = true
+                  AND EXISTS (
+                    SELECT 1 FROM equipo_categorias ec
+                    JOIN equipos e ON e.id = ec.equipo_id
+                    WHERE ec.categoria_id = c.id
+                      AND COALESCE(e.visible_catalogo, true) = true
+                  )
+                ORDER BY c.nombre
+            """).fetchall()
         finally:
             conn.close()
 
-        for r in rows:
+        for r in equipos:
             lastmod_raw = r["lastmod"]
             lastmod = (
                 lastmod_raw.strftime("%Y-%m-%d")
@@ -90,6 +116,19 @@ def sitemap():
                 "lastmod": lastmod,
                 "changefreq": "weekly",
                 "priority": "0.7",
+            })
+
+        # URLs de categoría — landings de tráfico orgánico
+        # ("alquiler lentes Mar del Plata" → /categoria/lentes).
+        for r in categorias:
+            cat_slug = _build_categoria_slug(r["nombre"])
+            if not cat_slug:
+                continue
+            urls.append({
+                "loc": f"{SITE_URL}/categoria/{cat_slug}",
+                "lastmod": today,
+                "changefreq": "weekly",
+                "priority": "0.8",
             })
     except Exception:
         pass
