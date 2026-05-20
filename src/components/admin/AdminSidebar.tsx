@@ -19,11 +19,6 @@ import {
   Palette,
   Ruler,
   ShieldCheck,
-  Telescope,
-  Network,
-  Sun,
-  CalendarDays,
-  Check,
   Database,
   Mail,
   Inbox,
@@ -62,11 +57,7 @@ const items: NavItem[] = [
     url: "/admin",
     icon: LayoutDashboard,
     exact: true,
-    children: [
-      { title: "Hoy", url: "/admin/hoy", icon: Sun },
-    ],
   },
-  { title: "Calendario", url: "/admin/calendario", icon: CalendarDays },
   {
     title: "Inventario",
     url: "/admin/equipos",

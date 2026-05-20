@@ -36,7 +36,6 @@ const AdminUnidadesLazyRouteImport = createFileRoute('/admin/unidades')()
 const AdminSpecsLazyRouteImport = createFileRoute('/admin/specs')()
 const AdminSolicitudesLazyRouteImport = createFileRoute('/admin/solicitudes')()
 const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
-const AdminHoyLazyRouteImport = createFileRoute('/admin/hoy')()
 const AdminGearCompatibilityLazyRouteImport = createFileRoute(
   '/admin/gear-compatibility',
 )()
@@ -48,7 +47,6 @@ const AdminEmailTemplatesLazyRouteImport = createFileRoute(
 )()
 const AdminDisenoLazyRouteImport = createFileRoute('/admin/diseno')()
 const AdminClientesLazyRouteImport = createFileRoute('/admin/clientes')()
-const AdminCalendarioLazyRouteImport = createFileRoute('/admin/calendario')()
 const AdminPedidosIndexLazyRouteImport = createFileRoute('/admin/pedidos/')()
 const AdminEquiposIndexLazyRouteImport = createFileRoute('/admin/equipos/')()
 const AdminSpecsDefinitionsLazyRouteImport = createFileRoute(
@@ -147,11 +145,6 @@ const AdminSettingsLazyRoute = AdminSettingsLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/settings.lazy').then((d) => d.Route),
 )
-const AdminHoyLazyRoute = AdminHoyLazyRouteImport.update({
-  id: '/hoy',
-  path: '/hoy',
-  getParentRoute: () => AdminRoute,
-} as any).lazy(() => import('./routes/admin/hoy.lazy').then((d) => d.Route))
 const AdminGearCompatibilityLazyRoute =
   AdminGearCompatibilityLazyRouteImport.update({
     id: '/gear-compatibility',
@@ -185,13 +178,6 @@ const AdminClientesLazyRoute = AdminClientesLazyRouteImport.update({
   getParentRoute: () => AdminRoute,
 } as any).lazy(() =>
   import('./routes/admin/clientes.lazy').then((d) => d.Route),
-)
-const AdminCalendarioLazyRoute = AdminCalendarioLazyRouteImport.update({
-  id: '/calendario',
-  path: '/calendario',
-  getParentRoute: () => AdminRoute,
-} as any).lazy(() =>
-  import('./routes/admin/calendario.lazy').then((d) => d.Route),
 )
 const EquipoSlugRoute = EquipoSlugRouteImport.update({
   id: '/equipo/$slug',
@@ -327,13 +313,11 @@ export interface FileRoutesByFullPath {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/equipo/$slug': typeof EquipoSlugRoute
-  '/admin/calendario': typeof AdminCalendarioLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
   '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
-  '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/specs': typeof AdminSpecsLazyRouteWithChildren
@@ -366,13 +350,11 @@ export interface FileRoutesByTo {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/equipo/$slug': typeof EquipoSlugRoute
-  '/admin/calendario': typeof AdminCalendarioLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
   '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
-  '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/specs': typeof AdminSpecsLazyRouteWithChildren
@@ -409,13 +391,11 @@ export interface FileRoutesById {
   '/cliente/portal': typeof ClientePortalRoute
   '/cliente/registro': typeof ClienteRegistroRoute
   '/equipo/$slug': typeof EquipoSlugRoute
-  '/admin/calendario': typeof AdminCalendarioLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
   '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
-  '/admin/hoy': typeof AdminHoyLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/specs': typeof AdminSpecsLazyRouteWithChildren
@@ -453,13 +433,11 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/equipo/$slug'
-    | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/diseno'
     | '/admin/email-templates'
     | '/admin/estadisticas'
     | '/admin/gear-compatibility'
-    | '/admin/hoy'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/specs'
@@ -492,13 +470,11 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/equipo/$slug'
-    | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/diseno'
     | '/admin/email-templates'
     | '/admin/estadisticas'
     | '/admin/gear-compatibility'
-    | '/admin/hoy'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/specs'
@@ -534,13 +510,11 @@ export interface FileRouteTypes {
     | '/cliente/portal'
     | '/cliente/registro'
     | '/equipo/$slug'
-    | '/admin/calendario'
     | '/admin/clientes'
     | '/admin/diseno'
     | '/admin/email-templates'
     | '/admin/estadisticas'
     | '/admin/gear-compatibility'
-    | '/admin/hoy'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/specs'
@@ -672,13 +646,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsLazyRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/hoy': {
-      id: '/admin/hoy'
-      path: '/hoy'
-      fullPath: '/admin/hoy'
-      preLoaderRoute: typeof AdminHoyLazyRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/gear-compatibility': {
       id: '/admin/gear-compatibility'
       path: '/gear-compatibility'
@@ -712,13 +679,6 @@ declare module '@tanstack/react-router' {
       path: '/clientes'
       fullPath: '/admin/clientes'
       preLoaderRoute: typeof AdminClientesLazyRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/calendario': {
-      id: '/admin/calendario'
-      path: '/calendario'
-      fullPath: '/admin/calendario'
-      preLoaderRoute: typeof AdminCalendarioLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/equipo/$slug': {
@@ -893,13 +853,11 @@ interface AdminRouteChildren {
   AdminEquiposRoute: typeof AdminEquiposRouteWithChildren
   AdminLoginRoute: typeof AdminLoginRoute
   AdminNovedadesRoute: typeof AdminNovedadesRoute
-  AdminCalendarioLazyRoute: typeof AdminCalendarioLazyRoute
   AdminClientesLazyRoute: typeof AdminClientesLazyRoute
   AdminDisenoLazyRoute: typeof AdminDisenoLazyRoute
   AdminEmailTemplatesLazyRoute: typeof AdminEmailTemplatesLazyRoute
   AdminEstadisticasLazyRoute: typeof AdminEstadisticasLazyRoute
   AdminGearCompatibilityLazyRoute: typeof AdminGearCompatibilityLazyRoute
-  AdminHoyLazyRoute: typeof AdminHoyLazyRoute
   AdminSettingsLazyRoute: typeof AdminSettingsLazyRoute
   AdminSolicitudesLazyRoute: typeof AdminSolicitudesLazyRoute
   AdminSpecsLazyRoute: typeof AdminSpecsLazyRouteWithChildren
@@ -914,13 +872,11 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEquiposRoute: AdminEquiposRouteWithChildren,
   AdminLoginRoute: AdminLoginRoute,
   AdminNovedadesRoute: AdminNovedadesRoute,
-  AdminCalendarioLazyRoute: AdminCalendarioLazyRoute,
   AdminClientesLazyRoute: AdminClientesLazyRoute,
   AdminDisenoLazyRoute: AdminDisenoLazyRoute,
   AdminEmailTemplatesLazyRoute: AdminEmailTemplatesLazyRoute,
   AdminEstadisticasLazyRoute: AdminEstadisticasLazyRoute,
   AdminGearCompatibilityLazyRoute: AdminGearCompatibilityLazyRoute,
-  AdminHoyLazyRoute: AdminHoyLazyRoute,
   AdminSettingsLazyRoute: AdminSettingsLazyRoute,
   AdminSolicitudesLazyRoute: AdminSolicitudesLazyRoute,
   AdminSpecsLazyRoute: AdminSpecsLazyRouteWithChildren,
