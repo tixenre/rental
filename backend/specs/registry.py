@@ -209,7 +209,7 @@ _CAMARAS = CategoriaRegistry(
         SpecDef(key="metering_range", label="Rango de medición", tipo="string", prioridad=304),
         SpecDef(key="interval_recording", label="Grabación por intervalo", tipo="bool", prioridad=305),
         SpecDef(key="self_timer", label="Disparador automático", tipo="string", prioridad=306),
-        SpecDef(key="aspect_ratio", label="Aspect ratio", tipo="string", prioridad=307, ayuda="Ej: 16:9, 4:3, 1:1"),
+        SpecDef(key="aspect_ratio", label="Relación de aspecto", tipo="string", prioridad=307, ayuda="Ej: 16:9, 4:3, 1:1"),
         SpecDef(key="image_file_format", label="Formato de imagen", tipo="string", prioridad=308, ayuda="Ej: JPEG, HEIF, RAW"),
         SpecDef(key="bit_depth", label="Profundidad de bits", tipo="string", prioridad=309),
         SpecDef(key="autofocus_sensitivity", label="Sensibilidad AF", tipo="string", prioridad=310),
