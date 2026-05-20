@@ -82,6 +82,11 @@ class SpecDefinitionUpdate(BaseModel):
     validado: Optional[bool] = None
     tabla_columnas: Optional[list[dict]] = None
     output_config: Optional[dict] = None
+    # Flags persistentes a nivel categoría raíz (ver migración e5a7b9d2c4f1).
+    favorito: Optional[bool] = None
+    en_nombre: Optional[bool] = None
+    en_filtros: Optional[bool] = None
+    prioridad: Optional[int] = None
 
 
 # Asignación de una spec_def a una categoría con flags propios.
@@ -193,9 +198,14 @@ def listar_spec_definitions(request: Request):
             SELECT
               sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id,
               sd.enum_options, sd.ayuda, sd.tabla_columnas, sd.output_config,
+              sd.categoria_raiz_id,
               COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
               COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
               COALESCE(sd.validado, FALSE) AS validado,
+              COALESCE(sd.favorito, FALSE) AS favorito,
+              COALESCE(sd.en_nombre, FALSE) AS en_nombre,
+              COALESCE(sd.en_filtros, FALSE) AS en_filtros,
+              COALESCE(sd.prioridad, 100) AS prioridad,
               (SELECT COUNT(*) FROM categoria_spec_templates t WHERE t.spec_def_id = sd.id) AS uso_categorias,
               (SELECT COUNT(*) FROM equipo_specs es WHERE es.spec_def_id = sd.id) AS uso_equipos,
               COALESCE(
@@ -218,6 +228,115 @@ def listar_spec_definitions(request: Request):
             ORDER BY sd.validado DESC, sd.label
         """).fetchall()
         return {"items": [row_to_dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.get("/admin/specs/por-categoria")
+def listar_specs_por_categoria(request: Request):
+    """Devuelve specs agrupadas por categoría raíz (Cámaras, Lentes, …) con
+    los flags persistentes y el conteo de equipos que la tienen cargada.
+    Usado por la UI consolidada de /admin/specs (drag-and-drop + favoritos)."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        # Raíces que tienen specs sembradas. Ordenadas por prioridad de la
+        # categoría (= el orden visual del bloque).
+        rows = conn.execute("""
+            SELECT
+              c.id AS categoria_id,
+              c.nombre AS categoria_nombre,
+              c.prioridad AS categoria_prioridad,
+              c.grupo_visual,
+              sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
+              sd.enum_options, sd.ayuda,
+              COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
+              COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
+              COALESCE(sd.favorito, FALSE) AS favorito,
+              COALESCE(sd.en_nombre, FALSE) AS en_nombre,
+              COALESCE(sd.en_filtros, FALSE) AS en_filtros,
+              COALESCE(sd.prioridad, 100) AS prioridad,
+              (SELECT COUNT(*) FROM equipo_specs es WHERE es.spec_def_id = sd.id) AS uso_equipos
+            FROM spec_definitions sd
+            JOIN categorias c ON c.id = sd.categoria_raiz_id
+            WHERE sd.categoria_raiz_id IS NOT NULL
+            ORDER BY c.prioridad NULLS LAST, c.nombre, sd.prioridad, sd.label
+        """).fetchall()
+        # Agrupar por categoría raíz
+        grupos: dict[int, dict] = {}
+        for r in rows:
+            d = row_to_dict(r)
+            cid = d["categoria_id"]
+            if cid not in grupos:
+                grupos[cid] = {
+                    "id": cid,
+                    "nombre": d["categoria_nombre"],
+                    "prioridad": d["categoria_prioridad"],
+                    "grupo_visual": d.get("grupo_visual"),
+                    "specs": [],
+                }
+            grupos[cid]["specs"].append({
+                "id": d["id"],
+                "spec_key": d["spec_key"],
+                "label": d["label"],
+                "tipo": d["tipo"],
+                "unidad": d.get("unidad"),
+                "enum_options": d.get("enum_options"),
+                "ayuda": d.get("ayuda"),
+                "es_compatibilidad": d.get("es_compatibilidad", False),
+                "compatibilidad_modo": d.get("compatibilidad_modo"),
+                "favorito": d.get("favorito", False),
+                "en_nombre": d.get("en_nombre", False),
+                "en_filtros": d.get("en_filtros", False),
+                "prioridad": d.get("prioridad", 100),
+                "uso_equipos": d.get("uso_equipos", 0),
+            })
+        # Devolver como lista ordenada
+        return {"categorias": list(grupos.values())}
+    finally:
+        conn.close()
+
+
+@router.put("/admin/specs/categoria/{categoria_id}/reorder")
+def reorder_specs_categoria(categoria_id: int, payload: dict, request: Request):
+    """Reordena las specs de una categoría raíz vía drag-and-drop.
+
+    Payload: `{"spec_ids": [id1, id2, id3, ...]}` en el orden deseado.
+    Se asigna prioridad = 10, 20, 30, ... según el índice (con gap por si
+    hay que insertar después)."""
+    _require_admin(request)
+    ids = payload.get("spec_ids")
+    if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
+        raise HTTPException(400, "spec_ids debe ser una lista de enteros.")
+    conn = get_db()
+    try:
+        # Verificar que todos los ids pertenecen a la categoría
+        rows = conn.execute(
+            "SELECT id FROM spec_definitions WHERE categoria_raiz_id = ?",
+            (categoria_id,),
+        ).fetchall()
+        valid_ids = {row_to_dict(r)["id"] for r in rows}
+        for spec_id in ids:
+            if spec_id not in valid_ids:
+                raise HTTPException(
+                    400,
+                    f"Spec id={spec_id} no pertenece a la categoría {categoria_id}.",
+                )
+        for idx, spec_id in enumerate(ids):
+            prioridad = (idx + 1) * 10
+            conn.execute(
+                "UPDATE spec_definitions SET prioridad = ?, updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = ?",
+                (prioridad, spec_id),
+            )
+        conn.commit()
+        return {"ok": True, "actualizadas": len(ids)}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
