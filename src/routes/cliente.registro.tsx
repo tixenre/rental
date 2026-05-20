@@ -15,6 +15,7 @@ function ClienteRegistroPage() {
   const [form, setForm] = useState({
     nombre: "", apellido: "", telefono: "",
     direccion: "", cuit: "", perfil_impuestos: "consumidor_final",
+    razon_social: "", domicilio_fiscal: "", email_facturacion: "",
   });
 
   const token = new URLSearchParams(window.location.search).get("t") ?? "";
@@ -116,11 +117,26 @@ function ClienteRegistroPage() {
                 className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="consumidor_final">Consumidor final</option>
-                <option value="responsable_inscripto">Responsable inscripto</option>
+                <option value="responsable_inscripto">Responsable inscripto (Factura A)</option>
                 <option value="monotributo">Monotributo</option>
                 <option value="exento">Exento</option>
               </select>
             </div>
+
+            {form.perfil_impuestos === "responsable_inscripto" && (
+              <div className="rounded-md border border-dashed hairline bg-amber-soft/40 p-3 space-y-3">
+                <div className="text-xs font-semibold text-ink uppercase tracking-wider">
+                  Datos para Factura A
+                </div>
+                <Field label="Razón social" value={form.razon_social}
+                  onChange={(v) => setForm((f) => ({ ...f, razon_social: v }))} />
+                <Field label="Domicilio fiscal" value={form.domicilio_fiscal}
+                  onChange={(v) => setForm((f) => ({ ...f, domicilio_fiscal: v }))} />
+                <Field label="Email de facturación" value={form.email_facturacion}
+                  onChange={(v) => setForm((f) => ({ ...f, email_facturacion: v }))} />
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={sending}

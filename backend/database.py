@@ -325,6 +325,9 @@ def init_db():
             cuit              TEXT NOT NULL,
             descuento         FLOAT DEFAULT 0,
             perfil_impuestos  TEXT DEFAULT 'consumidor_final',
+            razon_social      TEXT,
+            domicilio_fiscal  TEXT,
+            email_facturacion TEXT,
             notas             TEXT,
             created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -5,6 +5,7 @@ import { Plus, Minus, Sparkles, ChevronDown, ArrowRight } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
+import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { priceBreakdown } from "@/lib/pricing";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { EmptyImage } from "./EmptyImage";
@@ -39,6 +40,8 @@ export function EquipmentRow({
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
   const selected = qty > 0;
   const navigate = useNavigate();
+  const { data: clienteSession } = useClienteSession();
+  const conIva = aplicaIva(clienteSession?.perfil_impuestos);
   const openDetail = () =>
     navigate({ to: "/equipo/$slug", params: { slug: buildEquipoSlug(item) } });
 
@@ -141,7 +144,7 @@ export function EquipmentRow({
                 {formatARS(item.pricePerDay)}
               </span>
               <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-                /jornada
+                /jornada{conIva ? " +IVA" : ""}
               </span>
               {showPeriodTotal && (
                 <span className="ml-1 font-display text-xs tabular text-amber">
@@ -158,7 +161,7 @@ export function EquipmentRow({
             {formatARS(item.pricePerDay)}
           </div>
           <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-            / jornada
+            / jornada{conIva ? " +IVA" : ""}
           </div>
           {showPeriodTotal && (
             <div className="mt-1 font-display text-sm tabular text-amber">
