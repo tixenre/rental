@@ -25,6 +25,7 @@ import { Route as ClienteRegistroRouteImport } from './routes/cliente.registro'
 import { Route as ClientePortalRouteImport } from './routes/cliente.portal'
 import { Route as ClientePerfilRouteImport } from './routes/cliente.perfil'
 import { Route as ClienteLoginRouteImport } from './routes/cliente.login'
+import { Route as CategoriaSlugRouteImport } from './routes/categoria.$slug'
 import { Route as AdminNovedadesRouteImport } from './routes/admin/novedades'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
@@ -225,6 +226,11 @@ const ClienteLoginRoute = ClienteLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => ClienteRoute,
 } as any)
+const CategoriaSlugRoute = CategoriaSlugRouteImport.update({
+  id: '/categoria/$slug',
+  path: '/categoria/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminNovedadesRoute = AdminNovedadesRouteImport.update({
   id: '/novedades',
   path: '/novedades',
@@ -366,6 +372,7 @@ export interface FileRoutesByFullPath {
   '/admin/equipos': typeof AdminEquiposRouteWithChildren
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
+  '/categoria/$slug': typeof CategoriaSlugRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
@@ -409,6 +416,7 @@ export interface FileRoutesByTo {
   '/terminos': typeof TerminosRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
+  '/categoria/$slug': typeof CategoriaSlugRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
@@ -456,6 +464,7 @@ export interface FileRoutesById {
   '/admin/equipos': typeof AdminEquiposRouteWithChildren
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
+  '/categoria/$slug': typeof CategoriaSlugRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
@@ -504,6 +513,7 @@ export interface FileRouteTypes {
     | '/admin/equipos'
     | '/admin/login'
     | '/admin/novedades'
+    | '/categoria/$slug'
     | '/cliente/login'
     | '/cliente/perfil'
     | '/cliente/portal'
@@ -547,6 +557,7 @@ export interface FileRouteTypes {
     | '/terminos'
     | '/admin/login'
     | '/admin/novedades'
+    | '/categoria/$slug'
     | '/cliente/login'
     | '/cliente/perfil'
     | '/cliente/portal'
@@ -593,6 +604,7 @@ export interface FileRouteTypes {
     | '/admin/equipos'
     | '/admin/login'
     | '/admin/novedades'
+    | '/categoria/$slug'
     | '/cliente/login'
     | '/cliente/perfil'
     | '/cliente/portal'
@@ -637,6 +649,7 @@ export interface RootRouteChildren {
   PreguntasFrecuentesRoute: typeof PreguntasFrecuentesRoute
   PrivacidadRoute: typeof PrivacidadRoute
   TerminosRoute: typeof TerminosRoute
+  CategoriaSlugRoute: typeof CategoriaSlugRoute
   EquipoSlugRoute: typeof EquipoSlugRoute
 }
 
@@ -816,6 +829,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/cliente/login'
       preLoaderRoute: typeof ClienteLoginRouteImport
       parentRoute: typeof ClienteRoute
+    }
+    '/categoria/$slug': {
+      id: '/categoria/$slug'
+      path: '/categoria/$slug'
+      fullPath: '/categoria/$slug'
+      preLoaderRoute: typeof CategoriaSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admin/novedades': {
       id: '/admin/novedades'
@@ -1059,6 +1079,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreguntasFrecuentesRoute: PreguntasFrecuentesRoute,
   PrivacidadRoute: PrivacidadRoute,
   TerminosRoute: TerminosRoute,
+  CategoriaSlugRoute: CategoriaSlugRoute,
   EquipoSlugRoute: EquipoSlugRoute,
 }
 export const routeTree = rootRouteImport

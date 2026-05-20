@@ -37,6 +37,7 @@ import { formatARS } from "@/lib/format";
 import { useClienteSession, aplicaIva, IVA_RATE } from "@/lib/iva";
 import { priceBreakdown } from "@/lib/pricing";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
+import { buildCategoriaSlug } from "@/lib/categoria-slug";
 import { type Equipment } from "@/data/equipment";
 
 const SITE_URL = "https://ramblarental.com";
@@ -146,6 +147,36 @@ export const Route = createFileRoute("/equipo/$slug")({
                 unitText: "jornada",
               },
             },
+          }),
+        },
+        // BreadcrumbList: Inicio → Categoría → Equipo. Google muestra el
+        // camino en SERP en vez de la URL fea — mejor CTR.
+        {
+          type: "application/ld+json",
+          children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              {
+                "@type": "ListItem",
+                position: 1,
+                name: "Inicio",
+                item: `${SITE_URL}/`,
+              },
+              ...(equipo.category
+                ? [{
+                    "@type": "ListItem",
+                    position: 2,
+                    name: equipo.category,
+                    item: `${SITE_URL}/categoria/${buildCategoriaSlug(equipo.category)}`,
+                  }]
+                : []),
+              {
+                "@type": "ListItem",
+                position: equipo.category ? 3 : 2,
+                name: equipo.name,
+              },
+            ],
           }),
         },
       ],
