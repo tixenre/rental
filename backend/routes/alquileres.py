@@ -508,6 +508,7 @@ def list_pedidos(
     estado:   Optional[str] = Query(None),
     fuente:   Optional[str] = Query(None),
     q:        Optional[str] = Query(None),
+    con_saldo: Optional[bool] = Query(None, description="Si true, solo pedidos con saldo pendiente (monto_pagado < monto_total)"),
     page:     int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=500),
     sort_by:  Optional[str] = Query(None),
@@ -530,6 +531,11 @@ def list_pedidos(
             like = f"%{q}%"
             where += " AND (p.cliente_nombre LIKE ? OR p.numero_remito LIKE ? OR CAST(p.numero_pedido AS TEXT) LIKE ?)"
             params += [like, like, like]
+        if con_saldo:
+            # Pedidos con saldo > 0 y no cancelados. Borrador y presupuesto no
+            # aplican porque todavía no se cobra; cancelado tampoco.
+            where += " AND (COALESCE(p.monto_pagado, 0) < COALESCE(p.monto_total, 0))"
+            where += " AND p.estado IN ('confirmado','retirado','devuelto','finalizado')"
 
         col = SORT_COLS.get(sort_by, "p.numero_pedido")
         direction = "ASC" if sort_dir == "asc" else "DESC"
