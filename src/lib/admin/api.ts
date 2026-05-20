@@ -1297,10 +1297,11 @@ export const adminApi = {
     }),
 
   // pedidos / alquileres
-  listPedidos: (params: { estado?: string; q?: string; per_page?: number; page?: number } = {}) => {
+  listPedidos: (params: { estado?: string; q?: string; con_saldo?: boolean; per_page?: number; page?: number } = {}) => {
     const sp = new URLSearchParams();
     if (params.estado) sp.set("estado", params.estado);
     if (params.q) sp.set("q", params.q);
+    if (params.con_saldo) sp.set("con_saldo", "true");
     sp.set("per_page", String(params.per_page ?? 100));
     sp.set("page", String(params.page ?? 1));
     return authedJson<PedidosListResp>(`/api/alquileres?${sp.toString()}`);

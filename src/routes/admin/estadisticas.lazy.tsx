@@ -1,6 +1,6 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, Users, Package, DollarSign, Calendar } from "lucide-react";
+import { TrendingUp, TrendingDown, Users, Package, DollarSign, Calendar, Calculator, Heart, Repeat } from "lucide-react";
 
 import { adminApi } from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -54,6 +54,37 @@ function EstadisticasPage() {
               sub={fmtArs(data.mejor_peor_mes.mejor_total)}
             />
           </div>
+
+          {/* KPIs derivados: ticket promedio + LTV. Calculados en frontend
+              porque ya tenemos todos los totales — no hace falta backend. */}
+          {(() => {
+            const t = data.totales;
+            const ticket = t.total_pedidos ? Math.round(t.total_ars / t.total_pedidos) : 0;
+            const ltv = t.total_clientes ? Math.round(t.total_ars / t.total_clientes) : 0;
+            const pedidosPorCliente = t.total_clientes ? (t.total_pedidos / t.total_clientes).toFixed(1) : "0";
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <Kpi
+                  icon={Calculator}
+                  label="Ticket promedio"
+                  value={fmtArs(ticket)}
+                  sub="Facturado / Pedidos"
+                />
+                <Kpi
+                  icon={Heart}
+                  label="LTV cliente"
+                  value={fmtArs(ltv)}
+                  sub="Facturado / Clientes"
+                />
+                <Kpi
+                  icon={Repeat}
+                  label="Pedidos / cliente"
+                  value={pedidosPorCliente}
+                  sub="Frecuencia promedio"
+                />
+              </div>
+            );
+          })()}
 
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Por mes (sparkline) */}
