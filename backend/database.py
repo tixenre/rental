@@ -660,6 +660,10 @@ def init_db():
             validado            BOOLEAN NOT NULL DEFAULT FALSE,
             tabla_columnas      JSONB,
             output_config       JSONB,
+            favorito            BOOLEAN NOT NULL DEFAULT FALSE,
+            en_nombre           BOOLEAN NOT NULL DEFAULT FALSE,
+            en_filtros          BOOLEAN NOT NULL DEFAULT FALSE,
+            prioridad           INTEGER NOT NULL DEFAULT 100,
             created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (categoria_raiz_id, spec_key)
