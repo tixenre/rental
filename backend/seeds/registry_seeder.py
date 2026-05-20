@@ -32,27 +32,40 @@ if TYPE_CHECKING:
     from psycopg.cursor import Cursor
 
 
-def _ensure_categoria_raiz(conn, nombre: str, prioridad: int, dry_run: bool = False) -> int | None:
-    """Crea o promueve a raíz una categoría. Devuelve su id."""
+def _ensure_categoria_raiz(
+    conn,
+    nombre: str,
+    prioridad: int,
+    grupo_visual: str | None = None,
+    dry_run: bool = False,
+) -> int | None:
+    """Crea o promueve a raíz una categoría. Devuelve su id.
+
+    También sincroniza `grupo_visual` desde el registry — siempre overwrite
+    porque el registry es la fuente de verdad de la taxonomía visual.
+    """
     row = conn.execute(
         "SELECT id, parent_id FROM categorias WHERE nombre = %s", (nombre,)
     ).fetchone()
     if row:
-        if row["parent_id"] is not None and not dry_run:
+        if not dry_run:
             conn.execute(
-                "UPDATE categorias SET parent_id = NULL WHERE id = %s", (row["id"],)
+                "UPDATE categorias SET parent_id = NULL, grupo_visual = %s WHERE id = %s",
+                (grupo_visual, row["id"]),
             )
         return row["id"]
     if dry_run:
         return None
     cur = conn.execute(
         """
-        INSERT INTO categorias (nombre, prioridad, parent_id)
-        VALUES (%s, %s, NULL)
-        ON CONFLICT (nombre) DO UPDATE SET parent_id = NULL
+        INSERT INTO categorias (nombre, prioridad, parent_id, grupo_visual)
+        VALUES (%s, %s, NULL, %s)
+        ON CONFLICT (nombre) DO UPDATE SET
+            parent_id = NULL,
+            grupo_visual = EXCLUDED.grupo_visual
         RETURNING id
         """,
-        (nombre, prioridad),
+        (nombre, prioridad, grupo_visual),
     )
     new = cur.fetchone()
     return new[0] if isinstance(new, tuple) else (new["id"] if new else None)
@@ -197,7 +210,13 @@ def seed_categoria_from_registry(
     }
 
     # 1) Raíz
-    raiz_id = _ensure_categoria_raiz(conn, cat_reg.nombre, cat_reg.prioridad, dry_run)
+    raiz_id = _ensure_categoria_raiz(
+        conn,
+        cat_reg.nombre,
+        cat_reg.prioridad,
+        grupo_visual=cat_reg.grupo_visual,
+        dry_run=dry_run,
+    )
     if raiz_id is None and not dry_run:
         raise RuntimeError(f"No se pudo crear categoría raíz '{cat_reg.nombre}'")
 

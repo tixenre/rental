@@ -505,6 +505,12 @@ def init_db():
     conn.execute("""
         ALTER TABLE categorias ADD COLUMN IF NOT EXISTS nombre_publico_template TEXT
     """)
+    # `grupo_visual` agrupa varias categorías raíz en un bloque visual del
+    # catálogo (ej. Lentes / Adaptadores / Filtros → "Óptica") sin nidos en
+    # el modelo de datos. Single source of truth: registry.py.
+    conn.execute("""
+        ALTER TABLE categorias ADD COLUMN IF NOT EXISTS grupo_visual VARCHAR(64)
+    """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_cat_prioridad ON categorias(prioridad, nombre)
     """)
