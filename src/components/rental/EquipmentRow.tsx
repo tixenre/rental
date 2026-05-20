@@ -133,7 +133,7 @@ export function EquipmentRow({
               </div>
               <ChevronDown
                 className={cn(
-                  "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+                  "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform lg:hidden",
                   expanded && "rotate-180",
                 )}
               />
@@ -228,7 +228,9 @@ export function EquipmentRow({
         )}
       </div>
 
-      {/* Mini-ficha expandida inline */}
+      {/* Mini-ficha expandida inline — solo mobile. En desktop el detalle
+       * lo muestra el PreviewPane lateral, así que ocultamos esto en lg+
+       * para evitar dos UIs simultáneas del mismo dato. */}
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
@@ -237,7 +239,7 @@ export function EquipmentRow({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="overflow-hidden"
+            className="overflow-hidden lg:hidden"
           >
             <div className="border-t hairline px-3 py-3 sm:px-4 sm:py-4 space-y-3">
               {/* Quick facts fundamentales (montura, formato, resolución...).
