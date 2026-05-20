@@ -256,9 +256,14 @@ def listar_specs_por_categoria(request: Request):
               COALESCE(sd.en_nombre, FALSE) AS en_nombre,
               COALESCE(sd.en_filtros, FALSE) AS en_filtros,
               COALESCE(sd.prioridad, 100) AS prioridad,
-              (SELECT COUNT(*) FROM equipo_specs es WHERE es.spec_def_id = sd.id) AS uso_equipos
+              COALESCE(uso.n, 0) AS uso_equipos
             FROM spec_definitions sd
             JOIN categorias c ON c.id = sd.categoria_raiz_id
+            LEFT JOIN (
+              SELECT spec_def_id, COUNT(*) AS n
+              FROM equipo_specs
+              GROUP BY spec_def_id
+            ) uso ON uso.spec_def_id = sd.id
             WHERE sd.categoria_raiz_id IS NOT NULL
             ORDER BY c.prioridad NULLS LAST, c.nombre, sd.prioridad, sd.label
         """).fetchall()
@@ -322,13 +327,25 @@ def reorder_specs_categoria(categoria_id: int, payload: dict, request: Request):
                     400,
                     f"Spec id={spec_id} no pertenece a la categoría {categoria_id}.",
                 )
+        if not ids:
+            return {"ok": True, "actualizadas": 0}
+        # Una sola UPDATE con CASE WHEN — evita el N+1.
+        # Los ids ya fueron validados (todos ints + pertenecen a la categoría),
+        # así que es seguro inlinearlos en la query.
+        case_parts = []
+        params: list[int] = []
         for idx, spec_id in enumerate(ids):
-            prioridad = (idx + 1) * 10
-            conn.execute(
-                "UPDATE spec_definitions SET prioridad = ?, updated_at = CURRENT_TIMESTAMP "
-                "WHERE id = ?",
-                (prioridad, spec_id),
-            )
+            case_parts.append("WHEN id = ? THEN ?")
+            params.extend([spec_id, (idx + 1) * 10])
+        placeholders = ",".join("?" for _ in ids)
+        params.extend(ids)
+        conn.execute(
+            f"""UPDATE spec_definitions
+                   SET prioridad = CASE {' '.join(case_parts)} ELSE prioridad END,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE id IN ({placeholders})""",
+            params,
+        )
         conn.commit()
         return {"ok": True, "actualizadas": len(ids)}
     except HTTPException:
@@ -486,6 +503,9 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(400, "Nada para actualizar")
+    if "prioridad" in updates and updates["prioridad"] is not None:
+        if updates["prioridad"] < 0:
+            raise HTTPException(400, "prioridad debe ser >= 0")
     if "spec_key" in updates:
         # Editable durante construcción del sistema. Validamos formato igual
         # que en CREATE; la colisión por UNIQUE constraint la captura el

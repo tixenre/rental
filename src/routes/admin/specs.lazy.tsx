@@ -105,10 +105,20 @@ function SpecsConsolidadasPage() {
         <div className="text-sm text-muted-foreground">Cargando specs…</div>
       )}
       {q.isError && (
-        <div className="text-sm text-destructive">Error cargando specs.</div>
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-2">
+          <div className="text-sm font-medium text-destructive">Error cargando specs.</div>
+          <div className="text-xs text-destructive/80 font-mono break-all">
+            {(q.error as Error)?.message ?? "Error desconocido"}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Si el deploy es reciente, esperá un minuto y refrescá. Si persiste, revisá que la migración
+            <code className="mx-1 bg-muted px-1 rounded">e5a7b9d2c4f1_spec_def_flags</code>
+            haya corrido en producción.
+          </div>
+        </div>
       )}
 
-      {!q.isLoading && categorias.length === 0 && (
+      {!q.isLoading && !q.isError && categorias.length === 0 && (
         <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
           No hay specs sembradas todavía.
         </div>
@@ -376,16 +386,14 @@ function FlagSwitch({
 }
 
 function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () => void }) {
-  // Cuando spec se actualiza desde la query, queremos mostrar los valores
-  // frescos. Re-leemos del cache si está disponible.
-  const queryClient = useQueryClient();
-  const data = queryClient.getQueryData<PorCategoriaResponse>([
-    "admin",
-    "specs-por-categoria",
-  ]);
-  const fresh = data?.categorias
-    .flatMap((c) => c.specs)
-    .find((s) => s.id === spec.id) ?? spec;
+  // Reactivo: si la query refresca (por ej. después de toggle un flag),
+  // el drawer se re-renderiza con el dato fresco automáticamente.
+  const { data: fresh = spec } = useQuery({
+    queryKey: ["admin", "specs-por-categoria"],
+    queryFn: () => authedJson<PorCategoriaResponse>("/api/admin/specs/por-categoria"),
+    select: (data) =>
+      data.categorias.flatMap((c) => c.specs).find((s) => s.id === spec.id) ?? spec,
+  });
 
   return (
     <div

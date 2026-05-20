@@ -29,7 +29,6 @@ import { Route as CategoriaSlugRouteImport } from './routes/categoria.$slug'
 import { Route as AdminNovedadesRouteImport } from './routes/admin/novedades'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
-import { Route as AdminEquiposEtiquetasRouteImport } from './routes/admin/equipos.etiquetas'
 import { Route as ClientePedidosIdEditarRouteImport } from './routes/cliente.pedidos.$id.editar'
 
 const AdminIndexLazyRouteImport = createFileRoute('/admin/')()
@@ -52,13 +51,6 @@ const AdminClientesLazyRouteImport = createFileRoute('/admin/clientes')()
 const AdminCalendarioLazyRouteImport = createFileRoute('/admin/calendario')()
 const AdminPedidosIndexLazyRouteImport = createFileRoute('/admin/pedidos/')()
 const AdminEquiposIndexLazyRouteImport = createFileRoute('/admin/equipos/')()
-const AdminSpecsObservatorioLazyRouteImport = createFileRoute(
-  '/admin/specs/observatorio',
-)()
-const AdminSpecsLegacyLazyRouteImport = createFileRoute('/admin/specs/legacy')()
-const AdminSpecsFamiliasLazyRouteImport = createFileRoute(
-  '/admin/specs/familias',
-)()
 const AdminSpecsDefinitionsLazyRouteImport = createFileRoute(
   '/admin/specs/definitions',
 )()
@@ -66,17 +58,11 @@ const AdminPedidosNuevoLazyRouteImport = createFileRoute(
   '/admin/pedidos/nuevo',
 )()
 const AdminPedidosIdLazyRouteImport = createFileRoute('/admin/pedidos/$id')()
-const AdminEquiposValidacionLazyRouteImport = createFileRoute(
-  '/admin/equipos/validacion',
-)()
 const AdminEquiposSpecsLazyRouteImport = createFileRoute(
   '/admin/equipos/specs',
 )()
 const AdminEquiposMarcasLazyRouteImport = createFileRoute(
   '/admin/equipos/marcas',
-)()
-const AdminEquiposClasificarLazyRouteImport = createFileRoute(
-  '/admin/equipos/clasificar',
 )()
 const AdminEquiposCategoriasLazyRouteImport = createFileRoute(
   '/admin/equipos/categorias',
@@ -266,28 +252,6 @@ const AdminEquiposIndexLazyRoute = AdminEquiposIndexLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/equipos.index.lazy').then((d) => d.Route),
 )
-const AdminSpecsObservatorioLazyRoute =
-  AdminSpecsObservatorioLazyRouteImport.update({
-    id: '/observatorio',
-    path: '/observatorio',
-    getParentRoute: () => AdminSpecsLazyRoute,
-  } as any).lazy(() =>
-    import('./routes/admin/specs.observatorio.lazy').then((d) => d.Route),
-  )
-const AdminSpecsLegacyLazyRoute = AdminSpecsLegacyLazyRouteImport.update({
-  id: '/legacy',
-  path: '/legacy',
-  getParentRoute: () => AdminSpecsLazyRoute,
-} as any).lazy(() =>
-  import('./routes/admin/specs.legacy.lazy').then((d) => d.Route),
-)
-const AdminSpecsFamiliasLazyRoute = AdminSpecsFamiliasLazyRouteImport.update({
-  id: '/familias',
-  path: '/familias',
-  getParentRoute: () => AdminSpecsLazyRoute,
-} as any).lazy(() =>
-  import('./routes/admin/specs.familias.lazy').then((d) => d.Route),
-)
 const AdminSpecsDefinitionsLazyRoute =
   AdminSpecsDefinitionsLazyRouteImport.update({
     id: '/definitions',
@@ -310,14 +274,6 @@ const AdminPedidosIdLazyRoute = AdminPedidosIdLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/pedidos.$id.lazy').then((d) => d.Route),
 )
-const AdminEquiposValidacionLazyRoute =
-  AdminEquiposValidacionLazyRouteImport.update({
-    id: '/validacion',
-    path: '/validacion',
-    getParentRoute: () => AdminEquiposRoute,
-  } as any).lazy(() =>
-    import('./routes/admin/equipos.validacion.lazy').then((d) => d.Route),
-  )
 const AdminEquiposSpecsLazyRoute = AdminEquiposSpecsLazyRouteImport.update({
   id: '/specs',
   path: '/specs',
@@ -332,14 +288,6 @@ const AdminEquiposMarcasLazyRoute = AdminEquiposMarcasLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/equipos.marcas.lazy').then((d) => d.Route),
 )
-const AdminEquiposClasificarLazyRoute =
-  AdminEquiposClasificarLazyRouteImport.update({
-    id: '/clasificar',
-    path: '/clasificar',
-    getParentRoute: () => AdminEquiposRoute,
-  } as any).lazy(() =>
-    import('./routes/admin/equipos.clasificar.lazy').then((d) => d.Route),
-  )
 const AdminEquiposCategoriasLazyRoute =
   AdminEquiposCategoriasLazyRouteImport.update({
     id: '/categorias',
@@ -355,11 +303,6 @@ const AdminEquiposCalidadLazyRoute = AdminEquiposCalidadLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/equipos.calidad.lazy').then((d) => d.Route),
 )
-const AdminEquiposEtiquetasRoute = AdminEquiposEtiquetasRouteImport.update({
-  id: '/etiquetas',
-  path: '/etiquetas',
-  getParentRoute: () => AdminEquiposRoute,
-} as any)
 const ClientePedidosIdEditarRoute = ClientePedidosIdEditarRouteImport.update({
   id: '/pedidos/$id/editar',
   path: '/pedidos/$id/editar',
@@ -397,19 +340,13 @@ export interface FileRoutesByFullPath {
   '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente/': typeof ClienteIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
-  '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
   '/admin/equipos/calidad': typeof AdminEquiposCalidadLazyRoute
   '/admin/equipos/categorias': typeof AdminEquiposCategoriasLazyRoute
-  '/admin/equipos/clasificar': typeof AdminEquiposClasificarLazyRoute
   '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
   '/admin/equipos/specs': typeof AdminEquiposSpecsLazyRoute
-  '/admin/equipos/validacion': typeof AdminEquiposValidacionLazyRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
-  '/admin/specs/familias': typeof AdminSpecsFamiliasLazyRoute
-  '/admin/specs/legacy': typeof AdminSpecsLegacyLazyRoute
-  '/admin/specs/observatorio': typeof AdminSpecsObservatorioLazyRoute
   '/admin/equipos/': typeof AdminEquiposIndexLazyRoute
   '/admin/pedidos/': typeof AdminPedidosIndexLazyRoute
   '/cliente/pedidos/$id/editar': typeof ClientePedidosIdEditarRoute
@@ -442,19 +379,13 @@ export interface FileRoutesByTo {
   '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente': typeof ClienteIndexRoute
   '/admin': typeof AdminIndexLazyRoute
-  '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
   '/admin/equipos/calidad': typeof AdminEquiposCalidadLazyRoute
   '/admin/equipos/categorias': typeof AdminEquiposCategoriasLazyRoute
-  '/admin/equipos/clasificar': typeof AdminEquiposClasificarLazyRoute
   '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
   '/admin/equipos/specs': typeof AdminEquiposSpecsLazyRoute
-  '/admin/equipos/validacion': typeof AdminEquiposValidacionLazyRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
-  '/admin/specs/familias': typeof AdminSpecsFamiliasLazyRoute
-  '/admin/specs/legacy': typeof AdminSpecsLegacyLazyRoute
-  '/admin/specs/observatorio': typeof AdminSpecsObservatorioLazyRoute
   '/admin/equipos': typeof AdminEquiposIndexLazyRoute
   '/admin/pedidos': typeof AdminPedidosIndexLazyRoute
   '/cliente/pedidos/$id/editar': typeof ClientePedidosIdEditarRoute
@@ -491,19 +422,13 @@ export interface FileRoutesById {
   '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente/': typeof ClienteIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
-  '/admin/equipos/etiquetas': typeof AdminEquiposEtiquetasRoute
   '/admin/equipos/calidad': typeof AdminEquiposCalidadLazyRoute
   '/admin/equipos/categorias': typeof AdminEquiposCategoriasLazyRoute
-  '/admin/equipos/clasificar': typeof AdminEquiposClasificarLazyRoute
   '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
   '/admin/equipos/specs': typeof AdminEquiposSpecsLazyRoute
-  '/admin/equipos/validacion': typeof AdminEquiposValidacionLazyRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
-  '/admin/specs/familias': typeof AdminSpecsFamiliasLazyRoute
-  '/admin/specs/legacy': typeof AdminSpecsLegacyLazyRoute
-  '/admin/specs/observatorio': typeof AdminSpecsObservatorioLazyRoute
   '/admin/equipos/': typeof AdminEquiposIndexLazyRoute
   '/admin/pedidos/': typeof AdminPedidosIndexLazyRoute
   '/cliente/pedidos/$id/editar': typeof ClientePedidosIdEditarRoute
@@ -541,19 +466,13 @@ export interface FileRouteTypes {
     | '/admin/unidades'
     | '/cliente/'
     | '/admin/'
-    | '/admin/equipos/etiquetas'
     | '/admin/equipos/calidad'
     | '/admin/equipos/categorias'
-    | '/admin/equipos/clasificar'
     | '/admin/equipos/marcas'
     | '/admin/equipos/specs'
-    | '/admin/equipos/validacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/admin/specs/definitions'
-    | '/admin/specs/familias'
-    | '/admin/specs/legacy'
-    | '/admin/specs/observatorio'
     | '/admin/equipos/'
     | '/admin/pedidos/'
     | '/cliente/pedidos/$id/editar'
@@ -586,19 +505,13 @@ export interface FileRouteTypes {
     | '/admin/unidades'
     | '/cliente'
     | '/admin'
-    | '/admin/equipos/etiquetas'
     | '/admin/equipos/calidad'
     | '/admin/equipos/categorias'
-    | '/admin/equipos/clasificar'
     | '/admin/equipos/marcas'
     | '/admin/equipos/specs'
-    | '/admin/equipos/validacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/admin/specs/definitions'
-    | '/admin/specs/familias'
-    | '/admin/specs/legacy'
-    | '/admin/specs/observatorio'
     | '/admin/equipos'
     | '/admin/pedidos'
     | '/cliente/pedidos/$id/editar'
@@ -634,19 +547,13 @@ export interface FileRouteTypes {
     | '/admin/unidades'
     | '/cliente/'
     | '/admin/'
-    | '/admin/equipos/etiquetas'
     | '/admin/equipos/calidad'
     | '/admin/equipos/categorias'
-    | '/admin/equipos/clasificar'
     | '/admin/equipos/marcas'
     | '/admin/equipos/specs'
-    | '/admin/equipos/validacion'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/admin/specs/definitions'
-    | '/admin/specs/familias'
-    | '/admin/specs/legacy'
-    | '/admin/specs/observatorio'
     | '/admin/equipos/'
     | '/admin/pedidos/'
     | '/cliente/pedidos/$id/editar'
@@ -891,27 +798,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEquiposIndexLazyRouteImport
       parentRoute: typeof AdminEquiposRoute
     }
-    '/admin/specs/observatorio': {
-      id: '/admin/specs/observatorio'
-      path: '/observatorio'
-      fullPath: '/admin/specs/observatorio'
-      preLoaderRoute: typeof AdminSpecsObservatorioLazyRouteImport
-      parentRoute: typeof AdminSpecsLazyRoute
-    }
-    '/admin/specs/legacy': {
-      id: '/admin/specs/legacy'
-      path: '/legacy'
-      fullPath: '/admin/specs/legacy'
-      preLoaderRoute: typeof AdminSpecsLegacyLazyRouteImport
-      parentRoute: typeof AdminSpecsLazyRoute
-    }
-    '/admin/specs/familias': {
-      id: '/admin/specs/familias'
-      path: '/familias'
-      fullPath: '/admin/specs/familias'
-      preLoaderRoute: typeof AdminSpecsFamiliasLazyRouteImport
-      parentRoute: typeof AdminSpecsLazyRoute
-    }
     '/admin/specs/definitions': {
       id: '/admin/specs/definitions'
       path: '/definitions'
@@ -933,13 +819,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPedidosIdLazyRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/equipos/validacion': {
-      id: '/admin/equipos/validacion'
-      path: '/validacion'
-      fullPath: '/admin/equipos/validacion'
-      preLoaderRoute: typeof AdminEquiposValidacionLazyRouteImport
-      parentRoute: typeof AdminEquiposRoute
-    }
     '/admin/equipos/specs': {
       id: '/admin/equipos/specs'
       path: '/specs'
@@ -952,13 +831,6 @@ declare module '@tanstack/react-router' {
       path: '/marcas'
       fullPath: '/admin/equipos/marcas'
       preLoaderRoute: typeof AdminEquiposMarcasLazyRouteImport
-      parentRoute: typeof AdminEquiposRoute
-    }
-    '/admin/equipos/clasificar': {
-      id: '/admin/equipos/clasificar'
-      path: '/clasificar'
-      fullPath: '/admin/equipos/clasificar'
-      preLoaderRoute: typeof AdminEquiposClasificarLazyRouteImport
       parentRoute: typeof AdminEquiposRoute
     }
     '/admin/equipos/categorias': {
@@ -975,13 +847,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEquiposCalidadLazyRouteImport
       parentRoute: typeof AdminEquiposRoute
     }
-    '/admin/equipos/etiquetas': {
-      id: '/admin/equipos/etiquetas'
-      path: '/etiquetas'
-      fullPath: '/admin/equipos/etiquetas'
-      preLoaderRoute: typeof AdminEquiposEtiquetasRouteImport
-      parentRoute: typeof AdminEquiposRoute
-    }
     '/cliente/pedidos/$id/editar': {
       id: '/cliente/pedidos/$id/editar'
       path: '/pedidos/$id/editar'
@@ -993,24 +858,18 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminEquiposRouteChildren {
-  AdminEquiposEtiquetasRoute: typeof AdminEquiposEtiquetasRoute
   AdminEquiposCalidadLazyRoute: typeof AdminEquiposCalidadLazyRoute
   AdminEquiposCategoriasLazyRoute: typeof AdminEquiposCategoriasLazyRoute
-  AdminEquiposClasificarLazyRoute: typeof AdminEquiposClasificarLazyRoute
   AdminEquiposMarcasLazyRoute: typeof AdminEquiposMarcasLazyRoute
   AdminEquiposSpecsLazyRoute: typeof AdminEquiposSpecsLazyRoute
-  AdminEquiposValidacionLazyRoute: typeof AdminEquiposValidacionLazyRoute
   AdminEquiposIndexLazyRoute: typeof AdminEquiposIndexLazyRoute
 }
 
 const AdminEquiposRouteChildren: AdminEquiposRouteChildren = {
-  AdminEquiposEtiquetasRoute: AdminEquiposEtiquetasRoute,
   AdminEquiposCalidadLazyRoute: AdminEquiposCalidadLazyRoute,
   AdminEquiposCategoriasLazyRoute: AdminEquiposCategoriasLazyRoute,
-  AdminEquiposClasificarLazyRoute: AdminEquiposClasificarLazyRoute,
   AdminEquiposMarcasLazyRoute: AdminEquiposMarcasLazyRoute,
   AdminEquiposSpecsLazyRoute: AdminEquiposSpecsLazyRoute,
-  AdminEquiposValidacionLazyRoute: AdminEquiposValidacionLazyRoute,
   AdminEquiposIndexLazyRoute: AdminEquiposIndexLazyRoute,
 }
 
@@ -1020,16 +879,10 @@ const AdminEquiposRouteWithChildren = AdminEquiposRoute._addFileChildren(
 
 interface AdminSpecsLazyRouteChildren {
   AdminSpecsDefinitionsLazyRoute: typeof AdminSpecsDefinitionsLazyRoute
-  AdminSpecsFamiliasLazyRoute: typeof AdminSpecsFamiliasLazyRoute
-  AdminSpecsLegacyLazyRoute: typeof AdminSpecsLegacyLazyRoute
-  AdminSpecsObservatorioLazyRoute: typeof AdminSpecsObservatorioLazyRoute
 }
 
 const AdminSpecsLazyRouteChildren: AdminSpecsLazyRouteChildren = {
   AdminSpecsDefinitionsLazyRoute: AdminSpecsDefinitionsLazyRoute,
-  AdminSpecsFamiliasLazyRoute: AdminSpecsFamiliasLazyRoute,
-  AdminSpecsLegacyLazyRoute: AdminSpecsLegacyLazyRoute,
-  AdminSpecsObservatorioLazyRoute: AdminSpecsObservatorioLazyRoute,
 }
 
 const AdminSpecsLazyRouteWithChildren = AdminSpecsLazyRoute._addFileChildren(
