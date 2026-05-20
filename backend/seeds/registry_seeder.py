@@ -104,12 +104,18 @@ def _upsert_spec_definition(
         ).fetchone()
         return row["id"] if row else -1
 
+    # Flags iniciales desde registry. En ON CONFLICT NO se sobreescriben — el
+    # admin los puede haber tocado desde /admin/specs y queremos respetar eso.
+    # Si querés re-bootstrappear, hay que truncate manual.
+    favorito_inicial = bool(spec.en_card or spec.destacado)
+
     cur = conn.execute(
         """
         INSERT INTO spec_definitions
           (categoria_raiz_id, spec_key, label, tipo, unidad, enum_options,
-           ayuda, es_compatibilidad, compatibilidad_modo, rol_compatibilidad)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           ayuda, es_compatibilidad, compatibilidad_modo, rol_compatibilidad,
+           favorito, en_nombre, en_filtros, prioridad)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (categoria_raiz_id, spec_key) DO UPDATE SET
             label               = EXCLUDED.label,
             tipo                = EXCLUDED.tipo,
@@ -127,6 +133,8 @@ def _upsert_spec_definition(
             enum_json, spec.ayuda, spec.es_compatibilidad,
             spec.compatibilidad_modo or "exacta",
             spec.rol_compatibilidad,
+            favorito_inicial, bool(spec.en_nombre), bool(spec.en_filtros),
+            int(spec.prioridad),
         ),
     )
     new = cur.fetchone()
