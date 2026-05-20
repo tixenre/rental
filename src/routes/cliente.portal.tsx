@@ -15,7 +15,8 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { businessWhatsappLink } from "@/lib/business";
+import { useBusinessPhone } from "@/lib/business";
+import { whatsappLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cliente/portal")({
@@ -393,6 +394,7 @@ function PedidoCard({
   perfilImpuestos: string | null;
 }) {
   const navigate = useNavigate();
+  const businessPhone = useBusinessPhone();
   const { documentos_disponibles: docs } = pedido;
   const numero = pedido.numero_pedido ?? pedido.id;
   const jornadas = jornadasEntre(pedido.fecha_desde, pedido.fecha_hasta);
@@ -747,9 +749,10 @@ function PedidoCard({
           )}
 
           {(() => {
-            const waHref = businessWhatsappLink(
-              `Hola, consulta sobre el pedido #${numero}`
-            );
+            const waHref = whatsappLink({
+              phone: businessPhone,
+              message: `Hola, consulta sobre el pedido #${numero}`,
+            });
             if (!waHref) return null;
             return (
               <section>
