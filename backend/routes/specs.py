@@ -267,6 +267,7 @@ def listar_specs_por_categoria(request: Request):
               c.nombre AS categoria_nombre,
               c.prioridad AS categoria_prioridad,
               c.grupo_visual,
+              c.nombre_publico_template,
               sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
               sd.enum_options, sd.ayuda,
               COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
@@ -297,6 +298,7 @@ def listar_specs_por_categoria(request: Request):
                     "nombre": d["categoria_nombre"],
                     "prioridad": d["categoria_prioridad"],
                     "grupo_visual": d.get("grupo_visual"),
+                    "nombre_publico_template": d.get("nombre_publico_template"),
                     "specs": [],
                 }
             grupos[cid]["specs"].append({

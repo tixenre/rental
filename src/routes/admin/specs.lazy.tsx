@@ -66,6 +66,7 @@ interface CategoriaConSpecs {
   nombre: string;
   prioridad: number | null;
   grupo_visual: string | null;
+  nombre_publico_template: string | null;
   specs: Spec[];
 }
 
@@ -224,6 +225,14 @@ function CategoriaPanel({
           </span>
         )}
       </div>
+
+      {/* Editor del template del nombre auto-generado */}
+      <NombreTemplateEditor
+        categoriaId={categoria.id}
+        categoriaNombre={categoria.nombre}
+        currentTemplate={categoria.nombre_publico_template}
+        specsEnNombre={sortedSpecs.filter((s) => s.en_nombre)}
+      />
 
       <DndContext
         sensors={sensors}
@@ -569,5 +578,148 @@ function FlagDisplay({
         <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
       </div>
     </div>
+  );
+}
+
+/**
+ * Editor del template del nombre auto-generado para la categoría.
+ *
+ * El template usa placeholders como `{spec:Label}` que se reemplazan por el
+ * valor del spec del equipo cuando se genera el nombre público. Por ejemplo:
+ *   "{Marca} {Modelo} {spec:Resolución máxima} {spec:Lens mount}"
+ *   → "Sony FX3A 4K E-mount"
+ *
+ * El editor sólo permite insertar placeholders de specs marcados como
+ * "en_nombre". Para activar más specs, el admin las marca abajo.
+ */
+function NombreTemplateEditor({
+  categoriaId,
+  categoriaNombre,
+  currentTemplate,
+  specsEnNombre,
+}: {
+  categoriaId: number;
+  categoriaNombre: string;
+  currentTemplate: string | null;
+  specsEnNombre: Spec[];
+}) {
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState<string>(currentTemplate ?? "");
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Sync cuando cambie el template desde el servidor (otra pestaña, etc.)
+  // pero solo si no estamos editando.
+  useMemo(() => {
+    if (!isDirty) setValue(currentTemplate ?? "");
+  }, [currentTemplate, isDirty]);
+
+  const saveMutation = useMutation({
+    mutationFn: (template: string) =>
+      authedJson<{ ok: true }>(`/api/admin/categorias/${categoriaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre_publico_template: template.trim() || null }),
+      }),
+    onSuccess: () => {
+      toast.success(`Template de ${categoriaNombre} guardado`);
+      setIsDirty(false);
+      queryClient.invalidateQueries({ queryKey: ["admin", "specs-por-categoria"] });
+    },
+    onError: () => toast.error("Error guardando el template"),
+  });
+
+  const insertPlaceholder = (label: string) => {
+    setValue((v) => `${v}${v && !v.endsWith(" ") ? " " : ""}{spec:${label}}`);
+    setIsDirty(true);
+  };
+
+  return (
+    <details
+      open={!!currentTemplate || isDirty}
+      className="rounded-lg border bg-card overflow-hidden"
+    >
+      <summary className="px-4 py-3 cursor-pointer flex items-center gap-2 hover:bg-muted/50 transition-colors">
+        <FileText className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium text-ink">
+          Plantilla del nombre auto-generado
+        </span>
+        {currentTemplate && (
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+            configurado
+          </Badge>
+        )}
+        <span className="ml-auto text-xs text-muted-foreground">
+          {specsEnNombre.length} specs disponibles
+        </span>
+      </summary>
+
+      <div className="px-4 py-4 border-t space-y-3">
+        <div className="text-xs text-muted-foreground">
+          Usá placeholders <code className="bg-muted px-1 rounded font-mono">{`{spec:Label}`}</code> para insertar valores
+          de specs. Los placeholders <code className="bg-muted px-1 rounded font-mono">{`{Marca}`}</code>,
+          <code className="bg-muted px-1 rounded font-mono mx-1">{`{Modelo}`}</code>
+          y <code className="bg-muted px-1 rounded font-mono">{`{Nombre}`}</code> también funcionan.
+        </div>
+
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setIsDirty(true);
+          }}
+          placeholder={`Ej: {Marca} {Modelo} {spec:${specsEnNombre[0]?.label ?? "Lens mount"}}`}
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+
+        {specsEnNombre.length > 0 && (
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+              Insertar spec (click)
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {specsEnNombre.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => insertPlaceholder(s.label)}
+                  className="rounded-full border bg-background px-2 py-0.5 text-xs hover:border-ink hover:bg-muted transition"
+                >
+                  + {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {specsEnNombre.length === 0 && (
+          <div className="text-xs text-muted-foreground italic">
+            Marcá specs con "Nombre" debajo para que aparezcan acá como insertables.
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 pt-1">
+          <Button
+            size="sm"
+            disabled={!isDirty || saveMutation.isPending}
+            onClick={() => saveMutation.mutate(value)}
+          >
+            {saveMutation.isPending ? "Guardando…" : "Guardar template"}
+          </Button>
+          {isDirty && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setValue(currentTemplate ?? "");
+                setIsDirty(false);
+              }}
+            >
+              Descartar cambios
+            </Button>
+          )}
+        </div>
+      </div>
+    </details>
   );
 }
