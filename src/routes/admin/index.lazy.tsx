@@ -8,7 +8,6 @@ import {
   Users,
   AlertCircle,
   ArrowRight,
-  Maximize2,
 } from "lucide-react";
 
 import { adminApi, type PedidoResumen } from "@/lib/admin/api";
@@ -115,25 +114,16 @@ function AdminDashboard() {
             </div>
           </div>
 
-          {/* Calendario embebido */}
+          {/* Calendario full — antes vivía en /admin/calendario */}
           <div className="mt-10">
-            <div className="mb-4 flex items-end justify-between">
-              <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                  Vista mensual
-                </div>
-                <h2 className="font-display text-xl text-ink mt-0.5">Calendario</h2>
+            <div className="mb-4">
+              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                Vista mensual
               </div>
-              <Link
-                to="/admin/calendario"
-                className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition border hairline rounded-full px-3 py-1.5"
-                aria-label="Abrir calendario en pantalla completa"
-              >
-                <Maximize2 className="h-3 w-3" /> Pantalla completa
-              </Link>
+              <h2 className="font-display text-xl text-ink mt-0.5">Calendario</h2>
             </div>
 
-            <CalendarioWidget variant="compact" initialView="mes" showLegend={false} />
+            <CalendarioWidget variant="full" initialView="mes" />
           </div>
         </>
       )}
