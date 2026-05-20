@@ -203,7 +203,10 @@ def listar_spec_definitions(request: Request):
                           json_build_object(
                             'id', c.id,
                             'nombre', c.nombre,
-                            'template_id', t.id
+                            'template_id', t.id,
+                            'destacado', COALESCE(t.destacado, FALSE),
+                            'prioridad', t.prioridad,
+                            'ayuda', t.ayuda
                           ) ORDER BY c.nombre
                         )
                  FROM categoria_spec_templates t

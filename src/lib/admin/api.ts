@@ -304,6 +304,12 @@ export type SpecDefinitionCategoriaAsign = {
   id: number;
   nombre: string;
   template_id: number;
+  /** Flags por categoría — el detalle vive en "Specs por categoría". Solo
+   *  los exponemos acá para que el modal global muestre inline si tienen
+   *  override por categoría (read-only). */
+  destacado: boolean;
+  prioridad: number;
+  ayuda: string | null;
 };
 
 export type SpecDefinition = {
