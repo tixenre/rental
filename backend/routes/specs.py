@@ -240,6 +240,25 @@ def listar_specs_por_categoria(request: Request):
     _require_admin(request)
     conn = get_db()
     try:
+        # Pre-check: las columnas favorito/en_nombre/en_filtros/prioridad
+        # vienen de la migración `e5a7b9d2c4f1_spec_def_flags`. Si no corrió
+        # en producción (alembic upgrade head falla silenciosamente al boot),
+        # el SELECT principal tira UndefinedColumn 500 sin contexto.
+        # Mejor detectarlo acá y devolver mensaje accionable.
+        cols_rows = conn.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'spec_definitions'
+        """).fetchall()
+        col_names = {row_to_dict(c)["column_name"] for c in cols_rows}
+        required = {"favorito", "en_nombre", "en_filtros", "prioridad"}
+        missing = required - col_names
+        if missing:
+            raise HTTPException(
+                503,
+                f"Migración pendiente: faltan columnas {sorted(missing)} en spec_definitions. "
+                f"Correr `alembic upgrade head` en producción o forzar re-deploy.",
+            )
         # Raíces que tienen specs sembradas. Ordenadas por prioridad de la
         # categoría (= el orden visual del bloque).
         rows = conn.execute("""
@@ -298,6 +317,80 @@ def listar_specs_por_categoria(request: Request):
             })
         # Devolver como lista ordenada
         return {"categorias": list(grupos.values())}
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Devolver el error con contexto SQL para diagnosticar 500s desde
+        # la UI admin. Es endpoint admin → OK exponer detalles.
+        import traceback
+        raise HTTPException(
+            500,
+            f"Error en listar_specs_por_categoria: {type(e).__name__}: {e}\n"
+            f"{traceback.format_exc()[-500:]}",
+        )
+    finally:
+        conn.close()
+
+
+@router.get("/admin/specs/diagnostico")
+def diagnostico_specs(request: Request):
+    """Devuelve info de estado del subsistema specs — útil para diagnosticar
+    500s desde la UI admin sin tener acceso a logs."""
+    _require_admin(request)
+    conn = get_db()
+    try:
+        # Schema de spec_definitions
+        cols = conn.execute("""
+            SELECT column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'spec_definitions'
+            ORDER BY ordinal_position
+        """).fetchall()
+        # Versión actual de alembic
+        try:
+            ver_row = conn.execute(
+                "SELECT version_num FROM alembic_version LIMIT 1"
+            ).fetchone()
+            alembic_version = (
+                row_to_dict(ver_row)["version_num"] if ver_row else None
+            )
+        except Exception as e:
+            alembic_version = f"<error: {e}>"
+        # Conteo de specs sembradas
+        try:
+            total = conn.execute(
+                "SELECT COUNT(*) AS n FROM spec_definitions"
+            ).fetchone()
+            total_specs = row_to_dict(total)["n"] if total else 0
+        except Exception as e:
+            total_specs = f"<error: {e}>"
+        # Categorías raíz con specs
+        try:
+            cats = conn.execute("""
+                SELECT c.nombre, COUNT(sd.id) AS n
+                FROM categorias c
+                LEFT JOIN spec_definitions sd ON sd.categoria_raiz_id = c.id
+                WHERE c.parent_id IS NULL
+                GROUP BY c.id, c.nombre
+                ORDER BY c.nombre
+            """).fetchall()
+            por_categoria = [row_to_dict(r) for r in cats]
+        except Exception as e:
+            por_categoria = f"<error: {e}>"
+        return {
+            "alembic_version": alembic_version,
+            "spec_definitions_schema": [row_to_dict(c) for c in cols],
+            "total_specs": total_specs,
+            "por_categoria_raiz": por_categoria,
+            "expected_columns": [
+                "favorito", "en_nombre", "en_filtros", "prioridad",
+            ],
+            "missing_required_columns": sorted(
+                {"favorito", "en_nombre", "en_filtros", "prioridad"}
+                - {row_to_dict(c)["column_name"] for c in cols}
+            ),
+        }
     finally:
         conn.close()
 
