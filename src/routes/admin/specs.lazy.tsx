@@ -397,11 +397,11 @@ function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () => void }
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex justify-end"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end"
       onClick={onClose}
     >
       <div
-        className="bg-paper w-full max-w-md h-full overflow-y-auto p-6 shadow-xl border-l"
+        className="bg-background w-full max-w-md h-full overflow-y-auto p-6 shadow-2xl border-l"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 mb-4">
