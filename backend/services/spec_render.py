@@ -124,6 +124,64 @@ def _parse_path(path: str) -> tuple[Optional[str], int]:
     return path or None, 0
 
 
+def _format_value_by_tipo(
+    value: str, tipo: Optional[str], unidad: Optional[str] = None
+) -> str:
+    """Formatea el value de una spec según su tipo para renderización en
+    nombres públicos / contextos legibles.
+
+    - `multi_enum`: parsea JSON array → join con ` · `. Si el value es string
+      simple (legacy), lo devuelve tal cual.
+    - `rango`: parsea JSON array → `"min - max"` o solo `"v"` si es fijo. Si
+      hay unidad, la agrega.
+    - `bool`: `"true"` → "Sí", `"false"` → "" (vacío para colapsar conectores).
+    - resto (string, number, enum): devuelve value tal cual.
+    """
+    if not value:
+        return ""
+    v = value.strip()
+    if not v:
+        return ""
+
+    if tipo == "multi_enum":
+        if v.startswith("["):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return " · ".join(str(x) for x in parsed if str(x).strip())
+            except Exception:
+                pass
+        return v
+
+    if tipo == "rango":
+        if v.startswith("["):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    items = [str(x) for x in parsed if str(x).strip()]
+                    if len(items) == 1:
+                        out = items[0]
+                    elif len(items) >= 2:
+                        out = f"{items[0]} - {items[1]}"
+                    else:
+                        return ""
+                    if unidad:
+                        out = f"{out} {unidad}"
+                    return out
+            except Exception:
+                pass
+        # value no es JSON — devolver tal cual
+        return v
+
+    if tipo == "bool":
+        low = v.lower()
+        if low in ("true", "1", "yes", "sí", "si"):
+            return "Sí"
+        return ""
+
+    return v
+
+
 def render_spec_placeholder(
     value: str,
     tipo: Optional[str],
@@ -152,14 +210,16 @@ def render_spec_placeholder(
     if not path:
         if tipo == "tabla":
             return format_tabla_value(value or "", tabla_columnas or [], output_config)
-        # Aplicar name_format si está configurado y hay value
+        # Formatear value según tipo antes de aplicar name_format.
+        rendered = _format_value_by_tipo(value or "", tipo, unidad)
+        # Aplicar name_format si está configurado y hay value rendered.
         nf = (output_config or {}).get("name_format") if output_config else None
-        if nf and value:
+        if nf and rendered:
             try:
-                return nf.replace("{value}", value).replace("{unidad}", unidad or "")
+                return nf.replace("{value}", rendered).replace("{unidad}", unidad or "")
             except Exception:
-                return value or ""
-        return value or ""
+                return rendered
+        return rendered
     if not value or not (value.startswith("[") or value.startswith("{")):
         return ""
     col_key, row_idx = _parse_path(path)
