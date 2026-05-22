@@ -623,13 +623,21 @@ function NombreTemplateEditor({
 
   const saveMutation = useMutation({
     mutationFn: (template: string) =>
-      authedJson<{ ok: true }>(`/api/admin/categorias/${categoriaId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre_publico_template: template.trim() || null }),
-      }),
-    onSuccess: () => {
-      toast.success(`Template de ${categoriaNombre} guardado`);
+      authedJson<{ ok: true; nombres_regenerados?: number }>(
+        `/api/admin/categorias/${categoriaId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre_publico_template: template.trim() || null }),
+        },
+      ),
+    onSuccess: (data) => {
+      const n = data.nombres_regenerados ?? 0;
+      toast.success(
+        n > 0
+          ? `Template guardado · ${n} ${n === 1 ? "equipo" : "equipos"} con nombre regenerado`
+          : `Template de ${categoriaNombre} guardado`,
+      );
       setIsDirty(false);
       queryClient.invalidateQueries({ queryKey: ["admin", "specs-por-categoria"] });
     },
