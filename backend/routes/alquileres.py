@@ -794,10 +794,20 @@ def registrar_pago(id: int, data: PagoParcial, request: Request):
     """Endpoint legacy: setea monto_pagado directamente (sin registro en tabla pagos)."""
     conn = get_db()
     try:
-        if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
+        p = conn.execute(
+            "SELECT id, monto_total FROM alquileres WHERE id=?", (id,)
+        ).fetchone()
+        if not p:
             raise HTTPException(404, "Pedido no encontrado")
         if data.monto_pagado < 0:
             raise HTTPException(400, "El monto pagado no puede ser negativo")
+        monto_total = (p["monto_total"] or 0) if isinstance(p, dict) else (p[1] or 0)
+        if data.monto_pagado > monto_total:
+            raise HTTPException(
+                400,
+                f"El monto pagado ({data.monto_pagado}) no puede exceder el "
+                f"total del pedido ({monto_total})",
+            )
         conn.execute("UPDATE alquileres SET monto_pagado=? WHERE id=?", (data.monto_pagado, id))
         _maybe_finalizar(conn, id)
         conn.commit()
