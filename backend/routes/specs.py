@@ -397,6 +397,102 @@ def diagnostico_specs(request: Request):
         conn.close()
 
 
+@router.get("/admin/specs/template-debug")
+def template_debug(categoria_id: int, request: Request):
+    """Diagnóstico para el endpoint `listar_templates`.
+
+    Reportado: el form de edición de equipo muestra solo 1 spec en la
+    ficha técnica para un equipo en raíz "Iluminación" (que tiene 56
+    specs en el registry). PR #407 agregó fallback al registry pero el
+    bug persiste tras el deploy. Este endpoint devuelve los conteos
+    intermedios del mismo SQL para identificar dónde falla la cadena.
+    """
+    _require_admin(request)
+    conn = get_db()
+    try:
+        # 1) Calcular raíz desde la categoría dada
+        raiz_row = conn.execute(
+            """
+            WITH RECURSIVE up AS (
+                SELECT id, parent_id, 0 AS depth FROM categorias WHERE id = ?
+                UNION
+                SELECT c.id, c.parent_id, up.depth + 1
+                FROM categorias c JOIN up ON up.parent_id = c.id
+            )
+            SELECT id FROM up WHERE parent_id IS NULL LIMIT 1
+            """,
+            (categoria_id,),
+        ).fetchone()
+        raiz_id = row_to_dict(raiz_row)["id"] if raiz_row else categoria_id
+
+        # 2) Conteo de specs en spec_definitions con esa raíz
+        sd_row = conn.execute(
+            "SELECT COUNT(*) AS n FROM spec_definitions WHERE categoria_raiz_id = ?",
+            (raiz_id,),
+        ).fetchone()
+        categoria_raiz_specs_count = row_to_dict(sd_row)["n"] if sd_row else 0
+
+        # 3) Asignaciones explícitas en categoria_spec_templates
+        assigned_rows = conn.execute(
+            """
+            SELECT sd.spec_key
+            FROM categoria_spec_templates t
+            JOIN spec_definitions sd ON sd.id = t.spec_def_id
+            WHERE t.categoria_id = ?
+            ORDER BY sd.label
+            """,
+            (categoria_id,),
+        ).fetchall()
+        assigned_keys = [row_to_dict(r)["spec_key"] for r in assigned_rows]
+
+        # 4) Fallback: specs de la raíz que NO tienen asignación a categoria_id
+        fallback_rows = conn.execute(
+            """
+            SELECT sd.spec_key
+            FROM spec_definitions sd
+            WHERE sd.categoria_raiz_id = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM categoria_spec_templates t
+                  WHERE t.categoria_id = ?
+                    AND t.spec_def_id = sd.id
+              )
+            ORDER BY sd.label
+            """,
+            (raiz_id, categoria_id),
+        ).fetchall()
+        fallback_keys = [row_to_dict(r)["spec_key"] for r in fallback_rows]
+
+        # 5) Categoria info para el response
+        cat_row = conn.execute(
+            "SELECT id, nombre, parent_id FROM categorias WHERE id = ?",
+            (categoria_id,),
+        ).fetchone()
+        cat_info = row_to_dict(cat_row) if cat_row else None
+
+        return {
+            "input": {"categoria_id": categoria_id},
+            "categoria": cat_info,
+            "raiz_id": raiz_id,
+            "categoria_raiz_specs_count": categoria_raiz_specs_count,
+            "assigned_count": len(assigned_keys),
+            "fallback_count": len(fallback_keys),
+            "total_items": len(assigned_keys) + len(fallback_keys),
+            "sample_keys_assigned": assigned_keys[:5],
+            "sample_keys_fallback": fallback_keys[:5],
+            "explicacion": {
+                "ok_endpoint_funciona": "categoria_raiz_specs_count == total_items",
+                "bug_si_fallback_zero_pero_raiz_no_zero":
+                    "El SQL del fallback en listar_templates está mal — "
+                    "los specs existen pero no se devuelven.",
+                "bug_si_raiz_specs_count_zero":
+                    "Los specs no tienen categoria_raiz_id poblado — "
+                    "regresión en el seeder.",
+            },
+        }
+    finally:
+        conn.close()
+
+
 @router.put("/admin/specs/categoria/{categoria_id}/reorder")
 def reorder_specs_categoria(categoria_id: int, payload: dict, request: Request):
     """Reordena las specs de una categoría raíz vía drag-and-drop.
