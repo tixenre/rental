@@ -1,7 +1,7 @@
-import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createLazyFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Trash2, ExternalLink, Plus, Coins } from "lucide-react";
+import { Search, Trash2, ExternalLink, Plus, Coins, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -13,14 +13,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { adminApi, ESTADO_LABEL, type Pedido, type PedidoEstado } from "@/lib/admin/api";
+import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
+import { authedJson } from "@/lib/authedFetch";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
   AdminCard,
@@ -37,8 +35,16 @@ export const Route = createLazyFileRoute("/admin/pedidos/")({
   component: PedidosPage,
 });
 
-const ESTADOS: PedidoEstado[] = [
-  "borrador", "presupuesto", "confirmado", "retirado", "devuelto", "finalizado", "cancelado",
+/** Grupos de estados que se exponen como chips en el toolbar. Algunos mapean
+ *  a un único `estado` del backend, otros agrupan varios y se filtran client-side. */
+type EstadoFilter = "activos" | "presupuesto" | "confirmado" | "cerrados" | "todos";
+
+const ESTADO_FILTERS: { id: EstadoFilter; label: string }[] = [
+  { id: "activos",     label: "Activos" },
+  { id: "presupuesto", label: "Solicitados" },
+  { id: "confirmado",  label: "Confirmados" },
+  { id: "cerrados",    label: "Cerrados" },
+  { id: "todos",       label: "Todos" },
 ];
 
 const ESTADO_CLASS: Record<string, string> = {
@@ -93,20 +99,33 @@ function PedidosPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
-  const [estado, setEstado] = useState<string>("");
+  const [filter, setFilter] = useState<EstadoFilter>("activos");
   const [conSaldo, setConSaldo] = useState(false);
   const [deleting, setDeleting] = useState<Pedido | null>(null);
 
+  // Chips "Activos" y "Cerrados" agrupan varios estados → filtramos client-side
+  // sobre la lista que devuelve el backend (per_page=200 cubre el volumen real).
+  const backendEstado = filter === "presupuesto" || filter === "confirmado" ? filter : undefined;
+
   const pedidosQ = useQuery({
-    queryKey: ["admin", "pedidos", { q, estado, conSaldo }],
+    queryKey: ["admin", "pedidos", { q, filter, conSaldo }],
     queryFn: () => adminApi.listPedidos({
       q: q || undefined,
-      estado: estado || undefined,
+      estado: conSaldo ? undefined : backendEstado,
       con_saldo: conSaldo || undefined,
       per_page: 200,
     }),
     refetchInterval: 5000,
   });
+
+  // Contador de solicitudes pendientes para el badge del tab. Fetcheo separado
+  // para que sea independiente del filtro del listado de pedidos.
+  const solicitudesQ = useQuery({
+    queryKey: ["admin", "solicitudes", "count"],
+    queryFn: () => authedJson<{ estado: string }[]>("/api/admin/solicitudes"),
+    refetchInterval: 10000,
+  });
+  const pendingCount = (solicitudesQ.data ?? []).filter((s) => s.estado === "pendiente").length;
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => adminApi.deletePedido(id),
@@ -121,7 +140,15 @@ function PedidosPage() {
   const openPedido = (id: number) =>
     navigate({ to: "/admin/pedidos/$id", params: { id: String(id) } });
 
-  const items = pedidosQ.data?.items ?? [];
+  // El backend filtra solo cuando le pasamos un estado puntual; "Activos" y
+  // "Cerrados" son agrupaciones que aplicamos acá.
+  const items = useMemo(() => {
+    const raw = pedidosQ.data?.items ?? [];
+    if (conSaldo) return raw;
+    if (filter === "activos") return raw.filter((p) => p.estado !== "finalizado" && p.estado !== "cancelado");
+    if (filter === "cerrados") return raw.filter((p) => p.estado === "finalizado" || p.estado === "cancelado");
+    return raw;
+  }, [pedidosQ.data, filter, conSaldo]);
   const total = pedidosQ.data?.total ?? 0;
 
   return (
@@ -132,8 +159,9 @@ function PedidosPage() {
             Back-office
           </div>
           <h1 className="font-display text-3xl text-ink">Pedidos</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {pedidosQ.isLoading ? "Cargando…" : `${total} pedidos`}
+          <p className="text-sm text-muted-foreground mt-1 max-w-[540px]">
+            Reservas activas y solicitudes de cambio de tus clientes.{" "}
+            {pedidosQ.isLoading ? "Cargando…" : `${total} en total.`}
           </p>
         </div>
         <Button
@@ -144,12 +172,12 @@ function PedidosPage() {
         </Button>
       </header>
 
-      {/* Tabs: Todos / Cobranzas. Cobranzas filtra pedidos con saldo > 0 en
-          estados ya cobrables (confirmado, retirado, devuelto, finalizado). */}
+      {/* Tabs: Todos / Cobranzas / Solicitudes. Solicitudes navega a su página
+          dedicada porque es un flujo aparte (cliente → admin), no un filtro. */}
       <div className="flex items-center gap-1 border-b hairline -mb-1">
         <button
           type="button"
-          onClick={() => { setConSaldo(false); setEstado(""); }}
+          onClick={() => { setConSaldo(false); setFilter("activos"); }}
           className={cn(
             "px-3 py-2 text-sm font-medium border-b-2 transition",
             !conSaldo
@@ -161,7 +189,7 @@ function PedidosPage() {
         </button>
         <button
           type="button"
-          onClick={() => { setConSaldo(true); setEstado(""); }}
+          onClick={() => { setConSaldo(true); setFilter("todos"); }}
           className={cn(
             "px-3 py-2 text-sm font-medium border-b-2 transition inline-flex items-center gap-1.5",
             conSaldo
@@ -172,28 +200,50 @@ function PedidosPage() {
           Cobranzas
           <Coins className="h-3.5 w-3.5" />
         </button>
+        <Link
+          to="/admin/solicitudes"
+          className={cn(
+            "px-3 py-2 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-ink transition inline-flex items-center gap-1.5",
+          )}
+        >
+          Solicitudes
+          <Pencil className="h-3.5 w-3.5" />
+          {pendingCount > 0 && (
+            <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-amber px-1.5 py-px font-mono text-[10px] font-bold tracking-wider text-ink">
+              {pendingCount}
+            </span>
+          )}
+        </Link>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-2">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-2.5">
+        <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar por cliente, número o remito…"
-            className="pl-9"
+            className="pl-9 md:max-w-md"
           />
         </div>
         {!conSaldo && (
-          <Select value={estado || "__all"} onValueChange={(v) => setEstado(v === "__all" ? "" : v)}>
-            <SelectTrigger className="md:w-48"><SelectValue placeholder="Todos los estados" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all">Todos los estados</SelectItem>
-              {ESTADOS.map((e) => (
-                <SelectItem key={e} value={e}>{ESTADO_LABEL[e]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {ESTADO_FILTERS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFilter(f.id)}
+                className={cn(
+                  "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                  filter === f.id
+                    ? "bg-ink text-amber border-ink"
+                    : "border-hairline text-muted-foreground hover:text-ink hover:border-ink",
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
