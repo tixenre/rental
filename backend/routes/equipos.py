@@ -232,11 +232,11 @@ class EquipoCreate(BaseModel):
     nombre:           str
     marca:            Optional[str]   = None
     modelo:           Optional[str]   = None
-    cantidad:         int             = 1
-    precio_jornada:   Optional[int]   = None   # precio diario de alquiler (ARS)
-    precio_usd:       Optional[float] = None   # valor de mercado (USD)
-    roi_pct:          Optional[float] = None   # retorno % (ej: 2.0 → precio = valor*0.02)
-    valor_reposicion: Optional[float] = None   # valor para seguro (USD)
+    cantidad:         int             = Field(default=1, ge=0, le=9999)
+    precio_jornada:   Optional[int]   = Field(default=None, ge=0)
+    precio_usd:       Optional[float] = Field(default=None, ge=0)
+    roi_pct:          Optional[float] = Field(default=None, ge=0, le=100)
+    valor_reposicion: Optional[float] = Field(default=None, ge=0)
     foto_url:         Optional[str]   = None
     fecha_compra:     Optional[str]   = None
     serie:            Optional[str]   = None
@@ -251,16 +251,16 @@ class EquipoUpdate(BaseModel):
     nombre:           Optional[str]   = None
     marca:            Optional[str]   = None
     modelo:           Optional[str]   = None
-    cantidad:         Optional[int]   = None
-    precio_jornada:   Optional[int]   = None
+    cantidad:         Optional[int]   = Field(default=None, ge=0, le=9999)
+    precio_jornada:   Optional[int]   = Field(default=None, ge=0)
     # Flag explícito que el frontend manda para indicar si el precio
     # viene de la fórmula (auto, false) o lo tipeó el admin a mano (true).
     # Si no se manda y se cambia precio_jornada, el endpoint infiere
     # según contexto (ver update_equipo).
     precio_jornada_manual: Optional[bool] = None
-    precio_usd:       Optional[float] = None
-    roi_pct:          Optional[float] = None
-    valor_reposicion: Optional[float] = None
+    precio_usd:       Optional[float] = Field(default=None, ge=0)
+    roi_pct:          Optional[float] = Field(default=None, ge=0, le=100)
+    valor_reposicion: Optional[float] = Field(default=None, ge=0)
     foto_url:         Optional[str]   = None
     fecha_compra:     Optional[str]   = None
     serie:            Optional[str]   = None
@@ -1437,6 +1437,37 @@ def get_kit(id: int):
         conn.close()
 
 
+def _crea_ciclo_kit(conn, equipo_id: int, componente_id: int) -> bool:
+    """¿Agregar `componente_id` como componente de `equipo_id` crearía un ciclo?
+
+    Hay ciclo si `equipo_id` ya es alcanzable desde `componente_id` siguiendo
+    la cadena de sus propios componentes (BFS hacia abajo desde el componente
+    candidato). Auto-referencia directa (equipo_id == componente_id) la maneja
+    el caller, pero también la detectamos acá por las dudas.
+
+    Sin este check, dos endpoints concurrentes podrían crear A→B y B→A y
+    dejar el grafo con un ciclo, que aunque las queries actuales no recursen,
+    rompe la semántica de "un kit contiene componentes" y puede causar bugs
+    si alguna vez se hace un traversal recursivo.
+    """
+    if equipo_id == componente_id:
+        return True
+    visitados: set[int] = set()
+    pila: list[int] = [componente_id]
+    while pila:
+        actual = pila.pop()
+        if actual == equipo_id:
+            return True
+        if actual in visitados:
+            continue
+        visitados.add(actual)
+        hijos = conn.execute(
+            "SELECT componente_id FROM kit_componentes WHERE equipo_id = ?", (actual,)
+        ).fetchall()
+        pila.extend(h["componente_id"] for h in hijos)
+    return False
+
+
 @router.post("/equipos/{id}/kit", status_code=201)
 def add_kit_item(id: int, data: KitItem):
     if id == data.componente_id:
@@ -1447,6 +1478,12 @@ def add_kit_item(id: int, data: KitItem):
             raise HTTPException(404, "Equipo no encontrado")
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (data.componente_id,)).fetchone():
             raise HTTPException(404, "Componente no encontrado")
+        if _crea_ciclo_kit(conn, id, data.componente_id):
+            raise HTTPException(
+                400,
+                "Agregar este componente crearía un ciclo en los kits "
+                "(el componente ya contiene a este equipo en su cadena).",
+            )
         try:
             conn.execute("""
                 INSERT INTO kit_componentes (equipo_id, componente_id, cantidad)
