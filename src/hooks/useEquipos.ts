@@ -284,7 +284,10 @@ export function useEquipos(startDate?: Date, endDate?: Date) {
       const items = (data?.items ?? []).map(backendToEquipment);
       return { items, usingFallback: false };
     },
-    staleTime: desde && hasta ? 2 * 60 * 1000 : 5 * 60 * 1000,
+    // staleTime corto (30s) para que los cambios desde back-office se reflejen
+    // rápido en el catálogo público. Sin esto, el cliente podía ver datos
+    // viejos hasta 5min después de un cambio del admin.
+    staleTime: 30_000,
     retry: 1,
   });
 
@@ -299,7 +302,7 @@ export function useCategorias() {
   return useQuery({
     queryKey: ["categorias"],
     queryFn: apiGetCategorias,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 60_000,
   });
 }
 
@@ -307,7 +310,7 @@ export function useMarcas() {
   return useQuery<{ items: BackendMarca[] }>({
     queryKey: ["marcas"],
     queryFn: apiGetMarcs,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 60_000,
     retry: 1,
   });
 }
