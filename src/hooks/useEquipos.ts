@@ -93,86 +93,21 @@ function resolveCategory(etiquetas: string[], nombre: string, marca: string): Ca
 // cae al combo viejo "nombre + modelo".
 
 export function buildPublicName(e: BackendEquipo): string {
-  // 1) Si el backend ya calculó el nombre_publico (PR B/D del rediseño),
-  // lo usamos directamente. Es la single source of truth.
+  // El backend es single source of truth: si calculó el nombre_publico
+  // (via el template configurado en /admin/specs), usamos eso.
   const backendNombre = ((e as unknown as { nombre_publico?: string | null }).nombre_publico ?? "").trim();
   if (backendNombre) return backendNombre;
 
-  const tipo = e.categorias?.[0]?.nombre?.trim() ?? "";
-  const marca = (e.marca ?? "").trim();
-  const modelo = (e.modelo ?? "").trim();
+  // Sin template configurado (o template que rindió vacío) → fallback al
+  // nombre interno. No replicamos el render del template en el frontend
+  // — eso causaba inconsistencia entre lo que el admin veía aquí y lo
+  // persistido del backend.
   const nombre = (e.nombre ?? "").trim();
-  const f = e.ficha;
-  const montura = (f?.montura ?? "").trim();
-  const formato = (f?.formato ?? "").trim();
-  const resolucion = (f?.resolucion ?? "").trim();
-
-  // 1) Si hay template editable, lo renderizamos.
-  const tpl = (f?.nombre_publico_template ?? "").trim();
-  if (tpl) {
-    const vars: Record<string, string> = {
-      tipo, marca, modelo, nombre, montura, formato, resolucion,
-    };
-    const rendered = renderNameTemplate(tpl, vars);
-    if (rendered) return rendered;
+  const modelo = (e.modelo ?? "").trim();
+  if (nombre && modelo && !nombre.includes(modelo)) {
+    return `${nombre} ${modelo}`;
   }
-
-  // 2) Auto-build clásico.
-  const parts = [tipo, marca, modelo, montura, formato, resolucion]
-    .map((s) => s.replace(/\s+/g, " ").trim())
-    .filter(Boolean);
-
-  if (parts.length === 0) {
-    return e.nombre || "Sin nombre";
-  }
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const p of parts) {
-    const key = p.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      out.push(p);
-    }
-  }
-  return out.join(" ");
-}
-
-/**
- * Reemplaza tokens {clave} (case-insensitive) por su valor.
- * Si un token está vacío, se borra junto con el separador inmediato
- * (espacio, guion, em-dash, coma, slash, pipe) para no dejar "Sony — ".
- * Devuelve "" si el resultado quedó vacío o solo separadores.
- */
-function renderNameTemplate(tpl: string, vars: Record<string, string>): string {
-  // Normalizar claves a lowercase
-  const lower: Record<string, string> = {};
-  for (const k of Object.keys(vars)) lower[k.toLowerCase()] = vars[k] ?? "";
-
-  // 1) Reemplazar tokens conocidos vacíos junto con el separador adyacente.
-  //    Patrón: separador (opcional) + {token} O {token} + separador (opcional)
-  const SEP = "[\\s\\-–—,/|·]";
-  let out = tpl.replace(
-    new RegExp(`(${SEP}+)?\\{([a-zA-Z_]+)\\}(${SEP}+)?`, "g"),
-    (_m, before: string | undefined, key: string, after: string | undefined) => {
-      const k = key.toLowerCase();
-      if (!(k in lower)) return _m; // token desconocido → literal
-      const val = lower[k].trim();
-      if (val) return `${before ?? ""}${val}${after ?? ""}`;
-      // Vacío: comemos UN separador (preferimos el de la derecha)
-      if (after) return before ?? "";
-      if (before) return "";
-      return "";
-    },
-  );
-
-  // 2) Limpiar separadores duplicados o sueltos al inicio/final
-  out = out.replace(/\s+/g, " ").trim();
-  out = out.replace(new RegExp(`^${SEP}+|${SEP}+$`, "g"), "").trim();
-  out = out.replace(new RegExp(`(${SEP})\\s*\\1+`, "g"), "$1");
-
-  // Si solo quedaron separadores → vacío
-  if (!out || /^[\s\-–—,/|·]+$/.test(out)) return "";
-  return out;
+  return nombre || modelo || "Sin nombre";
 }
 
 /**
