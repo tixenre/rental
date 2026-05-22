@@ -16,6 +16,7 @@ router = APIRouter()
 # ── Modelos ──────────────────────────────────────────────────────────────────
 
 class ClienteCreate(BaseModel):
+    from pydantic import field_validator
     nombre:             str
     apellido:           str
     telefono:           str = ""
@@ -27,8 +28,18 @@ class ClienteCreate(BaseModel):
     notas:              Optional[str] = None
     direccion_maps_url: Optional[str] = None
 
+    @field_validator("descuento")
+    @classmethod
+    def validate_descuento(cls, v):
+        if v is None:
+            return 0
+        if v < 0 or v > 100:
+            raise ValueError("descuento debe estar entre 0 y 100")
+        return v
+
 
 class ClienteUpdate(BaseModel):
+    from pydantic import field_validator
     nombre:             Optional[str]   = None
     apellido:           Optional[str]   = None
     telefono:           Optional[str]   = None
@@ -39,6 +50,15 @@ class ClienteUpdate(BaseModel):
     perfil_impuestos:   Optional[str]   = None
     notas:              Optional[str]   = None
     direccion_maps_url: Optional[str]   = None
+
+    @field_validator("descuento")
+    @classmethod
+    def validate_descuento(cls, v):
+        if v is None:
+            return v
+        if v < 0 or v > 100:
+            raise ValueError("descuento debe estar entre 0 y 100")
+        return v
 
 
 # ── Rutas ────────────────────────────────────────────────────────────────────

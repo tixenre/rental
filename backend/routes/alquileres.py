@@ -50,17 +50,28 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
         WHERE pi.pedido_id = ?
     """, (pedido_id,)).fetchall()
     items = [row_to_dict(r) for r in rows]
+    if not items:
+        return items
 
-    # Agregar componentes (kits) a cada item
+    # Batch fetch de componentes de kits: 1 query agregada en lugar de N+1
+    # (antes hacía 1 query por cada item del pedido). Para pedidos con 10
+    # items con kits, baja de 11 queries a 2.
+    equipo_ids = list({item["equipo_id"] for item in items})
+    placeholders = ",".join("?" for _ in equipo_ids)
+    comp_rows = conn.execute(f"""
+        SELECT kc.*, ec.nombre, ec.marca, ec.foto_url, ec.cantidad AS stock_total,
+               ec.nombre_publico, ec.nombre_publico_largo
+        FROM kit_componentes kc
+        JOIN equipos ec ON ec.id = kc.componente_id
+        WHERE kc.equipo_id IN ({placeholders})
+    """, equipo_ids).fetchall()
+    # Group by equipo_id
+    componentes_por_equipo: dict[int, list[dict]] = {}
+    for c in comp_rows:
+        d = row_to_dict(c)
+        componentes_por_equipo.setdefault(d["equipo_id"], []).append(d)
     for item in items:
-        comp_rows = conn.execute("""
-            SELECT kc.*, ec.nombre, ec.marca, ec.foto_url, ec.cantidad AS stock_total,
-                   ec.nombre_publico, ec.nombre_publico_largo
-            FROM kit_componentes kc
-            JOIN equipos ec ON ec.id = kc.componente_id
-            WHERE kc.equipo_id = ?
-        """, (item['equipo_id'],)).fetchall()
-        item['componentes'] = [row_to_dict(c) for c in comp_rows]
+        item["componentes"] = componentes_por_equipo.get(item["equipo_id"], [])
 
     return items
 
@@ -256,10 +267,17 @@ class PedidoItem(BaseModel):
     @field_validator("cantidad")
     @classmethod
     def validate_cantidad(cls, v: int) -> int:
-        if v < 1:
+        if v is None or v < 1:
             raise ValueError("cantidad debe ser >= 1")
         if v > 999:
             raise ValueError("cantidad demasiado alta (máx 999)")
+        return v
+
+    @field_validator("precio_jornada")
+    @classmethod
+    def validate_precio(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("precio_jornada no puede ser negativo")
         return v
 
 
@@ -290,6 +308,7 @@ class PagoCreate(BaseModel):
 
 
 class PedidoDatos(BaseModel):
+    from pydantic import field_validator
     cliente_id:       Optional[int]   = None
     cliente_nombre:   Optional[str]   = None
     cliente_email:    Optional[str]   = None
@@ -298,6 +317,15 @@ class PedidoDatos(BaseModel):
     fecha_hasta:      Optional[str]   = None
     notas:            Optional[str]   = None
     descuento_pct:    Optional[float] = None
+
+    @field_validator("descuento_pct")
+    @classmethod
+    def validate_descuento(cls, v):
+        if v is None:
+            return v
+        if v < 0 or v > 100:
+            raise ValueError("descuento_pct debe estar entre 0 y 100")
+        return v
 
 
 class PedidoItemUpdate(BaseModel):
@@ -885,10 +913,20 @@ def registrar_pago(id: int, data: PagoParcial, request: Request):
     """Endpoint legacy: setea monto_pagado directamente (sin registro en tabla pagos)."""
     conn = get_db()
     try:
-        if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
+        p = conn.execute(
+            "SELECT id, monto_total FROM alquileres WHERE id=?", (id,)
+        ).fetchone()
+        if not p:
             raise HTTPException(404, "Pedido no encontrado")
         if data.monto_pagado < 0:
             raise HTTPException(400, "El monto pagado no puede ser negativo")
+        monto_total = (p["monto_total"] or 0) if isinstance(p, dict) else (p[1] or 0)
+        if data.monto_pagado > monto_total:
+            raise HTTPException(
+                400,
+                f"El monto pagado ({data.monto_pagado}) no puede exceder el "
+                f"total del pedido ({monto_total})",
+            )
         conn.execute("UPDATE alquileres SET monto_pagado=? WHERE id=?", (data.monto_pagado, id))
         _maybe_finalizar(conn, id)
         conn.commit()
