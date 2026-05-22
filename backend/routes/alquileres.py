@@ -50,17 +50,28 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
         WHERE pi.pedido_id = ?
     """, (pedido_id,)).fetchall()
     items = [row_to_dict(r) for r in rows]
+    if not items:
+        return items
 
-    # Agregar componentes (kits) a cada item
+    # Batch fetch de componentes de kits: 1 query agregada en lugar de N+1
+    # (antes hacía 1 query por cada item del pedido). Para pedidos con 10
+    # items con kits, baja de 11 queries a 2.
+    equipo_ids = list({item["equipo_id"] for item in items})
+    placeholders = ",".join("?" for _ in equipo_ids)
+    comp_rows = conn.execute(f"""
+        SELECT kc.*, ec.nombre, ec.marca, ec.foto_url, ec.cantidad AS stock_total,
+               ec.nombre_publico, ec.nombre_publico_largo
+        FROM kit_componentes kc
+        JOIN equipos ec ON ec.id = kc.componente_id
+        WHERE kc.equipo_id IN ({placeholders})
+    """, equipo_ids).fetchall()
+    # Group by equipo_id
+    componentes_por_equipo: dict[int, list[dict]] = {}
+    for c in comp_rows:
+        d = row_to_dict(c)
+        componentes_por_equipo.setdefault(d["equipo_id"], []).append(d)
     for item in items:
-        comp_rows = conn.execute("""
-            SELECT kc.*, ec.nombre, ec.marca, ec.foto_url, ec.cantidad AS stock_total,
-                   ec.nombre_publico, ec.nombre_publico_largo
-            FROM kit_componentes kc
-            JOIN equipos ec ON ec.id = kc.componente_id
-            WHERE kc.equipo_id = ?
-        """, (item['equipo_id'],)).fetchall()
-        item['componentes'] = [row_to_dict(c) for c in comp_rows]
+        item["componentes"] = componentes_por_equipo.get(item["equipo_id"], [])
 
     return items
 
