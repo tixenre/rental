@@ -220,6 +220,24 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
     enableBeforeUnload: false,
   });
 
+  // Disponibilidad — usada por ItemsCard y por el gate del botón "Enviar".
+  // En cliente se usa el endpoint con ownership; en admin el normal.
+  // IMPORTANTE: estos hooks deben estar ANTES de cualquier early return
+  // (líneas más abajo de pedidoQ.isLoading / pedidoQ.error) porque
+  // React exige que los hooks se llamen en el mismo orden cada render
+  // (Rules of Hooks → React error #310). Usamos `?.` y `enabled` para que
+  // no corran cuando los datos todavía no llegaron.
+  const adminDispoQ = useQuery({
+    queryKey: ["admin", "disponibilidad", draft.datos?.fecha_desde, draft.datos?.fecha_hasta, pedido?.id],
+    queryFn: () => adminApi.getDisponibilidad(draft.datos!.fecha_desde, draft.datos!.fecha_hasta, pedido!.id),
+    enabled: !isCliente && !!pedido && !!draft.datos?.fecha_desde && !!draft.datos?.fecha_hasta,
+  });
+  const clienteDispoQ = useQuery({
+    queryKey: ["cliente", "disponibilidad", pedido?.id, draft.datos?.fecha_desde, draft.datos?.fecha_hasta],
+    queryFn: () => clienteApi.getDisponibilidad(pedido!.id, draft.datos!.fecha_desde, draft.datos!.fecha_hasta),
+    enabled: isCliente && !!pedido && !!draft.datos?.fecha_desde && !!draft.datos?.fecha_hasta,
+  });
+
   if (pedidoQ.isLoading) {
     return (
       <div className="flex items-center justify-center h-[60vh] text-muted-foreground gap-2">
@@ -244,18 +262,6 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
   const numero = pedido.numero_pedido ? `#${pedido.numero_pedido}` : `(borrador #${pedido.id})`;
   const clienteNombre = draft.datos.cliente_nombre || "Sin cliente";
 
-  // Disponibilidad — usada por ItemsCard y por el gate del botón "Enviar".
-  // En cliente se usa el endpoint con ownership; en admin el normal.
-  const adminDispoQ = useQuery({
-    queryKey: ["admin", "disponibilidad", draft.datos.fecha_desde, draft.datos.fecha_hasta, pedido.id],
-    queryFn: () => adminApi.getDisponibilidad(draft.datos!.fecha_desde, draft.datos!.fecha_hasta, pedido.id),
-    enabled: !isCliente && !!draft.datos.fecha_desde && !!draft.datos.fecha_hasta,
-  });
-  const clienteDispoQ = useQuery({
-    queryKey: ["cliente", "disponibilidad", pedido.id, draft.datos.fecha_desde, draft.datos.fecha_hasta],
-    queryFn: () => clienteApi.getDisponibilidad(pedido.id, draft.datos!.fecha_desde, draft.datos!.fecha_hasta),
-    enabled: isCliente && !!draft.datos.fecha_desde && !!draft.datos.fecha_hasta,
-  });
   const stockMap: Record<string, { cantidad: number; reservado: number }> = isCliente
     ? Object.fromEntries(
         Object.entries(clienteDispoQ.data ?? {}).map(([k, v]) => [
