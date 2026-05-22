@@ -52,6 +52,7 @@ interface Spec {
   unidad: string | null;
   enum_options: string[] | null;
   ayuda: string | null;
+  output_config: { name_format?: string; row_strategy?: string } | null;
   es_compatibilidad: boolean;
   compatibilidad_modo: string | null;
   favorito: boolean;
@@ -520,6 +521,13 @@ function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () => void }
             />
           </div>
 
+          {/* Formato en título auto. Solo útil si está marcado "En Nombre". */}
+          {fresh.en_nombre && (
+            <div className="border-t pt-4">
+              <NameFormatEditor spec={fresh} />
+            </div>
+          )}
+
           {fresh.es_compatibilidad && (
             <div className="border-t pt-4 space-y-2">
               <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -721,5 +729,108 @@ function NombreTemplateEditor({
         </div>
       </div>
     </details>
+  );
+}
+
+/**
+ * Editor del formato del spec dentro del nombre auto-generado.
+ *
+ * Sin formato, el placeholder {spec:Label} en el template del nombre se
+ * renderiza solo con el value (ej. "19389"). Con formato custom, podés
+ * decir "Potencia {value} lúmenes" para que se renderice como
+ * "Potencia 19389 lúmenes" automáticamente en cada equipo.
+ *
+ * Placeholders disponibles: {value}, {unidad}.
+ */
+function NameFormatEditor({ spec }: { spec: Spec }) {
+  const queryClient = useQueryClient();
+  const current = spec.output_config?.name_format ?? "";
+  const [value, setValue] = useState<string>(current);
+  const [isDirty, setIsDirty] = useState(false);
+
+  useMemo(() => {
+    if (!isDirty) setValue(current);
+  }, [current, isDirty]);
+
+  const saveMutation = useMutation({
+    mutationFn: (fmt: string) =>
+      authedJson<{ ok: true }>(`/api/admin/spec-definitions/${spec.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          output_config: fmt.trim()
+            ? { ...(spec.output_config ?? {}), name_format: fmt.trim() }
+            : { ...(spec.output_config ?? {}), name_format: undefined },
+        }),
+      }),
+    onSuccess: () => {
+      toast.success("Formato guardado");
+      setIsDirty(false);
+      queryClient.invalidateQueries({ queryKey: ["admin", "specs-por-categoria"] });
+    },
+    onError: () => toast.error("Error guardando el formato"),
+  });
+
+  // Preview con value ejemplo. Si la spec tiene uso, fingimos un value real.
+  const exampleValue = spec.tipo === "bool" ? "Sí" : spec.tipo === "number" ? "1234" : "valor";
+  const exampleUnit = spec.unidad ?? "";
+  const preview = value.trim()
+    ? value.replace("{value}", exampleValue).replace("{unidad}", exampleUnit)
+    : exampleValue;
+
+  return (
+    <div className="space-y-2">
+      <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        Formato en título auto
+      </h3>
+      <div className="text-xs text-muted-foreground">
+        Cómo se renderiza este spec cuando lo insertás como{" "}
+        <code className="bg-muted px-1 rounded font-mono">{`{spec:${spec.label}}`}</code>
+        {" "}en el template del nombre. Placeholders:{" "}
+        <code className="bg-muted px-1 rounded font-mono">{`{value}`}</code>,{" "}
+        <code className="bg-muted px-1 rounded font-mono">{`{unidad}`}</code>.
+      </div>
+
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setIsDirty(true);
+        }}
+        placeholder={`Ej: Potencia {value} ${spec.unidad ?? "unidades"}`}
+        className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+      />
+
+      <div className="text-xs">
+        <span className="text-muted-foreground">Preview:</span>{" "}
+        <span className="text-ink font-medium">{preview}</span>
+        {!value.trim() && (
+          <span className="text-muted-foreground italic ml-1">(default: solo el valor)</span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 pt-1">
+        <Button
+          size="sm"
+          disabled={!isDirty || saveMutation.isPending}
+          onClick={() => saveMutation.mutate(value)}
+        >
+          {saveMutation.isPending ? "Guardando…" : "Guardar formato"}
+        </Button>
+        {isDirty && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setValue(current);
+              setIsDirty(false);
+            }}
+          >
+            Descartar
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }

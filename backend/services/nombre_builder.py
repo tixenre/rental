@@ -273,6 +273,7 @@ def _render_template(
             spec_map[norm_spec_label(s.get("label") or "")] = {
                 "value": (s.get("value") or "").strip(),
                 "tipo": s.get("tipo"),
+                "unidad": s.get("unidad"),
                 "tabla_columnas": s.get("tabla_columnas"),
                 "output_config": s.get("output_config"),
             }
@@ -295,6 +296,7 @@ def _render_template(
                     info.get("tabla_columnas"),
                     info.get("output_config"),
                     path,
+                    unidad=info.get("unidad"),
                 )
             else:
                 val = ""

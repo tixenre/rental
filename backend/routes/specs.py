@@ -269,7 +269,7 @@ def listar_specs_por_categoria(request: Request):
               c.grupo_visual,
               c.nombre_publico_template,
               sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
-              sd.enum_options, sd.ayuda,
+              sd.enum_options, sd.ayuda, sd.output_config,
               COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
               COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
               COALESCE(sd.favorito, FALSE) AS favorito,
@@ -309,6 +309,7 @@ def listar_specs_por_categoria(request: Request):
                 "unidad": d.get("unidad"),
                 "enum_options": d.get("enum_options"),
                 "ayuda": d.get("ayuda"),
+                "output_config": d.get("output_config"),
                 "es_compatibilidad": d.get("es_compatibilidad", False),
                 "compatibilidad_modo": d.get("compatibilidad_modo"),
                 "favorito": d.get("favorito", False),
@@ -582,8 +583,10 @@ def _resolve_unidad_id(conn, simbolo: Optional[str]) -> Optional[int]:
 
 
 def _validate_output_config(oc: Optional[dict], tipo: str) -> None:
-    """Verifica shape de `output_config`. Solo soporta `row_strategy` por ahora,
-    y solo aplica a specs tipo tabla."""
+    """Verifica shape de `output_config`. Soporta:
+    - `row_strategy` (solo specs tipo tabla)
+    - `name_format` (template para nombre auto, ej. "Potencia {value} lm")
+    """
     if oc is None or oc == {}:
         return
     if not isinstance(oc, dict):
@@ -600,6 +603,12 @@ def _validate_output_config(oc: Optional[dict], tipo: str) -> None:
                 f"output_config.row_strategy inválido: '{rs}'. "
                 f"Permitidos: {sorted(_VALID_ROW_STRATEGIES)}.",
             )
+    nf = oc.get("name_format")
+    if nf is not None:
+        if not isinstance(nf, str):
+            raise HTTPException(400, "output_config.name_format debe ser string.")
+        if len(nf) > 200:
+            raise HTTPException(400, "output_config.name_format máximo 200 caracteres.")
 
 
 def _validate_tabla_columnas(cols: Optional[list[dict]]) -> None:

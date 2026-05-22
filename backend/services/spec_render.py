@@ -130,20 +130,35 @@ def render_spec_placeholder(
     tabla_columnas: Optional[list],
     output_config: Optional[dict],
     path: str = "",
+    unidad: Optional[str] = None,
 ) -> str:
     """Resuelve un placeholder de spec.
 
     - `path == ""` (placeholder es `{spec:Label}`):
         * Si tipo == 'tabla', formatea con conectores aplicando row_strategy.
-        * Si no, devuelve el value tal cual.
+        * Si no, devuelve el value tal cual — o aplica `name_format` si está
+          configurado en `output_config`.
     - `path == "colKey"` o `"colKey[i]"`:
         * Solo aplica a tipo tabla. Extrae la celda colKey de la fila i.
         * Sin índice explícito, usa fila 0 (no se aplica row_strategy: el
           path explícito gana sobre la config).
+
+    `output_config.name_format` (str, opcional): template con `{value}` y
+    `{unidad}` para personalizar cómo se renderiza el spec dentro del
+    nombre auto. Ej. "Potencia {value} lúmenes" → "Potencia 19389 lúmenes".
+    Si el value está vacío, no se aplica (devuelve string vacío para que
+    los conectores adyacentes del template también se colapsen).
     """
     if not path:
         if tipo == "tabla":
             return format_tabla_value(value or "", tabla_columnas or [], output_config)
+        # Aplicar name_format si está configurado y hay value
+        nf = (output_config or {}).get("name_format") if output_config else None
+        if nf and value:
+            try:
+                return nf.replace("{value}", value).replace("{unidad}", unidad or "")
+            except Exception:
+                return value or ""
         return value or ""
     if not value or not (value.startswith("[") or value.startswith("{")):
         return ""
