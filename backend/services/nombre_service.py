@@ -52,45 +52,70 @@ def _categorias_de(conn, equipo_id: int) -> tuple[Optional[str], Optional[str]]:
 
 
 def _specs_en_nombre_de(conn, equipo_id: int) -> list[dict]:
-    """Devuelve TODAS las specs del equipo con metadata para el render del
-    nombre. Cada item: {label, value, tipo, tabla_columnas}. Ordenadas por
-    prioridad de la asignación a la categoría.
+    """Devuelve los specs del equipo marcados `en_nombre=true` en el registry,
+    con sus valores actuales del equipo + metadata para el render.
 
-    El builder usa:
-      - Path template: el `{spec:Label}` busca por label; si la spec es tabla
-        usa `tabla_columnas` para formatear con conectores.
-      - Path formatter: cada formatter filtra por las que le interesan.
+    Lee directo de `spec_definitions` (single source of truth) + LEFT JOIN
+    con `equipo_specs` para traer el valor. No depende de
+    `categoria_spec_templates` (que puede estar incompleto tras migraciones
+    del registry — mismo bug que resolvimos en PR #410 para listar templates).
 
-    Ya no usamos el flag `visible_en_nombre` — está deprecado y removido del UI;
-    el template (en `categoria.nombre_publico_template`) es source of truth."""
+    Cada item: `{label, spec_key, value, tipo, unidad, tabla_columnas,
+    output_config}`. Ordenados por `sd.prioridad`.
+
+    El builder los usa en `_render_template`: cada placeholder `{spec:Label}`
+    busca por label y aplica `render_spec_placeholder` (que respeta
+    `output_config.name_format` y formatea tipos no-string).
+    """
     import json as _json
     rows = conn.execute(
         """
-        SELECT sd.label, sd.spec_key, sd.tipo, sd.tabla_columnas,
-               es.value, t.prioridad
-        FROM equipo_specs es
-        JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
-        JOIN categoria_spec_templates t
-          ON t.categoria_id = ec.categoria_id AND t.spec_def_id = es.spec_def_id
-        JOIN spec_definitions sd ON sd.id = es.spec_def_id
-        WHERE es.equipo_id = ?
-        ORDER BY t.prioridad, sd.label
+        SELECT
+          sd.label, sd.spec_key, sd.tipo, sd.unidad,
+          sd.tabla_columnas, sd.output_config,
+          COALESCE(es.value, '') AS value,
+          COALESCE(sd.prioridad, 100) AS prioridad
+        FROM spec_definitions sd
+        JOIN equipo_categorias ec ON ec.equipo_id = ?
+        JOIN categorias c ON c.id = ec.categoria_id
+        LEFT JOIN equipo_specs es
+          ON es.equipo_id = ec.equipo_id AND es.spec_def_id = sd.id
+        WHERE COALESCE(sd.en_nombre, FALSE) = TRUE
+          AND sd.categoria_raiz_id IS NOT NULL
+          AND (sd.categoria_raiz_id = c.id OR sd.categoria_raiz_id = c.parent_id)
+        ORDER BY COALESCE(sd.prioridad, 100), sd.label
         """,
         (equipo_id,),
     ).fetchall()
     out: list[dict] = []
+    seen_labels: set[str] = set()
     for r in rows:
+        label = r["label"]
+        # Dedupe por label (un equipo puede estar en varias cats de la misma raíz)
+        key = (label or "").lower().strip()
+        if key in seen_labels:
+            continue
+        seen_labels.add(key)
         cols = r["tabla_columnas"]
         if isinstance(cols, str):
             try:
                 cols = _json.loads(cols)
             except Exception:
                 cols = None
+        oc = r["output_config"]
+        if isinstance(oc, str):
+            try:
+                oc = _json.loads(oc)
+            except Exception:
+                oc = None
         out.append({
-            "label": r["label"],
+            "label": label,
+            "spec_key": r["spec_key"],
             "value": r["value"] or "",
             "tipo": r["tipo"],
+            "unidad": r["unidad"],
             "tabla_columnas": cols,
+            "output_config": oc,
         })
     return out
 

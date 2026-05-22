@@ -19,6 +19,7 @@ import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { ViewIntroDialog } from "@/components/rental/ViewIntroDialog";
 import { PreviewPane } from "@/components/rental/PreviewPane";
 import { useEquipos, useCategorias, useMarcas } from "@/hooks/useEquipos";
+import type { BackendMarca } from "@/lib/api";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,21 @@ type IndexSearch = {
   cat?: string;
 };
 
+const SITE_URL = "https://ramblarental.com";
+
+async function fetchOgImage(): Promise<string> {
+  try {
+    const res = await fetch("/api/settings/og_image_url");
+    if (!res.ok) return `${SITE_URL}/icon-512.png`;
+    const data = await res.json();
+    const url = (data?.value as string) || "";
+    if (!url) return `${SITE_URL}/icon-512.png`;
+    return url.startsWith("http") ? url : `${SITE_URL}${url}`;
+  } catch {
+    return `${SITE_URL}/icon-512.png`;
+  }
+}
+
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): IndexSearch => {
     const v = search.view;
@@ -43,7 +59,26 @@ export const Route = createFileRoute("/")({
       cat: typeof c === "string" && c.trim() ? c.trim() : undefined,
     };
   },
-  head: () => ({
+  loader: async ({ context }) => {
+    // Cachea por 5 min para no pegarle al backend en cada render.
+    const ctx = context as {
+      queryClient?: {
+        fetchQuery: <T>(opts: { queryKey: unknown[]; queryFn: () => Promise<T>; staleTime?: number }) => Promise<T>;
+      };
+    };
+    const ogImage = ctx.queryClient
+      ? await ctx.queryClient.fetchQuery({
+          queryKey: ["settings", "og_image_url"],
+          queryFn: fetchOgImage,
+          staleTime: 5 * 60 * 1000,
+        })
+      : await fetchOgImage();
+    return { ogImage };
+  },
+  head: ({ loaderData }) => {
+    const data = loaderData as { ogImage: string } | undefined;
+    const ogImage = data?.ogImage ?? `${SITE_URL}/icon-512.png`;
+    return ({
     meta: [
       { title: "Rambla Rental — Alquiler de equipos de cine y foto en Mar del Plata" },
       {
@@ -53,24 +88,46 @@ export const Route = createFileRoute("/")({
       },
       // Open Graph (Facebook, WhatsApp, LinkedIn).
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://ramblarental.com/" },
+      { property: "og:url", content: `${SITE_URL}/` },
       { property: "og:title", content: "Rambla Rental — Alquiler de equipos de cine y foto" },
       {
         property: "og:description",
         content: "Cámaras, lentes, iluminación, audio y soportes. Estudio en Mar del Plata.",
       },
-      { property: "og:image", content: "https://ramblarental.com/icon-512.png" },
+      { property: "og:image", content: ogImage },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
       { property: "og:locale", content: "es_AR" },
       // Twitter Cards.
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Rambla Rental" },
       { name: "twitter:description", content: "Equipos audiovisuales · Mar del Plata" },
-      { name: "twitter:image", content: "https://ramblarental.com/icon-512.png" },
+      { name: "twitter:image", content: ogImage },
     ],
     links: [
-      { rel: "canonical", href: "https://ramblarental.com/" },
+      { rel: "canonical", href: `${SITE_URL}/` },
     ],
-  }),
+    scripts: [
+      // WebSite + SearchAction: Google muestra una caja de búsqueda inline
+      // en los resultados cuando se busca el nombre de la marca, llevando
+      // directo al buscador del catálogo (`/?q=...`).
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "Rambla Rental",
+          url: `${SITE_URL}/`,
+          potentialAction: {
+            "@type": "SearchAction",
+            target: `${SITE_URL}/?q={search_term_string}`,
+            "query-input": "required name=search_term_string",
+          },
+        }),
+      },
+    ],
+    });
+  },
   component: IndexOrMobile,
 });
 
@@ -526,7 +583,7 @@ function GridMode({
 }: {
   allEquipos: Equipment[];
   apiCategories: string[];
-  marcas: any[];
+  marcas: BackendMarca[];
   selectedBrand?: string | null;
   onBrandSelect: (brandName: string | null) => void;
   onJumpToCategory: (c: string) => void;
@@ -752,7 +809,7 @@ function ListMode({
 }: {
   allEquipos: Equipment[];
   apiCategories: string[];
-  marcas: any[];
+  marcas: BackendMarca[];
   query: string;
   setQuery: (v: string) => void;
   selectedCats: Set<string>;

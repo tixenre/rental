@@ -1,7 +1,8 @@
 import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Trash2, ExternalLink, Plus } from "lucide-react";
+import { Search, Trash2, ExternalLink, Plus, Coins } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -93,13 +94,15 @@ function PedidosPage() {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [estado, setEstado] = useState<string>("");
+  const [conSaldo, setConSaldo] = useState(false);
   const [deleting, setDeleting] = useState<Pedido | null>(null);
 
   const pedidosQ = useQuery({
-    queryKey: ["admin", "pedidos", { q, estado }],
+    queryKey: ["admin", "pedidos", { q, estado, conSaldo }],
     queryFn: () => adminApi.listPedidos({
       q: q || undefined,
       estado: estado || undefined,
+      con_saldo: conSaldo || undefined,
       per_page: 200,
     }),
     refetchInterval: 5000,
@@ -141,6 +144,36 @@ function PedidosPage() {
         </Button>
       </header>
 
+      {/* Tabs: Todos / Cobranzas. Cobranzas filtra pedidos con saldo > 0 en
+          estados ya cobrables (confirmado, retirado, devuelto, finalizado). */}
+      <div className="flex items-center gap-1 border-b hairline -mb-1">
+        <button
+          type="button"
+          onClick={() => { setConSaldo(false); setEstado(""); }}
+          className={cn(
+            "px-3 py-2 text-sm font-medium border-b-2 transition",
+            !conSaldo
+              ? "border-amber text-ink"
+              : "border-transparent text-muted-foreground hover:text-ink",
+          )}
+        >
+          Todos
+        </button>
+        <button
+          type="button"
+          onClick={() => { setConSaldo(true); setEstado(""); }}
+          className={cn(
+            "px-3 py-2 text-sm font-medium border-b-2 transition inline-flex items-center gap-1.5",
+            conSaldo
+              ? "border-amber text-ink"
+              : "border-transparent text-muted-foreground hover:text-ink",
+          )}
+        >
+          Cobranzas
+          <Coins className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
       <div className="flex flex-col md:flex-row gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -151,16 +184,35 @@ function PedidosPage() {
             className="pl-9"
           />
         </div>
-        <Select value={estado || "__all"} onValueChange={(v) => setEstado(v === "__all" ? "" : v)}>
-          <SelectTrigger className="md:w-48"><SelectValue placeholder="Todos los estados" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all">Todos los estados</SelectItem>
-            {ESTADOS.map((e) => (
-              <SelectItem key={e} value={e}>{ESTADO_LABEL[e]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!conSaldo && (
+          <Select value={estado || "__all"} onValueChange={(v) => setEstado(v === "__all" ? "" : v)}>
+            <SelectTrigger className="md:w-48"><SelectValue placeholder="Todos los estados" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all">Todos los estados</SelectItem>
+              {ESTADOS.map((e) => (
+                <SelectItem key={e} value={e}>{ESTADO_LABEL[e]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
+
+      {/* Banner de totales cuando estás viendo cobranzas */}
+      {conSaldo && pedidosQ.data && (() => {
+        const items = pedidosQ.data.items;
+        const totalSaldo = items.reduce(
+          (s, p) => s + Math.max(0, (p.monto_total ?? 0) - (p.monto_pagado ?? 0)),
+          0,
+        );
+        return (
+          <div className="rounded-md border border-amber/40 bg-amber-soft/50 px-3.5 py-2.5 flex items-center justify-between gap-2 text-sm">
+            <span className="text-ink">
+              <strong>{items.length}</strong> pedido{items.length !== 1 ? "s" : ""} con saldo pendiente
+            </span>
+            <span className="font-display text-lg tabular text-ink">{fmtArs(totalSaldo)}</span>
+          </div>
+        );
+      })()}
 
       {pedidosQ.error && (
         <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">

@@ -32,27 +32,40 @@ if TYPE_CHECKING:
     from psycopg.cursor import Cursor
 
 
-def _ensure_categoria_raiz(conn, nombre: str, prioridad: int, dry_run: bool = False) -> int | None:
-    """Crea o promueve a raíz una categoría. Devuelve su id."""
+def _ensure_categoria_raiz(
+    conn,
+    nombre: str,
+    prioridad: int,
+    grupo_visual: str | None = None,
+    dry_run: bool = False,
+) -> int | None:
+    """Crea o promueve a raíz una categoría. Devuelve su id.
+
+    También sincroniza `grupo_visual` desde el registry — siempre overwrite
+    porque el registry es la fuente de verdad de la taxonomía visual.
+    """
     row = conn.execute(
         "SELECT id, parent_id FROM categorias WHERE nombre = %s", (nombre,)
     ).fetchone()
     if row:
-        if row["parent_id"] is not None and not dry_run:
+        if not dry_run:
             conn.execute(
-                "UPDATE categorias SET parent_id = NULL WHERE id = %s", (row["id"],)
+                "UPDATE categorias SET parent_id = NULL, grupo_visual = %s WHERE id = %s",
+                (grupo_visual, row["id"]),
             )
         return row["id"]
     if dry_run:
         return None
     cur = conn.execute(
         """
-        INSERT INTO categorias (nombre, prioridad, parent_id)
-        VALUES (%s, %s, NULL)
-        ON CONFLICT (nombre) DO UPDATE SET parent_id = NULL
+        INSERT INTO categorias (nombre, prioridad, parent_id, grupo_visual)
+        VALUES (%s, %s, NULL, %s)
+        ON CONFLICT (nombre) DO UPDATE SET
+            parent_id = NULL,
+            grupo_visual = EXCLUDED.grupo_visual
         RETURNING id
         """,
-        (nombre, prioridad),
+        (nombre, prioridad, grupo_visual),
     )
     new = cur.fetchone()
     return new[0] if isinstance(new, tuple) else (new["id"] if new else None)
@@ -104,12 +117,18 @@ def _upsert_spec_definition(
         ).fetchone()
         return row["id"] if row else -1
 
+    # Flags iniciales desde registry. En ON CONFLICT NO se sobreescriben — el
+    # admin los puede haber tocado desde /admin/specs y queremos respetar eso.
+    # Si querés re-bootstrappear, hay que truncate manual.
+    favorito_inicial = bool(spec.en_card or spec.destacado)
+
     cur = conn.execute(
         """
         INSERT INTO spec_definitions
           (categoria_raiz_id, spec_key, label, tipo, unidad, enum_options,
-           ayuda, es_compatibilidad, compatibilidad_modo, rol_compatibilidad)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           ayuda, es_compatibilidad, compatibilidad_modo, rol_compatibilidad,
+           favorito, en_nombre, en_filtros, prioridad)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (categoria_raiz_id, spec_key) DO UPDATE SET
             label               = EXCLUDED.label,
             tipo                = EXCLUDED.tipo,
@@ -127,6 +146,8 @@ def _upsert_spec_definition(
             enum_json, spec.ayuda, spec.es_compatibilidad,
             spec.compatibilidad_modo or "exacta",
             spec.rol_compatibilidad,
+            favorito_inicial, bool(spec.en_nombre), bool(spec.en_filtros),
+            int(spec.prioridad),
         ),
     )
     new = cur.fetchone()
@@ -189,7 +210,13 @@ def seed_categoria_from_registry(
     }
 
     # 1) Raíz
-    raiz_id = _ensure_categoria_raiz(conn, cat_reg.nombre, cat_reg.prioridad, dry_run)
+    raiz_id = _ensure_categoria_raiz(
+        conn,
+        cat_reg.nombre,
+        cat_reg.prioridad,
+        grupo_visual=cat_reg.grupo_visual,
+        dry_run=dry_run,
+    )
     if raiz_id is None and not dry_run:
         raise RuntimeError(f"No se pudo crear categoría raíz '{cat_reg.nombre}'")
 

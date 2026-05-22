@@ -1,8 +1,8 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Sparkles, Library, AlertCircle, ArrowLeftRight, ListOrdered, CheckCircle2, Circle, Search, X, FolderTree, List } from "lucide-react";
+import { Plus, Pencil, Trash2, Sparkles, Library, AlertCircle, ArrowLeftRight, ListOrdered, CheckCircle2, Circle, Search, X, FolderTree, List, HelpCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +53,7 @@ const TIPO_LABEL: Record<SpecTipo, string> = {
 };
 
 function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) {
-  useDocumentTitle("Catálogo de specs · Back Office");
+  useDocumentTitle("Specs · Back Office");
   const qc = useQueryClient();
   const [editing, setEditing] = useState<SpecDefinition | "new" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SpecDefinition | null>(null);
@@ -284,12 +284,11 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
             ? "font-display text-xl text-ink flex items-center gap-2"
             : "font-display text-3xl text-ink flex items-center gap-2"}>
             <Library className={embedded ? "h-5 w-5 text-amber" : "h-6 w-6 text-amber"} />
-            Catálogo global de specs
+            Specs
           </h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Definiciones únicas de specs (montura, formato, etc.). Cada una
-            puede asignarse a una o más categorías. Editar acá afecta a todas
-            las categorías que la usan.
+            Definiciones reutilizables (montura, formato, lúmenes…). Editar
+            afecta a todas las categorías que la usan.
           </p>
         </div>
         <Button onClick={() => setEditing("new")}>
@@ -748,6 +747,16 @@ function DefinitionFormModal({
     () => new Set((definition?.categorias ?? []).map((c) => c.id)),
     [definition?.id],   // eslint-disable-line react-hooks/exhaustive-deps
   );
+  // Lookup catId → flags por categoría (destacado/prioridad/ayuda) para
+  // mostrar inline en cada checkbox. Read-only — el detalle se edita en
+  // "Specs por categoría".
+  const catFlagsById = useMemo(() => {
+    const map = new Map<number, { destacado: boolean; prioridad: number; ayuda: string | null }>();
+    for (const c of definition?.categorias ?? []) {
+      map.set(c.id, { destacado: c.destacado, prioridad: c.prioridad, ayuda: c.ayuda });
+    }
+    return map;
+  }, [definition?.id]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [selectedCatIds, setSelectedCatIds] = useState<Set<number>>(initialCatIds);
   const catsQ = useQuery({
     queryKey: ["admin", "categorias"],
@@ -903,8 +912,15 @@ function DefinitionFormModal({
         onClick={(e) => e.stopPropagation()}
       >
         <header className="border-b hairline px-4 py-3 shrink-0">
-          <div className="font-display text-base text-ink">
-            {isNew ? "Nueva definición" : "Editar definición"}
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <div className="font-display text-base text-ink">
+              {isNew ? "Nueva definición" : "Editar definición"}
+            </div>
+            {!isNew && definition && (
+              <div className="font-mono text-[10px] tracking-[0.1em] text-muted-foreground tabular">
+                {definition.uso_categorias ?? 0}c · {definition.uso_equipos ?? 0}e
+              </div>
+            )}
           </div>
           <p className="text-[11px] text-muted-foreground mt-0.5">
             Cambios afectan a todas las categorías que usan esta spec.
@@ -1077,6 +1093,50 @@ function DefinitionFormModal({
                       >
                         {lastSegment}
                       </span>
+                      {(() => {
+                        const flags = catFlagsById.get(c.id);
+                        if (!flags) return null;
+                        const items: ReactNode[] = [];
+                        if (flags.destacado) {
+                          items.push(
+                            <span
+                              key="d"
+                              title="Destacado en esta categoría"
+                              className="inline-flex items-center text-amber"
+                            >
+                              <Sparkles className="h-2.5 w-2.5" />
+                            </span>,
+                          );
+                        }
+                        if (flags.prioridad !== 100) {
+                          items.push(
+                            <span
+                              key="p"
+                              title={`Prioridad ${flags.prioridad} en esta categoría`}
+                              className="inline-flex items-center font-mono text-[9px] text-muted-foreground tabular"
+                            >
+                              p{flags.prioridad}
+                            </span>,
+                          );
+                        }
+                        if (flags.ayuda) {
+                          items.push(
+                            <span
+                              key="h"
+                              title={`Ayuda override: ${flags.ayuda}`}
+                              className="inline-flex items-center text-muted-foreground"
+                            >
+                              <HelpCircle className="h-2.5 w-2.5" />
+                            </span>,
+                          );
+                        }
+                        if (items.length === 0) return null;
+                        return (
+                          <span className="inline-flex items-center gap-1 ml-1 shrink-0">
+                            {items}
+                          </span>
+                        );
+                      })()}
                     </label>
                   );
                 })}

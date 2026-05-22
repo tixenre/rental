@@ -8,7 +8,8 @@ import { EstadoBadge } from "@/components/rental/EstadoBadge";
 import {
   ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon,
   CheckCircle2, XCircle, Info, FileText, FileSignature, Truck,
-  Search, Mail, Phone, MapPin, Building2, Receipt, LogOut, CircleCheckBig,
+  MessageCircle, Search, Mail, Phone, MapPin, Building2, Receipt,
+  LogOut, CircleCheckBig,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -19,6 +20,8 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useBusinessPhone } from "@/lib/business";
+import { whatsappLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cliente/portal")({
@@ -34,7 +37,7 @@ type Perfil = {
   telefono: string;
   direccion: string;
   cuit?: string | null;
-  perfil_impuestos?: string;
+  perfil_impuestos?: string | null;
   descuento?: number;
   direccion_maps_url?: string | null;
   created_at?: string | null;
@@ -414,6 +417,7 @@ export default function ClientePortal() {
                 onToggle={() => setExpanded(expanded === p.id ? null : p.id)}
                 ventanaHoras={ventanaHoras}
                 onChanged={reloadPedidos}
+                perfilImpuestos={perfil?.perfil_impuestos ?? null}
               />
             ))}
           </div>
@@ -487,15 +491,17 @@ function jornadasEntre(desde?: string, hasta?: string): number {
 }
 
 function PedidoCard({
-  pedido, expanded, onToggle, ventanaHoras, onChanged,
+  pedido, expanded, onToggle, ventanaHoras, onChanged, perfilImpuestos,
 }: {
   pedido: Pedido;
   expanded: boolean;
   onToggle: () => void;
   ventanaHoras: number;
   onChanged: () => void;
+  perfilImpuestos: string | null;
 }) {
   const navigate = useNavigate();
+  const businessPhone = useBusinessPhone();
   const { documentos_disponibles: docs } = pedido;
   const numero = pedido.numero_pedido ?? pedido.id;
   const jornadas = jornadasEntre(pedido.fecha_desde, pedido.fecha_hasta);
@@ -539,7 +545,10 @@ function PedidoCard({
   const subtotalItems = pedido.items.reduce((acc, it) => acc + it.subtotal, 0);
   const descuentoPct = pedido.descuento_pct ?? 0;
   const descuentoMonto = Math.round(subtotalItems * (descuentoPct / 100));
-  const total = pedido.monto_total ?? (subtotalItems - descuentoMonto);
+  const totalNeto = pedido.monto_total ?? (subtotalItems - descuentoMonto);
+  const conIva = perfilImpuestos === "responsable_inscripto";
+  const ivaMonto = conIva ? Math.round(totalNeto * 0.21) : 0;
+  const total = totalNeto + ivaMonto;
   const pagado = pedido.monto_pagado ?? 0;
   const balance = Math.max(0, total - pagado);
 
@@ -806,8 +815,22 @@ function PedidoCard({
                 </span>
               </div>
             )}
+            {conIva && (
+              <>
+                <div className="flex justify-between items-baseline font-sans text-[13px]">
+                  <span className="text-muted-foreground">Subtotal neto</span>
+                  <span className="font-mono font-semibold text-ink tabular-nums">{fmt(totalNeto)}</span>
+                </div>
+                <div className="flex justify-between items-baseline font-sans text-[13px]">
+                  <span className="text-muted-foreground">IVA 21%</span>
+                  <span className="font-mono font-semibold text-ink tabular-nums">+{fmt(ivaMonto)}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between items-baseline pt-1.5 mt-1 border-t border-[var(--hairline)]">
-              <span className="font-sans text-[15px] font-bold text-ink">Total</span>
+              <span className="font-sans text-[15px] font-bold text-ink">
+                Total{conIva ? " · IVA incluído" : ""}
+              </span>
               <span className="font-display text-[22px] font-black text-ink tabular-nums">{fmt(total)}</span>
             </div>
             {pagado > 0 && (
@@ -851,6 +874,26 @@ function PedidoCard({
             </section>
           )}
 
+          {(() => {
+            const waHref = whatsappLink({
+              phone: businessPhone,
+              message: `Hola, consulta sobre el pedido #${numero}`,
+            });
+            if (!waHref) return null;
+            return (
+              <section>
+                <a
+                  href={waHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#25D366] text-white px-4 py-2.5 font-sans text-sm font-semibold hover:brightness-95 transition min-h-[44px]"
+                >
+                  <MessageCircle className="h-4 w-4" strokeWidth={2.2} />
+                  Consulta por WhatsApp
+                </a>
+              </section>
+            );
+          })()}
         </div>
       )}
 

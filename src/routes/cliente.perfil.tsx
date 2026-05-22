@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
+import { invalidateClienteSession } from "@/lib/iva";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { PublicLayout } from "@/components/rental/PublicLayout";
@@ -10,6 +11,8 @@ export const Route = createFileRoute("/cliente/perfil")({
   component: PerfilPage,
 });
 
+type PerfilImpuestos = "consumidor_final" | "responsable_inscripto" | "monotributo" | "exento";
+
 type Perfil = {
   id: number;
   nombre: string;
@@ -18,6 +21,10 @@ type Perfil = {
   telefono: string;
   direccion: string;
   cuit?: string | null;
+  perfil_impuestos?: PerfilImpuestos | null;
+  razon_social?: string | null;
+  domicilio_fiscal?: string | null;
+  email_facturacion?: string | null;
 };
 
 function PerfilPage() {
@@ -41,6 +48,10 @@ function PerfilPage() {
           telefono: data.telefono,
           direccion: data.direccion,
           cuit: data.cuit ?? "",
+          perfil_impuestos: data.perfil_impuestos ?? "consumidor_final",
+          razon_social: data.razon_social ?? "",
+          domicilio_fiscal: data.domicilio_fiscal ?? "",
+          email_facturacion: data.email_facturacion ?? "",
         });
       })
       .catch(() => navigate({ to: "/cliente/login" }))
@@ -69,6 +80,10 @@ function PerfilPage() {
       }
       const updated = (await res.json()) as Perfil;
       setPerfil(updated);
+      // Invalidamos el cache compartido para que las próximas llamadas a
+      // useClienteSession (catálogo, ficha, carrito) reflejen el nuevo
+      // perfil impositivo de inmediato.
+      invalidateClienteSession();
       toast.success("Perfil actualizado");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar");
@@ -170,6 +185,55 @@ function PerfilPage() {
               className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm text-ink"
             />
           </Field>
+
+          <Field label="Perfil impositivo" hint="Determina cómo se discrimina el IVA en tus facturas">
+            <select
+              value={form.perfil_impuestos ?? "consumidor_final"}
+              onChange={(e) => setForm({ ...form, perfil_impuestos: e.target.value as PerfilImpuestos })}
+              className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm text-ink"
+            >
+              <option value="consumidor_final">Consumidor final</option>
+              <option value="responsable_inscripto">Responsable inscripto (Factura A)</option>
+              <option value="monotributo">Monotributo</option>
+              <option value="exento">Exento</option>
+            </select>
+          </Field>
+
+          {/* Datos para Factura A — sólo visibles si el cliente es RI */}
+          {form.perfil_impuestos === "responsable_inscripto" && (
+            <div className="rounded-md border border-dashed hairline bg-amber-soft/40 p-4 space-y-3">
+              <div className="text-xs font-semibold text-ink uppercase tracking-wider">
+                Datos para Factura A
+              </div>
+              <Field label="Razón social" hint="Nombre legal de tu empresa">
+                <input
+                  type="text"
+                  value={form.razon_social ?? ""}
+                  onChange={(e) => setForm({ ...form, razon_social: e.target.value })}
+                  placeholder="Productora SA"
+                  className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm text-ink"
+                />
+              </Field>
+              <Field label="Domicilio fiscal" hint="Si difiere del domicilio de entrega">
+                <input
+                  type="text"
+                  value={form.domicilio_fiscal ?? ""}
+                  onChange={(e) => setForm({ ...form, domicilio_fiscal: e.target.value })}
+                  placeholder="Av. Siempre Viva 123, Mar del Plata"
+                  className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm text-ink"
+                />
+              </Field>
+              <Field label="Email de facturación" hint="Si querés que la factura llegue a otro email">
+                <input
+                  type="email"
+                  value={form.email_facturacion ?? ""}
+                  onChange={(e) => setForm({ ...form, email_facturacion: e.target.value })}
+                  placeholder="facturacion@empresa.com"
+                  className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm text-ink"
+                />
+              </Field>
+            </div>
+          )}
 
           <div className="pt-3">
             <button

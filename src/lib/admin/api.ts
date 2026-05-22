@@ -304,6 +304,12 @@ export type SpecDefinitionCategoriaAsign = {
   id: number;
   nombre: string;
   template_id: number;
+  /** Flags por categoría — el detalle vive en "Specs por categoría". Solo
+   *  los exponemos acá para que el modal global muestre inline si tienen
+   *  override por categoría (read-only). */
+  destacado: boolean;
+  prioridad: number;
+  ayuda: string | null;
 };
 
 export type SpecDefinition = {
@@ -1144,102 +1150,6 @@ export const adminApi = {
     );
   },
 
-  // ── Skill gear-compatibility (F6): pendientes + propuestas ─────────
-  /** Equipos pendientes de análisis IA (nunca analizados o modificados
-   *  después del último run). Lo consume el skill cuando se invoca `new`. */
-  listarPendientesCompat: (limit = 50) =>
-    authedJson<{ total: number; items: EquipoPendienteCompat[] }>(
-      `/api/admin/equipos/pendientes-compat?limit=${limit}`,
-    ),
-  /** Lista propuestas IA generadas por el skill. estado:
-   *  pendientes (default) | aplicadas | descartadas | todas. */
-  listarPropuestas: (estado: "pendientes" | "aplicadas" | "descartadas" | "todas" = "pendientes") =>
-    authedJson<{ items: PropuestaPendiente[] }>(
-      `/api/admin/specs/propuestas?estado=${estado}`,
-    ),
-  aplicarPropuesta: (propuestaId: number) =>
-    authedPostJson<{ ok: true; id: number; tipo: PropuestaTipo }>(
-      `/api/admin/specs/propuestas/${propuestaId}/aplicar`,
-      {},
-    ),
-  descartarPropuesta: (propuestaId: number) =>
-    authedPostJson<{ ok: true; id: number }>(
-      `/api/admin/specs/propuestas/${propuestaId}/descartar`,
-      {},
-    ),
-  bulkPropuestas: (input: {
-    ids: number[];
-    accion: "apply" | "discard";
-    min_confianza?: number;
-  }) =>
-    authedPostJson<{
-      ok_count: number;
-      ok_ids: number[];
-      failed: Array<{ id: number; error: string }>;
-      skipped_by_confianza: number;
-    }>("/api/admin/specs/propuestas/bulk", input),
-
-  // ── Familias jerárquicas (HDMI 1.4 < 2.0 < 2.1, SDI, etc.) ────────
-  listSpecFamilias: () =>
-    authedJson<{
-      items: Array<{
-        familia: string;
-        items: Array<{
-          id: number;
-          valor: string;
-          posicion: number;
-          spec_def_id: number | null;
-        }>;
-      }>;
-    }>("/api/admin/spec-familias"),
-  createSpecFamiliaItem: (input: {
-    familia: string;
-    valor: string;
-    posicion: number;
-    spec_def_id?: number | null;
-  }) =>
-    authedJson<{ id: number; familia: string; valor: string; posicion: number }>(
-      "/api/admin/spec-familias",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      },
-    ),
-  updateSpecFamiliaItem: (
-    itemId: number,
-    input: { familia?: string; valor?: string; posicion?: number; spec_def_id?: number | null },
-  ) =>
-    authedJson<{ ok: true; id: number }>(`/api/admin/spec-familias/${itemId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    }),
-  deleteSpecFamiliaItem: async (itemId: number) => {
-    const res = await authedFetch(`/api/admin/spec-familias/${itemId}`, { method: "DELETE" });
-    if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
-  },
-
-  // ── Cleanup de specs legacy (equipo_fichas.specs_json) ───────────
-  listLegacyInventario: () =>
-    authedJson<{
-      total: number;
-      items: Array<{
-        equipo_id: number;
-        equipo_nombre: string;
-        total: number;
-        matched: number;
-        custom: number;
-      }>;
-    }>("/api/admin/specs/legacy/inventario"),
-  promoverLegacyEquipo: (equipoId: number) =>
-    authedPostJson<{
-      ok: true;
-      equipo_id: number;
-      promoted_count: number;
-      kept_count: number;
-      promoted: Array<{ label: string; spec_def_id: number }>;
-    }>(`/api/admin/specs/legacy/promover/${equipoId}`, {}),
 
   // ── Nombres públicos / validación ──────────────────────────────────
   regenerarNombres: (dry_run = true) =>
@@ -1291,10 +1201,11 @@ export const adminApi = {
     }),
 
   // pedidos / alquileres
-  listPedidos: (params: { estado?: string; q?: string; per_page?: number; page?: number } = {}) => {
+  listPedidos: (params: { estado?: string; q?: string; con_saldo?: boolean; per_page?: number; page?: number } = {}) => {
     const sp = new URLSearchParams();
     if (params.estado) sp.set("estado", params.estado);
     if (params.q) sp.set("q", params.q);
+    if (params.con_saldo) sp.set("con_saldo", "true");
     sp.set("per_page", String(params.per_page ?? 100));
     sp.set("page", String(params.page ?? 1));
     return authedJson<PedidosListResp>(`/api/alquileres?${sp.toString()}`);
@@ -1440,6 +1351,18 @@ export const adminApi = {
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(json?.detail ?? `Upload logo → ${res.status}`);
+    return json as { ok: true; url: string };
+  },
+
+  uploadOgImage: async (file: File): Promise<{ ok: true; url: string }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await authedFetch("/api/admin/settings/upload-og-image", {
+      method: "POST",
+      body: fd,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.detail ?? `Upload OG image → ${res.status}`);
     return json as { ok: true; url: string };
   },
 

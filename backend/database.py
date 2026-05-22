@@ -325,6 +325,9 @@ def init_db():
             cuit              TEXT NOT NULL,
             descuento         FLOAT DEFAULT 0,
             perfil_impuestos  TEXT DEFAULT 'consumidor_final',
+            razon_social      TEXT,
+            domicilio_fiscal  TEXT,
+            email_facturacion TEXT,
             notas             TEXT,
             created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -502,6 +505,12 @@ def init_db():
     conn.execute("""
         ALTER TABLE categorias ADD COLUMN IF NOT EXISTS nombre_publico_template TEXT
     """)
+    # `grupo_visual` agrupa varias categorías raíz en un bloque visual del
+    # catálogo (ej. Lentes / Adaptadores / Filtros → "Óptica") sin nidos en
+    # el modelo de datos. Single source of truth: registry.py.
+    conn.execute("""
+        ALTER TABLE categorias ADD COLUMN IF NOT EXISTS grupo_visual VARCHAR(64)
+    """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_cat_prioridad ON categorias(prioridad, nombre)
     """)
@@ -657,6 +666,10 @@ def init_db():
             validado            BOOLEAN NOT NULL DEFAULT FALSE,
             tabla_columnas      JSONB,
             output_config       JSONB,
+            favorito            BOOLEAN NOT NULL DEFAULT FALSE,
+            en_nombre           BOOLEAN NOT NULL DEFAULT FALSE,
+            en_filtros          BOOLEAN NOT NULL DEFAULT FALSE,
+            prioridad           INTEGER NOT NULL DEFAULT 100,
             created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (categoria_raiz_id, spec_key)

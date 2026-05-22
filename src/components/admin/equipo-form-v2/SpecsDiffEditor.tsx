@@ -69,19 +69,48 @@ export function SpecsDiffEditor({
 
   // Particionar specs en "del template" y "custom".
   // El orden del template-bound viene de templateItems (prioridad ASC).
+  //
+  // Importante: si un template item NO tiene match en specs[] (porque el
+  // useEffect de EquipoFormDialogV2 no ha rellenado specs vacías todavía,
+  // o por algún edge case), igual lo renderizamos con un "ghost spec"
+  // (id derivado del spec_def_id). Cuando el admin edita el valor por
+  // primera vez, updateSpec lo materializa en specs[]. Esto asegura que
+  // el form siempre muestre todos los specs disponibles del template,
+  // independiente de timing/sincronización.
   const specByLabel = new Map<string, Spec>();
   for (const s of specs) specByLabel.set(lower(s.label), s);
 
-  const templateBound: Array<{ spec: Spec; tmpl: SpecTemplate }> = [];
+  const templateBound: Array<{ spec: Spec; tmpl: SpecTemplate; ghost: boolean }> = [];
   for (const t of templateItems ?? []) {
-    const s = specByLabel.get(lower(t.label));
-    if (s) templateBound.push({ spec: s, tmpl: t });
+    if (!t.label?.trim()) continue;
+    const existing = specByLabel.get(lower(t.label));
+    if (existing) {
+      templateBound.push({ spec: existing, tmpl: t, ghost: false });
+    } else {
+      // Ghost: spec todavía no materializado en specs[]. El id usa
+      // spec_def_id como discriminador para que updateSpec lo encuentre.
+      templateBound.push({
+        spec: { id: `tmpl-${t.spec_def_id}`, label: t.label, value: "" },
+        tmpl: t,
+        ghost: true,
+      });
+    }
   }
-  const templateBoundIds = new Set(templateBound.map((x) => x.spec.id));
+  const templateBoundIds = new Set(
+    templateBound.filter((x) => !x.ghost).map((x) => x.spec.id),
+  );
   const custom = specs.filter((s) => !templateBoundIds.has(s.id));
 
   const updateSpec = (id: string, patch: Partial<Spec>) => {
-    onChange(specs.map((s) => s.id === id ? { ...s, ...patch } : s));
+    // Si el id corresponde a un spec ya en specs[], update normal.
+    if (specs.some((s) => s.id === id)) {
+      onChange(specs.map((s) => s.id === id ? { ...s, ...patch } : s));
+      return;
+    }
+    // Ghost: materializar agregando al specs[] con el label del template.
+    const ghost = templateBound.find((x) => x.ghost && x.spec.id === id);
+    if (!ghost) return;
+    onChange([...specs, { id, label: ghost.tmpl.label, value: "", ...patch }]);
   };
   const removeSpec = (id: string) => onChange(specs.filter((s) => s.id !== id));
   // addSpec removido: las specs se administran desde Gear Compatibility.
@@ -106,7 +135,8 @@ export function SpecsDiffEditor({
     onChange(next);
   };
 
-  const totalCount = specs.length;
+  // Total incluye ghosts (templateItems no materializados aún en specs[]).
+  const totalCount = templateBound.length + custom.length;
 
   return (
     <div className="space-y-2">
@@ -123,13 +153,6 @@ export function SpecsDiffEditor({
             </>
           )}
         </span>
-        <a
-          href="/admin/gear-compatibility"
-          className="text-[11px] text-muted-foreground hover:text-ink underline"
-          title="Las specs se administran desde Gear Compatibility. Acá solo cargás valores."
-        >
-          ¿Falta una spec? Gestionala en Gear Compatibility →
-        </a>
       </div>
 
       {/* Propuestos (del autocompletar) */}

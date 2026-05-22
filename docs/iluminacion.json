@@ -28,8 +28,7 @@
         "peso_g": 390,
         "iluminacion_subtipo": "Flexible Mat",
         "color_modes": [
-          "Tungsten",
-          "Daylight"
+          "Bicolor"
         ]
       },
       "extras": {
@@ -296,9 +295,8 @@
         "peso_g": 240,
         "iluminacion_subtipo": "Panel",
         "color_modes": [
-          "RGB",
-          "Tungsten",
-          "Daylight"
+          "Bicolor",
+          "RGB"
         ]
       },
       "extras": {
@@ -514,10 +512,9 @@
         ],
         "montaje": "Bowens",
         "peso_g": 3160,
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
-          "Tungsten",
-          "Daylight"
+          "Bicolor"
         ]
       },
       "extras": {
@@ -715,7 +712,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1930190-REG/amaran_mp00000191_ray_360c_rgb_led.html/specs",
       "specs": {
         "potencia_w": 410,
-        "lumens": 23174,
+        "lumens_at_5600k": 23174,
         "cri": 95,
         "temperatura_k": [
           1800,
@@ -731,11 +728,10 @@
         ],
         "montaje": "Bowens",
         "peso_g": 3300,
-        "iluminacion_subtipo": "COB Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
-          "RGB",
-          "Tungsten",
-          "Daylight"
+          "Bicolor",
+          "RGB"
         ]
       },
       "extras": {
@@ -986,9 +982,8 @@
         "peso_g": 16250,
         "iluminacion_subtipo": "Panel",
         "color_modes": [
-          "RGB",
-          "Tungsten",
-          "Daylight"
+          "Bicolor",
+          "RGB"
         ]
       },
       "extras": {
@@ -1448,9 +1443,8 @@
         "peso_g": 730,
         "iluminacion_subtipo": "Tube Light",
         "color_modes": [
-          "RGB",
-          "Tungsten",
-          "Daylight"
+          "Bicolor",
+          "RGB"
         ]
       },
       "extras": {
@@ -1680,7 +1674,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1595337-REG/aputure_aacbc7_accent_b7c_led_light.html",
       "specs": {
         "potencia_w": 7,
-        "lumens": 570,
+        "lumens_at_5600k": 570,
         "cri": 95,
         "temperatura_k": [
           2000,
@@ -1691,11 +1685,10 @@
           "AC"
         ],
         "peso_g": 210,
-        "iluminacion_subtipo": "Bulb / Lamp",
+        "iluminacion_subtipo": "Foco",
         "color_modes": [
-          "RGB",
-          "Tungsten",
-          "Daylight"
+          "Bicolor",
+          "RGB"
         ]
       },
       "extras": {
@@ -1777,7 +1770,7 @@
         ],
         "montaje": "Bowens",
         "peso_g": 860,
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
           "Tungsten"
         ]
@@ -1953,7 +1946,7 @@
         ],
         "montaje": "Bowens",
         "peso_g": 2400,
-        "iluminacion_subtipo": "COB Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
           "Tungsten"
         ]
@@ -2172,7 +2165,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1476382-REG/nanlite_12_2026_forza_500_led_monolight.html?fromDisList=y",
       "specs": {
         "potencia_w": 500,
-        "lumens": 46613,
+        "lumens_at_5600k": 46613,
         "cri": 98,
         "temperatura_k": [
           5600
@@ -2186,7 +2179,7 @@
         ],
         "montaje": "Bowens",
         "peso_g": 2490,
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
           "Tungsten"
         ]
@@ -2362,7 +2355,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1476380-REG/nanlite_12_2022_forza_60_led_monolight.html",
       "specs": {
         "potencia_w": 60,
-        "lumens": 6732,
+        "lumens_at_5600k": 6732,
         "cri": 98,
         "temperatura_k": [
           5600
@@ -2375,7 +2368,7 @@
         ],
         "montaje": "Propietario",
         "peso_g": 830,
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
           "Tungsten"
         ]
@@ -2574,7 +2567,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1762211-REG/amaran_ap30011a10_300c_rgb_led_monolight.html?fromDisList=y",
       "specs": {
         "potencia_w": 360,
-        "lumens": 19389,
+        "lumens_at_5600k": 19389,
         "cri": 95,
         "temperatura_k": [
           2500,
@@ -2590,11 +2583,10 @@
         ],
         "montaje": "Bowens",
         "peso_g": 2600,
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
-          "RGB",
-          "Tungsten",
-          "Daylight"
+          "Bicolor",
+          "RGB"
         ]
       },
       "extras": {
@@ -2817,7 +2809,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1753990-REG/amaran_apm022xa10_amaran_cob_200x_s.html?fromDisList=y",
       "specs": {
         "potencia_w": 229,
-        "lumens": 17000,
+        "lumens_at_5600k": 17000,
         "cri": 95,
         "temperatura_k": [
           2700,
@@ -2834,10 +2826,9 @@
         ],
         "montaje": "Bowens",
         "peso_g": 1560,
-        "iluminacion_subtipo": "COB Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
-          "Tungsten",
-          "Daylight"
+          "Bicolor"
         ]
       },
       "extras": {

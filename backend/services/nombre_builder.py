@@ -273,6 +273,7 @@ def _render_template(
             spec_map[norm_spec_label(s.get("label") or "")] = {
                 "value": (s.get("value") or "").strip(),
                 "tipo": s.get("tipo"),
+                "unidad": s.get("unidad"),
                 "tabla_columnas": s.get("tabla_columnas"),
                 "output_config": s.get("output_config"),
             }
@@ -295,6 +296,7 @@ def _render_template(
                     info.get("tabla_columnas"),
                     info.get("output_config"),
                     path,
+                    unidad=info.get("unidad"),
                 )
             else:
                 val = ""
@@ -318,233 +320,6 @@ def _render_template(
     return out if out and not re.match(rf"^{_TPL_SEP}+$", out) else ""
 
 
-# ── Formatters específicos por categoría ────────────────────────────────
-
-def _fmt_camara(*, marca, modelo, subcat, specs, raiz, specs_ordered=None) -> tuple[list[str], list[str]]:
-    """Cámara Sony FX3 Sensor Full-Frame Montura E 4K — incluye TODAS
-    las specs marcadas visible_en_nombre en orden de prioridad."""
-    tipo = SUBCATEGORIA_A_TIPO.get(subcat or "", "Cámara")
-    base = [tipo, marca, modelo]
-    extras_corto: list[str] = []
-    extras_largo: list[str] = []
-    # Recorrer las specs en orden (ya vienen filtradas por visible_en_nombre
-    # y ordenadas por prioridad).
-    for label, value in (specs_ordered or []):
-        if not value or str(value).strip() == "":
-            continue
-        v = str(value).strip()
-        if v.lower() in ("false", "0", "no"):
-            continue
-        label_lc = label.strip().lower()
-        # Formato especial por key conocida.
-        # "lens mount" es el label canónico nuevo; "montura" es legacy.
-        if label_lc.startswith("lens mount") or label_lc.startswith("montura"):
-            entry = f"Montura {v}"
-        elif label_lc.startswith("video"):
-            # "UHD 4K hasta 120p" → en el largo tal cual, en el corto
-            # extraer solo el "4K" / "6K" / "8K".
-            import re as _re
-            short = _re.search(r"(\d+K|FHD)", v)
-            extras_corto.append(short.group(1) if short else v)
-            extras_largo.append(v)
-            continue
-        elif label_lc.startswith("sensor"):
-            entry = v
-        elif label_lc.startswith("formato"):
-            entry = v
-        else:
-            # Bool true → solo label; otro → "Label valor"
-            if v.lower() in ("true", "1", "sí", "si", "yes"):
-                entry = label
-            else:
-                entry = f"{label} {v}"
-        extras_corto.append(entry)
-        extras_largo.append(entry)
-    return base + extras_corto, base + extras_largo
-
-
-def _fmt_lente(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Lente Prime Sigma 35mm f/1.4 Art Montura EF
-       Lente Zoom Sony FE 24-70mm f/2.8 GM II Montura E
-
-    Usa schema canónico: distancia_focal=[v] o [min,max], apertura=[v] o
-    [min,max], lens_mount enum. Fallback a claves legacy (focal mín/máx,
-    apertura máx, montura) si el equipo viene de un esquema viejo."""
-    tipo = "Lente"
-    modelo_lc = (modelo or "").lower()
-
-    # ── Schema canónico: distancia_focal como lista ──
-    focal = specs.get("distancia_focal")
-    if not focal:
-        fmin = specs.get("focal mín") or specs.get("focal min")
-        fmax = specs.get("focal máx") or specs.get("focal max")
-        if fmin and fmax:
-            focal = [fmin, fmax] if str(fmin) != str(fmax) else [fmin]
-        elif fmin:
-            focal = [fmin]
-
-    es_zoom = isinstance(focal, list) and len(focal) >= 2 and focal[0] != focal[-1]
-    es_prime = isinstance(focal, list) and len(focal) == 1
-
-    sub_tipo = None
-    if es_zoom:
-        sub_tipo = "Zoom"
-    elif es_prime:
-        sub_tipo = "Prime"
-    else:
-        if re.search(r"\d+\s*-\s*\d+\s*mm", modelo_lc):
-            sub_tipo = "Zoom"
-        elif re.search(r"\b\d+\s*mm\b", modelo_lc):
-            sub_tipo = "Prime"
-
-    base: list[str] = [tipo]
-    if sub_tipo:
-        base.append(sub_tipo)
-    base.extend([marca or "", modelo or ""])
-
-    extras_corto: list[str] = []
-    extras_largo: list[str] = []
-
-    if focal and "mm" not in modelo_lc:
-        if isinstance(focal, list) and len(focal) >= 2 and focal[0] != focal[-1]:
-            extras_corto.append(f"{_fmt_num(focal[0])}-{_fmt_num(focal[-1])}mm")
-        elif isinstance(focal, list):
-            extras_corto.append(f"{_fmt_num(focal[0])}mm")
-
-    apertura = specs.get("apertura")
-    if not apertura:
-        apertura = specs.get("apertura máx") or specs.get("apertura max")
-    if apertura and "f/" not in modelo_lc and "t/" not in modelo_lc:
-        if isinstance(apertura, list) and apertura:
-            if len(apertura) >= 2 and apertura[0] != apertura[-1]:
-                extras_corto.append(f"f/{_fmt_num(apertura[0])}-{_fmt_num(apertura[-1])}")
-            else:
-                extras_corto.append(f"f/{_fmt_num(apertura[0])}")
-        else:
-            v = str(apertura).strip()
-            if not v.lower().startswith(("f/", "t/")):
-                clean = re.sub(r"^f\s*", "", v, flags=re.IGNORECASE)
-                v = f"f/{clean}"
-            extras_corto.append(v)
-
-    # Línea (Art / GM / L) — antes de la montura
-    linea = specs.get("linea")
-    if linea and str(linea).lower() not in modelo_lc:
-        extras_corto.append(str(linea))
-
-    # Montura — saltear si el valor ya aparece en el modelo (ej. "M42")
-    mount_val = specs.get("lens_mount") or specs.get("montura")
-    if mount_val:
-        mount_lc = str(mount_val).lower()
-        ya_en_modelo = (
-            "montura" in modelo_lc
-            or "mount" in modelo_lc
-            or re.search(rf"\b{re.escape(mount_lc)}\b", modelo_lc)
-        )
-        if not ya_en_modelo:
-            extras_corto.append(f"Montura {mount_val}")
-
-    if specs.get("formato"):
-        extras_largo.append(specs["formato"])
-
-    return base + extras_corto, base + extras_corto + extras_largo
-
-
-def _fmt_luz(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Luz LED Amaran 300C RGB Bicolor
-       Luz LED Nanlite Forza 500 Daylight (si no es RGB/bicolor)
-       Flash Godox V1"""
-    tipo = SUBCATEGORIA_A_TIPO.get(subcat or "", "Luz")
-    # Si subcategoría es "LED daylight/bicolor" pero NI rgb NI bicolor → "Luz LED Daylight"
-    es_rgb = _is_true(specs.get("rgb"))
-    es_bicolor = _is_true(specs.get("bicolor"))
-
-    base = [tipo, marca, modelo]
-
-    extras_corto = []
-    if es_rgb:
-        extras_corto.append("RGB")
-    if es_bicolor:
-        extras_corto.append("Bicolor")
-
-    # Si no es ni RGB ni bicolor y la subcategoría es "LED daylight/bicolor",
-    # asumimos daylight (los daylight puros van en esa subcat).
-    if not extras_corto and (subcat or "").lower().startswith("led daylight"):
-        extras_corto.append("Daylight")
-
-    extras_largo = list(extras_corto)
-    if specs.get("potencia"):
-        extras_largo.append(f"{specs['potencia']}W")
-    return base + extras_corto, base + extras_largo
-
-
-def _fmt_adaptador(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Adaptador Sigma MC-11 EF → E
-       Filtro polarizador Tiffen 82mm
-       Filtro variable Tiffen 82mm 2-8 stops
-
-    Schema canónico (lens_mount/lens_mount_out/diametro_filtro/densidad).
-    Lee filtro_subtipo / adaptador_subtipo según corresponda; fallback al
-    nombre de sub-categoría."""
-    tipo = (
-        specs.get("filtro_subtipo")
-        or specs.get("adaptador_subtipo")
-        or SUBCATEGORIA_A_TIPO.get(subcat or "", "Adaptador")
-    )
-    modelo_lc = (modelo or "").lower()
-
-    # Solo eliminamos el tipo si el modelo ARRANCA con la primera palabra del tipo
-    tipo_str = str(tipo).strip().lower()
-    primer_word = tipo_str.split()[0] if tipo_str else ""
-    tipo_redundante = bool(
-        tipo_str and (
-            tipo_str in modelo_lc
-            or (primer_word and modelo_lc.startswith(primer_word + " "))
-        )
-    )
-    base = ([] if tipo_redundante else [tipo]) + [marca or "", modelo or ""]
-    extras_corto: list[str] = []
-
-    # Adaptadores: mount_out → mount (lens → body)
-    mount_out = specs.get("lens_mount_out") or specs.get("montura salida")
-    mount = specs.get("lens_mount") or specs.get("montura entrada") or specs.get("montura")
-    if mount_out and mount and f"{mount_out} → {mount}".lower() not in modelo_lc:
-        extras_corto.append(f"{mount_out} → {mount}")
-    elif mount and "montura" not in modelo_lc and "mount" not in modelo_lc and not mount_out:
-        extras_corto.append(f"Montura {mount}")
-
-    # Filtros: diámetro (spec canónica diametro_filtro; fallback legacy)
-    diam = (
-        specs.get("diametro_filtro")
-        or specs.get("diametro_mm")
-        or specs.get("diámetro")
-        or specs.get("diametro")
-    )
-    if diam and f"{diam}mm".lower() not in modelo_lc:
-        extras_corto.append(f"{diam}mm")
-
-    densidad = specs.get("densidad") or specs.get("densidad nd")
-    if densidad and str(densidad).lower() not in modelo_lc:
-        extras_corto.append(str(densidad))
-
-    return base + extras_corto, base + extras_corto
-
-
-def _fmt_generico(*, marca, modelo, subcat, specs, raiz, **_) -> tuple[list[str], list[str]]:
-    """Fallback: tipo + marca + modelo, sin specs."""
-    tipo = SUBCATEGORIA_A_TIPO.get(subcat or "", RAIZ_A_TIPO.get(raiz or "", ""))
-    return [tipo, marca, modelo], [tipo, marca, modelo]
-
-
-# Mapeo de raíz → formatter
-_FORMATTERS = {
-    "Cámaras": _fmt_camara,
-    "Lentes": _fmt_lente,
-    "Iluminación": _fmt_luz,
-    "Adaptadores": _fmt_adaptador,
-    "Filtros": _fmt_adaptador,  # mismo formatter (rama filtro detecta por specs)
-}
-
 
 # ── API pública ─────────────────────────────────────────────────────────
 
@@ -561,69 +336,65 @@ def construir_nombre_publico(
 ) -> tuple[str, str]:
     """Devuelve (nombre_publico, nombre_publico_largo).
 
+    Jerarquía (decidido en refactor 2026-05-22):
+    1. Si hay `nombre_publico_override` (escape hatch manual del admin) →
+       gana sobre todo.
+    2. Si hay `template_override` (template de categoría o ficha) →
+       `_render_template` con specs y vars del equipo.
+    3. Si NO hay template → devolver `("", "")`. La UI debe usar
+       `nombre_interno` como fallback.
+
+    Antes había un auto-build con formatters por categoría (`_fmt_luz`,
+    `_fmt_camara`, etc.) que tomaba decisiones hardcoded y miraba specs
+    legacy. Se eliminó porque generaba inconsistencias con el template.
+
+    `categoria_raiz` y `categoria_sub` quedan en la firma por compat con
+    callers existentes, pero ya no se usan internamente.
+
     Args:
-        nombre_interno: el `equipos.nombre` (fallback final).
+        nombre_interno: el `equipos.nombre` (no se usa salvo override).
         marca / modelo: del equipo.
-        categoria_raiz: ej. "Iluminación". None si el equipo no tiene
-            categoría asignada → fallback a nombre interno.
-        categoria_sub: ej. "LED daylight/bicolor". Refina el tipo.
-        specs_en_nombre: lista de dicts {label, value, tipo, tabla_columnas}
-            desde `equipo_specs` (con metadata para formato).
-        template_override: si la ficha tiene `nombre_publico_template`,
-            se usa con tokens.
-        nombre_publico_override: override manual del admin desde la UI de
-            validación. Gana sobre todo el resto.
+        categoria_raiz: ej. "Iluminación". Compat — no se usa.
+        categoria_sub: ej. "LED Bicolor". Compat — no se usa.
+        specs_en_nombre: lista de dicts {label, value, tipo, unidad,
+            tabla_columnas, output_config} desde `equipo_specs` JOIN
+            `spec_definitions`.
+        template_override: template con placeholders `{marca}` `{modelo}`
+            `{nombre}` y `{spec:Label}`. Hoy viene de
+            `categorias.nombre_publico_template`.
+        nombre_publico_override: override manual del admin. Gana siempre.
+
+    Returns:
+        (corto, largo). Hoy ambos son iguales. `largo` queda en la firma
+        por compat con consumers existentes.
     """
     marca_s = (marca or "").strip()
     modelo_s = (modelo or "").strip()
     nombre_s = (nombre_interno or "").strip()
 
-    # 1. Override del admin (UI de validación) — gana sobre todo
+    # 1. Override manual del admin — gana sobre todo
     if nombre_publico_override and nombre_publico_override.strip():
         v = nombre_publico_override.strip()
         return v, v
 
-    # 2. Template manual con tokens (ficha)
+    # 2. Template del registry (categoría)
     if template_override and template_override.strip():
         vars_dict = {
-            "tipo": SUBCATEGORIA_A_TIPO.get(categoria_sub or "", "")
-                    or RAIZ_A_TIPO.get(categoria_raiz or "", ""),
             "marca": marca_s,
             "modelo": modelo_s,
             "nombre": nombre_s,
         }
         rendered = _render_template(template_override, vars_dict, specs=specs_en_nombre)
         if rendered:
+            # Cap suave a 120 chars — los nombres del template suelen ser
+            # más descriptivos que el auto-build legacy.
+            rendered = _cap_largo(rendered, 120)
             return rendered, rendered
+        # Template existe pero rindió vacío (todos los placeholders sin valor).
+        # Igual devolvemos vacío para que la UI use nombre interno.
 
-    # 3. Auto-build: dispatch al formatter de la categoría raíz
-    formatter = _FORMATTERS.get(categoria_raiz or "", _fmt_generico)
-
-    # Para path formatter usamos shape simple (label, value).
-    simple_pairs = [(s["label"], s["value"]) for s in specs_en_nombre]
-    specs_d = _specs_dict(simple_pairs)
-    # Algunos formatters usan la lista ordenada en lugar de dict (porque
-    # importa el orden de prioridad del template).
-    parts_corto, parts_largo = formatter(
-        marca=marca_s, modelo=modelo_s,
-        subcat=categoria_sub, raiz=categoria_raiz,
-        specs=specs_d,
-        specs_ordered=simple_pairs,
-    )
-
-    corto = _join(parts_corto)
-    largo = _join(parts_largo)
-
-    # Cap suave del corto (60 chars)
-    corto = _cap_largo(corto, 60)
-
-    # Fallback si todo quedó vacío
-    if not corto:
-        corto = nombre_s
-    if not largo:
-        largo = corto or nombre_s
-
-    return corto, largo
+    # 3. Sin template → vacío. La UI usa `equipos.nombre` como fallback.
+    return "", ""
 
 
 # ════════════════════════════════════════════════════════════════════════

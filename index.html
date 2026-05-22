@@ -58,6 +58,11 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
 
+    <!-- PWA del back-office. El `scope: /admin/` hace que el navegador sólo
+         ofrezca "Instalar" cuando el usuario navega dentro de /admin/* — el
+         catálogo público no propone instalación. -->
+    <link rel="manifest" href="/manifest-admin.json" />
+
     <!-- Color del tema para barra del navegador en mobile. -->
     <meta name="theme-color" content="#fbbf24" />
 

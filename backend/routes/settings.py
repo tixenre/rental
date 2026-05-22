@@ -53,6 +53,8 @@ ALLOWED_SETTINGS_KEYS = {
     "roi_pct_default",   # % default para nuevos equipos. Float.
     "shipping_usd",      # Envío default en USD para cálculo de reposición. Float.
     "logo_url",          # URL pública del logo (imagen). String.
+    "og_image_url",      # URL pública del OG image para preview en redes (1200x630).
+    "whatsapp_phone",    # Teléfono del negocio para click-to-chat (formato +5492235852510).
     "email_from",        # From address de mails ('Rambla <pedidos@rambla.com.uy>'). Pisado por env EMAIL_FROM.
     "email_admin_to",    # Destinatario de notif al admin cuando entra un pedido. Pisado por env EMAIL_ADMIN_TO.
 }
@@ -698,6 +700,54 @@ def _optimize_logo(raw_content: bytes) -> tuple[bytes, str, str]:
     return out.getvalue(), "image/png", "png"
 
 
+def _optimize_og_image(raw_content: bytes) -> tuple[bytes, str, str]:
+    """Optimiza imagen para preview Open Graph (WhatsApp / IG / Facebook).
+
+    Target: 1200x630 (recomendación de Facebook). Si la imagen no tiene
+    ese aspect ratio (1.91:1), la centramos sobre fondo blanco y cubrimos.
+    Se sirve como JPEG (mejor compresión que PNG para fotos).
+
+    Retorna (bytes, content_type, ext).
+    """
+    from io import BytesIO
+    from PIL import Image
+
+    TARGET_W, TARGET_H = 1200, 630
+
+    img = Image.open(BytesIO(raw_content))
+    if img.mode in ("RGBA", "LA", "P"):
+        # Aplanamos sobre fondo blanco (los OG images suelen rendererarse en
+        # plataformas que no manejan transparencia bien).
+        bg = Image.new("RGB", img.size, (255, 255, 255))
+        img_rgba = img.convert("RGBA") if img.mode != "RGBA" else img
+        bg.paste(img_rgba, mask=img_rgba.split()[-1])
+        img = bg
+    else:
+        img = img.convert("RGB")
+
+    # Cover: escalar y centrar para llenar 1200x630.
+    src_ratio = img.width / img.height
+    tgt_ratio = TARGET_W / TARGET_H
+    if src_ratio > tgt_ratio:
+        # Imagen más ancha que el target — recortar lados.
+        new_h = TARGET_H
+        new_w = int(img.width * (TARGET_H / img.height))
+        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        left = (new_w - TARGET_W) // 2
+        img = img.crop((left, 0, left + TARGET_W, TARGET_H))
+    else:
+        # Imagen más alta — recortar top/bottom.
+        new_w = TARGET_W
+        new_h = int(img.height * (TARGET_W / img.width))
+        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        top = (new_h - TARGET_H) // 2
+        img = img.crop((0, top, TARGET_W, top + TARGET_H))
+
+    out = BytesIO()
+    img.save(out, format="JPEG", quality=85, optimize=True)
+    return out.getvalue(), "image/jpeg", "jpg"
+
+
 @router.post("/admin/settings/upload-logo")
 async def upload_logo(request: Request):
     """Sube una imagen como logo a R2 y guarda la URL en app_settings.
@@ -746,6 +796,57 @@ async def upload_logo(request: Request):
         conn.execute("""
             INSERT INTO app_settings (key, value, updated_at, updated_by)
             VALUES ('logo_url', %s, CURRENT_TIMESTAMP, %s)
+            ON CONFLICT (key) DO UPDATE
+            SET value = EXCLUDED.value,
+                updated_at = CURRENT_TIMESTAMP,
+                updated_by = EXCLUDED.updated_by
+        """, (versioned_url, actor))
+        conn.commit()
+        return {"ok": True, "url": versioned_url}
+    finally:
+        conn.close()
+
+
+@router.post("/admin/settings/upload-og-image")
+async def upload_og_image(request: Request):
+    """Sube imagen como preview de Open Graph (1200x630) y guarda la URL
+    en `app_settings.og_image_url`.
+
+    Es la imagen que ven WhatsApp / IG / Facebook al compartir el link de
+    la home. Misma estrategia que upload-logo: path fijo + cache-buster.
+    """
+    session = require_admin(request)
+    actor = (session.get("email") or session.get("user_id") or "admin")[:255]
+
+    form = await request.form()
+    file = form.get("file")
+    if file is None or not hasattr(file, "read"):
+        raise HTTPException(400, "Falta el campo 'file'")
+
+    raw_content = await file.read()
+    if not raw_content:
+        raise HTTPException(400, "Archivo vacío")
+    if len(raw_content) > 5 * 1024 * 1024:
+        raise HTTPException(413, "Archivo muy grande (máx 5MB)")
+
+    try:
+        content, ctype, ext = _optimize_og_image(raw_content)
+    except Exception as e:
+        raise HTTPException(400, f"No se pudo procesar la imagen: {e}")
+
+    path = f"branding/og-image.{ext}"
+
+    from routes.equipos import _upload_to_r2
+    public_url = _upload_to_r2(path, content, ctype)
+
+    import time as _time
+    versioned_url = f"{public_url}?v={int(_time.time())}"
+
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT INTO app_settings (key, value, updated_at, updated_by)
+            VALUES ('og_image_url', %s, CURRENT_TIMESTAMP, %s)
             ON CONFLICT (key) DO UPDATE
             SET value = EXCLUDED.value,
                 updated_at = CURRENT_TIMESTAMP,

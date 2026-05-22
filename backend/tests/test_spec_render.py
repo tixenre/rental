@@ -119,3 +119,68 @@ def test_render_spec_placeholder_con_columna_y_indice():
 
 def test_render_spec_placeholder_indice_fuera_de_rango():
     assert render_spec_placeholder(VAL_LUMEN, "tabla", COLS_LUMEN, None, "lumen[99]") == ""
+
+
+# ── Tests del formato por tipo (multi_enum, rango, bool) — refactor 2026-05-22
+
+
+def test_render_multi_enum_json_array():
+    """multi_enum value JSON array → join con ' · '."""
+    value = '["RGB", "Tungsten", "Daylight"]'
+    out = render_spec_placeholder(value, "multi_enum", None, None, "")
+    assert out == "RGB · Tungsten · Daylight"
+
+
+def test_render_multi_enum_string_legacy():
+    """Si el value es string simple (no JSON), devolver tal cual."""
+    out = render_spec_placeholder("RGB", "multi_enum", None, None, "")
+    assert out == "RGB"
+
+
+def test_render_multi_enum_con_name_format():
+    """name_format se aplica al join."""
+    value = '["RGB", "Tungsten"]'
+    oc = {"name_format": "Modos: {value}"}
+    out = render_spec_placeholder(value, "multi_enum", None, oc, "")
+    assert out == "Modos: RGB · Tungsten"
+
+
+def test_render_rango_min_max():
+    value = "[80, 102400]"
+    out = render_spec_placeholder(value, "rango", None, None, "")
+    assert out == "80 - 102400"
+
+
+def test_render_rango_con_unidad():
+    out = render_spec_placeholder("[80, 102400]", "rango", None, None, "", unidad="ISO")
+    assert out == "80 - 102400 ISO"
+
+
+def test_render_rango_valor_unico():
+    out = render_spec_placeholder("[5600]", "rango", None, None, "", unidad="K")
+    assert out == "5600 K"
+
+
+def test_render_bool_true():
+    """bool `true` → label proxy ('Sí')."""
+    out = render_spec_placeholder("true", "bool", None, None, "")
+    assert out == "Sí"
+
+
+def test_render_bool_false():
+    """bool `false` → vacío (para colapsar conectores en el template)."""
+    out = render_spec_placeholder("false", "bool", None, None, "")
+    assert out == ""
+
+
+def test_render_number_unchanged():
+    """number sigue devolviendo el value como string."""
+    out = render_spec_placeholder("19389", "number", None, None, "", unidad="lm")
+    assert out == "19389"
+
+
+def test_render_number_con_name_format_y_unidad():
+    """name_format con {value} y {unidad}."""
+    oc = {"name_format": "{value} {unidad}"}
+    out = render_spec_placeholder("19389", "number", None, oc, "", unidad="lm")
+    assert out == "19389 lm"

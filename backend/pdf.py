@@ -271,10 +271,36 @@ def _pedido_html(pedido: dict) -> str:
           <td class="right">{fmt_ars(comp_subtotal)}</td>
         </tr>"""
 
-    total = sum(
+    total_neto = sum(
         (it.get("precio_jornada") or 0) * it.get("cantidad",1) * jornadas
         for it in items
     ) or pedido.get("monto_total") or 0
+    # IVA discriminado: sólo para Responsable Inscripto (Factura A).
+    # El resto ve el total como veían siempre (sin IVA agregado).
+    es_ri = (pedido.get("cliente_perfil_impuestos") or "") == "responsable_inscripto"
+    iva_pct = 21
+    if es_ri:
+        iva_monto = int(round(total_neto * iva_pct / 100))
+        total_final = total_neto + iva_monto
+        totales_html = f"""
+      <div class="total-row" style="opacity:0.85">
+        <span class="total-label">Subtotal (neto)</span>
+        <span class="total-val">{fmt_ars(total_neto)}</span>
+      </div>
+      <div class="total-row" style="opacity:0.85">
+        <span class="total-label">IVA {iva_pct}%</span>
+        <span class="total-val">{fmt_ars(iva_monto)}</span>
+      </div>
+      <div class="total-row">
+        <span class="total-label">Total</span>
+        <span class="total-val">{fmt_ars(total_final)}</span>
+      </div>"""
+    else:
+        totales_html = f"""
+      <div class="total-row">
+        <span class="total-label">Total</span>
+        <span class="total-val">{fmt_ars(total_neto)}</span>
+      </div>"""
 
     notas_html = f'<div class="notas"><strong>Notas:</strong> {html.escape(pedido["notas"])}</div>' \
                  if pedido.get("notas") else ""
@@ -526,10 +552,7 @@ def _pedido_html(pedido: dict) -> str:
 
   <div class="total-section">
     <div class="total-box">
-      <div class="total-row">
-        <span class="total-label">Total</span>
-        <span class="total-val">{fmt_ars(total)}</span>
-      </div>
+      {totales_html}
       <div class="total-sub">{jornadas} jornada{"s" if jornadas != 1 else ""} · {len(items)} equipo{"s" if len(items) != 1 else ""}</div>
     </div>
   </div>
@@ -920,6 +943,30 @@ def _contrato_html(pedido: dict) -> str:
     cliente_email     = html.escape(pedido.get("cliente_email") or "—")
     cliente_telefono  = html.escape(pedido.get("cliente_telefono") or "—")
     cliente_direccion = html.escape(pedido.get("cliente_direccion") or "—")
+    cliente_cuit      = html.escape(pedido.get("cliente_cuit") or "—")
+    # Datos fiscales si el cliente es Responsable Inscripto (Factura A).
+    es_ri = (pedido.get("cliente_perfil_impuestos") or "") == "responsable_inscripto"
+    razon_social     = html.escape(pedido.get("cliente_razon_social") or "")
+    domicilio_fiscal = html.escape(pedido.get("cliente_domicilio_fiscal") or "")
+    fiscal_extra_html = ""
+    if es_ri:
+        fiscal_extra_html = f"""
+    <div class="parte-dato">
+      <div class="parte-label">Razón social</div>
+      <div class="parte-val">{razon_social or "—"}</div>
+    </div>
+    <div class="parte-dato">
+      <div class="parte-label">CUIT</div>
+      <div class="parte-val">{cliente_cuit}</div>
+    </div>
+    <div class="parte-dato">
+      <div class="parte-label">Domicilio fiscal</div>
+      <div class="parte-val">{domicilio_fiscal or cliente_direccion}</div>
+    </div>
+    <div class="parte-dato">
+      <div class="parte-label">Condición IVA</div>
+      <div class="parte-val">Responsable Inscripto</div>
+    </div>"""
 
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -1166,7 +1213,7 @@ def _contrato_html(pedido: dict) -> str:
     <div class="parte-dato">
       <div class="parte-label">Domicilio</div>
       <div class="parte-val">{cliente_direccion}</div>
-    </div>
+    </div>{fiscal_extra_html}
   </div>
 </div>
 

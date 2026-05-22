@@ -98,6 +98,70 @@ _SPEC_KEY_TRANSLATIONS = {
     "color": "Color",
     "material": "Material",
     "warranty": "Garantía",
+    # ── Calibración con relevamiento Firecrawl (22 productos B&H) ─────
+    # Labels detectados que no estaban en el mapping. Mantienen el espíritu
+    # del normalizer: traducir al castellano canónico para que el observatorio
+    # los matchee contra el catálogo (con el sistema de aliases agregado en
+    # PR #359, varios mappean a specs ya existentes).
+    #
+    # Packaging / generales
+    "package weight": "Peso del paquete",
+    "box dimensions (lxwxh)": "Dimensiones del paquete",
+    "item type": "Tipo de ítem",
+    "key features": "Características clave",
+    "mounting options": "Opciones de montaje",
+    "controls": "Controles",
+    "display type": "Tipo de pantalla",
+    # Audio (mics, wireless, lavalier, shotgun)
+    "audio i/o": "Entradas/salidas de audio",
+    "polar pattern": "Patrón polar",
+    "frequency response": "Respuesta de frecuencia",
+    "maximum spl": "SPL máximo",
+    "analog output": "Salida analógica",
+    "microphone type": "Tipo de micrófono",
+    "receiver type": "Tipo de receptor",
+    "element type": "Tipo de elemento",
+    "sound field": "Campo de sonido",
+    "number of audio channels": "Canales de audio",
+    "included transmitters": "Transmisores incluidos",
+    "diversity": "Diversidad",
+    "max operating range": "Rango máx. de operación",
+    "max transmitters per band": "Máx. transmisores por banda",
+    "encryption": "Encriptación",
+    "built-in recorder": "Grabador interno",
+    "timecode support": "Soporte timecode",
+    "antenna": "Antena",
+    "rf frequency band": "Banda RF",
+    "wireless technology": "Tecnología inalámbrica",
+    "gain range": "Rango de ganancia",
+    # Cámaras
+    "effective sensor resolution": "Resolución del sensor",
+    "iso/gain sensitivity": "ISO/Ganancia",
+    "max recording modes": "Modos de grabación máx",
+    "max video output": "Salida video máx",
+    "video i/o": "Entradas/salidas de video",
+    "power i/o": "Entradas/salidas de poder",
+    "other i/o": "Otras entradas/salidas",
+    "media/memory card slot": "Tipo de memoria",
+    # Lentes
+    "lens format coverage": "Cobertura de formato",
+    "angle of view": "Ángulo de visión",
+    "magnification": "Magnificación",
+    "optical design": "Construcción óptica",
+    "aperture/iris blades": "Hojas del diafragma",
+    "focus type": "Tipo de enfoque",
+    # Iluminación
+    "input power": "Potencia de entrada",
+    "output": "Salida lumínica",
+    "cct": "Temperatura color",
+    "light loss/gain": "Pérdida/ganancia de luz",
+    # Otros
+    "included charging case": "Estuche de carga incluido",
+    "mobile app compatible": "Compatible con app móvil",
+    "power sources": "Fuentes de alimentación",
+    "usb/lightning connectivity": "Conectividad USB/Lightning",
+    "battery": "Batería",
+    "lens mount": "Lens mount",
 }
 
 
@@ -2436,8 +2500,37 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
                     # No abortar el rename si un equipo falla regenerar tags.
                     logger.warning("regenerate_auto_tags falló para equipo %s tras rename de cat %s",
                                    r["equipo_id"], cid, exc_info=True)
+        # Si cambió el template del nombre público, regenerar el nombre de
+        # cada equipo asignado a esta categoría (directa o como sub-cat).
+        # Sin esto, el admin guarda el template pero los equipos siguen con
+        # su nombre publico viejo hasta que alguien los toca individualmente.
+        nombres_regen = 0
+        if patch.nombre_publico_template is not None:
+            eq_rows = conn.execute(
+                """
+                WITH RECURSIVE descendants AS (
+                    SELECT id FROM categorias WHERE id = ?
+                    UNION
+                    SELECT c.id FROM categorias c
+                    JOIN descendants d ON c.parent_id = d.id
+                )
+                SELECT DISTINCT ec.equipo_id
+                FROM equipo_categorias ec
+                JOIN descendants d ON d.id = ec.categoria_id
+                """,
+                (cid,),
+            ).fetchall()
+            for r in eq_rows:
+                try:
+                    actualizar_nombres_de(conn, r["equipo_id"], commit=False)
+                    nombres_regen += 1
+                except Exception:
+                    logger.warning(
+                        "actualizar_nombres_de falló para equipo %s tras cambio de template cat %s",
+                        r["equipo_id"], cid, exc_info=True,
+                    )
         conn.commit()
-        return {"ok": True}
+        return {"ok": True, "nombres_regenerados": nombres_regen}
     except HTTPException:
         conn.rollback()
         raise

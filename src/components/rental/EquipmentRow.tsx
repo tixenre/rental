@@ -5,11 +5,13 @@ import { Plus, Minus, Sparkles, ChevronDown, ArrowRight } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
+import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { priceBreakdown } from "@/lib/pricing";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { EmptyImage } from "./EmptyImage";
 import { IncludedList } from "./IncludedList";
 import { KitSection } from "./KitSection";
+import { AddonPills } from "./AddonPills";
 import { cn } from "@/lib/utils";
 
 /**
@@ -39,6 +41,8 @@ export function EquipmentRow({
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
   const selected = qty > 0;
   const navigate = useNavigate();
+  const { data: clienteSession } = useClienteSession();
+  const conIva = aplicaIva(clienteSession?.perfil_impuestos);
   const openDetail = () =>
     navigate({ to: "/equipo/$slug", params: { slug: buildEquipoSlug(item) } });
 
@@ -130,7 +134,7 @@ export function EquipmentRow({
               </div>
               <ChevronDown
                 className={cn(
-                  "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+                  "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform lg:hidden",
                   expanded && "rotate-180",
                 )}
               />
@@ -141,7 +145,7 @@ export function EquipmentRow({
                 {formatARS(item.pricePerDay)}
               </span>
               <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-                /jornada
+                /jornada{conIva ? " +IVA" : ""}
               </span>
               {showPeriodTotal && (
                 <span className="ml-1 font-display text-xs tabular text-amber">
@@ -152,13 +156,22 @@ export function EquipmentRow({
           </div>
         </button>
 
+        {/* Addon pills inline — solo desktop (lg+).
+         * En mobile/tablet los addons viven en el expand inline (KitSection +
+         * IncludedList). Acá es el quick-peek para decidir sin click. */}
+        <AddonPills
+          items={item.includes}
+          max={3}
+          className="hidden lg:flex max-w-[280px]"
+        />
+
         {/* Precio en desktop */}
         <div className="hidden text-right sm:block">
           <div className="font-display text-base tabular text-ink">
             {formatARS(item.pricePerDay)}
           </div>
           <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-            / jornada
+            / jornada{conIva ? " +IVA" : ""}
           </div>
           {showPeriodTotal && (
             <div className="mt-1 font-display text-sm tabular text-amber">
@@ -225,7 +238,9 @@ export function EquipmentRow({
         )}
       </div>
 
-      {/* Mini-ficha expandida inline */}
+      {/* Mini-ficha expandida inline — solo mobile. En desktop el detalle
+       * lo muestra el PreviewPane lateral, así que ocultamos esto en lg+
+       * para evitar dos UIs simultáneas del mismo dato. */}
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
@@ -234,7 +249,7 @@ export function EquipmentRow({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="overflow-hidden"
+            className="overflow-hidden lg:hidden"
           >
             <div className="border-t hairline px-3 py-3 sm:px-4 sm:py-4 space-y-3">
               {/* Quick facts fundamentales (montura, formato, resolución...).

@@ -427,7 +427,7 @@ function CartSheet({
   const { data: descuentosPuntos = [] } = useQuery({
     queryKey: ["descuentos-jornada"],
     queryFn: apiGetDescuentosJornada,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 60_000,
   });
   const descuentoPct = fechaDesde ? interpolarDescuento(descuentosPuntos, jornadas) : 0;
   const descJornadas = descuentoPct > 0

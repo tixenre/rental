@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
+import { useClienteSession, aplicaIva, IVA_PCT, desglosarIva } from "@/lib/iva";
 import { EmptyImage } from "./EmptyImage";
 import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
@@ -74,11 +75,16 @@ export function CartDrawer({
   const { data: descuentosPuntos = [] } = useQuery({
     queryKey: ["descuentos-jornada"],
     queryFn: apiGetDescuentosJornada,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 60_000,
   });
   const descuentoPct = d > 0 ? interpolarDescuento(descuentosPuntos, d) : 0;
   const descuentoMonto = Math.round(subtotalTotal * descuentoPct / 100);
-  const total = subtotalTotal - descuentoMonto;
+  const totalNeto = subtotalTotal - descuentoMonto;
+
+  const { data: clienteSession } = useClienteSession();
+  const ivaDesglose = desglosarIva(totalNeto, clienteSession?.perfil_impuestos);
+  const conIva = aplicaIva(clienteSession?.perfil_impuestos);
+  const total = ivaDesglose.total;
 
   // Lock scroll del body + guardar foco al abrir, restaurar al cerrar
   useEffect(() => {
@@ -460,9 +466,21 @@ export function CartDrawer({
                       <span className="tabular">−{formatARS(descuentoMonto)}</span>
                     </div>
                   )}
+                  {conIva && (
+                    <>
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>Subtotal neto</span>
+                        <span className="tabular">{formatARS(ivaDesglose.neto)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>IVA {IVA_PCT}%</span>
+                        <span className="tabular">+{formatARS(ivaDesglose.iva)}</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                      Total
+                      Total{conIva ? " · IVA incluído" : ""}
                     </span>
                     <span className="font-display text-3xl tabular text-ink">
                       {formatARS(total)}

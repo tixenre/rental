@@ -197,7 +197,6 @@ _SPEC_LABELS: dict[str, str] = {
     # Iluminación
     "iluminacion_subtipo": "Tipo",
     "potencia_w": "Potencia",
-    "lumens": "Lúmenes",
     "lumens_at_5600k": "Lúmenes (5600K)",
     "lumens_at_3200k": "Lúmenes (3200K)",
     "cri": "CRI",
