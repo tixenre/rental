@@ -31,7 +31,7 @@ from .models import CategoriaRegistry, Registry, SpecDef, SubCategoria
 # ─────────────────────────────────────────────────────────────────────
 
 FORMATO_ENUM: list[str] = [
-    "1\"", "MFT", "M4/3", "APS-C", "Super 35", "Full-frame", "Medium Format"
+    "1\"", "MFT", "APS-C", "Super 35", "Full-frame", "Medium Format"
 ]
 
 LENS_MOUNT_ENUM: list[str] = [
@@ -62,7 +62,7 @@ _CAMARAS = CategoriaRegistry(
             key="camera_subtipo", label="Tipo", tipo="enum",
             enum_options=[
                 "Cinema Camera", "Mirrorless", "DSLR", "Vlogging",
-                "Action Camera", "Compact", "Medium Format", "Camera",
+                "Action Camera", "Compact", "Medium Format",
             ],
             prioridad=10, en_card=True, en_filtros=True, en_nombre=True,
             destacado=True, ayuda="Form factor de la cámara",
@@ -138,7 +138,7 @@ _CAMARAS = CategoriaRegistry(
                 ayuda="Ej: USB-C 3.2 Gen 2 (data), Timecode, multi/USB"),
         SpecDef(
             key="wireless", label="Wireless", tipo="multi_enum",
-            enum_options=["Wi-Fi", "Wi-Fi 2.4 GHz", "Wi-Fi 5 GHz", "Bluetooth", "NFC", "5G", "LTE"],
+            enum_options=["Wi-Fi", "Bluetooth", "NFC", "5G", "LTE"],
             prioridad=130, en_filtros=True,
         ),
         SpecDef(key="mobile_app_compatible", label="App móvil compatible", tipo="bool",
@@ -347,8 +347,8 @@ _ILUMINACION = CategoriaRegistry(
         SpecDef(
             key="iluminacion_subtipo", label="Tipo", tipo="enum",
             enum_options=[
-                "Flash", "Bulb / Lamp", "Panel", "Tube Light", "Flexible Mat",
-                "Monolight", "COB Monolight", "Spotlight", "Fresnel", "On-Camera",
+                "Flash", "Foco", "Panel", "Tube Light", "Flexible Mat",
+                "Monoled", "Fresnel", "On-Camera",
             ],
             prioridad=10, en_card=True, en_filtros=True, en_nombre=True,
             destacado=True, ayuda="Form factor del fixture",
@@ -357,8 +357,9 @@ _ILUMINACION = CategoriaRegistry(
                 prioridad=20, en_card=True, en_filtros=True, en_nombre=True, destacado=True),
         SpecDef(
             key="color_modes", label="Modos de color", tipo="multi_enum",
-            enum_options=["RGB", "Daylight", "Tungsten", "HSI", "Bicolor variable"],
+            enum_options=["RGB", "Bicolor", "Daylight", "Tungsten"],
             prioridad=30, en_card=True, en_filtros=True, destacado=True,
+            ayuda="Si una luz es bicolor (variable Daylight↔Tungsten) marcala como Bicolor, no las dos por separado.",
         ),
         SpecDef(key="temperatura_k", label="Temperatura color", tipo="rango", unidad="K",
                 prioridad=40, en_card=True, en_filtros=True,
