@@ -28,8 +28,7 @@
         "peso_g": 390,
         "iluminacion_subtipo": "Flexible Mat",
         "color_modes": [
-          "Tungsten",
-          "Daylight"
+          "Bicolor"
         ]
       },
       "extras": {
@@ -296,9 +295,8 @@
         "peso_g": 240,
         "iluminacion_subtipo": "Panel",
         "color_modes": [
-          "RGB",
-          "Tungsten",
-          "Daylight"
+          "Bicolor",
+          "RGB"
         ]
       },
       "extras": {
@@ -514,10 +512,9 @@
         ],
         "montaje": "Bowens",
         "peso_g": 3160,
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
-          "Tungsten",
-          "Daylight"
+          "Bicolor"
         ]
       },
       "extras": {
@@ -731,11 +728,10 @@
         ],
         "montaje": "Bowens",
         "peso_g": 3300,
-        "iluminacion_subtipo": "COB Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
-          "RGB",
-          "Tungsten",
-          "Daylight"
+          "Bicolor",
+          "RGB"
         ]
       },
       "extras": {
@@ -986,9 +982,8 @@
         "peso_g": 16250,
         "iluminacion_subtipo": "Panel",
         "color_modes": [
-          "RGB",
-          "Tungsten",
-          "Daylight"
+          "Bicolor",
+          "RGB"
         ]
       },
       "extras": {
@@ -1448,9 +1443,8 @@
         "peso_g": 730,
         "iluminacion_subtipo": "Tube Light",
         "color_modes": [
-          "RGB",
-          "Tungsten",
-          "Daylight"
+          "Bicolor",
+          "RGB"
         ]
       },
       "extras": {
@@ -1691,11 +1685,10 @@
           "AC"
         ],
         "peso_g": 210,
-        "iluminacion_subtipo": "Bulb / Lamp",
+        "iluminacion_subtipo": "Foco",
         "color_modes": [
-          "RGB",
-          "Tungsten",
-          "Daylight"
+          "Bicolor",
+          "RGB"
         ]
       },
       "extras": {
@@ -1777,7 +1770,7 @@
         ],
         "montaje": "Bowens",
         "peso_g": 860,
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
           "Tungsten"
         ]
@@ -1953,7 +1946,7 @@
         ],
         "montaje": "Bowens",
         "peso_g": 2400,
-        "iluminacion_subtipo": "COB Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
           "Tungsten"
         ]
@@ -2186,7 +2179,7 @@
         ],
         "montaje": "Bowens",
         "peso_g": 2490,
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
           "Tungsten"
         ]
@@ -2375,7 +2368,7 @@
         ],
         "montaje": "Propietario",
         "peso_g": 830,
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
           "Tungsten"
         ]
@@ -2590,11 +2583,10 @@
         ],
         "montaje": "Bowens",
         "peso_g": 2600,
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
-          "RGB",
-          "Tungsten",
-          "Daylight"
+          "Bicolor",
+          "RGB"
         ]
       },
       "extras": {
@@ -2834,10 +2826,9 @@
         ],
         "montaje": "Bowens",
         "peso_g": 1560,
-        "iluminacion_subtipo": "COB Monolight",
+        "iluminacion_subtipo": "Monoled",
         "color_modes": [
-          "Tungsten",
-          "Daylight"
+          "Bicolor"
         ]
       },
       "extras": {
