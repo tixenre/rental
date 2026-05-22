@@ -75,7 +75,7 @@ export function CartDrawer({
   const { data: descuentosPuntos = [] } = useQuery({
     queryKey: ["descuentos-jornada"],
     queryFn: apiGetDescuentosJornada,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 60_000,
   });
   const descuentoPct = d > 0 ? interpolarDescuento(descuentosPuntos, d) : 0;
   const descuentoMonto = Math.round(subtotalTotal * descuentoPct / 100);
