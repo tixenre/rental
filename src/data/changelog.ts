@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    number: 147,
+    date: "2026-05-22",
+    type: "style",
+    title: "Catálogo desktop: ajustes finales del diseño",
+    body: "Tres mejoras chicas alineadas con el prototipo de diseño: (1) el toggle Explorar/Lista del catálogo pasa a un estilo más compacto (sin uppercase ni tracking ancho) para que no compita visualmente con el título del hero; (2) las cards del listado en desktop ahora muestran inline hasta 3 \"addon pills\" con los componentes del kit (batería, cargador, tarjeta) — quick-peek sin necesidad de abrir el panel lateral; (3) la franja del carrito tiene un hover preview que muestra al pasar el mouse cada ítem con su foto, marca, modelo y precio — para chequear el carrito sin abrir el drawer. Mobile no cambia: los addons siguen apareciendo en el expand inline y no hay hover preview (es solo para desktop).",
+    labels: ["catalogo", "desktop", "diseno"],
+  },
+  {
     number: 146,
     date: "2026-05-15",
     type: "feat",
