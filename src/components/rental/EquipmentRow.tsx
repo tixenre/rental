@@ -11,6 +11,7 @@ import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { EmptyImage } from "./EmptyImage";
 import { IncludedList } from "./IncludedList";
 import { KitSection } from "./KitSection";
+import { AddonPills } from "./AddonPills";
 import { cn } from "@/lib/utils";
 
 /**
@@ -154,6 +155,15 @@ export function EquipmentRow({
             </div>
           </div>
         </button>
+
+        {/* Addon pills inline — solo desktop (lg+).
+         * En mobile/tablet los addons viven en el expand inline (KitSection +
+         * IncludedList). Acá es el quick-peek para decidir sin click. */}
+        <AddonPills
+          items={item.includes}
+          max={3}
+          className="hidden lg:flex max-w-[280px]"
+        />
 
         {/* Precio en desktop */}
         <div className="hidden text-right sm:block">
