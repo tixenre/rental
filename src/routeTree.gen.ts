@@ -36,9 +36,6 @@ const AdminUnidadesLazyRouteImport = createFileRoute('/admin/unidades')()
 const AdminSpecsLazyRouteImport = createFileRoute('/admin/specs')()
 const AdminSolicitudesLazyRouteImport = createFileRoute('/admin/solicitudes')()
 const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
-const AdminGearCompatibilityLazyRouteImport = createFileRoute(
-  '/admin/gear-compatibility',
-)()
 const AdminEstadisticasLazyRouteImport = createFileRoute(
   '/admin/estadisticas',
 )()
@@ -145,14 +142,6 @@ const AdminSettingsLazyRoute = AdminSettingsLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/settings.lazy').then((d) => d.Route),
 )
-const AdminGearCompatibilityLazyRoute =
-  AdminGearCompatibilityLazyRouteImport.update({
-    id: '/gear-compatibility',
-    path: '/gear-compatibility',
-    getParentRoute: () => AdminRoute,
-  } as any).lazy(() =>
-    import('./routes/admin/gear-compatibility.lazy').then((d) => d.Route),
-  )
 const AdminEstadisticasLazyRoute = AdminEstadisticasLazyRouteImport.update({
   id: '/estadisticas',
   path: '/estadisticas',
@@ -317,7 +306,6 @@ export interface FileRoutesByFullPath {
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
-  '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/specs': typeof AdminSpecsLazyRouteWithChildren
@@ -354,7 +342,6 @@ export interface FileRoutesByTo {
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
-  '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/specs': typeof AdminSpecsLazyRouteWithChildren
@@ -395,7 +382,6 @@ export interface FileRoutesById {
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
-  '/admin/gear-compatibility': typeof AdminGearCompatibilityLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/specs': typeof AdminSpecsLazyRouteWithChildren
@@ -437,7 +423,6 @@ export interface FileRouteTypes {
     | '/admin/diseno'
     | '/admin/email-templates'
     | '/admin/estadisticas'
-    | '/admin/gear-compatibility'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/specs'
@@ -474,7 +459,6 @@ export interface FileRouteTypes {
     | '/admin/diseno'
     | '/admin/email-templates'
     | '/admin/estadisticas'
-    | '/admin/gear-compatibility'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/specs'
@@ -514,7 +498,6 @@ export interface FileRouteTypes {
     | '/admin/diseno'
     | '/admin/email-templates'
     | '/admin/estadisticas'
-    | '/admin/gear-compatibility'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/specs'
@@ -644,13 +627,6 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsLazyRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/gear-compatibility': {
-      id: '/admin/gear-compatibility'
-      path: '/gear-compatibility'
-      fullPath: '/admin/gear-compatibility'
-      preLoaderRoute: typeof AdminGearCompatibilityLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/estadisticas': {
@@ -857,7 +833,6 @@ interface AdminRouteChildren {
   AdminDisenoLazyRoute: typeof AdminDisenoLazyRoute
   AdminEmailTemplatesLazyRoute: typeof AdminEmailTemplatesLazyRoute
   AdminEstadisticasLazyRoute: typeof AdminEstadisticasLazyRoute
-  AdminGearCompatibilityLazyRoute: typeof AdminGearCompatibilityLazyRoute
   AdminSettingsLazyRoute: typeof AdminSettingsLazyRoute
   AdminSolicitudesLazyRoute: typeof AdminSolicitudesLazyRoute
   AdminSpecsLazyRoute: typeof AdminSpecsLazyRouteWithChildren
@@ -876,7 +851,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminDisenoLazyRoute: AdminDisenoLazyRoute,
   AdminEmailTemplatesLazyRoute: AdminEmailTemplatesLazyRoute,
   AdminEstadisticasLazyRoute: AdminEstadisticasLazyRoute,
-  AdminGearCompatibilityLazyRoute: AdminGearCompatibilityLazyRoute,
   AdminSettingsLazyRoute: AdminSettingsLazyRoute,
   AdminSolicitudesLazyRoute: AdminSolicitudesLazyRoute,
   AdminSpecsLazyRoute: AdminSpecsLazyRouteWithChildren,

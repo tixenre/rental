@@ -123,13 +123,6 @@ export function SpecsDiffEditor({
             </>
           )}
         </span>
-        <a
-          href="/admin/gear-compatibility"
-          className="text-[11px] text-muted-foreground hover:text-ink underline"
-          title="Las specs se administran desde Gear Compatibility. Acá solo cargás valores."
-        >
-          ¿Falta una spec? Gestionala en Gear Compatibility →
-        </a>
       </div>
 
       {/* Propuestos (del autocompletar) */}
