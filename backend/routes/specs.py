@@ -1163,30 +1163,31 @@ def resumen_templates(request: Request):
 
 @router.get("/admin/categorias/{categoria_id}/spec-templates")
 def listar_templates(categoria_id: int, request: Request):
-    """Lista asignaciones de la categoría + specs huérfanos del registry.
+    """Lista TODOS los specs disponibles para una categoría.
 
-    Devuelve dos tipos de filas:
-    1. Asignaciones en `categoria_spec_templates` (con flags propios).
-    2. Specs definidos en `spec_definitions` con `categoria_raiz_id = X`
-       que NO tienen asignación en `categoria_spec_templates` — se
-       devuelven con flags default derivados del spec_def. Esto evita
-       que el form quede vacío si una migración intermedia falló y las
-       asignaciones quedaron incompletas.
+    Simplificación: lee directo de `spec_definitions` filtrando por
+    `categoria_raiz_id`. No depende de `categoria_spec_templates` (que
+    causaba bugs cuando las asignaciones quedaban incompletas tras
+    migraciones del registry expandido).
 
-    El frontend usa `label, tipo, unidad, enum_options` para renderear
-    inputs — los flags afectan visibilidad y orden."""
+    Si el caller pasa una sub-categoría, sube por la jerarquía
+    (`WITH RECURSIVE`) para llegar a la raíz y leer todos sus specs.
+
+    Los flags devueltos (destacado, visible_en_card, visible_en_filtros,
+    visible_en_nombre) se derivan del spec_def directamente
+    (favorito, en_filtros, en_nombre) — son la metadata canónica del
+    registry. Si en el futuro se necesita sobrescribir flags por
+    sub-categoría se reactiva el JOIN a `categoria_spec_templates`."""
     _require_admin(request)
     conn = get_db()
     try:
-        # Determinar la raíz de la categoría — si es sub-cat, subimos al
-        # parent_id hasta encontrar la raíz. Si ya es raíz, queda igual.
-        # Sólo importa para el fallback de specs huérfanos.
+        # Subir a la raíz si recibimos una sub-cat.
         raiz_row = conn.execute(
             """
             WITH RECURSIVE up AS (
-                SELECT id, parent_id, 0 AS depth FROM categorias WHERE id = ?
+                SELECT id, parent_id FROM categorias WHERE id = ?
                 UNION
-                SELECT c.id, c.parent_id, up.depth + 1
+                SELECT c.id, c.parent_id
                 FROM categorias c JOIN up ON up.parent_id = c.id
             )
             SELECT id FROM up WHERE parent_id IS NULL LIMIT 1
@@ -1195,37 +1196,9 @@ def listar_templates(categoria_id: int, request: Request):
         ).fetchone()
         raiz_id = row_to_dict(raiz_row)["id"] if raiz_row else categoria_id
 
-        # Asignaciones explícitas en la categoría (sub o raíz)
-        rows_assigned = conn.execute(
+        rows = conn.execute(
             """
             SELECT
-              t.id, t.categoria_id, t.spec_def_id,
-              sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id, sd.enum_options,
-              sd.tabla_columnas, sd.output_config,
-              t.prioridad,
-              COALESCE(t.visible_en_card, FALSE) AS visible_en_card,
-              COALESCE(t.visible_en_filtros, FALSE) AS visible_en_filtros,
-              COALESCE(t.visible_en_nombre, FALSE) AS visible_en_nombre,
-              COALESCE(t.obligatorio, FALSE) AS obligatorio,
-              COALESCE(t.ayuda, sd.ayuda) AS ayuda,
-              COALESCE(t.destacado, FALSE) AS destacado,
-              COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
-              COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
-              t.rol_compatibilidad
-            FROM categoria_spec_templates t
-            JOIN spec_definitions sd ON sd.id = t.spec_def_id
-            WHERE t.categoria_id = ?
-            """,
-            (categoria_id,),
-        ).fetchall()
-
-        # Specs del registry (en la raíz) que NO tienen asignación arriba.
-        # Fallback automático para que el form siempre tenga contenido.
-        rows_fallback = conn.execute(
-            """
-            SELECT
-              NULL::integer AS id,
-              ?::integer AS categoria_id,
               sd.id AS spec_def_id,
               sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id, sd.enum_options,
               sd.tabla_columnas, sd.output_config,
@@ -1233,25 +1206,28 @@ def listar_templates(categoria_id: int, request: Request):
               COALESCE(sd.favorito, FALSE) AS visible_en_card,
               COALESCE(sd.en_filtros, FALSE) AS visible_en_filtros,
               COALESCE(sd.en_nombre, FALSE) AS visible_en_nombre,
+              COALESCE(sd.favorito, FALSE) AS destacado,
               FALSE AS obligatorio,
               sd.ayuda,
-              COALESCE(sd.favorito, FALSE) AS destacado,
               COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
               COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
-              NULL::varchar AS rol_compatibilidad
+              sd.rol_compatibilidad
             FROM spec_definitions sd
             WHERE sd.categoria_raiz_id = ?
-              AND NOT EXISTS (
-                  SELECT 1 FROM categoria_spec_templates t
-                  WHERE t.categoria_id = ?
-                    AND t.spec_def_id = sd.id
-              )
+            ORDER BY COALESCE(sd.prioridad, 100), sd.label
             """,
-            (categoria_id, raiz_id, categoria_id),
+            (raiz_id,),
         ).fetchall()
 
-        items = [row_to_dict(r) for r in rows_assigned] + [row_to_dict(r) for r in rows_fallback]
-        items.sort(key=lambda x: (x.get("prioridad") or 100, x.get("label") or ""))
+        items = []
+        for r in rows:
+            d = row_to_dict(r)
+            # Compat con el shape que el frontend espera (id del template +
+            # categoria_id). Como no hay template propiamente dicho, usamos
+            # null para id y echamos categoria_id como espejo del input.
+            d["id"] = None
+            d["categoria_id"] = categoria_id
+            items.append(d)
         return {"items": items}
     finally:
         conn.close()
