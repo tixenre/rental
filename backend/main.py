@@ -50,7 +50,6 @@ from routes.settings         import router as settings_router
 from routes.cliente_portal   import router as cliente_portal_router
 from routes.marcas           import router as marcas_router
 from routes.specs            import router as specs_router
-from routes.specs_observatorio import router as specs_observatorio_router
 from routes.unidades         import router as unidades_router
 from routes.seo              import router as seo_router
 from routes.inventario       import router as inventario_router
@@ -131,7 +130,6 @@ app.include_router(dashboard_router,      prefix="/api")
 app.include_router(settings_router,       prefix="/api")
 app.include_router(marcas_router,         prefix="/api")
 app.include_router(specs_router,          prefix="/api")
-app.include_router(specs_observatorio_router, prefix="/api")
 app.include_router(unidades_router,       prefix="/api")
 app.include_router(inventario_router,     prefix="/api/admin")
 app.include_router(email_templates_router, prefix="/api")
