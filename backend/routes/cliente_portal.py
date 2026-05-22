@@ -171,10 +171,13 @@ def cliente_me(request: Request):
     cliente_id = session["cliente_id"]
     conn = get_db()
     try:
+        # `created_at` lo usa el drawer del portal para mostrar "Cliente desde
+        # [año]" — no es opcional, el cliente espera verlo en su perfil.
         row = conn.execute(
             """SELECT id, nombre, apellido, email, telefono, direccion, cuit,
                       perfil_impuestos, descuento, direccion_maps_url,
-                      razon_social, domicilio_fiscal, email_facturacion
+                      razon_social, domicilio_fiscal, email_facturacion,
+                      created_at
                FROM clientes WHERE id = ?""",
             (cliente_id,)
         ).fetchone()

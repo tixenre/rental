@@ -20,6 +20,12 @@ export type TopBarProps = {
   /** Solo aplica cuando variant === "cliente". */
   onLogout?: () => void;
   /**
+   * Si se provee, el pill del usuario abre un drawer en lugar de navegar
+   * a `/cliente/perfil`. Lo usa el portal para mostrar el perfil sin
+   * abandonar la lista de pedidos.
+   */
+  onProfileClick?: () => void;
+  /**
    * Cuando true, el TopBar se tiñe de amber gradualmente conforme el hero
    * (primera sección de la página) scrollea hacia arriba.
    * El progreso se lee de `--amber-pct` en `document.documentElement`.
@@ -27,9 +33,9 @@ export type TopBarProps = {
   amberOnScroll?: boolean;
 };
 
-export function TopBar({ variant = "default", userName, onLogout, amberOnScroll }: TopBarProps = {}) {
+export function TopBar({ variant = "default", userName, onLogout, onProfileClick, amberOnScroll }: TopBarProps = {}) {
   if (variant === "cliente") {
-    return <ClienteTopBar userName={userName} onLogout={onLogout} />;
+    return <ClienteTopBar userName={userName} onLogout={onLogout} onProfileClick={onProfileClick} />;
   }
   return <DefaultTopBar amberOnScroll={amberOnScroll} />;
 }
@@ -160,7 +166,27 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
   );
 }
 
-function ClienteTopBar({ userName, onLogout }: { userName?: string; onLogout?: () => void }) {
+function ClienteTopBar({ userName, onLogout, onProfileClick }: {
+  userName?: string;
+  onLogout?: () => void;
+  onProfileClick?: () => void;
+}) {
+  const initial = userName ? userName[0].toUpperCase() : null;
+  const firstName = userName ? userName.split(" ")[0] : null;
+
+  const pillContent = (
+    <>
+      <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-amber text-ink font-display text-xs font-black shrink-0">
+        {initial ?? <User className="h-3.5 w-3.5" />}
+      </div>
+      {firstName && (
+        <span className="hidden sm:block pr-1 text-sm font-semibold text-ink">
+          {firstName}
+        </span>
+      )}
+    </>
+  );
+
   return (
     <header className="sticky top-0 z-[var(--z-topbar)] border-b hairline bg-background/95 backdrop-blur-md md:bg-background/85 md:backdrop-blur-xl">
       <div className="px-4 py-3 md:px-6 flex items-center gap-3">
@@ -169,21 +195,25 @@ function ClienteTopBar({ userName, onLogout }: { userName?: string; onLogout?: (
         </div>
         <div className="flex-1" />
 
-        {/* Avatar pill: inicial amber + nombre */}
-        <Link
-          to="/cliente/perfil"
-          className="inline-flex items-center gap-2 rounded-full border hairline px-2 py-1 hover:border-ink/30 transition"
-          title="Editar mi perfil"
-        >
-          <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-amber text-ink font-display text-xs font-black shrink-0">
-            {userName ? userName[0].toUpperCase() : <User className="h-3.5 w-3.5" />}
-          </div>
-          {userName && (
-            <span className="hidden sm:block pr-1 text-sm font-semibold text-ink">
-              {userName.split(" ")[0]}
-            </span>
-          )}
-        </Link>
+        {/* Avatar pill: si hay onProfileClick → abre drawer; sino → /cliente/perfil */}
+        {onProfileClick ? (
+          <button
+            type="button"
+            onClick={onProfileClick}
+            className="inline-flex items-center gap-2 rounded-full border hairline px-2 py-1 hover:border-ink/30 transition"
+            title="Ver mi cuenta"
+          >
+            {pillContent}
+          </button>
+        ) : (
+          <Link
+            to="/cliente/perfil"
+            className="inline-flex items-center gap-2 rounded-full border hairline px-2 py-1 hover:border-ink/30 transition"
+            title="Editar mi perfil"
+          >
+            {pillContent}
+          </Link>
+        )}
 
         {onLogout && (
           <button

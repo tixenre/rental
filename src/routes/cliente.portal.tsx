@@ -1,11 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { clienteApi } from "@/lib/cliente/api";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { StatCard } from "@/components/rental/StatCard";
 import { EstadoBadge } from "@/components/rental/EstadoBadge";
-import { ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon, CheckCircle2, XCircle, Info, FileText, FileSignature, Truck, MessageCircle } from "lucide-react";
+import {
+  ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon,
+  CheckCircle2, XCircle, Info, FileText, FileSignature, Truck,
+  MessageCircle, Search, Mail, Phone, MapPin, Building2, Receipt,
+  LogOut, CircleCheckBig,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -25,9 +30,17 @@ export const Route = createFileRoute("/cliente/portal")({
 });
 
 type Perfil = {
-  nombre: string; apellido: string; email: string;
-  telefono: string; direccion: string;
+  id: number;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono: string;
+  direccion: string;
+  cuit?: string | null;
   perfil_impuestos?: string | null;
+  descuento?: number;
+  direccion_maps_url?: string | null;
+  created_at?: string | null;
 };
 
 type Item = {
@@ -56,6 +69,7 @@ type Pedido = {
   monto_total?: number; monto_pagado?: number;
   descuento_pct?: number | null;
   notas?: string | null;
+  created_at?: string | null;
   items: Item[];
   pagos?: Pago[];
   solicitudes?: SolicitudPortal[];
@@ -131,6 +145,8 @@ export default function ClientePortal() {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [tab, setTab] = useState<Filtro>("todos");
+  const [query, setQuery] = useState<string>("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [ventanaHoras, setVentanaHoras] = useState<number>(24);
   const [docsNuevos, setDocsNuevos] = useState<
     Array<{ pedidoId: number; numero: string; tipo: DocTipo }>
@@ -233,14 +249,36 @@ export default function ClientePortal() {
     historial: historico,
   };
 
-  const filteredPedidos =
-    tab === "activos" ? pedidos.filter((p) => ACTIVE_STATES.has(p.estado))
+  const tabFiltered = useMemo(() => (
+    tab === "activos"   ? pedidos.filter((p) => ACTIVE_STATES.has(p.estado))
     : tab === "historial" ? pedidos.filter((p) => HIST_STATES.has(p.estado))
-    : pedidos;
+    : pedidos
+  ), [tab, pedidos]);
+
+  const q = query.trim().toLowerCase();
+  const filteredPedidos = useMemo(() => {
+    if (!q) return tabFiltered;
+    return tabFiltered.filter((p) => {
+      if (String(p.numero_pedido ?? "").toLowerCase().includes(q)) return true;
+      if (p.estado.toLowerCase().includes(q)) return true;
+      if ((p.notas ?? "").toLowerCase().includes(q)) return true;
+      if (p.items.some((it) =>
+        (it.nombre_publico ?? it.nombre).toLowerCase().includes(q) ||
+        (it.marca ?? "").toLowerCase().includes(q) ||
+        (it.modelo ?? "").toLowerCase().includes(q)
+      )) return true;
+      return false;
+    });
+  }, [tabFiltered, q]);
 
   return (
     <PublicLayout
-      topBar={{ variant: "cliente", userName, onLogout: handleLogout }}
+      topBar={{
+        variant: "cliente",
+        userName,
+        onLogout: handleLogout,
+        onProfileClick: perfil ? () => setDrawerOpen(true) : undefined,
+      }}
     >
       <div className="bg-amber border-b border-[color-mix(in_oklch,var(--ink)_12%,transparent)]">
         <div className="max-w-[760px] mx-auto px-6 pt-9 pb-10">
@@ -283,6 +321,29 @@ export default function ClientePortal() {
         </h2>
 
         {pedidos.length > 0 && (
+          <div className="mb-3 relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por número, equipo, marca…"
+              className="w-full rounded-full border border-[var(--hairline)] bg-surface px-9 py-2.5 font-sans text-[13px] text-ink outline-none transition placeholder:text-muted-foreground hover:border-ink/30 focus:border-ink focus:bg-card"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 grid h-[22px] w-[22px] place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-ink"
+                aria-label="Limpiar búsqueda"
+              >
+                <XIcon className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {pedidos.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-4">
             {TAB_OPTIONS.map(({ value, label }) => {
               const active = tab === value;
@@ -313,6 +374,13 @@ export default function ClientePortal() {
           </div>
         )}
 
+        {q && filteredPedidos.length > 0 && (
+          <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+            <strong className="text-ink font-bold">{filteredPedidos.length}</strong>{" "}
+            {filteredPedidos.length === 1 ? "pedido" : "pedidos"} para “{query}”
+          </div>
+        )}
+
         {pedidos.length === 0 ? (
           <PedidoEmpty
             title="Sin pedidos aún"
@@ -320,15 +388,25 @@ export default function ClientePortal() {
             cta
           />
         ) : filteredPedidos.length === 0 ? (
-          <PedidoEmpty
-            title={tab === "activos" ? "Sin rentals activos" : "Sin pedidos por acá"}
-            sub={
-              tab === "activos"
-                ? "No tenés rentals activos en este momento."
-                : "No tenés pedidos en esta sección todavía."
-            }
-            cta
-          />
+          q ? (
+            <PedidoEmpty
+              title="Nada coincide con tu búsqueda"
+              sub={`No encontramos pedidos para “${query}”. Probá con otro término.`}
+              actionLabel="Limpiar búsqueda"
+              onAction={() => setQuery("")}
+              icon="search"
+            />
+          ) : (
+            <PedidoEmpty
+              title={tab === "activos" ? "Sin rentals activos" : "Sin pedidos por acá"}
+              sub={
+                tab === "activos"
+                  ? "No tenés rentals activos en este momento."
+                  : "No tenés pedidos en esta sección todavía."
+              }
+              cta
+            />
+          )
         ) : (
           <div className="flex flex-col gap-2.5">
             {filteredPedidos.map((p) => (
@@ -351,19 +429,48 @@ export default function ClientePortal() {
         onDismiss={dismissDocsPopup}
         onVerPedido={verPedido}
       />
+
+      {perfil && (
+        <ProfileDrawer
+          open={drawerOpen}
+          perfil={perfil}
+          pedidosCount={pedidos.length}
+          totalAlquilado={pedidos.reduce((s, p) => s + (p.monto_total ?? 0), 0)}
+          onClose={() => setDrawerOpen(false)}
+          onLogout={handleLogout}
+        />
+      )}
     </PublicLayout>
   );
 }
 
-function PedidoEmpty({ title, sub, cta }: { title: string; sub: string; cta?: boolean }) {
+function PedidoEmpty({
+  title, sub, cta, actionLabel, onAction, icon = "bag",
+}: {
+  title: string;
+  sub: string;
+  cta?: boolean;
+  actionLabel?: string;
+  onAction?: () => void;
+  icon?: "bag" | "search";
+}) {
+  const Icon = icon === "search" ? Search : ShoppingBag;
   return (
     <div className="rounded-xl border border-dashed border-[var(--hairline)] px-6 py-[60px] text-center">
       <div className="mx-auto mb-3.5 grid h-14 w-14 place-items-center rounded-full bg-amber-soft text-amber">
-        <ShoppingBag className="h-6 w-6" strokeWidth={1.5} />
+        <Icon className="h-6 w-6" strokeWidth={1.5} />
       </div>
       <div className="font-display text-xl font-black text-ink mb-1.5">{title}</div>
       <div className="font-sans text-[13px] text-muted-foreground mb-[18px]">{sub}</div>
-      {cta && (
+      {actionLabel && onAction ? (
+        <button
+          type="button"
+          onClick={onAction}
+          className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-2.5 font-sans text-[13px] font-bold text-amber transition hover:bg-amber hover:text-ink"
+        >
+          {actionLabel} <XIcon className="h-3.5 w-3.5" />
+        </button>
+      ) : cta && (
         <Link
           to="/"
           className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-2.5 font-sans text-[13px] font-bold text-amber transition hover:bg-amber hover:text-ink"
@@ -467,7 +574,13 @@ function PedidoCard({
           <span className="font-mono text-[11px] font-bold text-ink tracking-[0.05em]">
             #{pedido.numero_pedido}
           </span>
-          <EstadoBadge estado={pedido.estado} />
+          {pendiente ? (
+            <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+              Mod. pendiente
+            </span>
+          ) : (
+            <EstadoBadge estado={pedido.estado} />
+          )}
           <span className="font-sans text-[13px] text-muted-foreground flex-1 min-w-0 truncate">
             {fmtDate(pedido.fecha_desde)}
             <span className="opacity-40 mx-1">→</span>
@@ -561,6 +674,44 @@ function PedidoCard({
               </section>
             );
           })()}
+
+          {(docs.remito || docs.contrato || docs.albaran) && (
+            <section
+              className="rounded-md border px-3 py-3"
+              style={{
+                background: "color-mix(in oklch, var(--amber) 6%, var(--background))",
+                borderColor: "color-mix(in oklch, var(--amber) 35%, transparent)",
+              }}
+            >
+              <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink/70 mb-2">
+                Documentos
+              </h3>
+              <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
+                {docs.remito && (
+                  <DocActions pedidoId={pedido.id} numero={numero} tipo="remito" label="Remito" />
+                )}
+                {docs.contrato && (
+                  <DocActions
+                    pedidoId={pedido.id} numero={numero} tipo="contrato" label="Contrato"
+                    description={DOC_DESCRIPTION.contrato}
+                  />
+                )}
+                {docs.albaran && (
+                  <DocActions
+                    pedidoId={pedido.id} numero={numero} tipo="albaran" label="Albarán"
+                    description={DOC_DESCRIPTION.albaran}
+                  />
+                )}
+              </div>
+            </section>
+          )}
+
+          <section>
+            <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+              Estado del pedido
+            </h3>
+            <PedidoTimeline pedido={pedido} />
+          </section>
 
           {puedeModificar && (
             <section>
@@ -711,31 +862,6 @@ function PedidoCard({
                   </li>
                 ))}
               </ul>
-            </section>
-          )}
-
-          {(docs.remito || docs.contrato || docs.albaran) && (
-            <section>
-              <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
-                Documentos
-              </h3>
-              <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
-                {docs.remito && (
-                  <DocActions pedidoId={pedido.id} numero={numero} tipo="remito" label="Remito" />
-                )}
-                {docs.contrato && (
-                  <DocActions
-                    pedidoId={pedido.id} numero={numero} tipo="contrato" label="Contrato"
-                    description={DOC_DESCRIPTION.contrato}
-                  />
-                )}
-                {docs.albaran && (
-                  <DocActions
-                    pedidoId={pedido.id} numero={numero} tipo="albaran" label="Albarán"
-                    description={DOC_DESCRIPTION.albaran}
-                  />
-                )}
-              </div>
             </section>
           )}
 
@@ -1033,5 +1159,417 @@ function DocAvailablePopup({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Timeline cronológico del pedido ────────────────────────────────────────
+// Derivado en frontend de `created_at` del pedido + `solicitudes[]` + el
+// `estado` actual. Camino A del HANDOFF_BACKEND.md — el backend no guarda
+// (todavía) un log de transiciones de estado, así que mostramos el flujo
+// canónico y marcamos cada paso como done/current/pending según el estado
+// actual; solo "solicitado" y los eventos de modificación tienen fecha
+// exacta.
+
+type TLState = "pending" | "done" | "current" | "rejected";
+type TLStep = {
+  key: string;
+  label: string;
+  desc: string;
+  fecha?: string | null;
+  nota?: string | null;
+  state: TLState;
+};
+
+const FLOW_STEPS: ReadonlyArray<{ tipo: string; label: string; desc: string }> = [
+  { tipo: "solicitado", label: "Solicitado",
+    desc: "Recibimos tu pedido. Lo revisamos y te confirmamos disponibilidad." },
+  { tipo: "confirmado", label: "Confirmado",
+    desc: "Equipos reservados a tu nombre. Listo para retirar en la fecha." },
+  { tipo: "retirado",   label: "Retirado",
+    desc: "Pasaste por el local y te llevaste el equipo." },
+  { tipo: "devuelto",   label: "Devuelto",
+    desc: "Recibimos el equipo de vuelta y lo revisamos." },
+  { tipo: "finalizado", label: "Finalizado",
+    desc: "Pedido cerrado. Gracias por elegirnos." },
+];
+
+// Cuántos FLOW_STEPS están completados según el estado actual.
+const ESTADO_PROGRESS: Record<string, number> = {
+  borrador:    0,
+  presupuesto: 1,
+  confirmado:  2,
+  retirado:    3,
+  devuelto:    4,
+  finalizado:  5,
+};
+
+function buildTimelineSteps(pedido: Pedido): TLStep[] {
+  const cancelado = pedido.estado === "cancelado";
+  const progress = ESTADO_PROGRESS[pedido.estado] ?? 1;
+
+  const flow: TLStep[] = FLOW_STEPS.map((step, idx) => ({
+    key: step.tipo,
+    label: step.label,
+    desc: step.desc,
+    // Solo el primer paso ("solicitado") tiene fecha exacta — viene de
+    // created_at del pedido. Los demás no se loggean en backend (gap).
+    fecha: step.tipo === "solicitado" ? pedido.created_at ?? null : null,
+    state: idx < progress ? "done" : "pending",
+  }));
+
+  // Eventos de modificación derivados de solicitudes[]. Solo mostramos al
+  // cliente las que él inició: pendiente/aprobada/rechazada, más las
+  // canceladas-por-sistema (cuando el pedido cambia de estado y se anula
+  // la solicitud). Las que él mismo canceló no las mostramos — ya lo sabe.
+  const mods: TLStep[] = [];
+  for (const sol of pedido.solicitudes ?? []) {
+    mods.push({
+      key: `mod_sol-${sol.id}`,
+      label: "Modificación solicitada",
+      desc: "Pediste un cambio en el pedido.",
+      fecha: sol.created_at,
+      state: sol.estado === "pendiente" ? "current" : "done",
+    });
+    if (sol.estado === "aprobada") {
+      mods.push({
+        key: `mod_ap-${sol.id}`,
+        label: "Modificación aceptada",
+        desc: "Aplicamos el cambio que pediste.",
+        fecha: sol.resolved_at,
+        nota: sol.respuesta,
+        state: "done",
+      });
+    } else if (sol.estado === "rechazada") {
+      mods.push({
+        key: `mod_re-${sol.id}`,
+        label: "Modificación rechazada",
+        desc: "No pudimos aplicar el cambio.",
+        fecha: sol.resolved_at,
+        nota: sol.respuesta,
+        state: "rejected",
+      });
+    } else if (sol.estado === "cancelada" && sol.resolved_by === "system") {
+      mods.push({
+        key: `mod_ca-${sol.id}`,
+        label: "Solicitud anulada",
+        desc: "El pedido cambió de estado y la solicitud quedó sin efecto.",
+        fecha: sol.resolved_at,
+        nota: sol.respuesta,
+        state: "rejected",
+      });
+    }
+  }
+
+  // Mezclar: ítems con fecha en orden cronológico + flow sin fecha
+  // mantienen su posición relativa después.
+  const withDate = [...flow.filter((s) => s.fecha), ...mods.filter((m) => m.fecha)]
+    .sort((a, b) => (a.fecha ?? "").localeCompare(b.fecha ?? ""));
+  const withoutDate = flow.filter((s) => !s.fecha);
+
+  let merged: TLStep[] = [...withDate, ...withoutDate];
+
+  if (cancelado) {
+    merged = merged.filter((it) => it.state !== "pending");
+    merged.push({
+      key: "cancelado",
+      label: "Cancelado",
+      desc: "El pedido fue cancelado.",
+      state: "rejected",
+    });
+    return merged;
+  }
+
+  // Marcar paso actual: si ya hay un "current" (por solicitud pendiente)
+  // no tocamos; sino, el último "done" pasa a "current".
+  const hasCurrent = merged.some((it) => it.state === "current");
+  if (!hasCurrent) {
+    let lastDone = -1;
+    for (let i = 0; i < merged.length; i++) {
+      if (merged[i].state === "done") lastDone = i;
+    }
+    if (lastDone >= 0) merged[lastDone].state = "current";
+  }
+
+  return merged;
+}
+
+function fmtTimelineDateTime(s?: string | null): string | null {
+  if (!s) return null;
+  const dStr = s.slice(0, 10);
+  if (dStr.length < 10) return null;
+  const d = new Date(dStr + "T" + (s.length >= 16 ? s.slice(11, 16) : "12:00") + ":00");
+  if (Number.isNaN(d.getTime())) return null;
+  const dias = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]} · ${hh}:${mm}`;
+}
+
+function PedidoTimeline({ pedido }: { pedido: Pedido }) {
+  const steps = buildTimelineSteps(pedido);
+  return (
+    <div className="flex flex-col">
+      {steps.map((s, i) => {
+        const isLast = i === steps.length - 1;
+        const lineCls =
+          s.state === "done" ? "bg-ink/25"
+          : s.state === "current"
+            ? "bg-gradient-to-b from-amber from-50% to-[var(--hairline)] to-50%"
+            : "bg-[var(--hairline)]";
+        const dotCls =
+          s.state === "done"     ? "border-ink bg-ink text-amber"
+          : s.state === "current" ? "border-amber bg-amber text-ink shadow-[0_0_0_4px_var(--amber-soft)]"
+          : s.state === "rejected" ? "border-destructive bg-destructive text-white"
+          : "border-[var(--hairline)] bg-background text-muted-foreground border-dashed";
+        const Icon =
+          s.state === "rejected" ? XCircle
+          : s.state === "current" ? Clock
+          : s.state === "done"     ? CircleCheckBig
+          : Clock;
+        return (
+          <div key={s.key} className={cn("relative flex gap-3", isLast ? "pb-0" : "pb-3.5")}>
+            {!isLast && (
+              <span
+                className={cn("absolute left-[13px] top-7 bottom-0 w-[2px]", lineCls)}
+                aria-hidden
+              />
+            )}
+            <div
+              className={cn(
+                "z-[1] grid h-7 w-7 shrink-0 place-items-center rounded-full border-2",
+                dotCls,
+              )}
+            >
+              <Icon className="h-3 w-3" strokeWidth={2} />
+            </div>
+            <div className="flex-1 min-w-0 pt-0.5">
+              <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                <span
+                  className={cn(
+                    "font-sans text-[13px] font-bold text-ink",
+                    s.state === "pending" && "text-muted-foreground font-semibold",
+                  )}
+                >
+                  {s.label}
+                </span>
+                {s.fecha && (
+                  <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground tabular-nums">
+                    {fmtTimelineDateTime(s.fecha)}
+                  </span>
+                )}
+              </div>
+              <div
+                className={cn(
+                  "font-sans text-xs text-muted-foreground leading-[1.5] mt-0.5",
+                  s.state === "current" && "text-ink/80",
+                )}
+              >
+                {s.desc}
+              </div>
+              {s.nota && (
+                <div className="mt-1.5 rounded-sm border border-[var(--hairline)] bg-surface px-2.5 py-1.5 font-sans text-xs text-ink whitespace-pre-wrap">
+                  {s.nota}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── ProfileDrawer: vista lateral del perfil del cliente ────────────────────
+// Reemplaza el drop-target del avatar pill en el TopBar. Solo lectura aquí
+// — la edición sigue viviendo en `/cliente/perfil` (link "Editar datos").
+
+function ProfileDrawer({
+  open, perfil, pedidosCount, totalAlquilado, onClose, onLogout,
+}: {
+  open: boolean;
+  perfil: Perfil;
+  pedidosCount: number;
+  totalAlquilado: number;
+  onClose: () => void;
+  onLogout: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [open, onClose]);
+
+  const initials = `${(perfil.nombre[0] ?? "").toUpperCase()}${(perfil.apellido[0] ?? "").toUpperCase()}`;
+  const clienteDesde = perfil.created_at
+    ? new Date(perfil.created_at.slice(0, 10) + "T12:00:00").getFullYear()
+    : null;
+
+  return (
+    <>
+      <div
+        className={cn(
+          "fixed inset-0 z-[90] bg-black/45 backdrop-blur-[2px] transition-opacity duration-200",
+          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
+        )}
+        onClick={onClose}
+        aria-hidden
+      />
+      <aside
+        className={cn(
+          "fixed top-0 right-0 bottom-0 z-[100] flex w-[380px] max-w-[92vw] flex-col overflow-hidden",
+          "border-l border-[var(--hairline)] bg-background shadow-[-20px_0_60px_-10px_rgba(0,0,0,0.18)]",
+          "transition-transform duration-[260ms] ease-[cubic-bezier(.32,.72,.32,1)]",
+          open ? "translate-x-0" : "translate-x-full",
+        )}
+        aria-hidden={!open}
+        role="dialog"
+        aria-label="Mi cuenta"
+      >
+        <div className="flex items-center justify-between border-b border-[var(--hairline)] px-5 py-4">
+          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+            Mi cuenta
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-ink"
+            aria-label="Cerrar"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5">
+          <div className="flex items-center gap-3.5 border-b border-[var(--hairline)] pb-5 mb-5">
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-amber text-ink font-display text-[22px] font-black">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <div className="font-display text-[22px] font-black text-ink leading-tight tracking-[-0.015em] truncate">
+                {perfil.nombre} {perfil.apellido}
+              </div>
+              {clienteDesde && (
+                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground mt-1">
+                  Cliente desde {clienteDesde}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <ProfileSection title="Contacto">
+            <ProfileField icon={Mail} label="Email" value={perfil.email} />
+            <ProfileField icon={Phone} label="Teléfono" value={perfil.telefono} />
+            {perfil.direccion && (
+              <ProfileField icon={MapPin} label="Dirección" value={perfil.direccion} />
+            )}
+          </ProfileSection>
+
+          {(perfil.cuit || perfil.perfil_impuestos) && (
+            <ProfileSection title="Facturación">
+              {perfil.cuit && (
+                <ProfileField icon={Receipt} label="CUIT" value={perfil.cuit} mono />
+              )}
+              {perfil.perfil_impuestos && (
+                <ProfileField icon={Building2} label="Condición" value={
+                  ({
+                    consumidor_final: "Consumidor Final",
+                    responsable_inscripto: "Responsable Inscripto",
+                    monotributo: "Monotributo",
+                    exento: "Exento",
+                  } as Record<string, string>)[perfil.perfil_impuestos] ?? perfil.perfil_impuestos
+                } />
+              )}
+            </ProfileSection>
+          )}
+
+          <ProfileSection title="Resumen histórico">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-md border border-[var(--hairline)] bg-surface px-3.5 py-3">
+                <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Pedidos</div>
+                <div className="font-display text-[22px] font-black text-ink tabular-nums leading-none mt-1">
+                  {pedidosCount}
+                </div>
+              </div>
+              <div className="rounded-md border border-[var(--hairline)] bg-surface px-3.5 py-3">
+                <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Total alquilado</div>
+                <div className="font-display text-[22px] font-black text-ink tabular-nums leading-none mt-1">
+                  {fmt(totalAlquilado)}
+                </div>
+              </div>
+            </div>
+          </ProfileSection>
+        </div>
+
+        <div className="flex gap-2 border-t border-[var(--hairline)] px-5 py-3.5">
+          <Link
+            to="/cliente/perfil"
+            onClick={onClose}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-[var(--hairline)] py-2.5 font-sans text-xs font-bold text-ink transition hover:border-ink"
+          >
+            <Pencil className="h-3 w-3" />
+            Editar datos
+          </Link>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-ink py-2.5 font-sans text-xs font-bold text-amber transition hover:bg-amber hover:text-ink"
+          >
+            <LogOut className="h-3 w-3" />
+            Cerrar sesión
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+function ProfileSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-5 last:mb-0">
+      <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2.5">
+        {title}
+      </div>
+      <div className="flex flex-col rounded-md border border-[var(--hairline)] bg-surface overflow-hidden">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ProfileField({
+  icon: Icon, label, value, mono,
+}: {
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3 border-b border-[var(--hairline)] px-3.5 py-2.5 last:border-b-0">
+      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-sm bg-amber-soft text-amber">
+        <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
+          {label}
+        </div>
+        <div
+          className={cn(
+            "text-[13px] font-semibold text-ink mt-0.5 truncate",
+            mono ? "font-mono" : "font-sans",
+          )}
+        >
+          {value}
+        </div>
+      </div>
+    </div>
   );
 }

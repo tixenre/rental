@@ -26,6 +26,15 @@ logger = logging.getLogger(__name__)
 _jinja_html = jinja2.Environment(autoescape=True, undefined=jinja2.Undefined)
 _jinja_text = jinja2.Environment(autoescape=False, undefined=jinja2.Undefined)
 
+# Templates que solo deben enviarse UNA vez por pedido (idempotency).
+# El recordatorio_retiro tiene su propio UNIQUE INDEX en DB; estos los
+# chequeamos via SELECT antes de enviar para evitar dobles envíos por
+# doble-click, retries, o reentradas al endpoint de confirmación.
+_IDEMPOTENT_PER_PEDIDO = {
+    "pedido_creado_cliente",
+    "pedido_confirmado_cliente",
+}
+
 
 def _resolve_from(conn) -> str:
     """from address: env EMAIL_FROM > app_settings.email_from > fallback."""
@@ -101,6 +110,24 @@ def send_email(
 
     conn = get_db()
     try:
+        # Idempotency: si este template ya se envió OK para este pedido,
+        # no lo mandamos de nuevo (doble-click en confirmar, retries, etc).
+        if template_key in _IDEMPOTENT_PER_PEDIDO and alquiler_id:
+            existing = conn.execute(
+                """
+                SELECT id FROM emails_log
+                 WHERE template_key = ? AND alquiler_id = ? AND status = 'sent'
+                 LIMIT 1
+                """,
+                (template_key, alquiler_id),
+            ).fetchone()
+            if existing:
+                logger.info(
+                    "send_email: skip duplicado tpl=%s alquiler=%s log_id=%s",
+                    template_key, alquiler_id, existing["id"],
+                )
+                return {"ok": True, "skipped": True, "log_id": existing["id"]}
+
         try:
             rendered = render_template(template_key, context)
         except Exception as e:

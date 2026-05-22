@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Query, HTTPException, Request
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from database import get_db, row_to_dict
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
@@ -164,15 +164,26 @@ def _get_alquiler_pagos(conn, pedido_id: int) -> list[dict]:
 
 
 def _recalcular_monto_pagado(conn, pedido_id: int):
-    """Suma todos los pagos del registro y actualiza monto_pagado en pedidos.
+    """Recalcula monto_pagado atómicamente desde alquiler_pagos.
+
+    Usa UPDATE con subquery (en lugar de SELECT-luego-UPDATE) para evitar
+    race conditions cuando dos pagos llegan en paralelo.
 
     No hace commit — el caller debe commitear inmediatamente después para que
     el UPDATE no quede huérfano si falla algo posterior en la misma transacción.
     """
-    total = conn.execute(
-        "SELECT COALESCE(SUM(monto), 0) FROM alquiler_pagos WHERE pedido_id=?", (pedido_id,)
-    ).fetchone()[0]
-    conn.execute("UPDATE alquileres SET monto_pagado=? WHERE id=?", (total, pedido_id))
+    conn.execute(
+        """
+        UPDATE alquileres
+           SET monto_pagado = (
+               SELECT COALESCE(SUM(monto), 0)
+                 FROM alquiler_pagos
+                WHERE pedido_id = ?
+           )
+         WHERE id = ?
+        """,
+        (pedido_id, pedido_id),
+    )
 
 
 def _get_alquiler_detail(conn, id: int) -> dict:
@@ -211,6 +222,7 @@ def _enriquecer_pedido_con_cliente_fiscal(conn, pedido: dict) -> dict:
     return pedido
 
 
+
 def _get_historial_modificaciones(conn, pedido_id: int) -> list[dict]:
     """Timeline de cambios solicitados por el cliente sobre el pedido.
 
@@ -243,7 +255,6 @@ def _parse_precio(v) -> int:
 
 
 class PedidoItem(BaseModel):
-    from pydantic import field_validator
     equipo_id:      int
     cantidad:       int
     precio_jornada: int = 0
@@ -255,9 +266,11 @@ class PedidoItem(BaseModel):
 
     @field_validator("cantidad")
     @classmethod
-    def validate_cantidad(cls, v):
-        if v is None or v <= 0:
-            raise ValueError("cantidad debe ser mayor a 0")
+    def validate_cantidad(cls, v: int) -> int:
+        if v is None or v < 1:
+            raise ValueError("cantidad debe ser >= 1")
+        if v > 999:
+            raise ValueError("cantidad demasiado alta (máx 999)")
         return v
 
     @field_validator("precio_jornada")
@@ -646,6 +659,11 @@ def delete_pedido(id: int, request: Request):
 
 ESTADOS_REQUIEREN_FECHAS = {"confirmado", "retirado", "devuelto", "finalizado"}
 
+# Estados que reservan stock activamente — cualquier transición HACIA uno de
+# estos requiere re-validar stock incluso si el destino no exige fechas/items
+# (caso típico: borrador → presupuesto).
+ESTADOS_QUE_RESERVAN = {"presupuesto", "confirmado", "retirado"}
+
 
 def _consolidar_items_por_equipo(items) -> dict:
     """Consolida items del mismo equipo sumando cantidades.
@@ -683,6 +701,19 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
     Si el pedido tiene varios items del MISMO equipo (raro pero posible si el
     frontend tiene un bug o si se usa la API directamente), suma las cantidades
     antes de validar — sino la validación pasaría con falsa negativa. Issue #102.
+
+    Para cada equipo del pedido, suma el stock reservado por TODOS los pedidos
+    activos en el rango, contando:
+      (a) `alquiler_items` que reserven directamente ese equipo, +
+      (b) `alquiler_items` de OTROS equipos que sean kits y tengan a este
+          equipo como componente (cantidad ponderada por kc.cantidad).
+    Sin (b) un kit no chequearía la disponibilidad de sus componentes y dos
+    pedidos podían quedar confirmados sobre la misma unidad — uno vía kit y
+    otro directo. `get_disponibilidad` ya sumaba (b); acá lo igualamos.
+
+    Además, expande los items del pedido para chequear también sus
+    componentes (si un item es un kit, exigimos stock para cada componente
+    multiplicando por su cantidad en el kit).
     """
     items = conn.execute("""
         SELECT pi.equipo_id, pi.cantidad, e.nombre, e.cantidad AS stock_total
@@ -691,7 +722,26 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
         WHERE pi.pedido_id = ?
     """, (pedido_id,)).fetchall()
 
-    consolidated = _consolidar_items_por_equipo(items)
+    # Expandimos kits: cada item del pedido aporta demanda al equipo directo
+    # y también a cada componente del kit (cantidad ponderada).
+    expanded: list[dict] = [dict(r) for r in items]
+    for r in items:
+        comps = conn.execute("""
+            SELECT kc.componente_id, kc.cantidad AS kc_cant,
+                   e.nombre, e.cantidad AS stock_total
+            FROM kit_componentes kc
+            JOIN equipos e ON e.id = kc.componente_id
+            WHERE kc.equipo_id = ?
+        """, (r["equipo_id"],)).fetchall()
+        for c in comps:
+            expanded.append({
+                "equipo_id": c["componente_id"],
+                "cantidad": r["cantidad"] * c["kc_cant"],
+                "nombre": c["nombre"],
+                "stock_total": c["stock_total"],
+            })
+
+    consolidated = _consolidar_items_por_equipo(expanded)
 
     problemas = []
     for it in consolidated.values():
@@ -709,8 +759,8 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
 
         stock_total = lock_result["cantidad"]
 
-        # Cuánto está reservado para ese equipo en el rango (excluyendo este pedido)
-        reservado = conn.execute(f"""
+        # (a) Reservas directas — items que apuntan a este equipo.
+        reservado_directo = conn.execute(f"""
             SELECT COALESCE(SUM(pi2.cantidad), 0)
             FROM alquiler_items pi2
             JOIN alquileres p ON p.id = pi2.pedido_id
@@ -721,6 +771,22 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
               AND p.fecha_hasta > ?
         """, (it["equipo_id"], pedido_id, fecha_hasta, fecha_desde)).fetchone()[0]
 
+        # (b) Reservas vía kits — items que reservan un kit que tiene a este
+        # equipo como componente. Multiplicamos cantidad del item por
+        # cantidad del componente en el kit.
+        reservado_via_kit = conn.execute(f"""
+            SELECT COALESCE(SUM(pi2.cantidad * kc.cantidad), 0)
+            FROM alquiler_items pi2
+            JOIN alquileres p ON p.id = pi2.pedido_id
+            JOIN kit_componentes kc ON kc.equipo_id = pi2.equipo_id
+            WHERE kc.componente_id = ?
+              AND p.id != ?
+              AND p.estado IN {ESTADOS_RESERVADO}
+              AND p.fecha_desde < ?
+              AND p.fecha_hasta > ?
+        """, (it["equipo_id"], pedido_id, fecha_hasta, fecha_desde)).fetchone()[0]
+
+        reservado = reservado_directo + reservado_via_kit
         disponible = stock_total - reservado
         if disponible < it["cantidad"]:
             problemas.append(
@@ -769,6 +835,24 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
                     errores.append(f"Sin stock suficiente: {s}")
             if errores:
                 raise HTTPException(422, {"errores": errores})
+
+        # Cualquier transición a un estado que reserva stock debe re-validar,
+        # incluyendo "presupuesto" (que no exige fechas pero sí reserva si las
+        # tiene). Salteamos si la transición no cambia el flag de "reserva"
+        # (ej. confirmado → confirmado, o presupuesto → confirmado ya validado
+        # arriba).
+        elif (
+            data.estado in ESTADOS_QUE_RESERVAN
+            and p_row["estado"] not in ESTADOS_QUE_RESERVAN
+            and p_row["fuente"] != "historico"
+            and p_row["fecha_desde"] and p_row["fecha_hasta"]
+        ):
+            sin_stock = _check_stock(conn, id, p_row["fecha_desde"], p_row["fecha_hasta"])
+            if sin_stock:
+                raise HTTPException(
+                    422,
+                    {"errores": [f"Sin stock suficiente: {s}" for s in sin_stock]},
+                )
 
         es_historico    = p_row["fuente"] == "historico"
         estado_anterior = p_row["estado"]
@@ -1087,6 +1171,21 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
     conn = get_db()
     try:
         pedido = _apply_pedido_items(conn, id, data.items)
+
+        # Si el pedido está en estado que reserva stock, validar después de
+        # aplicar los nuevos items. Sin esto el admin podía sumar cantidades
+        # que excedieran el stock disponible y crear doble booking silencioso.
+        p = conn.execute(
+            "SELECT estado, fecha_desde, fecha_hasta FROM alquileres WHERE id=?", (id,)
+        ).fetchone()
+        if (
+            p["estado"] in {"presupuesto", "confirmado", "retirado"}
+            and p["fecha_desde"] and p["fecha_hasta"]
+        ):
+            problemas = _check_stock(conn, id, p["fecha_desde"], p["fecha_hasta"])
+            if problemas:
+                raise HTTPException(409, "Sin stock: " + "; ".join(problemas))
+
         conn.commit()
         return pedido
     except Exception:

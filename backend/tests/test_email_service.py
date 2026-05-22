@@ -58,6 +58,17 @@ class FakeConn:
             ])
         if s.startswith("SELECT VALUE FROM APP_SETTINGS"):
             return FakeCursor([])  # sin override
+        if s.startswith("SELECT ID FROM EMAILS_LOG"):
+            # idempotency check: ¿ya hay sent para (template_key, alquiler_id)?
+            tpl, aid = params[0], params[1]
+            for i, log in enumerate(self.inserted_logs, 1):
+                if (
+                    log["template_key"] == tpl
+                    and log["alquiler_id"] == aid
+                    and log["status"] == "sent"
+                ):
+                    return FakeCursor([FakeRow(id=i)])
+            return FakeCursor([])
         if s.startswith("INSERT INTO EMAILS_LOG"):
             self.inserted_logs.append({
                 "to": params[0], "subject": params[1],
@@ -226,3 +237,56 @@ class TestSendEmailFailures:
         log = fake_db_with_templates.inserted_logs[0]
         assert log["status"] == "failed"
         assert log["error"]
+
+
+# ── send_email — idempotency ──────────────────────────────────────────────────
+
+class TestSendEmailIdempotency:
+    """Templates transaccionales (pedido_creado_cliente, pedido_confirmado_cliente)
+    no se envían dos veces para el mismo pedido aunque se invoque dos veces."""
+
+    def test_segunda_llamada_misma_alquiler_id_es_skip(
+        self, fake_db_with_templates, monkeypatch
+    ):
+        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        ctx = {"cliente_nombre": "Ana", "numero_pedido": 99}
+        r1 = send_email("pedido_creado_cliente", "a@b.com", ctx, alquiler_id=99)
+        r2 = send_email("pedido_creado_cliente", "a@b.com", ctx, alquiler_id=99)
+        assert r1["ok"] is True
+        assert r2["ok"] is True
+        assert r2.get("skipped") is True
+        # Solo se envió 1 mail aunque se llamó 2 veces
+        assert len(SENT_MAILS) == 1
+        # Solo se loggeó 1 fila
+        assert len(fake_db_with_templates.inserted_logs) == 1
+
+    def test_alquiler_distinto_si_envia(
+        self, fake_db_with_templates, monkeypatch
+    ):
+        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        ctx = {"cliente_nombre": "Ana", "numero_pedido": 1}
+        send_email("pedido_creado_cliente", "a@b.com", ctx, alquiler_id=1)
+        send_email("pedido_creado_cliente", "a@b.com", ctx, alquiler_id=2)
+        # Dos alquileres distintos → dos envíos
+        assert len(SENT_MAILS) == 2
+        assert len(fake_db_with_templates.inserted_logs) == 2
+
+    def test_sin_alquiler_id_no_se_aplica_idempotency(
+        self, fake_db_with_templates, monkeypatch
+    ):
+        # Sin alquiler_id no podemos chequear (test de admin, etc) → envía igual
+        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        ctx = {"cliente_nombre": "Ana", "numero_pedido": 1}
+        send_email("pedido_creado_cliente", "a@b.com", ctx, alquiler_id=None)
+        send_email("pedido_creado_cliente", "a@b.com", ctx, alquiler_id=None)
+        assert len(SENT_MAILS) == 2
+
+    def test_template_no_idempotente_pasa_dos_veces(
+        self, fake_db_with_templates, monkeypatch
+    ):
+        # pedido_creado_admin no está en el whitelist de idempotency
+        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        ctx = {"cliente_email": "a@b.com", "numero_pedido": 1}
+        send_email("pedido_creado_admin", "admin@x.com", ctx, alquiler_id=5)
+        send_email("pedido_creado_admin", "admin@x.com", ctx, alquiler_id=5)
+        assert len(SENT_MAILS) == 2
