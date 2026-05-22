@@ -50,14 +50,12 @@ _CAMARAS = CategoriaRegistry(
         SubCategoria(nombre="Foto", prioridad=10),
         SubCategoria(nombre="Video", prioridad=20),
         SubCategoria(nombre="Acción", prioridad=30),
-        # Video > monturas (taxonomía 2-niveles)
+        # Video > monturas (taxonomía 2-niveles).
+        # Sólo las monturas en uso real. Si más adelante hay equipos con
+        # otra montura, se agrega acá o se crea on-the-fly desde admin.
         SubCategoria(nombre="Montura E",   prioridad=10, parent="Video"),
         SubCategoria(nombre="Montura RF",  prioridad=20, parent="Video"),
         SubCategoria(nombre="Montura EF",  prioridad=30, parent="Video"),
-        SubCategoria(nombre="Montura L",   prioridad=40, parent="Video"),
-        SubCategoria(nombre="Montura Z",   prioridad=50, parent="Video"),
-        SubCategoria(nombre="Montura PL",  prioridad=60, parent="Video"),
-        SubCategoria(nombre="Montura BMD", prioridad=70, parent="Video"),
     ],
     specs=[
         SpecDef(
