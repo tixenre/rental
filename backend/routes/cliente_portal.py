@@ -2,6 +2,9 @@
 routes/cliente_portal.py — Portal de clientes (solo Google OAuth).
 """
 
+import datetime
+from math import ceil
+
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
@@ -277,7 +280,7 @@ def cliente_pedidos(request: Request):
         for p in pedidos:
             d = row_to_dict(p)
             items = conn.execute("""
-                SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
+                SELECT ai.equipo_id, ai.cantidad, ai.precio_jornada, ai.subtotal,
                        e.nombre, e.marca, e.modelo, e.foto_url,
                        e.nombre_publico, e.nombre_publico_largo
                 FROM alquiler_items ai
@@ -360,8 +363,94 @@ def cliente_pedido_detalle(id: int, request: Request):
 
 # ── Solicitud de modificación ─────────────────────────────────────────────────
 
+class SolicitudItemIn(BaseModel):
+    equipo_id: int
+    cantidad:  int
+
+
 class SolicitudCreate(BaseModel):
-    mensaje: str
+    """Payload del cliente para pedir una modificación.
+
+    Todos los campos son opcionales: si `items` viene, representa el estado
+    final deseado de los equipos (no un diff). Si `fecha_desde`/`fecha_hasta`
+    vienen, reemplazan las del pedido. `mensaje` es texto libre opcional.
+    Si no viene nada estructurado y solo hay `mensaje`, se acepta como
+    "modificación libre" (back-compat con el shape viejo).
+    """
+    mensaje:     Optional[str] = None
+    fecha_desde: Optional[str] = None
+    fecha_hasta: Optional[str] = None
+    items:       Optional[list[SolicitudItemIn]] = None
+
+
+def _jornadas(fecha_desde: Optional[str], fecha_hasta: Optional[str]) -> int:
+    if not fecha_desde or not fecha_hasta:
+        return 1
+    try:
+        d0 = datetime.datetime.fromisoformat(fecha_desde)
+        d1 = datetime.datetime.fromisoformat(fecha_hasta)
+    except ValueError:
+        return 1
+    return max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
+
+
+def _load_solicitud_full(conn, solicitud_id: int) -> dict:
+    """Devuelve la solicitud + pedido_actual (fechas + items snapshot) +
+    propuesta (fechas + items)."""
+    row = conn.execute("""
+        SELECT sm.*, c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
+               c.email AS cliente_email, a.numero_pedido,
+               a.fecha_desde AS pedido_fecha_desde, a.fecha_hasta AS pedido_fecha_hasta,
+               a.monto_total AS pedido_monto_total, a.estado AS pedido_estado
+        FROM solicitudes_modificacion sm
+        JOIN clientes c ON c.id = sm.cliente_id
+        JOIN alquileres a ON a.id = sm.pedido_id
+        WHERE sm.id = ?
+    """, (solicitud_id,)).fetchone()
+    if not row:
+        return None  # type: ignore[return-value]
+    sm = row_to_dict(row)
+
+    pedido_id = sm["pedido_id"]
+    items_actuales = conn.execute("""
+        SELECT pi.equipo_id, pi.cantidad, pi.precio_jornada,
+               e.nombre, e.marca, e.modelo, e.nombre_publico, e.foto_url
+        FROM alquiler_items pi
+        JOIN equipos e ON e.id = pi.equipo_id
+        WHERE pi.pedido_id = ?
+        ORDER BY e.nombre
+    """, (pedido_id,)).fetchall()
+
+    items_propuesta = conn.execute("""
+        SELECT si.equipo_id, si.cantidad, si.precio_jornada,
+               e.nombre, e.marca, e.modelo, e.nombre_publico, e.foto_url
+        FROM solicitud_items si
+        JOIN equipos e ON e.id = si.equipo_id
+        WHERE si.solicitud_id = ?
+        ORDER BY e.nombre
+    """, (solicitud_id,)).fetchall()
+
+    sm["pedido_actual"] = {
+        "fecha_desde": sm.pop("pedido_fecha_desde"),
+        "fecha_hasta": sm.pop("pedido_fecha_hasta"),
+        "monto_total": sm.pop("pedido_monto_total"),
+        "estado":      sm.pop("pedido_estado"),
+        "items":       [row_to_dict(r) for r in items_actuales],
+    }
+    fecha_desde_prop = sm.pop("fecha_desde_propuesta", None)
+    fecha_hasta_prop = sm.pop("fecha_hasta_propuesta", None)
+    # Si el cliente no mandó propuesta estructurada (solo `mensaje`),
+    # devolvemos None para que el admin vea "modificación libre" en lugar de
+    # un diff sin sentido.
+    if not items_propuesta and not fecha_desde_prop and not fecha_hasta_prop:
+        sm["propuesta"] = None
+    else:
+        sm["propuesta"] = {
+            "fecha_desde": fecha_desde_prop,
+            "fecha_hasta": fecha_hasta_prop,
+            "items":       [row_to_dict(r) for r in items_propuesta],
+        }
+    return sm
 
 
 @router.post("/api/cliente/pedidos/{id}/solicitar-modificacion")
@@ -369,20 +458,26 @@ def cliente_solicitar_modificacion(id: int, data: SolicitudCreate, request: Requ
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
 
-    if not data.mensaje.strip():
-        raise HTTPException(400, "El mensaje no puede estar vacío")
+    mensaje = (data.mensaje or "").strip()
+    fecha_desde = (data.fecha_desde or "").strip() or None
+    fecha_hasta = (data.fecha_hasta or "").strip() or None
+    items_in = data.items or []
+
+    if not mensaje and not fecha_desde and not fecha_hasta and not items_in:
+        raise HTTPException(400, "La solicitud está vacía")
 
     conn = get_db()
     try:
         pedido = conn.execute(
-            "SELECT id, estado FROM alquileres WHERE id = ? AND cliente_id = ?",
+            "SELECT id, estado, fecha_desde, fecha_hasta FROM alquileres "
+            "WHERE id = ? AND cliente_id = ?",
             (id, cliente_id)
         ).fetchone()
         if not pedido:
             raise HTTPException(404, "Pedido no encontrado")
 
         # Solo se pueden solicitar modificaciones en estados activos
-        if pedido["estado"] in ("cancelado", "devuelto"):
+        if pedido["estado"] in ("cancelado", "devuelto", "finalizado"):
             raise HTTPException(400, "No se pueden solicitar modificaciones en un pedido finalizado")
 
         # Evitar duplicados pendientes
@@ -393,12 +488,56 @@ def cliente_solicitar_modificacion(id: int, data: SolicitudCreate, request: Requ
         if pendiente:
             raise HTTPException(409, "Ya hay una solicitud pendiente para este pedido")
 
-        conn.execute(
-            "INSERT INTO solicitudes_modificacion (pedido_id, cliente_id, mensaje) VALUES (?,?,?)",
-            (id, cliente_id, data.mensaje.strip())
-        )
+        # Validar fechas si vinieron
+        eff_desde = fecha_desde or pedido["fecha_desde"]
+        eff_hasta = fecha_hasta or pedido["fecha_hasta"]
+        if eff_desde and eff_hasta:
+            try:
+                d0 = datetime.datetime.fromisoformat(eff_desde)
+                d1 = datetime.datetime.fromisoformat(eff_hasta)
+                if d1 < d0:
+                    raise HTTPException(400, "fecha_hasta debe ser posterior o igual a fecha_desde")
+            except ValueError:
+                raise HTTPException(400, "Las fechas tienen formato inválido")
+
+        # Validar items: equipos existen, cantidades > 0, no duplicados
+        seen = set()
+        items_rows: list[tuple] = []
+        for it in items_in:
+            if it.cantidad <= 0:
+                raise HTTPException(400, "Las cantidades deben ser > 0")
+            if it.equipo_id in seen:
+                raise HTTPException(400, "Hay equipos duplicados en la propuesta")
+            seen.add(it.equipo_id)
+            eq = conn.execute(
+                "SELECT id, precio_jornada FROM equipos WHERE id=?",
+                (it.equipo_id,),
+            ).fetchone()
+            if not eq:
+                raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado")
+            items_rows.append((it.equipo_id, it.cantidad, eq["precio_jornada"] or 0))
+
+        row = conn.execute(
+            """
+            INSERT INTO solicitudes_modificacion
+              (pedido_id, cliente_id, mensaje,
+               fecha_desde_propuesta, fecha_hasta_propuesta)
+            VALUES (?,?,?,?,?)
+            RETURNING id
+            """,
+            (id, cliente_id, mensaje or None, fecha_desde, fecha_hasta),
+        ).fetchone()
+        solicitud_id = row["id"] if isinstance(row, dict) or hasattr(row, "__getitem__") else row[0]
+
+        if items_rows:
+            conn.executemany(
+                "INSERT INTO solicitud_items (solicitud_id, equipo_id, cantidad, precio_jornada) "
+                "VALUES (?,?,?,?)",
+                [(solicitud_id, *r) for r in items_rows],
+            )
+
         conn.commit()
-        return {"ok": True}
+        return {"ok": True, "solicitud_id": solicitud_id}
     finally:
         conn.close()
 
@@ -407,7 +546,12 @@ def cliente_solicitar_modificacion(id: int, data: SolicitudCreate, request: Requ
 
 @router.get("/api/admin/solicitudes")
 def admin_solicitudes(request: Request):
-    """Lista de solicitudes de modificación (solo admins)."""
+    """Lista de solicitudes de modificación (solo admins).
+
+    Cada item incluye el snapshot del pedido actual (fechas + items) y, si el
+    cliente mandó una propuesta estructurada, la propuesta (fechas + items).
+    Esto le permite al admin renderizar el diff en el back-office.
+    """
     session = get_session(request)
     if not session or session.get("role") != "admin":
         raise HTTPException(401, "Acceso denegado")
@@ -415,22 +559,88 @@ def admin_solicitudes(request: Request):
     conn = get_db()
     try:
         rows = conn.execute("""
-            SELECT sm.id, sm.pedido_id, sm.mensaje, sm.estado, sm.respuesta, sm.created_at,
-                   c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
-                   a.numero_pedido
+            SELECT sm.id
             FROM solicitudes_modificacion sm
-            JOIN clientes c ON c.id = sm.cliente_id
-            JOIN alquileres a ON a.id = sm.pedido_id
             ORDER BY sm.created_at DESC
         """).fetchall()
-        return [row_to_dict(r) for r in rows]
+        return [_load_solicitud_full(conn, r["id"]) for r in rows]
     finally:
         conn.close()
 
 
+class SolicitudOverride(BaseModel):
+    fecha_desde: Optional[str] = None
+    fecha_hasta: Optional[str] = None
+    items:       list[SolicitudItemIn]
+
+
 class SolicitudRespuesta(BaseModel):
-    estado: str     # aprobada / rechazada
-    respuesta: str = ""
+    estado:     str                              # "aprobada" o "rechazada"
+    respuesta:  str = ""
+    override:   Optional[SolicitudOverride] = None
+
+
+def _apply_solicitud_a_pedido(
+    conn,
+    pedido_id: int,
+    fecha_desde: Optional[str],
+    fecha_hasta: Optional[str],
+    items: list[tuple[int, int]],  # (equipo_id, cantidad)
+) -> None:
+    """Aplica la resolución al pedido: pisa fechas + items + recalcula monto.
+
+    Importado dinámicamente para evitar import cycle con routes.alquileres
+    (que importa cosas de este módulo de forma indirecta vía routers en main).
+    """
+    from routes.alquileres import _aplicar_descuento
+
+    pedido = conn.execute(
+        "SELECT fecha_desde, fecha_hasta, descuento_pct FROM alquileres WHERE id=?",
+        (pedido_id,),
+    ).fetchone()
+    if not pedido:
+        raise HTTPException(404, "Pedido no encontrado")
+
+    eff_desde = fecha_desde or pedido["fecha_desde"]
+    eff_hasta = fecha_hasta or pedido["fecha_hasta"]
+    if eff_desde and eff_hasta:
+        try:
+            d0 = datetime.datetime.fromisoformat(eff_desde)
+            d1 = datetime.datetime.fromisoformat(eff_hasta)
+            if d1 < d0:
+                raise HTTPException(400, "fecha_hasta debe ser posterior o igual a fecha_desde")
+        except ValueError:
+            raise HTTPException(400, "Las fechas tienen formato inválido")
+    jornadas = _jornadas(eff_desde, eff_hasta)
+
+    bruto = 0
+    rows: list[tuple] = []
+    for equipo_id, cantidad in items:
+        eq = conn.execute(
+            "SELECT precio_jornada, nombre FROM equipos WHERE id=?", (equipo_id,)
+        ).fetchone()
+        if not eq:
+            raise HTTPException(404, f"Equipo {equipo_id} no encontrado")
+        precio = eq["precio_jornada"] or 0
+        subtotal = precio * cantidad * jornadas
+        bruto += subtotal
+        rows.append((pedido_id, equipo_id, cantidad, precio, subtotal))
+
+    monto_total = _aplicar_descuento(bruto, pedido["descuento_pct"] or 0)
+
+    conn.execute("DELETE FROM alquiler_items WHERE pedido_id=?", (pedido_id,))
+    if rows:
+        conn.executemany(
+            """INSERT INTO alquiler_items
+                 (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
+                 VALUES (?,?,?,?,?)""",
+            rows,
+        )
+    conn.execute(
+        "UPDATE alquileres SET fecha_desde=?, fecha_hasta=?, monto_total=?, updated_at=CURRENT_TIMESTAMP "
+        "WHERE id=?",
+        (eff_desde, eff_hasta, monto_total, pedido_id),
+    )
 
 
 @router.patch("/api/admin/solicitudes/{id}")
@@ -444,16 +654,70 @@ def admin_responder_solicitud(id: int, data: SolicitudRespuesta, request: Reques
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT id FROM solicitudes_modificacion WHERE id = ?", (id,)
+            "SELECT id, pedido_id, estado, fecha_desde_propuesta, fecha_hasta_propuesta "
+            "FROM solicitudes_modificacion WHERE id = ?",
+            (id,),
         ).fetchone()
         if not row:
             raise HTTPException(404, "Solicitud no encontrada")
+        if row["estado"] != "pendiente":
+            raise HTTPException(400, "Esta solicitud ya fue resuelta")
+
+        applied_override = False
+
+        if data.estado == "aprobada":
+            # Resolver qué se aplica: override del admin si vino, sino la propuesta.
+            if data.override is not None:
+                applied_override = True
+                items = [(it.equipo_id, it.cantidad) for it in data.override.items]
+                _apply_solicitud_a_pedido(
+                    conn,
+                    row["pedido_id"],
+                    data.override.fecha_desde,
+                    data.override.fecha_hasta,
+                    items,
+                )
+            else:
+                # Items propuestos por el cliente
+                prop_items = conn.execute(
+                    "SELECT equipo_id, cantidad FROM solicitud_items WHERE solicitud_id=?",
+                    (id,),
+                ).fetchall()
+                items = [(r["equipo_id"], r["cantidad"]) for r in prop_items]
+                if items or row["fecha_desde_propuesta"] or row["fecha_hasta_propuesta"]:
+                    # Si el cliente no propuso items, copiamos los actuales para no vaciar.
+                    if not items:
+                        actuales = conn.execute(
+                            "SELECT equipo_id, cantidad FROM alquiler_items WHERE pedido_id=?",
+                            (row["pedido_id"],),
+                        ).fetchall()
+                        items = [(r["equipo_id"], r["cantidad"]) for r in actuales]
+                    _apply_solicitud_a_pedido(
+                        conn,
+                        row["pedido_id"],
+                        row["fecha_desde_propuesta"],
+                        row["fecha_hasta_propuesta"],
+                        items,
+                    )
+                # Si la solicitud era solo `mensaje` libre, no aplicamos nada
+                # automático — el admin va a editar el pedido a mano.
+
         conn.execute(
-            "UPDATE solicitudes_modificacion SET estado = ?, respuesta = ? WHERE id = ?",
-            (data.estado, data.respuesta, id)
+            """UPDATE solicitudes_modificacion
+                  SET estado = ?, respuesta = ?, admin_override = ?,
+                      resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
+                WHERE id = ?""",
+            (data.estado, data.respuesta, applied_override,
+             session.get("email") or session.get("name") or "admin", id),
         )
         conn.commit()
-        return {"ok": True}
+        return {"ok": True, "applied_override": applied_override}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 

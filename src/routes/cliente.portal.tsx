@@ -1,12 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { StatCard } from "@/components/rental/StatCard";
 import { EstadoBadge } from "@/components/rental/EstadoBadge";
 import { ViewToggle } from "@/components/rental/ViewToggle";
 import { EmptyState } from "@/components/rental/EmptyState";
-import { ShoppingBag } from "lucide-react";
+import { ShoppingBag, Pencil, Plus, Minus, Search, X, MessageSquare, AlertCircle } from "lucide-react";
 
 export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mi cuenta — Rambla Rental" }] }),
@@ -19,6 +19,7 @@ type Perfil = {
 };
 
 type Item = {
+  equipo_id: number;
   nombre: string;
   marca: string;
   modelo?: string | null;
@@ -30,6 +31,13 @@ type Item = {
   nombre_publico_largo?: string | null;
 };
 type Pago = { monto: number; concepto?: string | null; fecha: string };
+type Solicitud = {
+  id: number;
+  mensaje: string | null;
+  estado: "pendiente" | "aprobada" | "rechazada" | "cancelada";
+  respuesta: string | null;
+  created_at: string;
+};
 type Pedido = {
   id: number; numero_pedido: string; estado: string;
   fecha_desde?: string; fecha_hasta?: string;
@@ -38,11 +46,23 @@ type Pedido = {
   notas?: string | null;
   items: Item[];
   pagos?: Pago[];
+  solicitudes?: Solicitud[];
   documentos_disponibles: { remito: boolean; contrato: boolean; albaran: boolean };
 };
 
-const ACTIVE_STATES = new Set(["solicitado", "confirmado", "entregado"]);
+type EquipoCatalogo = {
+  id: number;
+  nombre: string;
+  marca: string | null;
+  precio_jornada: number | null;
+  foto_url: string | null;
+  nombre_publico?: string | null;
+};
+
+const ACTIVE_STATES = new Set(["solicitado", "confirmado", "entregado", "presupuesto"]);
 const HIST_STATES = new Set(["devuelto", "finalizado"]);
+/** Estados en los que el cliente puede pedir una modificación. */
+const MOD_ELIGIBLE = new Set(["presupuesto", "solicitado", "confirmado"]);
 
 const TAB_OPTIONS = [
   { value: "todos" as const, label: "Todos" },
@@ -67,6 +87,12 @@ export default function ClientePortal() {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [tab, setTab] = useState<"todos" | "activos" | "historial">("todos");
+  const [modPedido, setModPedido] = useState<Pedido | null>(null);
+
+  async function reloadPedidos() {
+    const r = await authedFetch("/api/cliente/pedidos");
+    if (r.ok) setPedidos(await r.json());
+  }
 
   useEffect(() => {
     let alive = true;
@@ -189,11 +215,23 @@ export default function ClientePortal() {
                 pedido={p}
                 expanded={expanded === p.id}
                 onToggle={() => setExpanded(expanded === p.id ? null : p.id)}
+                onModRequest={() => setModPedido(p)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {modPedido && (
+        <ModRequestModal
+          pedido={modPedido}
+          onClose={() => setModPedido(null)}
+          onSuccess={async () => {
+            setModPedido(null);
+            await reloadPedidos();
+          }}
+        />
+      )}
     </PublicLayout>
   );
 }
@@ -206,7 +244,17 @@ function jornadasEntre(desde?: string, hasta?: string): number {
   return Math.max(1, Math.ceil((d2 - d1) / 86_400_000) + 1);
 }
 
-function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: boolean; onToggle: () => void }) {
+function PedidoCard({
+  pedido,
+  expanded,
+  onToggle,
+  onModRequest,
+}: {
+  pedido: Pedido;
+  expanded: boolean;
+  onToggle: () => void;
+  onModRequest: () => void;
+}) {
   const { documentos_disponibles: docs } = pedido;
   const numero = pedido.numero_pedido ?? pedido.id;
   const jornadas = jornadasEntre(pedido.fecha_desde, pedido.fecha_hasta);
@@ -217,6 +265,9 @@ function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: 
   const total = pedido.monto_total ?? (subtotalItems - descuentoMonto);
   const pagado = pedido.monto_pagado ?? 0;
   const balance = Math.max(0, total - pagado);
+
+  const pendiente = pedido.solicitudes?.find((s) => s.estado === "pendiente");
+  const puedeModificar = MOD_ELIGIBLE.has(pedido.estado) && !pendiente;
 
   return (
     <div className="rounded-xl border hairline bg-surface overflow-hidden">
@@ -356,6 +407,37 @@ function PedidoCard({ pedido, expanded, onToggle }: { pedido: Pedido; expanded: 
             <section>
               <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Notas</h3>
               <p className="text-xs text-muted-foreground whitespace-pre-wrap">{pedido.notas}</p>
+            </section>
+          )}
+
+          {/* Bloque: solicitud de modificación pendiente */}
+          {pendiente && (
+            <section className="rounded-md border border-amber/40 bg-amber-soft p-3 flex gap-2.5">
+              <MessageSquare className="h-4 w-4 text-amber shrink-0 mt-0.5" />
+              <div className="flex-1 text-xs leading-snug">
+                <div className="font-mono text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+                  Solicitud de modificación pendiente
+                </div>
+                {pendiente.mensaje && (
+                  <div className="text-ink whitespace-pre-wrap">{pendiente.mensaje}</div>
+                )}
+                <div className="font-mono text-[10px] text-muted-foreground mt-1.5">
+                  Esperando respuesta del equipo Rambla
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Acción: solicitar modificación */}
+          {puedeModificar && (
+            <section>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onModRequest(); }}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-dashed border-hairline bg-background px-3 py-2.5 text-xs font-semibold text-muted-foreground hover:border-ink hover:text-ink hover:border-solid transition-colors"
+              >
+                <Pencil className="h-3.5 w-3.5" /> Solicitar modificación
+              </button>
             </section>
           )}
 
@@ -520,6 +602,361 @@ function DocPreviewModal({
           title={title}
           className="flex-1 w-full bg-white border-0"
         />
+      </div>
+    </div>
+  );
+}
+
+// ── ModRequestModal ──────────────────────────────────────────────────────────
+//
+// Permite al cliente proponer cambios estructurados a un pedido activo: editar
+// cantidades, sumar/quitar equipos, mover fechas, agregar mensaje.
+
+function ModRequestModal({
+  pedido,
+  onClose,
+  onSuccess,
+}: {
+  pedido: Pedido;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  // Items propuestos: arranca con los actuales del pedido.
+  const [items, setItems] = useState<Map<number, number>>(
+    () => new Map(pedido.items.map((it) => [it.equipo_id, it.cantidad])),
+  );
+  const [fechaDesde, setFechaDesde] = useState(pedido.fecha_desde?.slice(0, 10) ?? "");
+  const [fechaHasta, setFechaHasta] = useState(pedido.fecha_hasta?.slice(0, 10) ?? "");
+  const [mensaje, setMensaje] = useState("");
+  const [search, setSearch] = useState("");
+  const [equipos, setEquipos] = useState<EquipoCatalogo[] | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Lazy load catálogo cuando el cliente abre la búsqueda.
+  useEffect(() => {
+    if (equipos !== null) return;
+    if (search.trim().length < 2) return;
+    let alive = true;
+    fetch("/api/equipos?per_page=500")
+      .then((r) => r.ok ? r.json() : { items: [] })
+      .then((d) => { if (alive) setEquipos(d.items ?? []); })
+      .catch(() => { if (alive) setEquipos([]); });
+    return () => { alive = false; };
+  }, [search, equipos]);
+
+  // ESC + lock scroll
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  // Mapa equipo_id → snapshot (nombre/marca/precio) usando el pedido actual
+  // + el catálogo cargado.
+  const infoPorId = useMemo(() => {
+    const m = new Map<number, { nombre: string; marca: string | null; precio: number; foto: string | null }>();
+    for (const it of pedido.items) {
+      m.set(it.equipo_id, {
+        nombre: it.nombre_publico || it.nombre,
+        marca: it.marca,
+        precio: it.precio_jornada,
+        foto: it.foto_url ?? null,
+      });
+    }
+    for (const e of equipos ?? []) {
+      if (!m.has(e.id)) {
+        m.set(e.id, {
+          nombre: e.nombre_publico || e.nombre,
+          marca: e.marca,
+          precio: e.precio_jornada ?? 0,
+          foto: e.foto_url,
+        });
+      }
+    }
+    return m;
+  }, [pedido.items, equipos]);
+
+  const itemsList = Array.from(items.entries());
+  const itemsFinales = itemsList.filter(([, c]) => c > 0);
+  const jornadas = jornadasEntre(fechaDesde, fechaHasta);
+  const totalEstimado = itemsFinales.reduce((acc, [eq, c]) => {
+    const precio = infoPorId.get(eq)?.precio ?? 0;
+    return acc + precio * c * jornadas;
+  }, 0);
+
+  function bumpQty(equipo_id: number, delta: number) {
+    setItems((prev) => {
+      const next = new Map(prev);
+      const cur = next.get(equipo_id) ?? 0;
+      next.set(equipo_id, Math.max(0, cur + delta));
+      return next;
+    });
+  }
+
+  function addEquipo(eq: EquipoCatalogo) {
+    setItems((prev) => {
+      const next = new Map(prev);
+      next.set(eq.id, (next.get(eq.id) ?? 0) + 1);
+      return next;
+    });
+    setSearch("");
+  }
+
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q || !equipos) return [];
+    return equipos
+      .filter((e) => {
+        if (items.has(e.id) && (items.get(e.id) ?? 0) > 0) return false;
+        const hay = `${e.nombre} ${e.marca ?? ""}`.toLowerCase();
+        return hay.includes(q);
+      })
+      .slice(0, 6);
+  }, [search, equipos, items]);
+
+  // El cliente debe haber cambiado algo: fechas, items o tirar un mensaje.
+  const fechasCambian = (fechaDesde || null) !== (pedido.fecha_desde?.slice(0, 10) ?? null)
+    || (fechaHasta || null) !== (pedido.fecha_hasta?.slice(0, 10) ?? null);
+  const itemsCambian = (() => {
+    const baseMap = new Map(pedido.items.map((it) => [it.equipo_id, it.cantidad]));
+    if (itemsFinales.length !== baseMap.size) return true;
+    for (const [eq, c] of itemsFinales) {
+      if (baseMap.get(eq) !== c) return true;
+    }
+    return false;
+  })();
+  const haySolicitud = fechasCambian || itemsCambian || mensaje.trim().length > 0;
+
+  async function handleSubmit() {
+    setError(null);
+    if (itemsFinales.length === 0) {
+      setError("Tu propuesta no tiene equipos. Agregá al menos uno.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const r = await authedFetch(`/api/cliente/pedidos/${pedido.id}/solicitar-modificacion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mensaje: mensaje.trim() || null,
+          fecha_desde: fechaDesde || null,
+          fecha_hasta: fechaHasta || null,
+          items: itemsFinales.map(([equipo_id, cantidad]) => ({ equipo_id, cantidad })),
+        }),
+      });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body?.detail || `Error ${r.status}`);
+      }
+      onSuccess();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/60 flex items-stretch sm:items-center justify-center sm:p-6"
+      onClick={onClose}
+    >
+      <div
+        className="bg-background w-full sm:max-w-xl sm:max-h-[90vh] h-full sm:h-auto flex flex-col sm:rounded-lg overflow-hidden shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between gap-2 border-b hairline px-4 py-3 shrink-0">
+          <div>
+            <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+              Pedido #{pedido.numero_pedido ?? pedido.id}
+            </div>
+            <h2 className="font-display text-lg text-ink">Solicitar modificación</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-md hover:bg-muted transition"
+            aria-label="Cerrar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          {/* Fechas */}
+          <section>
+            <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-1.5">
+              Fechas
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] text-muted-foreground">Desde</span>
+                <input
+                  type="date"
+                  value={fechaDesde}
+                  onChange={(e) => setFechaDesde(e.target.value)}
+                  className="rounded-md border hairline bg-background px-2 py-2 text-sm text-ink"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] text-muted-foreground">Hasta</span>
+                <input
+                  type="date"
+                  value={fechaHasta}
+                  min={fechaDesde || undefined}
+                  onChange={(e) => setFechaHasta(e.target.value)}
+                  className="rounded-md border hairline bg-background px-2 py-2 text-sm text-ink"
+                />
+              </label>
+            </div>
+            <div className="font-mono text-[10px] text-muted-foreground mt-1">
+              {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
+            </div>
+          </section>
+
+          {/* Items */}
+          <section>
+            <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-1.5">
+              Equipos
+            </div>
+            <div className="rounded-md border hairline overflow-hidden">
+              {itemsList.length === 0 && (
+                <div className="px-3 py-4 text-xs text-muted-foreground text-center">
+                  No quedan equipos. Agregá al menos uno.
+                </div>
+              )}
+              {itemsList.map(([equipo_id, c]) => {
+                const info = infoPorId.get(equipo_id);
+                const zeroed = c === 0;
+                return (
+                  <div
+                    key={equipo_id}
+                    className={
+                      "flex items-center gap-2.5 px-3 py-2 border-b hairline last:border-b-0 " +
+                      (zeroed ? "bg-destructive/5" : "bg-background")
+                    }
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className={"text-sm font-medium " + (zeroed ? "text-muted-foreground line-through" : "text-ink")}>
+                        {info?.nombre ?? "—"}
+                      </div>
+                      <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                        {info?.marca ?? ""}
+                      </div>
+                    </div>
+                    <div className="inline-flex items-center rounded-full border hairline bg-background overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => bumpQty(equipo_id, -1)}
+                        disabled={c === 0}
+                        className="h-7 w-7 grid place-items-center text-muted-foreground hover:bg-muted hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <Minus className="h-3 w-3" />
+                      </button>
+                      <span className="font-mono text-xs font-bold text-ink tabular-nums px-1.5 min-w-[28px] text-center">
+                        {c}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => bumpQty(equipo_id, +1)}
+                        className="h-7 w-7 grid place-items-center text-muted-foreground hover:bg-muted hover:text-ink"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="flex items-center gap-2 px-3 py-2 bg-amber-soft/30 border-t hairline">
+                <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <input
+                  placeholder="Buscar equipo del catálogo…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="flex-1 bg-background rounded-md border hairline px-2 py-1.5 text-xs"
+                />
+              </div>
+            </div>
+            {searchResults.length > 0 && (
+              <div className="mt-1.5 rounded-md border hairline bg-background max-h-44 overflow-y-auto">
+                {searchResults.map((eq) => (
+                  <button
+                    key={eq.id}
+                    type="button"
+                    onClick={() => addEquipo(eq)}
+                    className="w-full text-left flex items-center gap-2 px-3 py-2 border-b hairline last:border-b-0 hover:bg-surface transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-ink truncate">
+                        {eq.nombre_publico || eq.nombre}
+                      </div>
+                      <div className="font-mono text-[9px] text-muted-foreground truncate">
+                        {eq.marca ?? "—"} · {fmt(eq.precio_jornada ?? 0)}/jornada
+                      </div>
+                    </div>
+                    <span className="h-6 w-6 grid place-items-center rounded-full bg-ink text-amber shrink-0">
+                      <Plus className="h-3 w-3" strokeWidth={2.5} />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Mensaje */}
+          <section>
+            <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground mb-1.5">
+              Mensaje (opcional)
+            </div>
+            <textarea
+              value={mensaje}
+              onChange={(e) => setMensaje(e.target.value)}
+              placeholder="Contanos qué necesitás cambiar y por qué…"
+              className="w-full min-h-[72px] rounded-md border hairline bg-background px-3 py-2 text-sm text-ink resize-vertical"
+            />
+          </section>
+
+          {/* Resumen */}
+          <section className="rounded-md bg-amber-soft/40 border border-amber/30 px-3 py-2.5 flex items-baseline justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              Total estimado
+            </span>
+            <span className="font-display text-lg font-black text-ink tabular-nums">
+              {fmt(totalEstimado)}
+            </span>
+          </section>
+
+          {error && (
+            <div className="flex items-center gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              {error}
+            </div>
+          )}
+        </div>
+
+        <footer className="border-t hairline px-4 py-3 flex gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-md border hairline bg-background px-3 py-2.5 text-sm text-muted-foreground hover:text-ink hover:border-ink transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting || !haySolicitud || itemsFinales.length === 0}
+            className="flex-1 rounded-md bg-ink text-amber px-3 py-2.5 text-sm font-semibold hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            {submitting ? "Enviando…" : "Enviar solicitud"}
+          </button>
+        </footer>
       </div>
     </div>
   );

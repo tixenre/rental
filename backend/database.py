@@ -958,17 +958,54 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_pagos_pedido ON alquiler_pagos(pedido_id)
     """)
 
+    # Solicitudes de modificación: el cliente manda una propuesta estructurada
+    # (fechas + items) más un mensaje libre. El admin la aprueba (con o sin
+    # override propio) o la rechaza. Al aprobar, los datos efectivos se aplican
+    # al alquiler.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS solicitudes_modificacion (
-            id          SERIAL PRIMARY KEY,
-            pedido_id   INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
-            cliente_id  INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
-            mensaje     TEXT NOT NULL,
-            estado      TEXT NOT NULL DEFAULT 'pendiente',
-            respuesta   TEXT,
-            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            id                     SERIAL PRIMARY KEY,
+            pedido_id              INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
+            cliente_id             INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            mensaje                TEXT,
+            estado                 TEXT NOT NULL DEFAULT 'pendiente',
+            respuesta              TEXT,
+            fecha_desde_propuesta  TEXT,
+            fecha_hasta_propuesta  TEXT,
+            admin_override         BOOLEAN NOT NULL DEFAULT FALSE,
+            resolved_at            TIMESTAMP,
+            resolved_by            TEXT,
+            created_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Backfill para installs anteriores que tenían el shape viejo (solo mensaje).
+    for col, ddl in (
+        ("fecha_desde_propuesta", "ALTER TABLE solicitudes_modificacion ADD COLUMN fecha_desde_propuesta TEXT"),
+        ("fecha_hasta_propuesta", "ALTER TABLE solicitudes_modificacion ADD COLUMN fecha_hasta_propuesta TEXT"),
+        ("admin_override",        "ALTER TABLE solicitudes_modificacion ADD COLUMN admin_override BOOLEAN NOT NULL DEFAULT FALSE"),
+        ("resolved_at",           "ALTER TABLE solicitudes_modificacion ADD COLUMN resolved_at TIMESTAMP"),
+        ("resolved_by",           "ALTER TABLE solicitudes_modificacion ADD COLUMN resolved_by TEXT"),
+    ):
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass  # columna ya existe
+    # mensaje pasó a opcional — drop NOT NULL si quedó del schema viejo.
+    try:
+        conn.execute("ALTER TABLE solicitudes_modificacion ALTER COLUMN mensaje DROP NOT NULL")
+    except Exception:
+        pass
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS solicitud_items (
+            id             SERIAL PRIMARY KEY,
+            solicitud_id   INTEGER NOT NULL REFERENCES solicitudes_modificacion(id) ON DELETE CASCADE,
+            equipo_id      INTEGER NOT NULL REFERENCES equipos(id),
+            cantidad       INTEGER NOT NULL DEFAULT 1,
+            precio_jornada INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_solicitudes_pedido ON solicitudes_modificacion(pedido_id)
     """)
@@ -977,6 +1014,9 @@ def init_db():
     """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_solicitudes_cliente ON solicitudes_modificacion(cliente_id)
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_solicitud_items_solicitud ON solicitud_items(solicitud_id)
     """)
 
     # Configuración global de la app (tipo de cambio, defaults, etc.).

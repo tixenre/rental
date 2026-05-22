@@ -1354,6 +1354,28 @@ export const adminApi = {
     return res.json();
   },
 
+  // solicitudes de modificación (cliente → admin)
+  listSolicitudes: () =>
+    authedJson<SolicitudAdmin[]>("/api/admin/solicitudes"),
+  responderSolicitud: (
+    id: number,
+    estado: "aprobada" | "rechazada",
+    respuesta = "",
+    override?: SolicitudOverrideInput | null,
+  ) =>
+    authedJson<{ ok: true; applied_override: boolean }>(
+      `/api/admin/solicitudes/${id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          estado,
+          respuesta,
+          ...(override ? { override } : {}),
+        }),
+      },
+    ),
+
   // clientes
   listClientes: (params: { q?: string; per_page?: number } = {}) => {
     const sp = new URLSearchParams();
@@ -1631,6 +1653,56 @@ export type PedidoDatosInput = {
 const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 export const pedidoPdfUrl = (id: number, kind: "pdf" | "albaran" | "contrato" = "pdf") =>
   `${API_BASE}/api/alquileres/${id}/${kind}`;
+
+// ── Solicitudes de modificación (cliente → admin) ────────────────────────────
+
+export type SolicitudEstado = "pendiente" | "aprobada" | "rechazada" | "cancelada";
+
+export type SolicitudItemSnapshot = {
+  equipo_id: number;
+  cantidad: number;
+  precio_jornada: number;
+  nombre: string;
+  marca: string | null;
+  modelo: string | null;
+  nombre_publico: string | null;
+  foto_url: string | null;
+};
+
+export type SolicitudAdmin = {
+  id: number;
+  pedido_id: number;
+  numero_pedido: number | null;
+  cliente_nombre: string;
+  cliente_apellido: string;
+  cliente_email: string | null;
+  mensaje: string | null;
+  estado: SolicitudEstado;
+  respuesta: string | null;
+  admin_override: boolean;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  created_at: string;
+  pedido_actual: {
+    fecha_desde: string | null;
+    fecha_hasta: string | null;
+    monto_total: number;
+    estado: string;
+    items: SolicitudItemSnapshot[];
+  };
+  /** `null` cuando el cliente solo mandó un mensaje libre sin diff estructurado. */
+  propuesta: {
+    fecha_desde: string | null;
+    fecha_hasta: string | null;
+    items: SolicitudItemSnapshot[];
+  } | null;
+};
+
+export type SolicitudOverrideInput = {
+  fecha_desde?: string | null;
+  fecha_hasta?: string | null;
+  items: { equipo_id: number; cantidad: number }[];
+};
 
 export const ESTADO_LABEL: Record<PedidoEstado, string> = {
   borrador: "Borrador",
