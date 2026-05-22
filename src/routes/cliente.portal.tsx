@@ -214,6 +214,34 @@ export default function ClientePortal() {
     navigate({ to: "/cliente/login" });
   }
 
+  // IMPORTANTE: hooks SIEMPRE antes de cualquier early return. Si los
+  // ponemos después del `if (loading) return ...`, React ve un set distinto
+  // de hooks en el render con `loading=true` vs el de `loading=false` y
+  // tira el error #310 ("Rendered more hooks than during the previous
+  // render"). Las dependencias usan `pedidos` que arranca como [] mientras
+  // loading=true, así que es seguro evaluarlas.
+  const tabFiltered = useMemo(() => (
+    tab === "activos"   ? pedidos.filter((p) => ACTIVE_STATES.has(p.estado))
+    : tab === "historial" ? pedidos.filter((p) => HIST_STATES.has(p.estado))
+    : pedidos
+  ), [tab, pedidos]);
+
+  const q = query.trim().toLowerCase();
+  const filteredPedidos = useMemo(() => {
+    if (!q) return tabFiltered;
+    return tabFiltered.filter((p) => {
+      if (String(p.numero_pedido ?? "").toLowerCase().includes(q)) return true;
+      if (p.estado.toLowerCase().includes(q)) return true;
+      if ((p.notas ?? "").toLowerCase().includes(q)) return true;
+      if (p.items.some((it) =>
+        (it.nombre_publico ?? it.nombre).toLowerCase().includes(q) ||
+        (it.marca ?? "").toLowerCase().includes(q) ||
+        (it.modelo ?? "").toLowerCase().includes(q)
+      )) return true;
+      return false;
+    });
+  }, [tabFiltered, q]);
+
   if (loading) {
     return (
       <PublicLayout topBar={{ variant: "cliente" }}>
@@ -248,28 +276,6 @@ export default function ClientePortal() {
     activos: activosPedidos.length,
     historial: historico,
   };
-
-  const tabFiltered = useMemo(() => (
-    tab === "activos"   ? pedidos.filter((p) => ACTIVE_STATES.has(p.estado))
-    : tab === "historial" ? pedidos.filter((p) => HIST_STATES.has(p.estado))
-    : pedidos
-  ), [tab, pedidos]);
-
-  const q = query.trim().toLowerCase();
-  const filteredPedidos = useMemo(() => {
-    if (!q) return tabFiltered;
-    return tabFiltered.filter((p) => {
-      if (String(p.numero_pedido ?? "").toLowerCase().includes(q)) return true;
-      if (p.estado.toLowerCase().includes(q)) return true;
-      if ((p.notas ?? "").toLowerCase().includes(q)) return true;
-      if (p.items.some((it) =>
-        (it.nombre_publico ?? it.nombre).toLowerCase().includes(q) ||
-        (it.marca ?? "").toLowerCase().includes(q) ||
-        (it.modelo ?? "").toLowerCase().includes(q)
-      )) return true;
-      return false;
-    });
-  }, [tabFiltered, q]);
 
   return (
     <PublicLayout
