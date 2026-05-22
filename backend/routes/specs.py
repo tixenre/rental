@@ -1321,11 +1321,25 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
         ).fetchall()
         specs = {str(r["spec_def_id"]): r["value"] for r in spec_rows}
 
-        # Template aplicable: las categorías del equipo + sus asignaciones.
-        # Mergeados con dedup por spec_def_id (la primera asignación gana en
-        # caso de conflicto entre categorías).
+        # Template aplicable: las categorías del equipo + ANCESTROS + sus
+        # asignaciones. Si el equipo está sólo en sub-cat (ej. "LED RGB"),
+        # también traemos los templates de la raíz padre ("Iluminación")
+        # porque el seeder los asigna a la raíz. Mergeados con dedup por
+        # spec_def_id (la asignación más cercana al equipo gana).
         template_rows = conn.execute(
             """
+            WITH RECURSIVE cats_y_ancestros AS (
+                -- Categorías directas del equipo
+                SELECT c.id AS categoria_id, c.parent_id, 0 AS depth
+                FROM equipo_categorias ec
+                JOIN categorias c ON c.id = ec.categoria_id
+                WHERE ec.equipo_id = ?
+                UNION
+                -- + cada ancestro (parent recursivo) hasta la raíz
+                SELECT c.id AS categoria_id, c.parent_id, cya.depth + 1
+                FROM categorias c
+                JOIN cats_y_ancestros cya ON cya.parent_id = c.id
+            )
             SELECT DISTINCT ON (t.spec_def_id)
                 t.id AS template_id,
                 t.spec_def_id,
@@ -1337,12 +1351,11 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
                 COALESCE(t.ayuda, sd.ayuda) AS ayuda,
                 COALESCE(t.destacado, FALSE) AS destacado,
                 c.nombre AS categoria_nombre
-            FROM equipo_categorias ec
-            JOIN categoria_spec_templates t ON t.categoria_id = ec.categoria_id
+            FROM cats_y_ancestros cya
+            JOIN categoria_spec_templates t ON t.categoria_id = cya.categoria_id
             JOIN spec_definitions sd ON sd.id = t.spec_def_id
-            JOIN categorias c ON c.id = ec.categoria_id
-            WHERE ec.equipo_id = ?
-            ORDER BY t.spec_def_id, t.prioridad
+            JOIN categorias c ON c.id = cya.categoria_id
+            ORDER BY t.spec_def_id, cya.depth ASC, t.prioridad
             """,
             (equipo_id,),
         ).fetchall()
