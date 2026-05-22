@@ -1,8 +1,11 @@
 """Tests de helpers de pdf.py — formato de fechas, montos, nombres."""
 
+import os
+
 import pytest
 
 from pdf import (
+    _abs_image_url,
     _es_month,
     _fmt_ars,
     _fmt_date_long,
@@ -115,3 +118,32 @@ class TestParseValor:
     def test_vacio_o_none_devuelve_cero(self):
         assert _parse_valor("") == 0
         assert _parse_valor(None) == 0
+
+
+class TestAbsImageUrl:
+    """Resolver foto_url a URL absoluta para que Playwright pueda cargarla."""
+
+    def test_url_absoluta_https_pasa_intacta(self):
+        assert _abs_image_url("https://cdn.x/foo.jpg") == "https://cdn.x/foo.jpg"
+
+    def test_url_absoluta_http_pasa_intacta(self):
+        assert _abs_image_url("http://cdn.x/foo.jpg") == "http://cdn.x/foo.jpg"
+
+    def test_data_uri_pasa_intacta(self):
+        assert _abs_image_url("data:image/png;base64,iVBOR") == "data:image/png;base64,iVBOR"
+
+    def test_none_o_vacio_devuelve_vacio(self):
+        assert _abs_image_url(None) == ""
+        assert _abs_image_url("") == ""
+
+    def test_relativa_con_base_se_prepende(self, monkeypatch):
+        monkeypatch.setenv("FRONTEND_BASE_URL", "https://rambla.com.uy")
+        assert _abs_image_url("/uploads/foo.jpg") == "https://rambla.com.uy/uploads/foo.jpg"
+
+    def test_relativa_con_base_con_trailing_slash(self, monkeypatch):
+        monkeypatch.setenv("FRONTEND_BASE_URL", "https://rambla.com.uy/")
+        assert _abs_image_url("/uploads/foo.jpg") == "https://rambla.com.uy/uploads/foo.jpg"
+
+    def test_relativa_sin_base_devuelve_vacio(self, monkeypatch):
+        monkeypatch.delenv("FRONTEND_BASE_URL", raising=False)
+        assert _abs_image_url("/uploads/foo.jpg") == ""

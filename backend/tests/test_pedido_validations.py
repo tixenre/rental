@@ -185,3 +185,19 @@ class TestPedidoCreateSchema:
     def test_items_default_lista_vacia(self):
         data = PedidoCreate(estado="borrador")
         assert data.items == []
+
+    def test_cantidad_cero_rechazada(self):
+        with pytest.raises(Exception):
+            PedidoItem(equipo_id=1, cantidad=0, precio_jornada=1000)
+
+    def test_cantidad_negativa_rechazada(self):
+        with pytest.raises(Exception):
+            PedidoItem(equipo_id=1, cantidad=-3, precio_jornada=1000)
+
+    def test_cantidad_excesiva_rechazada(self):
+        with pytest.raises(Exception):
+            PedidoItem(equipo_id=1, cantidad=1000, precio_jornada=1000)
+
+    def test_cantidad_minimo_uno_acepta(self):
+        item = PedidoItem(equipo_id=1, cantidad=1, precio_jornada=1000)
+        assert item.cantidad == 1

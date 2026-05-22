@@ -17,6 +17,26 @@ OWNER_TELEFONO = os.getenv("OWNER_TELEFONO", "223 5909080")
 OWNER_EMAIL    = os.getenv("OWNER_EMAIL",    "ramblarental@gmail.com")
 
 
+def _abs_image_url(url: str | None) -> str:
+    """Resuelve foto_url a URL absoluta para el PDF.
+
+    Playwright renderiza con `page.set_content()` (base = about:blank), así
+    que paths relativos (`/uploads/foo.jpg`) no resuelven contra el host
+    del backend. Si la URL no es ya absoluta y tenemos FRONTEND_BASE_URL,
+    la prependeamos. Si no podemos resolverla, devolvemos "" — la celda
+    de la foto cae al placeholder "—" en el template.
+    """
+    if not url:
+        return ""
+    if url.startswith(("http://", "https://", "data:")):
+        return url
+    if url.startswith("/"):
+        base = os.environ.get("FRONTEND_BASE_URL", "").rstrip("/")
+        if base:
+            return f"{base}{url}"
+    return ""
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 _MESES = {
@@ -216,8 +236,9 @@ def _pedido_html(pedido: dict) -> str:
         # Presupuesto = nombre corto. Fallback al interno si no hay público aún.
         it_nombre = html.escape(_nombre_para_pdf(it, formal=False))
         foto_html = ""
-        if it.get("foto_url"):
-            foto_html = f'<img src="{html.escape(it.get("foto_url"))}" class="item-img" alt="foto">'
+        foto_abs = _abs_image_url(it.get("foto_url"))
+        if foto_abs:
+            foto_html = f'<img src="{html.escape(foto_abs)}" class="item-img" alt="foto">'
         else:
             foto_html = '<div class="item-img" style="display:flex;align-items:center;justify-content:center;font-size:20px">—</div>'
         rows += f"""
@@ -236,8 +257,9 @@ def _pedido_html(pedido: dict) -> str:
             comp_subtotal = (comp.get("precio_jornada") or 0) * cant_comp * jornadas
             comp_nombre = html.escape(_nombre_para_pdf(comp, formal=False))
             comp_foto_html = ""
-            if comp.get("foto_url"):
-                comp_foto_html = f'<img src="{html.escape(comp.get("foto_url"))}" class="item-img" alt="foto">'
+            comp_foto_abs = _abs_image_url(comp.get("foto_url"))
+            if comp_foto_abs:
+                comp_foto_html = f'<img src="{html.escape(comp_foto_abs)}" class="item-img" alt="foto">'
             else:
                 comp_foto_html = '<div class="item-img" style="display:flex;align-items:center;justify-content:center;font-size:14px">—</div>'
             rows += f"""
@@ -577,8 +599,9 @@ def _albaran_html(pedido: dict) -> str:
         valor_total += valor * cant
 
         foto_html = ""
-        if it.get("foto_url"):
-            foto_html = f'<img src="{html.escape(it.get("foto_url"))}" class="alb-img" alt="foto">'
+        foto_abs = _abs_image_url(it.get("foto_url"))
+        if foto_abs:
+            foto_html = f'<img src="{html.escape(foto_abs)}" class="alb-img" alt="foto">'
         else:
             foto_html = '<div class="alb-img" style="display:flex;align-items:center;justify-content:center;font-size:16px">—</div>'
         rows += f"""
@@ -615,8 +638,9 @@ def _albaran_html(pedido: dict) -> str:
             valor_total += comp_valor * comp_cant
 
             comp_foto_html = ""
-            if comp.get("foto_url"):
-                comp_foto_html = f'<img src="{html.escape(comp.get("foto_url"))}" class="alb-img" alt="foto">'
+            comp_foto_abs = _abs_image_url(comp.get("foto_url"))
+            if comp_foto_abs:
+                comp_foto_html = f'<img src="{html.escape(comp_foto_abs)}" class="alb-img" alt="foto">'
             else:
                 comp_foto_html = '<div class="alb-img" style="display:flex;align-items:center;justify-content:center;font-size:12px">—</div>'
 
@@ -815,6 +839,18 @@ def _contrato_html(pedido: dict) -> str:
 
     fecha_hoy = _es_month(datetime.now().strftime("%d de %B de %Y"))
     items = pedido.get("items", [])
+
+    # Calcular jornadas si no vienen pre-computadas — el template lo muestra
+    # en el bloque "Duración" y antes quedaba "—" porque _get_alquiler_detail
+    # no calculaba este campo.
+    jornadas = pedido.get("cantidad_jornadas")
+    if not jornadas:
+        try:
+            d1 = datetime.fromisoformat(pedido["fecha_desde"])
+            d2 = datetime.fromisoformat(pedido["fecha_hasta"])
+            jornadas = max(1, (d2 - d1).days or 1)
+        except Exception:
+            jornadas = 1
 
     # Tabla de equipos (mezcla de presupuesto + albarán + contrato)
     rows = ""
@@ -1084,7 +1120,7 @@ def _contrato_html(pedido: dict) -> str:
   </div>
   <div class="meta-item">
     <span class="meta-label">Duración</span>
-    <span class="meta-val">{pedido.get("cantidad_jornadas", "—")} jornadas</span>
+    <span class="meta-val">{jornadas} jornadas</span>
   </div>
 </div>
 

@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Query, HTTPException, Request
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from database import get_db, row_to_dict
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
@@ -153,15 +153,26 @@ def _get_alquiler_pagos(conn, pedido_id: int) -> list[dict]:
 
 
 def _recalcular_monto_pagado(conn, pedido_id: int):
-    """Suma todos los pagos del registro y actualiza monto_pagado en pedidos.
+    """Recalcula monto_pagado atómicamente desde alquiler_pagos.
+
+    Usa UPDATE con subquery (en lugar de SELECT-luego-UPDATE) para evitar
+    race conditions cuando dos pagos llegan en paralelo.
 
     No hace commit — el caller debe commitear inmediatamente después para que
     el UPDATE no quede huérfano si falla algo posterior en la misma transacción.
     """
-    total = conn.execute(
-        "SELECT COALESCE(SUM(monto), 0) FROM alquiler_pagos WHERE pedido_id=?", (pedido_id,)
-    ).fetchone()[0]
-    conn.execute("UPDATE alquileres SET monto_pagado=? WHERE id=?", (total, pedido_id))
+    conn.execute(
+        """
+        UPDATE alquileres
+           SET monto_pagado = (
+               SELECT COALESCE(SUM(monto), 0)
+                 FROM alquiler_pagos
+                WHERE pedido_id = ?
+           )
+         WHERE id = ?
+        """,
+        (pedido_id, pedido_id),
+    )
 
 
 def _get_alquiler_detail(conn, id: int) -> dict:
@@ -207,7 +218,6 @@ def _parse_precio(v) -> int:
 
 
 class PedidoItem(BaseModel):
-    from pydantic import field_validator
     equipo_id:      int
     cantidad:       int
     precio_jornada: int = 0
@@ -216,6 +226,15 @@ class PedidoItem(BaseModel):
     @classmethod
     def coerce_precio(cls, v):
         return _parse_precio(v)
+
+    @field_validator("cantidad")
+    @classmethod
+    def validate_cantidad(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("cantidad debe ser >= 1")
+        if v > 999:
+            raise ValueError("cantidad demasiado alta (máx 999)")
+        return v
 
 
 class PedidoCreate(BaseModel):
