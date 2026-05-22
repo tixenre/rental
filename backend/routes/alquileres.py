@@ -242,6 +242,20 @@ class PedidoItem(BaseModel):
     def coerce_precio(cls, v):
         return _parse_precio(v)
 
+    @field_validator("cantidad")
+    @classmethod
+    def validate_cantidad(cls, v):
+        if v is None or v <= 0:
+            raise ValueError("cantidad debe ser mayor a 0")
+        return v
+
+    @field_validator("precio_jornada")
+    @classmethod
+    def validate_precio(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("precio_jornada no puede ser negativo")
+        return v
+
 
 class PedidoCreate(BaseModel):
     cliente_nombre:   Optional[str] = ""
@@ -270,6 +284,7 @@ class PagoCreate(BaseModel):
 
 
 class PedidoDatos(BaseModel):
+    from pydantic import field_validator
     cliente_id:       Optional[int]   = None
     cliente_nombre:   Optional[str]   = None
     cliente_email:    Optional[str]   = None
@@ -278,6 +293,15 @@ class PedidoDatos(BaseModel):
     fecha_hasta:      Optional[str]   = None
     notas:            Optional[str]   = None
     descuento_pct:    Optional[float] = None
+
+    @field_validator("descuento_pct")
+    @classmethod
+    def validate_descuento(cls, v):
+        if v is None:
+            return v
+        if v < 0 or v > 100:
+            raise ValueError("descuento_pct debe estar entre 0 y 100")
+        return v
 
 
 class PedidoItemUpdate(BaseModel):

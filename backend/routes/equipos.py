@@ -293,6 +293,7 @@ MAX_PHOTO_CANDIDATES_BUSCAR_RETURN   = 10
 # ── Modelos ──────────────────────────────────────────────────────────────────
 
 class EquipoCreate(BaseModel):
+    from pydantic import field_validator
     nombre:           str
     marca:            Optional[str]   = None
     modelo:           Optional[str]   = None
@@ -310,8 +311,23 @@ class EquipoCreate(BaseModel):
     estado:           Optional[str]   = "operativo"   # operativo / en_mantenimiento / fuera_servicio
     ficha_completa:   Optional[bool]  = False
 
+    @field_validator("precio_jornada")
+    @classmethod
+    def validate_precio(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("precio_jornada no puede ser negativo")
+        return v
+
+    @field_validator("cantidad")
+    @classmethod
+    def validate_cantidad(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("cantidad no puede ser negativa")
+        return v
+
 
 class EquipoUpdate(BaseModel):
+    from pydantic import field_validator
     nombre:           Optional[str]   = None
     marca:            Optional[str]   = None
     modelo:           Optional[str]   = None
@@ -333,6 +349,20 @@ class EquipoUpdate(BaseModel):
     visible_catalogo: Optional[int]   = None
     estado:           Optional[str]   = None
     ficha_completa:   Optional[bool]  = None
+
+    @field_validator("precio_jornada")
+    @classmethod
+    def validate_precio(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("precio_jornada no puede ser negativo")
+        return v
+
+    @field_validator("cantidad")
+    @classmethod
+    def validate_cantidad(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("cantidad no puede ser negativa")
+        return v
 
 
 class FichaUpdate(BaseModel):
