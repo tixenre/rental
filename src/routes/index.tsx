@@ -355,7 +355,7 @@ function Index() {
             <div className="flex items-center gap-4 px-6 py-2.5 border-b hairline">
               <ViewToggle
                 options={[
-                  { value: "grid" as Mode, label: "Explorar", icon: <LayoutGrid className="h-3 w-3" /> },
+                  { value: "grid" as Mode, label: "Grid", icon: <LayoutGrid className="h-3 w-3" /> },
                   { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
                 ]}
                 value={mode}
@@ -385,9 +385,11 @@ function Index() {
               </div>
             </div>
 
-            {/* Fila 2: Cat-tabs (izq, scroll horizontal) + Disponibles (der) */}
-            <div className="flex items-center gap-3 pl-4 pr-6 overflow-x-auto scrollbar-none">
-              <div className="flex shrink-0">
+            {/* Fila 2: Cat-tabs (izq, scroll horizontal aislado) + Disponibles (der, fijo).
+             * El overflow-x-auto va SOLO sobre las tabs — así con muchas categorías
+             * el filtro "Disponibles" no se sale de viewport. */}
+            <div className="flex items-center gap-3 pl-4 pr-6">
+              <div className="flex shrink min-w-0 overflow-x-auto scrollbar-none">
                 {["Todo", ...apiCategories].map((cat) => {
                   const isActive =
                     cat === "Todo"
