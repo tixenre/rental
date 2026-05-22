@@ -215,6 +215,25 @@ function Index() {
     });
   };
 
+  // Counts por categoría. Pre-buildeo un Map en una sola pasada en lugar
+  // de hacer `allEquipos.filter(...)` dentro del `.map()` de tabs — eso
+  // era O(equipos × categorías). Con ~120 equipos × ~15 cats eran 1800
+  // operaciones en cada render.
+  const categoryCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of allEquipos) {
+      const seen = new Set<string>();
+      if (e.category) seen.add(e.category);
+      for (const c of e.categorias ?? []) {
+        if (c.nombre) seen.add(c.nombre);
+      }
+      for (const cat of seen) {
+        map.set(cat, (map.get(cat) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [allEquipos]);
+
   const filtered = useMemo(() => {
     // Normaliza: minúsculas + sin acentos. Así "baterias" matchea "Batería".
     const norm = (s: string) =>
@@ -396,11 +415,7 @@ function Index() {
                   const count =
                     cat === "Todo"
                       ? allEquipos.length
-                      : allEquipos.filter(
-                          (e) =>
-                            e.category === cat ||
-                            (e.categorias ?? []).some((cc) => cc.nombre === cat),
-                        ).length;
+                      : categoryCounts.get(cat) ?? 0;
                   return (
                     <button
                       key={cat}
