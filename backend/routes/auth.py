@@ -139,7 +139,19 @@ def _oauth_client() -> OAuth2Client:
 
 @router.get("/auth/me")
 def auth_me(request: Request):
-    return require_session(request)
+    """Devuelve info de la sesión actual + flag `is_admin`.
+
+    El flag es necesario para que el front sepa si renderizar el
+    backoffice o redirect a una pantalla "sin acceso". `require_session`
+    solo verifica que haya sesión válida (cualquier Google login), pero
+    es admin solo si el email está en ADMIN_EMAILS.
+    """
+    # Import inline para evitar ciclo (admin_guard importa de routes.auth).
+    from admin_guard import is_admin_email
+
+    session = require_session(request)
+    email = (session.get("email") or "").strip().lower()
+    return {**session, "is_admin": is_admin_email(email)}
 
 
 @router.get("/auth/logout")

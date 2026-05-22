@@ -13,7 +13,7 @@ import { authedFetch } from "@/lib/authedFetch";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
-type Session = { email?: string; name?: string };
+type Session = { email?: string; name?: string; is_admin?: boolean };
 
 export function AdminLayout() {
   const navigate = useNavigate();
@@ -27,6 +27,13 @@ export function AdminLayout() {
         if (!alive) return;
         if (r.ok) {
           const data = (await r.json()) as Session;
+          if (!data.is_admin) {
+            // El usuario está logueado en Google pero su email no tiene
+            // permiso de administración. Redirect al login con flag
+            // `denied` para mostrarle el mensaje correspondiente.
+            navigate({ to: "/admin/login", search: { denied: "1" } });
+            return;
+          }
           setSession(data);
         } else {
           navigate({ to: "/admin/login" });

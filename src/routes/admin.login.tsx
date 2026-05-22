@@ -34,9 +34,18 @@ function AdminLoginPage() {
     if (errCode) {
       setError(ERROR_MESSAGES[errCode] ?? `Error: ${errCode}`);
     }
+    // Flag `denied=1` lo setea AdminLayout cuando el usuario está logueado
+    // en Google pero su email no está en ADMIN_EMAILS.
+    if (params.get("denied") === "1") {
+      setError(ERROR_MESSAGES.not_allowed);
+    }
 
-    authedFetch("/auth/me").then((r) => {
-      if (r.ok) navigate({ to: "/admin" });
+    authedFetch("/auth/me").then(async (r) => {
+      if (!r.ok) return;
+      // Solo redirect al admin si el usuario es admin. Sino se queda
+      // viendo la pantalla de login (con el mensaje si vino con denied).
+      const data = (await r.json()) as { is_admin?: boolean };
+      if (data.is_admin) navigate({ to: "/admin" });
     });
 
     authedFetch("/auth/config").then(async (r) => {
