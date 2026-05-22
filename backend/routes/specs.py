@@ -1067,13 +1067,40 @@ def resumen_templates(request: Request):
 
 @router.get("/admin/categorias/{categoria_id}/spec-templates")
 def listar_templates(categoria_id: int, request: Request):
-    """Lista asignaciones de la categoría, JOIN con spec_definitions para
-    devolver los campos planos (label, tipo, unidad, enum_options) que el
-    frontend usa para renderear inputs."""
+    """Lista asignaciones de la categoría + specs huérfanos del registry.
+
+    Devuelve dos tipos de filas:
+    1. Asignaciones en `categoria_spec_templates` (con flags propios).
+    2. Specs definidos en `spec_definitions` con `categoria_raiz_id = X`
+       que NO tienen asignación en `categoria_spec_templates` — se
+       devuelven con flags default derivados del spec_def. Esto evita
+       que el form quede vacío si una migración intermedia falló y las
+       asignaciones quedaron incompletas.
+
+    El frontend usa `label, tipo, unidad, enum_options` para renderear
+    inputs — los flags afectan visibilidad y orden."""
     _require_admin(request)
     conn = get_db()
     try:
-        rows = conn.execute(
+        # Determinar la raíz de la categoría — si es sub-cat, subimos al
+        # parent_id hasta encontrar la raíz. Si ya es raíz, queda igual.
+        # Sólo importa para el fallback de specs huérfanos.
+        raiz_row = conn.execute(
+            """
+            WITH RECURSIVE up AS (
+                SELECT id, parent_id, 0 AS depth FROM categorias WHERE id = ?
+                UNION
+                SELECT c.id, c.parent_id, up.depth + 1
+                FROM categorias c JOIN up ON up.parent_id = c.id
+            )
+            SELECT id FROM up WHERE parent_id IS NULL LIMIT 1
+            """,
+            (categoria_id,),
+        ).fetchone()
+        raiz_id = row_to_dict(raiz_row)["id"] if raiz_row else categoria_id
+
+        # Asignaciones explícitas en la categoría (sub o raíz)
+        rows_assigned = conn.execute(
             """
             SELECT
               t.id, t.categoria_id, t.spec_def_id,
@@ -1092,11 +1119,44 @@ def listar_templates(categoria_id: int, request: Request):
             FROM categoria_spec_templates t
             JOIN spec_definitions sd ON sd.id = t.spec_def_id
             WHERE t.categoria_id = ?
-            ORDER BY t.prioridad, sd.label
             """,
             (categoria_id,),
         ).fetchall()
-        return {"items": [row_to_dict(r) for r in rows]}
+
+        # Specs del registry (en la raíz) que NO tienen asignación arriba.
+        # Fallback automático para que el form siempre tenga contenido.
+        rows_fallback = conn.execute(
+            """
+            SELECT
+              NULL::integer AS id,
+              ?::integer AS categoria_id,
+              sd.id AS spec_def_id,
+              sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id, sd.enum_options,
+              sd.tabla_columnas, sd.output_config,
+              COALESCE(sd.prioridad, 100) AS prioridad,
+              COALESCE(sd.favorito, FALSE) AS visible_en_card,
+              COALESCE(sd.en_filtros, FALSE) AS visible_en_filtros,
+              COALESCE(sd.en_nombre, FALSE) AS visible_en_nombre,
+              FALSE AS obligatorio,
+              sd.ayuda,
+              COALESCE(sd.favorito, FALSE) AS destacado,
+              COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
+              COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
+              NULL::varchar AS rol_compatibilidad
+            FROM spec_definitions sd
+            WHERE sd.categoria_raiz_id = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM categoria_spec_templates t
+                  WHERE t.categoria_id = ?
+                    AND t.spec_def_id = sd.id
+              )
+            """,
+            (categoria_id, raiz_id, categoria_id),
+        ).fetchall()
+
+        items = [row_to_dict(r) for r in rows_assigned] + [row_to_dict(r) for r in rows_fallback]
+        items.sort(key=lambda x: (x.get("prioridad") or 100, x.get("label") or ""))
+        return {"items": items}
     finally:
         conn.close()
 
