@@ -2463,8 +2463,37 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
                     # No abortar el rename si un equipo falla regenerar tags.
                     logger.warning("regenerate_auto_tags falló para equipo %s tras rename de cat %s",
                                    r["equipo_id"], cid, exc_info=True)
+        # Si cambió el template del nombre público, regenerar el nombre de
+        # cada equipo asignado a esta categoría (directa o como sub-cat).
+        # Sin esto, el admin guarda el template pero los equipos siguen con
+        # su nombre publico viejo hasta que alguien los toca individualmente.
+        nombres_regen = 0
+        if patch.nombre_publico_template is not None:
+            eq_rows = conn.execute(
+                """
+                WITH RECURSIVE descendants AS (
+                    SELECT id FROM categorias WHERE id = ?
+                    UNION
+                    SELECT c.id FROM categorias c
+                    JOIN descendants d ON c.parent_id = d.id
+                )
+                SELECT DISTINCT ec.equipo_id
+                FROM equipo_categorias ec
+                JOIN descendants d ON d.id = ec.categoria_id
+                """,
+                (cid,),
+            ).fetchall()
+            for r in eq_rows:
+                try:
+                    actualizar_nombres_de(conn, r["equipo_id"], commit=False)
+                    nombres_regen += 1
+                except Exception:
+                    logger.warning(
+                        "actualizar_nombres_de falló para equipo %s tras cambio de template cat %s",
+                        r["equipo_id"], cid, exc_info=True,
+                    )
         conn.commit()
-        return {"ok": True}
+        return {"ok": True, "nombres_regenerados": nombres_regen}
     except HTTPException:
         conn.rollback()
         raise
