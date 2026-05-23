@@ -13,13 +13,21 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import {
   AlertTriangle, Database, Download, FileArchive, FileJson,
-  Loader2, Upload, Users,
+  Loader2, Trash2, Upload, Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { authedFetch } from "@/lib/authedFetch";
 import { useDocumentTitle } from "@/lib/use-document-title";
+
+const RESET_CONFIRMATION = "BORRAR TODO";
 
 export const Route = createLazyFileRoute("/admin/dataio")({
   component: DataIoPage,
@@ -69,6 +77,32 @@ function DataIoPage() {
   const [importBusy, setImportBusy] = useState(false);
   const [lastImport, setLastImport] = useState<ImportResult | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
+
+  const handleResetOperacional = async () => {
+    setResetBusy(true);
+    try {
+      const res = await authedFetch("/api/admin/dataio/reset-operacional", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: RESET_CONFIRMATION }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.detail ?? `${res.status} ${res.statusText}`);
+      toast.success(
+        `Borrado: ${json.deleted?.clientes ?? 0} clientes, ${json.deleted?.alquileres ?? 0} alquileres`
+      );
+      setLastImport(null);
+      setResetOpen(false);
+      setResetConfirm("");
+    } catch (e) {
+      toast.error(`Reset falló: ${(e as Error).message}`);
+    } finally {
+      setResetBusy(false);
+    }
+  };
 
   const handleDownload = async (entity: string, label: string) => {
     setBusy(entity);
@@ -292,6 +326,70 @@ function DataIoPage() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Zona destructiva: wipe clientes + alquileres */}
+        <div className="border-t border-destructive/30 pt-4 mt-2 space-y-2">
+          <div className="space-y-1">
+            <h3 className="font-medium text-sm flex items-center gap-2 text-destructive">
+              <Trash2 className="size-4" />
+              Borrar todo (clientes + alquileres)
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Elimina <strong>todos los clientes y alquileres</strong> (incluyendo
+              items, pagos y solicitudes de modificación via cascade). Útil para hacer
+              un wipe-and-reimport limpio. <strong className="text-destructive">No es reversible</strong> —
+              hacé un backup antes (botón "Descargar ZIP" más arriba).
+            </p>
+          </div>
+          <AlertDialog open={resetOpen} onOpenChange={(open) => {
+            setResetOpen(open);
+            if (!open) setResetConfirm("");
+          }}>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm">
+                <Trash2 className="size-4" />
+                Borrar clientes y alquileres
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Borrar TODOS los datos operacionales?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción elimina permanentemente todos los clientes, alquileres,
+                  items, pagos y solicitudes de modificación de la base de datos. El
+                  catálogo (equipos, marcas, etc.) no se toca.
+                  <br /><br />
+                  Para confirmar, escribí <code className="font-mono font-bold">{RESET_CONFIRMATION}</code> abajo:
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <Input
+                autoFocus
+                value={resetConfirm}
+                onChange={(e) => setResetConfirm(e.target.value)}
+                placeholder={RESET_CONFIRMATION}
+                className="font-mono"
+              />
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={resetBusy}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={resetConfirm !== RESET_CONFIRMATION || resetBusy}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleResetOperacional();
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {resetBusy ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-4" />
+                  )}
+                  Borrar definitivamente
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </section>
 
