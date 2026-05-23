@@ -57,6 +57,8 @@ function SettingsPage() {
 
       <DescuentosJornadaSection />
 
+      <BufferSection />
+
       <CambioYPreciosSection />
 
       <RankingSection />
@@ -229,6 +231,68 @@ function DescuentosJornadaSection() {
         >
           {crear.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
           Agregar
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+
+// ── Buffer entre alquileres ─────────────────────────────────────────────────
+
+function BufferSection() {
+  const qc = useQueryClient();
+  const [valor, setValor] = useState("");
+
+  const settingQ = useQuery({
+    queryKey: ["settings", "buffer_dias_alquiler"],
+    queryFn: () => adminApi.getSetting("buffer_dias_alquiler"),
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (settingQ.data && valor === "") setValor(settingQ.data.value ?? "0");
+  }, [settingQ.data, valor]);
+
+  const updateMut = useMutation({
+    mutationFn: (v: string) => adminApi.updateSetting("buffer_dias_alquiler", v),
+    onSuccess: () => {
+      toast.success("Buffer actualizado");
+      qc.invalidateQueries({ queryKey: ["settings"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const actual = settingQ.data?.value ?? "0";
+  const dirty = valor.trim() !== actual && valor.trim() !== "";
+
+  return (
+    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+      <div>
+        <h2 className="font-display text-lg text-ink">Buffer entre alquileres</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Días de prep/revisión exigidos entre que un equipo vuelve y sale de nuevo.
+          Con buffer &gt; 0, dos alquileres del mismo equipo no pueden quedar pegados.
+          Poné 0 para permitir alquileres consecutivos.
+        </p>
+      </div>
+      <div className="flex items-end gap-2 border-t hairline pt-3">
+        <div className="space-y-1">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Días de buffer</div>
+          <Input
+            type="number"
+            min={0}
+            className="w-28"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+          />
+        </div>
+        <Button
+          size="sm"
+          onClick={() => updateMut.mutate(String(Math.max(0, Math.floor(Number(valor) || 0))))}
+          disabled={!dirty || updateMut.isPending}
+        >
+          {updateMut.isPending ? "Guardando…" : "Guardar"}
         </Button>
       </div>
     </section>

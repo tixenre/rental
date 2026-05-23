@@ -555,9 +555,16 @@ def _check_stock_hipotetico(
     Excluye el pedido actual del cálculo de reservas existentes (sus items
     actuales no compiten con los propuestos para el mismo rango).
     """
-    from routes.alquileres import ESTADOS_RESERVADO, _consolidar_items_por_equipo
+    from routes.alquileres import (
+        ESTADOS_RESERVADO, _consolidar_items_por_equipo,
+        _get_buffer_dias, _rango_con_buffer, _unidades_en_mantenimiento,
+    )
     if not items or not fecha_desde or not fecha_hasta:
         return []
+
+    # Buffer entre alquileres (mantenimiento usa rango original).
+    buffer_dias = _get_buffer_dias(conn)
+    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias)
 
     # Resolver nombre + stock total + agrupar por equipo_id.
     enriched = []
@@ -597,8 +604,11 @@ def _check_stock_hipotetico(
               AND p.estado IN {ESTADOS_RESERVADO}
               AND p.fecha_desde < ?
               AND p.fecha_hasta > ?
-        """, (it["equipo_id"], pedido_id, fecha_hasta, fecha_desde)).fetchone()[0]
-        disponible = stock_total - reservado
+        """, (it["equipo_id"], pedido_id, fh_buf, fd_buf)).fetchone()[0]
+        en_mantenimiento = _unidades_en_mantenimiento(
+            conn, it["equipo_id"], fecha_desde, fecha_hasta
+        )
+        disponible = stock_total - reservado - en_mantenimiento
         if disponible < it["cantidad"]:
             problemas.append(
                 f"{it['nombre']} (necesitás {it['cantidad']}, disponible: {max(0, disponible)})"

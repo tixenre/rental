@@ -60,16 +60,30 @@ class StockFakeConn:
         reservas_directas=None,
         reservas_via_kit=None,
         pedido_items=None,
+        mantenimiento=None,
+        buffer_dias=0,
     ):
         self.equipos = equipos
         self.kit_componentes = kit_componentes or {}
         self.reservas_directas = reservas_directas or {}
         self.reservas_via_kit = reservas_via_kit or {}
         self.pedido_items = pedido_items or {}
+        # mantenimiento: dict[equipo_id, unidades_bloqueadas]
+        self.mantenimiento = mantenimiento or {}
+        self.buffer_dias = buffer_dias
 
     def execute(self, sql, params=()):
         s = " ".join(sql.split())  # normalizar whitespace
         s_up = s.upper()
+
+        # Buffer global (setting).
+        if "FROM APP_SETTINGS WHERE KEY = ?" in s_up:
+            return FakeCursor([FakeRow(value=str(self.buffer_dias))])
+
+        # Unidades en mantenimiento que bloquean stock.
+        if "FROM EQUIPO_MANTENIMIENTO" in s_up:
+            eq_id = params[0]
+            return FakeCursor([FakeRow({0: self.mantenimiento.get(eq_id, 0)})])
 
         # Items del pedido (primera query de _check_stock).
         if s_up.startswith("SELECT PI.EQUIPO_ID, PI.CANTIDAD, E.NOMBRE, E.CANTIDAD AS STOCK_TOTAL"):
@@ -220,6 +234,72 @@ class TestCheckStockKits:
             },
         )
         assert _check_stock(conn, 1, "2026-06-01", "2026-06-05") == []
+
+
+# ── _check_stock — mantenimiento bloquea stock ─────────────────────────────
+
+class TestCheckStockMantenimiento:
+    def test_mantenimiento_bloquea_unica_unidad(self):
+        """Equipo con stock=1 y 1 unidad en mantenimiento → no hay disponible."""
+        conn = StockFakeConn(
+            equipos={20: {"nombre": "Cámara FX3", "cantidad": 1}},
+            pedido_items={
+                1: [{"equipo_id": 20, "cantidad": 1, "nombre": "Cámara FX3", "stock_total": 1}],
+            },
+            mantenimiento={20: 1},  # 1 unidad fuera de servicio en el rango
+        )
+        problemas = _check_stock(conn, 1, "2026-06-01", "2026-06-05")
+        assert len(problemas) == 1
+        assert "Cámara FX3" in problemas[0]
+        assert "disponible: 0" in problemas[0]
+
+    def test_mantenimiento_parcial_deja_resto_disponible(self):
+        """Stock=3, 2 en mantenimiento, pedido pide 1 → OK (queda 1)."""
+        conn = StockFakeConn(
+            equipos={20: {"nombre": "Trípode", "cantidad": 3}},
+            pedido_items={
+                1: [{"equipo_id": 20, "cantidad": 1, "nombre": "Trípode", "stock_total": 3}],
+            },
+            mantenimiento={20: 2},
+        )
+        assert _check_stock(conn, 1, "2026-06-01", "2026-06-05") == []
+
+    def test_sin_mantenimiento_no_afecta(self):
+        """Sin entradas de mantenimiento bloqueante → comportamiento normal."""
+        conn = StockFakeConn(
+            equipos={20: {"nombre": "Cámara", "cantidad": 1}},
+            pedido_items={
+                1: [{"equipo_id": 20, "cantidad": 1, "nombre": "Cámara", "stock_total": 1}],
+            },
+            mantenimiento={},  # nada bloqueado
+        )
+        assert _check_stock(conn, 1, "2026-06-01", "2026-06-05") == []
+
+
+# ── Buffer entre alquileres ────────────────────────────────────────────────
+
+class TestBuffer:
+    def test_rango_sin_buffer_no_cambia(self):
+        from routes.alquileres import _rango_con_buffer
+        assert _rango_con_buffer("2026-06-01", "2026-06-05", 0) == ("2026-06-01", "2026-06-05")
+
+    def test_rango_con_buffer_expande_ambos_lados(self):
+        from routes.alquileres import _rango_con_buffer
+        assert _rango_con_buffer("2026-06-10", "2026-06-15", 2) == ("2026-06-08", "2026-06-17")
+
+    def test_rango_buffer_fecha_invalida_devuelve_original(self):
+        from routes.alquileres import _rango_con_buffer
+        assert _rango_con_buffer("", "", 3) == ("", "")
+
+    def test_get_buffer_dias_default_cero(self):
+        from routes.alquileres import _get_buffer_dias
+        conn = StockFakeConn(equipos={}, buffer_dias=0)
+        assert _get_buffer_dias(conn) == 0
+
+    def test_get_buffer_dias_lee_setting(self):
+        from routes.alquileres import _get_buffer_dias
+        conn = StockFakeConn(equipos={}, buffer_dias=2)
+        assert _get_buffer_dias(conn) == 2
 
 
 # ── _crea_ciclo_kit — detección de ciclos ────────────────────────────────

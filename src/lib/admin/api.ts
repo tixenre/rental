@@ -234,6 +234,9 @@ export type MantenimientoEvento = {
   descripcion: string | null;
   costo: number | null;
   proxima_revision: string | null;
+  fecha_hasta: string | null;
+  cantidad: number;
+  bloquea_stock: boolean;
   created_at?: string;
 };
 
@@ -243,6 +246,9 @@ export type MantenimientoInput = {
   descripcion?: string | null;
   costo?: number | null;
   proxima_revision?: string | null;
+  fecha_hasta?: string | null;
+  cantidad?: number;
+  bloquea_stock?: boolean;
 };
 
 export type MarcaAdmin = {
