@@ -147,6 +147,18 @@ async def import_dataio(
 
 RESET_CONFIRMATION = "BORRAR TODO"
 
+# Secuencias a resetear despues del wipe operacional. Sin reset, los IDs
+# de la siguiente import continuarian desde el MAX previo (ej. importar
+# desde Booqable arrancaria en id=500 en vez de 1).
+_OPERACIONAL_SEQUENCES = (
+    "clientes_id_seq",
+    "alquileres_id_seq",
+    "alquiler_items_id_seq",
+    "alquiler_pagos_id_seq",
+    "solicitudes_modificacion_id_seq",
+    "numero_pedido_seq",
+)
+
 
 @router.post("/admin/dataio/reset-operacional")
 def reset_operacional(
@@ -158,6 +170,10 @@ def reset_operacional(
     Pensado para hacer un wipe-and-reimport limpio. Requiere que el body
     incluya exactamente {"confirm": "BORRAR TODO"} para evitar disparos
     accidentales. La operacion no es reversible — hacer backup antes.
+
+    Tambien resetea las secuencias de IDs operacionales a 1 para que la
+    siguiente import arranque desde cero (clientes, alquileres y sus
+    tablas hijas, mas numero_pedido_seq).
     """
     if payload.get("confirm") != RESET_CONFIRMATION:
         raise HTTPException(
@@ -173,6 +189,10 @@ def reset_operacional(
         # alquileres primero: CASCADE limpia items, pagos y solicitudes_modificacion.
         conn.execute("DELETE FROM alquileres")
         conn.execute("DELETE FROM clientes")
+
+        for seq in _OPERACIONAL_SEQUENCES:
+            conn.execute(f"ALTER SEQUENCE IF EXISTS {seq} RESTART WITH 1")
+
         conn.commit()
 
         return {
@@ -181,6 +201,7 @@ def reset_operacional(
                 "clientes": clientes_before,
                 "alquileres": alquileres_before,
             },
+            "sequences_reset": list(_OPERACIONAL_SEQUENCES),
         }
     except Exception as e:
         try:
