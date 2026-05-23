@@ -168,10 +168,94 @@ def clean_extras(extras: dict) -> dict:
 
 SPECS_ORDER = [
     "iluminacion_subtipo",
-    "potencia_w", "lumens", "cri", "temperatura_k",
-    "bicolor", "rgb", "dimming",
+    "potencia_w",
+    "color_modes",
+    "lumens_at_5600k", "lumens_at_3200k",
+    "cri", "temperatura_k",
+    "dimming",
     "control_inalambrico", "alimentacion", "montaje", "peso",
 ]
+
+
+def _parse_temperatura_k(value) -> list | None:
+    """'5600K' → [5600], '2500-8500K' → [2500, 8500], null → None.
+
+    El registry define `temperatura_k` como tipo `rango`: si es fija usa [v],
+    si es variable usa [min, max]. El parser lo devuelve como string crudo,
+    acá lo convertimos al formato que espera el seed/dataio.
+    """
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return value
+    s = str(value).strip().upper().replace("K", "").strip()
+    if not s:
+        return None
+    if "-" in s:
+        try:
+            lo, hi = s.split("-", 1)
+            return [int(lo.strip()), int(hi.strip())]
+        except ValueError:
+            return None
+    try:
+        return [int(s)]
+    except ValueError:
+        return None
+
+
+def canonicalizar_specs(specs: dict) -> dict:
+    """Mapea keys legacy del parser → keys del registry (backend/specs/registry.py).
+
+    Transformaciones:
+      - {bicolor, rgb} → color_modes: multi_enum ["Bicolor","RGB","Daylight","Tungsten"]
+      - lumens → lumens_at_5600k (o _3200k si la luz es tungsten-only)
+      - temperatura_k: "5600K"/"2500-8500K" → [5600]/[2500,8500] (rango numérico)
+
+    Las keys originales se eliminan después del mapeo. Si ya existe la key
+    canónica (caso edge), no la pisa.
+    """
+    out = dict(specs)
+    bicolor = out.pop("bicolor", None)
+    rgb = out.pop("rgb", None)
+    lumens = out.pop("lumens", None)
+    temp_raw = out.get("temperatura_k")
+    temp = (temp_raw or "").strip() if isinstance(temp_raw, str) else ""
+
+    # color_modes (multi_enum)
+    if "color_modes" not in out:
+        modes = []
+        if bicolor:
+            modes.append("Bicolor")
+        if rgb:
+            modes.append("RGB")
+        if not modes and bicolor is False and rgb is False:
+            # No bicolor, no RGB: derivar de la temperatura si es fija
+            if temp.startswith("5600") or temp.startswith("5500"):
+                modes.append("Daylight")
+            elif temp.startswith("3200") or temp.startswith("3000"):
+                modes.append("Tungsten")
+        if modes:
+            out["color_modes"] = modes
+
+    # lumens → lumens_at_5600k (default) o _3200k si la luz es tungsten-only
+    if lumens is not None:
+        is_tungsten_only = (
+            bicolor is False and rgb is False and
+            (temp.startswith("3200") or temp.startswith("3000"))
+        )
+        target_key = "lumens_at_3200k" if is_tungsten_only else "lumens_at_5600k"
+        if target_key not in out:
+            out[target_key] = lumens
+
+    # temperatura_k: string → rango numérico
+    if "temperatura_k" in out:
+        parsed = _parse_temperatura_k(out["temperatura_k"])
+        if parsed is None:
+            del out["temperatura_k"]
+        else:
+            out["temperatura_k"] = parsed
+
+    return out
 
 EXTRAS_ORDER = [
     "item_type", "bulb_type", "base_type",
@@ -218,7 +302,7 @@ def normalizar():
         # Normalizar campos
         p["marca"] = canon_brand(p.get("marca", ""))
         p["modelo"] = canon_modelo(p.get("modelo", ""))
-        p["specs"] = reorder(p.get("specs", {}), SPECS_ORDER)
+        p["specs"] = reorder(canonicalizar_specs(p.get("specs", {})), SPECS_ORDER)
         p["extras"] = reorder(clean_extras(p.get("extras", {})), EXTRAS_ORDER)
         # Reorder top-level
         ordered = {

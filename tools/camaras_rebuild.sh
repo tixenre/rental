@@ -26,11 +26,11 @@ python3 tools/camaras_parser.py \
 
 echo "  → $(grep -c 'agregado' /tmp/camaras_parser.log) cámaras parseadas"
 
-echo "▸ Aplicando parches manuales"
-python3 tools/camaras_patches.py
-
 echo "▸ Normalizando marcas, modelos, IDs"
 python3 tools/camaras_normalizar.py
+
+echo "▸ Aplicando parches manuales (sobre IDs ya canonicalizados)"
+python3 tools/camaras_patches.py
 
 echo ""
 echo "Dataset reconstruido."
