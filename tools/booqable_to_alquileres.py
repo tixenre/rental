@@ -436,6 +436,14 @@ def build_alquileres(orders, idx):
     alquileres: list[dict] = []
     skipped: list[dict] = []
 
+    # Ordenar por numero_pedido Booqable ASC = orden cronologico.
+    # El numero_pedido local se reasigna 1..N (secuencial sin gaps de los
+    # cancelados). El numero original Booqable se preserva en notas.
+    def _num(o):
+        try: return int(o.get("number") or "0")
+        except ValueError: return 0
+    orders = sorted(orders, key=_num)
+
     for o in orders:
         status = (o.get("status") or "").strip().lower()
         if status not in STATUSES_TO_IMPORT:
@@ -491,10 +499,9 @@ def build_alquileres(orders, idx):
                 "subtotal": subtotal_ars,
             })
 
-        try:
-            numero_pedido = int(o.get("number") or "0")
-        except ValueError:
-            numero_pedido = 0
+        # Numero local secuencial 1..N. Numero original Booqable se guarda en notas.
+        numero_pedido = len(alquileres) + 1
+        booqable_num = (o.get("number") or "").strip()
 
         # Snapshot denormalizado del cliente
         name_parts = (cust["name"] or "").strip().split()
@@ -520,7 +527,7 @@ def build_alquileres(orders, idx):
             "monto_pagado": cents_to_ars(o.get("amount_paid_in_cents")),
             "descuento_pct": descuento_pct,
             "fuente": "booqable-historico",
-            "notas": f"Booqable #{o.get('number', '')} (imported)",
+            "notas": f"Booqable #{booqable_num} (imported)" if booqable_num else "Booqable (imported)",
             "items": items,
             "pagos": [],
         }
