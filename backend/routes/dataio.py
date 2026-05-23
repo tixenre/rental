@@ -18,6 +18,7 @@ Expone:
 
 import io
 import json
+import logging
 import zipfile
 from datetime import datetime
 from typing import Literal
@@ -30,6 +31,7 @@ from database import get_db
 from dataio import orchestrator
 from dataio.paths import CATALOG_ENTITIES, ENTITY_ORDER, OPERATIONAL_ENTITIES
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -83,7 +85,12 @@ def export_dataio(
                 f"Válidas: {list(ENTITY_ORDER) + ['catalog-all', 'operacional-all', 'full']}",
             )
 
-        rows = orchestrator.export_entity(conn, entity)
+        try:
+            rows = orchestrator.export_entity(conn, entity)
+        except Exception as e:
+            logger.exception("export_entity falló para %r", entity)
+            raise HTTPException(500, f"Export {entity} falló: {type(e).__name__}: {e}")
+
         ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         return JSONResponse(
             content=rows,
