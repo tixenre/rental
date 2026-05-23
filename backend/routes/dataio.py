@@ -194,23 +194,33 @@ def _create_placeholder_equipos(conn, zip_bytes: bytes) -> int:
     if not isinstance(placeholders, list):
         return 0
 
+    # El UNIQUE de equipos.slug puede ser un constraint completo (migracion
+    # f5b8d2e4a9c1) o un partial index "WHERE slug IS NOT NULL" (migracion
+    # e4a7c1f8d6b2 sin la siguiente, o el self-heal de export_equipos).
+    # ON CONFLICT con partial index requiere WHERE explicito que coincida.
+    # Probamos primero con WHERE; si falla, fallback al constraint completo.
     created = 0
     for p in placeholders:
         slug = (p.get("slug") or "").strip()
         nombre = (p.get("nombre") or "").strip()
         if not slug or not nombre:
             continue
-        result = conn.execute(
+        # Idempotencia manual: chequear antes de insertar. Es 2 queries por
+        # placeholder, pero los datasets son chicos (<100) y evita el
+        # quilombo del ON CONFLICT con partial vs full index.
+        exists = conn.execute(
+            "SELECT 1 FROM equipos WHERE slug = ? LIMIT 1", (slug,)
+        ).fetchone()
+        if exists:
+            continue
+        conn.execute(
             """
             INSERT INTO equipos (slug, nombre, cantidad, visible_catalogo, estado)
             VALUES (?, ?, 0, 0, 'historico')
-            ON CONFLICT (slug) DO NOTHING
-            RETURNING id
             """,
             (slug, nombre),
-        ).fetchone()
-        if result:
-            created += 1
+        )
+        created += 1
     return created
 
 
