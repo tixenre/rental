@@ -22,6 +22,7 @@ import {
   Database,
   Mail,
   Inbox,
+  HardDriveDownload,
 } from "lucide-react";
 
 import {
@@ -78,6 +79,7 @@ const items: NavItem[] = [
   { title: "Diseño",      url: "/admin/diseno",      icon: Palette },
   { title: "Novedades",   url: "/admin/novedades",   icon: Sparkles },
   { title: "Emails",      url: "/admin/email-templates", icon: Mail },
+  { title: "Export catálogo", url: "/admin/dataio", icon: HardDriveDownload },
   { title: "Settings",    url: "/admin/settings",    icon: Settings },
 ];
 
