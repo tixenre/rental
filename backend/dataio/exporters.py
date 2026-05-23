@@ -183,12 +183,66 @@ def export_categoria_spec_templates(conn) -> list[dict]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def export_equipos(conn) -> list[dict]:
-    """Solo exporta equipos que tienen slug seteado.
+def _ensure_equipos_slug(conn) -> None:
+    """Self-heal: si la columna `equipos.slug` no existe (porque alembic
+    upgrade falló o nunca corrió), la creamos y poblamos los slugs faltantes.
 
-    Durante la transición a slug (post-migración inicial pero pre-init-slugs),
-    los equipos sin slug se omiten. El comando `dataio init-slugs` los puebla.
+    Idempotente: no toca nada si la columna ya existe con todos los slugs.
+    Esto es defensivo para deploys donde la migración e4a7c1f8d6b2 quedó
+    sin aplicar — sin esto, todo el export y catálogo dataio queda roto.
     """
+    has_slug = conn.execute("""
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'equipos' AND column_name = 'slug'
+        ) AS x
+    """).fetchone()["x"]
+    changed = False
+    if not has_slug:
+        conn.execute("ALTER TABLE equipos ADD COLUMN slug VARCHAR(80)")
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_equipos_slug_unique "
+            "ON equipos(slug) WHERE slug IS NOT NULL"
+        )
+        changed = True
+
+    # Poblar slugs faltantes (también cubre el caso "columna existía pero
+    # init-slugs nunca corrió").
+    pending = conn.execute("""
+        SELECT id, nombre, marca, modelo FROM equipos
+        WHERE slug IS NULL AND eliminado_at IS NULL
+    """).fetchall()
+    if pending:
+        from .slug import equipo_slug
+        existing = {
+            r["slug"] for r in conn.execute(
+                "SELECT slug FROM equipos WHERE slug IS NOT NULL"
+            ).fetchall()
+        }
+        for r in pending:
+            base = equipo_slug(r["marca"], r["modelo"], r["nombre"]) or f"equipo-{r['id']}"
+            slug = base
+            n = 1
+            while slug in existing:
+                n += 1
+                slug = f"{base}-{n}"
+            existing.add(slug)
+            conn.execute("UPDATE equipos SET slug = ? WHERE id = ?", (slug, r["id"]))
+        changed = True
+
+    if changed:
+        conn.commit()
+
+
+def export_equipos(conn) -> list[dict]:
+    """Exporta equipos con slug como clave natural.
+
+    Auto-cura el slug si falta (columna o valor). Esto es defensivo:
+    en deploys donde la migración de Alembic no se aplicó, el export
+    seguía roto hasta intervención manual.
+    """
+    _ensure_equipos_slug(conn)
+
     rows = conn.execute("""
         SELECT e.slug, e.nombre, e.marca, e.modelo, e.cantidad,
                e.precio_jornada, e.precio_jornada_manual, e.precio_usd,
