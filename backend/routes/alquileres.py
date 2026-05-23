@@ -24,6 +24,16 @@ ESTADOS_VALIDOS    = {"borrador", "presupuesto", "confirmado", "retirado", "devu
 ESTADOS_RESERVADO  = "('presupuesto','confirmado','retirado')"   # usado en SQL IN clauses
 
 
+def _es_historico(fuente: str | None) -> bool:
+    """Pedidos historicos (importados) no validan fechas ni stock.
+
+    Soporta `historico` y prefijos tipo `<sistema>-historico` (ej.
+    `booqable-historico` que generan los converters de migracion). Asi un
+    converter futuro puede usar su propio prefijo sin tocar el backend.
+    """
+    return bool(fuente) and fuente.endswith("historico")
+
+
 # ── Helpers internos ─────────────────────────────────────────────────────────
 
 def _maybe_finalizar(conn, pedido_id: int):
@@ -808,7 +818,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
             raise HTTPException(404, "Pedido no encontrado")
 
         # ── Validaciones para estados que requieren fechas y stock ──────────────
-        if data.estado in ESTADOS_REQUIEREN_FECHAS and p_row["fuente"] != "historico":
+        if data.estado in ESTADOS_REQUIEREN_FECHAS and not _es_historico(p_row["fuente"]):
             errores = []
             if not p_row["fecha_desde"] or not p_row["fecha_hasta"]:
                 errores.append("El pedido no tiene fechas de inicio y fin.")
@@ -844,7 +854,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
         elif (
             data.estado in ESTADOS_QUE_RESERVAN
             and p_row["estado"] not in ESTADOS_QUE_RESERVAN
-            and p_row["fuente"] != "historico"
+            and not _es_historico(p_row["fuente"])
             and p_row["fecha_desde"] and p_row["fecha_hasta"]
         ):
             sin_stock = _check_stock(conn, id, p_row["fecha_desde"], p_row["fecha_hasta"])
@@ -854,7 +864,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
                     {"errores": [f"Sin stock suficiente: {s}" for s in sin_stock]},
                 )
 
-        es_historico    = p_row["fuente"] == "historico"
+        es_historico    = _es_historico(p_row["fuente"])
         estado_anterior = p_row["estado"]
         updates         = {"estado": data.estado}
 
