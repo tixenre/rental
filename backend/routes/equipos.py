@@ -1381,13 +1381,37 @@ def get_ficha(id: int):
         row = conn.execute(
             "SELECT * FROM equipo_fichas WHERE equipo_id = ?", (id,)
         ).fetchone()
-        if row:
-            return row_to_dict(row)
-        return {
+        base = row_to_dict(row) if row else {
             "equipo_id": id, "descripcion": None, "notas": None, "specs_json": None,
             "montura": None, "formato": None, "resolucion": None, "keywords_json": None,
             "nombre_publico_template": None,
         }
+        # Adjuntar specs estructuradas (equipo_specs) para que el form del admin
+        # pueda hidratar los inputs del template. Lista de {label, value,
+        # spec_def_id} ordenada por prioridad del template.
+        specs_estructuradas = [
+            {
+                "label": r["label"],
+                "value": r["value"],
+                "spec_def_id": r["spec_def_id"],
+                "spec_key": r["spec_key"],
+            }
+            for r in conn.execute(
+                """
+                SELECT sd.id AS spec_def_id, sd.spec_key, sd.label, es.value,
+                       COALESCE(MIN(cst.prioridad), 999) AS prioridad
+                FROM equipo_specs es
+                JOIN spec_definitions sd ON es.spec_def_id = sd.id
+                LEFT JOIN categoria_spec_templates cst ON cst.spec_def_id = sd.id
+                WHERE es.equipo_id = ?
+                GROUP BY sd.id, sd.spec_key, sd.label, es.value
+                ORDER BY prioridad ASC, sd.label ASC
+                """,
+                (id,),
+            ).fetchall()
+        ]
+        base["specs_estructuradas"] = specs_estructuradas
+        return base
     finally:
         conn.close()
 

@@ -263,7 +263,17 @@ export function EquipoFormDialogV2({
       if (f.montura?.trim()) dedicated.push(newSpec("Montura", f.montura.trim()));
       if (f.formato?.trim()) dedicated.push(newSpec("Formato", f.formato.trim()));
       if (f.resolucion?.trim()) dedicated.push(newSpec("Resolución", f.resolucion.trim()));
-      setSpecs(mergeSpecs(parsedSpecs, dedicated));
+
+      // Hidratar con specs estructuradas (equipo_specs). Estos valores son
+      // read-only desde este form: si el admin los edita acá, no se persisten
+      // porque al guardar se EXCLUYEN de specs_json (el save check los compara
+      // contra esta lista para no duplicar entre equipo_fichas y equipo_specs).
+      // Para editar specs estructuradas hay que usar /admin/equipos/specs.
+      const estructuradas: Spec[] = (f.specs_estructuradas ?? [])
+        .filter((s) => s.label?.trim() && s.value?.trim())
+        .map((s) => newSpec(s.label, s.value));
+
+      setSpecs(mergeSpecs(mergeSpecs(parsedSpecs, dedicated), estructuradas));
 
       // Unificar keywords_json (ficha) + etiquetas (equipo top-level).
       let kws: string[] = [];
@@ -857,8 +867,21 @@ export function EquipoFormDialogV2({
       const monturaSpec = findSpecValue(specs, "Montura") || null;
       const formatoSpec = findSpecValue(specs, "Formato") || null;
       const resolucionSpec = findSpecValue(specs, "Resolución") || null;
+
+      // Specs ya presentes en equipo_specs (hidratados al cargar). NO los
+      // duplicamos en equipo_fichas.specs_json — quedan como fuente única en
+      // equipo_specs. El usuario edita esos vía /admin/equipos/specs.
+      const estructuradasSet = new Set(
+        (fichaQ.data?.specs_estructuradas ?? [])
+          .filter((s) => s.label?.trim() && s.value?.trim())
+          .map((s) => `${s.label.trim().toLowerCase()}::${s.value.trim()}`),
+      );
+
       const specsCleaned = specs
         .filter((s) => s.label.trim() && s.value.trim())
+        .filter((s) => !estructuradasSet.has(
+          `${s.label.trim().toLowerCase()}::${s.value.trim()}`
+        ))
         .map(({ label, value }) => ({ label, value }));
 
       const tieneFicha = (
