@@ -9,6 +9,8 @@ Expone:
         - catalog-all: ZIP con las 8 entidades del catálogo.
         - operacional-all: ZIP con clientes + alquileres (datos privados).
         - full: ZIP con todo (catálogo + operacional).
+        - equipos-csv|alquileres-csv|clientes-csv: planilla CSV plana.
+        - csv-all: ZIP con las 3 planillas CSV.
 
     POST /api/admin/dataio/import?scope=operacional
         Sube un ZIP con clientes.json/alquileres.json para upsert. Solo
@@ -25,11 +27,12 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from admin_guard import require_admin
 from database import get_db
 from dataio import orchestrator
+from dataio.csv_exporters import CSV_EXPORTERS
 from dataio.paths import CATALOG_ENTITIES, ENTITY_ORDER, OPERATIONAL_ENTITIES
 
 logger = logging.getLogger(__name__)
@@ -78,6 +81,32 @@ def export_dataio(
         if entity == "full":
             zip_bytes = orchestrator.export_to_zip_bytes(conn, list(ENTITY_ORDER))
             return _zip_response(zip_bytes, "backup-full")
+
+        # ── Planillas CSV planas (una hoja, lista para Excel) ──
+        if entity == "csv-all":
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                for name, fn in CSV_EXPORTERS.items():
+                    zf.writestr(f"{name}.csv", fn(conn))
+            return _zip_response(buf.getvalue(), "planillas-csv")
+
+        if entity.endswith("-csv"):
+            name = entity[:-4]
+            fn = CSV_EXPORTERS.get(name)
+            if fn is None:
+                raise HTTPException(
+                    400,
+                    f"Entidad CSV inválida: {entity!r}. "
+                    f"Válidas: {[f'{k}-csv' for k in CSV_EXPORTERS] + ['csv-all']}",
+                )
+            ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+            return Response(
+                content=fn(conn),
+                media_type="text/csv; charset=utf-8",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{name}-{ts}.csv"'
+                },
+            )
 
         if entity not in ENTITY_ORDER:
             raise HTTPException(

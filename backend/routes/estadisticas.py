@@ -31,14 +31,14 @@ def get_estadisticas(request: Request):
         # ── Por mes ───────────────────────────────────────────────────────────────
         por_mes = conn.execute("""
             SELECT
-                substr(p.fecha_desde, 1, 7)    AS mes,
+                to_char(p.fecha_desde, 'YYYY-MM')    AS mes,
                 COUNT(DISTINCT p.id)           AS pedidos,
                 SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0))               AS total_ars
             FROM alquileres p
             JOIN alquiler_items pi ON pi.pedido_id = p.id
             WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
-            GROUP BY substr(p.fecha_desde, 1, 7)
-            ORDER BY substr(p.fecha_desde, 1, 7) DESC
+            GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
+            ORDER BY to_char(p.fecha_desde, 'YYYY-MM') DESC
             LIMIT 24
         """).fetchall()
 
@@ -126,11 +126,11 @@ def get_estadisticas(request: Request):
         mejor_peor = conn.execute("""
             SELECT
                 (SELECT mes FROM (
-                    SELECT substr(p.fecha_desde, 1, 7) AS mes, SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0)) AS total
+                    SELECT to_char(p.fecha_desde, 'YYYY-MM') AS mes, SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0)) AS total
                     FROM alquileres p
                     JOIN alquiler_items pi ON pi.pedido_id = p.id
                     WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
-                    GROUP BY substr(p.fecha_desde, 1, 7)
+                    GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
                     ORDER BY total DESC LIMIT 1
                 ) t1) AS mejor_mes,
                 (SELECT MAX(total) FROM (
@@ -138,14 +138,14 @@ def get_estadisticas(request: Request):
                     FROM alquileres p
                     JOIN alquiler_items pi ON pi.pedido_id = p.id
                     WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
-                    GROUP BY substr(p.fecha_desde, 1, 7)
+                    GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
                 ) t2) AS mejor_total,
                 (SELECT mes FROM (
-                    SELECT substr(p.fecha_desde, 1, 7) AS mes, SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0)) AS total
+                    SELECT to_char(p.fecha_desde, 'YYYY-MM') AS mes, SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0)) AS total
                     FROM alquileres p
                     JOIN alquiler_items pi ON pi.pedido_id = p.id
                     WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
-                    GROUP BY substr(p.fecha_desde, 1, 7)
+                    GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
                     ORDER BY total ASC LIMIT 1
                 ) t3) AS peor_mes,
                 (SELECT MIN(total) FROM (
@@ -153,7 +153,7 @@ def get_estadisticas(request: Request):
                     FROM alquileres p
                     JOIN alquiler_items pi ON pi.pedido_id = p.id
                     WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
-                    GROUP BY substr(p.fecha_desde, 1, 7)
+                    GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
                 ) t4) AS peor_total
         """).fetchone()
 
