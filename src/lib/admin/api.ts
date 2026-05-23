@@ -1304,21 +1304,7 @@ export const adminApi = {
   // estadísticas
   getEstadisticas: () => authedJson<EstadisticasData>("/api/estadisticas"),
 
-  // settings — imports CSV
-  importCsv: async (
-    kind: "equipos" | "clientes" | "alquileres",
-    file: File,
-  ): Promise<ImportCsvResp> => {
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await authedFetch(`/api/settings/import-${kind}`, {
-      method: "POST",
-      body: fd,
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json?.detail ?? `Import ${kind} → ${res.status}`);
-    return json as ImportCsvResp;
-  },
+  // settings — mantenimiento
   fixApellidos: () =>
     authedPostJson<{ ok: true; fixed?: number; message?: string }>(
       "/api/settings/fix-apellidos",
@@ -1459,18 +1445,6 @@ export type EstadisticasData = {
     peor_mes: string | null; peor_total: number | null;
   };
   por_dueno: { dueno: string; total_ars: number; items: number }[];
-};
-
-export type ImportCsvResp = {
-  ok?: boolean;
-  success_count?: number;
-  inserted?: number;
-  updated?: number;
-  skipped?: number;
-  errors?: string[];
-  error_details?: string[];
-  message?: string;
-  [k: string]: unknown;
 };
 
 export type Cliente = {

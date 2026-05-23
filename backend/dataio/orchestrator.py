@@ -128,7 +128,7 @@ def import_all(
                 logger.info("Import %s: archivo vacío o ausente (%s)", entity, path)
                 continue
 
-            kwargs: dict[str, Any] = {"dry_run": dry_run}
+            kwargs: dict[str, Any] = {}
             if entity == "equipos":
                 kwargs["prune_m2m"] = prune_m2m
 
@@ -232,11 +232,23 @@ def init_slugs(conn, dry_run: bool = False) -> dict[str, int]:
     from .slug import equipo_slug
 
     stats = {"updated": 0, "disambiguated": 0, "already_had": 0}
+
+    # Defensive check: si la columna `slug` no existe (la migración
+    # e4a7c1f8d6b2 falló silenciosamente), devolvemos un stat especial
+    # con `skipped=True` para que el caller pueda loguearlo claramente
+    # en lugar de cascadear con un UndefinedColumn críptico.
+    col_exists = conn.execute(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_name = 'equipos' AND column_name = 'slug' LIMIT 1"
+    ).fetchone()
+    if not col_exists:
+        stats["skipped_no_column"] = True
+        return stats
+
     rows = conn.execute(
         "SELECT id, nombre, marca, modelo FROM equipos WHERE slug IS NULL"
     ).fetchall()
     if not rows:
-        # Reportar cuántos ya tienen slug (info útil para logs).
         r = conn.execute(
             "SELECT COUNT(*) AS n FROM equipos WHERE slug IS NOT NULL"
         ).fetchone()
@@ -263,7 +275,14 @@ def init_slugs(conn, dry_run: bool = False) -> dict[str, int]:
             i += 1
             disamb = True
             if i > 100:
-                slug = f"{base}-id{r['id']}"
+                # Último recurso: sufijo con ID. También puede colisionar
+                # si una corrida previa ya lo asignó, así que iteramos.
+                fallback_base = f"{base}-id{r['id']}"
+                slug = fallback_base
+                j = 2
+                while slug in used_slugs:
+                    slug = f"{fallback_base}-{j}"
+                    j += 1
                 break
         if not dry_run:
             conn.execute(
