@@ -729,6 +729,7 @@ function GridMode({
           allEquipos={allEquipos}
           categories={apiCategories}
           onSelect={onJumpToCategory}
+          getCount={(c) => allEquipos.filter((e) => inCategory(e, c)).length}
         />
       )}
 
