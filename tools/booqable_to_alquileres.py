@@ -431,10 +431,31 @@ def _ensure_placeholder_by_title(title: str, placeholders: dict) -> str:
 # Build alquileres
 # ─────────────────────────────────────────────────────────────────────────────
 
+SIN_DETALLE_SLUG = "booqable-pedido-sin-detalle"
+SIN_DETALLE_NOMBRE = "Pedido histórico (sin detalle de items)"
+
+
+def _jornadas_local(fecha_desde: str, fecha_hasta: str) -> int:
+    """Replica el calculo del frontend (jornadasEntre en usePedidoDraft.ts):
+    dias de diferencia + 1 (inclusivo). Asi precio_jornada * jornadas en el
+    display coincide con lo que asignamos."""
+    import datetime as _dt
+    try:
+        d0 = _dt.date.fromisoformat(fecha_desde)
+        d1 = _dt.date.fromisoformat(fecha_hasta)
+    except (ValueError, TypeError):
+        return 1
+    diff = (d1 - d0).days
+    if diff < 0:
+        return 1
+    return max(1, diff + 1)
+
+
 def build_alquileres(orders, idx):
     placeholders: dict[str, dict] = {}
     alquileres: list[dict] = []
     skipped: list[dict] = []
+    usa_sin_detalle = False
 
     # Ordenar por numero_pedido Booqable ASC = orden cronologico.
     # El numero_pedido local se reasigna 1..N (secuencial sin gaps de los
@@ -463,6 +484,16 @@ def build_alquileres(orders, idx):
             })
             continue
 
+        fecha_desde = iso_date(o.get("starts_at"))
+        fecha_hasta = iso_date(o.get("stops_at"))
+        jornadas = _jornadas_local(fecha_desde, fecha_hasta)
+
+        # grand_total = lo que se cobro realmente (con impuestos). Es la
+        # fuente de verdad del monto del pedido.
+        grand_total = cents_to_ars(
+            o.get("grand_total_with_tax_in_cents") or o.get("grand_total_in_cents")
+        )
+
         # Filtrar lineas: ignorar combo parents (los children tienen la
         # composicion real). Quedarse con children + simples.
         all_lines = idx["lines_by_order"].get(o["id"], [])
@@ -471,14 +502,15 @@ def build_alquileres(orders, idx):
             if l["id"] not in idx["parent_ids_with_kids"]
         ]
 
-        items = []
+        # ── Paso 1: resolver cada linea a equipo + peso (price_in) ──────────
+        # Consolidamos por equipo_slug: si el mismo equipo aparece en varias
+        # lineas (ej. 2 unidades del mismo lente), se suman cantidad y peso.
+        by_slug: dict[str, dict] = {}
         for l in useful_lines:
-            subtotal_ars = cents_to_ars(l.get("price_in_cents"))
-            # Per decision del operador: items no cobrados (subtotal=0) se
-            # ignoran completamente — son accesorios "free" dentro de combos
-            # o items random sin valor comercial. No generan placeholder ni
-            # alquiler_item.
-            if subtotal_ars <= 0:
+            peso = cents_to_ars(l.get("price_in_cents"))
+            # Items no cobrados (price_in=0) se ignoran — accesorios free
+            # dentro de combos o items sin valor comercial.
+            if peso <= 0:
                 continue
             equipo_slug, qty_mult = resolve_equipo(l, idx, placeholders)
             if equipo_slug is None:
@@ -488,15 +520,45 @@ def build_alquileres(orders, idx):
             except ValueError:
                 cantidad = 1
             cantidad *= qty_mult
-            precio_each_ars = cents_to_ars(l.get("price_each_in_cents"))
-            if qty_mult > 1:
-                # Si expandimos un kit, el precio unitario baja proporcionalmente
-                precio_each_ars = precio_each_ars // qty_mult if precio_each_ars else 0
+            agg = by_slug.setdefault(equipo_slug, {"cantidad": 0, "peso": 0})
+            agg["cantidad"] += cantidad
+            agg["peso"] += peso
+
+        # ── Paso 2: distribuir grand_total proporcional al peso ─────────────
+        # Garantiza sum(subtotal) == grand_total (lo que se cobro). Las stats
+        # por equipo quedan netas (post-descuento), que es lo que el operador
+        # quiere para "cuanto genero cada equipo".
+        items = []
+        peso_total = sum(a["peso"] for a in by_slug.values())
+        if by_slug and peso_total > 0:
+            asignado_acc = 0
+            slugs = list(by_slug.items())
+            for i, (slug, agg) in enumerate(slugs):
+                if i == len(slugs) - 1:
+                    # ultimo item absorbe el redondeo para cuadrar exacto
+                    asignado = grand_total - asignado_acc
+                else:
+                    asignado = round(grand_total * agg["peso"] / peso_total)
+                    asignado_acc += asignado
+                cantidad = agg["cantidad"]
+                precio_jornada = round(asignado / (cantidad * jornadas)) if (cantidad and jornadas) else asignado
+                items.append({
+                    "equipo_slug": slug,
+                    "cantidad": cantidad,
+                    "precio_jornada": precio_jornada,
+                    "subtotal": asignado,
+                })
+        elif grand_total > 0:
+            # Pedido con monto pero sin lineas en el CSV de Booqable (export
+            # incompleto). Creamos 1 item sintetico a un placeholder generico
+            # para que el pedido no quede vacio y el total se muestre bien.
+            usa_sin_detalle = True
+            precio_jornada = round(grand_total / jornadas) if jornadas else grand_total
             items.append({
-                "equipo_slug": equipo_slug,
-                "cantidad": cantidad,
-                "precio_jornada": precio_each_ars,
-                "subtotal": subtotal_ars,
+                "equipo_slug": SIN_DETALLE_SLUG,
+                "cantidad": 1,
+                "precio_jornada": precio_jornada,
+                "subtotal": grand_total,
             })
 
         # Numero local secuencial 1..N. Numero original Booqable se guarda en notas.
@@ -509,23 +571,20 @@ def build_alquileres(orders, idx):
         if len(name_parts) > 1:
             cliente_nombre = " ".join(name_parts)
 
-        # Descuento explicito si Booqable lo tiene
-        try:
-            descuento_pct = float(o.get("discount_percentage") or "0")
-        except ValueError:
-            descuento_pct = 0.0
-
         alq = {
             "numero_pedido": numero_pedido,
             "cliente_email": cust["email"],
             "cliente_nombre": cliente_nombre,
             "cliente_telefono": cust.get("telefono") or None,
             "estado": map_status(status, o.get("payment_status")),
-            "fecha_desde": iso_date(o.get("starts_at")),
-            "fecha_hasta": iso_date(o.get("stops_at")),
-            "monto_total": cents_to_ars(o.get("grand_total_with_tax_in_cents") or o.get("grand_total_in_cents")),
+            "fecha_desde": fecha_desde,
+            "fecha_hasta": fecha_hasta,
+            "monto_total": grand_total,
             "monto_pagado": cents_to_ars(o.get("amount_paid_in_cents")),
-            "descuento_pct": descuento_pct,
+            # descuento_pct=0: los precios ya estan neteados (distribuimos el
+            # grand_total real). Si lo dejaramos en el % de Booqable, el
+            # frontend aplicaria el descuento DE NUEVO sobre montos ya netos.
+            "descuento_pct": 0.0,
             "fuente": "booqable-historico",
             "notas": f"Booqable #{booqable_num} (imported)" if booqable_num else "Booqable (imported)",
             "items": items,
@@ -533,7 +592,19 @@ def build_alquileres(orders, idx):
         }
         alquileres.append(alq)
 
-    return alquileres, list(placeholders.values()), skipped
+    placeholder_list = list(placeholders.values())
+    if usa_sin_detalle:
+        placeholder_list.append({
+            "slug": SIN_DETALLE_SLUG,
+            "nombre": SIN_DETALLE_NOMBRE,
+            "marca": "",
+            "modelo": "",
+            "source_booqable_slug": "",
+            "source_booqable_id": "",
+            "precio_referencia_ars": 0,
+        })
+
+    return alquileres, placeholder_list, skipped
 
 
 # ─────────────────────────────────────────────────────────────────────────────
