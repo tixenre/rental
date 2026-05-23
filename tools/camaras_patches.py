@@ -51,7 +51,7 @@ MANUAL_SPEC_PATCHES: dict[str, dict] = {
     # ── Sony FX3 (id_db=3) ───────────────────────────────────────────────────
     # B&H lista 46 specs. Faltantes que SÉ:
     "sony_fx3a": {
-        "sensor_crop": 1,                       # Full-frame default. Tiene S35 mode 1.5x.
+        "sensor_crop": "1x",                    # Full-frame default. Tiene S35 mode 1.5x.
         "continuous_shooting_fps": 10,          # 10 fps stills burst (compressed RAW)
         "processor": "BIONZ XR",
         # "recording_limit_min": None,          # Sin límite (cooling activo). None = no spec.
@@ -87,13 +87,13 @@ MANUAL_SPEC_PATCHES: dict[str, dict] = {
     # B&H lista 31 specs. Faltantes que SÉ (cinema cam con muchas particularidades):
     "canon_c200": {
         "built_in_microphone": False,           # No tiene mic interno (sí XLR)
-        "internal_recording": True,             # Sí, CFast (Raw) + SD (MP4)
+        "internal_recording": "Cinema Raw Light (CFast) + MP4 (SD)",
         "materials": "Magnesium Alloy",
         "mobile_app_compatible": False,         # No tiene app móvil
         "netflix_approved": False,
         "operating_conditions": "0 to 40°C",
         "rango_dinamico_stops": 15,             # Canon declara 15 stops con Canon Log
-        "sensor_crop": 1.5,                     # Super 35 vs FF
+        "sensor_crop": "1.5x",                  # Super 35 vs FF
         "wireless": [],                         # No tiene Wi-Fi/Bluetooth (multi_enum: lista vacía)
         # "continuous_shooting_fps": 1,         # Cinema cam, 1fps stills approx
         # "display_type": "4.0\" LCD Touchscreen (en monitor unit)",  # TODO: confirmar
@@ -113,7 +113,7 @@ MANUAL_SPEC_PATCHES: dict[str, dict] = {
         "built_in_nd": False,                   # KOMODO no tiene ND interno (necesita Lite/Pro adapter)
         "iso_nativo": [800],                    # Dual-base ISO: 800 (low) y 3200/6400 (high) según modo
         "processor": "RED A.I. processor",      # TODO: confirmar nombre exacto
-        "sensor_crop": 1.5,                     # Super 35 vs FF
+        "sensor_crop": "1.5x",                  # Super 35 vs FF
         # "continuous_shooting_fps": None,      # N/A (cinema cam, no stills mode dedicado)
         # "focus_points": None,                 # AF detector reciente, sin grid clásico
         # "gamma_curve": "REDLogFilm, REDgamma4, IPP2",  # TODO: confirmar

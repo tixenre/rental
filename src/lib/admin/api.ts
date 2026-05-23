@@ -106,6 +106,16 @@ export type Ficha = {
   /** Scrape raw cacheado del autocompletar. Lo usa el form para re-aplicar
    *  campos por sección sin volver a scrapear. */
   raw_json?:            string | null;
+  /** Specs estructuradas (equipo_specs JOIN spec_definitions) para hidratar
+   *  los inputs del template del form. Lista ordenada por prioridad del
+   *  template. Read-only desde el form: editar requiere PUT a
+   *  /admin/equipos/{id}/specs, no a /equipos/{id}/ficha. */
+  specs_estructuradas?: Array<{
+    label: string;
+    value: string;
+    spec_def_id: number;
+    spec_key: string;
+  }>;
 };
 
 export type CategoriaRef = {

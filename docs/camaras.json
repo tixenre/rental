@@ -43,7 +43,7 @@
         "fps_max": 120,
         "codecs": "XAVC HS, XAVC S-I 4:2:2, XAVC S 4:2:2, MPEG-4 AVC, H.265 HEVC",
         "bit_depth": "10-bit",
-        "internal_recording": true,
+        "internal_recording": "MPEG-4 AVC/XAVC S-I 4:2:2 10-Bit",
         "megapixels": 10.2,
         "iso_nativo": [
           80,
@@ -90,8 +90,8 @@
         "operating_conditions": "32 to 104°F / 0 to 40°C",
         "capture_type": "Stills & Video",
         "peso_g": 640,
-        "media_card_slots": 2,
-        "sensor_crop": 1,
+        "media_card_slots": "2",
+        "sensor_crop": "1x",
         "continuous_shooting_fps": 10,
         "processor": "BIONZ XR"
       },
@@ -589,7 +589,7 @@
         "fps_max": 120,
         "codecs": "XAVC HS, XAVC S-I 4:2:2, XAVC S 4:2:2, H.265 HEVC, H.264",
         "bit_depth": "10-bit",
-        "internal_recording": true,
+        "internal_recording": "H.264/XAVC S 4:2:2/4:2:0 8/10-Bit",
         "megapixels": 33.0,
         "continuous_shooting_fps": 30,
         "iso_nativo": [
@@ -632,7 +632,7 @@
         "operating_conditions": "32 to 104°F / 0 to 40°C",
         "capture_type": "Stills & Video",
         "peso_g": 610,
-        "media_card_slots": 2,
+        "media_card_slots": "2",
         "built_in_flash": false,
         "lens_communication": true,
         "netflix_approved": false,
@@ -1343,7 +1343,7 @@
         "fps_max": 59,
         "codecs": "XAVC HS, XAVC S-I 4:2:2, XAVC S 4:2:2",
         "bit_depth": "10-bit",
-        "internal_recording": true,
+        "internal_recording": "XAVC HS 4:2:2/4:2:0 10-Bit",
         "megapixels": 12.1,
         "continuous_shooting_fps": 10,
         "iso_nativo": [
@@ -1385,7 +1385,7 @@
         "operating_conditions": "32 to 104°F / 0 to 40°C",
         "capture_type": "Stills & Video",
         "peso_g": 399,
-        "media_card_slots": 1,
+        "media_card_slots": "1",
         "built_in_flash": false,
         "lens_communication": true,
         "materials": "Polycarbonate",
@@ -2020,17 +2020,17 @@
         "dimensions_mm": "144.8 × 152.4 × 177.8 mm",
         "capture_type": "Stills & Video",
         "peso_g": 1500,
-        "media_card_slots": 2,
+        "media_card_slots": "2",
         "processor": "2 x DIGIC DV 6",
         "time_code": "Drop Frame (in 59.94/29.97 mode only) or Non-Drop Frame\nRec run, free run, regeneration",
         "built_in_microphone": false,
-        "internal_recording": true,
+        "internal_recording": "Cinema Raw Light (CFast) + MP4 (SD)",
         "materials": "Magnesium Alloy",
         "mobile_app_compatible": false,
         "netflix_approved": false,
         "operating_conditions": "0 to 40°C",
         "rango_dinamico_stops": 15,
-        "sensor_crop": 1.5,
+        "sensor_crop": "1.5x",
         "wireless": []
       },
       "extras": {
@@ -2596,7 +2596,7 @@
         "resolucion_max": "6K",
         "fps_max": 120,
         "codecs": "ProRes, REDCODE",
-        "internal_recording": true,
+        "internal_recording": "REDCODE RAW",
         "megapixels": 19.9,
         "rango_dinamico_stops": 16,
         "estabilizacion": false,
@@ -2625,14 +2625,14 @@
         "operating_conditions": "32 to 104°F / 0 to 40°C",
         "capture_type": "Stills & Video",
         "peso_g": 1190,
-        "media_card_slots": 1,
+        "media_card_slots": "1",
         "bit_depth": "16-bit",
         "built_in_nd": false,
         "iso_nativo": [
           800
         ],
         "processor": "RED A.I. processor",
-        "sensor_crop": 1.5
+        "sensor_crop": "1.5x"
       },
       "extras": {
         "sensor": "Super35 — 19.9 Megapixel",
@@ -3052,7 +3052,7 @@
         "resolucion_max": "6K",
         "fps_max": 120,
         "codecs": "ProRes, REDCODE",
-        "internal_recording": true,
+        "internal_recording": "REDCODE RAW",
         "megapixels": 19.9,
         "iso_nativo": [
           250,
@@ -3088,7 +3088,7 @@
         "operating_conditions": "32 to 104°F / 0 to 40°C",
         "capture_type": "Stills & Video",
         "peso_g": 1000,
-        "media_card_slots": 1,
+        "media_card_slots": "1",
         "bit_depth": "16-bit",
         "built_in_nd": false,
         "ip_streaming": false
@@ -3661,7 +3661,7 @@
         "resolucion_max": "5K",
         "fps_max": 240,
         "codecs": "H.265 HEVC",
-        "internal_recording": true,
+        "internal_recording": "MP4 via  H.265/HEVC",
         "megapixels": 27.6,
         "iso_nativo": [
           100,
@@ -3682,7 +3682,7 @@
         "dimensions_mm": "71.8 × 50.8 × 33.6 mm",
         "operating_conditions": "14 to 95°F / -10 to 35°C",
         "peso_g": 154,
-        "media_card_slots": 1,
+        "media_card_slots": "1",
         "built_in_light": false,
         "lens_communication": false,
         "shutter_type": "Electronic",
