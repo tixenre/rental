@@ -79,9 +79,12 @@ def convert_row(row: dict[str, str]) -> dict[str, Any] | None:
         apellido = "-"
 
     props = parse_properties(row.get("properties") or "")
-    telefono = (props.get(PROP_PHONE) or "").strip() or None
-    direccion = (props.get(PROP_ADDRESS) or "").strip() or None
-    cuit = (props.get(PROP_CUIT) or "").strip() or None
+    # NOTE: la DB (clientes) marca telefono/direccion/cuit como NOT NULL aunque
+    # el schema Pydantic los permita opcionales. Defaulteamos a "" para no
+    # romper el insert; las filas vacias quedan trivialmente filtrables despues.
+    telefono = (props.get(PROP_PHONE) or "").strip()
+    direccion = (props.get(PROP_ADDRESS) or "").strip()
+    cuit = (props.get(PROP_CUIT) or "").strip()
 
     descuento = parse_float(row.get("discount_percentage") or "0")
     legal_type = (row.get("legal_type") or "").strip().lower()
@@ -105,8 +108,7 @@ def convert_row(row: dict[str, str]) -> dict[str, Any] | None:
     if number:
         cliente["notas"] = f"Booqable #{number}"
 
-    # Limpiar None de campos no-required asi el JSON queda mas chico
-    return {k: v for k, v in cliente.items() if v is not None}
+    return cliente
 
 
 def main() -> int:
