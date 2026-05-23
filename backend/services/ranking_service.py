@@ -318,9 +318,8 @@ def _recalcular_ranking_marcas(
     """Recalcula popularidad_score, cant_pedidos, ingreso_total_ars de
     cada marca sumando los stats de todos sus equipos. Issue #131.
 
-    Las marcas se relacionan via `equipos.marca` (TEXT, nombre case-sensitive)
-    o `equipos.brand_id` (FK más reciente). Usamos brand_id si está, sino
-    fallback al campo TEXT.
+    Las marcas se relacionan con sus equipos vía `equipos.brand_id` (FK),
+    la fuente única del nombre de marca.
     """
     estados_validos = ("confirmado", "retirado", "devuelto", "finalizado")
     placeholders = ",".join(["?"] * len(estados_validos))
@@ -342,7 +341,7 @@ def _recalcular_ranking_marcas(
                 )
             ), 0) AS ingreso_total_ars
         FROM marcas m
-        LEFT JOIN equipos e ON e.brand_id = m.id OR LOWER(e.marca) = LOWER(m.nombre)
+        LEFT JOIN equipos e ON e.brand_id = m.id
         LEFT JOIN alquiler_items ai ON ai.equipo_id = e.id
         LEFT JOIN alquileres a ON a.id = ai.pedido_id
             AND a.estado IN ({placeholders})

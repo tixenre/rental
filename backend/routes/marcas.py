@@ -149,16 +149,8 @@ def admin_update_marca(marca_id: int, patch: MarcaPatch, request: Request):
             UPDATE marcas SET {set_clause} WHERE id = %s
         """, values)
 
-        # Si el nombre cambió, propagar a equipos.marca (campo TEXT legacy
-        # que el catálogo público sigue usando). Sin esto, el rename queda
-        # solo en la tabla marcas y aparece duplicado: el rename "Amaran"→"amaran"
-        # deja equipos con marca="Amaran" mientras la tabla marcas tiene "amaran";
-        # la sync de startup recrea "Amaran" porque ve el TEXT viejo.
-        if patch.nombre is not None:
-            conn.execute(
-                "UPDATE equipos SET marca = %s WHERE brand_id = %s",
-                (patch.nombre, marca_id),
-            )
+        # brand_id (FK) es la fuente única del nombre de marca; renombrar la
+        # fila en `marcas` ya se refleja en todos los equipos vía el join.
 
         # Devolver la marca actualizada
         row = conn.execute("""

@@ -107,9 +107,12 @@ def seed_iluminacion(conn, dry_run: bool = False) -> dict:
                 equipo_id = -1
                 stats["equipos_creados"] += 1
             else:
+                conn.execute("""
+                    INSERT INTO marcas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING
+                """, (marca or '',))
                 cur = conn.execute("""
-                    INSERT INTO equipos (nombre, marca, modelo, foto_url, bh_url, cantidad, dueno)
-                    VALUES (%s, %s, %s, %s, %s, 1, 'Rambla')
+                    INSERT INTO equipos (nombre, brand_id, modelo, foto_url, bh_url, cantidad, dueno)
+                    VALUES (%s, (SELECT id FROM marcas WHERE LOWER(nombre)=LOWER(%s)), %s, %s, %s, 1, 'Rambla')
                     RETURNING id
                 """, (nombre, marca, modelo, foto_url, bh_url))
                 row = cur.fetchone()

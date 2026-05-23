@@ -136,7 +136,7 @@ def calcular_nombres_para(conn, equipo_id: int) -> tuple[str, str]:
 
     Devuelve (corto, largo). Útil para preview/dry-run."""
     eq = conn.execute(
-        "SELECT id, nombre, marca, modelo, "
+        "SELECT id, nombre, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca, modelo, "
         "       nombre_publico_override, nombre_publico_revisado "
         "FROM equipos WHERE id = ?",
         (equipo_id,),

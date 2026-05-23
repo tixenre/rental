@@ -178,7 +178,7 @@ def cmd_init_slugs(args: argparse.Namespace) -> int:
         if args.dry_run and args.verbose:
             from .slug import equipo_slug
             rows = conn.execute(
-                "SELECT id, nombre, marca, modelo FROM equipos "
+                "SELECT id, nombre, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca, modelo FROM equipos "
                 "WHERE slug IS NULL ORDER BY id"
             ).fetchall()
             if rows:

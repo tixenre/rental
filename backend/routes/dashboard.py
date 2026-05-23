@@ -60,13 +60,14 @@ def get_dashboard(_admin: dict = Depends(require_admin)):
         total_clientes = conn.execute("SELECT COUNT(*) FROM clientes").fetchone()[0]
 
         equipos_afuera = conn.execute("""
-            SELECT e.nombre, e.marca, SUM(pi.cantidad) AS cantidad,
+            SELECT e.nombre, mb.nombre AS marca, SUM(pi.cantidad) AS cantidad,
                    p.cliente_nombre, p.fecha_hasta
             FROM alquiler_items pi
             JOIN equipos e ON e.id = pi.equipo_id
+            LEFT JOIN marcas mb ON mb.id = e.brand_id
             JOIN alquileres p ON p.id = pi.pedido_id
             WHERE p.estado IN ('confirmado','retirado') AND p.fecha_hasta >= ?
-            GROUP BY pi.equipo_id, p.id, e.nombre, e.marca, p.cliente_nombre, p.fecha_hasta
+            GROUP BY pi.equipo_id, p.id, e.nombre, mb.nombre, p.cliente_nombre, p.fecha_hasta
             ORDER BY p.fecha_hasta
         """, (hoy,)).fetchall()
 

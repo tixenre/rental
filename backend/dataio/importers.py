@@ -379,24 +379,30 @@ def import_equipos(
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
 
     for eq in items:
+        # marca_nombre → brand_id (marcas.nombre es la fuente única). Si la
+        # marca no existe aún, la creamos para no perder el dato.
         brand_id = resolver.marca_id(eq.marca_nombre)
-        # marca legacy: si marca_nombre viene seteada, lo usamos como `marca` TEXT.
-        # Esto mantiene compat con código que lee `equipos.marca` directo.
-        marca_text = eq.marca or eq.marca_nombre
+        if brand_id is None and (eq.marca_nombre or eq.marca):
+            nombre_marca = (eq.marca_nombre or eq.marca).strip()
+            conn.execute(
+                "INSERT INTO marcas (nombre) VALUES (?) ON CONFLICT (nombre) DO NOTHING",
+                (nombre_marca,),
+            )
+            resolver.refresh_marcas()
+            brand_id = resolver.marca_id(nombre_marca)
 
         cur = conn.execute(
             """
             INSERT INTO equipos (
-                slug, nombre, marca, modelo, brand_id, cantidad,
+                slug, nombre, modelo, brand_id, cantidad,
                 precio_jornada, precio_jornada_manual, precio_usd, roi_pct,
                 valor_reposicion, foto_url, fecha_compra, serie, bh_url,
                 dueno, visible_catalogo, estado, ficha_completa, eliminado_at,
                 nombre_publico_override, nombre_publico_revisado, relevancia_manual
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (slug) DO UPDATE SET
                 nombre = EXCLUDED.nombre,
-                marca = EXCLUDED.marca,
                 modelo = EXCLUDED.modelo,
                 brand_id = EXCLUDED.brand_id,
                 cantidad = EXCLUDED.cantidad,
@@ -421,7 +427,7 @@ def import_equipos(
             RETURNING id, (xmax = 0) AS inserted
             """,
             (
-                eq.slug, eq.nombre, marca_text, eq.modelo, brand_id, eq.cantidad,
+                eq.slug, eq.nombre, eq.modelo, brand_id, eq.cantidad,
                 eq.precio_jornada, eq.precio_jornada_manual, eq.precio_usd,
                 eq.roi_pct, eq.valor_reposicion, eq.foto_url, eq.fecha_compra,
                 eq.serie, eq.bh_url, eq.dueno, eq.visible_catalogo, eq.estado,

@@ -227,7 +227,6 @@ def init_db():
         CREATE TABLE IF NOT EXISTS equipos (
             id               SERIAL PRIMARY KEY,
             nombre           TEXT NOT NULL,
-            marca            TEXT,
             modelo           TEXT,
             cantidad         INTEGER NOT NULL DEFAULT 1,
             precio_jornada   INTEGER,
@@ -284,35 +283,10 @@ def init_db():
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS ingreso_total_ars BIGINT NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS ranking_actualizado TIMESTAMP")
 
-    # Migration: agregar FK a marcas
+    # FK a marcas. brand_id es la fuente única del nombre de marca
+    # (vía marcas.nombre). El backfill desde la columna legacy `marca` y su
+    # DROP viven en la migración d5a8f2c4b6e9 (corre una sola vez).
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS brand_id INTEGER REFERENCES marcas(id)")
-
-    # Migration: migrar datos de marca (TEXT) a brand_id (FK)
-    try:
-        # Obtener marcas únicas existentes
-        existing_marcas = conn.execute("""
-            SELECT DISTINCT marca FROM equipos WHERE marca IS NOT NULL AND marca != ''
-            ORDER BY marca
-        """).fetchall()
-
-        for (marca,) in existing_marcas:
-            marca = marca.strip()
-            if not marca:
-                continue
-            # Insertar marca si no existe (UPSERT simulado con ON CONFLICT)
-            conn.execute("""
-                INSERT INTO marcas (nombre) VALUES (?)
-                ON CONFLICT (nombre) DO NOTHING
-            """, (marca,))
-
-        # Backfill: actualizar brand_id para todos los equipos
-        conn.execute("""
-            UPDATE equipos SET brand_id = (
-                SELECT id FROM marcas WHERE marcas.nombre = equipos.marca
-            ) WHERE marca IS NOT NULL AND marca != ''
-        """)
-    except Exception as e:
-        logger.warning("Migración de marcas parcial: %s", e)
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS clientes (
@@ -1178,7 +1152,7 @@ def attach_kit(conn, equipos: list[dict]) -> list[dict]:
     cur = conn.cursor()
     cur.execute(f"""
         SELECT kc.equipo_id, kc.componente_id, kc.cantidad,
-               e.nombre, e.marca, e.foto_url
+               e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
         FROM kit_componentes kc
         JOIN equipos e ON e.id = kc.componente_id
         WHERE kc.equipo_id IN ({placeholders})
@@ -1375,7 +1349,7 @@ def regenerate_auto_tags(conn, equipo_id: int) -> int:
     No toca las `origen='manual'`. Devuelve cuántas auto-tags quedaron asignadas.
     """
     eq = conn.execute(
-        "SELECT id, nombre, marca, modelo FROM equipos WHERE id = %s", (equipo_id,)
+        "SELECT id, nombre, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca, modelo FROM equipos WHERE id = %s", (equipo_id,)
     ).fetchone()
     if not eq:
         return 0
