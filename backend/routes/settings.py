@@ -400,12 +400,26 @@ async def upload_logo(request: Request):
     if len(raw_content) > 5 * 1024 * 1024:
         raise HTTPException(413, "Archivo muy grande (máx 5MB)")
 
-    # Optimizar manteniendo aspect ratio (wordmarks horizontales no se
-    # vuelven cuadrados — eso engrosaba el top bar mobile, issue #127).
-    try:
-        content, ctype, ext = _optimize_logo(raw_content)
-    except Exception as e:
-        raise HTTPException(400, f"No se pudo procesar la imagen: {e}")
+    # SVG: es vectorial, no pasa por PIL (que no lo entiende → "cannot
+    # identify image file"). Se sube tal cual; <img> lo renderiza bien y
+    # escala sin pérdida. Se sirve con content-type image/svg+xml.
+    filename = (getattr(file, "filename", "") or "").lower()
+    ctype_in = (getattr(file, "content_type", "") or "").lower()
+    is_svg = (
+        filename.endswith(".svg")
+        or "svg" in ctype_in
+        or b"<svg" in raw_content[:1024].lower()
+    )
+
+    if is_svg:
+        content, ctype, ext = raw_content, "image/svg+xml", "svg"
+    else:
+        # Optimizar manteniendo aspect ratio (wordmarks horizontales no se
+        # vuelven cuadrados — eso engrosaba el top bar mobile, issue #127).
+        try:
+            content, ctype, ext = _optimize_logo(raw_content)
+        except Exception as e:
+            raise HTTPException(400, f"No se pudo procesar la imagen: {e}")
 
     # Path FIJO — R2 sobreescribe.
     path = f"branding/logo.{ext}"

@@ -20,9 +20,11 @@ const SIZE_CLASS: Record<Size, string> = {
 export function Logo({
   size = "md",
   linkTo = "/",
+  className = "",
 }: {
   size?: Size;
   linkTo?: string | null;
+  className?: string;
 }) {
   const { data: logoSetting } = useQuery({
     queryKey: ["settings", "logo_url"],
@@ -37,7 +39,7 @@ export function Logo({
     <img
       src={src}
       alt="Rambla Rental"
-      className={`${SIZE_CLASS[size]} w-auto object-contain`}
+      className={`${SIZE_CLASS[size]} w-auto object-contain ${className}`}
     />
   );
 
