@@ -198,6 +198,23 @@ def map_status(booqable_status: str, payment_status: str | None) -> str:
     return "presupuesto"
 
 
+# Ajuste a planilla: cuando el monto REAL cobrado (de --montos-reales) es
+# MENOR al grand_total de Booqable, aplicamos un descuento_pct al pedido para
+# llegar al cobrado. Pasa con clientes que en Booqable se cargaban a precio
+# lista (ej. Filmar, escuela) pero pagaban menos por un descuento off-system.
+# Se aplica POR PEDIDO (solo los que difieren hacia abajo), no por cliente.
+# Umbral minimo de descuento para evitar ruido de redondeo.
+AJUSTE_PLANILLA_UMBRAL_PCT = 1.0
+
+
+def _parse_money(s: str) -> float:
+    s = (s or "").replace("$", "").replace(",", "").strip()
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -268,7 +285,21 @@ def load_data(args):
     if args.plannings:
         with open(args.plannings, encoding="utf-8") as f:
             plannings = list(csv.DictReader(f))
-    return orders, lines, products, customers, equipos, documents, plannings
+    # montos reales (planilla): remito → monto cobrado en pesos. Para clientes
+    # con descuento off-Booqable (CLIENTES_MONTO_REAL). Columnas: Remito N° (2),
+    # Monto (6). Sumamos por remito (varias lineas por pedido).
+    real_monto_by_remito = {}
+    if getattr(args, "montos_reales", None):
+        with open(args.montos_reales, encoding="utf-8") as f:
+            rr = csv.reader(f)
+            next(rr, None)
+            for row in rr:
+                if len(row) < 7:
+                    continue
+                rem = (row[2] or "").strip()
+                if rem:
+                    real_monto_by_remito[rem] = real_monto_by_remito.get(rem, 0) + _parse_money(row[6])
+    return orders, lines, products, customers, equipos, documents, plannings, real_monto_by_remito
 
 
 def _tokens(text: str) -> set[str]:
@@ -657,11 +688,21 @@ def build_alquileres(orders, idx):
         fecha_hasta = iso_date(o.get("stops_at"))
         jornadas = _jornadas_local(fecha_desde, fecha_hasta)
 
-        # grand_total = lo que se cobro realmente (con impuestos). Es la
-        # fuente de verdad del monto del pedido.
+        # Montos de Booqable:
+        #   - price_in_cents = BRUTO (lista, antes del descuento del pedido)
+        #   - grand_total_with_tax = NETO (despues del descuento de Booqable)
+        # Distribuimos el BRUTO entre los items (precios lista) y aplicamos un
+        # descuento_pct para llegar al neto. Asi NO se descuenta sobre un monto
+        # ya descontado (bug: pedidos con descuento en Booqable quedaban con
+        # los items ya bajados y encima se les aplicaba otro descuento).
         grand_total = cents_to_ars(
             o.get("grand_total_with_tax_in_cents") or o.get("grand_total_in_cents")
         )
+        bruto = cents_to_ars(o.get("price_in_cents"))
+        # Si no hay bruto (pedidos viejos) o es menor al neto, usamos el neto
+        # como bruto (descuento 0).
+        if bruto < grand_total:
+            bruto = grand_total
 
         # ── Paso 1: componer items mergeando PLANNINGS + charge-lines ───────
         # Los `lines` (charge) exportados de Booqable son INCOMPLETOS para
@@ -732,10 +773,10 @@ def build_alquileres(orders, idx):
             agg["cantidad"] += cantidad
             agg["peso"] += peso
 
-        # ── Paso 2: distribuir grand_total proporcional al peso ─────────────
-        # Garantiza sum(subtotal) == grand_total (lo que se cobro). Las stats
-        # por equipo quedan netas (post-descuento), que es lo que el operador
-        # quiere para "cuanto genero cada equipo".
+        # ── Paso 2: distribuir el BRUTO proporcional al peso ────────────────
+        # Items quedan a precio LISTA (sum(subtotal) == bruto). El descuento del
+        # pedido (Booqable y/o off-system) se aplica via descuento_pct, no
+        # bajando los items. Asi nunca se descuenta sobre un monto ya neteado.
         items = []
         peso_total = sum(a["peso"] for a in by_slug.values())
         if by_slug and peso_total > 0:
@@ -744,9 +785,9 @@ def build_alquileres(orders, idx):
             for i, (slug, agg) in enumerate(slugs):
                 if i == len(slugs) - 1:
                     # ultimo item absorbe el redondeo para cuadrar exacto
-                    asignado = grand_total - asignado_acc
+                    asignado = bruto - asignado_acc
                 else:
-                    asignado = round(grand_total * agg["peso"] / peso_total)
+                    asignado = round(bruto * agg["peso"] / peso_total)
                     asignado_acc += asignado
                 cantidad = agg["cantidad"]
                 precio_jornada = round(asignado / (cantidad * jornadas)) if (cantidad and jornadas) else asignado
@@ -756,17 +797,17 @@ def build_alquileres(orders, idx):
                     "precio_jornada": precio_jornada,
                     "subtotal": asignado,
                 })
-        elif grand_total > 0:
+        elif bruto > 0:
             # Pedido con monto pero sin lineas en el CSV de Booqable (export
             # incompleto). Creamos 1 item sintetico a un placeholder generico
             # para que el pedido no quede vacio y el total se muestre bien.
             usa_sin_detalle = True
-            precio_jornada = round(grand_total / jornadas) if jornadas else grand_total
+            precio_jornada = round(bruto / jornadas) if jornadas else bruto
             items.append({
                 "equipo_slug": SIN_DETALLE_SLUG,
                 "cantidad": 1,
                 "precio_jornada": precio_jornada,
-                "subtotal": grand_total,
+                "subtotal": bruto,
             })
 
         # Numero local secuencial 1..N. Numero original Booqable se guarda en notas.
@@ -792,6 +833,32 @@ def build_alquileres(orders, idx):
                 "notas": "Cliente sin email en Booqable (email placeholder generado)",
             }
 
+        # Monto/descuento — UN solo descuento efectivo sobre el BRUTO.
+        #   real = lo realmente cobrado:
+        #     - default: grand_total de Booqable (neto, ya con el descuento
+        #       del pedido si lo tenia; Booqable lo marca como pagado).
+        #     - si el pedido NO tiene descuento en Booqable (bruto==grand) y la
+        #       planilla registro un monto menor → descuento off-system real
+        #       (ej. Filmar). Usamos la planilla.
+        #   No aplicamos planilla cuando el pedido YA tiene descuento en
+        #   Booqable: ese descuento es el real, y una planilla menor suele ser
+        #   un error de carga (no doble-descontar).
+        real = grand_total
+        tiene_desc_booqable = bruto > grand_total + 1
+        real_montos = idx.get("real_monto_by_remito", {})
+        if (not tiene_desc_booqable
+                and booqable_num in real_montos
+                and bruto > 0):
+            planilla = round(real_montos[booqable_num])
+            disc_planilla = round((1 - planilla / bruto) * 100, 2)
+            if 0 < planilla < bruto and disc_planilla >= AJUSTE_PLANILLA_UMBRAL_PCT:
+                real = planilla
+
+        descuento_pct = round((1 - real / bruto) * 100, 2) if bruto > 0 else 0.0
+        if descuento_pct < 0:
+            descuento_pct = 0.0
+        monto_total = real
+
         alq = {
             "numero_pedido": numero_pedido,
             "cliente_email": cust["email"],
@@ -800,12 +867,9 @@ def build_alquileres(orders, idx):
             "estado": map_status(status, o.get("payment_status")),
             "fecha_desde": fecha_desde,
             "fecha_hasta": fecha_hasta,
-            "monto_total": grand_total,
+            "monto_total": monto_total,
             "monto_pagado": cents_to_ars(o.get("amount_paid_in_cents")),
-            # descuento_pct=0: los precios ya estan neteados (distribuimos el
-            # grand_total real). Si lo dejaramos en el % de Booqable, el
-            # frontend aplicaria el descuento DE NUEVO sobre montos ya netos.
-            "descuento_pct": 0.0,
+            "descuento_pct": descuento_pct,
             "fuente": "booqable-historico",
             "notas": f"Booqable #{booqable_num} (imported)" if booqable_num else "Booqable (imported)",
             "items": items,
@@ -980,15 +1044,20 @@ def main() -> int:
     ap.add_argument("--plannings", default=None,
                     help="plannings.csv (reservas) opcional, ultimo fallback "
                          "para pedidos sin order-lines ni doc-lines")
+    ap.add_argument("--montos-reales", default=None,
+                    help="CSV planilla (Rental Historicos) con remito+monto real "
+                         "cobrado; para clientes con descuento off-Booqable")
     ap.add_argument("--outdir", required=True)
     args = ap.parse_args()
 
-    orders, lines, products, customers, equipos, documents, plannings = load_data(args)
+    orders, lines, products, customers, equipos, documents, plannings, real_montos = load_data(args)
     print(f"orders: {len(orders)}, lines: {len(lines)}, products: {len(products)}, "
           f"customers: {len(customers)}, equipos locales: {len(equipos)}, "
-          f"documents: {len(documents)}, plannings: {len(plannings)}", file=sys.stderr)
+          f"documents: {len(documents)}, plannings: {len(plannings)}, "
+          f"montos_reales: {len(real_montos)}", file=sys.stderr)
 
     idx = build_indices(orders, lines, products, customers, equipos, documents, plannings)
+    idx["real_monto_by_remito"] = real_montos
     alquileres, placeholders, skipped, clientes_sin_email = build_alquileres(orders, idx)
     # clientes.json incluye TODOS (para wipe-and-reimport limpio), no solo los
     # sin email. El importer upsertea por email asi que es idempotente.

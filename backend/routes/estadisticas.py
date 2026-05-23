@@ -20,7 +20,7 @@ def get_estadisticas(request: Request):
             SELECT
                 COUNT(DISTINCT p.id)           AS total_pedidos,
                 COUNT(DISTINCT p.cliente_id)   AS total_clientes,
-                SUM(pi.subtotal)               AS total_ars,
+                SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0))               AS total_ars,
                 MIN(p.fecha_desde)             AS desde,
                 MAX(p.fecha_desde)             AS hasta
             FROM alquileres p
@@ -33,7 +33,7 @@ def get_estadisticas(request: Request):
             SELECT
                 substr(p.fecha_desde, 1, 7)    AS mes,
                 COUNT(DISTINCT p.id)           AS pedidos,
-                SUM(pi.subtotal)               AS total_ars
+                SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0))               AS total_ars
             FROM alquileres p
             JOIN alquiler_items pi ON pi.pedido_id = p.id
             WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
@@ -46,7 +46,7 @@ def get_estadisticas(request: Request):
         top_equipos = conn.execute("""
             SELECT
                 e.nombre                       AS equipo,
-                SUM(pi.subtotal)               AS total_ars,
+                SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0))               AS total_ars,
                 COUNT(*)                       AS veces
             FROM alquiler_items pi
             JOIN alquileres p  ON p.id  = pi.pedido_id
@@ -75,7 +75,7 @@ def get_estadisticas(request: Request):
         por_dueno = conn.execute("""
             SELECT
                 COALESCE(e.dueno, 'Rambla')    AS dueno,
-                SUM(pi.subtotal)               AS total_ars,
+                SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0))               AS total_ars,
                 COUNT(*)                       AS items
             FROM alquiler_items pi
             JOIN alquileres p ON p.id = pi.pedido_id
@@ -126,7 +126,7 @@ def get_estadisticas(request: Request):
         mejor_peor = conn.execute("""
             SELECT
                 (SELECT mes FROM (
-                    SELECT substr(p.fecha_desde, 1, 7) AS mes, SUM(pi.subtotal) AS total
+                    SELECT substr(p.fecha_desde, 1, 7) AS mes, SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0)) AS total
                     FROM alquileres p
                     JOIN alquiler_items pi ON pi.pedido_id = p.id
                     WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
@@ -134,14 +134,14 @@ def get_estadisticas(request: Request):
                     ORDER BY total DESC LIMIT 1
                 ) t1) AS mejor_mes,
                 (SELECT MAX(total) FROM (
-                    SELECT SUM(pi.subtotal) AS total
+                    SELECT SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0)) AS total
                     FROM alquileres p
                     JOIN alquiler_items pi ON pi.pedido_id = p.id
                     WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
                     GROUP BY substr(p.fecha_desde, 1, 7)
                 ) t2) AS mejor_total,
                 (SELECT mes FROM (
-                    SELECT substr(p.fecha_desde, 1, 7) AS mes, SUM(pi.subtotal) AS total
+                    SELECT substr(p.fecha_desde, 1, 7) AS mes, SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0)) AS total
                     FROM alquileres p
                     JOIN alquiler_items pi ON pi.pedido_id = p.id
                     WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
@@ -149,7 +149,7 @@ def get_estadisticas(request: Request):
                     ORDER BY total ASC LIMIT 1
                 ) t3) AS peor_mes,
                 (SELECT MIN(total) FROM (
-                    SELECT SUM(pi.subtotal) AS total
+                    SELECT SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0)) AS total
                     FROM alquileres p
                     JOIN alquiler_items pi ON pi.pedido_id = p.id
                     WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
