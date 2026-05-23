@@ -153,7 +153,8 @@
   --sidebar-foreground: oklch(0.18 0.01 60);
   --sidebar-primary: #FAB428;
   --sidebar-primary-foreground: oklch(0.18 0.01 60);
-  --sidebar-accent: oklch(0.94 0.008 85);
+  /* Item activo/hover del sidebar admin: amber soft + ink (como el mock). */
+  --sidebar-accent: var(--amber-soft);
   --sidebar-accent-foreground: oklch(0.18 0.01 60);
   --sidebar-border: oklch(0.18 0.01 60 / 12%);
   --sidebar-ring: color-mix(in oklch, #FAB428 50%, transparent);

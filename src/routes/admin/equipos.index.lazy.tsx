@@ -6,7 +6,6 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useUsdRate, calcularPrecioJornada } from "@/hooks/useSettings";
@@ -103,6 +102,7 @@ function EquiposPage() {
   const [historialEquipo, setHistorialEquipo] = useState<Equipo | null>(null);
   const [openDashboard, setOpenDashboard] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [tab, setTab] = useState<"todos" | "destacados" | "nuevos" | "sin-foto">("todos");
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", { q, etiqueta, categoria, marca, soloIncompletos, vistaPapelera, falta }],
@@ -245,8 +245,25 @@ function EquiposPage() {
     });
   };
 
-  const items = equiposQ.data?.items ?? [];
+  const allItems = equiposQ.data?.items ?? [];
   const total = equiposQ.data?.total ?? 0;
+
+  // Sub-tabs del handoff: filtros rápidos sobre la lista ya cargada.
+  const esDestacado = (eq: Equipo) =>
+    (eq.etiquetas ?? []).some((t) => t.toLowerCase() === "destacado");
+  const esNuevo = (eq: Equipo) =>
+    (eq.etiquetas ?? []).some((t) => t.toLowerCase() === "nuevo");
+  const tabCounts = {
+    todos: allItems.length,
+    destacados: allItems.filter(esDestacado).length,
+    nuevos: allItems.filter(esNuevo).length,
+    "sin-foto": allItems.filter((e) => !e.foto_url).length,
+  };
+  const items =
+    tab === "destacados" ? allItems.filter(esDestacado)
+    : tab === "nuevos" ? allItems.filter(esNuevo)
+    : tab === "sin-foto" ? allItems.filter((e) => !e.foto_url)
+    : allItems;
 
   const etiquetasOpts = useMemo(
     () => (etiquetasQ.data ?? []).filter((e) => (e.total ?? 0) > 0),
@@ -495,6 +512,29 @@ function EquiposPage() {
         </div>
       )}
 
+      {/* Sub-tabs (handoff): filtros rápidos. */}
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none border-b hairline pb-px">
+        {([
+          ["todos", "Todos"],
+          ["destacados", "Destacados"],
+          ["nuevos", "Nuevos"],
+          ["sin-foto", "Sin foto"],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-sans text-sm whitespace-nowrap transition",
+              tab === id ? "bg-muted font-bold text-ink" : "font-medium text-muted-foreground hover:text-ink",
+            )}
+          >
+            {label}
+            <span className="font-mono text-[10px] tabular-nums opacity-70">{tabCounts[id]}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="rounded-lg border hairline overflow-hidden bg-background">
         <Table>
           <TableHeader>
@@ -507,19 +547,20 @@ function EquiposPage() {
                 />
               </TableHead>
               <TableHead className="w-14"></TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead className="hidden md:table-cell">Marca / Modelo</TableHead>
-              <TableHead className="text-right">Stock</TableHead>
-              <TableHead className="text-right hidden sm:table-cell">Precio/día</TableHead>
-              <TableHead className="text-right hidden sm:table-cell w-24" title="% del valor del equipo cobrado por día (nombre tentativo)">% día</TableHead>
+              <TableHead>Equipo</TableHead>
+              <TableHead className="hidden lg:table-cell">Categoría</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead className="text-right">Stock</TableHead>
+              <TableHead className="text-right hidden sm:table-cell">$ / jornada</TableHead>
+              <TableHead className="text-right hidden sm:table-cell w-24" title="% del valor del equipo cobrado por día (nombre tentativo)">% día</TableHead>
+              <TableHead className="hidden md:table-cell">Etiquetas</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length === 0 && !equiposQ.isLoading && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
                   Sin equipos.{" "}
                   {(q || etiqueta) && (
                     <button
@@ -559,9 +600,22 @@ function EquiposPage() {
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-1.5">
+                <TableCell>
+                  {eq.marca && (
+                    <div className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground font-semibold leading-none mb-0.5">
+                      {eq.marca}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 font-medium text-ink leading-tight">
                     <span>{eq.nombre}</span>
+                    {esNuevo(eq) && (
+                      <span className="text-[9px] font-bold uppercase tracking-wide bg-ink text-amber px-1.5 py-0.5 rounded shrink-0">
+                        Nuevo
+                      </span>
+                    )}
+                    {esDestacado(eq) && (
+                      <span className="text-amber shrink-0" title="Destacado">★</span>
+                    )}
                     {!eq.ficha_completa && (
                       <span
                         className="text-[10px] text-amber-700 bg-amber-soft/40 px-1 py-0.5 rounded shrink-0"
@@ -572,8 +626,19 @@ function EquiposPage() {
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                  {[eq.marca, eq.modelo].filter(Boolean).join(" / ") || "—"}
+                <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                  {eq.categorias?.[0]?.nombre ?? "—"}
+                </TableCell>
+                <TableCell>
+                  {eq.visible_catalogo ? (
+                    <span className="inline-flex items-center rounded-full bg-verde/15 text-verde px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.1em]">
+                      Visible
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.1em]">
+                      Oculto
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   <StockInline equipo={eq} onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })} />
@@ -584,10 +649,17 @@ function EquiposPage() {
                 <TableCell className="text-right hidden sm:table-cell w-24">
                   <RoiInline equipo={eq} onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })} />
                 </TableCell>
-                <TableCell>
-                  <Badge variant={eq.estado === "operativo" ? "default" : "outline"}>
-                    {eq.estado === "en_mantenimiento" ? "Mantenim." : eq.estado === "fuera_servicio" ? "Fuera" : "OK"}
-                  </Badge>
+                <TableCell className="hidden md:table-cell">
+                  <div className="flex flex-wrap gap-1 max-w-[180px]">
+                    {(eq.etiquetas ?? []).slice(0, 2).map((t) => (
+                      <span key={t} className="inline-flex items-center rounded-full border hairline bg-surface px-2 py-0.5 text-[10px] font-medium text-ink whitespace-nowrap">
+                        {t}
+                      </span>
+                    ))}
+                    {(eq.etiquetas ?? []).length > 2 && (
+                      <span className="text-[10px] text-muted-foreground">+{(eq.etiquetas ?? []).length - 2}</span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-right">
                   {/* Mobile: un botón → ActionMenu */}
