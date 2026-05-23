@@ -37,7 +37,6 @@ import {
   type PedidoEstado, type Equipo, type Cliente, type PedidoHistorialItem,
 } from "@/lib/admin/api";
 import { clienteApi } from "@/lib/cliente/api";
-import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
   usePedidoDraft, jornadasEntre,
@@ -141,6 +140,19 @@ export type PedidoPageProps = {
   /** Callback al volver desde la vista cliente. */
   onClose?: () => void;
 };
+
+// Pill de estado coloreado por estado (paleta del mock del handoff).
+const ESTADO_PILL: Record<string, string> = {
+  borrador:    "bg-muted/60 text-muted-foreground border-transparent",
+  presupuesto: "bg-amber-soft text-amber-700 border-amber/40",
+  confirmado:  "bg-green-50 text-green-700 border-green-200",
+  retirado:    "bg-indigo-50 text-indigo-700 border-indigo-200",
+  devuelto:    "bg-emerald-50 text-emerald-700 border-emerald-200",
+  finalizado:  "bg-slate-100 text-slate-500 border-slate-200",
+  cancelado:   "bg-red-50 text-red-600 border-red-200",
+};
+// El mock muestra "Solicitado" para el estado interno 'presupuesto'.
+const estadoLabel = (e: PedidoEstado) => (e === "presupuesto" ? "Solicitado" : ESTADO_LABEL[e]);
 
 export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: PedidoPageProps) {
   const router = useRouter();
@@ -325,8 +337,8 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
               aria-label="Cambios sin enviar"
             />
           )}
-          <Badge variant={pedidoEstadoVariant(pedido.estado)} className="ml-1 shrink-0">
-            {ESTADO_LABEL[pedido.estado]}
+          <Badge variant="outline" className={cn("ml-1 shrink-0", ESTADO_PILL[pedido.estado])}>
+            {estadoLabel(pedido.estado)}
           </Badge>
         </div>
 
@@ -487,7 +499,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                 <h2 className="font-medium text-sm">Recogida</h2>
                 <div>
                   <Label className="text-xs text-muted-foreground mb-1.5">Desde</Label>
-                  <div className="rounded-md border hairline px-3 py-3">
+                  <div className="rounded-md border border-[color-mix(in_oklch,var(--amber)_45%,transparent)] px-3 py-3">
                     <div className="text-lg font-semibold text-ink tabular-nums">
                       {draft.datos.fecha_desde ? fmtFecha(draft.datos.fecha_desde) : "—"}
                     </div>
@@ -508,7 +520,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground mb-1.5">Hasta</Label>
-                  <div className="rounded-md border hairline px-3 py-3">
+                  <div className="rounded-md border border-[color-mix(in_oklch,var(--amber)_45%,transparent)] px-3 py-3">
                     <div className="text-lg font-semibold text-ink tabular-nums">
                       {draft.datos.fecha_hasta ? fmtFecha(draft.datos.fecha_hasta) : "—"}
                     </div>
