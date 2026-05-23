@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """
-Export customers, orders, order lines and products from Booqable to CSV.
+Export customers, orders, lines, products and documents from Booqable to CSV.
 
 Uses the Boomerang (public) API, which is available on every plan including free.
+
+`documents` (facturas/invoices) son utiles porque algunos pedidos viejos ya
+no tienen order-lines pero si document-lines. El export de documents trae el
+mapeo `rel_order_id` que permite puentear: order -> document -> document-lines
+(estas ultimas ya vienen en lines.csv con owner_type=documents).
 
 Setup
 -----
 1. In Booqable: Settings -> Developers -> API keys -> create a key with
-   read access to Customers, Orders, Lines and Products.
+   read access to Customers, Orders, Lines, Products and Documents.
 2. Export two env vars (or pass them as flags):
        export BOOQABLE_COMPANY=your-subdomain        # the part before .booqable.com
        export BOOQABLE_API_KEY=xxxxxxxxxxxxxxxxxxxx
@@ -39,7 +44,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-RESOURCES = ("customers", "orders", "lines", "products")
+RESOURCES = ("customers", "orders", "lines", "products", "documents")
 API_BASE_TMPL = "https://{company}.booqable.com/api/boomerang/{resource}"
 MAX_RETRIES = 8
 

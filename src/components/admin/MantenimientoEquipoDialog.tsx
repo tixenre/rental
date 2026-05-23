@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -81,10 +82,15 @@ export function MantenimientoEquipoDialog({
   const [descripcion, setDescripcion] = useState("");
   const [costo, setCosto] = useState<string>("");
   const [proximaRevision, setProximaRevision] = useState("");
+  // Bloqueo de disponibilidad
+  const [bloqueaStock, setBloqueaStock] = useState(false);
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [cantidadBloqueo, setCantidadBloqueo] = useState<string>("1");
 
   const resetForm = () => {
     setFecha(hoyISO()); setTipo("revision"); setDescripcion("");
     setCosto(""); setProximaRevision("");
+    setBloqueaStock(false); setFechaHasta(""); setCantidadBloqueo("1");
   };
 
   const addMut = useMutation({
@@ -111,12 +117,19 @@ export function MantenimientoEquipoDialog({
       toast.error("Fecha requerida");
       return;
     }
+    if (bloqueaStock && fechaHasta && fechaHasta < fecha) {
+      toast.error("La fecha de fin del bloqueo no puede ser anterior a la fecha");
+      return;
+    }
     addMut.mutate({
       fecha,
       tipo,
       descripcion: descripcion.trim() || null,
       costo: costo.trim() ? Math.max(0, Math.floor(Number(costo))) : null,
       proxima_revision: proximaRevision.trim() || null,
+      bloquea_stock: bloqueaStock,
+      fecha_hasta: bloqueaStock ? (fechaHasta.trim() || fecha) : null,
+      cantidad: bloqueaStock ? Math.max(1, Math.floor(Number(cantidadBloqueo) || 1)) : 1,
     });
   };
 
@@ -181,6 +194,32 @@ export function MantenimientoEquipoDialog({
               placeholder="Qué se hizo / qué pieza se cambió / qué hay que mirar la próxima…"
             />
           </div>
+
+          {/* Bloqueo de disponibilidad */}
+          <div className="rounded-md border hairline bg-background/60 p-2.5 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="space-y-0.5">
+                <Label className="text-xs font-medium text-ink/80">Bloquear disponibilidad</Label>
+                <p className="text-[10px] text-muted-foreground">
+                  El equipo no se podrá alquilar mientras esté en mantenimiento.
+                </p>
+              </div>
+              <Switch checked={bloqueaStock} onCheckedChange={setBloqueaStock} />
+            </div>
+            {bloqueaStock && (
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Fuera de servicio hasta</Label>
+                  <Input type="date" min={fecha} value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Unidades afectadas</Label>
+                  <Input type="number" min={1} value={cantidadBloqueo} onChange={(e) => setCantidadBloqueo(e.target.value)} />
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end">
             <Button size="sm" onClick={handleAdd} disabled={addMut.isPending}>
               {addMut.isPending
@@ -224,6 +263,12 @@ export function MantenimientoEquipoDialog({
                         className="text-[10px]"
                       >
                         próx. {fmtFecha(ev.proxima_revision)}
+                      </Badge>
+                    )}
+                    {ev.bloquea_stock && (
+                      <Badge variant="destructive" className="text-[10px]">
+                        bloquea stock{ev.fecha_hasta ? ` → ${fmtFecha(ev.fecha_hasta)}` : ""}
+                        {ev.cantidad > 1 ? ` (×${ev.cantidad})` : ""}
                       </Badge>
                     )}
                   </div>

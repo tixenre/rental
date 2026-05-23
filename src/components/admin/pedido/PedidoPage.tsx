@@ -940,7 +940,12 @@ function TotalesCard({
             <Input
               type="number" min={0} max={100} step="0.5"
               value={descuentoPct}
-              onChange={(e) => setDescuentoPct(parseFloat(e.target.value) || 0)}
+              onChange={(e) => {
+                // Clamp 0–100: el atributo max no impide tipear >100, y el
+                // backend rechaza >100 con 422. Clampeamos en la UI.
+                const v = parseFloat(e.target.value) || 0;
+                setDescuentoPct(Math.min(100, Math.max(0, v)));
+              }}
               className="h-7 w-20 text-right text-sm"
             />
           </div>

@@ -344,6 +344,51 @@ class PedidoItemUpdate(BaseModel):
 
 # ── Disponibilidad ───────────────────────────────────────────────────────────
 
+def _get_buffer_dias(conn) -> int:
+    """Días de prep/revisión exigidos entre alquileres (setting global)."""
+    row = conn.execute(
+        "SELECT value FROM app_settings WHERE key = ?", ("buffer_dias_alquiler",)
+    ).fetchone()
+    if not row:
+        return 0
+    try:
+        return max(0, int(row["value"]))
+    except (ValueError, TypeError):
+        return 0
+
+
+def _rango_con_buffer(fecha_desde: str, fecha_hasta: str, buffer_dias: int) -> tuple[str, str]:
+    """Expande [desde, hasta] en `buffer_dias` por cada lado. Expandir el rango
+    nuevo equivale a exigir `buffer_dias` de gap contra los alquileres
+    existentes (el overlap es simétrico). Devuelve fechas ISO YYYY-MM-DD."""
+    if buffer_dias <= 0:
+        return fecha_desde, fecha_hasta
+    try:
+        d0 = datetime.date.fromisoformat(fecha_desde[:10]) - datetime.timedelta(days=buffer_dias)
+        d1 = datetime.date.fromisoformat(fecha_hasta[:10]) + datetime.timedelta(days=buffer_dias)
+        return d0.isoformat(), d1.isoformat()
+    except (ValueError, TypeError):
+        return fecha_desde, fecha_hasta
+
+
+def _unidades_en_mantenimiento(conn, equipo_id: int, fecha_desde: str, fecha_hasta: str) -> int:
+    """Unidades del equipo fuera de servicio por mantenimiento en el rango.
+
+    Una entrada con bloquea_stock=TRUE saca `cantidad` unidades durante
+    [fecha, fecha_hasta]. El overlap usa la misma convención half-open que
+    los alquileres. El buffer NO aplica acá (la ventana de mantenimiento es
+    exacta)."""
+    row = conn.execute("""
+        SELECT COALESCE(SUM(cantidad), 0)
+        FROM equipo_mantenimiento
+        WHERE equipo_id = ?
+          AND bloquea_stock = TRUE
+          AND fecha < ?
+          AND COALESCE(fecha_hasta, fecha) > ?
+    """, (equipo_id, fecha_hasta, fecha_desde)).fetchone()
+    return int((row[0] if row else 0) or 0)
+
+
 @router.get("/disponibilidad")
 def get_disponibilidad(
     fecha_desde: str = Query(...),
@@ -355,6 +400,10 @@ def get_disponibilidad(
     excl = exclude_pedido_id  # None o int, ambos seguros como parámetro
 
     try:
+        # Buffer: expandimos el rango consultado para exigir gap entre alquileres.
+        buffer_dias = _get_buffer_dias(conn)
+        fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias)
+
         directas = conn.execute(f"""
             SELECT e.id, e.cantidad,
                    COALESCE(SUM(CASE
@@ -368,7 +417,7 @@ def get_disponibilidad(
             LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
             LEFT JOIN alquileres p ON p.id = pi.pedido_id
             GROUP BY e.id
-        """, (fecha_hasta, fecha_desde, excl, excl)).fetchall()
+        """, (fh_buf, fd_buf, excl, excl)).fetchall()
 
         reservado = {r["id"]: r["reservado"] for r in directas}
         cantidad  = {r["id"]: r["cantidad"]  for r in directas}
@@ -384,13 +433,26 @@ def get_disponibilidad(
               AND p.fecha_hasta > ?
               AND (? IS NULL OR p.id != ?)
             GROUP BY kc.componente_id
-        """, (fecha_hasta, fecha_desde, excl, excl)).fetchall()
+        """, (fh_buf, fd_buf, excl, excl)).fetchall()
 
         for r in via_kit:
             reservado[r["componente_id"]] = reservado.get(r["componente_id"], 0) + r["extra"]
 
+        # Mantenimiento que bloquea stock (sin buffer — ventana exacta).
+        mant = conn.execute("""
+            SELECT equipo_id, COALESCE(SUM(cantidad), 0) AS bloqueado
+            FROM equipo_mantenimiento
+            WHERE bloquea_stock = TRUE
+              AND fecha < ?
+              AND COALESCE(fecha_hasta, fecha) > ?
+            GROUP BY equipo_id
+        """, (fecha_hasta, fecha_desde)).fetchall()
+        en_mant = {r["equipo_id"]: r["bloqueado"] for r in mant}
+
         return {
-            str(eid): max(0, cantidad.get(eid, 0) - reservado.get(eid, 0))
+            str(eid): max(0, cantidad.get(eid, 0)
+                          - reservado.get(eid, 0)
+                          - en_mant.get(eid, 0))
             for eid in cantidad
         }
     finally:
@@ -753,6 +815,11 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
 
     consolidated = _consolidar_items_por_equipo(expanded)
 
+    # Buffer entre alquileres: expandimos el rango para exigir gap. Mantenimiento
+    # usa el rango original (ventana exacta).
+    buffer_dias = _get_buffer_dias(conn)
+    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias)
+
     problemas = []
     for it in consolidated.values():
         # Lock la fila de equipo durante el chequeo para evitar race conditions.
@@ -779,7 +846,7 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
               AND p.estado IN {ESTADOS_RESERVADO}
               AND p.fecha_desde < ?
               AND p.fecha_hasta > ?
-        """, (it["equipo_id"], pedido_id, fecha_hasta, fecha_desde)).fetchone()[0]
+        """, (it["equipo_id"], pedido_id, fh_buf, fd_buf)).fetchone()[0]
 
         # (b) Reservas vía kits — items que reservan un kit que tiene a este
         # equipo como componente. Multiplicamos cantidad del item por
@@ -794,9 +861,14 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
               AND p.estado IN {ESTADOS_RESERVADO}
               AND p.fecha_desde < ?
               AND p.fecha_hasta > ?
-        """, (it["equipo_id"], pedido_id, fecha_hasta, fecha_desde)).fetchone()[0]
+        """, (it["equipo_id"], pedido_id, fh_buf, fd_buf)).fetchone()[0]
 
-        reservado = reservado_directo + reservado_via_kit
+        # (c) Unidades fuera de servicio por mantenimiento (rango original).
+        en_mantenimiento = _unidades_en_mantenimiento(
+            conn, it["equipo_id"], fecha_desde, fecha_hasta
+        )
+
+        reservado = reservado_directo + reservado_via_kit + en_mantenimiento
         disponible = stock_total - reservado
         if disponible < it["cantidad"]:
             problemas.append(
@@ -1064,7 +1136,10 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
 
             if d0 >= d1:
                 raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
-            if d0 < hoy:
+            # Históricos importados tienen fechas en el pasado por diseño. El
+            # frontend manda fecha_desde junto con cualquier cambio (ej. solo
+            # el descuento), así que sin este bypass no se podría editar nada.
+            if d0 < hoy and not _es_historico(p["fuente"]):
                 raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 
     if not payload:

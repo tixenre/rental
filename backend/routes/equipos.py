@@ -415,6 +415,11 @@ class MantenimientoCreate(BaseModel):
     descripcion:      Optional[str] = None
     costo:            Optional[int] = None
     proxima_revision: Optional[str] = None
+    # Bloqueo de disponibilidad: si bloquea_stock=True, saca `cantidad`
+    # unidades del equipo durante [fecha, fecha_hasta].
+    fecha_hasta:      Optional[str] = None
+    cantidad:         int = 1
+    bloquea_stock:    bool = False
 
 
 class MantenimientoUpdate(BaseModel):
@@ -423,6 +428,9 @@ class MantenimientoUpdate(BaseModel):
     descripcion:      Optional[str] = None
     costo:            Optional[int] = None
     proxima_revision: Optional[str] = None
+    fecha_hasta:      Optional[str] = None
+    cantidad:         Optional[int] = None
+    bloquea_stock:    Optional[bool] = None
 
 
 # ── Disponibilidad en tiempo real ────────────────────────────────────────────
@@ -1415,7 +1423,8 @@ def list_mantenimiento(id: int):
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
         rows = conn.execute("""
-            SELECT id, equipo_id, fecha, tipo, descripcion, costo, proxima_revision, created_at
+            SELECT id, equipo_id, fecha, tipo, descripcion, costo, proxima_revision,
+                   fecha_hasta, cantidad, bloquea_stock, created_at
             FROM equipo_mantenimiento WHERE equipo_id = ?
             ORDER BY fecha DESC, id DESC
         """, (id,)).fetchall()
@@ -1443,9 +1452,13 @@ def add_mantenimiento(id: int, data: MantenimientoCreate):
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
         cur = conn.execute("""
-            INSERT INTO equipo_mantenimiento (equipo_id, fecha, tipo, descripcion, costo, proxima_revision)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (id, data.fecha, data.tipo or "revision", data.descripcion, data.costo, data.proxima_revision))
+            INSERT INTO equipo_mantenimiento
+                (equipo_id, fecha, tipo, descripcion, costo, proxima_revision,
+                 fecha_hasta, cantidad, bloquea_stock)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (id, data.fecha, data.tipo or "revision", data.descripcion, data.costo,
+              data.proxima_revision, data.fecha_hasta, max(1, data.cantidad),
+              data.bloquea_stock))
         conn.commit()
         new_id = cur.lastrowid
         row = conn.execute(

@@ -833,6 +833,16 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_mantenimiento_equipo "
         "ON equipo_mantenimiento(equipo_id, fecha DESC)"
     )
+    # Mantenimiento que bloquea disponibilidad: una entrada con bloquea_stock=true
+    # y fecha/fecha_hasta saca `cantidad` unidades del equipo durante ese rango.
+    # Si fecha_hasta es NULL o bloquea_stock=false, es solo log histórico.
+    conn.execute("ALTER TABLE equipo_mantenimiento ADD COLUMN IF NOT EXISTS fecha_hasta TEXT")
+    conn.execute("ALTER TABLE equipo_mantenimiento ADD COLUMN IF NOT EXISTS cantidad INTEGER NOT NULL DEFAULT 1")
+    conn.execute("ALTER TABLE equipo_mantenimiento ADD COLUMN IF NOT EXISTS bloquea_stock BOOLEAN NOT NULL DEFAULT FALSE")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mantenimiento_bloqueo "
+        "ON equipo_mantenimiento(equipo_id, fecha, fecha_hasta) WHERE bloquea_stock = TRUE"
+    )
 
     # ── Compatibilidades entre equipos (FX3 + Sigma EF → requiere MC-11) ──
     conn.execute("""
