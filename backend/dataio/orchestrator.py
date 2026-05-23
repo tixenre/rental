@@ -19,7 +19,13 @@ from typing import Any
 from .exporters import EXPORTERS
 from .importers import IMPORTERS, ImportError_
 from .natural_keys import KeyResolver
-from .paths import DATA_DIR, ENTITY_ORDER, entity_path
+from .paths import (
+    CATALOG_ENTITIES,
+    DATA_DIR,
+    ENTITY_ORDER,
+    OPERATIONAL_ENTITIES,
+    entity_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +54,9 @@ def export_all(
     """
     out = out_dir or DATA_DIR
     out.mkdir(parents=True, exist_ok=True)
-    entities = only or list(ENTITY_ORDER)
+    # Default: SOLO catálogo. Operacional requiere `only=[...]` explícito
+    # para evitar dumpear clientes/pedidos accidentalmente a /data/catalog/.
+    entities = only if only is not None else list(CATALOG_ENTITIES)
     counts: dict[str, int] = {}
     for entity in entities:
         if entity not in EXPORTERS:
@@ -107,7 +115,10 @@ def import_all(
     if not src.exists():
         raise ImportError_(f"Directorio no existe: {src}")
 
-    entities = only or list(ENTITY_ORDER)
+    # Default: SOLO catálogo. Operacional requiere `only=[...]` explícito
+    # para que el startup nunca importe accidentalmente clientes/pedidos
+    # desde un dump suelto.
+    entities = only if only is not None else list(CATALOG_ENTITIES)
     resolver = KeyResolver(conn)
     stats: dict[str, dict[str, int]] = {}
 
@@ -175,7 +186,9 @@ def diff_all(
     src = baseline_dir or DATA_DIR
     out: dict[str, dict[str, list[Any]]] = {}
 
-    for entity in ENTITY_ORDER:
+    # Solo comparamos catálogo. Operacional no está versionado en /data/
+    # y el diff no aplica (todo estaría en "solo_en_db").
+    for entity in CATALOG_ENTITIES:
         db_rows = export_entity(conn, entity)
         json_rows = _read_entity_json(entity_path(entity, src))
 
@@ -312,6 +325,72 @@ def has_catalog_data(in_dir: Path | None = None) -> bool:
         return len(rows) > 0
     except Exception:
         return False
+
+
+def export_to_zip_bytes(conn, entities: list[str]) -> bytes:
+    """Exporta `entities` a un ZIP en memoria. Útil para endpoints HTTP.
+
+    Cada entidad va a `{entity}.json` dentro del ZIP. Devuelve los bytes
+    del ZIP listos para servir como `application/zip`.
+    """
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for entity in entities:
+            if entity not in EXPORTERS:
+                logger.warning("Saltando entidad desconocida: %s", entity)
+                continue
+            rows = export_entity(conn, entity)
+            zf.writestr(
+                f"{entity}.json",
+                json.dumps(rows, ensure_ascii=False, indent=2) + "\n",
+            )
+    buf.seek(0)
+    return buf.read()
+
+
+def import_from_zip_bytes(
+    conn,
+    zip_bytes: bytes,
+    only: list[str],
+    dry_run: bool = False,
+    prune_m2m: bool = False,
+) -> dict[str, dict[str, int]]:
+    """Importa desde un ZIP en memoria. Útil para endpoints HTTP.
+
+    Extrae el ZIP a un directorio temporal y delega en `import_all` con
+    las mismas garantías (transacción, dry_run via SAVEPOINT).
+    """
+    import io
+    import tempfile
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            with tempfile.TemporaryDirectory(prefix="dataio_import_") as tmp:
+                tmp_path = Path(tmp)
+                # Extraer solo los .json esperados (no aceptamos rutas raras
+                # tipo ../ por seguridad — zipfile.extract es seguro pero
+                # validamos los nombres explícitamente).
+                for name in zf.namelist():
+                    base = Path(name).name  # quita cualquier directorio
+                    if not base.endswith(".json"):
+                        continue
+                    entity = base[:-5]
+                    if entity not in only:
+                        continue
+                    (tmp_path / base).write_bytes(zf.read(name))
+                return import_all(
+                    conn,
+                    in_dir=tmp_path,
+                    dry_run=dry_run,
+                    prune_m2m=prune_m2m,
+                    only=only,
+                )
+    except zipfile.BadZipFile as e:
+        raise ImportError_(f"Archivo ZIP inválido: {e}") from e
 
 
 def validate_dir(in_dir: Path | None = None) -> dict[str, int]:

@@ -32,6 +32,8 @@ class KeyResolver:
         self._etiquetas: dict[str, int] | None = None
         self._spec_defs: dict[tuple[str | None, str], int] | None = None
         self._equipos: dict[str, int] | None = None
+        self._clientes: dict[str, int] | None = None
+        self._alquileres: dict[int, int] | None = None
 
     # ── refresco / invalidación tras inserts ─────────────────────────────────
 
@@ -42,6 +44,8 @@ class KeyResolver:
         self._etiquetas = None
         self._spec_defs = None
         self._equipos = None
+        self._clientes = None
+        self._alquileres = None
 
     def refresh_marcas(self) -> None:
         self._marcas = None
@@ -59,6 +63,12 @@ class KeyResolver:
 
     def refresh_equipos(self) -> None:
         self._equipos = None
+
+    def refresh_clientes(self) -> None:
+        self._clientes = None
+
+    def refresh_alquileres(self) -> None:
+        self._alquileres = None
 
     # ── marcas ───────────────────────────────────────────────────────────────
 
@@ -132,3 +142,36 @@ class KeyResolver:
         if self._equipos is None:
             self._equipos = self._load_equipos()
         return self._equipos.get(slug)
+
+    # ── clientes ─────────────────────────────────────────────────────────────
+
+    def _load_clientes(self) -> dict[str, int]:
+        # Email lookup case-insensitive: el UNIQUE es sobre email tal cual,
+        # pero la app usa LOWER(email) en queries (ver índice
+        # idx_clientes_email_lower en database.py).
+        rows = self.conn.execute(
+            "SELECT id, LOWER(email) AS email FROM clientes WHERE email IS NOT NULL"
+        ).fetchall()
+        return {r["email"]: r["id"] for r in rows}
+
+    def cliente_id(self, email: str | None) -> int | None:
+        if not email:
+            return None
+        if self._clientes is None:
+            self._clientes = self._load_clientes()
+        return self._clientes.get(email.strip().lower())
+
+    # ── alquileres ───────────────────────────────────────────────────────────
+
+    def _load_alquileres(self) -> dict[int, int]:
+        rows = self.conn.execute(
+            "SELECT id, numero_pedido FROM alquileres WHERE numero_pedido IS NOT NULL"
+        ).fetchall()
+        return {int(r["numero_pedido"]): r["id"] for r in rows}
+
+    def alquiler_id(self, numero_pedido: int | None) -> int | None:
+        if numero_pedido is None:
+            return None
+        if self._alquileres is None:
+            self._alquileres = self._load_alquileres()
+        return self._alquileres.get(int(numero_pedido))

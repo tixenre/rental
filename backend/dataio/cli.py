@@ -1,6 +1,7 @@
 """dataio/cli.py — Entrypoint del CLI.
 
 Uso:
+    # CATÁLOGO (default) — JSONs versionados en /data/catalog/
     python -m backend.dataio.cli export                    # → data/catalog/
     python -m backend.dataio.cli export --only equipos     # solo una entidad
     python -m backend.dataio.cli export --out /tmp/cat/    # ubicación custom
@@ -10,6 +11,13 @@ Uso:
     python -m backend.dataio.cli diff                      # DB vs JSON
     python -m backend.dataio.cli validate                  # solo schema
     python -m backend.dataio.cli init-slugs                # one-shot, ver doc
+
+    # OPERACIONAL — clientes + alquileres (datos privados, NO commitear)
+    python -m backend.dataio.cli export --scope operacional --out /tmp/backup/
+    python -m backend.dataio.cli export --scope all --out /tmp/full-backup/
+    python -m backend.dataio.cli import --scope operacional --in /tmp/backup/
+
+`--scope` permite seleccionar grupos: catalog (default), operacional, all.
 """
 
 from __future__ import annotations
@@ -21,7 +29,7 @@ import sys
 from pathlib import Path
 
 from . import orchestrator
-from .paths import DATA_DIR, ENTITY_ORDER
+from .paths import CATALOG_ENTITIES, DATA_DIR, ENTITY_ORDER, OPERATIONAL_ENTITIES
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +44,27 @@ def _get_conn():
     return get_db()
 
 
+def _resolve_entities(args: argparse.Namespace) -> list[str] | None:
+    """Combina --scope y --only para producir la lista final de entidades.
+
+    --only tiene precedencia (lista explícita). Sino --scope determina:
+      catalog (default) → CATALOG_ENTITIES
+      operacional       → OPERATIONAL_ENTITIES
+      all               → ENTITY_ORDER
+    """
+    if args.only:
+        return args.only.split(",")
+    scope = getattr(args, "scope", "catalog")
+    if scope == "operacional":
+        return list(OPERATIONAL_ENTITIES)
+    if scope == "all":
+        return list(ENTITY_ORDER)
+    return list(CATALOG_ENTITIES)
+
+
 def cmd_export(args: argparse.Namespace) -> int:
     out_dir = Path(args.out) if args.out else DATA_DIR
-    only = args.only.split(",") if args.only else None
+    only = _resolve_entities(args)
     conn = _get_conn()
     try:
         counts = orchestrator.export_all(conn, out_dir, only=only)
@@ -53,7 +79,7 @@ def cmd_export(args: argparse.Namespace) -> int:
 
 def cmd_import(args: argparse.Namespace) -> int:
     in_dir = Path(args.in_dir) if args.in_dir else DATA_DIR
-    only = args.only.split(",") if args.only else None
+    only = _resolve_entities(args)
     conn = _get_conn()
     try:
         stats = orchestrator.import_all(
@@ -66,7 +92,10 @@ def cmd_import(args: argparse.Namespace) -> int:
         if not args.dry_run:
             conn.commit()
     except Exception as e:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         print(f"\n✗ Import falló: {e}", file=sys.stderr)
         return 1
     finally:
@@ -190,14 +219,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    pe = sub.add_parser("export", help="DB → JSONs en data/catalog/")
+    pe = sub.add_parser("export", help="DB → JSONs")
     pe.add_argument("--out", help="Directorio de salida (default: data/catalog/)")
     pe.add_argument(
-        "--only", help=f"Comma-separated subset de entidades: {','.join(ENTITY_ORDER)}"
+        "--scope",
+        choices=["catalog", "operacional", "all"],
+        default="catalog",
+        help="Grupo de entidades: catalog (default), operacional (clientes/pedidos), all",
+    )
+    pe.add_argument(
+        "--only",
+        help=f"Override del scope: comma-separated subset de entidades "
+             f"({','.join(ENTITY_ORDER)})",
     )
     pe.set_defaults(func=cmd_export)
 
-    pi = sub.add_parser("import", help="JSONs en data/catalog/ → DB (upsert)")
+    pi = sub.add_parser("import", help="JSONs → DB (upsert)")
     pi.add_argument("--in", dest="in_dir", help="Directorio fuente (default: data/catalog/)")
     pi.add_argument("--dry-run", action="store_true", help="No commitea")
     pi.add_argument(
@@ -205,7 +242,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Borra M2M (equipo_categorias/etiquetas) antes de insertar las del JSON",
     )
-    pi.add_argument("--only", help="Comma-separated subset de entidades")
+    pi.add_argument(
+        "--scope",
+        choices=["catalog", "operacional", "all"],
+        default="catalog",
+        help="Grupo de entidades: catalog (default), operacional, all",
+    )
+    pi.add_argument("--only", help="Override del scope: comma-separated subset")
     pi.set_defaults(func=cmd_import)
 
     pd = sub.add_parser("diff", help="Reporta diferencias DB vs JSON")

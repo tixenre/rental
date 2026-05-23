@@ -214,6 +214,79 @@ class EquipoFicha(_Base):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONAL — clientes, alquileres (con items/pagos embebidos)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# IMPORTANTE: estos JSONs NUNCA se commitean al repo (contienen datos
+# personales y comerciales). Solo se generan ad-hoc vía /admin/dataio o
+# CLI para backups o migración entre ambientes.
+
+
+class Cliente(_Base):
+    # Clave natural
+    email: str  # UNIQUE en DB
+    # Datos personales
+    nombre: str
+    apellido: str
+    telefono: str | None = None
+    direccion: str | None = None
+    direccion_maps_url: str | None = None
+    cuit: str | None = None
+    notas: str | None = None
+    # Comercial / fiscal
+    descuento: float = 0.0
+    perfil_impuestos: str = "consumidor_final"
+    razon_social: str | None = None
+    domicilio_fiscal: str | None = None
+    email_facturacion: str | None = None
+    # Link a Supabase Auth (opcional; no portable entre proyectos Supabase)
+    supabase_uid: str | None = None
+
+
+class AlquilerItemRef(_Base):
+    """Item embebido dentro de un Alquiler (no es entidad top-level)."""
+    equipo_slug: str  # FK → equipos.slug
+    cantidad: int = 1
+    precio_jornada: int = 0
+    subtotal: int = 0
+
+
+class AlquilerPagoRef(_Base):
+    """Pago embebido dentro de un Alquiler. No tiene clave natural propia
+    — la combinación (numero_pedido + fecha + monto + concepto) se trata
+    como identidad para evitar duplicarlos en re-imports.
+    """
+    monto: int
+    concepto: str | None = None
+    fecha: str  # ISO date string
+
+
+class Alquiler(_Base):
+    # Clave natural
+    numero_pedido: int  # UNIQUE en DB
+    # FK natural → cliente (puede ser null si cliente fue eliminado).
+    # Los campos cliente_* denormalizados preservan el snapshot histórico.
+    cliente_email: str | None = None
+    cliente_nombre: str
+    cliente_telefono: str | None = None
+    # Estado y fechas
+    estado: str = "presupuesto"
+    fecha_desde: str
+    fecha_hasta: str
+    # Montos
+    monto_total: int = 0
+    monto_pagado: int = 0
+    descuento_pct: float = 0.0
+    # Metadata
+    notas: str | None = None
+    fuente: str = "sistema"
+    numero_remito: str | None = None
+    # Embebidas para autosuficiencia
+    items: list[AlquilerItemRef] = Field(default_factory=list)
+    pagos: list[AlquilerPagoRef] = Field(default_factory=list)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Mapping entity → model (usado por exporters/importers)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -226,4 +299,6 @@ ENTITY_MODELS: dict[str, type[_Base]] = {
     "equipos": Equipo,
     "equipo_specs": EquipoSpec,
     "equipo_fichas": EquipoFicha,
+    "clientes": Cliente,
+    "alquileres": Alquiler,
 }

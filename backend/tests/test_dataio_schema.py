@@ -133,3 +133,69 @@ class TestEntityModels:
             assert entity in schema.ENTITY_MODELS, f"Falta modelo para {entity}"
             model = schema.ENTITY_MODELS[entity]
             assert issubclass(model, schema._Base)
+
+
+class TestCliente:
+    def test_minimo(self):
+        c = schema.Cliente(email="x@y.com", nombre="X", apellido="Y")
+        assert c.descuento == 0.0
+        assert c.perfil_impuestos == "consumidor_final"
+        assert c.supabase_uid is None
+
+    def test_completo(self):
+        c = schema.Cliente(
+            email="x@y.com", nombre="X", apellido="Y",
+            cuit="20-12345678-9", descuento=15.5,
+            razon_social="X SA", domicilio_fiscal="Av Y 1",
+            supabase_uid="123e4567-e89b-12d3-a456-426614174000",
+        )
+        assert c.descuento == 15.5
+        assert c.supabase_uid == "123e4567-e89b-12d3-a456-426614174000"
+
+    def test_rechaza_sin_email(self):
+        with pytest.raises(ValidationError):
+            schema.Cliente(nombre="X", apellido="Y")
+
+
+class TestAlquiler:
+    def test_minimo(self):
+        a = schema.Alquiler(
+            numero_pedido=1234,
+            cliente_nombre="Juan",
+            fecha_desde="2026-01-01",
+            fecha_hasta="2026-01-03",
+        )
+        assert a.estado == "presupuesto"
+        assert a.monto_total == 0
+        assert a.items == []
+        assert a.pagos == []
+
+    def test_con_items_y_pagos(self):
+        a = schema.Alquiler(
+            numero_pedido=1234,
+            cliente_email="x@y.com",
+            cliente_nombre="X Y",
+            fecha_desde="2026-01-01",
+            fecha_hasta="2026-01-03",
+            monto_total=50000,
+            items=[
+                {"equipo_slug": "sony-fx3", "cantidad": 1, "precio_jornada": 15000, "subtotal": 30000},
+                {"equipo_slug": "canon-r5", "cantidad": 2, "precio_jornada": 10000, "subtotal": 40000},
+            ],
+            pagos=[
+                {"monto": 25000, "concepto": "seña", "fecha": "2025-12-20"},
+            ],
+        )
+        assert len(a.items) == 2
+        assert a.items[0].equipo_slug == "sony-fx3"
+        assert a.items[1].cantidad == 2
+        assert len(a.pagos) == 1
+        assert a.pagos[0].concepto == "seña"
+
+    def test_rechaza_sin_numero_pedido(self):
+        with pytest.raises(ValidationError):
+            schema.Alquiler(
+                cliente_nombre="X",
+                fecha_desde="2026-01-01",
+                fecha_hasta="2026-01-03",
+            )

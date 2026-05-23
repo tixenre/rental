@@ -609,6 +609,181 @@ def import_equipo_fichas(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONAL — clientes, alquileres (con items y pagos embebidos)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def import_clientes(
+    conn, rows: list[dict], resolver: KeyResolver
+) -> dict[str, int]:
+    """Upsert clientes por email (UNIQUE, case-insensitive en queries).
+
+    Si supabase_uid viene seteado, se aplica — pero recordá que UIDs no
+    son portables entre proyectos Supabase. Si falla por UNIQUE
+    (ya hay otro cliente con ese uid), se ignora el conflicto.
+    """
+    items = _validate_rows(rows, schema.Cliente, "clientes")
+    stats = {"inserted": 0, "updated": 0, "skipped": 0}
+    for c in items:
+        # Pre-check: ¿existe por email? Email case-insensitive
+        # (el índice idx_clientes_email_lower lo permite).
+        existing = conn.execute(
+            "SELECT id FROM clientes WHERE LOWER(email) = LOWER(?) LIMIT 1",
+            (c.email,),
+        ).fetchone()
+
+        if existing:
+            conn.execute(
+                """
+                UPDATE clientes SET
+                    nombre = ?, apellido = ?, telefono = ?, direccion = ?,
+                    direccion_maps_url = ?, cuit = ?, descuento = ?,
+                    perfil_impuestos = ?, razon_social = ?, domicilio_fiscal = ?,
+                    email_facturacion = ?, notas = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (c.nombre, c.apellido, c.telefono, c.direccion,
+                 c.direccion_maps_url, c.cuit, c.descuento, c.perfil_impuestos,
+                 c.razon_social, c.domicilio_fiscal, c.email_facturacion,
+                 c.notas, existing["id"]),
+            )
+            stats["updated"] += 1
+        else:
+            conn.execute(
+                """
+                INSERT INTO clientes (
+                    email, nombre, apellido, telefono, direccion,
+                    direccion_maps_url, cuit, descuento, perfil_impuestos,
+                    razon_social, domicilio_fiscal, email_facturacion, notas
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (c.email, c.nombre, c.apellido, c.telefono, c.direccion,
+                 c.direccion_maps_url, c.cuit, c.descuento, c.perfil_impuestos,
+                 c.razon_social, c.domicilio_fiscal, c.email_facturacion, c.notas),
+            )
+            stats["inserted"] += 1
+
+        # supabase_uid: SET solo si viene y no genera conflicto. UPDATE
+        # separado para no bloquear el insert principal si choca.
+        if c.supabase_uid:
+            try:
+                conn.execute("SAVEPOINT sp_uid")
+                conn.execute(
+                    "UPDATE clientes SET supabase_uid = ?::uuid "
+                    "WHERE LOWER(email) = LOWER(?)",
+                    (c.supabase_uid, c.email),
+                )
+                conn.execute("RELEASE SAVEPOINT sp_uid")
+            except Exception:
+                conn.execute("ROLLBACK TO SAVEPOINT sp_uid")
+                conn.execute("RELEASE SAVEPOINT sp_uid")
+                # Conflicto con otro cliente que ya tenía ese uid — ignoramos.
+    resolver.refresh_clientes()
+    return stats
+
+
+def import_alquileres(
+    conn, rows: list[dict], resolver: KeyResolver
+) -> dict[str, int]:
+    """Upsert alquileres por numero_pedido + reemplaza items/pagos.
+
+    Política sobre M2M-like (items, pagos): REPLACE — borra todos los
+    existentes del alquiler y reinserta los del JSON. Esto es lo correcto
+    porque un pedido no acumula items entre imports.
+    """
+    items = _validate_rows(rows, schema.Alquiler, "alquileres")
+    stats = {"inserted": 0, "updated": 0, "skipped": 0}
+    # Nota: alquileres.numero_pedido NO tiene UNIQUE constraint (es una
+    # secuencia generada por la app), así que NO podemos usar ON CONFLICT.
+    # Pre-check + insert/update manual. El import es single-threaded por
+    # entidad, así que no hay race condition relevante.
+    for a in items:
+        cliente_id = resolver.cliente_id(a.cliente_email)
+        # cliente_id puede ser None: cliente fue eliminado pero el pedido
+        # se preserva con los campos cliente_* denormalizados (snapshot).
+
+        existing = conn.execute(
+            "SELECT id FROM alquileres WHERE numero_pedido = ? LIMIT 1",
+            (a.numero_pedido,),
+        ).fetchone()
+
+        if existing:
+            alq_id = existing["id"]
+            conn.execute(
+                """
+                UPDATE alquileres SET
+                    cliente_id = ?, cliente_nombre = ?, cliente_email = ?,
+                    cliente_telefono = ?, notas = ?, estado = ?,
+                    fecha_desde = ?, fecha_hasta = ?, monto_total = ?,
+                    monto_pagado = ?, descuento_pct = ?, fuente = ?,
+                    numero_remito = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (cliente_id, a.cliente_nombre, a.cliente_email, a.cliente_telefono,
+                 a.notas, a.estado, a.fecha_desde, a.fecha_hasta, a.monto_total,
+                 a.monto_pagado, a.descuento_pct, a.fuente, a.numero_remito,
+                 alq_id),
+            )
+            stats["updated"] += 1
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO alquileres (
+                    numero_pedido, cliente_id, cliente_nombre, cliente_email,
+                    cliente_telefono, notas, estado, fecha_desde, fecha_hasta,
+                    monto_total, monto_pagado, descuento_pct, fuente, numero_remito
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                RETURNING id
+                """,
+                (a.numero_pedido, cliente_id, a.cliente_nombre, a.cliente_email,
+                 a.cliente_telefono, a.notas, a.estado, a.fecha_desde, a.fecha_hasta,
+                 a.monto_total, a.monto_pagado, a.descuento_pct, a.fuente,
+                 a.numero_remito),
+            )
+            alq_id = cur.fetchone()["id"]
+            stats["inserted"] += 1
+
+        # Items: replace. Borrar todos los del pedido y reinsertar.
+        conn.execute(
+            "DELETE FROM alquiler_items WHERE pedido_id = ?", (alq_id,)
+        )
+        for it in a.items:
+            equipo_id = resolver.equipo_id(it.equipo_slug)
+            if equipo_id is None:
+                raise ImportError_(
+                    f"alquileres[{a.numero_pedido}].items: equipo_slug="
+                    f"{it.equipo_slug!r} no existe"
+                )
+            conn.execute(
+                """
+                INSERT INTO alquiler_items
+                    (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (alq_id, equipo_id, it.cantidad, it.precio_jornada, it.subtotal),
+            )
+
+        # Pagos: replace. Idem.
+        conn.execute(
+            "DELETE FROM alquiler_pagos WHERE pedido_id = ?", (alq_id,)
+        )
+        for p in a.pagos:
+            conn.execute(
+                """
+                INSERT INTO alquiler_pagos (pedido_id, monto, concepto, fecha)
+                VALUES (?, ?, ?, ?)
+                """,
+                (alq_id, p.monto, p.concepto, p.fecha),
+            )
+
+    resolver.refresh_alquileres()
+    return stats
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Dispatch
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -621,4 +796,6 @@ IMPORTERS = {
     "equipos": import_equipos,
     "equipo_specs": import_equipo_specs,
     "equipo_fichas": import_equipo_fichas,
+    "clientes": import_clientes,
+    "alquileres": import_alquileres,
 }

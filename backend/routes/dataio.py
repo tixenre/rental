@@ -1,71 +1,86 @@
-"""routes/dataio.py — Endpoint admin para descargar JSONs del catálogo.
+"""routes/dataio.py — Endpoints admin para export/import del catálogo y operacional.
 
 Expone:
-    GET /api/admin/dataio/export?entity=all|<entity_name>
-        - entity=all → application/zip con todos los JSONs
-        - entity=marcas (o cualquier entidad) → application/json individual
+    GET /api/admin/dataio/entities
+        Lista las entidades disponibles + a qué grupo pertenecen.
 
-Import por endpoint queda fuera del MVP. Para importar, usar el CLI:
-    python -m backend.dataio.cli import
+    GET /api/admin/dataio/export?entity=<name>|catalog-all|operacional-all|full
+        Devuelve JSON individual (una entidad) o ZIP (grupos).
+        - catalog-all: ZIP con las 8 entidades del catálogo.
+        - operacional-all: ZIP con clientes + alquileres (datos privados).
+        - full: ZIP con todo (catálogo + operacional).
+
+    POST /api/admin/dataio/import?scope=operacional
+        Sube un ZIP con clientes.json/alquileres.json para upsert. Solo
+        operacional desde la UI (catálogo se importa al startup).
+        Query param `dry_run=true` para simular.
 """
 
 import io
 import json
 import zipfile
 from datetime import datetime
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from admin_guard import require_admin
 from database import get_db
 from dataio import orchestrator
-from dataio.paths import ENTITY_ORDER
+from dataio.paths import CATALOG_ENTITIES, ENTITY_ORDER, OPERATIONAL_ENTITIES
 
 router = APIRouter()
 
 
 @router.get("/admin/dataio/entities")
 def list_entities(_admin: dict = Depends(require_admin)):
-    """Lista las entidades disponibles para export."""
-    return {"entities": list(ENTITY_ORDER)}
+    """Lista las entidades disponibles agrupadas por scope."""
+    return {
+        "catalog": list(CATALOG_ENTITIES),
+        "operacional": list(OPERATIONAL_ENTITIES),
+        "all": list(ENTITY_ORDER),
+    }
+
+
+def _zip_response(zip_bytes: bytes, filename_prefix: str) -> StreamingResponse:
+    ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    return StreamingResponse(
+        io.BytesIO(zip_bytes),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{filename_prefix}-{ts}.zip"'
+            )
+        },
+    )
 
 
 @router.get("/admin/dataio/export")
 def export_dataio(
-    entity: str = Query("all", description="Entidad a exportar o 'all' para ZIP"),
+    entity: str = Query("catalog-all", description="entidad o 'catalog-all'|'operacional-all'|'full'"),
     _admin: dict = Depends(require_admin),
 ):
-    """Exporta una entidad como JSON, o todas como ZIP.
-
-    `entity=all` devuelve `application/zip` con un archivo por entidad.
-    `entity=<nombre>` devuelve `application/json` con los datos de esa entidad.
-    """
+    """Exporta una entidad como JSON, o un grupo como ZIP."""
     conn = get_db()
     try:
-        if entity == "all":
-            buf = io.BytesIO()
-            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-                for e in ENTITY_ORDER:
-                    rows = orchestrator.export_entity(conn, e)
-                    zf.writestr(
-                        f"{e}.json",
-                        json.dumps(rows, ensure_ascii=False, indent=2) + "\n",
-                    )
-            buf.seek(0)
-            ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-            return StreamingResponse(
-                buf,
-                media_type="application/zip",
-                headers={
-                    "Content-Disposition": f'attachment; filename="catalogo-{ts}.zip"'
-                },
-            )
+        if entity == "catalog-all":
+            zip_bytes = orchestrator.export_to_zip_bytes(conn, list(CATALOG_ENTITIES))
+            return _zip_response(zip_bytes, "catalogo")
+
+        if entity == "operacional-all":
+            zip_bytes = orchestrator.export_to_zip_bytes(conn, list(OPERATIONAL_ENTITIES))
+            return _zip_response(zip_bytes, "operacional")
+
+        if entity == "full":
+            zip_bytes = orchestrator.export_to_zip_bytes(conn, list(ENTITY_ORDER))
+            return _zip_response(zip_bytes, "backup-full")
 
         if entity not in ENTITY_ORDER:
             raise HTTPException(
                 400,
-                f"Entidad inválida: {entity!r}. Válidas: {list(ENTITY_ORDER)}",
+                f"Entidad inválida: {entity!r}. "
+                f"Válidas: {list(ENTITY_ORDER) + ['catalog-all', 'operacional-all', 'full']}",
             )
 
         rows = orchestrator.export_entity(conn, entity)
@@ -76,5 +91,55 @@ def export_dataio(
                 "Content-Disposition": f'attachment; filename="{entity}-{ts}.json"'
             },
         )
+    finally:
+        conn.close()
+
+
+@router.post("/admin/dataio/import")
+async def import_dataio(
+    file: UploadFile = File(...),
+    scope: Literal["operacional"] = Query(
+        "operacional",
+        description="Scope a importar. Solo 'operacional' habilitado desde UI.",
+    ),
+    dry_run: bool = Query(False, description="Simular sin commitear."),
+    _admin: dict = Depends(require_admin),
+):
+    """Importa un ZIP con JSONs de clientes/alquileres.
+
+    Por seguridad, solo se permite `scope=operacional` desde la UI.
+    El catálogo se importa automáticamente al startup desde `/data/catalog/`.
+    """
+    if scope != "operacional":
+        raise HTTPException(400, "Solo scope=operacional permitido desde UI")
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise HTTPException(400, "Solo archivos .zip permitidos")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "Archivo vacío")
+
+    conn = get_db()
+    try:
+        stats = orchestrator.import_from_zip_bytes(
+            conn,
+            content,
+            only=list(OPERATIONAL_ENTITIES),
+            dry_run=dry_run,
+        )
+        if not dry_run:
+            conn.commit()
+        return {
+            "ok": True,
+            "dry_run": dry_run,
+            "stats": stats,
+            "total_inserted": sum(s.get("inserted", 0) for s in stats.values()),
+            "total_updated": sum(s.get("updated", 0) for s in stats.values()),
+        }
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise HTTPException(400, f"Import falló: {e}")
     finally:
         conn.close()
