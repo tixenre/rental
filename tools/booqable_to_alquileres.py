@@ -240,6 +240,25 @@ def load_data(args):
         products = list(csv.DictReader(f))
     with open(args.customers, encoding="utf-8") as f:
         customers = list(csv.DictReader(f))
+    # Fallback de clientes: si --customers es una lista curada (subset), puede
+    # faltar algun cliente que SI tiene pedidos. Los recuperamos de este CSV
+    # crudo. Solo se agregan los referenciados por pedidos importables.
+    if args.customers_fallback:
+        with open(args.customers_fallback, encoding="utf-8") as f:
+            fallback = list(csv.DictReader(f))
+        curated_ids = {c["id"] for c in customers}
+        order_cust_ids = {
+            o.get("customer_id") for o in orders
+            if o.get("status") in ("stopped", "started", "reserved")
+        }
+        recovered = [
+            c for c in fallback
+            if c["id"] not in curated_ids and c["id"] in order_cust_ids
+        ]
+        if recovered:
+            print(f"  + {len(recovered)} clientes recuperados del fallback "
+                  f"(faltaban en la lista curada pero tienen pedidos)", file=sys.stderr)
+            customers = customers + recovered
     equipos = json.load(open(args.equipos, encoding="utf-8"))
     documents = []
     if args.documents:
@@ -933,7 +952,11 @@ def main() -> int:
     ap.add_argument("--orders", required=True)
     ap.add_argument("--lines", required=True)
     ap.add_argument("--products", required=True)
-    ap.add_argument("--customers", required=True)
+    ap.add_argument("--customers", required=True,
+                    help="CSV de clientes (puede ser tu lista curada)")
+    ap.add_argument("--customers-fallback", default=None,
+                    help="CSV crudo de clientes; recupera los que faltan en "
+                         "--customers pero tienen pedidos")
     ap.add_argument("--equipos", required=True)
     ap.add_argument("--documents", default=None,
                     help="documents.csv (facturas) opcional, para recuperar "
