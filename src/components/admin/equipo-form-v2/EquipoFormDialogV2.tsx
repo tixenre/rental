@@ -117,12 +117,16 @@ export function EquipoFormDialogV2({
   onSubmit,
   saving,
   onCreatedWithMissingRecommended,
+  variant = "dialog",
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial?: Equipo | null;
   onSubmit: (data: EquipoInput, etiquetas: string[]) => Promise<Equipo>;
   saving?: boolean;
+  /** "dialog" (modal, default) o "page" (editor de página completa con
+   *  2 columnas + aside + save bar fija, como el mock del handoff). */
+  variant?: "dialog" | "page";
   /** Si el equipo se creó pero le faltan recomendados, el parent decide
    *  qué hacer (ej. reabrir el form en modo edit). #351 */
   onCreatedWithMissingRecommended?: (equipo: Equipo, missing: RecommendedField[]) => void;
@@ -1046,22 +1050,8 @@ export function EquipoFormDialogV2({
     onOpenChange(next);
   };
 
-  return (
+  const formSections = (
     <>
-    <Dialog open={open} onOpenChange={handleCloseRequest}>
-      <DialogContent className="w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="font-display text-2xl">
-            {isEdit ? "Editar equipo" : "Nuevo equipo"}
-          </DialogTitle>
-          {nombrePublico && (
-            <p className="text-xs text-muted-foreground">
-              Se ve en la web como: <span className="text-ink font-medium italic">{nombrePublico}</span>
-            </p>
-          )}
-        </DialogHeader>
-
-        <form onSubmit={submit} className="space-y-5" data-equipo-form-v2>
 
           {/* ════════════════════════════════════════════════════════════════
               STATUS STRIP — switches de estado (visible + ficha completa)
@@ -1483,22 +1473,30 @@ export function EquipoFormDialogV2({
             </div>
           </CollapsibleSection>
 
-          {/* ════════════════════════════════════════════════════════════════
-              FOOTER
-          ════════════════════════════════════════════════════════════════ */}
-          <DialogFooter className="pt-2 border-t hairline">
-            <Button type="button" variant="ghost" onClick={() => handleCloseRequest(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Guardando…</> : "Guardar"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    </>
+  );
 
-    {/* Confirmación al cerrar con cambios sin guardar (#232) */}
+  const titleText = isEdit ? "Editar equipo" : "Nuevo equipo";
+  const formId = "equipo-form-v2";
+
+  const publicHint = nombrePublico ? (
+    <p className="text-xs text-muted-foreground">
+      Se ve en la web como: <span className="text-ink font-medium italic">{nombrePublico}</span>
+    </p>
+  ) : null;
+
+  const footerActions = (
+    <>
+      <Button type="button" variant="ghost" onClick={() => handleCloseRequest(false)}>
+        Cancelar
+      </Button>
+      <Button type="submit" form={formId} disabled={saving}>
+        {saving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Guardando…</> : "Guardar"}
+      </Button>
+    </>
+  );
+
+  const confirmCloseDialog = (
     <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -1521,6 +1519,86 @@ export function EquipoFormDialogV2({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+
+  // ── Variant "page": editor de página completa (mock del handoff) ──────
+  if (variant === "page") {
+    const kpiFmt = (n: unknown) =>
+      typeof n === "number" && !Number.isNaN(n) ? n.toLocaleString("es-AR") : "—";
+    return (
+      <>
+        <div className="px-4 md:px-6 py-6 pb-28 max-w-6xl mx-auto">
+          <header className="mb-6">
+            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              Inventario · Equipos
+            </div>
+            <h1 className="font-display text-3xl text-ink">{titleText}</h1>
+            {publicHint}
+          </header>
+          <div className="grid lg:[grid-template-columns:minmax(0,1fr)_320px] gap-6 items-start">
+            <form id={formId} onSubmit={submit} className="space-y-5 min-w-0" data-equipo-form-v2>
+              {formSections}
+            </form>
+            <aside className="space-y-3 lg:sticky lg:top-6">
+              <div className="rounded-lg border hairline bg-card overflow-hidden">
+                <div className="aspect-square bg-white grid place-items-center p-4">
+                  {fotoActual ? (
+                    <img src={fotoActual} alt="" className="max-h-full max-w-full object-contain" />
+                  ) : (
+                    <ImageIcon className="h-10 w-10 text-muted-foreground/30" />
+                  )}
+                </div>
+                <div className="p-3 border-t hairline">
+                  <div className="font-medium text-ink text-sm leading-tight">
+                    {form.watch("nombre") || "Equipo sin nombre"}
+                  </div>
+                  {nombrePublico && (
+                    <div className="text-xs text-muted-foreground italic mt-0.5">{nombrePublico}</div>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg border hairline bg-card px-3 py-2.5">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">$ / jornada</div>
+                  <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">${kpiFmt(form.watch("precio_jornada"))}</div>
+                </div>
+                <div className="rounded-lg border hairline bg-card px-3 py-2.5">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">% día</div>
+                  <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">{kpiFmt(form.watch("roi_pct"))}%</div>
+                </div>
+                <div className="rounded-lg border hairline bg-card px-3 py-2.5 col-span-2">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Valor reposición</div>
+                  <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">${kpiFmt(form.watch("valor_reposicion"))}</div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+        <div className="sticky bottom-0 z-20 border-t hairline bg-background/95 backdrop-blur px-4 md:px-6 py-3 flex justify-end gap-2">
+          {footerActions}
+        </div>
+        {confirmCloseDialog}
+      </>
+    );
+  }
+
+  return (
+    <>
+    <Dialog open={open} onOpenChange={handleCloseRequest}>
+      <DialogContent className="w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-display text-2xl">{titleText}</DialogTitle>
+          {publicHint}
+        </DialogHeader>
+        <form id={formId} onSubmit={submit} className="space-y-5" data-equipo-form-v2>
+          {formSections}
+          <DialogFooter className="pt-2 border-t hairline">
+            {footerActions}
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+    {confirmCloseDialog}
     </>
   );
 }

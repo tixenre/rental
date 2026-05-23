@@ -22,7 +22,6 @@ import {
 
 import { adminApi, type Equipo, type EquipoInput, type FaltaField } from "@/lib/admin/api";
 import { ActionMenu } from "@/components/mobile";
-import { EquipoFormDialogV2 as EquipoFormDialog } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
 import { AutocompletarEquipoDialog } from "@/components/admin/autocompletar";
 import { BatchAutocompletarDialog } from "@/components/admin/BatchAutocompletarDialog";
 import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquipoDialog";
@@ -92,8 +91,6 @@ function EquiposPage() {
   const setVistaPapelera = (v: boolean | ((prev: boolean) => boolean)) =>
     updateFilters({ vista_papelera: typeof v === "function" ? v(vistaPapelera) : v });
 
-  const [openForm, setOpenForm] = useState(false);
-  const [editing, setEditing] = useState<Equipo | null>(null);
   const [deleting, setDeleting] = useState<Equipo | null>(null);
   const [enriching, setEnriching] = useState<Equipo | null>(null);
   const [menuEquipo, setMenuEquipo] = useState<Equipo | null>(null);
@@ -158,30 +155,6 @@ function EquiposPage() {
   // ni close (esos los emite el form recién cuando todo el flow terminó,
   // así evitamos que el dialog se cierre mientras todavía hay requests
   // en vuelo, y que aparezcan errores parciales después del cierre).
-  const saveMut = useMutation({
-    mutationFn: async ({ data, etiquetas }: { data: EquipoInput; etiquetas: string[] }) => {
-      // Guardia anti-duplicado: si tenemos `editing` con id, SIEMPRE va por
-      // updateEquipo. Si `editing` está truthy pero sin id (estado inconsistente),
-      // abortar antes de crear un equipo nuevo por accidente — el bug clásico
-      // que dejaba duplicados en la DB.
-      if (editing) {
-        if (!editing.id) {
-          throw new Error(
-            "Estado inconsistente: el form está en modo edición pero no tiene id. " +
-            "Cerrá el dialog y reabrí el equipo.",
-          );
-        }
-        const eq = await adminApi.updateEquipo(editing.id, data);
-        await adminApi.setEtiquetas(eq.id, etiquetas);
-        return eq;
-      }
-      const eq = await adminApi.createEquipo(data);
-      await adminApi.setEtiquetas(eq.id, etiquetas);
-      return eq;
-    },
-    onSettled: () => invalidate(),
-  });
-
   const deleteMut = useMutation({
     mutationFn: (id: number) => adminApi.deleteEquipo(id),
     onSuccess: () => {
@@ -197,9 +170,8 @@ function EquiposPage() {
     onSuccess: (eq) => {
       toast.success(`Duplicado: "${eq.nombre}"`);
       invalidate();
-      // Abrir el form del duplicado para que el admin lo termine de configurar.
-      setEditing(eq);
-      setOpenForm(true);
+      // Ir al editor del duplicado para que el admin lo termine de configurar.
+      navigate({ to: "/admin/equipos/$id/editar", params: { id: String(eq.id) } });
     },
     onError: (e: Error) => toast.error(`No se pudo duplicar: ${e.message}`),
   });
@@ -306,7 +278,7 @@ function EquiposPage() {
           <Button variant="outline" onClick={() => setOpenBatch(true)} title="Buscar specs en bulk para los equipos con link de fuente">
             <Sparkles className="h-4 w-4 mr-1" /> Batch specs
           </Button>
-          <Button onClick={() => { setEditing(null); setOpenForm(true); }}>
+          <Button onClick={() => navigate({ to: "/admin/equipos/nuevo" })}>
             <Plus className="h-4 w-4 mr-1" /> Nuevo equipo
           </Button>
         </div>
@@ -684,7 +656,7 @@ function EquiposPage() {
                     <Button size="icon" variant="ghost" title="Mantenimiento" onClick={() => setMantenimientoEquipo(eq)}>
                       <Wrench className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" title="Editar" onClick={() => { setEditing(eq); setOpenForm(true); }}>
+                    <Button size="icon" variant="ghost" title="Editar" onClick={() => navigate({ to: "/admin/equipos/$id/editar", params: { id: String(eq.id) } })}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
@@ -745,7 +717,7 @@ function EquiposPage() {
           {
             label: "Editar",
             icon: <Pencil className="h-4 w-4" />,
-            onClick: () => { setEditing(menuEquipo!); setOpenForm(true); },
+            onClick: () => menuEquipo && navigate({ to: "/admin/equipos/$id/editar", params: { id: String(menuEquipo.id) } }),
           },
           {
             label: "Duplicar equipo",
@@ -760,23 +732,6 @@ function EquiposPage() {
           },
         ]}
       />
-
-      {openForm && (
-        <EquipoFormDialog
-          open={openForm}
-          onOpenChange={(v) => { setOpenForm(v); if (!v) setEditing(null); }}
-          initial={editing}
-          saving={saveMut.isPending}
-          onSubmit={(data, etiquetas) => saveMut.mutateAsync({ data, etiquetas })}
-          onCreatedWithMissingRecommended={(equipo) => {
-            // Reabrimos el form en modo edit con el equipo recién creado
-            // para que el admin pueda completar foto / descripción / etc.
-            // sin tener que buscar el equipo en la lista. #351
-            setEditing(equipo);
-            setOpenForm(true);
-          }}
-        />
-      )}
 
       {openBatch && (
         <BatchAutocompletarDialog
