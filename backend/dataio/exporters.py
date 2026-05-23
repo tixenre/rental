@@ -364,6 +364,127 @@ def export_equipo_fichas(conn) -> list[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONAL — clientes, alquileres (con items/pagos embebidos)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def export_clientes(conn) -> list[dict]:
+    rows = conn.execute("""
+        SELECT email, nombre, apellido, telefono, direccion, direccion_maps_url,
+               cuit, descuento, perfil_impuestos, razon_social, domicilio_fiscal,
+               email_facturacion, notas, supabase_uid
+        FROM clientes
+        WHERE email IS NOT NULL
+        ORDER BY LOWER(email)
+    """).fetchall()
+    out: list[dict] = []
+    for r in rows:
+        out.append(
+            schema.Cliente(
+                email=r["email"],
+                nombre=r["nombre"],
+                apellido=r["apellido"],
+                telefono=r["telefono"],
+                direccion=r["direccion"],
+                direccion_maps_url=r["direccion_maps_url"],
+                cuit=r["cuit"],
+                descuento=float(r["descuento"] or 0.0),
+                perfil_impuestos=r["perfil_impuestos"] or "consumidor_final",
+                razon_social=r["razon_social"],
+                domicilio_fiscal=r["domicilio_fiscal"],
+                email_facturacion=r["email_facturacion"],
+                notas=r["notas"],
+                supabase_uid=str(r["supabase_uid"]) if r["supabase_uid"] else None,
+            ).model_dump()
+        )
+    return out
+
+
+def export_alquileres(conn) -> list[dict]:
+    """Exporta alquileres con items y pagos embebidos.
+
+    Filtra los que no tienen numero_pedido (legacy sin nro) — no son
+    re-importables sin clave natural. Si los necesitás, generales un
+    numero_pedido antes vía un script de mantenimiento.
+    """
+    rows = conn.execute("""
+        SELECT a.numero_pedido, a.cliente_nombre, a.cliente_telefono,
+               a.estado, a.fecha_desde, a.fecha_hasta, a.monto_total,
+               a.monto_pagado, a.descuento_pct, a.notas, a.fuente,
+               a.numero_remito, a.id AS alquiler_id,
+               c.email AS cliente_email
+        FROM alquileres a
+        LEFT JOIN clientes c ON c.id = a.cliente_id
+        WHERE a.numero_pedido IS NOT NULL
+        ORDER BY a.numero_pedido
+    """).fetchall()
+    if not rows:
+        return []
+
+    alquiler_ids = [r["alquiler_id"] for r in rows]
+    # Items con equipo_slug en batch
+    items_by_alq: dict[int, list[schema.AlquilerItemRef]] = {}
+    item_rows = conn.execute("""
+        SELECT ai.pedido_id, e.slug AS equipo_slug, ai.cantidad,
+               ai.precio_jornada, ai.subtotal
+        FROM alquiler_items ai
+        JOIN equipos e ON e.id = ai.equipo_id
+        WHERE ai.pedido_id = ANY(%s) AND e.slug IS NOT NULL
+        ORDER BY ai.pedido_id, ai.id
+    """, (alquiler_ids,)).fetchall()
+    for ir in item_rows:
+        items_by_alq.setdefault(ir["pedido_id"], []).append(
+            schema.AlquilerItemRef(
+                equipo_slug=ir["equipo_slug"],
+                cantidad=int(ir["cantidad"] or 1),
+                precio_jornada=int(ir["precio_jornada"] or 0),
+                subtotal=int(ir["subtotal"] or 0),
+            )
+        )
+
+    # Pagos en batch
+    pagos_by_alq: dict[int, list[schema.AlquilerPagoRef]] = {}
+    pago_rows = conn.execute("""
+        SELECT pedido_id, monto, concepto, fecha
+        FROM alquiler_pagos
+        WHERE pedido_id = ANY(%s)
+        ORDER BY pedido_id, fecha, id
+    """, (alquiler_ids,)).fetchall()
+    for pr in pago_rows:
+        pagos_by_alq.setdefault(pr["pedido_id"], []).append(
+            schema.AlquilerPagoRef(
+                monto=int(pr["monto"]),
+                concepto=pr["concepto"],
+                fecha=_to_iso(pr["fecha"]) or "",
+            )
+        )
+
+    out: list[dict] = []
+    for r in rows:
+        alq_id = r["alquiler_id"]
+        out.append(
+            schema.Alquiler(
+                numero_pedido=int(r["numero_pedido"]),
+                cliente_email=r["cliente_email"],
+                cliente_nombre=r["cliente_nombre"],
+                cliente_telefono=r["cliente_telefono"],
+                estado=r["estado"] or "presupuesto",
+                fecha_desde=r["fecha_desde"],
+                fecha_hasta=r["fecha_hasta"],
+                monto_total=int(r["monto_total"] or 0),
+                monto_pagado=int(r["monto_pagado"] or 0),
+                descuento_pct=float(r["descuento_pct"] or 0.0),
+                notas=r["notas"],
+                fuente=r["fuente"] or "sistema",
+                numero_remito=r["numero_remito"],
+                items=items_by_alq.get(alq_id, []),
+                pagos=pagos_by_alq.get(alq_id, []),
+            ).model_dump()
+        )
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Dispatch
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -376,4 +497,6 @@ EXPORTERS = {
     "equipos": export_equipos,
     "equipo_specs": export_equipo_specs,
     "equipo_fichas": export_equipo_fichas,
+    "clientes": export_clientes,
+    "alquileres": export_alquileres,
 }
