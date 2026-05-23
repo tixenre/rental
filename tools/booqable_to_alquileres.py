@@ -543,22 +543,36 @@ def build_alquileres(orders, idx):
 def write_outputs(out_dir: Path, alquileres, placeholders, skipped, idx):
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # alquileres.json + zip
+    # alquileres.json
     alq_path = out_dir / "alquileres.json"
     alq_path.write_text(
         json.dumps(alquileres, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    zip_path = out_dir / "alquileres.zip"
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.write(alq_path, arcname="alquileres.json")
 
-    # placeholders.json
+    # placeholders.json (humano-legible para debug)
     ph_path = out_dir / "placeholders.json"
     ph_path.write_text(
         json.dumps(placeholders, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+
+    # placeholders_equipos.json: formato consumido por el endpoint
+    # /admin/dataio/import (auto-crea equipos historicos antes de alquileres).
+    # Solo slug + nombre (los otros campos default a historico/0/0).
+    ph_equipos = [{"slug": p["slug"], "nombre": p["nombre"]} for p in placeholders]
+    ph_equipos_path = out_dir / "placeholders_equipos.json"
+    ph_equipos_path.write_text(
+        json.dumps(ph_equipos, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    # ZIP: alquileres + placeholders_equipos juntos. El endpoint reconoce
+    # ambos archivos automaticamente — el operador solo sube ESTE zip.
+    zip_path = out_dir / "alquileres.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.write(alq_path, arcname="alquileres.json")
+        zf.write(ph_equipos_path, arcname="placeholders_equipos.json")
 
     # placeholders.sql (para pegar en Railway DB UI ANTES del import)
     sql_lines = [
@@ -620,19 +634,15 @@ def write_outputs(out_dir: Path, alquileres, placeholders, skipped, idx):
         f"Placeholders nuevos:         {len(placeholders)}",
         f"Pedidos saltados:            {len(skipped)}",
         f"",
-        f"=== Pasos para importar ===",
-        f"1. Crear placeholders (Railway DB UI):",
-        f"   - Abri la query box en Postgres",
-        f"   - Pega el contenido de placeholders.sql",
-        f"   - Ejecutar",
+        f"=== Pasos para importar (UN SOLO PASO) ===",
+        f"  - Andar a /admin/dataio en la web",
+        f"  - Subir alquileres.zip en la seccion 'Import operacional'",
+        f"  - El endpoint crea los {len(placeholders)} placeholders solo y bumpea",
+        f"    las secuencias automaticamente. No hace falta tocar SQL.",
         f"",
-        f"2. Import operacional (admin UI):",
-        f"   - /admin/dataio",
-        f"   - Subi alquileres.zip (scope=operacional)",
-        f"",
-        f"3. Post-import (Railway DB UI):",
-        f"   - Pega el contenido de post_import.sql",
-        f"   - Ejecutar (bumpea las secuencias para no colisionar con futuros pedidos)",
+        f"  (Los archivos placeholders.sql y post_import.sql que siguen abajo",
+        f"  son backup por si la version del backend deployada todavia no soporta",
+        f"  el flujo all-in-one — verificar fecha de deploy >= hoy)",
         f"",
     ]
     (out_dir / "report.txt").write_text("\n".join(report), encoding="utf-8")
