@@ -295,30 +295,6 @@ def listar_precios_manuales(request: Request):
 
 
 
-@router.post("/settings/fix-apellidos")
-async def fix_apellidos_duplicados(request: Request = None):
-    """
-    Limpia apellidos duplicados: si apellido == nombre, lo reemplaza con '-'.
-    Usar una sola vez después de la primera importación.
-    """
-    require_admin(request)
-    conn = get_db()
-    try:
-        result = conn.execute("""
-            UPDATE clientes
-            SET apellido = '-', updated_at = CURRENT_TIMESTAMP
-            WHERE apellido = nombre
-        """)
-        conn.commit()
-        # Contar cuántos se actualizaron
-        count = conn.execute(
-            "SELECT COUNT(*) FROM clientes WHERE apellido = '-'"
-        ).fetchone()[0]
-        return {"fixed": count, "message": "Apellidos duplicados corregidos"}
-    finally:
-        conn.close()
-
-
 # ── Upload logo a R2 ──────────────────────────────────────────────────────────
 
 def _optimize_logo(raw_content: bytes) -> tuple[bytes, str, str]:
