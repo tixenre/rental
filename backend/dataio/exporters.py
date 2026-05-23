@@ -200,10 +200,6 @@ def _ensure_equipos_slug(conn) -> None:
     changed = False
     if not has_slug:
         conn.execute("ALTER TABLE equipos ADD COLUMN slug VARCHAR(80)")
-        conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_equipos_slug_unique "
-            "ON equipos(slug) WHERE slug IS NOT NULL"
-        )
         changed = True
 
     # Poblar slugs faltantes (también cubre el caso "columna existía pero
@@ -229,6 +225,25 @@ def _ensure_equipos_slug(conn) -> None:
             existing.add(slug)
             conn.execute("UPDATE equipos SET slug = ? WHERE id = ?", (slug, r["id"]))
         changed = True
+
+    # Asegurar el UNIQUE constraint completo (consistente con migración
+    # f5b8d2e4a9c1, no el partial index transicional). Idempotente.
+    conn.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'equipos_slug_key' AND conrelid = 'equipos'::regclass
+            ) AND NOT EXISTS (
+                SELECT 1 FROM equipos WHERE slug IS NOT NULL
+                GROUP BY slug HAVING COUNT(*) > 1
+            ) THEN
+                ALTER TABLE equipos ADD CONSTRAINT equipos_slug_key UNIQUE (slug);
+                DROP INDEX IF EXISTS idx_equipos_slug_unique;
+            END IF;
+        END $$;
+    """)
+    changed = True
 
     if changed:
         conn.commit()

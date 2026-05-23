@@ -1053,6 +1053,77 @@ def init_db():
         )
     """)
 
+    # ── Reconciliación con migraciones ──────────────────────────────────────
+    # Estas tablas/columnas históricamente vivían SOLO en migraciones Alembic.
+    # Las replicamos acá (idempotente) para que init_db produzca un esquema
+    # COMPLETO aunque `alembic upgrade` falle (paso defensivo: ya ocurrió una
+    # falla silenciosa con equipos.slug). Mantener en sync con migrations/.
+
+    # descuentos por jornada (migración a3e7f1d2b8c4)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS descuentos_jornada (
+            id         SERIAL PRIMARY KEY,
+            jornadas   INTEGER NOT NULL UNIQUE,
+            pct        FLOAT   NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_jornadas_pct FLOAT DEFAULT 0")
+
+    # email infra (migración a4e8c2b9d710)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS email_templates (
+            key        TEXT PRIMARY KEY,
+            subject    TEXT NOT NULL,
+            body_html  TEXT NOT NULL,
+            body_text  TEXT NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_by TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS emails_log (
+            id           BIGSERIAL PRIMARY KEY,
+            to_addr      TEXT NOT NULL,
+            subject      TEXT NOT NULL,
+            template_key TEXT NOT NULL,
+            alquiler_id  INTEGER REFERENCES alquileres(id) ON DELETE SET NULL,
+            status       TEXT NOT NULL,
+            provider     TEXT NOT NULL,
+            provider_id  TEXT,
+            error        TEXT,
+            sent_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_log_alquiler ON emails_log(alquiler_id)")
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_emails_log_recordatorio
+        ON emails_log(alquiler_id, template_key)
+        WHERE template_key = 'recordatorio_retiro' AND status = 'sent'
+    """)
+
+    # equipos.slug (migraciones e4a7c1f8d6b2 + f5b8d2e4a9c1): columna + UNIQUE
+    # constraint completo (no partial index — ese era transicional).
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS slug VARCHAR(80)")
+    conn.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'equipos_slug_key' AND conrelid = 'equipos'::regclass
+            ) AND NOT EXISTS (
+                SELECT 1 FROM equipos WHERE slug IS NOT NULL
+                GROUP BY slug HAVING COUNT(*) > 1
+            ) THEN
+                ALTER TABLE equipos ADD CONSTRAINT equipos_slug_key UNIQUE (slug);
+            END IF;
+        END $$;
+    """)
+
+    # JSONB agregadas por migraciones (b6f8d3e5a2c1, d7c9e1f3a8b2)
+    conn.execute("ALTER TABLE solicitudes_modificacion ADD COLUMN IF NOT EXISTS cambios_json JSONB")
+    conn.execute("ALTER TABLE spec_definitions ADD COLUMN IF NOT EXISTS tabla_columnas JSONB")
+
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
 
     # Seed the sequence to the current max so nextval never collides with existing data.
