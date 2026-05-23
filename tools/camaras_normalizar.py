@@ -190,17 +190,234 @@ def clean_extras(extras: dict) -> dict:
 
 SPECS_ORDER = [
     "camera_subtipo", "lens_mount", "formato",
-    "resolucion_max", "fps_max", "codecs",
+    "resolucion_max", "fps_max", "codecs", "bit_depth",
+    "internal_recording", "recording_limit_min",
     "megapixels", "continuous_shooting_fps",
     "iso_nativo", "iso_extendido", "rango_dinamico_stops",
-    "estabilizacion", "autofocus",
+    "estabilizacion", "autofocus", "focus_points",
     "fast_slow_motion", "lens_communication",
     "gps", "ip_streaming",
     "netflix_approved",
     "max_aperture", "sensor_crop",
-    "recording_limit_min",
+    "built_in_nd", "built_in_cc", "internal_filter_holder",
+    # Exposure / shutter
+    "shutter_type", "shutter_speed", "white_balance", "gamma_curve",
+    # Display / audio
+    "display_type", "built_in_microphone",
+    "audio_io", "audio_recording",
+    # IO
+    "video_io", "power_io", "other_io", "tripod_mount", "shoe_mount",
+    # Connectivity
+    "wireless", "mobile_app_compatible",
+    # Power / physical
+    "battery", "power_consumption_w",
+    "dimensions_mm", "materials", "operating_conditions",
+    "capture_type",
     "peso_g",
 ]
+
+
+# ── Rescate de extras → specs (canonicalización) ────────────────────────
+
+def _parse_shutter_type(value) -> str | None:
+    """Mechanical+Electronic → 'Hybrid'; Global → 'Global Shutter'; etc."""
+    if not isinstance(value, str):
+        return None
+    s = value.lower()
+    has_mech = "mechanical" in s
+    has_elec = "electronic" in s or "rolling" in s
+    if has_mech and has_elec:
+        return "Hybrid"
+    if "global" in s:
+        return "Global Shutter"
+    if has_mech:
+        return "Mechanical"
+    if "rolling" in s:
+        return "Rolling Shutter"
+    if has_elec:
+        return "Electronic"
+    return None
+
+
+def _parse_wireless(value) -> list | None:
+    """String tipo 'Wi-Fi 5 (802.11ac) / Bluetooth' → ['Wi-Fi','Bluetooth']."""
+    if not isinstance(value, str):
+        return None
+    s = value.lower()
+    found = []
+    if "wi-fi" in s or "wifi" in s:
+        found.append("Wi-Fi")
+    if "bluetooth" in s:
+        found.append("Bluetooth")
+    if "nfc" in s:
+        found.append("NFC")
+    if " 5g" in s or s.startswith("5g"):
+        found.append("5G")
+    if "lte" in s or "4g" in s:
+        found.append("LTE")
+    return found or None
+
+
+def _parse_yes_no(value) -> bool | None:
+    """'Yes' / 'No' / 'Yes: Android & iOS' → True/False/None.
+
+    Si el string es descriptivo y NO empieza con yes/no (ej. "Mechanical
+    Filter Wheel with 2-Stop..." para Built-In ND de la C200), lo
+    interpretamos como TRUE (la feature está presente, descripción del cómo).
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if not isinstance(value, str):
+        return None
+    s = value.strip().lower()
+    if not s:
+        return None
+    if s.startswith("yes") or s in ("true", "1"):
+        return True
+    if s.startswith("no") or s in ("false", "0", "n/a", "none"):
+        return False
+    # String descriptivo no-vacío → asumimos true (presencia de descripción
+    # implica que la feature existe)
+    return True
+
+
+def _format_dimensiones(value) -> str | None:
+    """{largo_cm, ancho_cm, alto_cm} → '129.7 × 84.5 × 77.8 mm'."""
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, dict):
+        return None
+    L = value.get("largo_cm")
+    W = value.get("ancho_cm")
+    H = value.get("alto_cm")
+    if L is None or W is None or H is None:
+        return None
+    return f"{round(L*10, 1)} × {round(W*10, 1)} × {round(H*10, 1)} mm"
+
+
+def _coerce_number(value):
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    try:
+        s = str(value).strip()
+        return float(s) if "." in s else int(s)
+    except (ValueError, TypeError):
+        return None
+
+
+# Renames directos: extras[src] → specs[dst] sin conversión
+EXTRAS_DIRECT_RENAMES = {
+    "shutter_speed":       "shutter_speed",
+    "white_balance":       "white_balance",
+    "gamma_curve":         "gamma_curve",
+    "audio_io":            "audio_io",
+    "audio_recording":     "audio_recording",
+    "power_io":            "power_io",
+    "other_io":            "other_io",
+    "tripod_mount":        "tripod_mount",
+    "shoe_mount":          "shoe_mount",
+    "capture_type":        "capture_type",
+    "pantalla":            "display_type",
+    "operating_temp":      "operating_conditions",
+    "materiales":          "materials",
+    "bateria":             "battery",
+    "salida_video":        "video_io",
+    "processor":           "processor",
+    "time_code":           "time_code",
+}
+
+# Bool fields: extras[src] (string "Yes"/"No") → specs[dst] (bool)
+EXTRAS_BOOL_RENAMES = {
+    "built_in_nd":            "built_in_nd",
+    "built_in_cc":            "built_in_cc",
+    "internal_filter_holder": "internal_filter_holder",
+    "built_in_flash":         "built_in_flash",
+    "built_in_light":         "built_in_light",
+}
+
+
+def canonicalizar_specs(specs: dict, extras: dict) -> dict:
+    """Rescata datos de extras → specs con renames + conversiones.
+
+    Reglas:
+      - Si la key destino YA está en specs, no se pisa (specs gana).
+      - Si el valor de origen es None/"", no se transfiere.
+      - Conversiones tipadas: número, bool, enum, multi_enum, dimensiones cm→mm.
+    """
+    out = dict(specs)
+
+    # Renames directos string→string
+    for src, dst in EXTRAS_DIRECT_RENAMES.items():
+        if dst in out:
+            continue
+        v = extras.get(src)
+        if v is None or v == "":
+            continue
+        out[dst] = v
+
+    # Bool renames Yes/No → True/False
+    for src, dst in EXTRAS_BOOL_RENAMES.items():
+        if dst in out:
+            continue
+        b = _parse_yes_no(extras.get(src))
+        if b is not None:
+            out[dst] = b
+
+    # shutter_type → enum
+    if "shutter_type" not in out:
+        parsed = _parse_shutter_type(extras.get("shutter_type"))
+        if parsed:
+            out["shutter_type"] = parsed
+
+    # focus_points: af_puntos → number
+    if "focus_points" not in out:
+        n = _coerce_number(extras.get("af_puntos"))
+        if n is not None:
+            out["focus_points"] = n
+
+    # power_consumption_w: consumo_w → number
+    if "power_consumption_w" not in out:
+        n = _coerce_number(extras.get("consumo_w"))
+        if n is not None:
+            out["power_consumption_w"] = n
+
+    # built_in_microphone: presencia de string ≠ "No" → True
+    if "built_in_microphone" not in out:
+        mic = extras.get("built_in_mic")
+        if isinstance(mic, bool):
+            out["built_in_microphone"] = mic
+        elif isinstance(mic, str) and mic.strip().lower() not in ("", "no", "none"):
+            out["built_in_microphone"] = True
+
+    # mobile_app_compatible: bool desde "Yes:..."
+    if "mobile_app_compatible" not in out:
+        b = _parse_yes_no(extras.get("app_compatible_raw"))
+        if b is not None:
+            out["mobile_app_compatible"] = b
+
+    # wireless: string → multi_enum
+    if "wireless" not in out:
+        w = _parse_wireless(extras.get("wireless"))
+        if w:
+            out["wireless"] = w
+
+    # dimensions_mm: dict cm → string mm
+    if "dimensions_mm" not in out:
+        d = _format_dimensiones(extras.get("dimensiones_cm"))
+        if d:
+            out["dimensions_mm"] = d
+
+    # ISO ranges: {"min":X, "max":Y} → [X, Y] (formato 'rango' del registry)
+    for iso_key in ("iso_nativo", "iso_extendido"):
+        v = out.get(iso_key)
+        if isinstance(v, dict) and "min" in v and "max" in v:
+            out[iso_key] = [v["min"], v["max"]]
+
+    return out
 
 EXTRAS_ORDER = [
     # Imaging
@@ -282,7 +499,9 @@ def normalizar():
 
         p["marca"] = canon_brand(p.get("marca", ""))
         p["modelo"] = canon_modelo(p.get("modelo", ""))
-        p["specs"] = reorder(p.get("specs", {}), SPECS_ORDER)
+        # Rescatar extras → specs ANTES de reorder (extras se preserva tal cual)
+        rescued_specs = canonicalizar_specs(p.get("specs", {}), p.get("extras", {}))
+        p["specs"] = reorder(rescued_specs, SPECS_ORDER)
         p["extras"] = reorder(clean_extras(p.get("extras", {})), EXTRAS_ORDER)
 
         ordered = {

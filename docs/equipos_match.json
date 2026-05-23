@@ -9,10 +9,21 @@
       "skip":   "No tocar (ni crear ni actualizar). Útil para casos como kit Zeiss que se manejan distinto en DB.",
       "review": "Match sugerido pero requiere revisión manual antes de aplicar."
     },
-    "overrides": "Si el match tiene override_marca/override_modelo, el seed PISA esos campos en la DB. Útil para corregir equipos mal-etiquetados (ej. Meike etiquetado como Canon)."
+    "overrides": "Si el match tiene override_marca/override_modelo, el seed PISA esos campos en la DB. Útil para corregir equipos mal-etiquetados (ej. Meike etiquetado como Canon).",
+    "pendientes_db_sin_dataset": {
+      "descripcion": "Equipos que están en la DB (no eliminados) pero NO tenemos HTML B&H todavía. Cuando se guarde el HTML en ~/Desktop/Paginas/<categoria>/, agregar la línea correspondiente al rebuild.sh y crear entry de match acá.",
+      "Cámaras": {
+        "id=4 sony-a7-iv": "Sony a7 IV — confirmado en inventario. Falta guardar HTML B&H y agregarlo a tools/camaras_rebuild.sh."
+      }
+    }
   },
   "Cámaras": {
-    "sony_fx3":           { "action": "update", "equipo_id": 3, "_note": "Sony FX3 (visible)" },
+    "sony_fx3a":          {
+      "action": "update", "equipo_id": 3,
+      "override_marca":  "Sony",
+      "override_modelo": "FX3",
+      "_note": "Sony FX3 (id=3 en DB). El dataset B&H tiene la FX3A (revisión nueva). Specs casi idénticas; usamos las del FX3A para llenar la ficha del FX3, PERO preservamos marca/modelo como 'Sony FX3' (no renombrar a FX3A)."
+    },
     "sony_a7v":           { "action": "update", "equipo_id": 5, "_note": "Sony a7 V (visible)" },
     "sony_zve1":          { "action": "update", "equipo_id": 6, "_note": "Sony ZV-E1 (visible)" },
     "canon_c200":         { "action": "update", "equipo_id": 7, "_note": "Canon EOS C200 (visible)" },

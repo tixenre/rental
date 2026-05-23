@@ -43,12 +43,19 @@ CURADO_PATH = ROOT / "docs" / "camaras.json"
 # ── Spec mappers específicos de cámaras ────────────────────────────────
 
 def _parse_formato(secciones: dict) -> str | None:
-    """'Image Sensor' → formato canónico: Full-frame / Super 35 / APS-C / MFT / 1\""""
+    """'Image Sensor' → formato del enum del registry.
+
+    El enum (FORMATO_ENUM en backend/specs/registry.py) es:
+      "1\"", "MFT", "APS-C", "Super 35", "Full-frame", "Medium Format"
+
+    Sensores chicos de action cams (1/1.9", 1/2.3", 1/2.5") NO están en el
+    enum — devolvemos None en vez de mapearlos a "1\"" (que es sensor real
+    de 1 pulgada, mucho más grande).
+    """
     val = _find_value(secciones, "Image Sensor", "Sensor Size", "Sensor Type")
     if not val:
         return None
     v = val.lower()
-    # Patrones canónicos
     if "full-frame" in v or "full frame" in v:
         return "Full-frame"
     if "super 35" in v or "super35" in v or "s35" in v:
@@ -59,9 +66,11 @@ def _parse_formato(secciones: dict) -> str | None:
         return "MFT"
     if "medium format" in v:
         return "Medium Format"
-    if "1/1.9" in v or '1/1.9"' in v or "1/2.3" in v:
+    # 1-inch real (Sony RX100, vlogging cams premium). Distinguir de fracciones.
+    if re.search(r"\b1[\s-]?inch\b", v) or re.search(r"\b1\"(?!\s*/)", v):
         return "1\""
-    return val.strip()
+    # Sensores 1/1.9", 1/2.3", etc. → no están en el enum, retornar None
+    return None
 
 
 def _parse_megapixels(secciones: dict) -> float | None:
@@ -173,8 +182,10 @@ def _parse_fps_max(secciones: dict) -> int | None:
     # Patrón 2: "up to N fps" patterns
     for m in re.finditer(r"up\s*to\s*(\d+)\s*fps", val, re.IGNORECASE):
         all_fps.append(float(m.group(1)))
-    # Patrón 3: numero seguido de 'p' (120p, 240p) — solo si >= 24
-    for m in re.finditer(r"\b(\d{2,4})\s*p\b", val):
+    # Patrón 3: número (decimal opcional) seguido por 'p', 'i', o 'i/p'.
+    # Cubre "120p", "240p", "59.94p", "59.94i/p", "50i/p".
+    # Lookbehind previene matches dentro de decimales (98 dentro de 23.98p).
+    for m in re.finditer(r"(?<![\d.])(\d+(?:\.\d+)?)\s*(?:i/p|i|p)\b", val):
         n = float(m.group(1))
         if 24 <= n <= 1000:
             all_fps.append(n)
@@ -241,16 +252,25 @@ def _parse_codecs(secciones: dict) -> str | None:
 
 
 def _parse_iso_range(secciones: dict, kind: str = "native") -> dict | None:
-    """ISO range. kind: 'native' → 'Native: X to Y' | 'extended' → 'X to Y Extended'"""
+    """ISO range. kind:
+      'native'   → 'Native: X to Y' | 'Native in <Mode>: X to Y' | 'Standard: X to Y'
+      'extended' → 'X to Y Extended' | 'Expanded: X to Y'
+    Permite variantes:
+      - Sony Alpha: 'Native in Manual Mode:'
+      - Canon Cinema: 'Standard:' / 'Expanded:'
+    """
     val = _find_value(secciones, "ISO/Gain Sensitivity", "ISO Range") or ""
     if not val:
         return None
     if kind == "native":
-        m = re.search(r"native:\s*(\d[\d,]*)\s*to\s*(\d[\d,]*)", val, re.IGNORECASE)
+        # 'native[...]:'  o  'standard:' (Canon)
+        m = re.search(r"native[^:]*:\s*(\d[\d,]*)\s*to\s*(\d[\d,]*)", val, re.IGNORECASE)
+        if not m:
+            m = re.search(r"standard:\s*(\d[\d,]*)\s*to\s*(\d[\d,]*)", val, re.IGNORECASE)
     else:
         m = re.search(r"(\d[\d,]*)\s*to\s*(\d[\d,]*)\s*extended", val, re.IGNORECASE)
         if not m:
-            m = re.search(r"extended:?\s*(\d[\d,]*)\s*to\s*(\d[\d,]*)", val, re.IGNORECASE)
+            m = re.search(r"(?:extended|expanded):?\s*(\d[\d,]*)\s*to\s*(\d[\d,]*)", val, re.IGNORECASE)
     if m:
         lo = int(m.group(1).replace(",", ""))
         hi = int(m.group(2).replace(",", ""))
@@ -394,10 +414,33 @@ def _parse_peso_g(secciones: dict) -> int | None:
 
 
 def _parse_dimensiones_cm(secciones: dict) -> dict | None:
-    """Dimensions → {largo_cm, ancho_cm, alto_cm}"""
-    val = _find_value(secciones, "Dimensions (W x H x D)", "Dimensions", "Size") or ""
+    """Dimensions → {largo_cm, ancho_cm, alto_cm}.
+
+    Solo busca labels específicos del cuerpo principal. NO usa "Dimensions"
+    genérico ni "Size" porque matchean accesorios incluidos (caps, shoes, etc.)
+    que viven en la misma sección B&H.
+
+    Si el value tiene "Body Only" / "Without Grip" / "(body only)", prefiere
+    esa porción (las cinema cams listan varias configs: With Grip / Without).
+    """
+    val = _find_value(
+        secciones, "Dimensions (W x H x D)", "Dimensions (W x D x H)",
+        "Dimensions (LxWxH)", "Camera Dimensions",
+    ) or ""
     if not val:
         return None
+
+    # Si el value tiene múltiples configs separadas por "|" o "\n", preferir la
+    # del cuerpo solo. B&H listas "Body Only" / "(body only)" / "Without Grip".
+    parts = re.split(r"[|\n]", val)
+    body_part = None
+    for p in parts:
+        pl = p.lower()
+        if "body only" in pl or "without grip" in pl or "without cage" in pl:
+            body_part = p
+            break
+    if body_part:
+        val = body_part
     # Preferir métrico (cm o mm)
     m_cm = re.search(r"([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*cm", val, re.IGNORECASE)
     if m_cm:
@@ -516,6 +559,54 @@ def _parse_internal_storage(secciones: dict) -> str | None:
     return val.strip()
 
 
+def _parse_media_card_slots(secciones: dict) -> int | None:
+    """Cuenta cuántos slots de memoria tiene. 'Dual Slot' / 'Slot 1: ... | Slot 2:' → 2."""
+    val = _find_value(secciones, "Media/Memory Card Slot", "Recording Media") or ""
+    if not val:
+        return None
+    v = val.lower()
+    if "dual slot" in v or "two slot" in v:
+        return 2
+    slot_nums = re.findall(r"slot\s*(\d+)\s*:", v)
+    if slot_nums:
+        return max(int(n) for n in slot_nums)
+    # Sin "Slot N:" explícito → asumimos 1
+    return 1
+
+
+def _parse_bit_depth(secciones: dict) -> str | None:
+    """Bit depth derivado de 'Internal Recording' / 'Max Recording Modes' / 'Video Format'.
+
+    B&H suele incluir '10-Bit' / '12-Bit' como parte del codec/recording.
+    Ej: 'MPEG-4 AVC/XAVC S-I 4:2:2 10-Bit | 4096 x 2160 up to ...' → '10-bit'.
+
+    Regla: tomar solo matches donde el número está directamente seguido
+    por '-bit' o ' bit' (sin pipe/comma/paren en el medio) Y el número
+    está en rango realista de bit depths (8/10/12/14/16/24).
+    """
+    val = _find_value(secciones, "Internal Recording", "Max Recording Modes", "Video Format") or ""
+    if not val:
+        return None
+    # Match solo si el número está separado por máx 1 espacio y un guión opcional.
+    # Excluye matches como "2160 | Bit Depth" donde hay separadores no-whitespace.
+    valid_depths = {"8", "10", "12", "14", "16", "24"}
+    for m in re.finditer(r"\b(\d+)-bit\b", val, re.IGNORECASE):
+        if m.group(1) in valid_depths:
+            return f"{m.group(1)}-bit"
+    return None
+
+
+def _parse_internal_recording_bool(secciones: dict) -> bool | None:
+    """¿Tiene grabación interna? True si hay descripción de Internal Recording."""
+    val = _find_value(secciones, "Internal Recording")
+    if val is None:
+        return None
+    v = val.strip().lower()
+    if v in ("no", "none", "n/a", ""):
+        return False
+    return True
+
+
 def map_camara_specs(secciones: dict, title: str = "") -> dict:
     """Mapea secciones raw → spec_keys canónicos del proyecto para Cámaras.
 
@@ -569,6 +660,14 @@ def map_camara_specs(secciones: dict, title: str = "") -> dict:
 
     # Recording limits
     _add("recording_limit_min", _parse_recording_limit_min(secciones))
+
+    # Bit depth + internal recording (derivados del campo 'Internal Recording')
+    _add("bit_depth", _parse_bit_depth(secciones))
+    ir = _parse_internal_recording_bool(secciones)
+    if ir is not None: result["internal_recording"] = ir
+
+    # Storage / media
+    _add("media_card_slots", _parse_media_card_slots(secciones))
 
     # Physical
     _add("peso_g", _parse_peso_g(secciones))
@@ -715,15 +814,27 @@ def map_camara_extras(secciones: dict, title: str = "") -> dict:
         ("Effective Pixels",      "effective_pixels"),
     ]
 
+    # Campos cuyo "No" debe PRESERVARSE (son bool en el registry → mapean a false)
+    BOOL_DESTINATIONS = {
+        "built_in_nd", "built_in_cc", "internal_filter_holder",
+        "built_in_flash", "built_in_light",
+    }
+
     seen_keys = set()
     for src, dst in FIELD_MAP:
         if dst in seen_keys:
             continue  # ya capturado por otra variante de label
         v = _find_value(secciones, src)
         if v:
-            # Preservar multi-línea (B&H lista varios valores con \n)
             line = v.strip()
-            if line and line.lower() not in ("no", "n/a", "none", "1 x"):
+            low = line.lower()
+            if dst in BOOL_DESTINATIONS:
+                # Preservar Yes/No para que el normalizador los castee a bool
+                if line and low not in ("n/a", "1 x", ""):
+                    result[dst] = line
+                    seen_keys.add(dst)
+            elif line and low not in ("no", "n/a", "none", "1 x"):
+                # Preservar multi-línea (B&H lista varios valores con \n)
                 result[dst] = line
                 seen_keys.add(dst)
 
