@@ -52,9 +52,10 @@ def import_marcas(
     conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
 ) -> dict[str, int]:
     items = _validate_rows(rows, schema.Marca, "marcas")
+    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
+    # alrededor del batch, así obtenemos stats reales sin commit final.
+    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
-    if dry_run:
-        return stats
     for m in items:
         cur = conn.execute(
             """
@@ -88,9 +89,10 @@ def import_categorias(
     conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
 ) -> dict[str, int]:
     items = _validate_rows(rows, schema.Categoria, "categorias")
+    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
+    # alrededor del batch, así obtenemos stats reales sin commit final.
+    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
-    if dry_run:
-        return stats
 
     # Pase 1: insertar raíces (parent_path IS None) y todas las categorías
     # con upsert simple, sin parent_id.
@@ -149,9 +151,10 @@ def import_etiquetas(
     conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
 ) -> dict[str, int]:
     items = _validate_rows(rows, schema.Etiqueta, "etiquetas")
+    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
+    # alrededor del batch, así obtenemos stats reales sin commit final.
+    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
-    if dry_run:
-        return stats
     for e in items:
         cur = conn.execute(
             """
@@ -180,9 +183,10 @@ def import_spec_definitions(
     conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
 ) -> dict[str, int]:
     items = _validate_rows(rows, schema.SpecDefinition, "spec_definitions")
+    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
+    # alrededor del batch, así obtenemos stats reales sin commit final.
+    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
-    if dry_run:
-        return stats
     import json as _json
 
     for sd in items:
@@ -318,9 +322,10 @@ def import_categoria_spec_templates(
     items = _validate_rows(
         rows, schema.CategoriaSpecTemplate, "categoria_spec_templates"
     )
+    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
+    # alrededor del batch, así obtenemos stats reales sin commit final.
+    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
-    if dry_run:
-        return stats
     for t in items:
         cat_id = resolver.categoria_id(t.categoria_nombre)
         if cat_id is None:
@@ -384,9 +389,10 @@ def import_equipos(
             estén en el JSON. Default False (preserva custom).
     """
     items = _validate_rows(rows, schema.Equipo, "equipos")
+    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
+    # alrededor del batch, así obtenemos stats reales sin commit final.
+    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
-    if dry_run:
-        return stats
 
     for eq in items:
         brand_id = resolver.marca_id(eq.marca_nombre)
@@ -516,9 +522,10 @@ def import_equipo_specs(
     conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
 ) -> dict[str, int]:
     items = _validate_rows(rows, schema.EquipoSpec, "equipo_specs")
+    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
+    # alrededor del batch, así obtenemos stats reales sin commit final.
+    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
-    if dry_run:
-        return stats
     for es in items:
         equipo_id = resolver.equipo_id(es.equipo_slug)
         if equipo_id is None:
@@ -560,9 +567,10 @@ def import_equipo_fichas(
     conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
 ) -> dict[str, int]:
     items = _validate_rows(rows, schema.EquipoFicha, "equipo_fichas")
+    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
+    # alrededor del batch, así obtenemos stats reales sin commit final.
+    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
-    if dry_run:
-        return stats
     for f in items:
         equipo_id = resolver.equipo_id(f.equipo_slug)
         if equipo_id is None:

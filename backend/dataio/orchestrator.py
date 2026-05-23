@@ -220,6 +220,81 @@ def diff_all(
     return out
 
 
+def init_slugs(conn, dry_run: bool = False) -> dict[str, int]:
+    """Puebla `equipos.slug` para filas existentes que tengan slug NULL.
+
+    Idempotente: si todos los equipos ya tienen slug, no hace nada.
+    Genera slug a partir de `slugify(marca + modelo)` con fallback a
+    `nombre` y desambiguación con sufijos (-2, -3, -id<id>).
+
+    Returns: {"updated": N, "disambiguated": M, "already_had": K}
+    """
+    from .slug import equipo_slug
+
+    stats = {"updated": 0, "disambiguated": 0, "already_had": 0}
+    rows = conn.execute(
+        "SELECT id, nombre, marca, modelo FROM equipos WHERE slug IS NULL"
+    ).fetchall()
+    if not rows:
+        # Reportar cuántos ya tienen slug (info útil para logs).
+        r = conn.execute(
+            "SELECT COUNT(*) AS n FROM equipos WHERE slug IS NOT NULL"
+        ).fetchone()
+        stats["already_had"] = int(r["n"] or 0)
+        return stats
+
+    used_slugs = {
+        r["slug"]
+        for r in conn.execute(
+            "SELECT slug FROM equipos WHERE slug IS NOT NULL"
+        ).fetchall()
+    }
+    stats["already_had"] = len(used_slugs)
+
+    for r in rows:
+        base = equipo_slug(r["marca"], r["modelo"], r["nombre"])
+        if not base:
+            base = f"equipo-{r['id']}"
+        slug = base
+        i = 2
+        disamb = False
+        while slug in used_slugs:
+            slug = f"{base}-{i}"
+            i += 1
+            disamb = True
+            if i > 100:
+                slug = f"{base}-id{r['id']}"
+                break
+        if not dry_run:
+            conn.execute(
+                "UPDATE equipos SET slug = ? WHERE id = ?", (slug, r["id"])
+            )
+        used_slugs.add(slug)
+        stats["updated"] += 1
+        if disamb:
+            stats["disambiguated"] += 1
+    return stats
+
+
+def has_catalog_data(in_dir: Path | None = None) -> bool:
+    """Devuelve True si /data/catalog/ existe y tiene al menos un equipo.
+
+    Usado por el startup para decidir si correr `dataio.import_all()` o
+    fallback a los seeds viejos durante la transición.
+    """
+    src = in_dir or DATA_DIR
+    if not src.exists():
+        return False
+    eq_path = entity_path("equipos", src)
+    if not eq_path.exists():
+        return False
+    try:
+        rows = _read_entity_json(eq_path)
+        return len(rows) > 0
+    except Exception:
+        return False
+
+
 def validate_dir(in_dir: Path | None = None) -> dict[str, int]:
     """Solo valida que los JSONs parseen y matcheen el schema. No toca DB.
 

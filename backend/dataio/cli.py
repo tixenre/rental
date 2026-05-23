@@ -141,70 +141,22 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def cmd_init_slugs(args: argparse.Namespace) -> int:
-    """One-shot: puebla `equipos.slug` para filas existentes.
-
-    Respeta `docs/equipos_match.json` para preservar IDs históricos
-    (no toca IDs, solo escribe el slug). Si hay colisión, agrega sufijo
-    -2, -3, etc. con el id como último recurso.
-    """
-    from .slug import equipo_slug
-
+    """One-shot: puebla `equipos.slug` para filas existentes."""
     conn = _get_conn()
     try:
-        rows = conn.execute(
-            "SELECT id, nombre, marca, modelo FROM equipos WHERE slug IS NULL"
-        ).fetchall()
-        if not rows:
-            print("  Todos los equipos ya tienen slug. Nada que hacer.")
-            return 0
-
-        used_slugs = {
-            r["slug"]
-            for r in conn.execute(
-                "SELECT slug FROM equipos WHERE slug IS NOT NULL"
-            ).fetchall()
-        }
-
-        n_updated = 0
-        n_disambiguated = 0
-        for r in rows:
-            base = equipo_slug(r["marca"], r["modelo"], r["nombre"])
-            if not base:
-                base = f"equipo-{r['id']}"
-
-            slug = base
-            i = 2
-            disamb = False
-            while slug in used_slugs:
-                slug = f"{base}-{i}"
-                i += 1
-                disamb = True
-                if i > 100:
-                    slug = f"{base}-id{r['id']}"
-                    break
-
-            if args.dry_run:
-                print(f"  [dry-run] equipo {r['id']} → slug='{slug}'")
-            else:
-                conn.execute(
-                    "UPDATE equipos SET slug = ? WHERE id = ?", (slug, r["id"])
-                )
-            used_slugs.add(slug)
-            n_updated += 1
-            if disamb:
-                n_disambiguated += 1
-
+        stats = orchestrator.init_slugs(conn, dry_run=args.dry_run)
         if not args.dry_run:
             conn.commit()
-        print(f"\n═ init-slugs terminado {'(DRY-RUN)' if args.dry_run else ''} ═")
-        print(f"  Equipos actualizados: {n_updated}")
-        print(f"  Con desambiguación:   {n_disambiguated}")
     except Exception as e:
         conn.rollback()
         print(f"\n✗ init-slugs falló: {e}", file=sys.stderr)
         return 1
     finally:
         conn.close()
+    print(f"\n═ init-slugs terminado {'(DRY-RUN)' if args.dry_run else ''} ═")
+    print(f"  Equipos ya con slug:  {stats['already_had']}")
+    print(f"  Equipos actualizados: {stats['updated']}")
+    print(f"  Con desambiguación:   {stats['disambiguated']}")
     return 0
 
 

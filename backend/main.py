@@ -222,22 +222,13 @@ def _run_alembic_migrations() -> None:
     command.upgrade(cfg, "head")
 
 
-def init_db_bg():
-    try:
-        init_db()
-        logger.info("BD PostgreSQL inicializada")
-    except Exception as e:
-        logger.error("No se pudo inicializar BD: %s. La app continuará — verificar DATABASE_URL.", e, exc_info=True)
-        return  # Si init_db falló, no tiene sentido correr alembic.
+def _run_legacy_seeds() -> None:
+    """Fallback: corre los seeds .py históricos (registry + per-cat).
 
-    try:
-        _run_alembic_migrations()
-        logger.info("Migraciones Alembic al día")
-    except Exception as e:
-        logger.error("Falló alembic upgrade: %s. La app sigue arrancando — revisar manualmente.", e, exc_info=True)
-
-    # Seed de specs DESPUÉS de alembic — corre el registry seeder por cada
-    # categoría declarada en backend/specs/registry.py. Idempotente.
+    Se invoca solo cuando `/data/catalog/` no existe o está vacío. Una vez
+    que cada ambiente tiene los JSONs commiteados, este path se elimina
+    junto con `backend/seeds/*.py` (PR de Fase 3).
+    """
     try:
         from database import get_db
         from seeds.registry_seeder import seed_all_categorias
@@ -257,13 +248,6 @@ def init_db_bg():
     except Exception as e:
         logger.warning("Registry seeder falló (no crítico): %s", e)
 
-    # Per-cat seeds: pueblan `equipo_specs` (valores) y sub-cats dinámicas
-    # (Monturas, diámetros) que el registry no declara. Idempotentes:
-    # ON CONFLICT (equipo_id, spec_def_id) DO UPDATE en equipo_specs,
-    # docs/equipos_match.json preserva equipo.id para FKs de pedidos.
-    # Sin esto, la migración c1f9e5d3b7a8 (que wipea equipo_specs) deja la
-    # DB con specs vacíos hasta que un humano corra `python -m backend.seeds.*`
-    # a mano en la shell de Railway.
     _PER_CAT_SEEDS = [
         ("camaras",     "seed_camaras"),
         ("lentes",      "seed_lentes"),
@@ -294,6 +278,78 @@ def init_db_bg():
                 conn.close()
         except Exception as e:
             logger.warning("Seed %s falló (no crítico, sigue resto): %s", modname, e)
+
+
+def init_db_bg():
+    try:
+        init_db()
+        logger.info("BD PostgreSQL inicializada")
+    except Exception as e:
+        logger.error("No se pudo inicializar BD: %s. La app continuará — verificar DATABASE_URL.", e, exc_info=True)
+        return  # Si init_db falló, no tiene sentido correr alembic.
+
+    try:
+        _run_alembic_migrations()
+        logger.info("Migraciones Alembic al día")
+    except Exception as e:
+        logger.error("Falló alembic upgrade: %s. La app sigue arrancando — revisar manualmente.", e, exc_info=True)
+
+    # Paso intermedio: poblar `equipos.slug` para filas existentes que no
+    # lo tengan (post migración f5b8d2e4a9c1). Idempotente. Necesario antes
+    # de correr `dataio.import_all`, que upsert-ea por slug.
+    try:
+        from database import get_db
+        from dataio import orchestrator as dataio_orch
+        conn = get_db()
+        try:
+            slug_stats = dataio_orch.init_slugs(conn)
+            conn.commit()
+            if slug_stats["updated"] > 0:
+                logger.info(
+                    "init-slugs: %d equipos actualizados (%d con desambiguación), %d ya tenían",
+                    slug_stats["updated"],
+                    slug_stats["disambiguated"],
+                    slug_stats["already_had"],
+                )
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning("init-slugs falló (no crítico): %s", e)
+
+    # Catálogo: si `/data/catalog/` tiene los JSONs versionados, usar el
+    # módulo `dataio` (fuente de verdad nueva). Si no existe o está vacío,
+    # fallback a los seeds .py viejos para mantener la app funcionando
+    # durante la transición. La PR de Fase 3 eliminará el fallback.
+    try:
+        from database import get_db
+        from dataio import orchestrator as dataio_orch
+        if dataio_orch.has_catalog_data():
+            conn = get_db()
+            try:
+                stats = dataio_orch.import_all(conn)
+                conn.commit()
+                total_ins = sum(s.get("inserted", 0) for s in stats.values())
+                total_upd = sum(s.get("updated", 0) for s in stats.values())
+                logger.info(
+                    "dataio.import_all OK: +%d inserts, ~%d updates desde /data/catalog/",
+                    total_ins, total_upd,
+                )
+            finally:
+                conn.close()
+        else:
+            logger.info(
+                "dataio.import_all: /data/catalog/ vacío o ausente, fallback a seeds .py"
+            )
+            _run_legacy_seeds()
+    except Exception as e:
+        logger.error(
+            "dataio.import_all falló: %s. Intentando fallback a seeds .py.", e,
+            exc_info=True,
+        )
+        try:
+            _run_legacy_seeds()
+        except Exception as e2:
+            logger.error("Fallback seeds .py también falló: %s", e2, exc_info=True)
 
     # Auto-run del ranking si nunca corrió (popularidad_score=0 en todos
     # los equipos). Después de eso, queda en manos del admin desde
