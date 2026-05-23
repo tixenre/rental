@@ -25,7 +25,7 @@ import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const POPULAR_CHIPS = ["Sony FX3", "Aputure 600d", "RØDE", "Pack boda", "Pack entrevista"];
+const POPULAR_CHIPS = ["Pack boda", "Pack entrevista", "Sony FX3", "Aputure 600d", "RØDE NTG", "Pack 3 LEDs", "Manfrotto"];
 
 type IndexSearch = {
   /** Modo de visualización compartible por URL. `?view=grid` o `?view=list`. */
@@ -205,6 +205,12 @@ function Index() {
   // para las fechas pickeadas). Solo tiene efecto cuando hay rango de fechas
   // — sin fechas, `disponible` queda undefined y todos pasan.
   const [disponiblesOnly, setDisponiblesOnly] = useState(false);
+  // Scroll-feel: `scrolled` se activa cuando el hero se tiñó >65% (mismo
+  // umbral que el snap del topbar) → retinta el cat-bar para que combine con
+  // el topbar amber. `spyCat` resalta el tab de la categoría en viewport
+  // (scroll-spy) en modo browse, sin filtrar.
+  const [scrolled, setScrolled] = useState(false);
+  const [spyCat, setSpyCat] = useState<string | null>(null);
 
   const toggleCat = (c: string) => {
     setSelectedCats((prev) => {
@@ -291,6 +297,7 @@ function Index() {
       const heroH = hero.offsetHeight;
       const pct = heroH > 0 ? Math.min(100, Math.round((window.scrollY / heroH) * 100)) : 0;
       document.documentElement.style.setProperty("--amber-pct", pct + "%");
+      setScrolled((prev) => (prev === pct >= 65 ? prev : pct >= 65));
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
@@ -299,6 +306,30 @@ function Index() {
       document.documentElement.style.setProperty("--amber-pct", "0%");
     };
   }, []);
+
+  // Scroll-spy: en modo browse (grid, sin filtro ni búsqueda) resalta el tab
+  // de la categoría que está en viewport. No filtra — solo actualiza `spyCat`.
+  const browseMode = mode === "grid" && selectedCats.size === 0 && !query.trim();
+  useEffect(() => {
+    if (!browseMode) {
+      setSpyCat(null);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const cat = (entry.target as HTMLElement).dataset.cat;
+            if (cat) setSpyCat(cat);
+          }
+        }
+      },
+      { rootMargin: "-40% 0px -55% 0px" },
+    );
+    const sections = document.querySelectorAll("[data-cat-section]");
+    sections.forEach((s) => observer.observe(s));
+    return () => observer.disconnect();
+  }, [browseMode, allEquipos.length]);
 
   return (
     <PublicLayout topBar={{ amberOnScroll: true }}>
@@ -343,8 +374,17 @@ function Index() {
           </div>
         </section>
 
-        {/* Toggle Modo + búsqueda sticky */}
-        <div className="sticky top-14 sm:top-[69px] z-30 border-b hairline bg-background">
+        {/* Toggle Modo + búsqueda sticky. Al scrollear >65% (mismo umbral que
+            el snap del topbar) se retinta de amber soft para combinar con el
+            topbar teñido en vez de quedar como una barra blanca "rota". */}
+        <div
+          className="sticky top-14 sm:top-[69px] z-30 border-b hairline backdrop-blur-xl transition-colors"
+          style={{
+            background: scrolled
+              ? "color-mix(in oklch, var(--amber) 20%, var(--background))"
+              : "var(--background)",
+          }}
+        >
           {/* Mobile */}
           <div className="sm:hidden px-3 py-3">
             <MobileStickyBar
@@ -381,22 +421,26 @@ function Index() {
                 onChange={setMode}
               />
 
-              <div className="flex-1" />
-
-              {/* Buscador en la derecha del cat-bar */}
-              <div className="relative shrink-0 w-72">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              {/* Buscador protagonista — crece hasta 520px y se alinea a la
+                  derecha (design handoff §3.1). */}
+              <div className="relative ml-auto w-full max-w-[520px]">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar equipo, marca…"
-                  className="w-full rounded-full border hairline bg-surface py-1.5 pl-8 pr-7 text-sm placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
+                  placeholder="Buscar equipo, marca o categoría…"
+                  style={
+                    scrolled
+                      ? { background: "color-mix(in oklch, var(--amber) 30%, white)" }
+                      : undefined
+                  }
+                  className="w-full rounded-full border hairline bg-surface py-2.5 pl-11 pr-9 text-sm font-medium placeholder:font-normal placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
                 />
                 {query && (
                   <button
                     onClick={() => setQuery("")}
                     aria-label="Limpiar"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -408,8 +452,11 @@ function Index() {
             <div className="flex items-center gap-3 pl-4 pr-6 overflow-x-auto scrollbar-none">
               <div className="flex shrink-0">
                 {["Todo", ...apiCategories].map((cat) => {
-                  const isActive =
-                    cat === "Todo"
+                  // En browse mode el highlight sigue al scroll-spy (spyCat),
+                  // sin filtrar; al filtrar/buscar vuelve a basarse en selectedCats.
+                  const isActive = browseMode
+                    ? cat === (spyCat ?? "Todo")
+                    : cat === "Todo"
                       ? selectedCats.size === 0
                       : selectedCats.has(cat);
                   const count =
@@ -728,7 +775,7 @@ function GridMode({
         }
 
         return (
-          <div key={c} id={`cat-${c}`} className="scroll-mt-40">
+          <div key={c} id={`cat-${c}`} data-cat-section data-cat={c} className="scroll-mt-40">
             <CarouselRow
               title={c}
               count={items.length}
