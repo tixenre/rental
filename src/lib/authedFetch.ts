@@ -32,7 +32,22 @@ export async function authedJson<T>(path: string, init: AuthedFetchInit = {}): P
     let message = "";
     try {
       const parsed = JSON.parse(text);
-      message = parsed?.detail ?? parsed?.message ?? "";
+      const detail = parsed?.detail ?? parsed?.message ?? "";
+      // FastAPI a veces devuelve detail como string, otras como objeto
+      // estructurado (ej. {"errores": [...]}). Sin esto el toast queda
+      // como "[object Object]" y no se ve el error real.
+      if (typeof detail === "string") {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        message = detail.join("; ");
+      } else if (detail && typeof detail === "object") {
+        const errs = (detail as { errores?: unknown }).errores;
+        if (Array.isArray(errs)) {
+          message = errs.join("; ");
+        } else {
+          message = JSON.stringify(detail);
+        }
+      }
     } catch {
       // No era JSON. Tomar las primeras líneas, sin tags HTML, y truncar.
       message = text
