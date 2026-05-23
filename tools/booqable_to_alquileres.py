@@ -464,6 +464,13 @@ def build_alquileres(orders, idx):
 
         items = []
         for l in useful_lines:
+            subtotal_ars = cents_to_ars(l.get("price_in_cents"))
+            # Per decision del operador: items no cobrados (subtotal=0) se
+            # ignoran completamente — son accesorios "free" dentro de combos
+            # o items random sin valor comercial. No generan placeholder ni
+            # alquiler_item.
+            if subtotal_ars <= 0:
+                continue
             equipo_slug, qty_mult = resolve_equipo(l, idx, placeholders)
             if equipo_slug is None:
                 continue
@@ -473,7 +480,6 @@ def build_alquileres(orders, idx):
                 cantidad = 1
             cantidad *= qty_mult
             precio_each_ars = cents_to_ars(l.get("price_each_in_cents"))
-            subtotal_ars = cents_to_ars(l.get("price_in_cents"))
             if qty_mult > 1:
                 # Si expandimos un kit, el precio unitario baja proporcionalmente
                 precio_each_ars = precio_each_ars // qty_mult if precio_each_ars else 0
