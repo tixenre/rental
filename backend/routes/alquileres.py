@@ -1136,7 +1136,10 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
 
             if d0 >= d1:
                 raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
-            if d0 < hoy:
+            # Históricos importados tienen fechas en el pasado por diseño. El
+            # frontend manda fecha_desde junto con cualquier cambio (ej. solo
+            # el descuento), así que sin este bypass no se podría editar nada.
+            if d0 < hoy and not _es_historico(p["fuente"]):
                 raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 
     if not payload:

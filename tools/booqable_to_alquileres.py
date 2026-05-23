@@ -663,37 +663,53 @@ def build_alquileres(orders, idx):
             o.get("grand_total_with_tax_in_cents") or o.get("grand_total_in_cents")
         )
 
-        # Lineas en 3 niveles de fallback para no perder detalle:
-        #   1. order-lines (lo normal)
-        #   2. document-lines (factura, si el pedido no tiene order-lines)
-        #   3. plannings (reserva fisica, ultimo recurso)
-        all_lines = idx["lines_by_order"].get(o["id"], [])
-        fuente_lineas = "order-lines"
-        if not all_lines:
-            all_lines = idx.get("doclines_by_order", {}).get(o["id"], [])
-            fuente_lineas = "doc-lines"
-        if not all_lines:
-            all_lines = idx.get("planlines_by_order", {}).get(o["id"], [])
-            fuente_lineas = "plannings"
-        useful_lines = [
-            l for l in all_lines
-            if l["id"] not in idx["parent_ids_with_kids"]
+        # ── Paso 1: componer items mergeando PLANNINGS + charge-lines ───────
+        # Los `lines` (charge) exportados de Booqable son INCOMPLETOS para
+        # varios pedidos (ej. #507 tiene 4 productos pero solo 1 charge-line).
+        # Los PLANNINGS (reservas fisicas) siempre reflejan los productos
+        # trackeados reservados (== item_count), asi que son la fuente
+        # confiable de composicion. Las charge-lines aportan: (a) items
+        # custom/no-trackeados sin planning (ej. "Sopapa"), (b) hints de
+        # precio. Mergeamos dedupeando por item_id para no doble-contar.
+        #
+        # Peso para distribuir el grand_total: base_price del producto (para
+        # plannings) o price_in (para charge-lines). El grand_total real
+        # absorbe descuentos, asi que sum(subtotales) == lo que se cobro.
+        plan_lines = idx.get("planlines_by_order", {}).get(o["id"], [])
+        charge_lines = idx["lines_by_order"].get(o["id"], [])
+        if not charge_lines:
+            charge_lines = idx.get("doclines_by_order", {}).get(o["id"], [])
+        charge_lines = [
+            l for l in charge_lines if l["id"] not in idx["parent_ids_with_kids"]
         ]
 
-        # ── Paso 1: resolver cada linea a equipo + peso ─────────────────────
-        # Consolidamos por equipo_slug: si el mismo equipo aparece en varias
-        # lineas (ej. 2 unidades del mismo lente), se suman cantidad y peso.
-        #
-        # Peso para distribuir el grand_total:
-        #   - price_in si > 0 (lo normal)
-        #   - si price_in == 0 PERO la linea es hijo de un combo, usamos el
-        #     base_price del producto. Razon: en las facturas, el combo padre
-        #     lleva el precio y los hijos quedan en 0, pero los hijos SON el
-        #     equipo real rentado — no hay que perderlos.
-        #   - si price_in == 0 y NO es hijo de combo → accesorio "free"
-        #     standalone, se ignora (decision del operador).
         by_slug: dict[str, dict] = {}
-        for l in useful_lines:
+        covered_item_ids: set[str] = set()
+
+        # (a) Plannings → composicion confiable (peso = base_price * qty).
+        for pl in plan_lines:
+            item_id = pl.get("item_id")
+            try:
+                cantidad = max(1, int(pl.get("quantity") or "1"))
+            except ValueError:
+                cantidad = 1
+            peso = cents_to_ars(pl.get("price_in_cents")) or 1  # base_price*qty
+            equipo_slug, qty_mult = resolve_equipo(pl, idx, placeholders)
+            if equipo_slug is None:
+                continue
+            if item_id:
+                covered_item_ids.add(item_id)
+            cantidad *= qty_mult
+            agg = by_slug.setdefault(equipo_slug, {"cantidad": 0, "peso": 0})
+            agg["cantidad"] += cantidad
+            agg["peso"] += peso
+
+        # (b) Charge-lines → items sin planning (custom/no-trackeados). Las que
+        # duplican un planning (mismo item_id) se saltan: evita doble-conteo.
+        for l in charge_lines:
+            item_id = l.get("item_id")
+            if item_id and item_id in covered_item_ids:
+                continue  # ya cubierto por un planning
             price_in = cents_to_ars(l.get("price_in_cents"))
             es_hijo_combo = bool(l.get("parent_line_id"))
             try:
@@ -703,9 +719,9 @@ def build_alquileres(orders, idx):
             if price_in > 0:
                 peso = price_in
             elif es_hijo_combo:
-                prod = idx["prod_by_id"].get(l.get("item_id"))
+                prod = idx["prod_by_id"].get(item_id)
                 base = cents_to_ars((prod or {}).get("base_price_in_cents"))
-                peso = (base * cantidad) if base > 0 else 1  # peso minimo: no perderlo
+                peso = (base * cantidad) if base > 0 else 1
             else:
                 continue  # standalone sin precio → free accessory
             equipo_slug, qty_mult = resolve_equipo(l, idx, placeholders)
