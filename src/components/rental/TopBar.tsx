@@ -87,7 +87,14 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
           <div className="flex items-center md:hidden">
             <div className="w-10" />
             <div className="flex-1 flex justify-center">
-              <Logo size="md" linkTo="/" />
+              <Logo
+                size="md"
+                linkTo="/"
+                className={cn(
+                  "transition-[filter] duration-150",
+                  snapped && "[filter:brightness(0)_invert(1)]",
+                )}
+              />
             </div>
             <Link
               to="/cliente"
@@ -98,9 +105,17 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
             </Link>
           </div>
 
-          {/* Desktop col izquierda: logo */}
+          {/* Desktop col izquierda: logo. Al snapear (topbar amber) el logo
+              se invierte a blanco para leerse sobre el fondo amarillo. */}
           <div className="hidden md:flex items-center shrink-0">
-            <Logo size="md" linkTo="/" />
+            <Logo
+              size="md"
+              linkTo="/"
+              className={cn(
+                "transition-[filter] duration-150",
+                snapped && "[filter:brightness(0)_invert(1)]",
+              )}
+            />
           </div>
 
           {/* Desktop col central: pill de fechas */}

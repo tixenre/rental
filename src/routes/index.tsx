@@ -414,7 +414,7 @@ function Index() {
             <div className="flex items-center gap-4 px-6 py-2.5 border-b hairline">
               <ViewToggle
                 options={[
-                  { value: "grid" as Mode, label: "Explorar", icon: <LayoutGrid className="h-3 w-3" /> },
+                  { value: "grid" as Mode, label: "Grid", icon: <LayoutGrid className="h-3 w-3" /> },
                   { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
                 ]}
                 value={mode}
