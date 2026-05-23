@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { clienteApi } from "@/lib/cliente/api";
 import { PublicLayout } from "@/components/rental/PublicLayout";
@@ -245,9 +245,9 @@ export default function ClientePortal() {
   if (loading) {
     return (
       <PublicLayout topBar={{ variant: "cliente" }}>
-        <div className="max-w-[760px] mx-auto px-6 pt-8 pb-20">
-          <div className="grid grid-cols-3 gap-2 sm:gap-2.5 mb-8">
-            {[0, 1, 2].map((i) => (
+        <div className="w-full px-5 lg:px-12 xl:px-[72px] pt-8 pb-20">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-9">
+            {[0, 1, 2, 3].map((i) => (
               <div key={i} className="h-[88px] rounded-md border hairline bg-muted/30 animate-pulse" />
             ))}
           </div>
@@ -271,6 +271,19 @@ export default function ClientePortal() {
   );
   const historico = pedidos.filter((p) => HIST_STATES.has(p.estado)).length;
 
+  // Próximo evento: el retiro o devolución futuro más cercano entre los activos.
+  const ahora = Date.now();
+  const proximo = activosPedidos
+    .flatMap((p) => {
+      const ev: { ts: number; iso: string; tipo: string }[] = [];
+      const d = p.fecha_desde ? new Date(p.fecha_desde).getTime() : NaN;
+      const h = p.fecha_hasta ? new Date(p.fecha_hasta).getTime() : NaN;
+      if (!Number.isNaN(d) && d >= ahora) ev.push({ ts: d, iso: p.fecha_desde!, tipo: "retiro" });
+      if (!Number.isNaN(h) && h >= ahora) ev.push({ ts: h, iso: p.fecha_hasta!, tipo: "devolución" });
+      return ev;
+    })
+    .sort((a, b) => a.ts - b.ts)[0];
+
   const counts: Record<Filtro, number> = {
     todos: pedidos.length,
     activos: activosPedidos.length,
@@ -287,7 +300,7 @@ export default function ClientePortal() {
       }}
     >
       <div className="bg-amber border-b border-[color-mix(in_oklch,var(--ink)_12%,transparent)]">
-        <div className="max-w-[760px] mx-auto px-6 pt-9 pb-10">
+        <div className="w-full px-5 lg:px-12 xl:px-[72px] pt-9 pb-10">
           <div className="font-mono text-[10px] uppercase tracking-[0.26em] text-ink/60">
             Portal de clientes
           </div>
@@ -300,13 +313,18 @@ export default function ClientePortal() {
         </div>
       </div>
 
-      <div className="max-w-[760px] mx-auto px-6 pt-8 pb-20">
+      <div className="w-full px-5 lg:px-12 xl:px-[72px] pt-8 pb-20">
         {pedidos.length > 0 && (
-          <div className="grid grid-cols-3 gap-2 sm:gap-2.5 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-9">
             <StatCard
               label="Activos"
               value={String(activosPedidos.length)}
               meta={`${fmt(totalActivos)} en rentals`}
+            />
+            <StatCard
+              label="Próximo"
+              value={proximo ? fmtDate(proximo.iso) : "—"}
+              meta={proximo ? proximo.tipo : "sin fechas próximas"}
             />
             <StatCard
               label="A pagar"
@@ -511,6 +529,25 @@ function PedidoCard({
   const { documentos_disponibles: docs } = pedido;
   const numero = pedido.numero_pedido ?? pedido.id;
   const jornadas = jornadasEntre(pedido.fecha_desde, pedido.fecha_hasta);
+  const tlCurrent = buildTimelineSteps(pedido).find((s) => s.state === "current");
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Al colapsar, la página pierde alto y el scroll se clampea saltando arriba.
+  // Capturamos el top del head antes del toggle y compensamos con scrollBy en
+  // el próximo frame para que la card quede en la misma posición visual.
+  function handleToggle() {
+    if (expanded && cardRef.current) {
+      const before = cardRef.current.getBoundingClientRect().top;
+      onToggle();
+      requestAnimationFrame(() => {
+        if (!cardRef.current) return;
+        const after = cardRef.current.getBoundingClientRect().top;
+        if (after !== before) window.scrollBy(0, after - before);
+      });
+    } else {
+      onToggle();
+    }
+  }
 
   const [askCancel, setAskCancel] = useState(false);
   const pendiente = (pedido.solicitudes ?? []).find((s) => s.estado === "pendiente");
@@ -563,6 +600,7 @@ function PedidoCard({
 
   return (
     <div
+      ref={cardRef}
       id={`pedido-${pedido.id}`}
       className={cn(
         "rounded-xl border bg-surface overflow-hidden transition-[border-color,box-shadow] scroll-mt-4",
@@ -574,7 +612,7 @@ function PedidoCard({
       <div className="flex items-stretch">
         <button
           type="button"
-          onClick={onToggle}
+          onClick={handleToggle}
           className="flex-1 min-w-0 flex items-center gap-3.5 px-4 sm:px-[18px] py-3.5 transition hover:bg-[color-mix(in_oklch,var(--ink)_2%,transparent)] text-left"
         >
           <span className="font-mono text-[11px] font-bold text-ink tracking-[0.05em]">
@@ -624,282 +662,302 @@ function PedidoCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-dashed border-[var(--hairline)] px-4 sm:px-[18px] pt-[18px] pb-[22px] flex flex-col gap-5 animate-[expand-in_.22s_ease-out]">
+        <div className="border-t border-dashed border-[var(--hairline)] px-4 sm:px-[18px] pt-[18px] pb-[22px] grid gap-y-5 gap-x-7 animate-[expand-in_.22s_ease-out] [grid-template-areas:'banner''timeline''main''side'] lg:[grid-template-columns:minmax(0,1fr)_clamp(20rem,26%,25rem)] lg:[grid-template-areas:'banner_banner''timeline_timeline''main_side']">
 
-          {pendiente && (
-            <section className="rounded-md border border-amber bg-amber-soft px-3.5 py-3 flex items-start gap-2.5">
-              <Clock className="h-4 w-4 text-amber mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="font-sans text-[13px] font-semibold text-ink">
-                  Solicitud de modificación pendiente
-                </div>
-                <div className="font-sans text-xs text-ink/70 mt-0.5">
-                  Estamos revisando los cambios que pediste. Te avisamos por mail cuando los resolvamos.
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAskCancel(true)}
-                className="rounded-full px-4 py-2 font-sans text-sm font-semibold text-ink border border-ink/20 hover:border-ink transition shrink-0 inline-flex items-center gap-1.5 min-h-[40px]"
-              >
-                <XIcon className="h-3.5 w-3.5" /> Cancelar
-              </button>
-            </section>
-          )}
-
-          {ultimaResuelta && (() => {
-            const isAprobada  = ultimaResuelta.estado === "aprobada";
-            const isRechazada = ultimaResuelta.estado === "rechazada";
-            const isSystemCancel = ultimaResuelta.estado === "cancelada"; // ya filtramos por resolved_by='system'
-            const titulo =
-              isAprobada  ? "Tu última solicitud fue aprobada"
-              : isRechazada ? "Tu última solicitud fue rechazada"
-              : "Tu solicitud quedó sin efecto";
-            return (
-              <section
-                className={cn(
-                  "rounded-md border px-3.5 py-3 flex items-start gap-2.5",
-                  isAprobada  ? "border-emerald-300 bg-emerald-50"
-                  : isRechazada ? "border-rose-300 bg-rose-50"
-                  : "border-violet-300 bg-violet-50",
-                )}
-              >
-                {isAprobada  ? <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
-                : isRechazada ? <XCircle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />
-                : <Info className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />}
-                <div className="flex-1 min-w-0">
-                  <div className="font-sans text-[13px] font-semibold text-ink">
-                    {titulo}
-                  </div>
-                  {ultimaResuelta.respuesta && (
-                    <div className="font-sans text-xs text-ink/80 mt-0.5 whitespace-pre-wrap">
-                      {isSystemCancel ? ultimaResuelta.respuesta : ultimaResuelta.respuesta}
+          {/* ── Banner: solicitud pendiente / resuelta (full width) ── */}
+          {(pendiente || ultimaResuelta) && (
+            <div className="[grid-area:banner] flex flex-col gap-3">
+              {pendiente && (
+                <section className="rounded-md border border-amber bg-amber-soft px-3.5 py-3 flex items-start gap-2.5">
+                  <Clock className="h-4 w-4 text-amber mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-sans text-[13px] font-semibold text-ink">
+                      Solicitud de modificación pendiente
                     </div>
-                  )}
-                </div>
-              </section>
-            );
-          })()}
+                    <div className="font-sans text-xs text-ink/70 mt-0.5">
+                      Estamos revisando los cambios que pediste. Te avisamos por mail cuando los resolvamos.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAskCancel(true)}
+                    className="rounded-full px-4 py-2 font-sans text-sm font-semibold text-ink border border-ink/20 hover:border-ink transition shrink-0 inline-flex items-center gap-1.5 min-h-[40px]"
+                  >
+                    <XIcon className="h-3.5 w-3.5" /> Cancelar
+                  </button>
+                </section>
+              )}
 
-          {(docs.remito || docs.contrato || docs.albaran) && (
-            <section
-              className="rounded-md border px-3 py-3"
-              style={{
-                background: "color-mix(in oklch, var(--amber) 6%, var(--background))",
-                borderColor: "color-mix(in oklch, var(--amber) 35%, transparent)",
-              }}
-            >
-              <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink/70 mb-2">
-                Documentos
-              </h3>
-              <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
-                {docs.remito && (
-                  <DocActions pedidoId={pedido.id} numero={numero} tipo="remito" label="Remito" />
-                )}
-                {docs.contrato && (
-                  <DocActions
-                    pedidoId={pedido.id} numero={numero} tipo="contrato" label="Contrato"
-                    description={DOC_DESCRIPTION.contrato}
-                  />
-                )}
-                {docs.albaran && (
-                  <DocActions
-                    pedidoId={pedido.id} numero={numero} tipo="albaran" label="Albarán"
-                    description={DOC_DESCRIPTION.albaran}
-                  />
-                )}
-              </div>
-            </section>
+              {ultimaResuelta && (() => {
+                const isAprobada  = ultimaResuelta.estado === "aprobada";
+                const isRechazada = ultimaResuelta.estado === "rechazada";
+                const isSystemCancel = ultimaResuelta.estado === "cancelada"; // ya filtramos por resolved_by='system'
+                const titulo =
+                  isAprobada  ? "Tu última solicitud fue aprobada"
+                  : isRechazada ? "Tu última solicitud fue rechazada"
+                  : "Tu solicitud quedó sin efecto";
+                return (
+                  <section
+                    className={cn(
+                      "rounded-md border px-3.5 py-3 flex items-start gap-2.5",
+                      isAprobada  ? "border-emerald-300 bg-emerald-50"
+                      : isRechazada ? "border-rose-300 bg-rose-50"
+                      : "border-violet-300 bg-violet-50",
+                    )}
+                  >
+                    {isAprobada  ? <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
+                    : isRechazada ? <XCircle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />
+                    : <Info className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-sans text-[13px] font-semibold text-ink">
+                        {titulo}
+                      </div>
+                      {ultimaResuelta.respuesta && (
+                        <div className="font-sans text-xs text-ink/80 mt-0.5 whitespace-pre-wrap">
+                          {isSystemCancel ? ultimaResuelta.respuesta : ultimaResuelta.respuesta}
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                );
+              })()}
+            </div>
           )}
 
-          <section>
-            <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
-              Estado del pedido
-            </h3>
+          {/* ── Timeline: card propia, full width ── */}
+          <section className="[grid-area:timeline] rounded-lg border border-[var(--hairline)] bg-card px-5 pt-[18px] pb-4">
+            <div className="flex items-baseline justify-between gap-3 mb-3.5">
+              <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
+                Estado del pedido
+              </h3>
+              {tlCurrent && (
+                <div className="font-sans text-xs text-muted-foreground text-right flex-1 min-w-0 leading-[1.4]">
+                  <strong className="text-ink font-semibold">{tlCurrent.label}</strong>
+                  {tlCurrent.desc ? ` · ${tlCurrent.desc}` : ""}
+                </div>
+              )}
+            </div>
             <PedidoTimeline pedido={pedido} />
           </section>
 
-          {puedeModificar && (
+          {/* ── Main (izquierda): período → equipos → acciones ── */}
+          <div className="[grid-area:main] flex flex-col gap-5 min-w-0">
+            <section className="grid grid-cols-3 gap-2">
+              <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
+                <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">Retiro</div>
+                <div className="font-sans text-sm font-semibold text-ink mt-0.5">{fmtDate(pedido.fecha_desde)}</div>
+                {retiroTime && <div className="font-mono text-[10px] text-muted-foreground">{retiroTime}</div>}
+              </div>
+              <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
+                <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">Devolución</div>
+                <div className="font-sans text-sm font-semibold text-ink mt-0.5">{fmtDate(pedido.fecha_hasta)}</div>
+                {devolucionTime && <div className="font-mono text-[10px] text-muted-foreground">{devolucionTime}</div>}
+              </div>
+              <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
+                <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">Jornadas</div>
+                <div className="font-display text-2xl font-black text-ink tabular-nums leading-none mt-1">{jornadas}</div>
+              </div>
+            </section>
+
             <section>
-              <button
-                type="button"
-                onClick={() => navigate({
-                  to: "/cliente/pedidos/$id/editar",
-                  params: { id: String(pedido.id) },
-                })}
-                className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 font-sans text-[13px] font-bold text-amber hover:bg-amber hover:text-ink transition"
-              >
-                <Pencil className="h-3.5 w-3.5" /> Modificar pedido
-              </button>
-              {pedido.estado === "confirmado" && (
-                <p className="mt-2 font-sans text-xs text-muted-foreground">
-                  Los cambios necesitarán nuestra aprobación.
-                </p>
-              )}
-            </section>
-          )}
-
-          {!puedeModificar && MODIFICABLE_STATES.has(pedido.estado) && !pendiente && !dentroVentana && (
-            <section className="rounded-md border border-dashed border-[var(--hairline)] px-3.5 py-2.5 font-sans text-xs text-muted-foreground">
-              No es posible modificar este pedido a menos de {ventanaHoras} h del retiro. Contactanos directamente.
-            </section>
-          )}
-
-          <section className="grid grid-cols-3 gap-2">
-            <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
-              <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">Retiro</div>
-              <div className="font-sans text-sm font-semibold text-ink mt-0.5">{fmtDate(pedido.fecha_desde)}</div>
-              {retiroTime && <div className="font-mono text-[10px] text-muted-foreground">{retiroTime}</div>}
-            </div>
-            <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
-              <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">Devolución</div>
-              <div className="font-sans text-sm font-semibold text-ink mt-0.5">{fmtDate(pedido.fecha_hasta)}</div>
-              {devolucionTime && <div className="font-mono text-[10px] text-muted-foreground">{devolucionTime}</div>}
-            </div>
-            <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
-              <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">Jornadas</div>
-              <div className="font-display text-2xl font-black text-ink tabular-nums leading-none mt-1">{jornadas}</div>
-            </div>
-          </section>
-
-          <section>
-            <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
-              Equipos ({pedido.items.length})
-            </h3>
-            <ul>
-              {pedido.items.map((item, i) => {
-                const display = item.nombre_publico || item.nombre;
-                return (
-                  <li
-                    key={i}
-                    className="flex items-center gap-2.5 py-2 border-b border-[var(--hairline)] last:border-b-0"
-                  >
-                    {item.foto_url ? (
-                      <img
-                        src={item.foto_url}
-                        alt={display}
-                        loading="lazy"
-                        className="h-10 w-10 rounded-sm border border-[var(--hairline)] bg-white object-cover shrink-0"
-                      />
-                    ) : (
-                      <div className="h-10 w-10 rounded-sm border border-[var(--hairline)] bg-white grid place-items-center shrink-0">
-                        <ShoppingBag className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      {item.marca && (
-                        <div className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground leading-none">
-                          {item.marca}
+              <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+                Equipos ({pedido.items.length})
+              </h3>
+              <ul>
+                {pedido.items.map((item, i) => {
+                  const display = item.nombre_publico || item.nombre;
+                  return (
+                    <li
+                      key={i}
+                      className="flex items-center gap-2.5 py-2 border-b border-[var(--hairline)] last:border-b-0"
+                    >
+                      {item.foto_url ? (
+                        <img
+                          src={item.foto_url}
+                          alt={display}
+                          loading="lazy"
+                          className="h-10 w-10 rounded-sm border border-[var(--hairline)] bg-white object-cover shrink-0"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-sm border border-[var(--hairline)] bg-white grid place-items-center shrink-0">
+                          <ShoppingBag className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                         </div>
                       )}
-                      <div className="font-sans text-[13px] font-semibold text-ink leading-tight mt-0.5 truncate">
-                        {display}
+                      <div className="min-w-0 flex-1">
+                        {item.marca && (
+                          <div className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground leading-none">
+                            {item.marca}
+                          </div>
+                        )}
+                        <div className="font-sans text-[13px] font-semibold text-ink leading-tight mt-0.5 truncate">
+                          {display}
+                        </div>
+                        <div className="font-mono text-[10px] text-muted-foreground tabular-nums mt-0.5">
+                          {item.cantidad} × {fmt(item.precio_jornada)}/j · {jornadas}j
+                        </div>
                       </div>
-                      <div className="font-mono text-[10px] text-muted-foreground tabular-nums mt-0.5">
-                        {item.cantidad} × {fmt(item.precio_jornada)}/j · {jornadas}j
+                      <div className="font-mono text-[13px] font-bold text-ink tabular-nums shrink-0">
+                        {fmt(item.subtotal)}
                       </div>
-                    </div>
-                    <div className="font-mono text-[13px] font-bold text-ink tabular-nums shrink-0">
-                      {fmt(item.subtotal)}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-
-          <section className="flex flex-col gap-1.5 pt-2.5 border-t border-[var(--hairline)]">
-            <div className="flex justify-between items-baseline font-sans text-[13px]">
-              <span className="text-muted-foreground">Subtotal equipos</span>
-              <span className="font-mono font-semibold text-ink tabular-nums">{fmt(subtotalItems)}</span>
-            </div>
-            {descuentoPct > 0 && (
-              <div className="flex justify-between items-baseline font-sans text-[13px]">
-                <span className="text-muted-foreground">Descuento ({descuentoPct}%)</span>
-                <span className="font-mono font-semibold tabular-nums text-verde">
-                  −{fmt(descuentoMonto)}
-                </span>
-              </div>
-            )}
-            {conIva && (
-              <>
-                <div className="flex justify-between items-baseline font-sans text-[13px]">
-                  <span className="text-muted-foreground">Subtotal neto</span>
-                  <span className="font-mono font-semibold text-ink tabular-nums">{fmt(totalNeto)}</span>
-                </div>
-                <div className="flex justify-between items-baseline font-sans text-[13px]">
-                  <span className="text-muted-foreground">IVA 21%</span>
-                  <span className="font-mono font-semibold text-ink tabular-nums">+{fmt(ivaMonto)}</span>
-                </div>
-              </>
-            )}
-            <div className="flex justify-between items-baseline pt-1.5 mt-1 border-t border-[var(--hairline)]">
-              <span className="font-sans text-[15px] font-bold text-ink">
-                Total{conIva ? " · IVA incluído" : ""}
-              </span>
-              <span className="font-display text-[22px] font-black text-ink tabular-nums">{fmt(total)}</span>
-            </div>
-            {pagado > 0 && (
-              <>
-                <div className="flex justify-between items-baseline font-sans text-[13px]">
-                  <span className="text-muted-foreground">Pagado</span>
-                  <span className="font-mono font-semibold tabular-nums text-verde">{fmt(pagado)}</span>
-                </div>
-                <div className="flex justify-between items-baseline font-sans text-[13px]">
-                  <span className="text-muted-foreground">{balance > 0 ? "Balance pendiente" : "Saldo"}</span>
-                  <span className={cn("font-mono font-bold tabular-nums", balance > 0 ? "text-ink" : "text-verde")}>
-                    {fmt(balance)}
-                  </span>
-                </div>
-              </>
-            )}
-          </section>
-
-          {pedido.pagos && pedido.pagos.length > 0 && (
-            <section>
-              <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">Pagos</h3>
-              <ul className="flex flex-col gap-1">
-                {pedido.pagos.map((pg, i) => (
-                  <li key={i} className="flex items-center justify-between gap-2 font-sans text-xs text-muted-foreground">
-                    <span className="truncate">
-                      {fmtDate(pg.fecha)}{pg.concepto ? ` · ${pg.concepto}` : ""}
-                    </span>
-                    <span className="font-mono tabular-nums text-verde shrink-0">{fmt(pg.monto)}</span>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             </section>
-          )}
 
-          {pedido.notas && (
-            <section>
-              <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">Notas</h3>
-              <div className="rounded-md border border-[color-mix(in_oklch,var(--amber)_40%,transparent)] bg-amber-soft px-3.5 py-3 font-sans text-xs text-ink leading-[1.5] whitespace-pre-wrap">
-                {pedido.notas}
-              </div>
-            </section>
-          )}
-
-          {(() => {
-            const waHref = whatsappLink({
-              phone: businessPhone,
-              message: `Hola, consulta sobre el pedido #${numero}`,
-            });
-            if (!waHref) return null;
-            return (
+            {puedeModificar && (
               <section>
-                <a
-                  href={waHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full bg-[#25D366] text-white px-4 py-2.5 font-sans text-sm font-semibold hover:brightness-95 transition min-h-[44px]"
+                <button
+                  type="button"
+                  onClick={() => navigate({
+                    to: "/cliente/pedidos/$id/editar",
+                    params: { id: String(pedido.id) },
+                  })}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 font-sans text-[13px] font-bold text-amber hover:bg-amber hover:text-ink transition"
                 >
-                  <MessageCircle className="h-4 w-4" strokeWidth={2.2} />
-                  Consulta por WhatsApp
-                </a>
+                  <Pencil className="h-3.5 w-3.5" /> Modificar pedido
+                </button>
+                {pedido.estado === "confirmado" && (
+                  <p className="mt-2 font-sans text-xs text-muted-foreground">
+                    Los cambios necesitarán nuestra aprobación.
+                  </p>
+                )}
               </section>
-            );
-          })()}
+            )}
+
+            {!puedeModificar && MODIFICABLE_STATES.has(pedido.estado) && !pendiente && !dentroVentana && (
+              <section className="rounded-md border border-dashed border-[var(--hairline)] px-3.5 py-2.5 font-sans text-xs text-muted-foreground">
+                No es posible modificar este pedido a menos de {ventanaHoras} h del retiro. Contactanos directamente.
+              </section>
+            )}
+
+            {(() => {
+              const waHref = whatsappLink({
+                phone: businessPhone,
+                message: `Hola, consulta sobre el pedido #${numero}`,
+              });
+              if (!waHref) return null;
+              return (
+                <section>
+                  <a
+                    href={waHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full bg-[#25D366] text-white px-4 py-2.5 font-sans text-sm font-semibold hover:brightness-95 transition min-h-[44px]"
+                  >
+                    <MessageCircle className="h-4 w-4" strokeWidth={2.2} />
+                    Consulta por WhatsApp
+                  </a>
+                </section>
+              );
+            })()}
+          </div>
+
+          {/* ── Side (derecha): documentos → totales → pagos → notas ── */}
+          <aside className="[grid-area:side] flex flex-col gap-4 min-w-0">
+            {(docs.remito || docs.contrato || docs.albaran) && (
+              <section
+                className="rounded-md border px-3 py-3"
+                style={{
+                  background: "color-mix(in oklch, var(--amber) 6%, var(--background))",
+                  borderColor: "color-mix(in oklch, var(--amber) 35%, transparent)",
+                }}
+              >
+                <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink/70 mb-2">
+                  Documentos
+                </h3>
+                <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
+                  {docs.remito && (
+                    <DocActions pedidoId={pedido.id} numero={numero} tipo="remito" label="Remito" />
+                  )}
+                  {docs.contrato && (
+                    <DocActions
+                      pedidoId={pedido.id} numero={numero} tipo="contrato" label="Contrato"
+                      description={DOC_DESCRIPTION.contrato}
+                    />
+                  )}
+                  {docs.albaran && (
+                    <DocActions
+                      pedidoId={pedido.id} numero={numero} tipo="albaran" label="Albarán"
+                      description={DOC_DESCRIPTION.albaran}
+                    />
+                  )}
+                </div>
+              </section>
+            )}
+
+            <section className="flex flex-col gap-1.5 rounded-md border border-[var(--hairline)] bg-card px-3.5 py-3">
+              <div className="flex justify-between items-baseline font-sans text-[13px]">
+                <span className="text-muted-foreground">Subtotal equipos</span>
+                <span className="font-mono font-semibold text-ink tabular-nums">{fmt(subtotalItems)}</span>
+              </div>
+              {descuentoPct > 0 && (
+                <div className="flex justify-between items-baseline font-sans text-[13px]">
+                  <span className="text-muted-foreground">Descuento ({descuentoPct}%)</span>
+                  <span className="font-mono font-semibold tabular-nums text-verde">
+                    −{fmt(descuentoMonto)}
+                  </span>
+                </div>
+              )}
+              {conIva && (
+                <>
+                  <div className="flex justify-between items-baseline font-sans text-[13px]">
+                    <span className="text-muted-foreground">Subtotal neto</span>
+                    <span className="font-mono font-semibold text-ink tabular-nums">{fmt(totalNeto)}</span>
+                  </div>
+                  <div className="flex justify-between items-baseline font-sans text-[13px]">
+                    <span className="text-muted-foreground">IVA 21%</span>
+                    <span className="font-mono font-semibold text-ink tabular-nums">+{fmt(ivaMonto)}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-between items-baseline pt-1.5 mt-1 border-t border-[var(--hairline)]">
+                <span className="font-sans text-[15px] font-bold text-ink">
+                  Total{conIva ? " · IVA incluído" : ""}
+                </span>
+                <span className="font-display text-[22px] font-black text-ink tabular-nums">{fmt(total)}</span>
+              </div>
+              {pagado > 0 && (
+                <>
+                  <div className="flex justify-between items-baseline font-sans text-[13px]">
+                    <span className="text-muted-foreground">Pagado</span>
+                    <span className="font-mono font-semibold tabular-nums text-verde">{fmt(pagado)}</span>
+                  </div>
+                  <div className="flex justify-between items-baseline font-sans text-[13px]">
+                    <span className="text-muted-foreground">{balance > 0 ? "Balance pendiente" : "Saldo"}</span>
+                    <span className={cn("font-mono font-bold tabular-nums", balance > 0 ? "text-ink" : "text-verde")}>
+                      {fmt(balance)}
+                    </span>
+                  </div>
+                </>
+              )}
+            </section>
+
+            {pedido.pagos && pedido.pagos.length > 0 && (
+              <section>
+                <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">Pagos</h3>
+                <ul className="flex flex-col gap-1">
+                  {pedido.pagos.map((pg, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2 font-sans text-xs text-muted-foreground">
+                      <span className="truncate">
+                        {fmtDate(pg.fecha)}{pg.concepto ? ` · ${pg.concepto}` : ""}
+                      </span>
+                      <span className="font-mono tabular-nums text-verde shrink-0">{fmt(pg.monto)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {pedido.notas && (
+              <section>
+                <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">Notas</h3>
+                <div className="rounded-md border border-[color-mix(in_oklch,var(--amber)_40%,transparent)] bg-amber-soft px-3.5 py-3 font-sans text-xs text-ink leading-[1.5] whitespace-pre-wrap">
+                  {pedido.notas}
+                </div>
+              </section>
+            )}
+          </aside>
         </div>
       )}
 
@@ -1315,32 +1373,34 @@ function fmtTimelineDateTime(s?: string | null): string | null {
 function PedidoTimeline({ pedido }: { pedido: Pedido }) {
   const steps = buildTimelineSteps(pedido);
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-row items-start gap-0 pt-1">
       {steps.map((s, i) => {
         const isLast = i === steps.length - 1;
-        const lineCls =
-          s.state === "done" ? "bg-ink/25"
-          : s.state === "current"
-            ? "bg-gradient-to-b from-amber from-50% to-[var(--hairline)] to-50%"
-            : "bg-[var(--hairline)]";
         const dotCls =
           s.state === "done"     ? "border-ink bg-ink text-amber"
           : s.state === "current" ? "border-amber bg-amber text-ink shadow-[0_0_0_4px_var(--amber-soft)]"
           : s.state === "rejected" ? "border-destructive bg-destructive text-white"
           : "border-[var(--hairline)] bg-background text-muted-foreground border-dashed";
+        const connectorCls =
+          s.state === "done"     ? "after:bg-ink/25"
+          : s.state === "current" ? "after:bg-[image:linear-gradient(to_right,var(--amber)_0%,var(--amber)_50%,var(--hairline)_50%)]"
+          : s.state === "rejected" ? "after:bg-destructive/30"
+          : "after:bg-[var(--hairline)]";
         const Icon =
           s.state === "rejected" ? XCircle
           : s.state === "current" ? Clock
           : s.state === "done"     ? CircleCheckBig
           : Clock;
         return (
-          <div key={s.key} className={cn("relative flex gap-3", isLast ? "pb-0" : "pb-3.5")}>
-            {!isLast && (
-              <span
-                className={cn("absolute left-[13px] top-7 bottom-0 w-[2px]", lineCls)}
-                aria-hidden
-              />
+          <div
+            key={s.key}
+            className={cn(
+              "relative flex-1 min-w-0 flex flex-col items-center text-center px-1 gap-2",
+              !isLast &&
+                "after:content-[''] after:absolute after:top-[13px] after:left-[calc(50%+18px)] after:right-[calc(-50%+18px)] after:h-0.5",
+              !isLast && connectorCls,
             )}
+          >
             <div
               className={cn(
                 "z-[1] grid h-7 w-7 shrink-0 place-items-center rounded-full border-2",
@@ -1349,35 +1409,18 @@ function PedidoTimeline({ pedido }: { pedido: Pedido }) {
             >
               <Icon className="h-3 w-3" strokeWidth={2} />
             </div>
-            <div className="flex-1 min-w-0 pt-0.5">
-              <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                <span
-                  className={cn(
-                    "font-sans text-[13px] font-bold text-ink",
-                    s.state === "pending" && "text-muted-foreground font-semibold",
-                  )}
-                >
-                  {s.label}
-                </span>
-                {s.fecha && (
-                  <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground tabular-nums">
-                    {fmtTimelineDateTime(s.fecha)}
-                  </span>
-                )}
-              </div>
+            <div className="w-full min-w-0">
               <div
                 className={cn(
-                  "font-sans text-xs text-muted-foreground leading-[1.5] mt-0.5",
-                  s.state === "current" && "text-ink/80",
+                  "font-sans text-xs leading-tight truncate",
+                  s.state === "pending" ? "text-muted-foreground font-semibold" : "font-bold text-ink",
                 )}
               >
-                {s.desc}
+                {s.label}
               </div>
-              {s.nota && (
-                <div className="mt-1.5 rounded-sm border border-[var(--hairline)] bg-surface px-2.5 py-1.5 font-sans text-xs text-ink whitespace-pre-wrap">
-                  {s.nota}
-                </div>
-              )}
+              <div className="font-mono text-[9.5px] uppercase tracking-[0.06em] text-muted-foreground tabular-nums mt-0.5">
+                {s.fecha ? fmtTimelineDateTime(s.fecha) : "—"}
+              </div>
             </div>
           </div>
         );
