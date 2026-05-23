@@ -22,7 +22,7 @@ import zipfile
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from admin_guard import require_admin
@@ -141,5 +141,52 @@ async def import_dataio(
         except Exception:
             pass
         raise HTTPException(400, f"Import falló: {e}")
+    finally:
+        conn.close()
+
+
+RESET_CONFIRMATION = "BORRAR TODO"
+
+
+@router.post("/admin/dataio/reset-operacional")
+def reset_operacional(
+    payload: dict = Body(...),
+    _admin: dict = Depends(require_admin),
+):
+    """Borra TODOS los clientes y alquileres (incluidos items/pagos via CASCADE).
+
+    Pensado para hacer un wipe-and-reimport limpio. Requiere que el body
+    incluya exactamente {"confirm": "BORRAR TODO"} para evitar disparos
+    accidentales. La operacion no es reversible — hacer backup antes.
+    """
+    if payload.get("confirm") != RESET_CONFIRMATION:
+        raise HTTPException(
+            400,
+            f"Confirmacion requerida. Enviar {{'confirm': '{RESET_CONFIRMATION}'}}",
+        )
+
+    conn = get_db()
+    try:
+        clientes_before = conn.execute("SELECT COUNT(*) AS n FROM clientes").fetchone()["n"]
+        alquileres_before = conn.execute("SELECT COUNT(*) AS n FROM alquileres").fetchone()["n"]
+
+        # alquileres primero: CASCADE limpia items, pagos y solicitudes_modificacion.
+        conn.execute("DELETE FROM alquileres")
+        conn.execute("DELETE FROM clientes")
+        conn.commit()
+
+        return {
+            "ok": True,
+            "deleted": {
+                "clientes": clientes_before,
+                "alquileres": alquileres_before,
+            },
+        }
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise HTTPException(500, f"Reset falló: {e}")
     finally:
         conn.close()
