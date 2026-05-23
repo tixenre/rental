@@ -74,17 +74,16 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
       <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
       <header
         ref={headerRef}
-        className="sticky top-0 z-[var(--z-topbar)] border-b hairline backdrop-blur-xl transition-[background,border-color]"
-        style={amberOnScroll ? undefined : undefined}
+        className="sticky top-0 z-[var(--z-topbar)] h-16 border-b hairline backdrop-blur-xl transition-[background,border-color]"
       >
         <div
           className={cn(
-            "px-4 py-3 md:px-6 md:grid md:grid-cols-[auto_1fr_auto] md:gap-4 md:items-center",
+            "h-full px-4 md:px-6 md:grid md:grid-cols-[auto_1fr_auto] md:gap-4 md:items-center",
             !amberOnScroll && "bg-background/95 md:bg-background/85",
           )}
         >
           {/* Mobile: logo centrado + botón sesión derecha */}
-          <div className="flex items-center md:hidden">
+          <div className="flex h-full w-full items-center md:hidden">
             <div className="w-10" />
             <div className="flex-1 flex justify-center">
               <Logo
