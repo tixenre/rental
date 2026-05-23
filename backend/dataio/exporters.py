@@ -480,7 +480,7 @@ def export_alquileres(conn) -> list[dict]:
         SELECT a.numero_pedido, a.cliente_nombre, a.cliente_telefono,
                a.estado, a.fecha_desde, a.fecha_hasta, a.monto_total,
                a.monto_pagado, a.descuento_pct, a.notas, a.fuente,
-               a.numero_remito, a.id AS alquiler_id,
+               a.id AS alquiler_id,
                c.email AS cliente_email
         FROM alquileres a
         LEFT JOIN clientes c ON c.id = a.cliente_id
@@ -545,7 +545,6 @@ def export_alquileres(conn) -> list[dict]:
                 descuento_pct=float(r["descuento_pct"] or 0.0),
                 notas=r["notas"],
                 fuente=r["fuente"] or "sistema",
-                numero_remito=r["numero_remito"],
                 items=items_by_alq.get(alq_id, []),
                 pagos=pagos_by_alq.get(alq_id, []),
             ).model_dump()

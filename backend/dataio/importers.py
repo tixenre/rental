@@ -718,12 +718,12 @@ def import_alquileres(
                     cliente_telefono = ?, notas = ?, estado = ?,
                     fecha_desde = ?, fecha_hasta = ?, monto_total = ?,
                     monto_pagado = ?, descuento_pct = ?, fuente = ?,
-                    numero_remito = ?, updated_at = CURRENT_TIMESTAMP
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
                 (cliente_id, a.cliente_nombre, a.cliente_email, a.cliente_telefono,
                  a.notas, a.estado, a.fecha_desde, a.fecha_hasta, a.monto_total,
-                 a.monto_pagado, a.descuento_pct, a.fuente, a.numero_remito,
+                 a.monto_pagado, a.descuento_pct, a.fuente,
                  alq_id),
             )
             stats["updated"] += 1
@@ -733,15 +733,14 @@ def import_alquileres(
                 INSERT INTO alquileres (
                     numero_pedido, cliente_id, cliente_nombre, cliente_email,
                     cliente_telefono, notas, estado, fecha_desde, fecha_hasta,
-                    monto_total, monto_pagado, descuento_pct, fuente, numero_remito
+                    monto_total, monto_pagado, descuento_pct, fuente
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """,
                 (a.numero_pedido, cliente_id, a.cliente_nombre, a.cliente_email,
                  a.cliente_telefono, a.notas, a.estado, a.fecha_desde, a.fecha_hasta,
-                 a.monto_total, a.monto_pagado, a.descuento_pct, a.fuente,
-                 a.numero_remito),
+                 a.monto_total, a.monto_pagado, a.descuento_pct, a.fuente),
             )
             alq_id = cur.fetchone()["id"]
             stats["inserted"] += 1

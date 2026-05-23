@@ -578,12 +578,12 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
         cur = conn.execute("""
             INSERT INTO alquileres (cliente_nombre, cliente_email, cliente_telefono,
                                  cliente_id, notas, fecha_desde, fecha_hasta,
-                                 monto_total, estado, numero_pedido, numero_remito,
+                                 monto_total, estado, numero_pedido,
                                  descuento_pct, descuento_jornadas_pct)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
         """, (cliente_nombre, cliente_email, cliente_telefono,
               data.cliente_id, data.notas, data.fecha_desde, data.fecha_hasta,
-              monto_total, estado_inicial, next_num, str(next_num),
+              monto_total, estado_inicial, next_num,
               descuento_pct, descuento_jornadas_pct))
         pedido_id = cur.lastrowid
 
@@ -649,8 +649,8 @@ def list_pedidos(
             params.append(fuente)
         if q:
             like = f"%{q}%"
-            where += " AND (p.cliente_nombre LIKE ? OR p.numero_remito LIKE ? OR CAST(p.numero_pedido AS TEXT) LIKE ?)"
-            params += [like, like, like]
+            where += " AND (p.cliente_nombre LIKE ? OR CAST(p.numero_pedido AS TEXT) LIKE ?)"
+            params += [like, like]
         if con_saldo:
             # Pedidos con saldo > 0 y no cancelados. Borrador y presupuesto no
             # aplican porque todavía no se cobra; cancelado tampoco.
@@ -659,10 +659,8 @@ def list_pedidos(
 
         col = SORT_COLS.get(sort_by, "p.numero_pedido")
         direction = "ASC" if sort_dir == "asc" else "DESC"
-        # Poner "Registro manual" al final (los importados del histórico tienen
-        # numero_remito NULL o string vacío — antes solo chequeábamos NULL y
-        # los string vacíos se trataban como "tiene número" y subían arriba).
-        has_numero = "(p.numero_remito IS NOT NULL AND p.numero_remito != '')"
+        # Poner "Registro manual" (sin número de pedido) al final.
+        has_numero = "(p.numero_pedido IS NOT NULL)"
         order = f"{has_numero} DESC, {col} {direction} NULLS LAST"
         # secundario: número descendente para desempate
         if col != "p.numero_pedido":
@@ -943,7 +941,6 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
         if data.estado == "confirmado" and not p_row["numero_pedido"]:
             next_n = _next_numero_pedido(conn)
             updates["numero_pedido"] = next_n
-            updates["numero_remito"] = str(next_n)
 
         set_clause = ", ".join(f"{k}=?" for k in updates)
         conn.execute(f"UPDATE alquileres SET {set_clause} WHERE id=?", (*updates.values(), id))

@@ -280,7 +280,6 @@ class Alquiler(_Base):
     # Metadata
     notas: str | None = None
     fuente: str = "sistema"
-    numero_remito: str | None = None
     # Embebidas para autosuficiencia
     items: list[AlquilerItemRef] = Field(default_factory=list)
     pagos: list[AlquilerPagoRef] = Field(default_factory=list)

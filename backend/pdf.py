@@ -152,8 +152,6 @@ def _pedido_filename(pedido: dict, suffix: str = "") -> str:
     """Devuelve algo como 'R-0001_Martinez-Santiago.pdf' o '..._albaran.pdf'."""
     if pedido.get("numero_pedido"):
         num = f"R-{int(pedido['numero_pedido']):04d}"
-    elif pedido.get("numero_remito"):
-        num = pedido["numero_remito"]
     else:
         num = str(pedido["id"])
     cliente = _slug(pedido.get("cliente_nombre") or "")
@@ -211,7 +209,7 @@ def _pedido_html(pedido: dict) -> str:
     if pedido.get("numero_pedido"):
         remito_num = f"R-{pedido['numero_pedido']:04d}"
     else:
-        remito_num = pedido.get("numero_remito") or f"#{pedido['id']}"
+        remito_num = f"#{pedido['id']}"
     fecha_doc = _es_month(datetime.now().strftime("%-d de %B de %Y"))
 
     try:
@@ -680,8 +678,6 @@ def _albaran_html(pedido: dict) -> str:
 
     if pedido.get("numero_pedido"):
         ref = f"R-{int(pedido['numero_pedido']):04d}"
-    elif pedido.get("numero_remito"):
-        ref = pedido["numero_remito"]
     else:
         ref = f"#{pedido['id']}"
 
