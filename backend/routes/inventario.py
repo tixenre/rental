@@ -210,7 +210,7 @@ def _detect_categoria_sospechosa(conn) -> list[dict]:
 
     rows = conn.execute("""
         SELECT
-          e.id, e.nombre, e.marca,
+          e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
           COALESCE(
             (SELECT array_agg(ec.categoria_id) FROM equipo_categorias ec WHERE ec.equipo_id = e.id),
             ARRAY[]::int[]

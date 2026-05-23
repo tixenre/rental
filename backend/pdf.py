@@ -89,32 +89,38 @@ def _nombre_para_pdf(item: dict, *, formal: bool = False) -> str:
         return f"{marca} {nombre}".strip() or "—"
     return nombre or "—"
 
+def _as_dt(s):
+    """Coacciona a datetime. Acepta str ISO, date, datetime o None.
+    Las columnas de fecha son TIMESTAMP/DATE → psycopg devuelve objetos."""
+    if not s:
+        return None
+    if hasattr(s, "strftime"):  # ya es date/datetime
+        return s
+    try:
+        return datetime.fromisoformat(str(s))
+    except ValueError:
+        return None
+
 def _fmt_date_short(s) -> str:
     """Formatea fecha como DD/MM/YYYY. Retorna '—' si inválida o vacía."""
     if not s:
         return "—"
-    try:
-        return datetime.fromisoformat(s).strftime("%d/%m/%Y")
-    except Exception:
-        return str(s)
+    d = _as_dt(s)
+    return d.strftime("%d/%m/%Y") if d else str(s)
 
 def _fmt_date_long(s) -> str:
     """Formatea fecha como '5 de marzo de 2025'. Retorna '—' si inválida."""
     if not s:
         return "—"
-    try:
-        return _es_month(datetime.fromisoformat(s).strftime("%-d de %B de %Y"))
-    except Exception:
-        return str(s)
+    d = _as_dt(s)
+    return _es_month(d.strftime("%-d de %B de %Y")) if d else str(s)
 
 def _fmt_date_long_time(s) -> str:
     """Formatea fecha+hora como '5 de marzo de 2025, 14:30'."""
     if not s:
         return "—"
-    try:
-        return _es_month(datetime.fromisoformat(s).strftime("%-d de %B de %Y, %H:%M"))
-    except Exception:
-        return str(s)
+    d = _as_dt(s)
+    return _es_month(d.strftime("%-d de %B de %Y, %H:%M")) if d else str(s)
 
 def _fmt_ars(n, zero_dash: bool = True) -> str:
     """Formatea número como peso argentino ('$1.234.567').
@@ -152,8 +158,6 @@ def _pedido_filename(pedido: dict, suffix: str = "") -> str:
     """Devuelve algo como 'R-0001_Martinez-Santiago.pdf' o '..._albaran.pdf'."""
     if pedido.get("numero_pedido"):
         num = f"R-{int(pedido['numero_pedido']):04d}"
-    elif pedido.get("numero_remito"):
-        num = pedido["numero_remito"]
     else:
         num = str(pedido["id"])
     cliente = _slug(pedido.get("cliente_nombre") or "")
@@ -211,12 +215,12 @@ def _pedido_html(pedido: dict) -> str:
     if pedido.get("numero_pedido"):
         remito_num = f"R-{pedido['numero_pedido']:04d}"
     else:
-        remito_num = pedido.get("numero_remito") or f"#{pedido['id']}"
+        remito_num = f"#{pedido['id']}"
     fecha_doc = _es_month(datetime.now().strftime("%-d de %B de %Y"))
 
     try:
-        d1 = datetime.fromisoformat(pedido["fecha_desde"])
-        d2 = datetime.fromisoformat(pedido["fecha_hasta"])
+        d1 = _as_dt(pedido["fecha_desde"])
+        d2 = _as_dt(pedido["fecha_hasta"])
         jornadas = max(1, (d2 - d1).days or 1)
     except Exception:
         jornadas = 1
@@ -680,8 +684,6 @@ def _albaran_html(pedido: dict) -> str:
 
     if pedido.get("numero_pedido"):
         ref = f"R-{int(pedido['numero_pedido']):04d}"
-    elif pedido.get("numero_remito"):
-        ref = pedido["numero_remito"]
     else:
         ref = f"#{pedido['id']}"
 

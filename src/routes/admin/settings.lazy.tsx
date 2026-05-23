@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowDown, ArrowUp, Upload, Wrench, AlertTriangle, Loader2, Image as ImageIcon,
-  TrendingUp, TrendingDown, Sparkles, FolderSync, Plus, Trash2,
+  ArrowDown, ArrowUp, Upload, Loader2, Image as ImageIcon,
+  TrendingUp, TrendingDown, Sparkles, Plus, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,22 +24,6 @@ export const Route = createLazyFileRoute("/admin/settings")({
 
 function SettingsPage() {
   useDocumentTitle("Settings · Back Office");
-  const [confirmReset, setConfirmReset] = useState(false);
-
-  const fixMut = useMutation({
-    mutationFn: () => adminApi.fixApellidos(),
-    onSuccess: (d) => toast.success(d.message ?? `Apellidos corregidos${d.fixed ? ` (${d.fixed})` : ""}`),
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const resetMut = useMutation({
-    mutationFn: () => adminApi.resetClientesDesdeBackup(),
-    onSuccess: (d) => {
-      toast.success(d.message ?? "Clientes restaurados desde backup");
-      setConfirmReset(false);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-4xl mx-auto">
@@ -62,65 +46,6 @@ function SettingsPage() {
       <CambioYPreciosSection />
 
       <RankingSection />
-
-      <MigrarStorageSection />
-
-      <section className="rounded-lg border hairline bg-background p-4 space-y-3">
-        <h2 className="font-display text-lg text-ink">Mantenimiento</h2>
-
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t hairline pt-3">
-          <div>
-            <div className="text-ink">Corregir apellidos</div>
-            <p className="text-xs text-muted-foreground">
-              Recorre clientes y separa apellido del nombre cuando vinieron juntos.
-            </p>
-          </div>
-          <Button variant="outline" onClick={() => fixMut.mutate()} disabled={fixMut.isPending}>
-            <Wrench className="h-4 w-4 mr-1" />
-            {fixMut.isPending ? "Procesando…" : "Ejecutar"}
-          </Button>
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t hairline pt-3">
-          <div>
-            <div className="text-ink flex items-center gap-1.5">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              Restaurar clientes desde backup
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Reemplaza la tabla de clientes por la versión del backup. Destructivo.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            className="border-destructive/40 text-destructive hover:bg-destructive/5"
-            onClick={() => setConfirmReset(true)}
-          >
-            Restaurar
-          </Button>
-        </div>
-      </section>
-
-      <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Restaurar clientes desde backup?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción reemplaza la tabla de clientes actual con la versión guardada en el backup.
-              Cualquier cliente nuevo creado después se perderá.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => resetMut.mutate()}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Sí, restaurar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
@@ -689,104 +614,6 @@ function CambioYPreciosSection() {
   );
 }
 
-
-// ── Migración de paths R2 ───────────────────────────────────────────────────
-
-function MigrarStorageSection() {
-  type MigrateResult = Awaited<ReturnType<typeof adminApi.migrarStoragePaths>>;
-  const [preview, setPreview] = useState<MigrateResult | null>(null);
-  const [applied, setApplied] = useState<MigrateResult | null>(null);
-
-  const previewMut = useMutation({
-    mutationFn: () => adminApi.migrarStoragePaths(true),
-    onSuccess: (data) => {
-      setPreview(data);
-      setApplied(null);
-      if ((data.to_rename ?? 0) === 0) {
-        toast.info("Todas las fotos ya tienen el formato correcto.");
-      }
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const applyMut = useMutation({
-    mutationFn: () => adminApi.migrarStoragePaths(false),
-    onSuccess: (data) => {
-      setApplied(data);
-      setPreview(null);
-      toast.success(`${data.moved ?? 0} fotos renombradas${data.errors ? ` · ${data.errors} errores` : ""}`);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const busy = previewMut.isPending || applyMut.isPending;
-  const toRename = preview?.to_rename ?? 0;
-
-  return (
-    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
-      <div>
-        <h2 className="font-display text-lg text-ink flex items-center gap-2">
-          <FolderSync className="h-4 w-4 text-muted-foreground" />
-          Migrar fotos R2
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Renombra las carpetas y archivos de fotos al nuevo esquema{" "}
-          <code className="font-mono text-[11px] bg-muted/50 px-1 py-0.5 rounded">
-            id_slug/id_slug.ext
-          </code>
-          . Actualizá el deploy primero, luego ejecutá esto una sola vez.
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2 pt-1">
-        <Button variant="outline" onClick={() => previewMut.mutate()} disabled={busy}>
-          {previewMut.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-          Ver preview
-        </Button>
-        {toRename > 0 && !applied && (
-          <Button onClick={() => applyMut.mutate()} disabled={busy}>
-            {applyMut.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-            Renombrar {toRename} fotos
-          </Button>
-        )}
-      </div>
-
-      {preview && toRename > 0 && (
-        <div className="rounded-md border hairline bg-muted/20 p-3 space-y-2">
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-ink">{toRename}</strong> fotos para renombrar:
-          </p>
-          <div className="max-h-48 overflow-y-auto space-y-1">
-            {(preview.detail ?? []).slice(0, 30).map((r, i) => (
-              <div key={i} className="font-mono text-[11px] text-muted-foreground leading-tight">
-                <span className="line-through">{r.old}</span>
-                <span className="text-ink"> → {r.new}</span>
-              </div>
-            ))}
-            {toRename > 30 && (
-              <p className="text-xs text-muted-foreground">…y {toRename - 30} más.</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {applied && (
-        <div className="rounded-md border hairline bg-muted/20 p-3 text-sm space-y-1">
-          <p className="text-ink font-medium">Migración completa</p>
-          <p className="text-xs text-muted-foreground">
-            {applied.moved ?? 0} fotos movidas · {applied.db_updated ?? 0} URLs actualizadas en BD
-            {(applied.errors ?? 0) > 0 && (
-              <span className="text-destructive"> · {applied.errors} errores</span>
-            )}
-          </p>
-          {(applied.error_detail ?? []).map((e, i) => (
-            <p key={i} className="text-xs text-destructive font-mono truncate">{e.key}: {e.error}</p>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
 
 /** Lista los equipos con precio_jornada_manual=TRUE y muestra qué precio
  *  daría la fórmula con el USD rate actual. Permite seleccionar manualmente

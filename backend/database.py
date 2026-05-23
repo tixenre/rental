@@ -227,7 +227,6 @@ def init_db():
         CREATE TABLE IF NOT EXISTS equipos (
             id               SERIAL PRIMARY KEY,
             nombre           TEXT NOT NULL,
-            marca            TEXT,
             modelo           TEXT,
             cantidad         INTEGER NOT NULL DEFAULT 1,
             precio_jornada   INTEGER,
@@ -235,7 +234,7 @@ def init_db():
             roi_pct          FLOAT,
             valor_reposicion FLOAT,
             foto_url         TEXT,
-            fecha_compra     TEXT,
+            fecha_compra     DATE,
             serie            TEXT,
             bh_url           TEXT,
             dueno            TEXT DEFAULT 'Rambla',
@@ -284,35 +283,10 @@ def init_db():
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS ingreso_total_ars BIGINT NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS ranking_actualizado TIMESTAMP")
 
-    # Migration: agregar FK a marcas
+    # FK a marcas. brand_id es la fuente única del nombre de marca
+    # (vía marcas.nombre). El backfill desde la columna legacy `marca` y su
+    # DROP viven en la migración d5a8f2c4b6e9 (corre una sola vez).
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS brand_id INTEGER REFERENCES marcas(id)")
-
-    # Migration: migrar datos de marca (TEXT) a brand_id (FK)
-    try:
-        # Obtener marcas únicas existentes
-        existing_marcas = conn.execute("""
-            SELECT DISTINCT marca FROM equipos WHERE marca IS NOT NULL AND marca != ''
-            ORDER BY marca
-        """).fetchall()
-
-        for (marca,) in existing_marcas:
-            marca = marca.strip()
-            if not marca:
-                continue
-            # Insertar marca si no existe (UPSERT simulado con ON CONFLICT)
-            conn.execute("""
-                INSERT INTO marcas (nombre) VALUES (?)
-                ON CONFLICT (nombre) DO NOTHING
-            """, (marca,))
-
-        # Backfill: actualizar brand_id para todos los equipos
-        conn.execute("""
-            UPDATE equipos SET brand_id = (
-                SELECT id FROM marcas WHERE marcas.nombre = equipos.marca
-            ) WHERE marca IS NOT NULL AND marca != ''
-        """)
-    except Exception as e:
-        logger.warning("Migración de marcas parcial: %s", e)
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS clientes (
@@ -351,13 +325,12 @@ def init_db():
             cliente_telefono TEXT,
             notas            TEXT,
             estado           TEXT NOT NULL DEFAULT 'presupuesto',
-            fecha_desde      TEXT NOT NULL,
-            fecha_hasta      TEXT NOT NULL,
+            fecha_desde      TIMESTAMP,
+            fecha_hasta      TIMESTAMP,
             monto_total      INTEGER DEFAULT 0,
             monto_pagado     INTEGER DEFAULT 0,
             descuento_pct    FLOAT DEFAULT 0,
             fuente           TEXT DEFAULT 'sistema',
-            numero_remito    TEXT,
             numero_pedido    INTEGER,
             created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -689,37 +662,6 @@ def init_db():
         "ON spec_definitions(spec_key) WHERE categoria_raiz_id IS NULL"
     )
 
-    # Observatorio de specs: relevamiento desnormalizado de los specs que
-    # el scrape B&H/Adorama detecta en `equipo_fichas.raw_json`. Sirve
-    # para detectar gaps del template, calibrar enum_options y familias
-    # jerárquicas. Se repopula con `POST /admin/specs/observatorio/recompute`.
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS spec_observacion (
-            id                  SERIAL PRIMARY KEY,
-            equipo_id           INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
-            categoria_raiz      VARCHAR(64),
-            label_observado     VARCHAR(255) NOT NULL,
-            label_normalizado   VARCHAR(255) NOT NULL,
-            value_observado     TEXT NOT NULL,
-            spec_def_id         INTEGER REFERENCES spec_definitions(id) ON DELETE SET NULL,
-            matched_template    BOOLEAN NOT NULL DEFAULT FALSE,
-            source              VARCHAR(64),
-            observed_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (equipo_id, label_normalizado)
-        )
-    """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_obs_categoria_label "
-        "ON spec_observacion (categoria_raiz, label_normalizado)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_obs_matched "
-        "ON spec_observacion (matched_template) WHERE matched_template = FALSE"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_obs_spec_def "
-        "ON spec_observacion (spec_def_id) WHERE spec_def_id IS NOT NULL"
-    )
     # Catálogo global de unidades (lm, K, V, A, W…). Referenciado por specs
     # tabla con columnas `valor_unidad` para listas cerradas de opciones.
     conn.execute("""
@@ -821,11 +763,11 @@ def init_db():
         CREATE TABLE IF NOT EXISTS equipo_mantenimiento (
             id                SERIAL PRIMARY KEY,
             equipo_id         INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
-            fecha             TEXT NOT NULL,
+            fecha             TIMESTAMP NOT NULL,
             tipo              VARCHAR(32) NOT NULL DEFAULT 'revision',
             descripcion       TEXT,
             costo             INTEGER,
-            proxima_revision  TEXT,
+            proxima_revision  TIMESTAMP,
             created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -836,7 +778,7 @@ def init_db():
     # Mantenimiento que bloquea disponibilidad: una entrada con bloquea_stock=true
     # y fecha/fecha_hasta saca `cantidad` unidades del equipo durante ese rango.
     # Si fecha_hasta es NULL o bloquea_stock=false, es solo log histórico.
-    conn.execute("ALTER TABLE equipo_mantenimiento ADD COLUMN IF NOT EXISTS fecha_hasta TEXT")
+    conn.execute("ALTER TABLE equipo_mantenimiento ADD COLUMN IF NOT EXISTS fecha_hasta TIMESTAMP")
     conn.execute("ALTER TABLE equipo_mantenimiento ADD COLUMN IF NOT EXISTS cantidad INTEGER NOT NULL DEFAULT 1")
     conn.execute("ALTER TABLE equipo_mantenimiento ADD COLUMN IF NOT EXISTS bloquea_stock BOOLEAN NOT NULL DEFAULT FALSE")
     conn.execute(
@@ -972,7 +914,7 @@ def init_db():
             pedido_id  INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
             monto      INTEGER NOT NULL,
             concepto   TEXT,
-            fecha      TEXT DEFAULT CURRENT_DATE,
+            fecha      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -1053,6 +995,110 @@ def init_db():
         )
     """)
 
+    # ── Reconciliación con migraciones ──────────────────────────────────────
+    # Estas tablas/columnas históricamente vivían SOLO en migraciones Alembic.
+    # Las replicamos acá (idempotente) para que init_db produzca un esquema
+    # COMPLETO aunque `alembic upgrade` falle (paso defensivo: ya ocurrió una
+    # falla silenciosa con equipos.slug). Mantener en sync con migrations/.
+
+    # descuentos por jornada (migración a3e7f1d2b8c4)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS descuentos_jornada (
+            id         SERIAL PRIMARY KEY,
+            jornadas   INTEGER NOT NULL UNIQUE,
+            pct        FLOAT   NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_jornadas_pct FLOAT DEFAULT 0")
+
+    # email infra (migración a4e8c2b9d710)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS email_templates (
+            key        TEXT PRIMARY KEY,
+            subject    TEXT NOT NULL,
+            body_html  TEXT NOT NULL,
+            body_text  TEXT NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_by TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS emails_log (
+            id           BIGSERIAL PRIMARY KEY,
+            to_addr      TEXT NOT NULL,
+            subject      TEXT NOT NULL,
+            template_key TEXT NOT NULL,
+            alquiler_id  INTEGER REFERENCES alquileres(id) ON DELETE SET NULL,
+            status       TEXT NOT NULL,
+            provider     TEXT NOT NULL,
+            provider_id  TEXT,
+            error        TEXT,
+            sent_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_log_alquiler ON emails_log(alquiler_id)")
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_emails_log_recordatorio
+        ON emails_log(alquiler_id, template_key)
+        WHERE template_key = 'recordatorio_retiro' AND status = 'sent'
+    """)
+
+    # equipos.slug (migraciones e4a7c1f8d6b2 + f5b8d2e4a9c1): columna + UNIQUE
+    # constraint completo (no partial index — ese era transicional).
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS slug VARCHAR(80)")
+    conn.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'equipos_slug_key' AND conrelid = 'equipos'::regclass
+            ) AND NOT EXISTS (
+                SELECT 1 FROM equipos WHERE slug IS NOT NULL
+                GROUP BY slug HAVING COUNT(*) > 1
+            ) THEN
+                ALTER TABLE equipos ADD CONSTRAINT equipos_slug_key UNIQUE (slug);
+            END IF;
+        END $$;
+    """)
+
+    # JSONB agregadas por migraciones (b6f8d3e5a2c1, d7c9e1f3a8b2)
+    conn.execute("ALTER TABLE solicitudes_modificacion ADD COLUMN IF NOT EXISTS cambios_json JSONB")
+    conn.execute("ALTER TABLE spec_definitions ADD COLUMN IF NOT EXISTS tabla_columnas JSONB")
+
+    # Fechas TEXT → tipo nativo (migración e2c6f4a8b1d7). Las fechas se
+    # guardaban como strings ISO; ahora son TIMESTAMP/DATE. Idempotente: solo
+    # convierte si la columna sigue siendo 'text'. Defensivo: limpia valores
+    # no-ISO a NULL antes del cast y re-aplica NOT NULL solo si quedó limpio.
+    for tabla, col, tipo, not_null in (
+        ("alquileres", "fecha_desde", "timestamp", False),
+        ("alquileres", "fecha_hasta", "timestamp", False),
+        ("equipo_mantenimiento", "fecha", "timestamp", True),
+        ("equipo_mantenimiento", "fecha_hasta", "timestamp", False),
+        ("equipo_mantenimiento", "proxima_revision", "timestamp", False),
+        ("alquiler_pagos", "fecha", "timestamp", False),
+        ("equipos", "fecha_compra", "date", False),
+    ):
+        renotnull = (
+            f"IF NOT EXISTS (SELECT 1 FROM {tabla} WHERE {col} IS NULL) THEN "
+            f"ALTER TABLE {tabla} ALTER COLUMN {col} SET NOT NULL; END IF;"
+            if not_null else ""
+        )
+        conn.execute(f"""
+            DO $$
+            BEGIN
+                IF (SELECT data_type FROM information_schema.columns
+                    WHERE table_name = '{tabla}' AND column_name = '{col}') = 'text' THEN
+                    ALTER TABLE {tabla} ALTER COLUMN {col} DROP NOT NULL;
+                    UPDATE {tabla} SET {col} = NULL
+                        WHERE {col} !~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}';
+                    ALTER TABLE {tabla} ALTER COLUMN {col} TYPE {tipo}
+                        USING NULLIF(TRIM({col}), '')::{tipo};
+                    {renotnull}
+                END IF;
+            END $$;
+        """)
+
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
 
     # Seed the sequence to the current max so nextval never collides with existing data.
@@ -1061,8 +1107,6 @@ def init_db():
         SELECT setval('numero_pedido_seq',
             GREATEST(
                 (SELECT COALESCE(MAX(numero_pedido), 0) FROM alquileres WHERE numero_pedido IS NOT NULL),
-                (SELECT COALESCE(MAX(CAST(numero_remito AS INTEGER)), 0) FROM alquileres
-                 WHERE numero_remito IS NOT NULL AND numero_remito ~ '^[0-9]+$'),
                 (SELECT last_value FROM numero_pedido_seq)
             ), true)
     """)
@@ -1096,6 +1140,30 @@ def row_to_dict(row) -> dict:
     if isinstance(row, dict):
         return row
     return dict(row)
+
+
+def to_datetime(v):
+    """Coacciona a `datetime`. Acepta str ISO, `date`, `datetime` o None.
+
+    Las columnas de fecha pasaron de TEXT a TIMESTAMP/DATE, así que psycopg
+    devuelve objetos `datetime`/`date` en vez de strings. Los request bodies
+    siguen llegando como strings ISO. Este helper neutraliza ambos casos."""
+    from datetime import date as _date, datetime as _dt
+    if v is None or v == "":
+        return None
+    if isinstance(v, _dt):
+        return v
+    if isinstance(v, _date):
+        return _dt(v.year, v.month, v.day)
+    return _dt.fromisoformat(str(v))
+
+
+def to_iso(v) -> str | None:
+    """Coacciona a string ISO. None/'' → None. Acepta str, `date`, `datetime`."""
+    if v is None or v == "":
+        return None
+    iso = getattr(v, "isoformat", None)
+    return iso() if callable(iso) else str(v)
 
 
 # ── Helpers de equipos ─────────────────────────────────────────────────────
@@ -1141,7 +1209,7 @@ def attach_kit(conn, equipos: list[dict]) -> list[dict]:
     cur = conn.cursor()
     cur.execute(f"""
         SELECT kc.equipo_id, kc.componente_id, kc.cantidad,
-               e.nombre, e.marca, e.foto_url
+               e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
         FROM kit_componentes kc
         JOIN equipos e ON e.id = kc.componente_id
         WHERE kc.equipo_id IN ({placeholders})
@@ -1338,7 +1406,7 @@ def regenerate_auto_tags(conn, equipo_id: int) -> int:
     No toca las `origen='manual'`. Devuelve cuántas auto-tags quedaron asignadas.
     """
     eq = conn.execute(
-        "SELECT id, nombre, marca, modelo FROM equipos WHERE id = %s", (equipo_id,)
+        "SELECT id, nombre, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca, modelo FROM equipos WHERE id = %s", (equipo_id,)
     ).fetchone()
     if not eq:
         return 0

@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from database import get_db, row_to_dict
+from database import get_db, row_to_dict, to_datetime
 from routes.auth import get_session, signer, COOKIE_SECURE, SESSION_MAX_AGE
 from admin_guard import require_admin
 from itsdangerous import BadSignature, SignatureExpired
@@ -39,8 +39,10 @@ def _ventana_cumple(fecha_desde: Optional[str], ventana_horas: int) -> bool:
     if not fecha_desde:
         return True
     try:
-        d0 = datetime.datetime.fromisoformat(fecha_desde)
+        d0 = to_datetime(fecha_desde)
     except ValueError:
+        return True
+    if d0 is None:
         return True
     return (d0 - datetime.datetime.now()).total_seconds() >= ventana_horas * 3600
 
@@ -356,7 +358,7 @@ def cliente_pedidos(request: Request):
             d = row_to_dict(p)
             items = conn.execute("""
                 SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                       e.nombre, e.marca, e.modelo, e.foto_url,
+                       e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url,
                        e.nombre_publico, e.nombre_publico_largo
                 FROM alquiler_items ai
                 JOIN equipos e ON e.id = ai.equipo_id
@@ -411,7 +413,7 @@ def cliente_pedido_detalle(id: int, request: Request):
 
         items = conn.execute("""
             SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                   e.id AS equipo_id, e.nombre, e.marca, e.foto_url,
+                   e.id AS equipo_id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url,
                    e.nombre_publico, e.nombre_publico_largo
             FROM alquiler_items ai
             JOIN equipos e ON e.id = ai.equipo_id
@@ -481,8 +483,8 @@ def _validar_fechas_propuestas(
     if not nueva_desde or not nueva_hasta:
         return  # Pedido sin fechas (caso raro de borrador) — no validamos
     try:
-        d0 = datetime.datetime.fromisoformat(nueva_desde)
-        d1 = datetime.datetime.fromisoformat(nueva_hasta)
+        d0 = to_datetime(nueva_desde)
+        d1 = to_datetime(nueva_hasta)
     except ValueError:
         raise HTTPException(400, "Formato de fechas inválido")
     if d0 >= d1:
@@ -519,11 +521,11 @@ def _validar_ventana_corte(
 
     if fecha_desde_propuesta and fecha_desde_actual:
         try:
-            d_prop = datetime.datetime.fromisoformat(fecha_desde_propuesta)
-            d_act = datetime.datetime.fromisoformat(fecha_desde_actual)
+            d_prop = to_datetime(fecha_desde_propuesta)
+            d_act = to_datetime(fecha_desde_actual)
             if d_prop >= d_act:
                 return ventana  # pull-out: permitido sin chequeo
-        except ValueError:
+        except (ValueError, TypeError):
             pass
 
     if not _ventana_cumple(fecha_desde_actual, ventana):
@@ -1185,7 +1187,7 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
     pedido = row_to_dict(row)
 
     items = conn.execute("""
-        SELECT pi.cantidad, e.id AS equipo_id, e.nombre, e.marca, e.modelo,
+        SELECT pi.cantidad, e.id AS equipo_id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo,
                e.serie, e.valor_reposicion, e.foto_url, pi.precio_jornada, pi.subtotal,
                e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
@@ -1197,7 +1199,7 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
 
     for item in pedido["items"]:
         comp_rows = conn.execute("""
-            SELECT ec.nombre, ec.marca, ec.modelo, ec.serie, ec.valor_reposicion,
+            SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.modelo, ec.serie, ec.valor_reposicion,
                    ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id

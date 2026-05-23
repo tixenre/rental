@@ -259,7 +259,7 @@ def init_slugs(conn, dry_run: bool = False) -> dict[str, int]:
         return stats
 
     rows = conn.execute(
-        "SELECT id, nombre, marca, modelo FROM equipos WHERE slug IS NULL"
+        "SELECT id, nombre, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca, modelo FROM equipos WHERE slug IS NULL"
     ).fetchall()
     if not rows:
         r = conn.execute(

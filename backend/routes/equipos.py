@@ -618,7 +618,7 @@ def list_equipos(
         like = f"%{q}%"
         base_sql += """ AND (
             e.nombre ILIKE ?
-            OR COALESCE(e.marca, '') ILIKE ?
+            OR COALESCE((SELECT nombre FROM marcas WHERE id = e.brand_id), '') ILIKE ?
             OR COALESCE(e.modelo, '') ILIKE ?
             OR COALESCE(e.serie, '') ILIKE ?
             OR EXISTS (
@@ -674,9 +674,8 @@ def list_equipos(
         params.append(etiqueta)
 
     if marca:
-        # Filtro por marca exacta (case-insensitive). Usa el campo TEXT que
-        # se sincroniza con la tabla marcas en rename (#303).
-        base_sql += " AND LOWER(COALESCE(e.marca, '')) = LOWER(?)"
+        # Filtro por marca exacta (case-insensitive) contra marcas.nombre (brand_id FK).
+        base_sql += " AND LOWER(COALESCE((SELECT nombre FROM marcas WHERE id = e.brand_id), '')) = LOWER(?)"
         params.append(marca)
 
     # ── Sort ──
@@ -694,7 +693,7 @@ def list_equipos(
     try:
         total = conn.execute(f"SELECT COUNT(*) {base_sql}", params).fetchone()[0]
         rows  = conn.execute(
-            f"SELECT e.* {base_sql} {order_clause} LIMIT ? OFFSET ?",
+            f"SELECT e.*, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca {base_sql} {order_clause} LIMIT ? OFFSET ?",
             params + [per_page, offset]
         ).fetchall()
         equipos = [row_to_dict(r) for r in rows]
@@ -852,7 +851,7 @@ def get_equipo(id_or_slug: str):
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT * FROM equipos WHERE id = ?", (actual_id,)
+            "SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id = ?", (actual_id,)
         ).fetchone()
         if not row:
             raise HTTPException(404, "Equipo no encontrado")
@@ -867,7 +866,7 @@ def get_equipo(id_or_slug: str):
                 conn, ficha["specs_json"]
             )
         kit = conn.execute("""
-            SELECT kc.componente_id, kc.cantidad, e.nombre, e.marca, e.foto_url
+            SELECT kc.componente_id, kc.cantidad, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
             FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id
             WHERE kc.equipo_id = ?  ORDER BY e.nombre
         """, (actual_id,)).fetchall()
@@ -916,22 +915,44 @@ def _check_serie_unica(conn, serie: Optional[str], exclude_id: Optional[int] = N
         )
 
 
+def _resolve_brand_id(conn, nombre: str | None) -> int | None:
+    """Find-or-create de marca por nombre (case-insensitive). Devuelve el id
+    o None si nombre vacío. La marca (`marcas.nombre`) es la fuente única del
+    nombre de marca; equipos.brand_id la referencia."""
+    if not nombre or not nombre.strip():
+        return None
+    nombre = nombre.strip()
+    row = conn.execute(
+        "SELECT id FROM marcas WHERE LOWER(nombre) = LOWER(?) LIMIT 1", (nombre,)
+    ).fetchone()
+    if row:
+        return row["id"]
+    conn.execute(
+        "INSERT INTO marcas (nombre) VALUES (?) ON CONFLICT (nombre) DO NOTHING", (nombre,)
+    )
+    row = conn.execute(
+        "SELECT id FROM marcas WHERE LOWER(nombre) = LOWER(?) LIMIT 1", (nombre,)
+    ).fetchone()
+    return row["id"] if row else None
+
+
 @router.post("/equipos", status_code=201)
 def create_equipo(data: EquipoCreate):
     conn = get_db()
     try:
         # Validar serie única (rechaza 409 si choca con otro activo)
         _check_serie_unica(conn, data.serie)
+        brand_id = _resolve_brand_id(conn, data.marca)
         cur  = conn.execute("""
-            INSERT INTO equipos (nombre, marca, modelo, cantidad,
+            INSERT INTO equipos (nombre, brand_id, modelo, cantidad,
                                  precio_jornada, precio_usd, roi_pct,
                                  valor_reposicion, foto_url, fecha_compra,
                                  serie, bh_url, dueno, visible_catalogo, estado,
                                  ficha_completa)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (data.nombre, data.marca, data.modelo, data.cantidad,
+        """, (data.nombre, brand_id, data.modelo, data.cantidad,
               data.precio_jornada, data.precio_usd, data.roi_pct,
-              data.valor_reposicion, data.foto_url, data.fecha_compra,
+              data.valor_reposicion, data.foto_url, data.fecha_compra or None,
               data.serie, data.bh_url, data.dueno, data.visible_catalogo, data.estado,
               bool(data.ficha_completa)))
         new_id = cur.lastrowid
@@ -942,7 +963,7 @@ def create_equipo(data: EquipoCreate):
         except Exception:
             pass
         conn.commit()
-        row    = conn.execute("SELECT * FROM equipos WHERE id=?", (new_id,)).fetchone()
+        row    = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (new_id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         return equipo
     except Exception:
@@ -956,12 +977,20 @@ def create_equipo(data: EquipoCreate):
 def update_equipo(id: int, data: EquipoUpdate):
     conn     = get_db()
     try:
-        existing = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
+        existing = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
         if not existing:
             raise HTTPException(404, "Equipo no encontrado")
         updates = data.model_dump(exclude_unset=True)
         if not updates:
             raise HTTPException(400, "Nada para actualizar")
+        # marca → brand_id: marcas.nombre es la fuente única. Resolvemos la
+        # FK y NO escribimos la columna marca (eliminada).
+        marca_cambio = "marca" in updates
+        if marca_cambio:
+            updates["brand_id"] = _resolve_brand_id(conn, updates.pop("marca"))
+        # fecha_compra es DATE: '' rompe el cast → normalizar a NULL.
+        if "fecha_compra" in updates and not updates["fecha_compra"]:
+            updates["fecha_compra"] = None
         # Validar serie única si se está cambiando (excluyendo este equipo).
         # Rechaza si otra fila activa tiene la misma serie.
         if "serie" in updates:
@@ -991,17 +1020,17 @@ def update_equipo(id: int, data: EquipoUpdate):
         conn.execute(f"UPDATE equipos SET {set_clause} WHERE id = ?",
                      list(updates.values()) + [id])
         # Si cambió algo que alimenta auto-tags, regenerar.
-        if any(k in updates for k in ("nombre", "marca", "modelo")):
+        if marca_cambio or any(k in updates for k in ("nombre", "modelo")):
             regenerate_auto_tags(conn, id)
         # Hook: si cambió algo que afecta el nombre público, recalcular.
         # No falla el update si el recálculo rompe.
-        if any(k in updates for k in ("nombre", "marca", "modelo")):
+        if marca_cambio or any(k in updates for k in ("nombre", "modelo")):
             try:
                 actualizar_nombres_de(conn, id, commit=False)
             except Exception:
                 pass
         conn.commit()
-        row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
+        row    = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         return equipo
     except Exception:
@@ -1021,14 +1050,14 @@ def duplicate_equipo(id: int):
     """
     conn = get_db()
     try:
-        src = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
+        src = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
         if not src:
             raise HTTPException(404, "Equipo no encontrado")
         src_d = row_to_dict(src)
 
         cur = conn.execute("""
             INSERT INTO equipos (
-                nombre, marca, modelo, cantidad,
+                nombre, brand_id, modelo, cantidad,
                 precio_jornada, precio_usd, roi_pct,
                 valor_reposicion, foto_url, fecha_compra,
                 serie, bh_url, dueno, visible_catalogo, estado,
@@ -1036,9 +1065,9 @@ def duplicate_equipo(id: int):
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             f"{src_d['nombre']} (copia)",
-            src_d.get("marca"), src_d.get("modelo"), 1,
+            src_d.get("brand_id"), src_d.get("modelo"), 1,
             src_d.get("precio_jornada"), src_d.get("precio_usd"), src_d.get("roi_pct"),
-            src_d.get("valor_reposicion"), src_d.get("foto_url"), src_d.get("fecha_compra"),
+            src_d.get("valor_reposicion"), src_d.get("foto_url"), src_d.get("fecha_compra") or None,
             None,  # serie vacía
             src_d.get("bh_url"), src_d.get("dueno"), src_d.get("visible_catalogo", 1), src_d.get("estado", "operativo"),
             False,  # ficha_completa false para que el admin la revise
@@ -1100,7 +1129,7 @@ def duplicate_equipo(id: int):
             logger.warning("regenerate_auto_tags falló para duplicado %s: %s", new_id, e)
 
         conn.commit()
-        row = conn.execute("SELECT * FROM equipos WHERE id=?", (new_id,)).fetchone()
+        row = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (new_id,)).fetchone()
         return attach_tags(conn, [row_to_dict(row)])[0]
     except Exception:
         conn.rollback()
@@ -1388,7 +1417,7 @@ def get_equipo_historial(id: int):
                 p.fecha_desde, p.fecha_hasta,
                 COALESCE(c.nombre || ' ' || c.apellido, p.cliente_nombre) AS cliente,
                 pi.cantidad, pi.precio_jornada AS precio_item,
-                GREATEST(1, DATE_PART('day', LEFT(p.fecha_hasta, 10)::TIMESTAMP - LEFT(p.fecha_desde, 10)::TIMESTAMP))::INTEGER AS dias
+                GREATEST(1, (p.fecha_hasta::date - p.fecha_desde::date))::INTEGER AS dias
             FROM alquiler_items pi
             JOIN alquileres p ON p.id = pi.pedido_id
             LEFT JOIN clientes c ON c.id = p.cliente_id
@@ -1457,7 +1486,7 @@ def add_mantenimiento(id: int, data: MantenimientoCreate):
                  fecha_hasta, cantidad, bloquea_stock)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (id, data.fecha, data.tipo or "revision", data.descripcion, data.costo,
-              data.proxima_revision, data.fecha_hasta, max(1, data.cantidad),
+              data.proxima_revision or None, data.fecha_hasta or None, max(1, data.cantidad),
               data.bloquea_stock))
         conn.commit()
         new_id = cur.lastrowid
@@ -1486,6 +1515,10 @@ def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate):
         updates = data.model_dump(exclude_unset=True)
         if not updates:
             raise HTTPException(400, "Nada para actualizar")
+        # Columnas TIMESTAMP: '' rompe el cast → normalizar a NULL.
+        for k in ("fecha_hasta", "proxima_revision"):
+            if k in updates and not updates[k]:
+                updates[k] = None
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         conn.execute(
             f"UPDATE equipo_mantenimiento SET {set_clause} WHERE id = ?",
@@ -1533,7 +1566,7 @@ def get_kit(id: int):
             raise HTTPException(404, "Equipo no encontrado")
         rows = conn.execute("""
             SELECT kc.id, kc.componente_id, kc.cantidad, kc.orden,
-                   e.nombre, e.marca, e.modelo, e.foto_url, e.visible_catalogo
+                   e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url, e.visible_catalogo
             FROM kit_componentes kc
             JOIN equipos e ON e.id = kc.componente_id
             WHERE kc.equipo_id = ?
@@ -1697,7 +1730,7 @@ def set_etiquetas(id: int, data: EtiquetasUpdate):
                 DO UPDATE SET orden = EXCLUDED.orden, origen = 'manual'
             """, (id, row["id"], orden))
         conn.commit()
-        row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
+        row    = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         return equipo
     except Exception:
@@ -1800,7 +1833,7 @@ def set_categorias(id: int, data: CategoriasUpdate):
         except Exception:
             pass
         conn.commit()
-        row    = conn.execute("SELECT * FROM equipos WHERE id=?", (id,)).fetchone()
+        row    = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         equipo = attach_categorias(conn, [equipo])[0]
         return equipo
@@ -1958,17 +1991,17 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
         # ── Top 10 más alquilados (cantidad de pedidos + revenue total) ──
         top_alquilados = conn.execute("""
             SELECT
-                e.id, e.nombre, e.marca, e.modelo, e.foto_url,
+                e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url,
                 COUNT(DISTINCT p.id) AS cant_pedidos,
                 SUM(
                     COALESCE(pi.precio_jornada, 0) * COALESCE(pi.cantidad, 1)
-                    * GREATEST(1, DATE_PART('day', LEFT(p.fecha_hasta, 10)::TIMESTAMP - LEFT(p.fecha_desde, 10)::TIMESTAMP))::INTEGER
+                    * GREATEST(1, (p.fecha_hasta::date - p.fecha_desde::date))::INTEGER
                 ) AS revenue_total
             FROM equipos e
             JOIN alquiler_items pi ON pi.equipo_id = e.id
             JOIN alquileres p ON p.id = pi.pedido_id
             WHERE e.eliminado_at IS NULL
-            GROUP BY e.id, e.nombre, e.marca, e.modelo, e.foto_url
+            GROUP BY e.id, e.nombre, e.modelo, e.foto_url
             ORDER BY cant_pedidos DESC, revenue_total DESC
             LIMIT 10
         """).fetchall()
@@ -1976,15 +2009,15 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
         # ── Equipos sin movimiento (último alquiler hace > N días, o nunca) ──
         sin_uso = conn.execute("""
             SELECT
-                e.id, e.nombre, e.marca, e.modelo, e.foto_url, e.valor_reposicion,
+                e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url, e.valor_reposicion,
                 MAX(p.fecha_desde) AS ultimo_alquiler,
                 COUNT(DISTINCT p.id) AS total_alquileres
             FROM equipos e
             LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
             LEFT JOIN alquileres p ON p.id = pi.pedido_id
             WHERE e.eliminado_at IS NULL
-            GROUP BY e.id, e.nombre, e.marca, e.modelo, e.foto_url, e.valor_reposicion
-            HAVING (MAX(p.fecha_desde) IS NULL OR MAX(p.fecha_desde) < (CURRENT_DATE - (? || ' days')::INTERVAL)::TEXT)
+            GROUP BY e.id, e.nombre, e.modelo, e.foto_url, e.valor_reposicion
+            HAVING (MAX(p.fecha_desde) IS NULL OR MAX(p.fecha_desde) < (CURRENT_DATE - (? || ' days')::INTERVAL))
             ORDER BY ultimo_alquiler ASC NULLS FIRST
             LIMIT 25
         """, (dias_sin_uso,)).fetchall()
@@ -1996,7 +2029,7 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
                 COUNT(DISTINCT p.id) AS cant_pedidos,
                 SUM(
                     COALESCE(pi.precio_jornada, 0) * COALESCE(pi.cantidad, 1)
-                    * GREATEST(1, DATE_PART('day', LEFT(p.fecha_hasta, 10)::TIMESTAMP - LEFT(p.fecha_desde, 10)::TIMESTAMP))::INTEGER
+                    * GREATEST(1, (p.fecha_hasta::date - p.fecha_desde::date))::INTEGER
                 ) AS revenue_total
             FROM categorias cat
             JOIN equipo_categorias ec ON ec.categoria_id = cat.id
@@ -2017,7 +2050,7 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
                 COUNT(DISTINCT p.id) AS total_pedidos,
                 SUM(
                     COALESCE(pi.precio_jornada, 0) * COALESCE(pi.cantidad, 1)
-                    * GREATEST(1, DATE_PART('day', LEFT(p.fecha_hasta, 10)::TIMESTAMP - LEFT(p.fecha_desde, 10)::TIMESTAMP))::INTEGER
+                    * GREATEST(1, (p.fecha_hasta::date - p.fecha_desde::date))::INTEGER
                 ) AS revenue_total
             FROM equipos e
             LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
@@ -2633,7 +2666,7 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
     conn = get_db()
     try:
         equipos = conn.execute("""
-            SELECT e.id, e.nombre, e.marca, e.modelo
+            SELECT e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo
             FROM equipos e
             ORDER BY e.nombre
         """).fetchall()
@@ -2725,29 +2758,29 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
 
         # Direct reservations that overlap this month
         directas = conn.execute(f"""
-            SELECT LEFT(p.fecha_desde, 10) AS desde,
-                   LEFT(p.fecha_hasta, 10) AS hasta,
+            SELECT to_char(p.fecha_desde, 'YYYY-MM-DD') AS desde,
+                   to_char(p.fecha_hasta, 'YYYY-MM-DD') AS hasta,
                    pi.cantidad
             FROM alquiler_items pi
             JOIN alquileres p ON p.id = pi.pedido_id
             WHERE pi.equipo_id = ?
               AND p.estado IN {ESTADOS}
-              AND LEFT(p.fecha_desde, 10) <= ?
-              AND LEFT(p.fecha_hasta, 10) > ?
+              AND p.fecha_desde::date <= ?
+              AND p.fecha_hasta::date > ?
         """, (id, last_day, first_day)).fetchall()
 
         # Via-kit reservations: this equipment is a component of a rented kit
         via_kit = conn.execute(f"""
-            SELECT LEFT(p.fecha_desde, 10) AS desde,
-                   LEFT(p.fecha_hasta, 10) AS hasta,
+            SELECT to_char(p.fecha_desde, 'YYYY-MM-DD') AS desde,
+                   to_char(p.fecha_hasta, 'YYYY-MM-DD') AS hasta,
                    pi.cantidad * kc.cantidad AS cantidad
             FROM kit_componentes kc
             JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
             JOIN alquileres p ON p.id = pi.pedido_id
             WHERE kc.componente_id = ?
               AND p.estado IN {ESTADOS}
-              AND LEFT(p.fecha_desde, 10) <= ?
-              AND LEFT(p.fecha_hasta, 10) > ?
+              AND p.fecha_desde::date <= ?
+              AND p.fecha_hasta::date > ?
         """, (id, last_day, first_day)).fetchall()
 
         reservations = [dict(r) for r in directas] + [dict(r) for r in via_kit]
@@ -4266,7 +4299,7 @@ def admin_aplicar_enriquecimiento(id: int, payload: AplicarEnriquecimientoInput,
         conn.commit()
 
         # Devolver equipo + ficha actualizados + resumen del matching
-        eq_row = conn.execute("SELECT * FROM equipos WHERE id = ?", (id,)).fetchone()
+        eq_row = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id = ?", (id,)).fetchone()
         ficha_row = conn.execute("SELECT * FROM equipo_fichas WHERE equipo_id = ?", (id,)).fetchone()
         return {
             "equipo": row_to_dict(eq_row),
@@ -4874,137 +4907,3 @@ def admin_storage_diag(request: Request):
         return {"ok": False, "vars": vars_status, "tested": True, "error": e.detail}
     except Exception as e:
         return {"ok": False, "vars": vars_status, "tested": True, "error": str(e)}
-
-
-# ── Admin: migración de paths R2 al nuevo esquema {id}_{slug}/ ───────────────
-
-@router.post("/admin/storage/migrate-paths")
-def admin_migrate_storage_paths(request: Request, dry_run: bool = True):
-    """Renombra todos los objetos R2 que están bajo el prefijo 'equipos/'
-    al nuevo esquema {id}_{slug}/{id}_{slug}.ext.
-    Con dry_run=true (default) solo lista los cambios sin aplicarlos.
-    Llamar con ?dry_run=false para ejecutar la migración real."""
-    require_admin(request)
-
-    cfg    = _r2_config()
-    client = _get_r2_client(cfg)
-    bucket = cfg["bucket"]
-    public_base = cfg["public_base"]
-
-    # 1. Cargar todos los equipos para construir el mapa id → slug
-    conn = get_db()
-    try:
-        equipo_rows = conn.execute("SELECT id, nombre FROM equipos").fetchall()
-    finally:
-        conn.close()
-
-    def _make_slug(nombre: str) -> str:
-        s = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode()
-        return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:50]
-
-    equipo_slugs: dict[int, str] = {}
-    for row in equipo_rows:
-        eid, nombre = int(row[0]), row[1] or ""
-        equipo_slugs[eid] = _make_slug(nombre) if nombre else ""
-
-    # 2. Listar objetos con prefix equipos/ (paginado)
-    old_keys: list[str] = []
-    paginator = client.get_paginator("list_objects_v2")
-    for page in paginator.paginate(Bucket=bucket, Prefix="equipos/"):
-        for obj in page.get("Contents", []):
-            old_keys.append(obj["Key"])
-
-    # 3. Calcular nuevos paths
-    renames: list[dict] = []
-    skipped: list[str] = []
-    for old_key in old_keys:
-        parts = old_key.split("/")
-        if len(parts) < 3:
-            skipped.append(old_key)
-            continue
-        try:
-            equipo_id = int(parts[1])
-        except ValueError:
-            skipped.append(old_key)
-            continue
-        filename = parts[-1]
-        m = re.search(r"\.([a-z0-9]+)$", filename, re.IGNORECASE)
-        if not m:
-            skipped.append(old_key)
-            continue
-        ext  = m.group(1).lower()
-        slug = equipo_slugs.get(equipo_id, "")
-        if slug:
-            new_key = f"equipos/{equipo_id}_{slug}/{equipo_id}_{slug}.{ext}"
-        else:
-            new_key = f"equipos/{equipo_id}/{equipo_id}.{ext}"
-        if old_key == new_key:
-            continue
-        renames.append({
-            "equipo_id": equipo_id,
-            "old": old_key,
-            "new": new_key,
-            "old_url": f"{public_base}/{old_key}",
-            "new_url": f"{public_base}/{new_key}",
-        })
-
-    if dry_run:
-        return {
-            "dry_run":  True,
-            "to_rename": len(renames),
-            "skipped":  len(skipped),
-            "detail":   renames,
-        }
-
-    # 4. Ejecutar copias + actualizaciones + borrado
-    moved:      list[dict] = []
-    db_updated: list[dict] = []
-    errors:     list[dict] = []
-
-    _CT_MAP = {"webp": "image/webp", "jpg": "image/jpeg", "jpeg": "image/jpeg",
-               "png": "image/png", "avif": "image/avif", "gif": "image/gif"}
-
-    for r in renames:
-        ext_new = r["new"].rsplit(".", 1)[-1].lower()
-        ctype   = _CT_MAP.get(ext_new, "image/webp")
-        try:
-            client.copy_object(
-                Bucket=bucket,
-                CopySource={"Bucket": bucket, "Key": r["old"]},
-                Key=r["new"],
-                CacheControl="public, max-age=31536000, immutable",
-                MetadataDirective="REPLACE",
-                ContentType=ctype,
-            )
-        except Exception as e:
-            errors.append({"key": r["old"], "stage": "copy", "error": str(e)})
-            continue
-
-        # Actualizar foto en DB si coincide con la URL vieja
-        try:
-            db_conn = get_db()
-            try:
-                db_conn.execute(
-                    "UPDATE equipos SET foto = %s WHERE id = %s AND foto = %s",
-                    (r["new_url"], r["equipo_id"], r["old_url"]),
-                )
-                db_conn.commit()
-                db_updated.append({"equipo_id": r["equipo_id"], "new_url": r["new_url"]})
-            finally:
-                db_conn.close()
-        except Exception as e:
-            errors.append({"key": r["old"], "stage": "db_update", "error": str(e)})
-
-        try:
-            client.delete_object(Bucket=bucket, Key=r["old"])
-            moved.append({"old": r["old"], "new": r["new"]})
-        except Exception as e:
-            errors.append({"key": r["old"], "stage": "delete", "error": str(e)})
-
-    return {
-        "dry_run":   False,
-        "moved":     len(moved),
-        "db_updated": len(db_updated),
-        "errors":    len(errors),
-        "error_detail": errors,
-    }

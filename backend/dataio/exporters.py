@@ -200,16 +200,12 @@ def _ensure_equipos_slug(conn) -> None:
     changed = False
     if not has_slug:
         conn.execute("ALTER TABLE equipos ADD COLUMN slug VARCHAR(80)")
-        conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_equipos_slug_unique "
-            "ON equipos(slug) WHERE slug IS NOT NULL"
-        )
         changed = True
 
     # Poblar slugs faltantes (también cubre el caso "columna existía pero
     # init-slugs nunca corrió").
     pending = conn.execute("""
-        SELECT id, nombre, marca, modelo FROM equipos
+        SELECT id, nombre, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca, modelo FROM equipos
         WHERE slug IS NULL AND eliminado_at IS NULL
     """).fetchall()
     if pending:
@@ -230,6 +226,25 @@ def _ensure_equipos_slug(conn) -> None:
             conn.execute("UPDATE equipos SET slug = ? WHERE id = ?", (slug, r["id"]))
         changed = True
 
+    # Asegurar el UNIQUE constraint completo (consistente con migración
+    # f5b8d2e4a9c1, no el partial index transicional). Idempotente.
+    conn.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'equipos_slug_key' AND conrelid = 'equipos'::regclass
+            ) AND NOT EXISTS (
+                SELECT 1 FROM equipos WHERE slug IS NOT NULL
+                GROUP BY slug HAVING COUNT(*) > 1
+            ) THEN
+                ALTER TABLE equipos ADD CONSTRAINT equipos_slug_key UNIQUE (slug);
+                DROP INDEX IF EXISTS idx_equipos_slug_unique;
+            END IF;
+        END $$;
+    """)
+    changed = True
+
     if changed:
         conn.commit()
 
@@ -244,7 +259,7 @@ def export_equipos(conn) -> list[dict]:
     _ensure_equipos_slug(conn)
 
     rows = conn.execute("""
-        SELECT e.slug, e.nombre, e.marca, e.modelo, e.cantidad,
+        SELECT e.slug, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.cantidad,
                e.precio_jornada, e.precio_jornada_manual, e.precio_usd,
                e.roi_pct, e.valor_reposicion, e.foto_url, e.fecha_compra,
                e.serie, e.bh_url, e.dueno, e.visible_catalogo, e.estado,
@@ -324,7 +339,7 @@ def export_equipos(conn) -> list[dict]:
                 roi_pct=r["roi_pct"],
                 valor_reposicion=r["valor_reposicion"],
                 foto_url=r["foto_url"],
-                fecha_compra=r["fecha_compra"],
+                fecha_compra=_to_iso(r["fecha_compra"]),
                 serie=r["serie"],
                 bh_url=r["bh_url"],
                 dueno=r["dueno"],
@@ -465,7 +480,7 @@ def export_alquileres(conn) -> list[dict]:
         SELECT a.numero_pedido, a.cliente_nombre, a.cliente_telefono,
                a.estado, a.fecha_desde, a.fecha_hasta, a.monto_total,
                a.monto_pagado, a.descuento_pct, a.notas, a.fuente,
-               a.numero_remito, a.id AS alquiler_id,
+               a.id AS alquiler_id,
                c.email AS cliente_email
         FROM alquileres a
         LEFT JOIN clientes c ON c.id = a.cliente_id
@@ -523,14 +538,13 @@ def export_alquileres(conn) -> list[dict]:
                 cliente_nombre=r["cliente_nombre"],
                 cliente_telefono=r["cliente_telefono"],
                 estado=r["estado"] or "presupuesto",
-                fecha_desde=r["fecha_desde"],
-                fecha_hasta=r["fecha_hasta"],
+                fecha_desde=_to_iso(r["fecha_desde"]) or "",
+                fecha_hasta=_to_iso(r["fecha_hasta"]) or "",
                 monto_total=int(r["monto_total"] or 0),
                 monto_pagado=int(r["monto_pagado"] or 0),
                 descuento_pct=float(r["descuento_pct"] or 0.0),
                 notas=r["notas"],
                 fuente=r["fuente"] or "sistema",
-                numero_remito=r["numero_remito"],
                 items=items_by_alq.get(alq_id, []),
                 pagos=pagos_by_alq.get(alq_id, []),
             ).model_dump()

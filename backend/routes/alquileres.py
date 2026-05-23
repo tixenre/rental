@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Query, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 
-from database import get_db, row_to_dict
+from database import get_db, row_to_dict, to_datetime, to_iso
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin
 from services.email import send_email
@@ -53,7 +53,9 @@ def _maybe_finalizar(conn, pedido_id: int):
 
 def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
     rows = conn.execute("""
-        SELECT pi.*, e.nombre, e.marca, e.foto_url, e.cantidad AS stock_total,
+        SELECT pi.*, e.nombre,
+               (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
+               e.foto_url, e.cantidad AS stock_total,
                e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
         JOIN equipos e ON e.id = pi.equipo_id
@@ -69,7 +71,7 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
     equipo_ids = list({item["equipo_id"] for item in items})
     placeholders = ",".join("?" for _ in equipo_ids)
     comp_rows = conn.execute(f"""
-        SELECT kc.*, ec.nombre, ec.marca, ec.foto_url, ec.cantidad AS stock_total,
+        SELECT kc.*, ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.foto_url, ec.cantidad AS stock_total,
                ec.nombre_publico, ec.nombre_publico_largo
         FROM kit_componentes kc
         JOIN equipos ec ON ec.id = kc.componente_id
@@ -134,7 +136,9 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
 
     ph = ",".join(["?"] * len(pedido_ids))
     rows = conn.execute(f"""
-        SELECT pi.*, e.nombre, e.marca, e.foto_url, e.cantidad AS stock_total,
+        SELECT pi.*, e.nombre,
+               (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
+               e.foto_url, e.cantidad AS stock_total,
                e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
         JOIN equipos e ON e.id = pi.equipo_id
@@ -148,7 +152,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
     if equipo_ids:
         cph = ",".join(["?"] * len(equipo_ids))
         comp_rows = conn.execute(f"""
-            SELECT kc.*, ec.nombre, ec.marca, ec.foto_url, ec.cantidad AS stock_total,
+            SELECT kc.*, ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.foto_url, ec.cantidad AS stock_total,
                    ec.nombre_publico, ec.nombre_publico_largo
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id
@@ -357,17 +361,19 @@ def _get_buffer_dias(conn) -> int:
         return 0
 
 
-def _rango_con_buffer(fecha_desde: str, fecha_hasta: str, buffer_dias: int) -> tuple[str, str]:
+def _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias: int):
     """Expande [desde, hasta] en `buffer_dias` por cada lado. Expandir el rango
     nuevo equivale a exigir `buffer_dias` de gap contra los alquileres
-    existentes (el overlap es simétrico). Devuelve fechas ISO YYYY-MM-DD."""
+    existentes (el overlap es simétrico). Devuelve fechas ISO YYYY-MM-DD.
+
+    Acepta str ISO o datetime (las columnas son TIMESTAMP)."""
     if buffer_dias <= 0:
         return fecha_desde, fecha_hasta
     try:
-        d0 = datetime.date.fromisoformat(fecha_desde[:10]) - datetime.timedelta(days=buffer_dias)
-        d1 = datetime.date.fromisoformat(fecha_hasta[:10]) + datetime.timedelta(days=buffer_dias)
+        d0 = to_datetime(fecha_desde).date() - datetime.timedelta(days=buffer_dias)
+        d1 = to_datetime(fecha_hasta).date() + datetime.timedelta(days=buffer_dias)
         return d0.isoformat(), d1.isoformat()
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, AttributeError):
         return fecha_desde, fecha_hasta
 
 
@@ -480,8 +486,8 @@ def _pedido_email_context(pedido: dict) -> dict:
         "cliente_email": pedido.get("cliente_email") or "",
         "cliente_telefono": pedido.get("cliente_telefono") or "",
         "numero_pedido": pedido.get("numero_pedido") or pedido.get("id"),
-        "fecha_desde": pedido.get("fecha_desde") or "",
-        "fecha_hasta": pedido.get("fecha_hasta") or "",
+        "fecha_desde": to_iso(pedido.get("fecha_desde")) or "",
+        "fecha_hasta": to_iso(pedido.get("fecha_hasta")) or "",
         "total": pedido.get("monto_total") or 0,
         "notas": pedido.get("notas") or "",
         "items_html": items_html,
@@ -547,8 +553,8 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                 descuento_pct    = c["descuento"] or 0.0
 
         if data.fecha_desde and data.fecha_hasta:
-            d0 = datetime.datetime.fromisoformat(data.fecha_desde)
-            d1 = datetime.datetime.fromisoformat(data.fecha_hasta)
+            d0 = to_datetime(data.fecha_desde)
+            d1 = to_datetime(data.fecha_hasta)
             hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
             if d0 >= d1:
@@ -578,12 +584,12 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
         cur = conn.execute("""
             INSERT INTO alquileres (cliente_nombre, cliente_email, cliente_telefono,
                                  cliente_id, notas, fecha_desde, fecha_hasta,
-                                 monto_total, estado, numero_pedido, numero_remito,
+                                 monto_total, estado, numero_pedido,
                                  descuento_pct, descuento_jornadas_pct)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
         """, (cliente_nombre, cliente_email, cliente_telefono,
-              data.cliente_id, data.notas, data.fecha_desde, data.fecha_hasta,
-              monto_total, estado_inicial, next_num, str(next_num),
+              data.cliente_id, data.notas, data.fecha_desde or None, data.fecha_hasta or None,
+              monto_total, estado_inicial, next_num,
               descuento_pct, descuento_jornadas_pct))
         pedido_id = cur.lastrowid
 
@@ -649,8 +655,8 @@ def list_pedidos(
             params.append(fuente)
         if q:
             like = f"%{q}%"
-            where += " AND (p.cliente_nombre LIKE ? OR p.numero_remito LIKE ? OR CAST(p.numero_pedido AS TEXT) LIKE ?)"
-            params += [like, like, like]
+            where += " AND (p.cliente_nombre LIKE ? OR CAST(p.numero_pedido AS TEXT) LIKE ?)"
+            params += [like, like]
         if con_saldo:
             # Pedidos con saldo > 0 y no cancelados. Borrador y presupuesto no
             # aplican porque todavía no se cobra; cancelado tampoco.
@@ -659,10 +665,8 @@ def list_pedidos(
 
         col = SORT_COLS.get(sort_by, "p.numero_pedido")
         direction = "ASC" if sort_dir == "asc" else "DESC"
-        # Poner "Registro manual" al final (los importados del histórico tienen
-        # numero_remito NULL o string vacío — antes solo chequeábamos NULL y
-        # los string vacíos se trataban como "tiene número" y subían arriba).
-        has_numero = "(p.numero_remito IS NOT NULL AND p.numero_remito != '')"
+        # Poner "Registro manual" (sin número de pedido) al final.
+        has_numero = "(p.numero_pedido IS NOT NULL)"
         order = f"{has_numero} DESC, {col} {direction} NULLS LAST"
         # secundario: número descendente para desempate
         if col != "p.numero_pedido":
@@ -896,8 +900,8 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
                 errores.append("El pedido no tiene fechas de inicio y fin.")
             else:
                 try:
-                    d0 = datetime.datetime.fromisoformat(p_row["fecha_desde"])
-                    d1 = datetime.datetime.fromisoformat(p_row["fecha_hasta"])
+                    d0 = to_datetime(p_row["fecha_desde"])
+                    d1 = to_datetime(p_row["fecha_hasta"])
                     hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
                     if d0 >= d1:
@@ -943,7 +947,6 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
         if data.estado == "confirmado" and not p_row["numero_pedido"]:
             next_n = _next_numero_pedido(conn)
             updates["numero_pedido"] = next_n
-            updates["numero_remito"] = str(next_n)
 
         set_clause = ", ".join(f"{k}=?" for k in updates)
         conn.execute(f"UPDATE alquileres SET {set_clause} WHERE id=?", (*updates.values(), id))
@@ -1115,6 +1118,10 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
         raise HTTPException(404, "Pedido no encontrado")
 
     payload = {k: v for k, v in data.model_dump(exclude_unset=True).items()}
+    # Columnas TIMESTAMP: '' rompe el cast → normalizar a NULL.
+    for _k in ("fecha_desde", "fecha_hasta"):
+        if _k in payload and not payload[_k]:
+            payload[_k] = None
 
     cliente_cambio = "cliente_id" in payload and payload["cliente_id"]
     if cliente_cambio:
@@ -1130,8 +1137,8 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
         nueva_desde = payload.get("fecha_desde") or p["fecha_desde"]
         nueva_hasta = payload.get("fecha_hasta") or p["fecha_hasta"]
         if nueva_desde and nueva_hasta:
-            d0 = datetime.datetime.fromisoformat(nueva_desde)
-            d1 = datetime.datetime.fromisoformat(nueva_hasta)
+            d0 = to_datetime(nueva_desde)
+            d1 = to_datetime(nueva_hasta)
             hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
             if d0 >= d1:
@@ -1151,8 +1158,8 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
     if "fecha_desde" in payload or "fecha_hasta" in payload or cliente_cambio:
         p2 = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
         if p2["fecha_desde"] and p2["fecha_hasta"]:
-            d0 = datetime.datetime.fromisoformat(p2["fecha_desde"])
-            d1 = datetime.datetime.fromisoformat(p2["fecha_hasta"])
+            d0 = to_datetime(p2["fecha_desde"])
+            d1 = to_datetime(p2["fecha_hasta"])
             jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
         else:
             jornadas = 1
@@ -1188,8 +1195,8 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
         raise HTTPException(400, "Debe tener al menos un ítem")
 
     if p["fecha_desde"] and p["fecha_hasta"]:
-        d0 = datetime.datetime.fromisoformat(p["fecha_desde"])
-        d1 = datetime.datetime.fromisoformat(p["fecha_hasta"])
+        d0 = to_datetime(p["fecha_desde"])
+        d1 = to_datetime(p["fecha_hasta"])
         jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
     else:
         jornadas = 1
@@ -1322,7 +1329,7 @@ async def pedido_albaran(id: int, request: Request, format: str = "pdf"):
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
         items  = conn.execute("""
-            SELECT pi.cantidad, e.nombre, e.marca, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
+            SELECT pi.cantidad, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
                    e.nombre_publico, e.nombre_publico_largo, pi.equipo_id
             FROM alquiler_items pi
             JOIN equipos e ON e.id = pi.equipo_id
@@ -1334,7 +1341,7 @@ async def pedido_albaran(id: int, request: Request, format: str = "pdf"):
         # Agregar componentes a cada item
         for item in pedido["items"]:
             comp_rows = conn.execute("""
-                SELECT ec.nombre, ec.marca, ec.modelo, ec.serie, ec.valor_reposicion,
+                SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.modelo, ec.serie, ec.valor_reposicion,
                        ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
                 FROM kit_componentes kc
                 JOIN equipos ec ON ec.id = kc.componente_id
@@ -1369,7 +1376,7 @@ async def pedido_contrato(id: int, request: Request, format: str = "pdf"):
         # Agregar componentes a cada item
         for item in pedido["items"]:
             comp_rows = conn.execute("""
-                SELECT ec.nombre, ec.marca, ec.modelo, ec.serie, ec.valor_reposicion,
+                SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.modelo, ec.serie, ec.valor_reposicion,
                        ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
                 FROM kit_componentes kc
                 JOIN equipos ec ON ec.id = kc.componente_id
