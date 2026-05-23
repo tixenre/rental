@@ -41,7 +41,7 @@ from typing import Any, Iterable
 
 RESOURCES = ("customers", "orders", "lines", "products")
 API_BASE_TMPL = "https://{company}.booqable.com/api/boomerang/{resource}"
-MAX_RETRIES = 5
+MAX_RETRIES = 8
 
 
 def http_get(url: str, api_key: str) -> dict[str, Any]:
@@ -53,7 +53,6 @@ def http_get(url: str, api_key: str) -> dict[str, Any]:
             "User-Agent": "booqable-export/1.0",
         },
     )
-    backoff = 2
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
@@ -61,20 +60,30 @@ def http_get(url: str, api_key: str) -> dict[str, Any]:
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", errors="replace")[:500]
             if e.code in (429, 500, 502, 503, 504) and attempt < MAX_RETRIES:
-                time.sleep(backoff)
-                backoff *= 2
+                # Honor Retry-After when provided; otherwise exponential backoff
+                # starting at 30s for 429 (Booqable is strict) and 2s for 5xx.
+                retry_after = e.headers.get("Retry-After") if e.headers else None
+                try:
+                    wait = int(retry_after) if retry_after else None
+                except ValueError:
+                    wait = None
+                if wait is None:
+                    base = 30 if e.code == 429 else 2
+                    wait = min(base * (2 ** (attempt - 1)), 300)
+                print(f"  HTTP {e.code}, waiting {wait}s before retry {attempt}/{MAX_RETRIES}", file=sys.stderr)
+                time.sleep(wait)
                 continue
             raise SystemExit(f"HTTP {e.code} on {url}\n{body}")
         except urllib.error.URLError as e:
             if attempt < MAX_RETRIES:
-                time.sleep(backoff)
-                backoff *= 2
+                wait = min(2 * (2 ** (attempt - 1)), 60)
+                time.sleep(wait)
                 continue
             raise SystemExit(f"Network error on {url}: {e}")
     raise SystemExit(f"Exhausted retries on {url}")
 
 
-def paginate(company: str, resource: str, api_key: str, page_size: int) -> Iterable[dict[str, Any]]:
+def paginate(company: str, resource: str, api_key: str, page_size: int, delay: float = 0.0) -> Iterable[dict[str, Any]]:
     page = 1
     total = 0
     while True:
@@ -91,7 +100,6 @@ def paginate(company: str, resource: str, api_key: str, page_size: int) -> Itera
             yield item
         total += len(items)
         print(f"  {resource}: fetched {total} so far", file=sys.stderr)
-        # JSON:API "meta.total_count" tells us when to stop; otherwise stop when short page
         meta = payload.get("meta", {}) or {}
         total_count = meta.get("total_count")
         if total_count is not None and total >= total_count:
@@ -99,6 +107,8 @@ def paginate(company: str, resource: str, api_key: str, page_size: int) -> Itera
         if len(items) < page_size:
             break
         page += 1
+        if delay > 0:
+            time.sleep(delay)
 
 
 def flatten(item: dict[str, Any]) -> dict[str, Any]:
@@ -138,9 +148,9 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writerows(rows)
 
 
-def export_resource(company: str, resource: str, api_key: str, page_size: int, out_dir: Path) -> int:
+def export_resource(company: str, resource: str, api_key: str, page_size: int, out_dir: Path, delay: float = 0.0) -> int:
     print(f"Exporting {resource}...", file=sys.stderr)
-    rows = [flatten(item) for item in paginate(company, resource, api_key, page_size)]
+    rows = [flatten(item) for item in paginate(company, resource, api_key, page_size, delay)]
     write_csv(out_dir / f"{resource}.csv", rows)
     print(f"  wrote {len(rows)} rows to {out_dir / (resource + '.csv')}", file=sys.stderr)
     return len(rows)
@@ -154,6 +164,8 @@ def main() -> int:
     parser.add_argument("--only", default=",".join(RESOURCES),
                         help=f"Comma-separated resources to export (any of: {','.join(RESOURCES)})")
     parser.add_argument("--page-size", type=int, default=100)
+    parser.add_argument("--delay", type=float, default=0.5,
+                        help="Seconds to sleep between page requests to stay under rate limits (default: 0.5)")
     args = parser.parse_args()
 
     if not args.company:
@@ -172,7 +184,7 @@ def main() -> int:
 
     totals: dict[str, int] = {}
     for resource in chosen:
-        totals[resource] = export_resource(args.company, resource, args.api_key, args.page_size, out_dir)
+        totals[resource] = export_resource(args.company, resource, args.api_key, args.page_size, out_dir, args.delay)
 
     print("\nDone. Output:", out_dir, file=sys.stderr)
     for r, n in totals.items():
