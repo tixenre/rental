@@ -14,7 +14,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { adminApi, descuentosJornadaApi, type ImportCsvResp } from "@/lib/admin/api";
+import { adminApi, descuentosJornadaApi } from "@/lib/admin/api";
 import { interpolarDescuento } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
@@ -22,25 +22,9 @@ export const Route = createLazyFileRoute("/admin/settings")({
   component: SettingsPage,
 });
 
-type Kind = "equipos" | "clientes" | "alquileres";
-
 function SettingsPage() {
   useDocumentTitle("Settings · Back Office");
-  const [results, setResults] = useState<Record<Kind, ImportCsvResp | null>>({
-    equipos: null, clientes: null, alquileres: null,
-  });
   const [confirmReset, setConfirmReset] = useState(false);
-
-  const importMut = useMutation({
-    mutationFn: ({ kind, file }: { kind: Kind; file: File }) =>
-      adminApi.importCsv(kind, file),
-    onSuccess: (data, { kind }) => {
-      setResults((prev) => ({ ...prev, [kind]: data }));
-      const ok = data.success_count ?? data.inserted ?? 0;
-      toast.success(`Import ${kind}: ${ok} filas procesadas`);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const fixMut = useMutation({
     mutationFn: () => adminApi.fixApellidos(),
@@ -65,7 +49,7 @@ function SettingsPage() {
         </div>
         <h1 className="font-display text-3xl text-ink">Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Importación de datos legacy y herramientas de mantenimiento.
+          Configuración del sistema y herramientas de mantenimiento.
         </p>
       </header>
 
@@ -78,40 +62,6 @@ function SettingsPage() {
       <RankingSection />
 
       <MigrarStorageSection />
-
-      <section className="rounded-lg border hairline bg-background p-4 space-y-3">
-        <h2 className="font-display text-lg text-ink">Imports CSV</h2>
-        <p className="text-sm text-muted-foreground">
-          Subí archivos CSV exportados desde el sistema viejo o planillas. UTF-8, con headers en la primera fila.
-        </p>
-
-        <div className="grid md:grid-cols-3 gap-3">
-          <ImportCard
-            kind="equipos"
-            label="Equipos"
-            hint="Headers: nombre, marca, modelo, cantidad, precio_jornada…"
-            onPick={(f) => importMut.mutate({ kind: "equipos", file: f })}
-            busy={importMut.isPending && importMut.variables?.kind === "equipos"}
-            result={results.equipos}
-          />
-          <ImportCard
-            kind="clientes"
-            label="Clientes"
-            hint="Headers: nombre, apellido, email, telefono, cuit…"
-            onPick={(f) => importMut.mutate({ kind: "clientes", file: f })}
-            busy={importMut.isPending && importMut.variables?.kind === "clientes"}
-            result={results.clientes}
-          />
-          <ImportCard
-            kind="alquileres"
-            label="Alquileres"
-            hint="Headers: numero_pedido, cliente, fecha_desde, fecha_hasta, items…"
-            onPick={(f) => importMut.mutate({ kind: "alquileres", file: f })}
-            busy={importMut.isPending && importMut.variables?.kind === "alquileres"}
-            result={results.alquileres}
-          />
-        </div>
-      </section>
 
       <section className="rounded-lg border hairline bg-background p-4 space-y-3">
         <h2 className="font-display text-lg text-ink">Mantenimiento</h2>
@@ -172,61 +122,6 @@ function SettingsPage() {
     </div>
   );
 }
-
-function ImportCard({
-  label, hint, onPick, busy, result,
-}: {
-  kind: Kind;
-  label: string;
-  hint: string;
-  onPick: (file: File) => void;
-  busy: boolean;
-  result: ImportCsvResp | null;
-}) {
-  const ref = useRef<HTMLInputElement>(null);
-  return (
-    <div className="rounded-md border hairline p-3 space-y-2">
-      <div className="font-display text-base text-ink">{label}</div>
-      <p className="text-xs text-muted-foreground min-h-8">{hint}</p>
-      <input
-        ref={ref}
-        type="file"
-        accept=".csv"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onPick(f);
-          e.target.value = "";
-        }}
-      />
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full"
-        onClick={() => ref.current?.click()}
-        disabled={busy}
-      >
-        <Upload className="h-4 w-4 mr-1" />
-        {busy ? "Subiendo…" : "Elegir CSV"}
-      </Button>
-
-      {result && (
-        <div className="text-xs space-y-1 pt-1 border-t hairline">
-          <div className="font-mono text-muted-foreground">
-            ✓ {result.success_count ?? result.inserted ?? 0} ok
-            {result.skipped ? ` · ${result.skipped} skip` : ""}
-            {(result.errors?.length ?? result.error_details?.length) ?
-              ` · ${result.errors?.length ?? result.error_details?.length} err` : ""}
-          </div>
-          {(result.errors ?? result.error_details ?? []).slice(0, 3).map((err, i) => (
-            <div key={i} className="text-destructive truncate">{err}</div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 
 // ── Descuentos por jornadas ─────────────────────────────────────────────────
 
