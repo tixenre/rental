@@ -1,0 +1,243 @@
+"""dataio/orchestrator.py — Coordina export/import respetando dependencias FK.
+
+Funciones principales:
+    export_all(conn, out_dir)
+    import_all(conn, in_dir, dry_run=False, prune_m2m=False, only=None)
+    diff_all(conn, baseline_dir) → dict de cambios por entidad
+
+Los archivos JSON se escriben con indent=2, sort_keys=False (el orden ya
+está dado por el exporter, que ordena por clave natural).
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+from typing import Any
+
+from .exporters import EXPORTERS
+from .importers import IMPORTERS, ImportError_
+from .natural_keys import KeyResolver
+from .paths import DATA_DIR, ENTITY_ORDER, entity_path
+
+logger = logging.getLogger(__name__)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EXPORT
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def export_entity(conn, entity: str) -> list[dict]:
+    """Exporta una entidad de la DB → list de dicts."""
+    if entity not in EXPORTERS:
+        raise ValueError(f"Entidad desconocida: {entity!r}")
+    return EXPORTERS[entity](conn)
+
+
+def export_all(
+    conn,
+    out_dir: Path | None = None,
+    only: list[str] | None = None,
+) -> dict[str, int]:
+    """Exporta todas las entidades a `out_dir` (default DATA_DIR).
+
+    Devuelve dict {entidad: count} con la cantidad de filas escritas.
+    Crea el directorio si no existe.
+    """
+    out = out_dir or DATA_DIR
+    out.mkdir(parents=True, exist_ok=True)
+    entities = only or list(ENTITY_ORDER)
+    counts: dict[str, int] = {}
+    for entity in entities:
+        if entity not in EXPORTERS:
+            logger.warning("Saltando entidad desconocida: %s", entity)
+            continue
+        rows = export_entity(conn, entity)
+        path = entity_path(entity, out)
+        path.write_text(
+            json.dumps(rows, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        counts[entity] = len(rows)
+        logger.info("Export %s: %d filas → %s", entity, len(rows), path)
+    return counts
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IMPORT
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _read_entity_json(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise ImportError_(f"JSON inválido en {path}: {e}") from e
+    if not isinstance(data, list):
+        raise ImportError_(f"{path} no contiene una lista (got {type(data).__name__})")
+    return data
+
+
+def import_all(
+    conn,
+    in_dir: Path | None = None,
+    dry_run: bool = False,
+    prune_m2m: bool = False,
+    only: list[str] | None = None,
+) -> dict[str, dict[str, int]]:
+    """Importa todas las entidades en orden FK desde `in_dir`.
+
+    Una sola transacción para todo. `dry_run=True` hace ROLLBACK al final
+    aunque todo haya funcionado.
+
+    Args:
+        in_dir: directorio con los JSONs. Default DATA_DIR.
+        dry_run: simula sin commitear.
+        prune_m2m: borra M2M existentes antes de re-insertar (peligroso).
+        only: lista de entidades a procesar (default todas en orden).
+
+    Returns:
+        {entidad: {"inserted": N, "updated": M, "skipped": K}, ...}
+    """
+    src = in_dir or DATA_DIR
+    if not src.exists():
+        raise ImportError_(f"Directorio no existe: {src}")
+
+    entities = only or list(ENTITY_ORDER)
+    resolver = KeyResolver(conn)
+    stats: dict[str, dict[str, int]] = {}
+
+    # Si vamos a hacer dry_run, usamos SAVEPOINT para garantizar rollback
+    # incluso si la conexión está en autocommit.
+    if dry_run:
+        conn.execute("SAVEPOINT dataio_dry_run")
+
+    try:
+        for entity in entities:
+            if entity not in IMPORTERS:
+                logger.warning("Saltando entidad desconocida: %s", entity)
+                continue
+            path = entity_path(entity, src)
+            rows = _read_entity_json(path)
+            if not rows:
+                stats[entity] = {"inserted": 0, "updated": 0, "skipped": 0}
+                logger.info("Import %s: archivo vacío o ausente (%s)", entity, path)
+                continue
+
+            kwargs: dict[str, Any] = {"dry_run": dry_run}
+            if entity == "equipos":
+                kwargs["prune_m2m"] = prune_m2m
+
+            entity_stats = IMPORTERS[entity](conn, rows, resolver, **kwargs)
+            stats[entity] = entity_stats
+            logger.info(
+                "Import %s: +%d ins, ~%d upd, %d skip (%s)",
+                entity,
+                entity_stats.get("inserted", 0),
+                entity_stats.get("updated", 0),
+                entity_stats.get("skipped", 0),
+                "dry-run" if dry_run else "live",
+            )
+
+        if dry_run:
+            conn.execute("ROLLBACK TO SAVEPOINT dataio_dry_run")
+        # commit/rollback final lo decide el caller (CLI o endpoint)
+    except Exception:
+        if dry_run:
+            try:
+                conn.execute("ROLLBACK TO SAVEPOINT dataio_dry_run")
+            except Exception:
+                pass
+        raise
+
+    return stats
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DIFF (compara DB vs baseline)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def diff_all(
+    conn, baseline_dir: Path | None = None
+) -> dict[str, dict[str, list[Any]]]:
+    """Compara el estado actual de la DB vs los JSONs baseline.
+
+    Útil para responder "¿qué hay en la DB que no esté en el repo?".
+
+    Returns:
+        {entidad: {"only_in_db": [keys], "only_in_json": [keys], "modified": [keys]}}
+    """
+    src = baseline_dir or DATA_DIR
+    out: dict[str, dict[str, list[Any]]] = {}
+
+    for entity in ENTITY_ORDER:
+        db_rows = export_entity(conn, entity)
+        json_rows = _read_entity_json(entity_path(entity, src))
+
+        # Identificar cada fila por una "key" derivada del modelo
+        def _key(row: dict, entity: str = entity) -> str:
+            if entity == "marcas":
+                return f"marca:{row['nombre']}"
+            if entity == "categorias":
+                return f"cat:{row['nombre']}"
+            if entity == "etiquetas":
+                return f"et:{row['nombre']}"
+            if entity == "spec_definitions":
+                cat = row.get("categoria_raiz_nombre") or ""
+                return f"sd:{cat}::{row['spec_key']}"
+            if entity == "categoria_spec_templates":
+                ref = row.get("spec_ref") or {}
+                cat = ref.get("categoria_raiz_nombre") or ""
+                return f"cst:{row['categoria_nombre']}::{cat}::{ref.get('spec_key', '')}"
+            if entity == "equipos":
+                return f"eq:{row['slug']}"
+            if entity == "equipo_specs":
+                ref = row.get("spec_ref") or {}
+                cat = ref.get("categoria_raiz_nombre") or ""
+                return f"es:{row['equipo_slug']}::{cat}::{ref.get('spec_key', '')}"
+            if entity == "equipo_fichas":
+                return f"ef:{row['equipo_slug']}"
+            return json.dumps(row, sort_keys=True)
+
+        db_by_key = {_key(r): r for r in db_rows}
+        json_by_key = {_key(r): r for r in json_rows}
+        only_db = [k for k in db_by_key if k not in json_by_key]
+        only_json = [k for k in json_by_key if k not in db_by_key]
+        modified = [
+            k for k in db_by_key
+            if k in json_by_key and db_by_key[k] != json_by_key[k]
+        ]
+        out[entity] = {
+            "only_in_db": only_db,
+            "only_in_json": only_json,
+            "modified": modified,
+        }
+    return out
+
+
+def validate_dir(in_dir: Path | None = None) -> dict[str, int]:
+    """Solo valida que los JSONs parseen y matcheen el schema. No toca DB.
+
+    Returns: {entidad: count_valid_rows}
+    """
+    src = in_dir or DATA_DIR
+    from . import schema as schema_mod
+
+    counts: dict[str, int] = {}
+    for entity in ENTITY_ORDER:
+        rows = _read_entity_json(entity_path(entity, src))
+        model = schema_mod.ENTITY_MODELS.get(entity)
+        if not model:
+            continue
+        for i, row in enumerate(rows):
+            try:
+                model(**row)
+            except Exception as e:
+                raise ImportError_(f"{entity}[{i}] inválido: {e}") from e
+        counts[entity] = len(rows)
+    return counts
