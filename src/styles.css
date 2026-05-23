@@ -4,6 +4,17 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── Fuentes de marca (Rambla) ──────────────────────────────────────────
+ * TT Commons (primaria: body + UI + headings) + Champ Black (display:
+ * showpieces + wordmark). Subset shippeado localmente — solo los pesos que
+ * usamos (400/500/600/700 + Champ 900). JetBrains Mono se carga en index.html.
+ */
+@font-face { font-family: "TT Commons"; font-weight: 400; font-style: normal; font-display: swap; src: url("./assets/fonts/TT_Commons_Regular_0.otf")  format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 500; font-style: normal; font-display: swap; src: url("./assets/fonts/TT_Commons_Medium_0.otf")   format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 600; font-style: normal; font-display: swap; src: url("./assets/fonts/TT_Commons_DemiBold_0.otf") format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 700; font-style: normal; font-display: swap; src: url("./assets/fonts/TT_Commons_Bold_0.otf")     format("opentype"); }
+@font-face { font-family: "Champ Black"; font-weight: 900; font-style: normal; font-display: swap; src: url("./assets/fonts/Champ-Black.ttf") format("truetype"); }
+
 
 /*
  * Rambla Rental — basado en el branding oficial (BATTI 2023)
@@ -20,8 +31,8 @@
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
 
-  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Champ Black", "TT Commons", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "TT Commons", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   --color-background: var(--background);
@@ -49,7 +60,9 @@
   --color-hairline: var(--hairline);
   --color-amber: var(--amber);
   --color-amber-soft: var(--amber-soft);
+  --color-amber-hot: var(--amber-hot);
   --color-ink: var(--ink);
+  --color-ink-pure: var(--ink-pure);
   --color-rosa: var(--rosa);
   --color-azul: var(--azul);
   --color-naranja: var(--naranja);
@@ -88,7 +101,8 @@
   /* Brand light palette */
   --background: oklch(0.985 0.005 90);          /* hueso casi blanco */
   --foreground: oklch(0.18 0.01 60);            /* tinta negra cálida */
-  --ink: oklch(0.14 0.01 60);
+  --ink: oklch(0.14 0.01 60);                   /* near-black cálido (UI) */
+  --ink-pure: #000;                             /* brand-exact: hero + print */
 
   --surface: oklch(0.97 0.008 85);
   --surface-elevated: oklch(1 0 0);
@@ -99,9 +113,10 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.18 0.01 60);
 
-  /* Amarillo brand (≈ #F2A81D / mostaza brillante) */
-  --amber: oklch(0.82 0.16 78);
-  --amber-soft: oklch(0.82 0.16 78 / 18%);
+  /* Amarillo brand · Pantone 1235 C · #FAB428 — exacto, NO ALTERAR (regla 1.8) */
+  --amber: #FAB428;
+  --amber-soft: color-mix(in oklch, #FAB428 18%, transparent);
+  --amber-hot: #FFCC55;                          /* paso claro para amber-tape */
 
   --primary: oklch(0.18 0.01 60);
   --primary-foreground: oklch(0.985 0.005 90);
@@ -112,7 +127,7 @@
   --muted: oklch(0.94 0.008 85);
   --muted-foreground: oklch(0.42 0.01 70);
 
-  --accent: oklch(0.82 0.16 78);
+  --accent: #FAB428;
   --accent-foreground: oklch(0.18 0.01 60);
 
   --destructive: oklch(0.62 0.22 27);
@@ -120,13 +135,13 @@
 
   --border: oklch(0.18 0.01 60 / 12%);
   --input: oklch(0.18 0.01 60 / 16%);
-  --ring: oklch(0.82 0.16 78 / 60%);
+  --ring: color-mix(in oklch, #FAB428 60%, transparent);
 
-  /* Paleta secundaria (del manual) */
-  --rosa: oklch(0.78 0.14 0);
-  --azul: oklch(0.7 0.16 235);
-  --naranja: oklch(0.74 0.18 45);
-  --verde: oklch(0.78 0.13 155);
+  /* Paleta secundaria (del manual) — hex exactos Pantone, usar sparingly */
+  --rosa: #ED7BAD;      /* PANTONE 211 C */
+  --azul: #1097DB;      /* PANTONE 299 C */
+  --naranja: #E9552F;   /* PANTONE 172 C */
+  --verde: #009971;     /* PANTONE 7724 C */
 
   --chart-1: var(--amber);
   --chart-2: var(--azul);
@@ -136,12 +151,12 @@
 
   --sidebar: oklch(0.985 0.005 90);
   --sidebar-foreground: oklch(0.18 0.01 60);
-  --sidebar-primary: oklch(0.82 0.16 78);
+  --sidebar-primary: #FAB428;
   --sidebar-primary-foreground: oklch(0.18 0.01 60);
   --sidebar-accent: oklch(0.94 0.008 85);
   --sidebar-accent-foreground: oklch(0.18 0.01 60);
   --sidebar-border: oklch(0.18 0.01 60 / 12%);
-  --sidebar-ring: oklch(0.82 0.16 78 / 50%);
+  --sidebar-ring: color-mix(in oklch, #FAB428 50%, transparent);
 }
 
 .dark {
@@ -218,16 +233,18 @@
     background: repeating-linear-gradient(
       -45deg,
       var(--amber) 0 24px,
-      oklch(0.86 0.14 78) 24px 48px
+      var(--amber-hot) 24px 48px
     );
   }
-  /* Wordmark "rambla" chunky redondeado al estilo del brand */
+  /* Wordmark "rambla" — Champ Black ya trae el peso chunky redondeado;
+   * solo lowercase + tracking leve para que respiren las letras. */
   .wordmark {
     font-family: var(--font-display);
-    font-weight: 800;
-    font-stretch: 75%;
-    letter-spacing: -0.04em;
+    font-weight: 900;
+    letter-spacing: 0.01em;
     font-feature-settings: "ss01";
+    text-transform: lowercase;
+    line-height: 0.9;
   }
   .grain::before {
     content: "";
@@ -242,6 +259,41 @@
   }
   .grain {
     position: relative;
+  }
+
+  /* ── Recetas de tipografía (design system) ────────────────────────────
+   * Champ Black (--font-display) SOLO para showpieces: hero, openers,
+   * wordmark. Headings/body/labels usan TT Commons en distintos pesos. */
+  .t-display-1 {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(3.5rem, 9vw, 8.5rem);
+    line-height: 0.9;
+    letter-spacing: -0.01em;
+    text-transform: lowercase;
+    text-wrap: balance;
+  }
+  .t-display-2 {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(2.25rem, 5vw, 4rem);
+    line-height: 1;
+    letter-spacing: -0.01em;
+    text-transform: lowercase;
+  }
+  .t-h1 { font-family: var(--font-sans); font-weight: 700; font-size: 1.875rem; line-height: 1.15; letter-spacing: -0.015em; }
+  .t-h2 { font-family: var(--font-sans); font-weight: 700; font-size: 1.5rem;   line-height: 1.2;  letter-spacing: -0.01em; }
+  .t-h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.125rem; line-height: 1.3; }
+  .t-body  { font-family: var(--font-sans); font-size: 1rem;     line-height: 1.55; }
+  .t-small { font-family: var(--font-sans); font-size: 0.875rem; line-height: 1.5; color: var(--muted-foreground); }
+  .t-mono  { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .t-eyebrow {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: 0.625rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
   }
 
   /* Safe area insets para iOS (notch, home indicator) */
