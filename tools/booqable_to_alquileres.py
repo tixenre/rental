@@ -145,6 +145,7 @@ MAPPING_BY_LINE_TITLE: dict[str, tuple[str, int]] = {
     "Bateria NP tipo sony": ("smallrig-l-series-np-f970", 1),
     "Baterias LP": ("canon-lp-e6p", 1),  # Canon LP-E6
     "Rode Link Mic": ("rode-lavalier", 1),  # archived Booqable "Rode Link" — uso lavalier
+    "Aputure Softbox Light Dome SE": ("aputure-softbox-mini-ii", 1),
 }
 
 # Slugs Booqable que van EXPLICITAMENTE a placeholder (no mapeables)
