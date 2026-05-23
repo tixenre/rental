@@ -241,7 +241,15 @@ def load_data(args):
     with open(args.customers, encoding="utf-8") as f:
         customers = list(csv.DictReader(f))
     equipos = json.load(open(args.equipos, encoding="utf-8"))
-    return orders, lines, products, customers, equipos
+    documents = []
+    if args.documents:
+        with open(args.documents, encoding="utf-8") as f:
+            documents = list(csv.DictReader(f))
+    plannings = []
+    if args.plannings:
+        with open(args.plannings, encoding="utf-8") as f:
+            plannings = list(csv.DictReader(f))
+    return orders, lines, products, customers, equipos, documents, plannings
 
 
 def _tokens(text: str) -> set[str]:
@@ -252,17 +260,25 @@ def _tokens(text: str) -> set[str]:
     return {x for x in set(t.split()) - STOP_TOKENS if len(x) > 1}
 
 
-def build_indices(orders, lines, products, customers, equipos):
-    # customer_id (UUID) → email
+def build_indices(orders, lines, products, customers, equipos, documents=None, plannings=None):
+    documents = documents or []
+    plannings = plannings or []
+    # customer_id (UUID) → datos. Genera email placeholder determinista si el
+    # cliente no tiene email (Booqable lo permite, nuestra DB exige email
+    # NOT NULL UNIQUE). Asi no se pierden los pedidos de esos clientes.
     cust_by_id = {}
     for c in customers:
         email = (c.get("email") or "").strip().lower()
-        if email:
-            cust_by_id[c["id"]] = {
-                "email": email,
-                "name": c.get("name", ""),
-                "telefono": _extract_prop(c.get("properties"), "telefono"),
-            }
+        placeholder = False
+        if not email:
+            email = f"sin-email-{c['id'][:8]}@booqable.local"
+            placeholder = True
+        cust_by_id[c["id"]] = {
+            "email": email,
+            "email_placeholder": placeholder,
+            "name": c.get("name", ""),
+            "telefono": _extract_prop(c.get("properties"), "telefono"),
+        }
 
     # product_id (UUID) → product dict
     prod_by_id = {p["id"]: p for p in products}
@@ -301,12 +317,83 @@ def build_indices(orders, lines, products, customers, equipos):
         if oid:
             lines_by_order.setdefault(oid, []).append(l)
 
+    # ── Fallback via documentos (facturas) ──────────────────────────────────
+    # Algunos pedidos no tienen order-lines pero si document-lines (la factura
+    # conserva el detalle). Construimos order_id → mejor documento → sus
+    # charge-lines, para usarlas cuando faltan las order-lines.
+    doclines_by_owner = {}  # document_id → [charge lines]
+    for l in lines:
+        if l.get("owner_type") != "documents" or l.get("line_type") != "charge":
+            continue
+        oid = l.get("owner_id")
+        if oid:
+            doclines_by_owner.setdefault(oid, []).append(l)
+
+    # order_id → documentos (con su conteo de lineas). Preferimos el doc con
+    # MAS charge-lines (el que tiene el detalle real), evitando double-count
+    # al elegir uno solo por pedido.
+    docs_by_order = {}
+    for d in documents:
+        oid = d.get("order_id")
+        if oid:
+            docs_by_order.setdefault(oid, []).append(d)
+
+    doclines_by_order = {}  # order_id → [charge lines del mejor documento]
+    for oid, docs in docs_by_order.items():
+        best_lines = []
+        best_precio = -1
+        for d in docs:
+            dl = doclines_by_owner.get(d["id"], [])
+            # Elegir por mayor suma de precios, NO por cantidad de lineas:
+            # un quote puede tener mas lineas pero con precio 0, mientras la
+            # factura tiene los precios reales.
+            precio = sum(int(l.get("price_in_cents") or 0) for l in dl)
+            if precio > best_precio:
+                best_precio = precio
+                best_lines = dl
+        # Solo usar doc-lines si tienen precios reales; si no, dejamos que
+        # caiga al fallback de plannings.
+        if best_lines and best_precio > 0:
+            doclines_by_order[oid] = best_lines
+
+    # ── Fallback via plannings (reserva de stock) ───────────────────────────
+    # Ultimo recurso: pedidos sin order-lines ni doc-lines pero con plannings
+    # (reserva fisica). Las plannings tienen item_id + quantity pero NO precio,
+    # asi que sintetizamos pseudo-lineas con peso = base_price del producto *
+    # cantidad (o solo cantidad si no hay precio). El grand_total del pedido se
+    # distribuye proporcional a ese peso, igual que las lineas reales.
+    plan_pseudolines_by_order = {}
+    for p in plannings:
+        item_id = p.get("item_id")
+        oid = p.get("order_id")
+        if not item_id or not oid:
+            continue
+        try:
+            qty = max(1, int(p.get("quantity") or "1"))
+        except ValueError:
+            qty = 1
+        prod = prod_by_id.get(item_id)
+        base = int((prod or {}).get("base_price_in_cents") or 0)
+        peso_cents = (base * qty) if base > 0 else (10000 * qty)  # fallback peso neutral
+        plan_pseudolines_by_order.setdefault(oid, []).append({
+            "id": f"planning:{p.get('id','')}",
+            "item_id": item_id,
+            "title": (prod or {}).get("name", ""),
+            "quantity": str(qty),
+            "price_in_cents": str(peso_cents),
+            "price_each_in_cents": str(base if base > 0 else peso_cents),
+            "owner_type": "orders",
+            "line_type": "charge",
+        })
+
     return {
         "cust_by_id": cust_by_id,
         "prod_by_id": prod_by_id,
         "local_slugs": local_slugs,
         "local_tokens": local_tokens,
         "lines_by_order": lines_by_order,
+        "doclines_by_order": doclines_by_order,
+        "planlines_by_order": plan_pseudolines_by_order,
         "parent_ids_with_kids": parent_ids_with_kids,
     }
 
@@ -428,6 +515,68 @@ def _ensure_placeholder_by_title(title: str, placeholders: dict) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Build clientes (TODOS, para wipe-and-reimport limpio)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def build_clientes(customers, idx):
+    """Convierte TODOS los customers de Booqable a clientes locales.
+
+    Email placeholder para los que no tienen (mismo esquema que cust_by_id).
+    Dedup por email (case-insensitive) — si dos customers comparten email,
+    gana el primero. Devuelve lista lista para import_clientes.
+    """
+    out = []
+    seen = set()
+    for c in customers:
+        cinfo = idx["cust_by_id"].get(c["id"])
+        if not cinfo:
+            continue
+        email = cinfo["email"]
+        if email.lower() in seen:
+            continue
+        seen.add(email.lower())
+
+        name = (c.get("name") or "").strip()
+        parts = name.split()
+        nombre = parts[0] if parts else email.split("@")[0]
+        apellido = " ".join(parts[1:]) if len(parts) > 1 else "-"
+
+        props_raw = c.get("properties") or ""
+        telefono = _extract_prop(props_raw, "telefono")
+        direccion = _extract_prop(props_raw, "direccion_principal")
+        cuit = _extract_prop(props_raw, "cuil_cuit")
+
+        try:
+            descuento = float(c.get("discount_percentage") or "0")
+        except ValueError:
+            descuento = 0.0
+        is_commercial = (c.get("legal_type") or "").strip().lower() == "commercial"
+
+        cliente = {
+            "email": email,
+            "nombre": nombre,
+            "apellido": apellido,
+            "telefono": telefono,
+            "direccion": direccion,
+            "cuit": cuit,
+            "descuento": descuento,
+            "perfil_impuestos": "responsable_inscripto" if is_commercial else "consumidor_final",
+        }
+        if is_commercial:
+            cliente["razon_social"] = name
+        num = (c.get("number") or "").strip()
+        notas = []
+        if num:
+            notas.append(f"Booqable #{num}")
+        if cinfo.get("email_placeholder"):
+            notas.append("sin email en Booqable (placeholder)")
+        if notas:
+            cliente["notas"] = " — ".join(notas)
+        out.append(cliente)
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Build alquileres
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -455,6 +604,7 @@ def build_alquileres(orders, idx):
     placeholders: dict[str, dict] = {}
     alquileres: list[dict] = []
     skipped: list[dict] = []
+    clientes_sin_email: dict[str, dict] = {}
     usa_sin_detalle = False
 
     # Ordenar por numero_pedido Booqable ASC = orden cronologico.
@@ -480,7 +630,7 @@ def build_alquileres(orders, idx):
             skipped.append({
                 "numero": o.get("number", ""),
                 "status": status,
-                "motivo": "customer_id sin match en customers.csv (sin email)",
+                "motivo": "customer_id no existe en customers.csv",
             })
             continue
 
@@ -494,31 +644,54 @@ def build_alquileres(orders, idx):
             o.get("grand_total_with_tax_in_cents") or o.get("grand_total_in_cents")
         )
 
-        # Filtrar lineas: ignorar combo parents (los children tienen la
-        # composicion real). Quedarse con children + simples.
+        # Lineas en 3 niveles de fallback para no perder detalle:
+        #   1. order-lines (lo normal)
+        #   2. document-lines (factura, si el pedido no tiene order-lines)
+        #   3. plannings (reserva fisica, ultimo recurso)
         all_lines = idx["lines_by_order"].get(o["id"], [])
+        fuente_lineas = "order-lines"
+        if not all_lines:
+            all_lines = idx.get("doclines_by_order", {}).get(o["id"], [])
+            fuente_lineas = "doc-lines"
+        if not all_lines:
+            all_lines = idx.get("planlines_by_order", {}).get(o["id"], [])
+            fuente_lineas = "plannings"
         useful_lines = [
             l for l in all_lines
             if l["id"] not in idx["parent_ids_with_kids"]
         ]
 
-        # ── Paso 1: resolver cada linea a equipo + peso (price_in) ──────────
+        # ── Paso 1: resolver cada linea a equipo + peso ─────────────────────
         # Consolidamos por equipo_slug: si el mismo equipo aparece en varias
         # lineas (ej. 2 unidades del mismo lente), se suman cantidad y peso.
+        #
+        # Peso para distribuir el grand_total:
+        #   - price_in si > 0 (lo normal)
+        #   - si price_in == 0 PERO la linea es hijo de un combo, usamos el
+        #     base_price del producto. Razon: en las facturas, el combo padre
+        #     lleva el precio y los hijos quedan en 0, pero los hijos SON el
+        #     equipo real rentado — no hay que perderlos.
+        #   - si price_in == 0 y NO es hijo de combo → accesorio "free"
+        #     standalone, se ignora (decision del operador).
         by_slug: dict[str, dict] = {}
         for l in useful_lines:
-            peso = cents_to_ars(l.get("price_in_cents"))
-            # Items no cobrados (price_in=0) se ignoran — accesorios free
-            # dentro de combos o items sin valor comercial.
-            if peso <= 0:
-                continue
-            equipo_slug, qty_mult = resolve_equipo(l, idx, placeholders)
-            if equipo_slug is None:
-                continue
+            price_in = cents_to_ars(l.get("price_in_cents"))
+            es_hijo_combo = bool(l.get("parent_line_id"))
             try:
                 cantidad = max(1, int(l.get("quantity") or "1"))
             except ValueError:
                 cantidad = 1
+            if price_in > 0:
+                peso = price_in
+            elif es_hijo_combo:
+                prod = idx["prod_by_id"].get(l.get("item_id"))
+                base = cents_to_ars((prod or {}).get("base_price_in_cents"))
+                peso = (base * cantidad) if base > 0 else 1  # peso minimo: no perderlo
+            else:
+                continue  # standalone sin precio → free accessory
+            equipo_slug, qty_mult = resolve_equipo(l, idx, placeholders)
+            if equipo_slug is None:
+                continue
             cantidad *= qty_mult
             agg = by_slug.setdefault(equipo_slug, {"cantidad": 0, "peso": 0})
             agg["cantidad"] += cantidad
@@ -571,6 +744,19 @@ def build_alquileres(orders, idx):
         if len(name_parts) > 1:
             cliente_nombre = " ".join(name_parts)
 
+        # Trackear clientes con email placeholder para emitirlos en clientes.json
+        # (no estaban en el import original porque no tenian email).
+        if cust.get("email_placeholder"):
+            clientes_sin_email[cust["email"]] = {
+                "email": cust["email"],
+                "nombre": name_parts[0] if name_parts else cliente_nombre,
+                "apellido": " ".join(name_parts[1:]) if len(name_parts) > 1 else "-",
+                "telefono": cust.get("telefono") or "",
+                "direccion": "",
+                "cuit": "",
+                "notas": "Cliente sin email en Booqable (email placeholder generado)",
+            }
+
         alq = {
             "numero_pedido": numero_pedido,
             "cliente_email": cust["email"],
@@ -604,20 +790,30 @@ def build_alquileres(orders, idx):
             "precio_referencia_ars": 0,
         })
 
-    return alquileres, placeholder_list, skipped
+    return alquileres, placeholder_list, skipped, list(clientes_sin_email.values())
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Output
 # ─────────────────────────────────────────────────────────────────────────────
 
-def write_outputs(out_dir: Path, alquileres, placeholders, skipped, idx):
+def write_outputs(out_dir: Path, alquileres, placeholders, skipped, idx, clientes_extra=None):
     out_dir.mkdir(parents=True, exist_ok=True)
+    clientes_extra = clientes_extra or []
 
     # alquileres.json
     alq_path = out_dir / "alquileres.json"
     alq_path.write_text(
         json.dumps(alquileres, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    # clientes.json: solo los clientes sin email (con placeholder generado).
+    # Los demas ya fueron importados en el paso de clientes. Idempotente:
+    # el importer upsertea por email.
+    clientes_path = out_dir / "clientes.json"
+    clientes_path.write_text(
+        json.dumps(clientes_extra, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -638,10 +834,14 @@ def write_outputs(out_dir: Path, alquileres, placeholders, skipped, idx):
         encoding="utf-8",
     )
 
-    # ZIP: alquileres + placeholders_equipos juntos. El endpoint reconoce
-    # ambos archivos automaticamente — el operador solo sube ESTE zip.
+    # ZIP: clientes + alquileres + placeholders_equipos juntos. El endpoint
+    # reconoce los 3 archivos automaticamente — el operador solo sube ESTE zip.
+    # IMPORTANTE: clientes va primero (FK de alquileres) pero el orchestrator
+    # ya respeta el orden OPERATIONAL_ENTITIES (clientes -> alquileres).
     zip_path = out_dir / "alquileres.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        if clientes_extra:
+            zf.write(clientes_path, arcname="clientes.json")
         zf.write(alq_path, arcname="alquileres.json")
         zf.write(ph_equipos_path, arcname="placeholders_equipos.json")
 
@@ -735,16 +935,28 @@ def main() -> int:
     ap.add_argument("--products", required=True)
     ap.add_argument("--customers", required=True)
     ap.add_argument("--equipos", required=True)
+    ap.add_argument("--documents", default=None,
+                    help="documents.csv (facturas) opcional, para recuperar "
+                         "detalle de pedidos sin order-lines")
+    ap.add_argument("--plannings", default=None,
+                    help="plannings.csv (reservas) opcional, ultimo fallback "
+                         "para pedidos sin order-lines ni doc-lines")
     ap.add_argument("--outdir", required=True)
     args = ap.parse_args()
 
-    orders, lines, products, customers, equipos = load_data(args)
+    orders, lines, products, customers, equipos, documents, plannings = load_data(args)
     print(f"orders: {len(orders)}, lines: {len(lines)}, products: {len(products)}, "
-          f"customers: {len(customers)}, equipos locales: {len(equipos)}", file=sys.stderr)
+          f"customers: {len(customers)}, equipos locales: {len(equipos)}, "
+          f"documents: {len(documents)}, plannings: {len(plannings)}", file=sys.stderr)
 
-    idx = build_indices(orders, lines, products, customers, equipos)
-    alquileres, placeholders, skipped = build_alquileres(orders, idx)
-    stats = write_outputs(Path(args.outdir), alquileres, placeholders, skipped, idx)
+    idx = build_indices(orders, lines, products, customers, equipos, documents, plannings)
+    alquileres, placeholders, skipped, clientes_sin_email = build_alquileres(orders, idx)
+    # clientes.json incluye TODOS (para wipe-and-reimport limpio), no solo los
+    # sin email. El importer upsertea por email asi que es idempotente.
+    clientes_all = build_clientes(customers, idx)
+    stats = write_outputs(Path(args.outdir), alquileres, placeholders, skipped, idx, clientes_all)
+    stats["clientes_total"] = len(clientes_all)
+    stats["clientes_sin_email"] = len(clientes_sin_email)
 
     print(f"\nResumen:", file=sys.stderr)
     for k, v in stats.items():
