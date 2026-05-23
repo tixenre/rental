@@ -343,12 +343,16 @@ function PreviewTab({ tplKey }: { tplKey: string }) {
       </div>
       <div>
         <Label className="text-xs">HTML</Label>
-        <iframe
-          srcDoc={d.html}
-          sandbox=""
-          className="w-full h-72 border hairline rounded-md bg-white"
-          title="preview html"
-        />
+        {/* email-frame: el mail centrado sobre fondo muted (ancho típico de
+            email ~600px), como el mock del handoff. */}
+        <div className="flex justify-center rounded-md border hairline bg-muted/30 p-4">
+          <iframe
+            srcDoc={d.html}
+            sandbox=""
+            className="w-full max-w-[600px] h-96 rounded-md bg-white shadow-sm border hairline"
+            title="preview html"
+          />
+        </div>
       </div>
       <div>
         <Label className="text-xs">Texto plano</Label>
