@@ -144,16 +144,39 @@ def cmd_init_slugs(args: argparse.Namespace) -> int:
     """One-shot: puebla `equipos.slug` para filas existentes."""
     conn = _get_conn()
     try:
+        # Para dry-run con detalle, hacemos un preview manual antes del
+        # call al orchestrator. Útil para auditar slugs antes de aplicar.
+        if args.dry_run and args.verbose:
+            from .slug import equipo_slug
+            rows = conn.execute(
+                "SELECT id, nombre, marca, modelo FROM equipos "
+                "WHERE slug IS NULL ORDER BY id"
+            ).fetchall()
+            if rows:
+                print("\n  [DRY-RUN] Previsualización de slugs a asignar:")
+                for r in rows:
+                    s = equipo_slug(r["marca"], r["modelo"], r["nombre"])
+                    if not s:
+                        s = f"equipo-{r['id']}"
+                    print(f"    id={r['id']:>5}  {r['nombre'][:50]:50s} → {s!r}")
+                print()
         stats = orchestrator.init_slugs(conn, dry_run=args.dry_run)
         if not args.dry_run:
             conn.commit()
     except Exception as e:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         print(f"\n✗ init-slugs falló: {e}", file=sys.stderr)
         return 1
     finally:
         conn.close()
     print(f"\n═ init-slugs terminado {'(DRY-RUN)' if args.dry_run else ''} ═")
+    if stats.get("skipped_no_column"):
+        print("  ⚠  La columna `equipos.slug` no existe en la DB. "
+              "Aplicar primero las migraciones Alembic (e4a7c1f8d6b2, f5b8d2e4a9c1).")
+        return 1
     print(f"  Equipos ya con slug:  {stats['already_had']}")
     print(f"  Equipos actualizados: {stats['updated']}")
     print(f"  Con desambiguación:   {stats['disambiguated']}")
@@ -199,6 +222,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="One-shot: puebla equipos.slug para filas existentes (post-migración)",
     )
     ps.add_argument("--dry-run", action="store_true")
+    ps.add_argument(
+        "--verbose", action="store_true",
+        help="Con --dry-run: muestra la lista completa de slugs a asignar.",
+    )
     ps.set_defaults(func=cmd_init_slugs)
 
     return p

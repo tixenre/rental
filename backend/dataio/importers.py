@@ -1,8 +1,8 @@
 """dataio/importers.py — list[dict] → upsert DB.
 
-Cada función `import_<entidad>(conn, rows, resolver, dry_run)` valida cada
-row con el modelo Pydantic correspondiente y aplica un upsert idempotente
-contra la DB.
+Cada función `import_<entidad>(conn, rows, resolver)` valida cada row con
+el modelo Pydantic correspondiente y aplica un upsert idempotente contra
+la DB.
 
 Política:
 - Upsert por clave natural. Insertar si no existe, actualizar si existe.
@@ -11,8 +11,11 @@ Política:
   con `ON CONFLICT DO UPDATE` para mantener `orden`/`origen`. Si una fila
   está en la DB pero no en el JSON, se preserva (es custom local).
   El borrado de no-listadas se hace solo con `prune=True`.
-- `dry_run=True` no ejecuta inserts; el orchestrator usa SAVEPOINT/ROLLBACK
-  para garantizar atomicidad incluso en dry-run.
+
+`dry-run` NO es responsabilidad de los importers — siempre escriben. El
+orchestrator (orchestrator.import_all) es quien envuelve el batch en un
+SAVEPOINT y hace ROLLBACK al final si `dry_run=True`. Si llamás a un
+importer directo sin orchestrator, vas a escribir a la DB siempre.
 
 Devuelve siempre un dict con stats: `{"inserted", "updated", "skipped"}`.
 """
@@ -49,12 +52,9 @@ def _validate_rows(rows: list[dict], model: type[schema._Base], entity: str) -> 
 
 
 def import_marcas(
-    conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
+    conn, rows: list[dict], resolver: KeyResolver
 ) -> dict[str, int]:
     items = _validate_rows(rows, schema.Marca, "marcas")
-    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
-    # alrededor del batch, así obtenemos stats reales sin commit final.
-    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
     for m in items:
         cur = conn.execute(
@@ -86,12 +86,9 @@ def import_marcas(
 
 
 def import_categorias(
-    conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
+    conn, rows: list[dict], resolver: KeyResolver
 ) -> dict[str, int]:
     items = _validate_rows(rows, schema.Categoria, "categorias")
-    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
-    # alrededor del batch, así obtenemos stats reales sin commit final.
-    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
 
     # Pase 1: insertar raíces (parent_path IS None) y todas las categorías
@@ -148,12 +145,9 @@ def import_categorias(
 
 
 def import_etiquetas(
-    conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
+    conn, rows: list[dict], resolver: KeyResolver
 ) -> dict[str, int]:
     items = _validate_rows(rows, schema.Etiqueta, "etiquetas")
-    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
-    # alrededor del batch, así obtenemos stats reales sin commit final.
-    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
     for e in items:
         cur = conn.execute(
@@ -180,12 +174,9 @@ def import_etiquetas(
 
 
 def import_spec_definitions(
-    conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
+    conn, rows: list[dict], resolver: KeyResolver
 ) -> dict[str, int]:
     items = _validate_rows(rows, schema.SpecDefinition, "spec_definitions")
-    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
-    # alrededor del batch, así obtenemos stats reales sin commit final.
-    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
     import json as _json
 
@@ -317,14 +308,11 @@ def import_spec_definitions(
 
 
 def import_categoria_spec_templates(
-    conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
+    conn, rows: list[dict], resolver: KeyResolver
 ) -> dict[str, int]:
     items = _validate_rows(
         rows, schema.CategoriaSpecTemplate, "categoria_spec_templates"
     )
-    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
-    # alrededor del batch, así obtenemos stats reales sin commit final.
-    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
     for t in items:
         cat_id = resolver.categoria_id(t.categoria_nombre)
@@ -379,7 +367,6 @@ def import_equipos(
     conn,
     rows: list[dict],
     resolver: KeyResolver,
-    dry_run: bool = False,
     prune_m2m: bool = False,
 ) -> dict[str, int]:
     """Upsert de equipos por slug + sync de M2M categorias/etiquetas.
@@ -389,9 +376,6 @@ def import_equipos(
             estén en el JSON. Default False (preserva custom).
     """
     items = _validate_rows(rows, schema.Equipo, "equipos")
-    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
-    # alrededor del batch, así obtenemos stats reales sin commit final.
-    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
 
     for eq in items:
@@ -519,12 +503,9 @@ def import_equipos(
 
 
 def import_equipo_specs(
-    conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
+    conn, rows: list[dict], resolver: KeyResolver
 ) -> dict[str, int]:
     items = _validate_rows(rows, schema.EquipoSpec, "equipo_specs")
-    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
-    # alrededor del batch, así obtenemos stats reales sin commit final.
-    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
     for es in items:
         equipo_id = resolver.equipo_id(es.equipo_slug)
@@ -564,12 +545,9 @@ def import_equipo_specs(
 
 
 def import_equipo_fichas(
-    conn, rows: list[dict], resolver: KeyResolver, dry_run: bool = False
+    conn, rows: list[dict], resolver: KeyResolver
 ) -> dict[str, int]:
     items = _validate_rows(rows, schema.EquipoFicha, "equipo_fichas")
-    # dry_run no se chequea acá: el orchestrator usa SAVEPOINT/ROLLBACK
-    # alrededor del batch, así obtenemos stats reales sin commit final.
-    _ = dry_run
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
     for f in items:
         equipo_id = resolver.equipo_id(f.equipo_slug)
