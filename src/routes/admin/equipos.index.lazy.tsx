@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import { useUsdRate, calcularPrecioJornada } from "@/hooks/useSettings";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -114,6 +115,11 @@ function EquiposPage() {
       solo_eliminados: vistaPapelera || undefined,
       falta,
     }),
+  });
+  const kpisQ = useQuery({
+    queryKey: ["admin", "equipos", "kpis"],
+    queryFn: () => adminApi.equiposKpis(),
+    staleTime: 60_000,
   });
   const etiquetasQ = useQuery({
     queryKey: ["admin", "etiquetas"],
@@ -288,6 +294,18 @@ function EquiposPage() {
           </Button>
         </div>
       </header>
+
+      {/* KPI strip (handoff): inventario de un vistazo. */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <KpiCard label="Total" value={kpisQ.data?.total ?? total} meta="equipos en catálogo" />
+        <KpiCard label="En uso hoy" value={kpisQ.data?.en_uso_hoy ?? 0} meta="unidades alquiladas ahora" />
+        <KpiCard
+          label="Mantenimiento"
+          value={kpisQ.data?.mantenimiento ?? 0}
+          meta="bloqueando stock hoy"
+          warn={(kpisQ.data?.mantenimiento ?? 0) > 0}
+        />
+      </div>
 
       {falta && (
         <FaltaBanner
@@ -1042,6 +1060,35 @@ const FALTA_LABELS: Record<FaltaField, string> = {
   serie:            "sin número de serie",
   valor_reposicion: "sin valor de reposición",
 };
+
+function KpiCard({
+  label,
+  value,
+  meta,
+  warn = false,
+}: {
+  label: string;
+  value: number;
+  meta: string;
+  warn?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-lg border bg-card px-3.5 py-3 sm:px-4 sm:py-3.5",
+        warn ? "border-[color-mix(in_oklch,var(--amber)_45%,transparent)] bg-amber-soft/40" : "hairline",
+      )}
+    >
+      <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
+        {label}
+      </div>
+      <div className="font-display text-2xl sm:text-3xl font-black text-ink tabular-nums leading-none mt-1">
+        {value}
+      </div>
+      <div className="font-sans text-[11px] text-muted-foreground mt-1">{meta}</div>
+    </div>
+  );
+}
 
 function FaltaBanner({
   falta,

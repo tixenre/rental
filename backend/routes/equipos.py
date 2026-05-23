@@ -469,6 +469,43 @@ def equipos_afuera():
         conn.close()
 
 
+@router.get("/equipos/kpis")
+def equipos_kpis(request: Request):
+    """KPIs del inventario para el header de /admin/equipos:
+    - total: equipos activos (no eliminados).
+    - en_uso_hoy: unidades en pedidos retirados que solapan hoy.
+    - mantenimiento: equipos con mantenimiento que bloquea stock activo hoy.
+    """
+    require_admin(request)
+    conn = get_db()
+    try:
+        total = conn.execute(
+            "SELECT COUNT(*) FROM equipos WHERE eliminado_at IS NULL"
+        ).fetchone()[0]
+        en_uso_hoy = conn.execute("""
+            SELECT COALESCE(SUM(pi.cantidad), 0)
+            FROM alquiler_items pi
+            JOIN alquileres p ON p.id = pi.pedido_id
+            WHERE p.estado = 'retirado'
+              AND p.fecha_desde::date <= CURRENT_DATE
+              AND p.fecha_hasta::date >= CURRENT_DATE
+        """).fetchone()[0]
+        mantenimiento = conn.execute("""
+            SELECT COUNT(DISTINCT equipo_id)
+            FROM equipo_mantenimiento
+            WHERE bloquea_stock = TRUE
+              AND fecha::date <= CURRENT_DATE
+              AND COALESCE(fecha_hasta, fecha)::date >= CURRENT_DATE
+        """).fetchone()[0]
+        return {
+            "total": int(total or 0),
+            "en_uso_hoy": int(en_uso_hoy or 0),
+            "mantenimiento": int(mantenimiento or 0),
+        }
+    finally:
+        conn.close()
+
+
 # ── Rutas de equipos ─────────────────────────────────────────────────────────
 
 ESTADOS_RESERVADO = "('presupuesto','confirmado','retirado')"
