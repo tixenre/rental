@@ -103,6 +103,11 @@ function PedidosPage() {
   const [conSaldo, setConSaldo] = useState(false);
   const [deleting, setDeleting] = useState<Pedido | null>(null);
 
+  // El mock muestra "Solicitado" para el estado interno 'presupuesto'
+  // (RUTAS §4.2 del handoff: label visible distinto del estado de la DB).
+  const estadoLabel = (e: Pedido["estado"]) =>
+    e === "presupuesto" ? "Solicitado" : ESTADO_LABEL[e];
+
   // Chips "Activos" y "Cerrados" agrupan varios estados → filtramos client-side
   // sobre la lista que devuelve el backend (per_page=200 cubre el volumen real).
   const backendEstado = filter === "presupuesto" || filter === "confirmado" ? filter : undefined;
@@ -156,7 +161,7 @@ function PedidosPage() {
       <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            Back-office
+            Operaciones · Pedidos
           </div>
           <h1 className="font-display text-3xl text-ink">Pedidos</h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-[540px]">
@@ -289,7 +294,7 @@ function PedidosPage() {
                 badge={
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Badge variant="outline" className={ESTADO_CLASS[p.estado] ?? ""}>
-                      {ESTADO_LABEL[p.estado]}
+                      {estadoLabel(p.estado)}
                     </Badge>
                     {p.tiene_solicitud_pendiente && (
                       <Badge variant="outline" className="border-amber text-amber-700 bg-amber-50">
@@ -332,12 +337,12 @@ function PedidosPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-20">N°</TableHead>
+              <TableHead className="w-20">Pedido</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead className="hidden md:table-cell">Fechas</TableHead>
-              <TableHead className="text-right hidden sm:table-cell">Total</TableHead>
-              <TableHead className="text-right hidden md:table-cell">Saldo</TableHead>
+              <TableHead className="hidden lg:table-cell">Items</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead className="text-right">Monto</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -361,7 +366,6 @@ function PedidosPage() {
               </TableRow>
             )}
             {items.map((p) => {
-              const saldo = (p.monto_total ?? 0) - (p.monto_pagado ?? 0);
               return (
                 <TableRow
                   key={p.id}
@@ -377,14 +381,11 @@ function PedidosPage() {
                       <div className="text-xs text-muted-foreground">{p.cliente_email}</div>
                     )}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                    {fmtFecha(p.fecha_desde)} → {fmtFecha(p.fecha_hasta)}
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground tabular-nums">
+                    {fmtFecha(p.fecha_desde)} <span className="text-muted-foreground/50 mx-0.5">→</span> {fmtFecha(p.fecha_hasta)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums hidden sm:table-cell">
-                    {fmtArs(p.monto_total)}
-                  </TableCell>
-                  <TableCell className={`text-right tabular-nums hidden md:table-cell ${saldo > 0 ? "text-ink" : "text-muted-foreground"}`}>
-                    {fmtArs(saldo)}
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                    {p.items?.length ?? 0} equipos
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -392,13 +393,28 @@ function PedidosPage() {
                         variant="outline"
                         className={ESTADO_CLASS[p.estado] ?? ""}
                       >
-                        {ESTADO_LABEL[p.estado]}
+                        {estadoLabel(p.estado)}
                       </Badge>
                       {p.tiene_solicitud_pendiente && (
-                        <Badge variant="outline" className="border-amber text-amber-700 bg-amber-50">
-                          Mod. pendiente
-                        </Badge>
+                        <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                          <Pencil className="h-3 w-3" /> mod.
+                        </span>
                       )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    <div className="text-ink font-medium">{fmtArs(p.monto_total)}</div>
+                    <div className={cn(
+                      "font-mono text-[10px] mt-0.5",
+                      (p.monto_pagado ?? 0) >= (p.monto_total ?? 0) ? "text-verde"
+                      : (p.monto_pagado ?? 0) > 0 ? "text-muted-foreground"
+                      : "text-destructive",
+                    )}>
+                      {(p.monto_pagado ?? 0) >= (p.monto_total ?? 0)
+                        ? "pagado"
+                        : (p.monto_pagado ?? 0) === 0
+                          ? "sin seña"
+                          : `seña ${fmtArs(p.monto_pagado)}`}
                     </div>
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
