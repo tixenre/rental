@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Query, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 
-from database import get_db, row_to_dict
+from database import get_db, row_to_dict, to_datetime, to_iso
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin
 from services.email import send_email
@@ -361,17 +361,19 @@ def _get_buffer_dias(conn) -> int:
         return 0
 
 
-def _rango_con_buffer(fecha_desde: str, fecha_hasta: str, buffer_dias: int) -> tuple[str, str]:
+def _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias: int):
     """Expande [desde, hasta] en `buffer_dias` por cada lado. Expandir el rango
     nuevo equivale a exigir `buffer_dias` de gap contra los alquileres
-    existentes (el overlap es simétrico). Devuelve fechas ISO YYYY-MM-DD."""
+    existentes (el overlap es simétrico). Devuelve fechas ISO YYYY-MM-DD.
+
+    Acepta str ISO o datetime (las columnas son TIMESTAMP)."""
     if buffer_dias <= 0:
         return fecha_desde, fecha_hasta
     try:
-        d0 = datetime.date.fromisoformat(fecha_desde[:10]) - datetime.timedelta(days=buffer_dias)
-        d1 = datetime.date.fromisoformat(fecha_hasta[:10]) + datetime.timedelta(days=buffer_dias)
+        d0 = to_datetime(fecha_desde).date() - datetime.timedelta(days=buffer_dias)
+        d1 = to_datetime(fecha_hasta).date() + datetime.timedelta(days=buffer_dias)
         return d0.isoformat(), d1.isoformat()
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, AttributeError):
         return fecha_desde, fecha_hasta
 
 
@@ -484,8 +486,8 @@ def _pedido_email_context(pedido: dict) -> dict:
         "cliente_email": pedido.get("cliente_email") or "",
         "cliente_telefono": pedido.get("cliente_telefono") or "",
         "numero_pedido": pedido.get("numero_pedido") or pedido.get("id"),
-        "fecha_desde": pedido.get("fecha_desde") or "",
-        "fecha_hasta": pedido.get("fecha_hasta") or "",
+        "fecha_desde": to_iso(pedido.get("fecha_desde")) or "",
+        "fecha_hasta": to_iso(pedido.get("fecha_hasta")) or "",
         "total": pedido.get("monto_total") or 0,
         "notas": pedido.get("notas") or "",
         "items_html": items_html,
@@ -551,8 +553,8 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                 descuento_pct    = c["descuento"] or 0.0
 
         if data.fecha_desde and data.fecha_hasta:
-            d0 = datetime.datetime.fromisoformat(data.fecha_desde)
-            d1 = datetime.datetime.fromisoformat(data.fecha_hasta)
+            d0 = to_datetime(data.fecha_desde)
+            d1 = to_datetime(data.fecha_hasta)
             hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
             if d0 >= d1:
@@ -586,7 +588,7 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                                  descuento_pct, descuento_jornadas_pct)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
         """, (cliente_nombre, cliente_email, cliente_telefono,
-              data.cliente_id, data.notas, data.fecha_desde, data.fecha_hasta,
+              data.cliente_id, data.notas, data.fecha_desde or None, data.fecha_hasta or None,
               monto_total, estado_inicial, next_num,
               descuento_pct, descuento_jornadas_pct))
         pedido_id = cur.lastrowid
@@ -898,8 +900,8 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
                 errores.append("El pedido no tiene fechas de inicio y fin.")
             else:
                 try:
-                    d0 = datetime.datetime.fromisoformat(p_row["fecha_desde"])
-                    d1 = datetime.datetime.fromisoformat(p_row["fecha_hasta"])
+                    d0 = to_datetime(p_row["fecha_desde"])
+                    d1 = to_datetime(p_row["fecha_hasta"])
                     hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
                     if d0 >= d1:
@@ -1116,6 +1118,10 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
         raise HTTPException(404, "Pedido no encontrado")
 
     payload = {k: v for k, v in data.model_dump(exclude_unset=True).items()}
+    # Columnas TIMESTAMP: '' rompe el cast → normalizar a NULL.
+    for _k in ("fecha_desde", "fecha_hasta"):
+        if _k in payload and not payload[_k]:
+            payload[_k] = None
 
     cliente_cambio = "cliente_id" in payload and payload["cliente_id"]
     if cliente_cambio:
@@ -1131,8 +1137,8 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
         nueva_desde = payload.get("fecha_desde") or p["fecha_desde"]
         nueva_hasta = payload.get("fecha_hasta") or p["fecha_hasta"]
         if nueva_desde and nueva_hasta:
-            d0 = datetime.datetime.fromisoformat(nueva_desde)
-            d1 = datetime.datetime.fromisoformat(nueva_hasta)
+            d0 = to_datetime(nueva_desde)
+            d1 = to_datetime(nueva_hasta)
             hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
             if d0 >= d1:
@@ -1152,8 +1158,8 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
     if "fecha_desde" in payload or "fecha_hasta" in payload or cliente_cambio:
         p2 = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
         if p2["fecha_desde"] and p2["fecha_hasta"]:
-            d0 = datetime.datetime.fromisoformat(p2["fecha_desde"])
-            d1 = datetime.datetime.fromisoformat(p2["fecha_hasta"])
+            d0 = to_datetime(p2["fecha_desde"])
+            d1 = to_datetime(p2["fecha_hasta"])
             jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
         else:
             jornadas = 1
@@ -1189,8 +1195,8 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
         raise HTTPException(400, "Debe tener al menos un ítem")
 
     if p["fecha_desde"] and p["fecha_hasta"]:
-        d0 = datetime.datetime.fromisoformat(p["fecha_desde"])
-        d1 = datetime.datetime.fromisoformat(p["fecha_hasta"])
+        d0 = to_datetime(p["fecha_desde"])
+        d1 = to_datetime(p["fecha_hasta"])
         jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
     else:
         jornadas = 1

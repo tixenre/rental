@@ -63,12 +63,8 @@ def calcular_estadisticas_equipo(
     estados_validos = ("confirmado", "retirado", "devuelto", "finalizado")
     placeholders = ",".join(["?"] * len(estados_validos))
 
-    # NOTA: alquileres.fecha_desde / fecha_hasta son TEXT (legacy schema).
-    # Usamos NULLIF + cast para ser tolerantes a strings vacíos. Filtramos
-    # por substring antes del cast para evitar errores en filas malformadas.
-    # NOTA: alquileres.fecha_desde / fecha_hasta son TEXT (legacy schema).
-    # La resta de date - date en PG devuelve int (días directamente).
-    # Filtramos antes del cast con regex para tolerar filas malformadas.
+    # fecha_desde / fecha_hasta son TIMESTAMP. La resta date - date en PG
+    # devuelve int (días directamente).
     row = conn.execute(
         f"""
         SELECT
@@ -77,16 +73,16 @@ def calcular_estadisticas_equipo(
                 ai.cantidad * COALESCE(ai.precio_jornada, 0) *
                 GREATEST(
                     1,
-                    NULLIF(a.fecha_hasta, '')::date - NULLIF(a.fecha_desde, '')::date
+                    (a.fecha_hasta::date - a.fecha_desde::date)
                 )
             ), 0) AS ingreso_total_ars
         FROM alquiler_items ai
         JOIN alquileres a ON a.id = ai.pedido_id
         WHERE ai.equipo_id = ?
           AND a.estado IN ({placeholders})
-          AND a.fecha_desde ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
-          AND a.fecha_hasta ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
-          AND NULLIF(a.fecha_desde, '')::date >= CURRENT_DATE - (? || ' days')::interval
+          AND a.fecha_desde IS NOT NULL
+          AND a.fecha_hasta IS NOT NULL
+          AND a.fecha_desde >= CURRENT_DATE - (? || ' days')::interval
         """,
         (equipo_id, *estados_validos, str(ventana_dias)),
     ).fetchone()
@@ -256,7 +252,7 @@ def _recalcular_ranking_categorias(
                 ai.cantidad * COALESCE(ai.precio_jornada, 0) *
                 GREATEST(
                     1,
-                    NULLIF(a.fecha_hasta, '')::date - NULLIF(a.fecha_desde, '')::date
+                    (a.fecha_hasta::date - a.fecha_desde::date)
                 )
             ), 0) AS ingreso_total_ars
         FROM categorias c
@@ -264,9 +260,9 @@ def _recalcular_ranking_categorias(
         LEFT JOIN alquiler_items ai ON ai.equipo_id = ec.equipo_id
         LEFT JOIN alquileres a ON a.id = ai.pedido_id
             AND a.estado IN ({placeholders})
-            AND a.fecha_desde ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
-            AND a.fecha_hasta ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
-            AND NULLIF(a.fecha_desde, '')::date >= CURRENT_DATE - (? || ' days')::interval
+            AND a.fecha_desde IS NOT NULL
+            AND a.fecha_hasta IS NOT NULL
+            AND a.fecha_desde >= CURRENT_DATE - (? || ' days')::interval
         GROUP BY c.id, c.nombre, c.popularidad_score, c.cant_pedidos, c.ingreso_total_ars
         """,
         (*estados_validos, str(ventana_dias)),
@@ -337,7 +333,7 @@ def _recalcular_ranking_marcas(
                 ai.cantidad * COALESCE(ai.precio_jornada, 0) *
                 GREATEST(
                     1,
-                    NULLIF(a.fecha_hasta, '')::date - NULLIF(a.fecha_desde, '')::date
+                    (a.fecha_hasta::date - a.fecha_desde::date)
                 )
             ), 0) AS ingreso_total_ars
         FROM marcas m
@@ -345,9 +341,9 @@ def _recalcular_ranking_marcas(
         LEFT JOIN alquiler_items ai ON ai.equipo_id = e.id
         LEFT JOIN alquileres a ON a.id = ai.pedido_id
             AND a.estado IN ({placeholders})
-            AND a.fecha_desde ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
-            AND a.fecha_hasta ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}'
-            AND NULLIF(a.fecha_desde, '')::date >= CURRENT_DATE - (? || ' days')::interval
+            AND a.fecha_desde IS NOT NULL
+            AND a.fecha_hasta IS NOT NULL
+            AND a.fecha_desde >= CURRENT_DATE - (? || ' days')::interval
         GROUP BY m.id, m.nombre, m.popularidad_score, m.cant_pedidos, m.ingreso_total_ars
         """,
         (*estados_validos, str(ventana_dias)),

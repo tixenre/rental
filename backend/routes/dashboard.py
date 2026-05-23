@@ -31,21 +31,21 @@ def get_dashboard(_admin: dict = Depends(require_admin)):
             SELECT p.id, p.cliente_nombre, p.fecha_desde, p.fecha_hasta, p.monto_total
             FROM alquileres p
             WHERE estado IN ('confirmado','retirado')
-              AND LEFT(p.fecha_desde, 10) = ?
+              AND p.fecha_desde::date = ?
             ORDER BY p.fecha_desde
         """, (hoy,)).fetchall()
 
         devuelven_hoy = conn.execute("""
             SELECT p.id, p.cliente_nombre, p.fecha_desde, p.fecha_hasta, p.monto_total
             FROM alquileres p
-            WHERE estado IN ('confirmado','retirado') AND LEFT(p.fecha_hasta, 10) = ?
+            WHERE estado IN ('confirmado','retirado') AND p.fecha_hasta::date = ?
             ORDER BY p.fecha_hasta
         """, (hoy,)).fetchall()
 
         devuelven_manana = conn.execute("""
             SELECT p.id, p.cliente_nombre, p.fecha_desde, p.fecha_hasta, p.monto_total
             FROM alquileres p
-            WHERE estado IN ('confirmado','retirado') AND LEFT(p.fecha_hasta, 10) = ?
+            WHERE estado IN ('confirmado','retirado') AND p.fecha_hasta::date = ?
             ORDER BY p.fecha_hasta
         """, (manana,)).fetchall()
 

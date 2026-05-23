@@ -952,7 +952,7 @@ def create_equipo(data: EquipoCreate):
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (data.nombre, brand_id, data.modelo, data.cantidad,
               data.precio_jornada, data.precio_usd, data.roi_pct,
-              data.valor_reposicion, data.foto_url, data.fecha_compra,
+              data.valor_reposicion, data.foto_url, data.fecha_compra or None,
               data.serie, data.bh_url, data.dueno, data.visible_catalogo, data.estado,
               bool(data.ficha_completa)))
         new_id = cur.lastrowid
@@ -988,6 +988,9 @@ def update_equipo(id: int, data: EquipoUpdate):
         marca_cambio = "marca" in updates
         if marca_cambio:
             updates["brand_id"] = _resolve_brand_id(conn, updates.pop("marca"))
+        # fecha_compra es DATE: '' rompe el cast → normalizar a NULL.
+        if "fecha_compra" in updates and not updates["fecha_compra"]:
+            updates["fecha_compra"] = None
         # Validar serie única si se está cambiando (excluyendo este equipo).
         # Rechaza si otra fila activa tiene la misma serie.
         if "serie" in updates:
@@ -1054,7 +1057,7 @@ def duplicate_equipo(id: int):
 
         cur = conn.execute("""
             INSERT INTO equipos (
-                nombre, marca, modelo, cantidad,
+                nombre, brand_id, modelo, cantidad,
                 precio_jornada, precio_usd, roi_pct,
                 valor_reposicion, foto_url, fecha_compra,
                 serie, bh_url, dueno, visible_catalogo, estado,
@@ -1062,9 +1065,9 @@ def duplicate_equipo(id: int):
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             f"{src_d['nombre']} (copia)",
-            src_d.get("marca"), src_d.get("modelo"), 1,
+            src_d.get("brand_id"), src_d.get("modelo"), 1,
             src_d.get("precio_jornada"), src_d.get("precio_usd"), src_d.get("roi_pct"),
-            src_d.get("valor_reposicion"), src_d.get("foto_url"), src_d.get("fecha_compra"),
+            src_d.get("valor_reposicion"), src_d.get("foto_url"), src_d.get("fecha_compra") or None,
             None,  # serie vacía
             src_d.get("bh_url"), src_d.get("dueno"), src_d.get("visible_catalogo", 1), src_d.get("estado", "operativo"),
             False,  # ficha_completa false para que el admin la revise
@@ -1414,7 +1417,7 @@ def get_equipo_historial(id: int):
                 p.fecha_desde, p.fecha_hasta,
                 COALESCE(c.nombre || ' ' || c.apellido, p.cliente_nombre) AS cliente,
                 pi.cantidad, pi.precio_jornada AS precio_item,
-                GREATEST(1, DATE_PART('day', LEFT(p.fecha_hasta, 10)::TIMESTAMP - LEFT(p.fecha_desde, 10)::TIMESTAMP))::INTEGER AS dias
+                GREATEST(1, (p.fecha_hasta::date - p.fecha_desde::date))::INTEGER AS dias
             FROM alquiler_items pi
             JOIN alquileres p ON p.id = pi.pedido_id
             LEFT JOIN clientes c ON c.id = p.cliente_id
@@ -1483,7 +1486,7 @@ def add_mantenimiento(id: int, data: MantenimientoCreate):
                  fecha_hasta, cantidad, bloquea_stock)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (id, data.fecha, data.tipo or "revision", data.descripcion, data.costo,
-              data.proxima_revision, data.fecha_hasta, max(1, data.cantidad),
+              data.proxima_revision or None, data.fecha_hasta or None, max(1, data.cantidad),
               data.bloquea_stock))
         conn.commit()
         new_id = cur.lastrowid
@@ -1512,6 +1515,10 @@ def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate):
         updates = data.model_dump(exclude_unset=True)
         if not updates:
             raise HTTPException(400, "Nada para actualizar")
+        # Columnas TIMESTAMP: '' rompe el cast → normalizar a NULL.
+        for k in ("fecha_hasta", "proxima_revision"):
+            if k in updates and not updates[k]:
+                updates[k] = None
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         conn.execute(
             f"UPDATE equipo_mantenimiento SET {set_clause} WHERE id = ?",
@@ -1988,7 +1995,7 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
                 COUNT(DISTINCT p.id) AS cant_pedidos,
                 SUM(
                     COALESCE(pi.precio_jornada, 0) * COALESCE(pi.cantidad, 1)
-                    * GREATEST(1, DATE_PART('day', LEFT(p.fecha_hasta, 10)::TIMESTAMP - LEFT(p.fecha_desde, 10)::TIMESTAMP))::INTEGER
+                    * GREATEST(1, (p.fecha_hasta::date - p.fecha_desde::date))::INTEGER
                 ) AS revenue_total
             FROM equipos e
             JOIN alquiler_items pi ON pi.equipo_id = e.id
@@ -2010,7 +2017,7 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
             LEFT JOIN alquileres p ON p.id = pi.pedido_id
             WHERE e.eliminado_at IS NULL
             GROUP BY e.id, e.nombre, e.modelo, e.foto_url, e.valor_reposicion
-            HAVING (MAX(p.fecha_desde) IS NULL OR MAX(p.fecha_desde) < (CURRENT_DATE - (? || ' days')::INTERVAL)::TEXT)
+            HAVING (MAX(p.fecha_desde) IS NULL OR MAX(p.fecha_desde) < (CURRENT_DATE - (? || ' days')::INTERVAL))
             ORDER BY ultimo_alquiler ASC NULLS FIRST
             LIMIT 25
         """, (dias_sin_uso,)).fetchall()
@@ -2022,7 +2029,7 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
                 COUNT(DISTINCT p.id) AS cant_pedidos,
                 SUM(
                     COALESCE(pi.precio_jornada, 0) * COALESCE(pi.cantidad, 1)
-                    * GREATEST(1, DATE_PART('day', LEFT(p.fecha_hasta, 10)::TIMESTAMP - LEFT(p.fecha_desde, 10)::TIMESTAMP))::INTEGER
+                    * GREATEST(1, (p.fecha_hasta::date - p.fecha_desde::date))::INTEGER
                 ) AS revenue_total
             FROM categorias cat
             JOIN equipo_categorias ec ON ec.categoria_id = cat.id
@@ -2043,7 +2050,7 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
                 COUNT(DISTINCT p.id) AS total_pedidos,
                 SUM(
                     COALESCE(pi.precio_jornada, 0) * COALESCE(pi.cantidad, 1)
-                    * GREATEST(1, DATE_PART('day', LEFT(p.fecha_hasta, 10)::TIMESTAMP - LEFT(p.fecha_desde, 10)::TIMESTAMP))::INTEGER
+                    * GREATEST(1, (p.fecha_hasta::date - p.fecha_desde::date))::INTEGER
                 ) AS revenue_total
             FROM equipos e
             LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
@@ -2751,29 +2758,29 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
 
         # Direct reservations that overlap this month
         directas = conn.execute(f"""
-            SELECT LEFT(p.fecha_desde, 10) AS desde,
-                   LEFT(p.fecha_hasta, 10) AS hasta,
+            SELECT to_char(p.fecha_desde, 'YYYY-MM-DD') AS desde,
+                   to_char(p.fecha_hasta, 'YYYY-MM-DD') AS hasta,
                    pi.cantidad
             FROM alquiler_items pi
             JOIN alquileres p ON p.id = pi.pedido_id
             WHERE pi.equipo_id = ?
               AND p.estado IN {ESTADOS}
-              AND LEFT(p.fecha_desde, 10) <= ?
-              AND LEFT(p.fecha_hasta, 10) > ?
+              AND p.fecha_desde::date <= ?
+              AND p.fecha_hasta::date > ?
         """, (id, last_day, first_day)).fetchall()
 
         # Via-kit reservations: this equipment is a component of a rented kit
         via_kit = conn.execute(f"""
-            SELECT LEFT(p.fecha_desde, 10) AS desde,
-                   LEFT(p.fecha_hasta, 10) AS hasta,
+            SELECT to_char(p.fecha_desde, 'YYYY-MM-DD') AS desde,
+                   to_char(p.fecha_hasta, 'YYYY-MM-DD') AS hasta,
                    pi.cantidad * kc.cantidad AS cantidad
             FROM kit_componentes kc
             JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
             JOIN alquileres p ON p.id = pi.pedido_id
             WHERE kc.componente_id = ?
               AND p.estado IN {ESTADOS}
-              AND LEFT(p.fecha_desde, 10) <= ?
-              AND LEFT(p.fecha_hasta, 10) > ?
+              AND p.fecha_desde::date <= ?
+              AND p.fecha_hasta::date > ?
         """, (id, last_day, first_day)).fetchall()
 
         reservations = [dict(r) for r in directas] + [dict(r) for r in via_kit]

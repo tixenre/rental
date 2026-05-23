@@ -234,7 +234,7 @@ def init_db():
             roi_pct          FLOAT,
             valor_reposicion FLOAT,
             foto_url         TEXT,
-            fecha_compra     TEXT,
+            fecha_compra     DATE,
             serie            TEXT,
             bh_url           TEXT,
             dueno            TEXT DEFAULT 'Rambla',
@@ -325,8 +325,8 @@ def init_db():
             cliente_telefono TEXT,
             notas            TEXT,
             estado           TEXT NOT NULL DEFAULT 'presupuesto',
-            fecha_desde      TEXT NOT NULL,
-            fecha_hasta      TEXT NOT NULL,
+            fecha_desde      TIMESTAMP,
+            fecha_hasta      TIMESTAMP,
             monto_total      INTEGER DEFAULT 0,
             monto_pagado     INTEGER DEFAULT 0,
             descuento_pct    FLOAT DEFAULT 0,
@@ -763,11 +763,11 @@ def init_db():
         CREATE TABLE IF NOT EXISTS equipo_mantenimiento (
             id                SERIAL PRIMARY KEY,
             equipo_id         INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
-            fecha             TEXT NOT NULL,
+            fecha             TIMESTAMP NOT NULL,
             tipo              VARCHAR(32) NOT NULL DEFAULT 'revision',
             descripcion       TEXT,
             costo             INTEGER,
-            proxima_revision  TEXT,
+            proxima_revision  TIMESTAMP,
             created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -778,7 +778,7 @@ def init_db():
     # Mantenimiento que bloquea disponibilidad: una entrada con bloquea_stock=true
     # y fecha/fecha_hasta saca `cantidad` unidades del equipo durante ese rango.
     # Si fecha_hasta es NULL o bloquea_stock=false, es solo log histórico.
-    conn.execute("ALTER TABLE equipo_mantenimiento ADD COLUMN IF NOT EXISTS fecha_hasta TEXT")
+    conn.execute("ALTER TABLE equipo_mantenimiento ADD COLUMN IF NOT EXISTS fecha_hasta TIMESTAMP")
     conn.execute("ALTER TABLE equipo_mantenimiento ADD COLUMN IF NOT EXISTS cantidad INTEGER NOT NULL DEFAULT 1")
     conn.execute("ALTER TABLE equipo_mantenimiento ADD COLUMN IF NOT EXISTS bloquea_stock BOOLEAN NOT NULL DEFAULT FALSE")
     conn.execute(
@@ -914,7 +914,7 @@ def init_db():
             pedido_id  INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
             monto      INTEGER NOT NULL,
             concepto   TEXT,
-            fecha      TEXT DEFAULT CURRENT_DATE,
+            fecha      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -1066,6 +1066,39 @@ def init_db():
     conn.execute("ALTER TABLE solicitudes_modificacion ADD COLUMN IF NOT EXISTS cambios_json JSONB")
     conn.execute("ALTER TABLE spec_definitions ADD COLUMN IF NOT EXISTS tabla_columnas JSONB")
 
+    # Fechas TEXT → tipo nativo (migración e2c6f4a8b1d7). Las fechas se
+    # guardaban como strings ISO; ahora son TIMESTAMP/DATE. Idempotente: solo
+    # convierte si la columna sigue siendo 'text'. Defensivo: limpia valores
+    # no-ISO a NULL antes del cast y re-aplica NOT NULL solo si quedó limpio.
+    for tabla, col, tipo, not_null in (
+        ("alquileres", "fecha_desde", "timestamp", False),
+        ("alquileres", "fecha_hasta", "timestamp", False),
+        ("equipo_mantenimiento", "fecha", "timestamp", True),
+        ("equipo_mantenimiento", "fecha_hasta", "timestamp", False),
+        ("equipo_mantenimiento", "proxima_revision", "timestamp", False),
+        ("alquiler_pagos", "fecha", "timestamp", False),
+        ("equipos", "fecha_compra", "date", False),
+    ):
+        renotnull = (
+            f"IF NOT EXISTS (SELECT 1 FROM {tabla} WHERE {col} IS NULL) THEN "
+            f"ALTER TABLE {tabla} ALTER COLUMN {col} SET NOT NULL; END IF;"
+            if not_null else ""
+        )
+        conn.execute(f"""
+            DO $$
+            BEGIN
+                IF (SELECT data_type FROM information_schema.columns
+                    WHERE table_name = '{tabla}' AND column_name = '{col}') = 'text' THEN
+                    ALTER TABLE {tabla} ALTER COLUMN {col} DROP NOT NULL;
+                    UPDATE {tabla} SET {col} = NULL
+                        WHERE {col} !~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}';
+                    ALTER TABLE {tabla} ALTER COLUMN {col} TYPE {tipo}
+                        USING NULLIF(TRIM({col}), '')::{tipo};
+                    {renotnull}
+                END IF;
+            END $$;
+        """)
+
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
 
     # Seed the sequence to the current max so nextval never collides with existing data.
@@ -1107,6 +1140,30 @@ def row_to_dict(row) -> dict:
     if isinstance(row, dict):
         return row
     return dict(row)
+
+
+def to_datetime(v):
+    """Coacciona a `datetime`. Acepta str ISO, `date`, `datetime` o None.
+
+    Las columnas de fecha pasaron de TEXT a TIMESTAMP/DATE, así que psycopg
+    devuelve objetos `datetime`/`date` en vez de strings. Los request bodies
+    siguen llegando como strings ISO. Este helper neutraliza ambos casos."""
+    from datetime import date as _date, datetime as _dt
+    if v is None or v == "":
+        return None
+    if isinstance(v, _dt):
+        return v
+    if isinstance(v, _date):
+        return _dt(v.year, v.month, v.day)
+    return _dt.fromisoformat(str(v))
+
+
+def to_iso(v) -> str | None:
+    """Coacciona a string ISO. None/'' → None. Acepta str, `date`, `datetime`."""
+    if v is None or v == "":
+        return None
+    iso = getattr(v, "isoformat", None)
+    return iso() if callable(iso) else str(v)
 
 
 # ── Helpers de equipos ─────────────────────────────────────────────────────
