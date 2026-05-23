@@ -118,6 +118,7 @@ MAPPING_BY_BOOQABLE_SLUG: dict[str, tuple[str, int]] = {
     "tarjeta-sd": ("sony-sf-g128t-t1", 1),  # Sony Tough 128gb V90
     "tarjeta-sd-angelbird-256-v30-sd": ("angelbird-av-pro-sd-v30-256gb", 1),
     "tarjeta-sd-sandisk-256-gb-v90-sd": ("sandisk-256gb-extreme-pro-uhs-ii-sdxc", 1),
+    "pinza-de-metal": ("impact-ssc-a20b", 1),  # Pinzas Grandes
     "tilta-gravity-gx2": ("tilta-gravity-g2x", 1),
     "tilta-hydra-ventosa-electronica-4-5": ("tilta-hydra-x-dan-ming-speed-pan-system", 1),
     "tilta-nucleus-nano-ii-inalambrico": ("tilta-nucleus-nano-ii-wireless-lens-control-system-with-control-handle-kit", 1),
@@ -135,6 +136,15 @@ MAPPING_BY_LINE_TITLE: dict[str, tuple[str, int]] = {
     "alargues": ("extension-electrica", 1),
     "Cable SDI - 20cm": ("elvid-bncrr-020-c2", 1),
     "Cargador Baterias Sony": ("sony-bc-zd1", 1),
+    "Rode Podcast Mics": ("rode-procaster", 1),
+    "Rodecaster Audio": ("rode-rodecaster-video", 1),
+    "Bandera Negra 60x90": ("ox-grips-bandera-negra", 1),
+    "Cable HDMI - 5mts": ("kondor-blue-kb-fhdmi-12-bk", 1),
+    "Car Mount con Cabezal Anti-vibracion": ("car-mount", 1),
+    "Marco 1x1": ("kupo-kg094012", 1),  # Marco Difusion
+    "Bateria NP tipo sony": ("smallrig-l-series-np-f970", 1),
+    "Baterias LP": ("canon-lp-e6p", 1),  # Canon LP-E6
+    "Rode Link Mic": ("rode-lavalier", 1),  # archived Booqable "Rode Link" — uso lavalier
 }
 
 # Slugs Booqable que van EXPLICITAMENTE a placeholder (no mapeables)
