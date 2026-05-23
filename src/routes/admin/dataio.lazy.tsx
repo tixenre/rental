@@ -13,7 +13,7 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import {
   AlertTriangle, Database, Download, FileArchive, FileJson,
-  Loader2, Trash2, Upload, Users,
+  FileSpreadsheet, Loader2, Trash2, Upload, Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -109,7 +109,9 @@ function DataIoPage() {
     try {
       const fallback = entity.includes("-all") || entity === "full"
         ? `${entity}.zip`
-        : `${entity}.json`;
+        : entity.endsWith("-csv")
+          ? `${entity.slice(0, -4)}.csv`
+          : `${entity}.json`;
       await downloadFile(`/api/admin/dataio/export?entity=${entity}`, fallback);
       toast.success(`Descargado: ${label}`);
     } catch (e) {
@@ -191,6 +193,55 @@ function DataIoPage() {
               onDownload={handleDownload}
             />
           ))}
+        </div>
+      </section>
+
+      {/* ─── PLANILLAS CSV ─── */}
+      <section className="rounded-lg border bg-card p-5 space-y-3">
+        <div className="space-y-1">
+          <h2 className="font-display text-lg flex items-center gap-2">
+            <FileSpreadsheet className="size-4" />
+            Exportar a planilla (CSV)
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Una sola hoja por entidad, lista para abrir en Excel/Sheets. Hace
+            los JOINs por vos (marca, categorías y specs ya vienen en columnas).
+            Alquileres y clientes incluyen datos privados —{" "}
+            <strong className="text-foreground">no commitear al repo.</strong>
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button
+            variant="outline"
+            onClick={() => handleDownload("equipos-csv", "Equipos (CSV)")}
+            disabled={busy !== null}
+          >
+            {busy === "equipos-csv" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            Equipos
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => handleDownload("alquileres-csv", "Alquileres (CSV)")}
+            disabled={busy !== null}
+          >
+            {busy === "alquileres-csv" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            Alquileres
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => handleDownload("clientes-csv", "Clientes (CSV)")}
+            disabled={busy !== null}
+          >
+            {busy === "clientes-csv" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            Clientes
+          </Button>
+          <Button
+            onClick={() => handleDownload("csv-all", "Planillas (ZIP)")}
+            disabled={busy !== null}
+          >
+            {busy === "csv-all" ? <Loader2 className="size-4 animate-spin" /> : <FileArchive className="size-4" />}
+            Todo (ZIP)
+          </Button>
         </div>
       </section>
 
