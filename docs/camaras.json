@@ -2024,7 +2024,7 @@
         "processor": "2 x DIGIC DV 6",
         "time_code": "Drop Frame (in 59.94/29.97 mode only) or Non-Drop Frame\nRec run, free run, regeneration",
         "built_in_microphone": false,
-        "internal_recording": true,
+        "internal_recording": "Cinema Raw Light (CFast) + MP4 (SD)",
         "materials": "Magnesium Alloy",
         "mobile_app_compatible": false,
         "netflix_approved": false,
