@@ -378,7 +378,7 @@ function Index() {
             el snap del topbar) se retinta de amber soft para combinar con el
             topbar teñido en vez de quedar como una barra blanca "rota". */}
         <div
-          className="sticky top-14 sm:top-[69px] z-30 border-b hairline backdrop-blur-xl transition-colors"
+          className="sticky top-16 z-30 border-b hairline backdrop-blur-xl transition-colors"
           style={{
             background: scrolled
               ? "color-mix(in oklch, var(--amber) 20%, var(--background))"
@@ -729,6 +729,7 @@ function GridMode({
           allEquipos={allEquipos}
           categories={apiCategories}
           onSelect={onJumpToCategory}
+          getCount={(c) => allEquipos.filter((e) => inCategory(e, c)).length}
         />
       )}
 

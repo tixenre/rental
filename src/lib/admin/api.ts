@@ -594,6 +594,11 @@ export const adminApi = {
     sp.set("per_page", String(params.per_page ?? 500));
     return authedJson<EquiposListResp>(`/api/equipos?${sp.toString()}`);
   },
+  /** KPIs del inventario para el header de /admin/equipos. */
+  equiposKpis: () =>
+    authedJson<{ total: number; en_uso_hoy: number; mantenimiento: number }>(
+      "/api/equipos/kpis",
+    ),
   restoreEquipo: (id: number) =>
     authedPostJson<{ ok: true; message?: string }>(`/api/equipos/${id}/restore`, {}),
   getEquipo: (id: number) => authedJson<Equipo>(`/api/equipos/${id}`),

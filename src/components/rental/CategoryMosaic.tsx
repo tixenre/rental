@@ -13,10 +13,15 @@ export function CategoryMosaic({
   allEquipos,
   categories,
   onSelect,
+  getCount,
 }: {
   allEquipos: Equipment[];
   categories: string[];
   onSelect: (c: string) => void;
+  /** Conteo por categoría. Si no se pasa, cuenta solo la categoría primaria
+   *  (legacy). El catálogo pasa el conteo por pertenencia M2M para que matchee
+   *  los tabs. */
+  getCount?: (c: string) => number;
 }) {
   return (
     <section className="px-6 py-8 lg:px-12 lg:py-12">
@@ -29,7 +34,7 @@ export function CategoryMosaic({
 
       <ul className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(160px,1fr))]">
         {categories.map((c) => {
-          const count = allEquipos.filter((e) => e.category === c).length;
+          const count = getCount ? getCount(c) : allEquipos.filter((e) => e.category === c).length;
           return (
             <li key={c}>
               <button

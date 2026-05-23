@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/rental/Logo";
+import { useBusinessPhone } from "@/lib/business";
+import { whatsappLink } from "@/lib/whatsapp";
 
 export const Route = createFileRoute("/cliente/login")({
   head: () => ({
@@ -21,10 +23,13 @@ const ERROR_MESSAGES: Record<string, string> = {
   no_code:        "Google no devolvió el código de autorización. Intentá de nuevo.",
 };
 
-const WHATSAPP_URL = "https://wa.me/5492236123456";
-
 function ClienteLoginPage() {
   const [error, setError] = useState<string | null>(null);
+  const businessPhone = useBusinessPhone();
+  const waHref = whatsappLink({
+    phone: businessPhone,
+    message: "Hola, quiero crear una cuenta para alquilar equipos.",
+  });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -39,7 +44,7 @@ function ClienteLoginPage() {
       </header>
 
       <div className="flex-1 grid place-items-center px-6 py-8">
-        <div className="w-full max-w-[400px] rounded-3xl border hairline bg-surface p-8 sm:px-8 sm:py-9 shadow-[0_12px_40px_-10px_rgba(0,0,0,0.08)] flex flex-col gap-[22px]">
+        <div className="w-full max-w-[400px] rounded-[20px] border hairline bg-surface p-8 sm:px-8 sm:py-9 shadow-[0_12px_40px_-10px_rgba(0,0,0,0.08)] flex flex-col gap-[22px]">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-[0.26em] text-muted-foreground">
               Portal de clientes
@@ -73,14 +78,18 @@ function ClienteLoginPage() {
 
           <div className="text-center font-sans text-xs text-muted-foreground">
             ¿No tenés cuenta todavía?{" "}
-            <a
-              href={WHATSAPP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-ink border-b border-ink pb-px hover:text-amber hover:border-amber transition"
-            >
-              Hablanos por WhatsApp
-            </a>
+            {waHref ? (
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-ink border-b border-ink pb-px hover:text-amber hover:border-amber transition"
+              >
+                Hablanos por WhatsApp
+              </a>
+            ) : (
+              <span className="text-ink">Escribinos para crear tu cuenta.</span>
+            )}
           </div>
         </div>
       </div>
