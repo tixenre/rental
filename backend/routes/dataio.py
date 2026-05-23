@@ -21,6 +21,7 @@ import json
 import logging
 import zipfile
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
@@ -127,12 +128,24 @@ async def import_dataio(
 
     conn = get_db()
     try:
+        # Hook para imports de migracion (ej. Booqable). Si el ZIP trae
+        # un `placeholders_equipos.json`, creamos esos equipos antes
+        # de importar alquileres para que las FKs resuelvan. Idempotente.
+        placeholders_created = _create_placeholder_equipos(conn, content)
+
         stats = orchestrator.import_from_zip_bytes(
             conn,
             content,
             only=list(OPERATIONAL_ENTITIES),
             dry_run=dry_run,
         )
+
+        # Bumpear secuencias post-import para que nuevos pedidos manuales
+        # no colisionen con los importados. Idempotente.
+        sequences_bumped = []
+        if not dry_run and stats.get("alquileres", {}).get("inserted", 0) > 0:
+            sequences_bumped = _bump_operacional_sequences(conn)
+
         if not dry_run:
             conn.commit()
         return {
@@ -141,6 +154,8 @@ async def import_dataio(
             "stats": stats,
             "total_inserted": sum(s.get("inserted", 0) for s in stats.values()),
             "total_updated": sum(s.get("updated", 0) for s in stats.values()),
+            "placeholders_creados": placeholders_created,
+            "sequences_bumped": sequences_bumped,
         }
     except Exception as e:
         try:
@@ -150,6 +165,78 @@ async def import_dataio(
         raise HTTPException(400, f"Import falló: {e}")
     finally:
         conn.close()
+
+
+def _create_placeholder_equipos(conn, zip_bytes: bytes) -> int:
+    """Si el ZIP trae `placeholders_equipos.json`, inserta esos equipos
+    como historicos (cantidad=0, visible_catalogo=0, estado='historico').
+    Idempotente: ON CONFLICT (slug) DO NOTHING.
+
+    Pensado para wipe-and-reimport desde sistemas externos (ej. Booqable)
+    donde hay items historicos sin equivalente en el catalogo activo.
+    """
+    import io
+    import json
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            for name in zf.namelist():
+                if Path(name).name != "placeholders_equipos.json":
+                    continue
+                placeholders = json.loads(zf.read(name).decode("utf-8"))
+                break
+            else:
+                return 0
+    except (zipfile.BadZipFile, json.JSONDecodeError, KeyError):
+        return 0
+
+    if not isinstance(placeholders, list):
+        return 0
+
+    created = 0
+    for p in placeholders:
+        slug = (p.get("slug") or "").strip()
+        nombre = (p.get("nombre") or "").strip()
+        if not slug or not nombre:
+            continue
+        result = conn.execute(
+            """
+            INSERT INTO equipos (slug, nombre, cantidad, visible_catalogo, estado)
+            VALUES (?, ?, 0, 0, 'historico')
+            ON CONFLICT (slug) DO NOTHING
+            RETURNING id
+            """,
+            (slug, nombre),
+        ).fetchone()
+        if result:
+            created += 1
+    return created
+
+
+def _bump_operacional_sequences(conn) -> list[str]:
+    """Despues de un import masivo, sube las secuencias al MAX actual.
+
+    Sin esto, nuevos pedidos manuales agarrarian numero_pedido=1 y
+    colisionarian con los importados. Idempotente.
+    """
+    bumped = []
+    for seq, table, col in (
+        ("alquileres_id_seq", "alquileres", "id"),
+        ("alquiler_items_id_seq", "alquiler_items", "id"),
+        ("alquiler_pagos_id_seq", "alquiler_pagos", "id"),
+        ("clientes_id_seq", "clientes", "id"),
+        ("numero_pedido_seq", "alquileres", "numero_pedido"),
+    ):
+        try:
+            conn.execute(
+                f"SELECT setval('{seq}', GREATEST(1, "
+                f"(SELECT COALESCE(MAX({col}), 0) FROM {table})), true)"
+            )
+            bumped.append(seq)
+        except Exception as e:
+            logger.warning("setval %s fallo (no critico): %s", seq, e)
+    return bumped
 
 
 RESET_CONFIRMATION = "BORRAR TODO"
