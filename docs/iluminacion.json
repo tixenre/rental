@@ -19,7 +19,10 @@
           7500
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth, DMX",
+        "control_inalambrico": [
+          "Bluetooth",
+          "DMX"
+        ],
         "alimentacion": [
           "AC",
           "V-mount",
@@ -494,7 +497,7 @@
       "modelo": "FC500B",
       "url_source": "https://www.bhphotovideo.com/c/product/1779322-REG/nanlite_fc500b_fc_500_led_spotlight.html",
       "specs": {
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Foco",
         "potencia_w": 520,
         "color_modes": [
           "Bicolor"
@@ -505,7 +508,9 @@
           6500
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC"
         ],
@@ -706,7 +711,7 @@
       "modelo": "Ray 360c",
       "url_source": "https://www.bhphotovideo.com/c/product/1930190-REG/amaran_mp00000191_ray_360c_rgb_led.html/specs",
       "specs": {
-        "iluminacion_subtipo": "COB Monolight",
+        "iluminacion_subtipo": "Foco",
         "potencia_w": 410,
         "color_modes": [
           "Bicolor",
@@ -719,7 +724,10 @@
           20000
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth, DMX",
+        "control_inalambrico": [
+          "Bluetooth",
+          "DMX"
+        ],
         "alimentacion": [
           "AC"
         ],
@@ -967,7 +975,11 @@
           20000
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth, DMX, RDM",
+        "control_inalambrico": [
+          "Bluetooth",
+          "DMX",
+          "RDM"
+        ],
         "alimentacion": [
           "AC"
         ],
@@ -1424,7 +1436,10 @@
           6500
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth, DMX",
+        "control_inalambrico": [
+          "Bluetooth",
+          "DMX"
+        ],
         "alimentacion": [
           "AC",
           "Batería integrada"
@@ -1658,7 +1673,7 @@
       "modelo": "Accent B7c",
       "url_source": "https://www.bhphotovideo.com/c/product/1595337-REG/aputure_aacbc7_accent_b7c_led_light.html",
       "specs": {
-        "iluminacion_subtipo": "Bulb / Lamp",
+        "iluminacion_subtipo": "Foco",
         "potencia_w": 7,
         "color_modes": [
           "Bicolor",
@@ -1741,7 +1756,7 @@
       "modelo": "VL150",
       "url_source": "https://www.bhphotovideo.com/c/product/1513246-REG/godox_vl150_video_led_light.html?fromDisList=y",
       "specs": {
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Foco",
         "potencia_w": 150,
         "color_modes": [
           "Daylight"
@@ -1751,7 +1766,9 @@
           5600
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC"
         ],
@@ -1913,7 +1930,7 @@
       "modelo": "VL300II",
       "url_source": "https://www.bhphotovideo.com/c/product/1721572-REG/godox_vl300ii_series_300w_led.html/specs?fromDisList=y",
       "specs": {
-        "iluminacion_subtipo": "COB Monolight",
+        "iluminacion_subtipo": "Foco",
         "potencia_w": 320,
         "color_modes": [
           "Daylight"
@@ -1923,7 +1940,9 @@
           5600
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC",
           "V-mount",
@@ -2145,7 +2164,7 @@
       "modelo": "Forza 500",
       "url_source": "https://www.bhphotovideo.com/c/product/1476382-REG/nanlite_12_2026_forza_500_led_monolight.html?fromDisList=y",
       "specs": {
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Foco",
         "potencia_w": 500,
         "color_modes": [
           "Daylight"
@@ -2156,7 +2175,9 @@
           5600
         ],
         "dimming": true,
-        "control_inalambrico": "Wi-Fi",
+        "control_inalambrico": [
+          "Wi-Fi"
+        ],
         "alimentacion": [
           "AC"
         ],
@@ -2333,7 +2354,7 @@
       "modelo": "Forza 60",
       "url_source": "https://www.bhphotovideo.com/c/product/1476380-REG/nanlite_12_2022_forza_60_led_monolight.html",
       "specs": {
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Foco",
         "potencia_w": 60,
         "color_modes": [
           "Daylight"
@@ -2545,7 +2566,7 @@
       "modelo": "300c",
       "url_source": "https://www.bhphotovideo.com/c/product/1762211-REG/amaran_ap30011a10_300c_rgb_led_monolight.html?fromDisList=y",
       "specs": {
-        "iluminacion_subtipo": "Monolight",
+        "iluminacion_subtipo": "Foco",
         "potencia_w": 360,
         "color_modes": [
           "Bicolor",
@@ -2558,7 +2579,9 @@
           7500
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC",
           "Batería integrada"
@@ -2785,7 +2808,7 @@
       "modelo": "COB 200x S",
       "url_source": "https://www.bhphotovideo.com/c/product/1753990-REG/amaran_apm022xa10_amaran_cob_200x_s.html?fromDisList=y",
       "specs": {
-        "iluminacion_subtipo": "COB Monolight",
+        "iluminacion_subtipo": "Foco",
         "potencia_w": 229,
         "color_modes": [
           "Bicolor"
@@ -2797,7 +2820,9 @@
           6500
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC",
           "V-mount",
