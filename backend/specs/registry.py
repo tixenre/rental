@@ -165,8 +165,8 @@ _CAMARAS = CategoriaRegistry(
         SpecDef(key="built_in_nd", label="Filtro ND integrado", tipo="bool",
                 prioridad=165, en_card=True, en_filtros=True,
                 ayuda="Cinema cameras: ND interno fijo o variable"),
-        SpecDef(key="internal_recording", label="Grabación interna", tipo="string",
-                prioridad=170, ayuda="Resolución máx + framerate + bitrate más alto"),
+        SpecDef(key="internal_recording", label="Grabación interna", tipo="bool",
+                prioridad=170, ayuda="¿Graba en medios internos? (la resolución/codec viven en specs aparte)"),
         SpecDef(key="gamma_curve", label="Curva de gamma / log", tipo="string",
                 prioridad=175, ayuda="Ej: S-Log3, V-Log, C-Log3, REDLogFilm"),
         # ─── Audio ────────────────────────────────────────────────────
@@ -175,9 +175,9 @@ _CAMARAS = CategoriaRegistry(
         SpecDef(key="built_in_microphone", label="Micrófono integrado", tipo="bool",
                 prioridad=185),
         # ─── Storage / media ──────────────────────────────────────────
-        SpecDef(key="media_card_slots", label="Slots de memoria", tipo="string",
+        SpecDef(key="media_card_slots", label="Slots de memoria", tipo="number",
                 prioridad=190, en_filtros=True,
-                ayuda="Ej: Dual CFexpress Type A / SDXC UHS-II"),
+                ayuda="Cantidad de slots de tarjeta (1, 2, …). El tipo de tarjeta vive en otra spec"),
         SpecDef(key="internal_storage", label="Almacenamiento interno", tipo="string",
                 prioridad=195, ayuda="Algunos cuerpos (REDs, FX) tienen SSD interno"),
         # ─── Display / EVF ────────────────────────────────────────────
@@ -348,7 +348,8 @@ _ILUMINACION = CategoriaRegistry(
             key="iluminacion_subtipo", label="Tipo", tipo="enum",
             enum_options=[
                 "Flash", "Foco", "Panel", "Tube Light", "Flexible Mat",
-                "Monoled", "Fresnel", "On-Camera",
+                "Monoled", "Fresnel", "On-Camera", "Monolight",
+                "COB Monolight", "Spotlight", "Bulb / Lamp",
             ],
             prioridad=10, en_card=True, en_filtros=True, en_nombre=True,
             destacado=True, ayuda="Form factor del fixture",

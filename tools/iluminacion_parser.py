@@ -372,7 +372,7 @@ def _parse_dimming(secciones: dict) -> bool:
     return val.strip().lower() not in ("", "no", "none", "n/a")
 
 
-def _parse_control_inalambrico(secciones: dict) -> str | None:
+def _parse_control_inalambrico(secciones: dict) -> list[str] | None:
     # Buscar en varios campos
     sources = []
     for label in ("Wireless Remote Control Type", "Control", "Wireless"):
@@ -402,7 +402,9 @@ def _parse_control_inalambrico(secciones: dict) -> str | None:
     if re.search(r"\bRDM\b", combined, re.IGNORECASE):
         protocols.append("RDM")
 
-    return ", ".join(protocols) if protocols else None
+    # multi_enum → lista (el registry lo valida como tal). Antes se devolvía
+    # un string con comas, que rompía la validación contra el registry.
+    return protocols or None
 
 
 def _parse_alimentacion(secciones: dict) -> list[str]:

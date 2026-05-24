@@ -91,7 +91,7 @@
         "capture_type": "Stills & Video",
         "peso_g": 640,
         "media_card_slots": 2,
-        "sensor_crop": 1,
+        "sensor_crop": "1x",
         "continuous_shooting_fps": 10,
         "processor": "BIONZ XR"
       },
@@ -2030,7 +2030,7 @@
         "netflix_approved": false,
         "operating_conditions": "0 to 40°C",
         "rango_dinamico_stops": 15,
-        "sensor_crop": 1.5,
+        "sensor_crop": "1.5x",
         "wireless": []
       },
       "extras": {
@@ -2632,7 +2632,7 @@
           800
         ],
         "processor": "RED A.I. processor",
-        "sensor_crop": 1.5
+        "sensor_crop": "1.5x"
       },
       "extras": {
         "sensor": "Super35 — 19.9 Megapixel",

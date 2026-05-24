@@ -19,7 +19,10 @@
           7500
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth, DMX",
+        "control_inalambrico": [
+          "Bluetooth",
+          "DMX"
+        ],
         "alimentacion": [
           "AC",
           "V-mount",
@@ -505,7 +508,9 @@
           6500
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC"
         ],
@@ -719,7 +724,10 @@
           20000
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth, DMX",
+        "control_inalambrico": [
+          "Bluetooth",
+          "DMX"
+        ],
         "alimentacion": [
           "AC"
         ],
@@ -967,7 +975,11 @@
           20000
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth, DMX, RDM",
+        "control_inalambrico": [
+          "Bluetooth",
+          "DMX",
+          "RDM"
+        ],
         "alimentacion": [
           "AC"
         ],
@@ -1424,7 +1436,10 @@
           6500
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth, DMX",
+        "control_inalambrico": [
+          "Bluetooth",
+          "DMX"
+        ],
         "alimentacion": [
           "AC",
           "Batería integrada"
@@ -1751,7 +1766,9 @@
           5600
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC"
         ],
@@ -1923,7 +1940,9 @@
           5600
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC",
           "V-mount",
@@ -2156,7 +2175,9 @@
           5600
         ],
         "dimming": true,
-        "control_inalambrico": "Wi-Fi",
+        "control_inalambrico": [
+          "Wi-Fi"
+        ],
         "alimentacion": [
           "AC"
         ],
@@ -2558,7 +2579,9 @@
           7500
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC",
           "Batería integrada"
@@ -2797,7 +2820,9 @@
           6500
         ],
         "dimming": true,
-        "control_inalambrico": "Bluetooth",
+        "control_inalambrico": [
+          "Bluetooth"
+        ],
         "alimentacion": [
           "AC",
           "V-mount",
