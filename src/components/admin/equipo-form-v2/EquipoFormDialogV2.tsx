@@ -313,34 +313,35 @@ export function EquipoFormDialogV2({
     }
   }, [initial, open]);
 
-  /** Categoría raíz dominante = la primera asignada que NO tiene parent. */
-  const categoriaRoot = useMemo(() => {
-    if (!catsQ.data) return null;
-    const cats = catsQ.data;
-    for (const id of selectedCats) {
-      const c = cats.find((x) => x.id === id);
-      if (!c) continue;
-      if (c.parent_id == null) return c.nombre;
-      // si es hijo, devolver el padre
-      const parent = cats.find((x) => x.id === c.parent_id);
-      if (parent) return parent.nombre;
-    }
-    return null;
-  }, [catsQ.data, selectedCats]);
+  // ── Categoría FUNCIONAL ────────────────────────────────────────────
+  // Define qué specs aplican (1 de las 5 del registry). Es independiente del
+  // árbol de catálogo (`selectedCats`), que es una agrupación manual del admin.
+  // Antes los specs se derivaban caminando el árbol de catálogo hasta la raíz;
+  // ahora salen de este campo explícito → catálogo y specs quedan desacoplados.
+  const funcCatsQ = useQuery({
+    queryKey: ["admin", "spec-categorias"],
+    queryFn: () => adminApi.listSpecCategorias(),
+    enabled: open,
+  });
+  const funcCatOptions = useMemo(
+    () => funcCatsQ.data?.categorias ?? [],
+    [funcCatsQ.data],
+  );
+  const [categoriaFuncional, setCategoriaFuncional] = useState<string>("");
+  useEffect(() => {
+    setCategoriaFuncional(initial?.categoria_funcional ?? "");
+  }, [initial, open]);
 
-  /** Id de la categoría raíz, para fetchear el spec template. */
+  /** Nombre de la categoría funcional — drive de specs + nombre público. */
+  const categoriaRoot = categoriaFuncional || null;
+
+  /** Id de la categoría funcional (en `categorias`), para fetchear el spec
+   *  template. Resuelto contra la fuente canónica de specs (no el catálogo). */
   const categoriaRootId = useMemo(() => {
-    if (!catsQ.data) return null;
-    const cats = catsQ.data;
-    for (const id of selectedCats) {
-      const c = cats.find((x) => x.id === id);
-      if (!c) continue;
-      if (c.parent_id == null) return c.id;
-      const parent = cats.find((x) => x.id === c.parent_id);
-      if (parent) return parent.id;
-    }
-    return null;
-  }, [catsQ.data, selectedCats]);
+    if (!categoriaFuncional) return null;
+    const c = funcCatOptions.find((x) => x.nombre === categoriaFuncional);
+    return c?.id ?? null;
+  }, [funcCatOptions, categoriaFuncional]);
 
   /** Template de nombre público de la categoría raíz (NULL si no hay). */
   const categoriaTemplate = useMemo(() => {
@@ -816,6 +817,7 @@ export function EquipoFormDialogV2({
       valor_reposicion: rest.valor_reposicion ?? null,
       visible_catalogo: visible_catalogo ? 1 : 0,
       ficha_completa: ficha_completa,
+      categoria_funcional: categoriaFuncional || null,
     };
 
     const fallidos: string[] = [];
@@ -1400,23 +1402,47 @@ export function EquipoFormDialogV2({
           {/* ════════════════════════════════════════════════════════════════
               CATEGORÍAS — después de ficha técnica (ver comentario arriba)
           ════════════════════════════════════════════════════════════════ */}
-          <section className="pt-2 border-t hairline">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-              Categorías {categoriaRoot && <span className="ml-1 normal-case text-ink/70">· primera = "{categoriaRoot}"</span>}
-            </Label>
-            <CategoriaSugeridaChip
-              categoriaSugerida={
-                importedFichaExt?.categoria_sugerida ?? cachedScrape?.categoria_sugerida ?? null
-              }
-              categorias={catsQ.data ?? []}
-              selected={selectedCats}
-              onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
-            />
-            <CategoriasPicker
-              categorias={catsQ.data ?? []}
-              selected={selectedCats}
-              onChange={setSelectedCats}
-            />
+          <section className="pt-2 border-t hairline space-y-3">
+            <Field label="Categoría de specs">
+              <Select
+                value={categoriaFuncional || "__none__"}
+                onValueChange={(v) =>
+                  setCategoriaFuncional(v === "__none__" ? "" : v)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin categoría de specs" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin categoría de specs</SelectItem>
+                  {funcCatOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.nombre}>{c.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Define qué specs técnicas aplican. Independiente del catálogo.
+              </p>
+            </Field>
+
+            <div>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                Categorías del catálogo
+              </Label>
+              <CategoriaSugeridaChip
+                categoriaSugerida={
+                  importedFichaExt?.categoria_sugerida ?? cachedScrape?.categoria_sugerida ?? null
+                }
+                categorias={catsQ.data ?? []}
+                selected={selectedCats}
+                onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
+              />
+              <CategoriasPicker
+                categorias={catsQ.data ?? []}
+                selected={selectedCats}
+                onChange={setSelectedCats}
+              />
+            </div>
           </section>
 
           {/* ════════════════════════════════════════════════════════════════

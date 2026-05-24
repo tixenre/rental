@@ -292,6 +292,17 @@ MAX_PHOTO_CANDIDATES_BUSCAR_RETURN   = 10
 
 # ── Modelos ──────────────────────────────────────────────────────────────────
 
+def _validar_categoria_funcional(v: Optional[str]) -> Optional[str]:
+    """Valida que la categoría funcional sea una del registry (o None)."""
+    if v is None or v == "":
+        return None
+    from specs import REGISTRY
+    if v not in REGISTRY.categorias:
+        validas = ", ".join(REGISTRY.categorias)
+        raise ValueError(f"categoria_funcional inválida: '{v}'. Opciones: {validas}")
+    return v
+
+
 class EquipoCreate(BaseModel):
     from pydantic import field_validator
     nombre:           str
@@ -310,6 +321,8 @@ class EquipoCreate(BaseModel):
     visible_catalogo: Optional[int]   = 1
     estado:           Optional[str]   = "operativo"   # operativo / en_mantenimiento / fuera_servicio
     ficha_completa:   Optional[bool]  = False
+    # Categoría funcional (1 de las 5 del registry): define qué specs aplican.
+    categoria_funcional: Optional[str] = None
 
     @field_validator("precio_jornada")
     @classmethod
@@ -324,6 +337,11 @@ class EquipoCreate(BaseModel):
         if v is not None and v < 0:
             raise ValueError("cantidad no puede ser negativa")
         return v
+
+    @field_validator("categoria_funcional")
+    @classmethod
+    def validate_categoria_funcional(cls, v):
+        return _validar_categoria_funcional(v)
 
 
 class EquipoUpdate(BaseModel):
@@ -349,6 +367,8 @@ class EquipoUpdate(BaseModel):
     visible_catalogo: Optional[int]   = None
     estado:           Optional[str]   = None
     ficha_completa:   Optional[bool]  = None
+    # Categoría funcional (1 de las 5 del registry): define qué specs aplican.
+    categoria_funcional: Optional[str] = None
 
     @field_validator("precio_jornada")
     @classmethod
@@ -363,6 +383,11 @@ class EquipoUpdate(BaseModel):
         if v is not None and v < 0:
             raise ValueError("cantidad no puede ser negativa")
         return v
+
+    @field_validator("categoria_funcional")
+    @classmethod
+    def validate_categoria_funcional(cls, v):
+        return _validar_categoria_funcional(v)
 
 
 class FichaUpdate(BaseModel):
@@ -985,13 +1010,13 @@ def create_equipo(data: EquipoCreate):
                                  precio_jornada, precio_usd, roi_pct,
                                  valor_reposicion, foto_url, fecha_compra,
                                  serie, bh_url, dueno, visible_catalogo, estado,
-                                 ficha_completa)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                 ficha_completa, categoria_funcional)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (data.nombre, brand_id, data.modelo, data.cantidad,
               data.precio_jornada, data.precio_usd, data.roi_pct,
               data.valor_reposicion, data.foto_url, data.fecha_compra or None,
               data.serie, data.bh_url, data.dueno, data.visible_catalogo, data.estado,
-              bool(data.ficha_completa)))
+              bool(data.ficha_completa), data.categoria_funcional))
         new_id = cur.lastrowid
         # Hook: calcular nombre_publico inicial. No falla el create si esto
         # rompe (ej. si los servicios no están disponibles).

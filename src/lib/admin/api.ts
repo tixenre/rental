@@ -136,6 +136,9 @@ export type Equipo = {
   estado: string;
   /** Flag manual del admin: ficha cargada y revisada (no requiere más trabajo). */
   ficha_completa?: boolean;
+  /** Categoría funcional (1 de las 5 del registry): define qué specs aplican.
+   *  Independiente del árbol de categorías de catálogo (`categorias`). */
+  categoria_funcional?: string | null;
   /** Timestamp ISO si el equipo está soft-deleted. null = activo (#206). */
   eliminado_at?: string | null;
   etiquetas?: string[];
@@ -1081,6 +1084,13 @@ export const adminApi = {
     authedJson<Record<number, number>>("/api/admin/spec-templates/resumen"),
   listSpecTemplates: (categoriaId: number) =>
     authedJson<{ items: SpecTemplate[] }>(`/api/admin/categorias/${categoriaId}/spec-templates`),
+  /** Categorías FUNCIONALES (las del registry con specs sembradas). Fuente
+   *  canónica para el selector "Categoría de specs" del form de equipos:
+   *  cada una trae su id real para fetchear el spec-template. */
+  listSpecCategorias: () =>
+    authedJson<{ categorias: { id: number; nombre: string }[] }>(
+      "/api/admin/specs/por-categoria",
+    ),
   listOrphanSpecs: (categoriaId: number) =>
     authedJson<OrphanSpec[]>(`/api/admin/categorias/${categoriaId}/spec-templates/orphans`),
   /** Asigna una spec_definition existente a una categoría. Para crear una
