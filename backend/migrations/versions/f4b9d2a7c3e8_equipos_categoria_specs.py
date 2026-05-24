@@ -1,14 +1,14 @@
-"""categoria_funcional en equipos
+"""categoria_specs en equipos
 
-Agregar `categoria_funcional TEXT` a `equipos`: la categoría FUNCIONAL del
-equipo (1 de las 5 del registry: Cámaras/Lentes/Iluminación/Adaptadores/
-Filtros). Define qué specs aplican, desacoplado del árbol de categorías de
-catálogo (`equipo_categorias`), que pasa a ser una agrupación manual
-web-managed independiente de los specs.
+Agregar `categoria_specs TEXT` a `equipos`: la categoría que define qué specs
+técnicas aplican (1 de las 5 del registry: Cámaras/Lentes/Iluminación/
+Adaptadores/Filtros) y la generación del nombre público. Desacoplado del árbol
+de categorías de catálogo (`equipo_categorias`), que pasa a ser una agrupación
+manual web-managed para el front-office, independiente de los specs.
 
 Backfill: para cada equipo se camina el árbol de sus categorías de catálogo
 hasta la raíz; si la raíz es una de las 5 funcionales, se asigna como
-`categoria_funcional`. Así no se pierde el ruteo de specs existente.
+`categoria_specs`. Así no se pierde el ruteo de specs existente.
 
 Revision ID: f4b9d2a7c3e8
 Revises: e2c6f4a8b1d7
@@ -23,11 +23,9 @@ down_revision: Union[str, Sequence[str], None] = "e2c6f4a8b1d7"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-_FUNCIONALES = ("Cámaras", "Lentes", "Iluminación", "Adaptadores", "Filtros")
-
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS categoria_funcional TEXT")
+    op.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS categoria_specs TEXT")
 
     # Backfill desde el árbol de catálogo: para cada categoría, resolver su raíz
     # (walk parent_id), y si la raíz es funcional, asignarla al equipo. DISTINCT
@@ -58,13 +56,13 @@ def upgrade() -> None:
             ORDER BY ec.equipo_id, roots.root_id
         )
         UPDATE equipos e
-        SET categoria_funcional = elegidas.root_name
+        SET categoria_specs = elegidas.root_name
         FROM elegidas
         WHERE e.id = elegidas.equipo_id
-          AND e.categoria_funcional IS NULL
+          AND e.categoria_specs IS NULL
         """
     )
 
 
 def downgrade() -> None:
-    op.execute("ALTER TABLE equipos DROP COLUMN IF EXISTS categoria_funcional")
+    op.execute("ALTER TABLE equipos DROP COLUMN IF EXISTS categoria_specs")

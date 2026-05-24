@@ -327,35 +327,35 @@ export function EquipoFormDialogV2({
     }
   }, [initial, open]);
 
-  // ── Categoría FUNCIONAL ────────────────────────────────────────────
+  // ── Categoría de SPECS ─────────────────────────────────────────────
   // Define qué specs aplican (1 de las 5 del registry) Y la generación del
   // nombre público. Es independiente del árbol de catálogo (`selectedCats`),
   // que es solo agrupación para el front-office. El template de specs lo
-  // resuelve el backend (`getEquipoSpecs`) desde `categoria_funcional`.
-  const funcCatsQ = useQuery({
+  // resuelve el backend (`getEquipoSpecs`) desde `categoria_specs`.
+  const specCatsQ = useQuery({
     queryKey: ["admin", "spec-categorias"],
     queryFn: () => adminApi.listSpecCategorias(),
     enabled: open,
   });
-  const funcCatOptions = useMemo(
-    () => funcCatsQ.data?.categorias ?? [],
-    [funcCatsQ.data],
+  const specCatOptions = useMemo(
+    () => specCatsQ.data?.categorias ?? [],
+    [specCatsQ.data],
   );
-  const [categoriaFuncional, setCategoriaFuncional] = useState<string>("");
+  const [categoriaSpecs, setCategoriaSpecs] = useState<string>("");
   useEffect(() => {
-    setCategoriaFuncional(initial?.categoria_funcional ?? "");
+    setCategoriaSpecs(initial?.categoria_specs ?? "");
   }, [initial, open]);
 
-  /** Nombre de la categoría funcional — drive de specs + nombre público. */
-  const categoriaRoot = categoriaFuncional || null;
+  /** Nombre de la categoría de specs — drive de specs + nombre público. */
+  const categoriaRoot = categoriaSpecs || null;
 
-  /** Id de la categoría funcional (en `categorias`), para fetchear el spec
+  /** Id de la categoría de specs (en `categorias`), para fetchear el spec
    *  template. Resuelto contra la fuente canónica de specs (no el catálogo). */
   const categoriaRootId = useMemo(() => {
-    if (!categoriaFuncional) return null;
-    const c = funcCatOptions.find((x) => x.nombre === categoriaFuncional);
+    if (!categoriaSpecs) return null;
+    const c = specCatOptions.find((x) => x.nombre === categoriaSpecs);
     return c?.id ?? null;
-  }, [funcCatOptions, categoriaFuncional]);
+  }, [specCatOptions, categoriaSpecs]);
 
   /** Template de nombre público de la categoría raíz (NULL si no hay). */
   const categoriaTemplate = useMemo(() => {
@@ -718,7 +718,7 @@ export function EquipoFormDialogV2({
       valor_reposicion: rest.valor_reposicion ?? null,
       visible_catalogo: visible_catalogo ? 1 : 0,
       ficha_completa: ficha_completa,
-      categoria_funcional: categoriaFuncional || null,
+      categoria_specs: categoriaSpecs || null,
     };
 
     const fallidos: string[] = [];
@@ -1297,9 +1297,9 @@ export function EquipoFormDialogV2({
           <section className="pt-2 border-t hairline space-y-3">
             <Field label="Categoría de specs">
               <Select
-                value={categoriaFuncional || "__none__"}
+                value={categoriaSpecs || "__none__"}
                 onValueChange={(v) =>
-                  setCategoriaFuncional(v === "__none__" ? "" : v)
+                  setCategoriaSpecs(v === "__none__" ? "" : v)
                 }
               >
                 <SelectTrigger>
@@ -1307,7 +1307,7 @@ export function EquipoFormDialogV2({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Sin categoría de specs</SelectItem>
-                  {funcCatOptions.map((c) => (
+                  {specCatOptions.map((c) => (
                     <SelectItem key={c.id} value={c.nombre}>{c.nombre}</SelectItem>
                   ))}
                 </SelectContent>

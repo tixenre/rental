@@ -1147,28 +1147,28 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
         ).fetchall()
         specs = {str(r["spec_def_id"]): r["value"] for r in spec_rows}
 
-        # Template aplicable: se resuelve desde la categoría FUNCIONAL del
-        # equipo (`equipos.categoria_funcional`), NO desde el árbol de
-        # catálogo. El catálogo (`equipo_categorias`) es solo agrupación para
-        # el front-office; las specs de un equipo las define su categoría
-        # funcional (1 de las 5 del registry: Cámaras/Lentes/…). Leemos directo
-        # de `spec_definitions` por `categoria_raiz_id` (mismo criterio que
+        # Template aplicable: se resuelve desde la categoría de SPECS del
+        # equipo (`equipos.categoria_specs`), NO desde el árbol de catálogo.
+        # El catálogo (`equipo_categorias`) es solo agrupación para el
+        # front-office; las specs de un equipo las define su categoría de specs
+        # (1 de las 5 del registry: Cámaras/Lentes/…). Leemos directo de
+        # `spec_definitions` por `categoria_raiz_id` (mismo criterio que
         # /admin/categorias/{id}/spec-templates) para no depender de
         # `categoria_spec_templates`, que puede quedar incompleto tras
         # migraciones del registry. El SELECT proyecta el shape completo del
         # tipo `SpecTemplate` del frontend.
-        func_row = conn.execute(
-            "SELECT categoria_funcional FROM equipos WHERE id = ?", (equipo_id,)
+        cs_row = conn.execute(
+            "SELECT categoria_specs FROM equipos WHERE id = ?", (equipo_id,)
         ).fetchone()
-        categoria_funcional = (
-            row_to_dict(func_row).get("categoria_funcional") if func_row else None
+        categoria_specs = (
+            row_to_dict(cs_row).get("categoria_specs") if cs_row else None
         )
 
         template: list[dict] = []
-        if categoria_funcional:
+        if categoria_specs:
             cat_row = conn.execute(
                 "SELECT id FROM categorias WHERE nombre = ? AND parent_id IS NULL",
-                (categoria_funcional,),
+                (categoria_specs,),
             ).fetchone()
             if cat_row:
                 raiz_id = row_to_dict(cat_row)["id"]

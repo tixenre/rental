@@ -146,9 +146,10 @@ export type Equipo = {
   estado: string;
   /** Flag manual del admin: ficha cargada y revisada (no requiere más trabajo). */
   ficha_completa?: boolean;
-  /** Categoría funcional (1 de las 5 del registry): define qué specs aplican.
-   *  Independiente del árbol de categorías de catálogo (`categorias`). */
-  categoria_funcional?: string | null;
+  /** Categoría de specs (1 de las 5 del registry): define qué specs aplican
+   *  y el nombre público. Independiente del árbol de categorías de catálogo
+   *  (`categorias`), que es solo agrupación para el front-office. */
+  categoria_specs?: string | null;
   /** Timestamp ISO si el equipo está soft-deleted. null = activo (#206). */
   eliminado_at?: string | null;
   etiquetas?: string[];
