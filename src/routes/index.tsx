@@ -446,12 +446,7 @@ function Index() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Buscar equipo, marca o categoría…"
-                  style={
-                    scrolled
-                      ? { background: "color-mix(in oklch, var(--amber) 30%, white)" }
-                      : undefined
-                  }
-                  className="w-full rounded-full border hairline bg-surface py-2.5 pl-11 pr-9 text-sm font-medium placeholder:font-normal placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
+                  className="w-full rounded-full border border-ink/15 bg-surface-elevated py-2.5 pl-11 pr-9 text-sm font-medium shadow-sm placeholder:font-normal placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
                 />
                 {query && (
                   <button
