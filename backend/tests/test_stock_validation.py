@@ -61,7 +61,7 @@ class StockFakeConn:
         reservas_via_kit=None,
         pedido_items=None,
         mantenimiento=None,
-        buffer_dias=0,
+        buffer_horas=0,
     ):
         self.equipos = equipos
         self.kit_componentes = kit_componentes or {}
@@ -70,7 +70,7 @@ class StockFakeConn:
         self.pedido_items = pedido_items or {}
         # mantenimiento: dict[equipo_id, unidades_bloqueadas]
         self.mantenimiento = mantenimiento or {}
-        self.buffer_dias = buffer_dias
+        self.buffer_horas = buffer_horas
 
     def execute(self, sql, params=()):
         s = " ".join(sql.split())  # normalizar whitespace
@@ -78,7 +78,7 @@ class StockFakeConn:
 
         # Buffer global (setting).
         if "FROM APP_SETTINGS WHERE KEY = ?" in s_up:
-            return FakeCursor([FakeRow(value=str(self.buffer_dias))])
+            return FakeCursor([FakeRow(value=str(self.buffer_horas))])
 
         # Unidades en mantenimiento que bloquean stock.
         if "FROM EQUIPO_MANTENIMIENTO" in s_up:
@@ -283,23 +283,33 @@ class TestBuffer:
         from routes.alquileres import _rango_con_buffer
         assert _rango_con_buffer("2026-06-01", "2026-06-05", 0) == ("2026-06-01", "2026-06-05")
 
-    def test_rango_con_buffer_expande_ambos_lados(self):
+    def test_rango_con_buffer_expande_por_horas(self):
         from routes.alquileres import _rango_con_buffer
-        assert _rango_con_buffer("2026-06-10", "2026-06-15", 2) == ("2026-06-08", "2026-06-17")
+        # 48 horas = 2 días, sin truncar a día → datetime ISO completo.
+        assert _rango_con_buffer("2026-06-10", "2026-06-15", 48) == (
+            "2026-06-08T00:00:00", "2026-06-17T00:00:00",
+        )
+
+    def test_rango_con_buffer_respeta_la_hora(self):
+        from routes.alquileres import _rango_con_buffer
+        # Con hora de retiro/devolución, el buffer expande hora-exacto.
+        assert _rango_con_buffer("2026-06-10T10:00:00", "2026-06-15T18:00:00", 6) == (
+            "2026-06-10T04:00:00", "2026-06-16T00:00:00",
+        )
 
     def test_rango_buffer_fecha_invalida_devuelve_original(self):
         from routes.alquileres import _rango_con_buffer
         assert _rango_con_buffer("", "", 3) == ("", "")
 
-    def test_get_buffer_dias_default_cero(self):
-        from routes.alquileres import _get_buffer_dias
-        conn = StockFakeConn(equipos={}, buffer_dias=0)
-        assert _get_buffer_dias(conn) == 0
+    def test_get_buffer_horas_default_cero(self):
+        from routes.alquileres import _get_buffer_horas
+        conn = StockFakeConn(equipos={}, buffer_horas=0)
+        assert _get_buffer_horas(conn) == 0
 
-    def test_get_buffer_dias_lee_setting(self):
-        from routes.alquileres import _get_buffer_dias
-        conn = StockFakeConn(equipos={}, buffer_dias=2)
-        assert _get_buffer_dias(conn) == 2
+    def test_get_buffer_horas_lee_setting(self):
+        from routes.alquileres import _get_buffer_horas
+        conn = StockFakeConn(equipos={}, buffer_horas=12)
+        assert _get_buffer_horas(conn) == 12
 
 
 # ── _crea_ciclo_kit — detección de ciclos ────────────────────────────────

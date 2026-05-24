@@ -42,7 +42,7 @@ ALLOWED_SETTINGS_KEYS = {
     "whatsapp_phone",    # Teléfono del negocio para click-to-chat (formato +5492235852510).
     "email_from",        # From address de mails ('Rambla <pedidos@rambla.com.uy>'). Pisado por env EMAIL_FROM.
     "email_admin_to",    # Destinatario de notif al admin cuando entra un pedido. Pisado por env EMAIL_ADMIN_TO.
-    "buffer_dias_alquiler",  # Días de prep/revisión exigidos entre alquileres. Int >= 0.
+    "buffer_horas_alquiler",  # Horas de prep/revisión exigidas entre alquileres. Int >= 0.
 }
 
 
@@ -112,7 +112,7 @@ def update_setting(key: str, payload: dict, request: Request):
                 raise ValueError("debe ser >= 0")
         except (ValueError, TypeError) as e:
             raise HTTPException(400, f"Valor inválido para '{key}': debe ser un número >= 0 ({e})")
-    if key == "buffer_dias_alquiler":
+    if key == "buffer_horas_alquiler":
         try:
             v = int(value)
             if v < 0:

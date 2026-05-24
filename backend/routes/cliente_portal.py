@@ -559,14 +559,14 @@ def _check_stock_hipotetico(
     """
     from routes.alquileres import (
         ESTADOS_RESERVADO, _consolidar_items_por_equipo,
-        _get_buffer_dias, _rango_con_buffer, _unidades_en_mantenimiento,
+        _get_buffer_horas, _rango_con_buffer, _unidades_en_mantenimiento,
     )
     if not items or not fecha_desde or not fecha_hasta:
         return []
 
     # Buffer entre alquileres (mantenimiento usa rango original).
-    buffer_dias = _get_buffer_dias(conn)
-    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias)
+    buffer_horas = _get_buffer_horas(conn)
+    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
 
     # Resolver nombre + stock total + agrupar por equipo_id.
     enriched = []

@@ -348,10 +348,10 @@ class PedidoItemUpdate(BaseModel):
 
 # ── Disponibilidad ───────────────────────────────────────────────────────────
 
-def _get_buffer_dias(conn) -> int:
-    """Días de prep/revisión exigidos entre alquileres (setting global)."""
+def _get_buffer_horas(conn) -> int:
+    """Horas de prep/revisión exigidas entre alquileres (setting global)."""
     row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = ?", ("buffer_dias_alquiler",)
+        "SELECT value FROM app_settings WHERE key = ?", ("buffer_horas_alquiler",)
     ).fetchone()
     if not row:
         return 0
@@ -361,17 +361,19 @@ def _get_buffer_dias(conn) -> int:
         return 0
 
 
-def _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias: int):
-    """Expande [desde, hasta] en `buffer_dias` por cada lado. Expandir el rango
-    nuevo equivale a exigir `buffer_dias` de gap contra los alquileres
-    existentes (el overlap es simétrico). Devuelve fechas ISO YYYY-MM-DD.
+def _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas: int):
+    """Expande [desde, hasta] en `buffer_horas` por cada lado. Expandir el
+    rango nuevo equivale a exigir `buffer_horas` de gap contra los alquileres
+    existentes (el overlap es simétrico). Devuelve datetimes ISO completos
+    (con hora) para que el overlap respete la hora de retiro/devolución —no se
+    trunca a día.
 
     Acepta str ISO o datetime (las columnas son TIMESTAMP)."""
-    if buffer_dias <= 0:
+    if buffer_horas <= 0:
         return fecha_desde, fecha_hasta
     try:
-        d0 = to_datetime(fecha_desde).date() - datetime.timedelta(days=buffer_dias)
-        d1 = to_datetime(fecha_hasta).date() + datetime.timedelta(days=buffer_dias)
+        d0 = to_datetime(fecha_desde) - datetime.timedelta(hours=buffer_horas)
+        d1 = to_datetime(fecha_hasta) + datetime.timedelta(hours=buffer_horas)
         return d0.isoformat(), d1.isoformat()
     except (ValueError, TypeError, AttributeError):
         return fecha_desde, fecha_hasta
@@ -407,8 +409,8 @@ def get_disponibilidad(
 
     try:
         # Buffer: expandimos el rango consultado para exigir gap entre alquileres.
-        buffer_dias = _get_buffer_dias(conn)
-        fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias)
+        buffer_horas = _get_buffer_horas(conn)
+        fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
 
         directas = conn.execute(f"""
             SELECT e.id, e.cantidad,
@@ -821,8 +823,8 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
 
     # Buffer entre alquileres: expandimos el rango para exigir gap. Mantenimiento
     # usa el rango original (ventana exacta).
-    buffer_dias = _get_buffer_dias(conn)
-    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias)
+    buffer_horas = _get_buffer_horas(conn)
+    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
 
     problemas = []
     for it in consolidated.values():

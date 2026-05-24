@@ -170,8 +170,8 @@ function BufferSection() {
   const [valor, setValor] = useState("");
 
   const settingQ = useQuery({
-    queryKey: ["settings", "buffer_dias_alquiler"],
-    queryFn: () => adminApi.getSetting("buffer_dias_alquiler"),
+    queryKey: ["settings", "buffer_horas_alquiler"],
+    queryFn: () => adminApi.getSetting("buffer_horas_alquiler"),
     staleTime: 60_000,
   });
 
@@ -180,7 +180,7 @@ function BufferSection() {
   }, [settingQ.data, valor]);
 
   const updateMut = useMutation({
-    mutationFn: (v: string) => adminApi.updateSetting("buffer_dias_alquiler", v),
+    mutationFn: (v: string) => adminApi.updateSetting("buffer_horas_alquiler", v),
     onSuccess: () => {
       toast.success("Buffer actualizado");
       qc.invalidateQueries({ queryKey: ["settings"] });
@@ -196,14 +196,15 @@ function BufferSection() {
       <div>
         <h2 className="font-display text-lg text-ink">Buffer entre alquileres</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Días de prep/revisión exigidos entre que un equipo vuelve y sale de nuevo.
-          Con buffer &gt; 0, dos alquileres del mismo equipo no pueden quedar pegados.
-          Poné 0 para permitir alquileres consecutivos.
+          Horas de prep/revisión exigidas entre que un equipo vuelve y sale de nuevo.
+          Con buffer &gt; 0, dos alquileres del mismo equipo no pueden quedar pegados
+          (respeta la hora de retiro/devolución). Poné 0 para permitir alquileres
+          consecutivos. Ej: 24 = un día.
         </p>
       </div>
       <div className="flex items-end gap-2 border-t hairline pt-3">
         <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Días de buffer</div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Horas de buffer</div>
           <Input
             type="number"
             min={0}
