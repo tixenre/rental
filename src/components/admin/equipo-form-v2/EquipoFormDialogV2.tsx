@@ -342,9 +342,45 @@ export function EquipoFormDialogV2({
     [specCatsQ.data],
   );
   const [categoriaSpecs, setCategoriaSpecs] = useState<string>("");
+  // Se vuelve true en cuanto el admin toca el selector. Mientras sea false,
+  // dejamos que el auto-default (abajo) complete la categoría de specs desde
+  // el catálogo. Así no peleamos contra una elección explícita de "Sin
+  // categoría de specs".
+  const specsTouchedRef = useRef(false);
   useEffect(() => {
     setCategoriaSpecs(initial?.categoria_specs ?? "");
+    specsTouchedRef.current = false;
   }, [initial, open]);
+
+  // Auto-default: si la categoría de specs quedó vacía (equipo viejo sin
+  // backfill, o equipo nuevo recién categorizado) y el equipo está en una
+  // categoría de catálogo cuyo root es una de las funcionales del registry,
+  // la adoptamos. Mantiene specs como driver del nombre público sin obligar
+  // al admin a elegirla a mano. El selector explícito gana (specsTouchedRef).
+  useEffect(() => {
+    if (specsTouchedRef.current) return;
+    if (categoriaSpecs) return;
+    if (!catsQ.data || selectedCats.size === 0 || specCatOptions.length === 0) return;
+    const funcNames = new Set(specCatOptions.map((c) => c.nombre));
+    const resolveRootName = (startId: number): string | null => {
+      const seen = new Set<number>();
+      let cur = catsQ.data!.find((x) => x.id === startId);
+      while (cur) {
+        if (cur.parent_id == null) return cur.nombre;
+        if (seen.has(cur.id)) return null;
+        seen.add(cur.id);
+        cur = catsQ.data!.find((x) => x.id === cur!.parent_id);
+      }
+      return null;
+    };
+    for (const id of selectedCats) {
+      const root = resolveRootName(id);
+      if (root && funcNames.has(root)) {
+        setCategoriaSpecs(root);
+        return;
+      }
+    }
+  }, [categoriaSpecs, catsQ.data, selectedCats, specCatOptions]);
 
   /** Nombre de la categoría de specs — drive de specs + nombre público. */
   const categoriaRoot = categoriaSpecs || null;
@@ -1298,9 +1334,10 @@ export function EquipoFormDialogV2({
             <Field label="Categoría de specs">
               <Select
                 value={categoriaSpecs || "__none__"}
-                onValueChange={(v) =>
-                  setCategoriaSpecs(v === "__none__" ? "" : v)
-                }
+                onValueChange={(v) => {
+                  specsTouchedRef.current = true;
+                  setCategoriaSpecs(v === "__none__" ? "" : v);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sin categoría de specs" />
