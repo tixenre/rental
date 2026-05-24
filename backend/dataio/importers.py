@@ -91,8 +91,10 @@ def import_categorias(
     items = _validate_rows(rows, schema.Categoria, "categorias")
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
 
-    # Pase 1: insertar raíces (parent_path IS None) y todas las categorías
-    # con upsert simple, sin parent_id.
+    # Pase 1: insertar las categorías que FALTEN. NO se sobreescriben las
+    # existentes — el catálogo es web-managed; el arranque solo bootstrapea lo
+    # que no está. Así las ediciones (nombre/prioridad/visible/grupo/parent)
+    # hechas en la web persisten entre deploys.
     pending: list[schema.Categoria] = []
     for c in items:
         cur = conn.execute(
@@ -100,12 +102,8 @@ def import_categorias(
             INSERT INTO categorias (nombre, prioridad, parent_id, visible,
                                     grupo_visual, nombre_publico_template)
             VALUES (?, ?, NULL, ?, ?, ?)
-            ON CONFLICT (nombre) DO UPDATE SET
-                prioridad = EXCLUDED.prioridad,
-                visible = EXCLUDED.visible,
-                grupo_visual = EXCLUDED.grupo_visual,
-                nombre_publico_template = EXCLUDED.nombre_publico_template
-            RETURNING (xmax = 0) AS inserted
+            ON CONFLICT (nombre) DO NOTHING
+            RETURNING id
             """,
             (
                 c.nombre,
@@ -116,14 +114,15 @@ def import_categorias(
             ),
         )
         row = cur.fetchone()
-        if row and row["inserted"]:
+        if row:
             stats["inserted"] += 1
         else:
-            stats["updated"] += 1
+            stats["skipped"] += 1
         if c.parent_path:
             pending.append(c)
 
-    # Pase 2: resolver parent_id de los que tienen parent_path
+    # Pase 2: setear parent_id SOLO de las que no tienen parent (recién
+    # insertadas). No pisa el árbol que armaste en la web.
     resolver.refresh_categorias()
     for c in pending:
         parent_id = resolver.categoria_id(c.parent_path)
@@ -133,7 +132,7 @@ def import_categorias(
                 f"que no existe (debe estar en el mismo JSON)"
             )
         conn.execute(
-            "UPDATE categorias SET parent_id = ? WHERE nombre = ?",
+            "UPDATE categorias SET parent_id = ? WHERE nombre = ? AND parent_id IS NULL",
             (parent_id, c.nombre),
         )
     return stats

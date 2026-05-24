@@ -39,20 +39,17 @@ def _ensure_categoria_raiz(
     grupo_visual: str | None = None,
     dry_run: bool = False,
 ) -> int | None:
-    """Crea o promueve a raíz una categoría. Devuelve su id.
+    """Asegura que la categoría raíz EXISTA (para que las specs cuelguen de
+    ella). Devuelve su id.
 
-    También sincroniza `grupo_visual` desde el registry — siempre overwrite
-    porque el registry es la fuente de verdad de la taxonomía visual.
+    No-destructivo: si ya existe, NO la toca (ni parent_id ni grupo_visual).
+    El catálogo es web-managed — el registry solo bootstrapea lo que falta,
+    así las ediciones hechas en la web persisten entre deploys.
     """
     row = conn.execute(
-        "SELECT id, parent_id FROM categorias WHERE nombre = %s", (nombre,)
+        "SELECT id FROM categorias WHERE nombre = %s", (nombre,)
     ).fetchone()
     if row:
-        if not dry_run:
-            conn.execute(
-                "UPDATE categorias SET parent_id = NULL, grupo_visual = %s WHERE id = %s",
-                (grupo_visual, row["id"]),
-            )
         return row["id"]
     if dry_run:
         return None
@@ -60,29 +57,30 @@ def _ensure_categoria_raiz(
         """
         INSERT INTO categorias (nombre, prioridad, parent_id, grupo_visual)
         VALUES (%s, %s, NULL, %s)
-        ON CONFLICT (nombre) DO UPDATE SET
-            parent_id = NULL,
-            grupo_visual = EXCLUDED.grupo_visual
+        ON CONFLICT (nombre) DO NOTHING
         RETURNING id
         """,
         (nombre, prioridad, grupo_visual),
     )
     new = cur.fetchone()
-    return new[0] if isinstance(new, tuple) else (new["id"] if new else None)
+    if new:
+        return new[0] if isinstance(new, tuple) else new["id"]
+    # Carrera: alguien la insertó entre el SELECT y el INSERT.
+    again = conn.execute("SELECT id FROM categorias WHERE nombre = %s", (nombre,)).fetchone()
+    return again["id"] if again else None
 
 
 def _ensure_subcategoria(
     conn, nombre: str, prioridad: int, parent_id: int, dry_run: bool = False
 ) -> int | None:
-    """Crea o reasocia una sub-categoría a su parent. Devuelve id."""
+    """Crea una sub-categoría si falta. Devuelve id.
+
+    No-destructivo: si ya existe, NO la toca (ni parent_id ni prioridad). El
+    árbol del catálogo es web-managed; el registry solo bootstrapea lo que
+    falta, así las ediciones de la web persisten entre deploys.
+    """
     row = conn.execute("SELECT id FROM categorias WHERE nombre = %s", (nombre,)).fetchone()
     if row:
-        if not dry_run:
-            conn.execute(
-                "UPDATE categorias SET parent_id = %s WHERE id = %s "
-                "AND (parent_id IS NULL OR parent_id != %s)",
-                (parent_id, row["id"], parent_id),
-            )
         return row["id"]
     if dry_run:
         return None
@@ -90,13 +88,17 @@ def _ensure_subcategoria(
         """
         INSERT INTO categorias (nombre, prioridad, parent_id)
         VALUES (%s, %s, %s)
-        ON CONFLICT (nombre) DO UPDATE SET parent_id = EXCLUDED.parent_id
+        ON CONFLICT (nombre) DO NOTHING
         RETURNING id
         """,
         (nombre, prioridad, parent_id),
     )
     new = cur.fetchone()
-    return new[0] if isinstance(new, tuple) else (new["id"] if new else None)
+    if new:
+        return new[0] if isinstance(new, tuple) else new["id"]
+    # Carrera: alguien la insertó entre el SELECT y el INSERT.
+    again = conn.execute("SELECT id FROM categorias WHERE nombre = %s", (nombre,)).fetchone()
+    return again["id"] if again else None
 
 
 def _upsert_spec_definition(
