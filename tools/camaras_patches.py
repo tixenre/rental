@@ -87,7 +87,7 @@ MANUAL_SPEC_PATCHES: dict[str, dict] = {
     # B&H lista 31 specs. Faltantes que SÉ (cinema cam con muchas particularidades):
     "canon_c200": {
         "built_in_microphone": False,           # No tiene mic interno (sí XLR)
-        "internal_recording": True,             # Sí, CFast (Raw) + SD (MP4)
+        "internal_recording": "Cinema Raw Light (CFast) + MP4 (SD)",
         "materials": "Magnesium Alloy",
         "mobile_app_compatible": False,         # No tiene app móvil
         "netflix_approved": False,

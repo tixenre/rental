@@ -559,19 +559,23 @@ def _parse_internal_storage(secciones: dict) -> str | None:
     return val.strip()
 
 
-def _parse_media_card_slots(secciones: dict) -> int | None:
-    """Cuenta cuántos slots de memoria tiene. 'Dual Slot' / 'Slot 1: ... | Slot 2:' → 2."""
+def _parse_media_card_slots(secciones: dict) -> str | None:
+    """Slots de memoria como string ("1 slot", "2 slots" o detalle).
+
+    El registry declara `media_card_slots` como tipo='string' (acepta tanto el
+    número como una descripción de qué tipo de slot). Devolvemos el COUNT
+    como string ('1' / '2') por simplicidad — más fácil de filtrar.
+    """
     val = _find_value(secciones, "Media/Memory Card Slot", "Recording Media") or ""
     if not val:
         return None
     v = val.lower()
     if "dual slot" in v or "two slot" in v:
-        return 2
+        return "2"
     slot_nums = re.findall(r"slot\s*(\d+)\s*:", v)
     if slot_nums:
-        return max(int(n) for n in slot_nums)
-    # Sin "Slot N:" explícito → asumimos 1
-    return 1
+        return str(max(int(n) for n in slot_nums))
+    return "1"
 
 
 def _parse_bit_depth(secciones: dict) -> str | None:
@@ -596,15 +600,22 @@ def _parse_bit_depth(secciones: dict) -> str | None:
     return None
 
 
-def _parse_internal_recording_bool(secciones: dict) -> bool | None:
-    """¿Tiene grabación interna? True si hay descripción de Internal Recording."""
+def _parse_internal_recording(secciones: dict) -> str | None:
+    """Grabación interna como string corto. El registry declara tipo='string'.
+
+    Si el HTML tiene la sección 'Internal Recording', devolvemos una
+    descripción compacta del primer codec/resolución listado. Si dice 'No' o
+    no hay valor, retorna None (el spec se omite en lugar de poner 'No').
+    """
     val = _find_value(secciones, "Internal Recording")
     if val is None:
         return None
-    v = val.strip().lower()
-    if v in ("no", "none", "n/a", ""):
-        return False
-    return True
+    v = val.strip()
+    if v.lower() in ("no", "none", "n/a", ""):
+        return None
+    # Primera línea / antes del primer '|' — descripción más representativa.
+    first = v.split("|")[0].split("\n")[0].strip()
+    return first or v[:120]
 
 
 def map_camara_specs(secciones: dict, title: str = "") -> dict:
@@ -663,8 +674,7 @@ def map_camara_specs(secciones: dict, title: str = "") -> dict:
 
     # Bit depth + internal recording (derivados del campo 'Internal Recording')
     _add("bit_depth", _parse_bit_depth(secciones))
-    ir = _parse_internal_recording_bool(secciones)
-    if ir is not None: result["internal_recording"] = ir
+    _add("internal_recording", _parse_internal_recording(secciones))
 
     # Storage / media
     _add("media_card_slots", _parse_media_card_slots(secciones))

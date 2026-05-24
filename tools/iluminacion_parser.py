@@ -373,6 +373,9 @@ def _parse_dimming(secciones: dict) -> bool:
 
 
 def _parse_control_inalambrico(secciones: dict) -> list[str] | None:
+    """Devuelve lista de protocolos. El registry declara este spec como
+    multi_enum, así que SIEMPRE retorna lista (o None si no hay match).
+    Enum del registry: Bluetooth, DMX, RDM, Wi-Fi, CRMX, Lumenradio, Art-Net, sACN."""
     # Buscar en varios campos
     sources = []
     for label in ("Wireless Remote Control Type", "Control", "Wireless"):
@@ -391,20 +394,23 @@ def _parse_control_inalambrico(secciones: dict) -> list[str] | None:
 
     combined = " ".join(sources)
 
-    protocols = []
-    for proto in ("Lumenradio", "CRMX", "Bluetooth", "Wi-Fi", "WiFi", "Zigbee", "2.4 GHz"):
+    protocols: list[str] = []
+    # Solo agregamos enum values válidos del registry (multi_enum).
+    for proto in ("Lumenradio", "CRMX", "Bluetooth", "Wi-Fi", "WiFi"):
         if proto.lower() in combined.lower():
             label = "Wi-Fi" if proto in ("WiFi", "Wi-Fi") else proto
             if label not in protocols:
                 protocols.append(label)
-    if re.search(r"\bDMX\b", combined, re.IGNORECASE):
+    if re.search(r"\bDMX\b", combined, re.IGNORECASE) and "DMX" not in protocols:
         protocols.append("DMX")
-    if re.search(r"\bRDM\b", combined, re.IGNORECASE):
+    if re.search(r"\bRDM\b", combined, re.IGNORECASE) and "RDM" not in protocols:
         protocols.append("RDM")
+    if re.search(r"\bArt-?Net\b", combined, re.IGNORECASE) and "Art-Net" not in protocols:
+        protocols.append("Art-Net")
+    if re.search(r"\bsACN\b", combined, re.IGNORECASE) and "sACN" not in protocols:
+        protocols.append("sACN")
 
-    # multi_enum → lista (el registry lo valida como tal). Antes se devolvía
-    # un string con comas, que rompía la validación contra el registry.
-    return protocols or None
+    return protocols if protocols else None
 
 
 def _parse_alimentacion(secciones: dict) -> list[str]:
@@ -522,17 +528,24 @@ _parse_peso = _parse_peso_g
 
 # ── Extras (campos estructurados extra para ficha técnica) ───────────────────
 
+# Mapeo a iluminacion_subtipo del registry (enum):
+# ['Flash', 'Foco', 'Panel', 'Tube Light', 'Flexible Mat', 'Monoled',
+#  'Fresnel', 'On-Camera']
+# Variantes B&H (Monolight, COB Monolight, Spotlight, Bulb/Lamp) mapean a
+# 'Foco' (single light fixture, equivalente conceptual al enum 'Foco').
 _TIPO_KEYWORDS = [
-    ("Fresnel", ["fresnel"]),
-    ("Tube Light", ["tube light", "led tube"]),
+    ("Fresnel",      ["fresnel"]),
+    ("Tube Light",   ["tube light", "led tube"]),
     ("Flexible Mat", ["flexible mat", "flex mat", "flexible light"]),
-    ("Panel", ["light panel", "led panel"]),
-    ("COB Monolight", ["cob led monolight", "cob monolight"]),
-    ("Monolight", ["led monolight", "monolight", "video light"]),
-    ("Spotlight", ["spotlight"]),
-    ("On-Camera", ["on-camera"]),
-    ("Bulb / Lamp", ["led lamp", "lamp"]),
-    ("Flash", ["flash", "speedlight", "strobe"]),
+    ("Panel",        ["light panel", "led panel"]),
+    ("Foco",         [
+        "cob led monolight", "cob monolight",
+        "led monolight", "monolight",
+        "spotlight", "video light",
+        "led lamp", "lamp",
+    ]),
+    ("On-Camera",    ["on-camera"]),
+    ("Flash",        ["flash", "speedlight", "strobe"]),
 ]
 
 
