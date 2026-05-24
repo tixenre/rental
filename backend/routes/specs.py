@@ -1147,56 +1147,59 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
         ).fetchall()
         specs = {str(r["spec_def_id"]): r["value"] for r in spec_rows}
 
-        # Template aplicable: las categorías del equipo + ANCESTROS + sus
-        # asignaciones. Si el equipo está sólo en sub-cat (ej. "LED RGB"),
-        # también traemos los templates de la raíz padre ("Iluminación")
-        # porque el seeder los asigna a la raíz. Mergeados con dedup por
-        # spec_def_id (la asignación más cercana al equipo gana).
-        #
-        # El SELECT proyecta el shape completo del tipo `SpecTemplate` del
-        # frontend (incluyendo es_compatibilidad/compatibilidad_modo/
-        # rol_compatibilidad/unidad_id/categoria_id/id) para que el form
-        # del admin consuma este endpoint como SoT única, sin necesitar
-        # un fetch extra a /admin/categorias/{id}/spec-templates.
-        template_rows = conn.execute(
-            """
-            WITH RECURSIVE cats_y_ancestros AS (
-                -- Categorías directas del equipo
-                SELECT c.id AS categoria_id, c.parent_id, 0 AS depth
-                FROM equipo_categorias ec
-                JOIN categorias c ON c.id = ec.categoria_id
-                WHERE ec.equipo_id = ?
-                UNION
-                -- + cada ancestro (parent recursivo) hasta la raíz
-                SELECT c.id AS categoria_id, c.parent_id, cya.depth + 1
-                FROM categorias c
-                JOIN cats_y_ancestros cya ON cya.parent_id = c.id
-            )
-            SELECT DISTINCT ON (t.spec_def_id)
-                t.id,
-                t.id AS template_id,  -- alias legacy
-                cya.categoria_id,
-                t.spec_def_id,
-                sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id, sd.enum_options,
-                sd.tabla_columnas, sd.output_config,
-                COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
-                COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
-                sd.rol_compatibilidad,
-                t.prioridad,
-                t.visible_en_card, t.visible_en_filtros, t.visible_en_nombre,
-                t.obligatorio,
-                COALESCE(t.ayuda, sd.ayuda) AS ayuda,
-                COALESCE(t.destacado, FALSE) AS destacado,
-                c.nombre AS categoria_nombre
-            FROM cats_y_ancestros cya
-            JOIN categoria_spec_templates t ON t.categoria_id = cya.categoria_id
-            JOIN spec_definitions sd ON sd.id = t.spec_def_id
-            JOIN categorias c ON c.id = cya.categoria_id
-            ORDER BY t.spec_def_id, cya.depth ASC, t.prioridad
-            """,
-            (equipo_id,),
-        ).fetchall()
-        template = [row_to_dict(r) for r in template_rows]
+        # Template aplicable: se resuelve desde la categoría de SPECS del
+        # equipo (`equipos.categoria_specs`), NO desde el árbol de catálogo.
+        # El catálogo (`equipo_categorias`) es solo agrupación para el
+        # front-office; las specs de un equipo las define su categoría de specs
+        # (1 de las 5 del registry: Cámaras/Lentes/…). Leemos directo de
+        # `spec_definitions` por `categoria_raiz_id` (mismo criterio que
+        # /admin/categorias/{id}/spec-templates) para no depender de
+        # `categoria_spec_templates`, que puede quedar incompleto tras
+        # migraciones del registry. El SELECT proyecta el shape completo del
+        # tipo `SpecTemplate` del frontend.
+        cs_row = conn.execute(
+            "SELECT categoria_specs FROM equipos WHERE id = ?", (equipo_id,)
+        ).fetchone()
+        categoria_specs = (
+            row_to_dict(cs_row).get("categoria_specs") if cs_row else None
+        )
+
+        template: list[dict] = []
+        if categoria_specs:
+            cat_row = conn.execute(
+                "SELECT id FROM categorias WHERE nombre = ? AND parent_id IS NULL",
+                (categoria_specs,),
+            ).fetchone()
+            if cat_row:
+                raiz_id = row_to_dict(cat_row)["id"]
+                template_rows = conn.execute(
+                    """
+                    SELECT
+                        sd.id AS spec_def_id,
+                        sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id,
+                        sd.enum_options, sd.tabla_columnas, sd.output_config,
+                        COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
+                        COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
+                        sd.rol_compatibilidad,
+                        COALESCE(sd.prioridad, 100) AS prioridad,
+                        COALESCE(sd.favorito, FALSE) AS visible_en_card,
+                        COALESCE(sd.en_filtros, FALSE) AS visible_en_filtros,
+                        COALESCE(sd.en_nombre, FALSE) AS visible_en_nombre,
+                        COALESCE(sd.favorito, FALSE) AS destacado,
+                        FALSE AS obligatorio,
+                        sd.ayuda
+                    FROM spec_definitions sd
+                    WHERE sd.categoria_raiz_id = ?
+                    ORDER BY COALESCE(sd.prioridad, 100), sd.label
+                    """,
+                    (raiz_id,),
+                ).fetchall()
+                for r in template_rows:
+                    d = row_to_dict(r)
+                    d["id"] = None
+                    d["template_id"] = None
+                    d["categoria_id"] = raiz_id
+                    template.append(d)
         template.sort(key=lambda t: (t["prioridad"], t["label"]))
 
         return {

@@ -327,47 +327,35 @@ export function EquipoFormDialogV2({
     }
   }, [initial, open]);
 
-  /** Sube por la jerarquía de categorías hasta encontrar el root real
-   *  (parent_id == null). Itera de a un nivel por iteración, con un
-   *  guard contra ciclos. Devuelve null si no hay match en `cats`. */
-  const resolveRoot = (
-    startId: number,
-    cats: CategoriaAdmin[],
-  ): CategoriaAdmin | null => {
-    const seen = new Set<number>();
-    let current = cats.find((x) => x.id === startId);
-    while (current) {
-      if (current.parent_id == null) return current;
-      if (seen.has(current.id)) return null;
-      seen.add(current.id);
-      current = cats.find((x) => x.id === current!.parent_id);
-    }
-    return null;
-  };
+  // ── Categoría de SPECS ─────────────────────────────────────────────
+  // Define qué specs aplican (1 de las 5 del registry) Y la generación del
+  // nombre público. Es independiente del árbol de catálogo (`selectedCats`),
+  // que es solo agrupación para el front-office. El template de specs lo
+  // resuelve el backend (`getEquipoSpecs`) desde `categoria_specs`.
+  const specCatsQ = useQuery({
+    queryKey: ["admin", "spec-categorias"],
+    queryFn: () => adminApi.listSpecCategorias(),
+    enabled: open,
+  });
+  const specCatOptions = useMemo(
+    () => specCatsQ.data?.categorias ?? [],
+    [specCatsQ.data],
+  );
+  const [categoriaSpecs, setCategoriaSpecs] = useState<string>("");
+  useEffect(() => {
+    setCategoriaSpecs(initial?.categoria_specs ?? "");
+  }, [initial, open]);
 
-  /** Categoría raíz dominante = la primera asignada cuyo ancestro root
-   *  podemos resolver. Sube hasta arriba (no solo un nivel), así una
-   *  sub-sub-cat como "Full Frame" resuelve a "Cámaras" — no a "Video". */
-  const categoriaRoot = useMemo(() => {
-    if (!catsQ.data) return null;
-    for (const id of selectedCats) {
-      const root = resolveRoot(id, catsQ.data);
-      if (root) return root.nombre;
-    }
-    return null;
-  }, [catsQ.data, selectedCats]);
+  /** Nombre de la categoría de specs — drive de specs + nombre público. */
+  const categoriaRoot = categoriaSpecs || null;
 
-  /** Id de la categoría raíz (mismo recorrido recursivo). Se usa para
-   *  el nombre_publico_template — el template de SPECS ya no depende de
-   *  esto, viene del endpoint `getEquipoSpecs`. */
+  /** Id de la categoría de specs (en `categorias`), para fetchear el spec
+   *  template. Resuelto contra la fuente canónica de specs (no el catálogo). */
   const categoriaRootId = useMemo(() => {
-    if (!catsQ.data) return null;
-    for (const id of selectedCats) {
-      const root = resolveRoot(id, catsQ.data);
-      if (root) return root.id;
-    }
-    return null;
-  }, [catsQ.data, selectedCats]);
+    if (!categoriaSpecs) return null;
+    const c = specCatOptions.find((x) => x.nombre === categoriaSpecs);
+    return c?.id ?? null;
+  }, [specCatOptions, categoriaSpecs]);
 
   /** Template de nombre público de la categoría raíz (NULL si no hay). */
   const categoriaTemplate = useMemo(() => {
@@ -730,6 +718,7 @@ export function EquipoFormDialogV2({
       valor_reposicion: rest.valor_reposicion ?? null,
       visible_catalogo: visible_catalogo ? 1 : 0,
       ficha_completa: ficha_completa,
+      categoria_specs: categoriaSpecs || null,
     };
 
     const fallidos: string[] = [];
@@ -1305,21 +1294,45 @@ export function EquipoFormDialogV2({
           {/* ════════════════════════════════════════════════════════════════
               CATEGORÍAS — después de ficha técnica (ver comentario arriba)
           ════════════════════════════════════════════════════════════════ */}
-          <section className="pt-2 border-t hairline">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-              Categorías {categoriaRoot && <span className="ml-1 normal-case text-ink/70">· primera = "{categoriaRoot}"</span>}
-            </Label>
-            <CategoriaSugeridaChip
-              categoriaSugerida={importedFichaExt?.categoria_sugerida ?? null}
-              categorias={catsQ.data ?? []}
-              selected={selectedCats}
-              onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
-            />
-            <CategoriasPicker
-              categorias={catsQ.data ?? []}
-              selected={selectedCats}
-              onChange={setSelectedCats}
-            />
+          <section className="pt-2 border-t hairline space-y-3">
+            <Field label="Categoría de specs">
+              <Select
+                value={categoriaSpecs || "__none__"}
+                onValueChange={(v) =>
+                  setCategoriaSpecs(v === "__none__" ? "" : v)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin categoría de specs" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin categoría de specs</SelectItem>
+                  {specCatOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.nombre}>{c.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Define qué specs técnicas aplican y el nombre público. Independiente del catálogo.
+              </p>
+            </Field>
+
+            <div>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                Categorías del catálogo
+              </Label>
+              <CategoriaSugeridaChip
+                categoriaSugerida={importedFichaExt?.categoria_sugerida ?? null}
+                categorias={catsQ.data ?? []}
+                selected={selectedCats}
+                onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
+              />
+              <CategoriasPicker
+                categorias={catsQ.data ?? []}
+                selected={selectedCats}
+                onChange={setSelectedCats}
+              />
+            </div>
           </section>
 
           {/* ════════════════════════════════════════════════════════════════

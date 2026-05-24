@@ -261,6 +261,13 @@ def init_db():
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS eliminado_at TIMESTAMP")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_equipos_eliminado_at ON equipos(eliminado_at) WHERE eliminado_at IS NOT NULL")
 
+    # Migration: categoría de SPECS del equipo (1 de las 5 del registry:
+    # Cámaras/Lentes/Iluminación/Adaptadores/Filtros). Define qué specs aplican
+    # y el nombre público, desacoplado del árbol de categorías de catálogo
+    # (equipo_categorias), que es una agrupación manual web-managed para el
+    # front-office. NULL = sin specs asignadas.
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS categoria_specs TEXT")
+
     # Tabla de marcas (brands)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS marcas (
