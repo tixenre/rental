@@ -19,7 +19,7 @@ import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { ViewIntroDialog } from "@/components/rental/ViewIntroDialog";
 import { PreviewPane } from "@/components/rental/PreviewPane";
 import { useEquipos, useCategorias, useMarcas } from "@/hooks/useEquipos";
-import type { BackendMarca } from "@/lib/api";
+import type { BackendMarca, BackendCategoria } from "@/lib/api";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
@@ -157,7 +157,24 @@ function Index() {
   // Categorías derivadas, ordenadas por prioridad del backend.
   // Las que no aparecen en /api/categorias quedan al final, alfabéticas.
   const apiCategories = useMemo(() => {
-    const cats = Array.from(new Set(allEquipos.map((e) => e.category)));
+    // Set de nombres visibles (todos los niveles) según el backend, que ya
+    // filtra `visible=TRUE` en /api/categorias. El mosaico/tabs muestran solo
+    // categorías que (a) tienen equipos y (b) están marcadas visibles. El
+    // admin las cura desde la solapa Diseño. Si todavía no cargó el árbol
+    // (`backendCats` vacío), no filtramos para evitar un flash sin tiles.
+    const visibleNames = new Set<string>();
+    const walk = (nodes: BackendCategoria[]) => {
+      nodes.forEach((n) => {
+        visibleNames.add(n.nombre);
+        if (n.children?.length) walk(n.children);
+      });
+    };
+    walk(backendCats);
+
+    let cats = Array.from(new Set(allEquipos.map((e) => e.category)));
+    if (visibleNames.size > 0) {
+      cats = cats.filter((c) => visibleNames.has(c));
+    }
     // Sort por: prioridad ASC (manual del admin), después popularidad
     // DESC (automática del ranking #131), después alfabético.
     // Mismo criterio que el backend ORDER BY en /api/categorias.
