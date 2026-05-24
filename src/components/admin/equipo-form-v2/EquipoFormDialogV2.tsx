@@ -50,7 +50,7 @@ import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/use
 import { KitEditor } from "./KitEditor";
 import { SpecsDiffEditor } from "./SpecsDiffEditor";
 import {
-  type Spec, newSpec, withIds, sameLabel, mergeSpecs, findSpecValue, uniq,
+  type Spec, newSpec, withIds, sameLabel, findSpecValue, uniq,
 } from "./spec-helpers";
 import type { AutocompletarResult } from "../autocompletar";
 import { generarNombrePublico, categoriaSoportaAutoGen } from "./nombre-publico";
@@ -190,11 +190,6 @@ export function EquipoFormDialogV2({
   const [autocompletando, setAutocompletando] = useState(false);
   const [importedFichaExt, setImportedFichaExt] = useState<Partial<AutocompletarResult> | null>(null);
 
-  // Cache del scrape: se carga desde ficha.raw_json al editar y se actualiza
-  // cuando se hace autocompletar. Habilita los botones ✨ por sección para
-  // re-aplicar campos sin volver a scrapear.
-  const [cachedScrape, setCachedScrape] = useState<Partial<AutocompletarResult> | null>(null);
-
   // Specs traídos del autocompletar: se guardan en una lista separada para
   // que el usuario los apruebe uno por uno (vs los specs actuales).
   const [specsPropuestos, setSpecsPropuestos] = useState<Spec[]>([]);
@@ -228,6 +223,12 @@ export function EquipoFormDialogV2({
   }, [watchedUsd, watchedRoi, usdRate, precioJornadaManual, form]);
 
   // ── Cargar ficha cuando estamos editando ──────────────────────────
+  // Ficha legacy = solo descripción, notas, nombre público template y
+  // keywords. Las specs estructuradas viven en `equipo_specs` y se
+  // cargan vía `equipoSpecsQ` (más abajo). Los campos legacy
+  // `specs_json`, `montura`, `formato`, `resolucion` y `raw_json` ya no
+  // se leen desde este form — quedan en BD como deuda hasta que se
+  // borren del backend.
   const fichaQ = useQuery({
     queryKey: ["admin", "equipo-ficha", initial?.id],
     queryFn: () => adminApi.getFicha(initial!.id),
@@ -252,29 +253,6 @@ export function EquipoFormDialogV2({
         setNombrePublicoAuto(true);
       }
 
-      let parsedSpecs: Spec[] = [];
-      try {
-        const raw = f.specs_json ? JSON.parse(f.specs_json) : [];
-        parsedSpecs = withIds(Array.isArray(raw) ? raw : []);
-      } catch { parsedSpecs = []; }
-
-      // Migrar montura/formato/resolucion dedicados → specs (si todavía no están).
-      const dedicated: Spec[] = [];
-      if (f.montura?.trim()) dedicated.push(newSpec("Montura", f.montura.trim()));
-      if (f.formato?.trim()) dedicated.push(newSpec("Formato", f.formato.trim()));
-      if (f.resolucion?.trim()) dedicated.push(newSpec("Resolución", f.resolucion.trim()));
-
-      // Hidratar con specs estructuradas (equipo_specs). Estos valores son
-      // read-only desde este form: si el admin los edita acá, no se persisten
-      // porque al guardar se EXCLUYEN de specs_json (el save check los compara
-      // contra esta lista para no duplicar entre equipo_fichas y equipo_specs).
-      // Para editar specs estructuradas hay que usar /admin/equipos/specs.
-      const estructuradas: Spec[] = (f.specs_estructuradas ?? [])
-        .filter((s) => s.label?.trim() && s.value?.trim())
-        .map((s) => newSpec(s.label, s.value));
-
-      setSpecs(mergeSpecs(mergeSpecs(parsedSpecs, dedicated), estructuradas));
-
       // Unificar keywords_json (ficha) + etiquetas (equipo top-level).
       let kws: string[] = [];
       try {
@@ -282,19 +260,45 @@ export function EquipoFormDialogV2({
         kws = Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
       } catch { kws = []; }
       setTags(uniq([...(initial?.etiquetas ?? []), ...kws]));
-
-      // Cargar cache del scrape (raw_json) para los botones ✨ por sección.
-      if (f.raw_json) {
-        try { setCachedScrape(JSON.parse(f.raw_json)); }
-        catch { setCachedScrape(null); }
-      } else {
-        setCachedScrape(null);
-      }
     } else if (!initial) {
-      setDescripcion(""); setNotas(""); setSpecs([]); setTags([]);
-      setNombrePublico(""); setCachedScrape(null);
+      setDescripcion(""); setNotas(""); setTags([]);
+      setNombrePublico("");
     }
   }, [fichaQ.data, initial]);
+
+  // ── Specs estructuradas (equipo_specs) ────────────────────────────
+  // Fuente única para el panel "Ficha técnica" del form. Devuelve:
+  //  - specs: { [spec_def_id]: value } — lo que el equipo tiene cargado
+  //  - template: lista de specs aplicables a las categorías del equipo
+  //    (el backend hace WITH RECURSIVE para resolver ancestros, así que
+  //    no hace falta calcular acá una "categoría raíz dominante").
+  // Al guardar, vuelve por putEquipoSpecs (PUT al mismo endpoint).
+  const equipoSpecsQ = useQuery({
+    queryKey: ["admin", "equipo-specs", initial?.id],
+    queryFn: () => adminApi.getEquipoSpecs(initial!.id),
+    enabled: !!initial?.id && open,
+  });
+  useEffect(() => {
+    if (!initial) {
+      setSpecs([]);
+      return;
+    }
+    const data = equipoSpecsQ.data;
+    if (!data) return;
+    // Mapear { spec_def_id → value } a Spec[] con label del template.
+    // El id de cada Spec es `spec-${spec_def_id}` para poder mapear
+    // de vuelta a spec_def_id al guardar (putEquipoSpecs).
+    const tmplById = new Map(data.template.map((t) => [t.spec_def_id, t]));
+    const next: Spec[] = [];
+    for (const [defIdStr, value] of Object.entries(data.specs)) {
+      const v = value == null ? "" : String(value);
+      if (!v.trim()) continue;
+      const t = tmplById.get(Number(defIdStr));
+      const label = t?.label ?? `spec ${defIdStr}`;
+      next.push({ id: `spec-${defIdStr}`, label, value: v });
+    }
+    setSpecs(next);
+  }, [equipoSpecsQ.data, initial]);
 
   // ── Categorías ─────────────────────────────────────────────────────
   const catsQ = useQuery({
@@ -323,31 +327,44 @@ export function EquipoFormDialogV2({
     }
   }, [initial, open]);
 
-  /** Categoría raíz dominante = la primera asignada que NO tiene parent. */
+  /** Sube por la jerarquía de categorías hasta encontrar el root real
+   *  (parent_id == null). Itera de a un nivel por iteración, con un
+   *  guard contra ciclos. Devuelve null si no hay match en `cats`. */
+  const resolveRoot = (
+    startId: number,
+    cats: CategoriaAdmin[],
+  ): CategoriaAdmin | null => {
+    const seen = new Set<number>();
+    let current = cats.find((x) => x.id === startId);
+    while (current) {
+      if (current.parent_id == null) return current;
+      if (seen.has(current.id)) return null;
+      seen.add(current.id);
+      current = cats.find((x) => x.id === current!.parent_id);
+    }
+    return null;
+  };
+
+  /** Categoría raíz dominante = la primera asignada cuyo ancestro root
+   *  podemos resolver. Sube hasta arriba (no solo un nivel), así una
+   *  sub-sub-cat como "Full Frame" resuelve a "Cámaras" — no a "Video". */
   const categoriaRoot = useMemo(() => {
     if (!catsQ.data) return null;
-    const cats = catsQ.data;
     for (const id of selectedCats) {
-      const c = cats.find((x) => x.id === id);
-      if (!c) continue;
-      if (c.parent_id == null) return c.nombre;
-      // si es hijo, devolver el padre
-      const parent = cats.find((x) => x.id === c.parent_id);
-      if (parent) return parent.nombre;
+      const root = resolveRoot(id, catsQ.data);
+      if (root) return root.nombre;
     }
     return null;
   }, [catsQ.data, selectedCats]);
 
-  /** Id de la categoría raíz, para fetchear el spec template. */
+  /** Id de la categoría raíz (mismo recorrido recursivo). Se usa para
+   *  el nombre_publico_template — el template de SPECS ya no depende de
+   *  esto, viene del endpoint `getEquipoSpecs`. */
   const categoriaRootId = useMemo(() => {
     if (!catsQ.data) return null;
-    const cats = catsQ.data;
     for (const id of selectedCats) {
-      const c = cats.find((x) => x.id === id);
-      if (!c) continue;
-      if (c.parent_id == null) return c.id;
-      const parent = cats.find((x) => x.id === c.parent_id);
-      if (parent) return parent.id;
+      const root = resolveRoot(id, catsQ.data);
+      if (root) return root.id;
     }
     return null;
   }, [catsQ.data, selectedCats]);
@@ -359,34 +376,16 @@ export function EquipoFormDialogV2({
     return cat?.nombre_publico_template ?? null;
   }, [catsQ.data, categoriaRootId]);
 
-  // ── Spec template auto-aplicado por categoría (#263 Opción B) ─────
-  // Cuando cambia la categoría raíz, traemos el template y agregamos
-  // sus labels al final de `specs` con value vacío. Si el usuario no
-  // los llena, `specsCleaned` ya los filtra al guardar (line ~644).
-  const specTemplateQ = useQuery({
-    queryKey: ["admin", "spec-template", categoriaRootId],
-    queryFn: () => adminApi.listSpecTemplates(categoriaRootId!),
-    enabled: open && !!categoriaRootId,
-  });
-  useEffect(() => {
-    const items = specTemplateQ.data?.items;
-    if (!items || items.length === 0) return;
-    setSpecs((prev) => {
-      const existing = new Set(prev.map((s) => s.label.trim().toLowerCase()));
-      const additions: Spec[] = [];
-      for (const t of items) {
-        if (!t.label?.trim()) continue;
-        if (existing.has(t.label.trim().toLowerCase())) continue;
-        additions.push(newSpec(t.label, ""));
-        existing.add(t.label.trim().toLowerCase());
-      }
-      return additions.length ? [...prev, ...additions] : prev;
-    });
-  }, [specTemplateQ.data]);
-
-  /** #291 Fase C: items del template (ya ordenados por prioridad ASC)
-   *  que SpecsDiffEditor consume para mostrar primero los template-bound. */
-  const templateItems = specTemplateQ.data?.items ?? [];
+  /** Items del template de specs aplicables al equipo (ordenados por
+   *  prioridad ASC). Vienen del MISMO endpoint que los valores
+   *  (`getEquipoSpecs`), así que no hace falta calcular categoriaRootId
+   *  ni fetchear el template por separado — el backend ya resuelve la
+   *  jerarquía de categorías con WITH RECURSIVE.
+   *
+   *  SpecsDiffEditor matchea por label vs `specs`; los faltantes los
+   *  renderiza como ghosts (input vacío) sin necesidad de pre-poblarlos
+   *  en el state. */
+  const templateItems = equipoSpecsQ.data?.template ?? [];
 
   // ── Auto-generación del nombre público ────────────────────────────
   // Cuando el toggle está ON y la categoría tiene template, regenera al
@@ -523,9 +522,6 @@ export function EquipoFormDialogV2({
       if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
 
       setImportedFichaExt(r);
-      // Actualizar cache del scrape: habilita los botones ✨ por sección
-      // para re-aplicar después sin volver a scrapear.
-      setCachedScrape(r);
 
       const parts: string[] = [];
       if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
@@ -651,98 +647,6 @@ export function EquipoFormDialogV2({
   };
 
   // ════════════════════════════════════════════════════════════════════
-  // Re-aplicar desde cache (botones ✨ por sección)
-  // ════════════════════════════════════════════════════════════════════
-  type CacheSection = "identificacion" | "foto" | "descripcion" | "ficha" | "etiquetas";
-
-  const cacheHas = (s: CacheSection): boolean => {
-    const r = cachedScrape;
-    if (!r) return false;
-    switch (s) {
-      case "identificacion": return !!(r.marca || r.modelo || r.nombre_normalizado);
-      case "foto":           return !!r.foto_url;
-      case "descripcion":    return !!r.descripcion;
-      case "ficha":          return !!(r.specs?.length || r.montura || r.formato || r.resolucion);
-      case "etiquetas":      return !!r.keywords?.length;
-    }
-  };
-
-  const applyFromCache = (s: CacheSection) => {
-    const r = cachedScrape;
-    if (!r) return;
-    switch (s) {
-      case "identificacion": {
-        if (r.marca) form.setValue("marca", r.marca, { shouldDirty: true });
-        if (r.modelo) form.setValue("modelo", r.modelo, { shouldDirty: true });
-        if (r.nombre_normalizado && !form.getValues("nombre")?.trim()) {
-          form.setValue("nombre", r.nombre_normalizado, { shouldDirty: true });
-        }
-        toast.success("Identificación recargada desde cache");
-        break;
-      }
-      case "foto": {
-        if (r.foto_url) {
-          // Limpiar pendingFile (si había una foto local pendiente de subir) —
-          // sino quedaría en estado inconsistente: URL del cache + archivo local
-          // que ya no aplica, y al guardar se subirían los dos.
-          if (pendingFile) {
-            setPendingFile(null);
-            if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
-            setPendingFilePreview("");
-          }
-          form.setValue("foto_url", r.foto_url, { shouldDirty: true });
-        }
-        toast.success("Foto recargada desde cache");
-        break;
-      }
-      case "descripcion": {
-        if (r.descripcion) setDescripcion(r.descripcion);
-        toast.success("Descripción recargada desde cache");
-        break;
-      }
-      case "ficha": {
-        const propuestos: Spec[] = withIds(r.specs ?? []);
-        if (r.montura) propuestos.unshift(newSpec("Montura", r.montura));
-        if (r.formato) propuestos.unshift(newSpec("Formato", r.formato));
-        if (r.resolucion) propuestos.unshift(newSpec("Resolución", r.resolucion));
-        // El LLM ya devuelve labels canónicos por el enum del schema —
-        // match simple por igualdad case-insensitive.
-        const tmplLabels = new Set(
-          (templateItems ?? []).map((t) => t.label.trim().toLowerCase()),
-        );
-        const autoAplicables = propuestos.filter((p) =>
-          tmplLabels.has(p.label.trim().toLowerCase()),
-        );
-        const requierenRevision = propuestos.filter((p) =>
-          !tmplLabels.has(p.label.trim().toLowerCase()),
-        );
-        if (autoAplicables.length > 0) {
-          setSpecs((prev) => {
-            const next = [...prev];
-            for (const p of autoAplicables) {
-              const idx = next.findIndex((x) => sameLabel(x.label, p.label));
-              if (idx >= 0) next[idx] = { ...next[idx], value: p.value };
-              else next.push(newSpec(p.label, p.value));
-            }
-            return next;
-          });
-        }
-        setSpecsPropuestos(requierenRevision);
-        const partes: string[] = [];
-        if (autoAplicables.length) partes.push(`${autoAplicables.length} aplicados`);
-        if (requierenRevision.length) partes.push(`${requierenRevision.length} pendientes`);
-        toast.success(`Recargado desde cache${partes.length ? `: ${partes.join(" · ")}` : ""}`);
-        break;
-      }
-      case "etiquetas": {
-        if (r.keywords?.length) setTags((prev) => uniq([...prev, ...r.keywords!]));
-        toast.success("Etiquetas mergeadas desde cache");
-        break;
-      }
-    }
-  };
-
-  // ════════════════════════════════════════════════════════════════════
   // Submit — mismo flow que el viejo (delegamos en adminApi).
   // ════════════════════════════════════════════════════════════════════
   // Keyboard shortcut: Cmd/Ctrl+S guarda el form (Esc lo maneja el Dialog).
@@ -861,33 +765,12 @@ export function EquipoFormDialogV2({
         }
       }
 
-      // Ficha — montura/formato/resolución se extraen de specs por label (V2
-      // los maneja como specs); el catálogo público sigue leyendo los campos
-      // dedicados, así que los seguimos guardando.
-      const monturaSpec = findSpecValue(specs, "Montura") || null;
-      const formatoSpec = findSpecValue(specs, "Formato") || null;
-      const resolucionSpec = findSpecValue(specs, "Resolución") || null;
-
-      // Specs ya presentes en equipo_specs (hidratados al cargar). NO los
-      // duplicamos en equipo_fichas.specs_json — quedan como fuente única en
-      // equipo_specs. El usuario edita esos vía /admin/equipos/specs.
-      const estructuradasSet = new Set(
-        (fichaQ.data?.specs_estructuradas ?? [])
-          .filter((s) => s.label?.trim() && s.value?.trim())
-          .map((s) => `${s.label.trim().toLowerCase()}::${s.value.trim()}`),
-      );
-
-      const specsCleaned = specs
-        .filter((s) => s.label.trim() && s.value.trim())
-        .filter((s) => !estructuradasSet.has(
-          `${s.label.trim().toLowerCase()}::${s.value.trim()}`
-        ))
-        .map(({ label, value }) => ({ label, value }));
-
+      // Ficha legacy: descripción + notas + keywords + nombre público.
+      // Las specs estructuradas ya NO van acá — viven en equipo_specs y
+      // se persisten vía putEquipoSpecs (más abajo).
       const tieneFicha = (
         isEdit ||
-        !!descripcion || !!notas || specsCleaned.length > 0 || tags.length > 0 ||
-        !!monturaSpec || !!formatoSpec || !!resolucionSpec ||
+        !!descripcion || !!notas || tags.length > 0 ||
         !!nombrePublico.trim() || !!importedFichaExt
       );
       if (tieneFicha) {
@@ -895,10 +778,6 @@ export function EquipoFormDialogV2({
           await adminApi.setFicha(equipoId, {
             descripcion: descripcion || null,
             notas: notas || null,
-            specs_json: specsCleaned.length ? JSON.stringify(specsCleaned) : null,
-            montura: monturaSpec,
-            formato: formatoSpec,
-            resolucion: resolucionSpec,
             keywords_json: tags.length ? JSON.stringify(tags) : null,
             // Si el toggle "auto" está ON y tenemos un template de categoría,
             // persistimos el TEMPLATE con tokens ("{marca} {modelo} ...").
@@ -912,6 +791,32 @@ export function EquipoFormDialogV2({
           });
         } catch (e) {
           fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
+        }
+      }
+
+      // Specs estructuradas → PUT a equipo_specs (SoT única). Mapeamos
+      // label → spec_def_id usando el template del equipo (lo que devolvió
+      // getEquipoSpecs). Los specs sin match (no están en el template de
+      // la categoría) se omiten — el admin los migra desde /admin/equipos/specs.
+      if (isEdit && equipoSpecsQ.data) {
+        try {
+          const tmplByLabel = new Map(
+            equipoSpecsQ.data.template.map(
+              (t) => [t.label.trim().toLowerCase(), t] as const,
+            ),
+          );
+          const specsDict: Record<string, string> = {};
+          for (const s of specs) {
+            const label = s.label.trim();
+            const value = s.value.trim();
+            if (!label || !value) continue;
+            const t = tmplByLabel.get(label.toLowerCase());
+            if (!t) continue;
+            specsDict[String(t.spec_def_id)] = value;
+          }
+          await adminApi.putEquipoSpecs(equipoId, specsDict);
+        } catch (e) {
+          fallidos.push(`specs (${e instanceof Error ? e.message : "error"})`);
         }
       }
 
@@ -1037,21 +942,6 @@ export function EquipoFormDialogV2({
   // ════════════════════════════════════════════════════════════════════
   const fotoActual = pendingFilePreview || form.watch("foto_url");
 
-  /** Botón ✨ que re-aplica una sección desde el scrape cacheado. */
-  const CacheBtn = ({ section, label = "cache" }: { section: CacheSection; label?: string }) => {
-    if (!cacheHas(section)) return null;
-    return (
-      <button
-        type="button"
-        onClick={() => applyFromCache(section)}
-        title="Re-aplicar desde scrape guardado"
-        className="text-[10px] text-muted-foreground hover:text-ink inline-flex items-center gap-0.5 shrink-0"
-      >
-        <Sparkles className="h-3 w-3" /> {label}
-      </button>
-    );
-  };
-
   // ── Confirmación al cerrar con cambios sin guardar (#232) ──────────
   // Detectamos cambios desde 4 fuentes: form fields (react-hook-form),
   // specs propuestos del autocompletar, ficha externa importada, archivo
@@ -1142,11 +1032,6 @@ export function EquipoFormDialogV2({
             <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-3">
               {/* Foto card */}
               <div className="space-y-1">
-                {cacheHas("foto") && (
-                  <div className="flex justify-end">
-                    <CacheBtn section="foto" />
-                  </div>
-                )}
                 <PhotoCard
                 url={fotoActual}
                 pendingFile={pendingFile}
@@ -1168,7 +1053,6 @@ export function EquipoFormDialogV2({
                 <Field
                   label="Nombre interno (técnico, para vos)"
                   error={form.formState.errors.nombre?.message}
-                  actions={<CacheBtn section="identificacion" label="cache id." />}
                 >
                   <Input
                     {...form.register("nombre")}
@@ -1340,7 +1224,6 @@ export function EquipoFormDialogV2({
           <CollapsibleSection
             title="Descripción (catálogo público)"
             defaultOpen={!!descripcion}
-            actions={<CacheBtn section="descripcion" />}
           >
             <Field label="Texto descriptivo">
               <Textarea
@@ -1359,7 +1242,6 @@ export function EquipoFormDialogV2({
           <CollapsibleSection
             title="Ficha técnica"
             defaultOpen={specsPropuestos.length > 0 || specs.length > 0}
-            actions={<CacheBtn section="ficha" />}
           >
             <div className="space-y-3">
               <SpecsDiffEditor
@@ -1384,7 +1266,7 @@ export function EquipoFormDialogV2({
                 }}
               />
 
-              <Field label="Etiquetas" actions={<CacheBtn section="etiquetas" />}>
+              <Field label="Etiquetas">
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap gap-1">
                     {tags.map((t) => (
@@ -1428,9 +1310,7 @@ export function EquipoFormDialogV2({
               Categorías {categoriaRoot && <span className="ml-1 normal-case text-ink/70">· primera = "{categoriaRoot}"</span>}
             </Label>
             <CategoriaSugeridaChip
-              categoriaSugerida={
-                importedFichaExt?.categoria_sugerida ?? cachedScrape?.categoria_sugerida ?? null
-              }
+              categoriaSugerida={importedFichaExt?.categoria_sugerida ?? null}
               categorias={catsQ.data ?? []}
               selected={selectedCats}
               onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}

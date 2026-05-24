@@ -965,17 +965,12 @@ export const adminApi = {
       equipo_id: number;
       /** Keys son spec_def_id stringificados ("123": "valor"). */
       specs: Record<string, string>;
-      template: Array<{
+      /** Template aplicable a las categorías del equipo (resuelto vía
+       *  WITH RECURSIVE en el backend). El shape extiende SpecTemplate
+       *  con `template_id` (alias legacy de `id`) y `categoria_nombre`
+       *  (para agrupar en UI). */
+      template: Array<SpecTemplate & {
         template_id: number;
-        spec_def_id: number;
-        spec_key: string; label: string; tipo: string;
-        unidad: string | null; enum_options: string[] | null;
-        tabla_columnas: SpecTablaColumna[] | null;
-        output_config: SpecOutputConfig | null;
-        prioridad: number;
-        visible_en_card: boolean; visible_en_filtros: boolean; visible_en_nombre: boolean;
-        obligatorio: boolean; ayuda: string | null;
-        destacado: boolean;
         categoria_nombre: string;
       }>;
     }>(`/api/admin/equipos/${id}/specs`),

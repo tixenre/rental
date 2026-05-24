@@ -1152,6 +1152,12 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
         # también traemos los templates de la raíz padre ("Iluminación")
         # porque el seeder los asigna a la raíz. Mergeados con dedup por
         # spec_def_id (la asignación más cercana al equipo gana).
+        #
+        # El SELECT proyecta el shape completo del tipo `SpecTemplate` del
+        # frontend (incluyendo es_compatibilidad/compatibilidad_modo/
+        # rol_compatibilidad/unidad_id/categoria_id/id) para que el form
+        # del admin consuma este endpoint como SoT única, sin necesitar
+        # un fetch extra a /admin/categorias/{id}/spec-templates.
         template_rows = conn.execute(
             """
             WITH RECURSIVE cats_y_ancestros AS (
@@ -1167,10 +1173,15 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
                 JOIN cats_y_ancestros cya ON cya.parent_id = c.id
             )
             SELECT DISTINCT ON (t.spec_def_id)
-                t.id AS template_id,
+                t.id,
+                t.id AS template_id,  -- alias legacy
+                cya.categoria_id,
                 t.spec_def_id,
                 sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.unidad_id, sd.enum_options,
                 sd.tabla_columnas, sd.output_config,
+                COALESCE(sd.es_compatibilidad, FALSE) AS es_compatibilidad,
+                COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
+                sd.rol_compatibilidad,
                 t.prioridad,
                 t.visible_en_card, t.visible_en_filtros, t.visible_en_nombre,
                 t.obligatorio,
