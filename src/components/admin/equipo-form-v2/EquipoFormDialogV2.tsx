@@ -285,17 +285,16 @@ export function EquipoFormDialogV2({
     }
     const data = equipoSpecsQ.data;
     if (!data) return;
-    // Mapear { spec_def_id → value } a Spec[] con label del template.
-    // El id de cada Spec es `spec-${spec_def_id}` para poder mapear
-    // de vuelta a spec_def_id al guardar (putEquipoSpecs).
-    const tmplById = new Map(data.template.map((t) => [t.spec_def_id, t]));
+    // Mapear { spec_def_id → value } a Spec[]. El id de cada Spec es
+    // `spec-${spec_def_id}` para poder mapear de vuelta al guardar
+    // (putEquipoSpecs). El label se resuelve contra el template EN VIVO de la
+    // categoría seleccionada en el efecto de re-etiquetado de abajo; acá
+    // arrancamos con un fallback hasta que el template cargue.
     const next: Spec[] = [];
     for (const [defIdStr, value] of Object.entries(data.specs)) {
       const v = value == null ? "" : String(value);
       if (!v.trim()) continue;
-      const t = tmplById.get(Number(defIdStr));
-      const label = t?.label ?? `spec ${defIdStr}`;
-      next.push({ id: `spec-${defIdStr}`, label, value: v });
+      next.push({ id: `spec-${defIdStr}`, label: `spec ${defIdStr}`, value: v });
     }
     setSpecs(next);
   }, [equipoSpecsQ.data, initial]);
@@ -400,16 +399,49 @@ export function EquipoFormDialogV2({
     return cat?.nombre_publico_template ?? null;
   }, [catsQ.data, categoriaRootId]);
 
-  /** Items del template de specs aplicables al equipo (ordenados por
-   *  prioridad ASC). Vienen del MISMO endpoint que los valores
-   *  (`getEquipoSpecs`), así que no hace falta calcular categoriaRootId
-   *  ni fetchear el template por separado — el backend ya resuelve la
-   *  jerarquía de categorías con WITH RECURSIVE.
-   *
-   *  SpecsDiffEditor matchea por label vs `specs`; los faltantes los
-   *  renderiza como ghosts (input vacío) sin necesidad de pre-poblarlos
-   *  en el state. */
-  const templateItems = equipoSpecsQ.data?.template ?? [];
+  // Template de specs de la categoría SELECCIONADA (en vivo, no la guardada).
+  // Lee de spec_definitions por categoria_raiz_id (mismo criterio que
+  // obtener_specs_equipo). Esto hace que al elegir "Categoría de specs" en el
+  // form aparezcan los specs al instante, sin necesidad de guardar primero.
+  const specTemplateQ = useQuery({
+    queryKey: ["admin", "spec-template", categoriaRootId],
+    queryFn: () => adminApi.listSpecTemplates(categoriaRootId!),
+    enabled: open && categoriaRootId != null,
+  });
+  /** Items del template de specs de la categoría seleccionada, ordenados por
+   *  prioridad ASC. SpecsDiffEditor matchea por label vs `specs`; los
+   *  faltantes los renderiza como ghosts (input vacío). */
+  const templateItems = useMemo(
+    () => specTemplateQ.data?.items ?? [],
+    [specTemplateQ.data],
+  );
+
+  // Re-etiquetado: cuando llega/cambia el template de la categoría
+  // seleccionada, resolvemos el label de cada spec guardado (id
+  // `spec-${spec_def_id}`) contra el template. Solo toca el label —preserva
+  // los valores y ediciones en curso—, así un spec canónico cae en la sección
+  // "Del template" y deja de verse como "spec N".
+  useEffect(() => {
+    if (templateItems.length === 0) return;
+    const labelById = new Map(templateItems.map((t) => [t.spec_def_id, t.label]));
+    setSpecs((prev) => {
+      let changed = false;
+      const next = prev.map((s) => {
+        const m = /^spec-(\d+)$/.exec(s.id);
+        if (!m) return s;
+        const label = labelById.get(Number(m[1]));
+        if (label && label !== s.label) {
+          changed = true;
+          return { ...s, label };
+        }
+        return s;
+      });
+      return changed ? next : prev;
+    });
+    // `equipoSpecsQ.data` en deps: cuando el efecto de carga reconstruye
+    // `specs` (con labels fallback), re-etiquetamos aunque el template ya
+    // estuviera cargado de antes (evita quedar pegado en "spec N").
+  }, [templateItems, equipoSpecsQ.data]);
 
   // ── Auto-generación del nombre público ────────────────────────────
   // Cuando el toggle está ON y la categoría tiene template, regenera al
@@ -819,25 +851,21 @@ export function EquipoFormDialogV2({
         }
       }
 
-      // Specs estructuradas → PUT a equipo_specs (SoT única). Mapeamos
-      // label → spec_def_id usando el template del equipo (lo que devolvió
-      // getEquipoSpecs). Los specs sin match (no están en el template de
-      // la categoría) se omiten — el admin los migra desde /admin/equipos/specs.
+      // Specs estructuradas → PUT a equipo_specs (SoT única). El id de cada
+      // spec codifica su spec_def_id (`spec-${id}` para guardados, `tmpl-${id}`
+      // para los del template materializados), así que mapeamos directo sin
+      // round-trip por label —que se rompía cuando el label todavía no estaba
+      // resuelto contra el template. Los specs custom (id uuid, sin
+      // spec_def_id) no van a equipo_specs: se gestionan en /admin/equipos/specs.
       if (isEdit && equipoSpecsQ.data) {
         try {
-          const tmplByLabel = new Map(
-            equipoSpecsQ.data.template.map(
-              (t) => [t.label.trim().toLowerCase(), t] as const,
-            ),
-          );
           const specsDict: Record<string, string> = {};
           for (const s of specs) {
-            const label = s.label.trim();
             const value = s.value.trim();
-            if (!label || !value) continue;
-            const t = tmplByLabel.get(label.toLowerCase());
-            if (!t) continue;
-            specsDict[String(t.spec_def_id)] = value;
+            if (!value) continue;
+            const m = /^(?:spec|tmpl)-(\d+)$/.exec(s.id);
+            if (!m) continue;
+            specsDict[m[1]] = value;
           }
           await adminApi.putEquipoSpecs(equipoId, specsDict);
         } catch (e) {
@@ -1266,9 +1294,33 @@ export function EquipoFormDialogV2({
           ════════════════════════════════════════════════════════════════ */}
           <CollapsibleSection
             title="Ficha técnica"
-            defaultOpen={specsPropuestos.length > 0 || specs.length > 0}
+            defaultOpen={specsPropuestos.length > 0 || specs.length > 0 || !!categoriaSpecs}
           >
             <div className="space-y-3">
+              <Field label="Categoría de specs">
+                <Select
+                  value={categoriaSpecs || "__none__"}
+                  onValueChange={(v) => {
+                    specsTouchedRef.current = true;
+                    setCategoriaSpecs(v === "__none__" ? "" : v);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sin categoría de specs" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sin categoría de specs</SelectItem>
+                    {specCatOptions.map((c) => (
+                      <SelectItem key={c.id} value={c.nombre}>{c.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Define qué specs técnicas aplican y el nombre público. Al elegirla aparecen
+                  los specs abajo. Independiente del catálogo.
+                </p>
+              </Field>
+
               <SpecsDiffEditor
                 specs={specs}
                 propuestos={specsPropuestos}
@@ -1328,32 +1380,10 @@ export function EquipoFormDialogV2({
           </CollapsibleSection>
 
           {/* ════════════════════════════════════════════════════════════════
-              CATEGORÍAS — después de ficha técnica (ver comentario arriba)
+              CATEGORÍAS DEL CATÁLOGO — agrupación para el front-office, separada
+              de la categoría de specs (que vive en Ficha técnica).
           ════════════════════════════════════════════════════════════════ */}
           <section className="pt-2 border-t hairline space-y-3">
-            <Field label="Categoría de specs">
-              <Select
-                value={categoriaSpecs || "__none__"}
-                onValueChange={(v) => {
-                  specsTouchedRef.current = true;
-                  setCategoriaSpecs(v === "__none__" ? "" : v);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sin categoría de specs" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Sin categoría de specs</SelectItem>
-                  {specCatOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.nombre}>{c.nombre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Define qué specs técnicas aplican y el nombre público. Independiente del catálogo.
-              </p>
-            </Field>
-
             <div>
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                 Categorías del catálogo
