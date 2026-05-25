@@ -21,7 +21,7 @@ CAT = CategoriaRegistry(
             destacado=True, obligatorio=True, ayuda="Form factor",
         ),
         SpecDef(
-            key="lens_mount", label="Lens mount", tipo="enum",
+            key="lens_mount", label="Montura", tipo="enum",
             enum_options=LENS_MOUNT_ENUM,
             prioridad=20, en_card=True, en_filtros=True, en_nombre=True,
             destacado=True, obligatorio=True,
@@ -29,7 +29,7 @@ CAT = CategoriaRegistry(
             es_compatibilidad=True, compatibilidad_modo="exacta",
         ),
         SpecDef(
-            key="lens_mount_out", label="Lens mount — lado lente", tipo="enum",
+            key="lens_mount_out", label="Montura — lado lente", tipo="enum",
             enum_options=LENS_MOUNT_ENUM,
             prioridad=30, en_card=True, en_filtros=True, en_nombre=True, destacado=True,
             ayuda="Rosca que recibe el lente del otro sistema",

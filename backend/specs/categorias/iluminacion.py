@@ -94,7 +94,7 @@ CAT = CategoriaRegistry(
         # ─── Performance fotométrico ──────────────────────────────────
         # tipo=rango: [v] fijo, [min, max] variable. Mismo patrón que
         # `angulo_vision` en Lentes y `beam_angle` en Modificadores.
-        SpecDef(key="beam_angle", label="Beam angle", tipo="rango", unidad="°",
+        SpecDef(key="beam_angle", label="Ángulo del haz", tipo="rango", unidad="°",
                 prioridad=135, en_filtros=True,
                 ayuda="[v] fijo, [min, max] variable (zoom Fresnel/spotlight)"),
         # ─── Hardware / control físico ────────────────────────────────
@@ -105,7 +105,7 @@ CAT = CategoriaRegistry(
         ),
         SpecDef(key="display", label="Display integrado", tipo="string",
                 prioridad=145, ayuda="Ej: OLED touchscreen, LCD"),
-        SpecDef(key="umbrella_mount", label="Umbrella mount", tipo="bool",
+        SpecDef(key="umbrella_mount", label="Montura paraguas", tipo="bool",
                 prioridad=150, en_filtros=True),
         SpecDef(key="effects", label="Efectos preprogramados", tipo="bool",
                 prioridad=155,

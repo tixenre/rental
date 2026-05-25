@@ -24,7 +24,7 @@ CAT = CategoriaRegistry(
     ],
     specs=[
         SpecDef(
-            key="lens_mount", label="Lens mount", tipo="enum",
+            key="lens_mount", label="Montura", tipo="enum",
             enum_options=LENS_MOUNT_ENUM,
             prioridad=10, en_card=True, en_filtros=True, en_nombre=True,
             destacado=True,

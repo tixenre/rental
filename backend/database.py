@@ -1319,6 +1319,7 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
     specs marcadas como destacado=true en el template de su categoría."""
     if not equipos:
         return equipos
+    from services.spec_render import render_spec_value
     ids = [e["id"] for e in equipos]
     placeholders = ",".join(["%s"] * len(ids))
     cur = conn.cursor()
@@ -1329,7 +1330,7 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
     # Una spec "Macro: No" no aporta como quick fact en la card — destacar
     # solo cuando el lente ES macro, no cuando no lo es.
     cur.execute(f"""
-        SELECT es.equipo_id, sd.label, sd.tipo, es.value, t.prioridad
+        SELECT es.equipo_id, sd.label, sd.tipo, sd.unidad, es.value, t.prioridad
         FROM equipo_specs es
         JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
         JOIN spec_definitions sd ON sd.id = es.spec_def_id
@@ -1355,7 +1356,11 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
         if key not in seen[eid]:
             # Para bool, el value queda vacío — el frontend muestra solo el
             # label como badge (ej. "MACRO" en lugar de "MACRO Sí").
-            value = "" if r["tipo"] == "bool" else r["value"]
+            # El resto pasa por el renderer canónico (mismo que el nombre
+            # público) → "[24, 70]" mm → "24-70 mm", "[2.8]" f/ → "f/2.8".
+            value = "" if r["tipo"] == "bool" else render_spec_value(
+                r["value"], r["tipo"], r["unidad"]
+            )
             dest_map[eid].append({"label": r["label"], "value": value})
             seen[eid].add(key)
 
@@ -1377,6 +1382,7 @@ def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
     """
     if not equipos:
         return equipos
+    from services.spec_render import render_spec_value
     ids = [e["id"] for e in equipos]
     placeholders = ",".join(["%s"] * len(ids))
     cur = conn.cursor()
@@ -1407,7 +1413,11 @@ def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
             continue  # dedup: mantenemos el de mayor prioridad (DISTINCT ON)
         specs_map[eid][key] = {
             "label": r["label"],
+            # `value` queda CRUDO (lo usan los filtros públicos por specsRaw).
+            # `value_display` es el render canónico (mismo que el nombre
+            # público) para mostrar en la ficha — "[24,70]" mm → "24-70 mm".
             "value": r["value"],
+            "value_display": render_spec_value(r["value"], r["tipo"], r["unidad"]),
             "tipo": r["tipo"],
             "unidad": r["unidad"],
             "prioridad": r["prioridad"],

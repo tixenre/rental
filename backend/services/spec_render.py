@@ -124,6 +124,35 @@ def _parse_path(path: str) -> tuple[Optional[str], int]:
     return path or None, 0
 
 
+def _is_prefix_unit(unidad: Optional[str]) -> bool:
+    """Unidades que van PEGADAS antes del número (f/, $, €) en vez de después.
+    Convención: termina en "/" o empieza con símbolo monetario. Espejo de
+    `isPrefixUnit` del frontend (SpecsDiffEditor.tsx)."""
+    u = (unidad or "").strip()
+    if not u:
+        return False
+    return u.endswith("/") or u[:1] in "$€£¥"
+
+
+def _apply_unit(text: str, unidad: Optional[str]) -> str:
+    """Pega la unidad al valor según su estilo:
+    - prefijo pegado: `f/`, `$` → "f/2.8", "$100"
+    - prefijo con espacio: `ISO` → "ISO 80 - 102400"
+    - sufijo pegado: `°` → "84°"
+    - sufijo con espacio (default): mm, g, W, K, fps… → "640 g"
+    """
+    u = (unidad or "").strip()
+    if not u or not text:
+        return text
+    if _is_prefix_unit(u):
+        return f"{u}{text}"
+    if u.lower() == "iso":
+        return f"{u} {text}"
+    if u == "°":
+        return f"{text}°"
+    return f"{text} {u}"
+
+
 def _format_value_by_tipo(
     value: str, tipo: Optional[str], unidad: Optional[str] = None
 ) -> str:
@@ -133,7 +162,7 @@ def _format_value_by_tipo(
     - `multi_enum`: parsea JSON array → join con ` · `. Si el value es string
       simple (legacy), lo devuelve tal cual.
     - `rango`: parsea JSON array → `"min - max"` o solo `"v"` si es fijo. Si
-      hay unidad, la agrega.
+      hay unidad, la agrega (prefijo para `f/`/monedas, sufijo para el resto).
     - `bool`: `"true"` → "Sí", `"false"` → "" (vacío para colapsar conectores).
     - resto (string, number, enum): devuelve value tal cual.
     """
@@ -162,12 +191,10 @@ def _format_value_by_tipo(
                     if len(items) == 1:
                         out = items[0]
                     elif len(items) >= 2:
-                        out = f"{items[0]} - {items[1]}"
+                        out = f"{items[0]}-{items[1]}"
                     else:
                         return ""
-                    if unidad:
-                        out = f"{out} {unidad}"
-                    return out
+                    return _apply_unit(out, unidad)
             except Exception:
                 pass
         # value no es JSON — devolver tal cual
@@ -180,6 +207,23 @@ def _format_value_by_tipo(
         return ""
 
     return v
+
+
+def render_spec_value(
+    value: str, tipo: Optional[str], unidad: Optional[str] = None
+) -> str:
+    """Render de display de un valor de spec — fuente ÚNICA para la ficha
+    pública y los specs destacados (quick facts). Comparte la lógica de
+    `_format_value_by_tipo` (rango/multi_enum/bool) que también alimenta el
+    nombre público, así un mismo valor se ve idéntico en todos lados.
+
+    Diferencia con el nombre: acá un `number` con unidad la muestra inline
+    (ej. "82 mm", "640 g") — en el nombre la unidad la pone el template.
+    """
+    base = _format_value_by_tipo(value, tipo, unidad)
+    if tipo == "number" and unidad and base:
+        return _apply_unit(base, unidad)
+    return base
 
 
 def render_spec_placeholder(

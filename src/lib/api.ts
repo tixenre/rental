@@ -95,6 +95,9 @@ export type BackendEquipo = {
   specs?: Record<string, {
     label: string;
     value: string;
+    /** Valor renderizado para display (mismo renderer que el nombre público).
+     *  `value` queda crudo para filtros. */
+    value_display?: string;
     tipo: string;
     unidad: string | null;
     prioridad: number;
