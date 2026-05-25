@@ -700,14 +700,14 @@ def map_camara_extras(secciones: dict, title: str = "") -> dict:
     # ── Imaging ──────────────────────────────────────────────────────
     _add("sensor", _parse_sensor(secciones))
     _add("tipo_estabilizacion", _parse_tipo_estabilizacion(secciones))
-    _add("af_puntos", _parse_af_puntos(secciones))
+    _add("focus_points", _parse_af_puntos(secciones))
 
     # ── Storage / memoria ────────────────────────────────────────────
     _add("memoria_tipo", _parse_memoria_tipo(secciones))
     _add("internal_storage", _parse_internal_storage(secciones))
 
     # ── I/O ───────────────────────────────────────────────────────────
-    _add("salida_video", _parse_salida_video(secciones))
+    _add("video_io", _parse_salida_video(secciones))
     _add("audio_canales", _parse_audio_canales(secciones))
 
     # ── Display ───────────────────────────────────────────────────────
@@ -715,8 +715,8 @@ def map_camara_extras(secciones: dict, title: str = "") -> dict:
     _add("pantalla", _parse_pantalla(secciones))
 
     # ── Power ─────────────────────────────────────────────────────────
-    _add("bateria", _parse_bateria(secciones))
-    _add("consumo_w", _parse_consumo_w(secciones))
+    _add("battery", _parse_bateria(secciones))
+    _add("power_consumption_w", _parse_consumo_w(secciones))
 
     # ── Physical ──────────────────────────────────────────────────────
     _add("dimensiones_cm", _parse_dimensiones_cm(secciones))
@@ -764,7 +764,7 @@ def map_camara_extras(secciones: dict, title: str = "") -> dict:
         ("Exposure Compensation", "exposure_compensation"),
         ("Metering Method",       "metering_method"),
         ("Metering Range",        "metering_range"),
-        ("Bulb/Time Mode",        "bulb_mode"),
+        ("Bulb/Time Mode",        "bulb_time_mode"),
         ("Self-Timer",            "self_timer"),
         ("Bit Depth",             "bit_depth"),
         ("Aspect Ratio",          "aspect_ratio"),
@@ -804,7 +804,7 @@ def map_camara_extras(secciones: dict, title: str = "") -> dict:
         # Physical / general
         ("Materials",             "materiales"),
         ("Capture Type",          "capture_type"),
-        ("Operating Conditions",  "operating_temp"),
+        ("Operating Conditions",  "operating_conditions"),
         ("Storage Conditions",    "storage_temp"),
         ("Environmental Resistance", "environmental_resistance"),
         ("Impact Resistance",     "impact_resistance"),
