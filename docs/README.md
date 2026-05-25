@@ -6,6 +6,7 @@
 
 | Archivo | Para qué sirve |
 |---|---|
+| [MEMORIA.md](MEMORIA.md) | **Memoria viva**: decisiones de criterio + preferencias (curado, fechado). El supervisor la hace cumplir. |
 | [PROTOCOLO.md](PROTOCOLO.md) | Detalle del workflow de auditoría + PRs prolijos. Referenciado desde el manifiesto. |
 | [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) | Setup de Railway: variables, build, dominio, troubleshooting. |
 | [DISEÑO_SPECS.md](DISEÑO_SPECS.md) | Diseño técnico del sistema de specs por categoría. |
@@ -18,5 +19,5 @@
 
 - **Bugs activos** → GitHub Issues con label `bug`.
 - **Features activas** → GitHub Issues con label `feature`.
-- **Ideas tempranas / decisiones pendientes** → sección "Pendientes" del [`../MANIFIESTO.md`](../MANIFIESTO.md). Se promueven a issues cuando hay decisión.
+- **Decisiones de criterio + preferencias** → [`MEMORIA.md`](MEMORIA.md) (curado, lo hace cumplir el supervisor).
 - **Docs técnicas** (cómo funciona X, por qué la decisión Y) → archivo nuevo en `docs/`.
