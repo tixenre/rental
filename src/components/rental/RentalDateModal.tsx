@@ -1,7 +1,6 @@
-import { type DateRange } from "react-day-picker";
 import { es } from "date-fns/locale";
 import { addDays, format, startOfDay } from "date-fns";
-import { X, ArrowRight, Calendar as CalendarIcon, Clock, Eraser } from "lucide-react";
+import { X, Calendar as CalendarIcon, Clock, Eraser, Minus, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +35,19 @@ function useIsMobile() {
   return isMobile;
 }
 
+const timeMin = (t: string) => {
+  const [h = 0, m = 0] = (t ?? "00:00").split(":").map(Number);
+  return h * 60 + m;
+};
+
+/**
+ * Modal de fechas — patrón unificado con el mobile: elegís la fecha de retiro
+ * y la cantidad de JORNADAS con un stepper; la devolución se calcula sola.
+ *
+ * El contador de jornadas es la fuente de verdad `days()` del carrito, que
+ * coincide con el backend (1 jornada = 24 h; devolver más tarde que la hora
+ * de retiro suma una jornada). El stepper mueve la fecha de devolución ±1 día.
+ */
 export function RentalDateModal({ open, onOpenChange }: Props) {
   const {
     startDate,
@@ -50,20 +62,43 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   const jornadas = days();
   const isMobile = useIsMobile();
 
-  const range: DateRange | undefined = startDate
-    ? { from: startDate, to: endDate }
-    : undefined;
-
   const today = startOfDay(new Date());
   const busy = buildBusyDays();
 
-  const handleRangeChange = (r: DateRange | undefined) => {
-    setDates(r?.from, r?.to);
+  // endsLater: devolver más tarde que la hora de retiro suma 1 jornada (modelo
+  // 24 h). Lo usamos para derivar la fecha de devolución a partir de la
+  // cantidad de jornadas objetivo, de forma que el stepper sea siempre
+  // truthful (jornadas mostradas = `days()` = lo que cobra el backend).
+  const endsLater = timeMin(endTime) > timeMin(startTime);
+
+  // Setea la fecha de devolución para alcanzar `target` jornadas exactas:
+  //   days() = dayDiff + (endsLater ? 1 : 0)  ⇒  dayDiff = target − endsLater.
+  const setJornadas = (target: number, base?: Date) => {
+    const start = base ?? startDate;
+    if (!start) return;
+    const t = Math.max(1, target);
+    const dayDiff = Math.max(0, t - (endsLater ? 1 : 0));
+    setDates(start, addDays(start, dayDiff));
+  };
+
+  // Al elegir la fecha de retiro preservamos las jornadas actuales (default 1).
+  const handleStartSelect = (d: Date | undefined) => {
+    if (!d) {
+      setDates(undefined, undefined);
+      return;
+    }
+    setJornadas(startDate && endDate ? jornadas : 1, d);
+  };
+
+  const incJornada = () => setJornadas(jornadas + 1);
+  const decJornada = () => {
+    if (jornadas <= 1) return;
+    setJornadas(jornadas - 1);
   };
 
   const apply = () => onOpenChange(false);
   const clear = () => setDates(undefined, undefined);
-  const hasRange = !!(range?.from && range?.to);
+  const hasStart = !!startDate;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -74,7 +109,7 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
         <VisuallyHidden>
           <DialogTitle>Tu Rental — Seleccionar fechas</DialogTitle>
           <DialogDescription>
-            Elegí la fecha de retiro y devolución del alquiler.
+            Elegí la fecha de retiro y la cantidad de jornadas del alquiler.
           </DialogDescription>
         </VisuallyHidden>
 
@@ -100,53 +135,109 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
           </button>
         </div>
 
-        {/* Resumen Retiro / Devolución — diseño limpio */}
-        <div className="px-5 sm:px-6 pt-5 pb-4 shrink-0">
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-2 sm:items-stretch">
-            <DateField
-              label="Retiro"
-              date={range?.from}
-              time={startTime}
-              onTimeChange={setStartTime}
-              timeAriaLabel="Hora de retiro"
-            />
-
-            <div className="hidden sm:flex items-center justify-center text-muted-foreground/40 px-1">
-              <ArrowRight className="h-4 w-4" />
+        {/* Retiro + jornadas + devolución calculada */}
+        <div className="px-5 sm:px-6 pt-5 pb-4 shrink-0 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Retiro */}
+            <div className="rounded-xl border hairline bg-surface/40 px-3.5 py-3 border-ink/15">
+              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-1.5">
+                Retiro
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span
+                  className={`tabular-nums text-base font-display leading-none ${
+                    startDate ? "text-ink" : "text-muted-foreground/50"
+                  }`}
+                >
+                  {startDate ? format(startDate, "dd MMM yyyy", { locale: es }) : "--/--/----"}
+                </span>
+                <TimeStepSelect
+                  value={startTime}
+                  onChange={setStartTime}
+                  aria-label="Hora de retiro"
+                  className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
+                />
+              </div>
             </div>
-            <div className="sm:hidden flex items-center justify-center py-1">
-              <div className="h-px flex-1 bg-border" />
-              <ArrowRight className="h-3 w-3 mx-3 text-muted-foreground/50 rotate-90" />
-              <div className="h-px flex-1 bg-border" />
-            </div>
 
-            <DateField
-              label="Devolución"
-              date={range?.to}
-              time={endTime}
-              onTimeChange={setEndTime}
-              timeAriaLabel="Hora de devolución"
-            />
+            {/* Jornadas stepper */}
+            <div className="rounded-xl border border-ink/15 bg-amber-soft/40 px-3.5 py-3">
+              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-1.5">
+                Jornadas
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  onClick={decJornada}
+                  disabled={!hasStart || jornadas <= 1}
+                  aria-label="Quitar una jornada"
+                  className="grid h-8 w-8 place-items-center rounded-full border hairline bg-background text-ink transition hover:border-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <div className="flex items-baseline gap-1.5 leading-none">
+                  <span className="font-display text-2xl font-black text-ink tabular-nums">
+                    {hasStart ? jornadas : "—"}
+                  </span>
+                  <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                    {jornadas === 1 ? "jornada" : "jornadas"}
+                  </span>
+                </div>
+                <button
+                  onClick={incJornada}
+                  disabled={!hasStart}
+                  aria-label="Agregar una jornada"
+                  className="grid h-8 w-8 place-items-center rounded-full border hairline bg-background text-ink transition hover:border-ink hover:bg-amber disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           </div>
 
-          <p className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          {/* Devolución calculada */}
+          {startDate && endDate && (
+            <div className="rounded-xl border border-amber/40 bg-amber-soft/60 px-3.5 py-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-1">
+                  Devolución
+                </div>
+                <span className="tabular-nums text-base font-display leading-none text-ink">
+                  {format(endDate, "dd MMM yyyy", { locale: es })}
+                </span>
+              </div>
+              <TimeStepSelect
+                value={endTime}
+                onChange={setEndTime}
+                aria-label="Hora de devolución"
+                className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
+              />
+            </div>
+          )}
+
+          <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Clock className="h-3 w-3" />
-            Horarios cada 30 min — sujeto a confirmación
+            Horarios cada 30 min — sujeto a confirmación. Devolver más tarde que la hora de
+            retiro suma una jornada.
           </p>
         </div>
 
-        {/* Calendario — área scrolleable */}
+        {/* Calendario — elegís la fecha de retiro */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex justify-center px-2 sm:px-4 pb-2 border-t hairline">
           <Calendar
-            mode="range"
-            selected={range}
-            onSelect={handleRangeChange}
+            mode="single"
+            selected={startDate}
+            onSelect={handleStartSelect}
             numberOfMonths={isMobile ? 1 : 2}
             locale={es}
             disabled={{ before: today }}
-            modifiers={{ busy }}
+            modifiers={
+              startDate && endDate
+                ? { busy, rango: { from: startDate, to: endDate } }
+                : { busy }
+            }
             modifiersClassNames={{
               busy: "bg-amber/30 text-ink rounded-full",
+              rango: "bg-amber-soft/70 text-ink",
             }}
             showOutsideDays={false}
             className="p-2 sm:p-4 pointer-events-auto"
@@ -160,16 +251,16 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
         >
           <button
             onClick={clear}
-            disabled={!hasRange && !startDate}
+            disabled={!hasStart}
             className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition px-2 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Eraser className="h-3.5 w-3.5" />
             Limpiar
           </button>
 
-          {hasRange && (
-            <div className="hidden sm:flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              <CalendarIcon className="h-3 w-3" />
+          {hasStart && endDate && (
+            <div className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.18em] text-ink">
+              <CalendarIcon className="h-3.5 w-3.5" />
               {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
             </div>
           )}
@@ -183,48 +274,5 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/** Campo de fecha + hora con styling consistente y sin gritar visualmente. */
-function DateField({
-  label,
-  date,
-  time,
-  onTimeChange,
-  timeAriaLabel,
-}: {
-  label: string;
-  date?: Date;
-  time: string;
-  onTimeChange: (t: string) => void;
-  timeAriaLabel: string;
-}) {
-  const hasDate = !!date;
-  return (
-    <div
-      className={`rounded-xl border hairline bg-surface/40 px-3.5 py-3 transition ${
-        hasDate ? "border-ink/15" : ""
-      }`}
-    >
-      <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-1.5">
-        {label}
-      </div>
-      <div className="flex items-center justify-between gap-3">
-        <span
-          className={`tabular-nums text-base font-display leading-none ${
-            hasDate ? "text-ink" : "text-muted-foreground/50"
-          }`}
-        >
-          {date ? format(date, "dd MMM yyyy", { locale: es }) : "--/--/----"}
-        </span>
-        <TimeStepSelect
-          value={time}
-          onChange={onTimeChange}
-          aria-label={timeAriaLabel}
-          className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
-        />
-      </div>
-    </div>
   );
 }
