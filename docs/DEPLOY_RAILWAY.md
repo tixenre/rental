@@ -11,7 +11,7 @@ Antes de comenzar, asegúrate de tener:
 - ✅ Una cuenta en **[GitHub](https://github.com)** (gratis)
 - ✅ Una cuenta en **[Railway.app](https://railway.app)** (gratis para empezar, ~$5-15/mes en producción)
 - ✅ **Git** instalado en tu máquina (`git --version`)
-- ✅ **Esta carpeta** (`/Users/tincho/Downloads/rambla-rental/`) lista con el código
+- ✅ **La carpeta del proyecto** lista con el código
 
 ---
 
@@ -41,7 +41,7 @@ A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0
 ### Paso 2.1: Inicializar repositorio Git (si no lo está)
 
 ```bash
-cd /Users/tincho/Downloads/rambla-rental
+cd rambla-rental   # la carpeta del proyecto
 git init
 ```
 
