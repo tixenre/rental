@@ -116,3 +116,14 @@
   → igual va a issue. **Nada se borra.** Si la sesión nota algo y no lo arregla en el momento, lo
   deja como issue, no lo descarta.
 
+### 2026-05-25 — Cuidar los minutos de GitHub Actions (repo privado)
+- **What:** el repo pasa a privado; en plan Free eso da **2.000 min/mes** de Actions (en público
+  era ilimitado). El CI corre 6 jobs por cada push a una PR. Hay que ser cuidadoso para no quemar
+  minutos al pedo.
+- **Why:** que el CI no se pause a fin de mes por consumir la cuota con corridas innecesarias.
+- **How to apply:** (1) **batch de commits** — pushear cuando el cambio está listo, no por cada
+  ajuste chico (cada push = una corrida completa). (2) Los cambios que no tocan código (docs,
+  memoria) **no deberían disparar los jobs pesados** (build, tests, mobile-smoke) — ver issue #487
+  (optimización del CI con path filters). (3) `concurrency: cancel-in-progress` ya cancela corridas
+  viejas al re-pushear.
+
