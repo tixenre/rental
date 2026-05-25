@@ -1364,6 +1364,59 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
     return equipos
 
 
+def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
+    """Agrega `specs` (dict) a cada equipo con TODAS las specs estructuradas
+    desde equipo_specs JOIN spec_definitions JOIN categoria_spec_templates.
+
+    Shape: {spec_key: {label, value, tipo, unidad, prioridad, en_card,
+    destacado}}. El catálogo público lee esto en vez de las columnas
+    legacy (montura/formato/specs_json) de equipo_fichas.
+
+    Solo incluye specs cuyo `spec_def` esté asignado al template de
+    alguna categoría del equipo (descartando orfanos cross-cat).
+    """
+    if not equipos:
+        return equipos
+    ids = [e["id"] for e in equipos]
+    placeholders = ",".join(["%s"] * len(ids))
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT DISTINCT ON (es.equipo_id, sd.id)
+            es.equipo_id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
+            es.value, t.prioridad,
+            t.visible_en_card AS en_card, t.destacado
+        FROM equipo_specs es
+        JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
+        JOIN spec_definitions sd ON sd.id = es.spec_def_id
+        JOIN categoria_spec_templates t
+            ON t.spec_def_id = es.spec_def_id
+           AND t.categoria_id = ec.categoria_id
+        WHERE es.equipo_id IN ({placeholders})
+        ORDER BY es.equipo_id, sd.id, t.prioridad
+    """, ids)
+    rows = cur.fetchall()
+    cur.close()
+
+    specs_map: dict[int, dict[str, dict]] = {e["id"]: {} for e in equipos}
+    for r in rows:
+        eid = r["equipo_id"]
+        key = r["spec_key"]
+        if key in specs_map[eid]:
+            continue  # dedup: mantenemos el de mayor prioridad (DISTINCT ON)
+        specs_map[eid][key] = {
+            "label": r["label"],
+            "value": r["value"],
+            "tipo": r["tipo"],
+            "unidad": r["unidad"],
+            "prioridad": r["prioridad"],
+            "en_card": bool(r["en_card"]),
+            "destacado": bool(r["destacado"]),
+        }
+    for e in equipos:
+        e["specs"] = specs_map[e["id"]]
+    return equipos
+
+
 # ── Auto-tags: regenerar etiquetas derivadas (origen='auto') ────────────────
 #
 # Las etiquetas auto se sintetizan desde marca, modelo, palabras del nombre

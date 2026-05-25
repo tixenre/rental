@@ -170,7 +170,26 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     output_config?: { row_strategy?: "all" | "first" | "last" } | null;
   };
   let parsedSpecs: ParsedSpec[] = [];
-  if (ficha?.specs_json) {
+
+  // Fase D: si el backend envía `e.specs` (dict keyed por spec_key, fuente
+  // estructurada desde equipo_specs), preferirlo. Si no, fallback a
+  // `ficha.specs_json` (legacy, parse del JSON guardado en equipo_fichas).
+  if (e.specs && Object.keys(e.specs).length > 0) {
+    parsedSpecs = Object.values(e.specs)
+      // Filtrar bool=false y values vacíos. Render igual que el flujo legacy.
+      .filter((s) => s.value != null && String(s.value).trim() !== "")
+      .filter((s) => {
+        if (s.tipo !== "bool") return true;
+        const v = String(s.value).toLowerCase();
+        return v === "sí" || v === "si" || v === "true" || v === "1";
+      })
+      // Ordenar por prioridad del template (igual que el panel del admin).
+      .sort((a, b) => (a.prioridad ?? 999) - (b.prioridad ?? 999))
+      .map((s) => ({
+        label: s.label,
+        value: formatSpecValueForDisplay(s.value),
+      }));
+  } else if (ficha?.specs_json) {
     try {
       const arr = JSON.parse(ficha.specs_json);
       if (Array.isArray(arr)) {
@@ -179,10 +198,6 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
           .map((s: { label: string; value: string; value_raw?: string; output_config?: ParsedSpec["output_config"] }) => ({
             label: String(s.label),
             value: formatSpecValueForDisplay(s.value),
-            // value_raw + output_config los agrega el backend para specs tipo
-            // tabla — los preservamos para que el placeholder
-            // {spec:Label.colKey} pueda parsear el JSON crudo y aplicar la
-            // row_strategy correcta al extraer celdas.
             ...(s.value_raw ? { value_raw: String(s.value_raw) } : {}),
             ...(s.output_config ? { output_config: s.output_config } : {}),
           }));
@@ -191,6 +206,12 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
       /* ignore malformed specs */
     }
   }
+
+  // Helpers para leer del nuevo formato (e.specs) con fallback al legacy.
+  const specByKey = (key: string): string | null => {
+    const s = e.specs?.[key];
+    return s && s.value != null && String(s.value).trim() !== "" ? String(s.value) : null;
+  };
 
   let parsedKeywords: string[] = [];
   if (ficha?.keywords_json) {
@@ -253,13 +274,13 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     destacado: (e.relevancia_manual ?? 100) <= 30,
     includes,
     _backendId: e.id,
-    // Ficha extendida
-    peso:           ficha?.peso          ?? null,
-    dimensiones:    ficha?.dimensiones   ?? null,
-    montura:        ficha?.montura       ?? null,
-    formato:        ficha?.formato       ?? null,
-    resolucion:     ficha?.resolucion    ?? null,
-    alimentacion:   ficha?.alimentacion  ?? null,
+    // Ficha extendida — preferir e.specs (Fase D), fallback a ficha.* legacy.
+    peso:           specByKey("peso_g")        ?? ficha?.peso          ?? null,
+    dimensiones:    specByKey("dimensions_mm") ?? ficha?.dimensiones   ?? null,
+    montura:        specByKey("lens_mount")    ?? ficha?.montura       ?? null,
+    formato:        specByKey("formato")       ?? ficha?.formato       ?? null,
+    resolucion:     specByKey("resolucion_max") ?? ficha?.resolucion   ?? null,
+    alimentacion:   specByKey("alimentacion")  ?? ficha?.alimentacion  ?? null,
     incluye:        parsedIncluye,
     conectividad:   parsedConectividad,
     compatibleCon:  parsedCompatibleCon,

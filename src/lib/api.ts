@@ -93,6 +93,18 @@ export type BackendEquipo = {
   categorias?: BackendCategoriaRef[];
   ficha?: BackendFicha;
   specs_destacados?: { label: string; value: string }[];
+  /** Specs estructuradas (Fase D): dict keyed por spec_key, fuente única
+   *  post-migración. Reemplaza specs_json + columnas legacy de ficha.
+   *  El frontend cae a `ficha.*` si este campo no está (backend viejo). */
+  specs?: Record<string, {
+    label: string;
+    value: string;
+    tipo: string;
+    unidad: string | null;
+    prioridad: number;
+    en_card: boolean;
+    destacado: boolean;
+  }>;
   /** Unidades disponibles para el rango desde/hasta. Solo presente si se pasan fechas. */
   disponible?: number;
 };

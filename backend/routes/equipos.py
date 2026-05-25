@@ -18,7 +18,8 @@ from pydantic import BaseModel, Field
 
 from database import (
     get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
-    attach_ficha, attach_specs_destacados, regenerate_auto_tags,
+    attach_ficha, attach_specs_destacados, attach_specs_estructuradas,
+    regenerate_auto_tags,
 )
 from routes.auth import get_session
 from admin_guard import require_admin
@@ -780,7 +781,12 @@ def list_equipos(
         equipos = attach_kit(conn, equipos)
         equipos = attach_categorias(conn, equipos)
         equipos = attach_ficha(conn, equipos)
-        # Formatear specs_json values tipo tabla con conectores legibles.
+        # Fase D: specs estructuradas para el catálogo público. Cada
+        # equipo recibe `specs: {spec_key: {label, value, ...}}` desde
+        # equipo_specs JOIN spec_definitions JOIN template.
+        equipos = attach_specs_estructuradas(conn, equipos)
+        # Formatear specs_json values tipo tabla con conectores legibles
+        # (deuda legacy — el catálogo nuevo lee `equipo.specs`).
         # Cargamos las defs UNA vez (no por equipo) para evitar N queries.
         tabla_defs_by_label = _load_tabla_defs_by_label(conn)
         if tabla_defs_by_label:
@@ -920,8 +926,12 @@ def get_equipo(id_or_slug: str):
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         equipo = attach_ficha(conn, [equipo])[0]
         equipo = attach_categorias(conn, [equipo])[0]
+        # Specs estructuradas (Fase D): el catálogo público lee
+        # `equipo.specs` (dict keyed por spec_key) en vez de las columnas
+        # legacy de equipo_fichas. Mantenemos `ficha` para back-compat.
+        equipo = attach_specs_estructuradas(conn, [equipo])[0]
         # Post-procesar `specs_json` para formatear values tipo tabla con
-        # sus conectores. El frontend recibe texto legible directo.
+        # sus conectores (deuda legacy — el catálogo nuevo lee `specs`).
         ficha = equipo.get("ficha") or {}
         if ficha.get("specs_json"):
             ficha["specs_json"] = _format_specs_json_with_definitions(
