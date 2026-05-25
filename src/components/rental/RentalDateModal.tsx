@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { useCart } from "@/lib/cart-store";
-import { deriveEndDate, diaAbierto, franjaParaFecha } from "@/lib/rental-dates";
+import { deriveEndDate, diaAbierto, franjaParaFecha, timeToMinutes } from "@/lib/rental-dates";
 import { useHorarios } from "@/lib/horarios";
 import { apiGetDiasBloqueados } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
@@ -109,6 +109,11 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   // domingo). Lo detectamos para avisar y bloquear "Aplicar" — el backend lo
   // rechazaría igual, pero acá damos feedback inmediato.
   const devolucionCerrada = !!endDate && !diaAbierto(horarios, endDate);
+
+  // La hora de devolución posterior a la de retiro es lo que suma la jornada
+  // extra (modelo 24h). Lo señalamos explícito para que el cliente lo note.
+  const sumaJornadaPorHora =
+    !!startDate && !!endDate && timeToMinutes(endTime) > timeToMinutes(startTime);
 
   // Si al cambiar de día la hora queda fuera de la franja, la clampeamos al
   // inicio de la franja para no dejar una selección inválida.
@@ -266,11 +271,22 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
             </div>
           )}
 
-          <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            Horarios cada 30 min — sujeto a confirmación. Devolver más tarde que la hora de
-            retiro suma una jornada.
-          </p>
+          {sumaJornadaPorHora ? (
+            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-[11px] text-ink">
+              <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
+              <span>
+                Devolvés a las <strong>{endTime}</strong>, más tarde que tu retiro
+                ({startTime}) → <strong>suma 1 jornada</strong>. Devolvé {startTime} o antes
+                para no sumarla.
+              </span>
+            </p>
+          ) : (
+            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              Horarios cada 30 min — sujeto a confirmación. Devolver más tarde que la hora de
+              retiro suma una jornada.
+            </p>
+          )}
 
           {devolucionCerrada && (
             <p className="flex items-center gap-1.5 text-[11px] text-destructive">

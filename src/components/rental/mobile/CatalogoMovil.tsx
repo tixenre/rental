@@ -19,7 +19,7 @@ import { authedFetch } from "@/lib/authedFetch";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
 import { apiGetDescuentosJornada, interpolarDescuento, apiGetDiasBloqueados } from "@/lib/api";
-import { deriveEndDate, franjaParaFecha, diaAbierto } from "@/lib/rental-dates";
+import { deriveEndDate, franjaParaFecha, diaAbierto, timeToMinutes } from "@/lib/rental-dates";
 import { useHorarios } from "@/lib/horarios";
 
 function fmtDate(d: Date | null): string {
@@ -368,6 +368,12 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
                 </div>
                 <div className="font-sans text-[15px] font-bold text-ink">{fmtDate(fechaHasta)}</div>
                 <div className="font-mono text-[11px] text-muted-foreground mt-0.5">hasta las {horaHasta}</div>
+                {timeToMinutes(horaHasta) > timeToMinutes(horaDesde) && (
+                  <div className="mt-1.5 text-[11px] text-ink leading-snug">
+                    Devolvés más tarde que tu retiro ({horaDesde}) → <strong>suma 1 jornada</strong>.
+                    Devolvé {horaDesde} o antes para no sumarla.
+                  </div>
+                )}
               </div>
             )}
             <div className="h-2" />
