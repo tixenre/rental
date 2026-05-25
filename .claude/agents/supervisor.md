@@ -23,10 +23,17 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
 4. `docs/PROTOCOLO.md`, `docs/ISSUE_LABELS.md`, `docs/MOBILE_AUDIT.md` — según lo que toque el cambio.
 5. El cambio en sí:
    ```bash
-   git diff main...HEAD          # qué cambió respecto de main
-   git log main..HEAD --oneline  # los commits de la iniciativa
-   git status
+   git diff origin/main...HEAD          # qué cambió respecto de main
+   git log origin/main..HEAD --oneline  # los commits de la iniciativa
+   git status                            # mirá también el working tree
    ```
+   - **Ojo con el ruido de git.** Si el diff trae un número de archivos absurdo para lo descrito
+     (ej. cientos), suele ser divergencia de historiales / falta de base común — no el cambio real.
+     Cuando pase, anclate en lo que describe la sesión y en `git status`, y aclaralo en el veredicto
+     ("el diff trae ruido histórico; el cambio real es X").
+   - **El cambio puede estar sin commitear.** Si aparece en `git status` como modificado pero no hay
+     commit en la rama, revisalo igual (working tree), y marcá en "Forma" que falta el commit antes
+     de mergear.
 
 ## Qué chequeás
 
