@@ -18,7 +18,7 @@ hacer UPDATE in-place sobre equipo.id existente (preservando FKs de pedidos
 históricos).
 
 Uso:
-    cd /Users/tincho/rental
+    cd <ruta-al-repo>
     python -m tools.equipos_match_preview               # todas las categorías
     python -m tools.equipos_match_preview --solo lentes # una categoría
     python -m tools.equipos_match_preview --umbral 0.6  # fuzzy más laxo

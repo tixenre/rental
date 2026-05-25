@@ -2,13 +2,14 @@
 # tools/camaras_rebuild.sh — Reconstruye el dataset completo de cámaras.
 #
 # Uso: bash tools/camaras_rebuild.sh
-# Pre: HTMLs guardados en ~/Desktop/Paginas/Camaras/
+# Pre: HTMLs guardados en $RAMBLA_HTMLS_DIR/Camaras/
+#      (default: ~/Desktop/Paginas/Camaras — override con RAMBLA_HTMLS_DIR)
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-CAMARAS_DIR="$HOME/Desktop/Paginas/Camaras"
+CAMARAS_DIR="${RAMBLA_HTMLS_DIR:-$HOME/Desktop/Paginas}/Camaras"
 
 echo "▸ Limpiando outputs anteriores"
 rm -f docs/camaras_raw.json docs/camaras.json

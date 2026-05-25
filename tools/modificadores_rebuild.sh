@@ -3,7 +3,8 @@
 # de luz (softbox / fresnel / spotlight / difusión).
 #
 # Uso: bash tools/modificadores_rebuild.sh
-# Pre: HTMLs guardados en ~/Desktop/Paginas/Modificadores_Luz/
+# Pre: HTMLs guardados en $RAMBLA_HTMLS_DIR/Modificadores_Luz/
+#      (default: ~/Desktop/Paginas/Modificadores_Luz — override con RAMBLA_HTMLS_DIR)
 #
 # Salida:
 #   - docs/modificadores.json
@@ -18,7 +19,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-PAGINAS="$HOME/Desktop/Paginas/Modificadores_Luz"
+PAGINAS="${RAMBLA_HTMLS_DIR:-$HOME/Desktop/Paginas}/Modificadores_Luz"
 
 echo "▸ Limpiando outputs anteriores"
 rm -f docs/modificadores_raw.json docs/modificadores.json
