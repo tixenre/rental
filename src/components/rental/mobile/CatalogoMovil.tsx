@@ -19,13 +19,7 @@ import { authedFetch } from "@/lib/authedFetch";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
 import { apiGetDescuentosJornada, interpolarDescuento } from "@/lib/api";
-
-/* ── Helpers ─────────────────────────────────────────────────────── */
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
+import { deriveEndDate } from "@/lib/rental-dates";
 
 function fmtDate(d: Date | null): string {
   if (!d) return "—";
@@ -201,8 +195,8 @@ function DateSheet({ onClose, onConfirm, initial }: DateSheetProps) {
   const [horaHasta, setHoraHasta] = useState(initial.horaHasta);
 
   const fechaHasta = useMemo(
-    () => (fechaDesde ? addDays(fechaDesde, jornadas - 1) : null),
-    [fechaDesde, jornadas],
+    () => (fechaDesde ? deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta) : null),
+    [fechaDesde, jornadas, horaDesde, horaHasta],
   );
 
   const selectStyle: React.CSSProperties = {
@@ -421,7 +415,7 @@ function CartSheet({
 
   const jornadasEfectivas = fechaDesde ? jornadas : 1;
   const subtotal = entries.reduce((s, { eq, qty }) => s + eq.pricePerDay * qty * jornadasEfectivas, 0);
-  const fechaHasta = fechaDesde ? addDays(fechaDesde, jornadas - 1) : null;
+  const fechaHasta = fechaDesde ? deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta) : null;
 
   // Descuento por jornadas desde el backend
   const { data: descuentosPuntos = [] } = useQuery({
@@ -466,7 +460,7 @@ function CartSheet({
       await createOrder({
         status: "solicitado",
         startDate: fechaDesde,
-        endDate: addDays(fechaDesde, jornadas - 1),
+        endDate: deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta),
         startTime: horaDesde,
         endTime: horaHasta,
         days: jornadas,
@@ -1120,8 +1114,8 @@ export function CatalogoMovil() {
 
   // Derived date values
   const fechaHasta = useMemo(
-    () => (fechaDesde ? addDays(fechaDesde, jornadas - 1) : null),
-    [fechaDesde, jornadas],
+    () => (fechaDesde ? deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta) : null),
+    [fechaDesde, jornadas, horaDesde, horaHasta],
   );
 
   const datePillLabel = useMemo(() => {
@@ -1241,7 +1235,7 @@ export function CatalogoMovil() {
       setHoraDesde(hd);
       setHoraHasta(hh);
       // Sync to cart store for cross-page consistency
-      cart.setDates(fd, addDays(fd, j - 1));
+      cart.setDates(fd, deriveEndDate(fd, j, hd, hh));
       cart.setStartTime(hd);
       cart.setEndTime(hh);
       setShowDateSheet(false);

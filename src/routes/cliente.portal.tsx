@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useBusinessPhone } from "@/lib/business";
+import { jornadasFromISO as jornadasEntre } from "@/lib/rental-dates";
 import { whatsappLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 
@@ -504,14 +505,6 @@ function PedidoEmpty({
       )}
     </div>
   );
-}
-
-function jornadasEntre(desde?: string, hasta?: string): number {
-  if (!desde || !hasta) return 1;
-  const d1 = new Date(desde + "T12:00:00").getTime();
-  const d2 = new Date(hasta + "T12:00:00").getTime();
-  if (Number.isNaN(d1) || Number.isNaN(d2) || d2 < d1) return 1;
-  return Math.max(1, Math.ceil((d2 - d1) / 86_400_000) + 1);
 }
 
 function PedidoCard({

@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { useCart } from "@/lib/cart-store";
+import { deriveEndDate } from "@/lib/rental-dates";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { TimeStepSelect } from "./TimeStepSelect";
 import { useEffect, useState } from "react";
@@ -35,11 +36,6 @@ function useIsMobile() {
   return isMobile;
 }
 
-const timeMin = (t: string) => {
-  const [h = 0, m = 0] = (t ?? "00:00").split(":").map(Number);
-  return h * 60 + m;
-};
-
 /**
  * Modal de fechas — patrón unificado con el mobile: elegís la fecha de retiro
  * y la cantidad de JORNADAS con un stepper; la devolución se calcula sola.
@@ -65,20 +61,12 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   const today = startOfDay(new Date());
   const busy = buildBusyDays();
 
-  // endsLater: devolver más tarde que la hora de retiro suma 1 jornada (modelo
-  // 24 h). Lo usamos para derivar la fecha de devolución a partir de la
-  // cantidad de jornadas objetivo, de forma que el stepper sea siempre
-  // truthful (jornadas mostradas = `days()` = lo que cobra el backend).
-  const endsLater = timeMin(endTime) > timeMin(startTime);
-
-  // Setea la fecha de devolución para alcanzar `target` jornadas exactas:
-  //   days() = dayDiff + (endsLater ? 1 : 0)  ⇒  dayDiff = target − endsLater.
+  // Setea la fecha de devolución para alcanzar `target` jornadas exactas
+  // (deriveEndDate vive en el util compartido, espejo del backend).
   const setJornadas = (target: number, base?: Date) => {
     const start = base ?? startDate;
     if (!start) return;
-    const t = Math.max(1, target);
-    const dayDiff = Math.max(0, t - (endsLater ? 1 : 0));
-    setDates(start, addDays(start, dayDiff));
+    setDates(start, deriveEndDate(start, target, startTime, endTime));
   };
 
   // Al elegir la fecha de retiro preservamos las jornadas actuales (default 1).
