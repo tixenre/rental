@@ -40,9 +40,7 @@ export function KitSection({ item }: { item: Equipment }) {
                *  En desktop solo cuando >1 (menos ruido en grid 2-col). */}
               <span
                 className={`shrink-0 grid h-9 min-w-9 place-items-center rounded-md px-1.5 font-mono text-xs tabular ${
-                  qty > 1
-                    ? "bg-ink text-amber font-bold"
-                    : "bg-muted text-ink/70 sm:hidden"
+                  qty > 1 ? "bg-ink text-amber font-bold" : "bg-muted text-ink/70 sm:hidden"
                 }`}
                 aria-label={`Cantidad: ${qty}`}
               >
@@ -74,9 +72,7 @@ export function KitSection({ item }: { item: Equipment }) {
                   </div>
                 )}
                 <div className="text-sm leading-snug text-ink">{inc.name}</div>
-                {inc.note && (
-                  <div className="text-[11px] text-muted-foreground">{inc.note}</div>
-                )}
+                {inc.note && <div className="text-[11px] text-muted-foreground">{inc.note}</div>}
               </div>
             </li>
           );

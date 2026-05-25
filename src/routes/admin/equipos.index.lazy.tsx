@@ -1,7 +1,22 @@
 import { createLazyFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Eye, EyeOff, Sparkles, AlertCircle, MoreHorizontal, Wrench, History, Copy, BarChart3, RotateCcw } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Eye,
+  EyeOff,
+  Sparkles,
+  AlertCircle,
+  MoreHorizontal,
+  Wrench,
+  History,
+  Copy,
+  BarChart3,
+  RotateCcw,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -10,14 +25,29 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useUsdRate, calcularPrecioJornada } from "@/hooks/useSettings";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 
 import { adminApi, type Equipo, type EquipoInput, type FaltaField } from "@/lib/admin/api";
@@ -102,16 +132,21 @@ function EquiposPage() {
   const [tab, setTab] = useState<"todos" | "destacados" | "nuevos" | "sin-foto">("todos");
 
   const equiposQ = useQuery({
-    queryKey: ["admin", "equipos", { q, etiqueta, categoria, marca, soloIncompletos, vistaPapelera, falta }],
-    queryFn: () => adminApi.listEquipos({
-      q: q || undefined,
-      etiqueta: etiqueta || undefined,
-      categoria: categoria || undefined,
-      marca: marca || undefined,
-      solo_incompletos: soloIncompletos || undefined,
-      solo_eliminados: vistaPapelera || undefined,
-      falta,
-    }),
+    queryKey: [
+      "admin",
+      "equipos",
+      { q, etiqueta, categoria, marca, soloIncompletos, vistaPapelera, falta },
+    ],
+    queryFn: () =>
+      adminApi.listEquipos({
+        q: q || undefined,
+        etiqueta: etiqueta || undefined,
+        categoria: categoria || undefined,
+        marca: marca || undefined,
+        solo_incompletos: soloIncompletos || undefined,
+        solo_eliminados: vistaPapelera || undefined,
+        falta,
+      }),
   });
   const kpisQ = useQuery({
     queryKey: ["admin", "equipos", "kpis"],
@@ -196,7 +231,9 @@ function EquiposPage() {
     mutationFn: (payload: Parameters<typeof adminApi.bulkAction>[0]) =>
       adminApi.bulkAction(payload),
     onSuccess: (r) => {
-      toast.success(`${r.affected} equipo${r.affected === 1 ? "" : "s"} actualizado${r.affected === 1 ? "" : "s"}`);
+      toast.success(
+        `${r.affected} equipo${r.affected === 1 ? "" : "s"} actualizado${r.affected === 1 ? "" : "s"}`,
+      );
       setSelectedIds(new Set());
       invalidate();
     },
@@ -206,7 +243,8 @@ function EquiposPage() {
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -223,8 +261,7 @@ function EquiposPage() {
   // Sub-tabs del handoff: filtros rápidos sobre la lista ya cargada.
   const esDestacado = (eq: Equipo) =>
     (eq.etiquetas ?? []).some((t) => t.toLowerCase() === "destacado");
-  const esNuevo = (eq: Equipo) =>
-    (eq.etiquetas ?? []).some((t) => t.toLowerCase() === "nuevo");
+  const esNuevo = (eq: Equipo) => (eq.etiquetas ?? []).some((t) => t.toLowerCase() === "nuevo");
   const tabCounts = {
     todos: allItems.length,
     destacados: allItems.filter(esDestacado).length,
@@ -232,10 +269,13 @@ function EquiposPage() {
     "sin-foto": allItems.filter((e) => !e.foto_url).length,
   };
   const items =
-    tab === "destacados" ? allItems.filter(esDestacado)
-    : tab === "nuevos" ? allItems.filter(esNuevo)
-    : tab === "sin-foto" ? allItems.filter((e) => !e.foto_url)
-    : allItems;
+    tab === "destacados"
+      ? allItems.filter(esDestacado)
+      : tab === "nuevos"
+        ? allItems.filter(esNuevo)
+        : tab === "sin-foto"
+          ? allItems.filter((e) => !e.foto_url)
+          : allItems;
 
   const etiquetasOpts = useMemo(
     () => (etiquetasQ.data ?? []).filter((e) => (e.total ?? 0) > 0),
@@ -272,10 +312,18 @@ function EquiposPage() {
           </p>
         </div>
         <div className="flex gap-1.5">
-          <Button variant="outline" onClick={() => setOpenDashboard(true)} title="Dashboard de uso (top alquilados, sin movimiento, revenue por categoría)">
+          <Button
+            variant="outline"
+            onClick={() => setOpenDashboard(true)}
+            title="Dashboard de uso (top alquilados, sin movimiento, revenue por categoría)"
+          >
             <BarChart3 className="h-4 w-4 mr-1" /> Uso
           </Button>
-          <Button variant="outline" onClick={() => setOpenBatch(true)} title="Buscar specs en bulk para los equipos con link de fuente">
+          <Button
+            variant="outline"
+            onClick={() => setOpenBatch(true)}
+            title="Buscar specs en bulk para los equipos con link de fuente"
+          >
             <Sparkles className="h-4 w-4 mr-1" /> Batch specs
           </Button>
           <Button onClick={() => navigate({ to: "/admin/equipos/nuevo" })}>
@@ -287,7 +335,11 @@ function EquiposPage() {
       {/* KPI strip (handoff): inventario de un vistazo. */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <KpiCard label="Total" value={kpisQ.data?.total ?? total} meta="equipos en catálogo" />
-        <KpiCard label="En uso hoy" value={kpisQ.data?.en_uso_hoy ?? 0} meta="unidades alquiladas ahora" />
+        <KpiCard
+          label="En uso hoy"
+          value={kpisQ.data?.en_uso_hoy ?? 0}
+          meta="unidades alquiladas ahora"
+        />
         <KpiCard
           label="Mantenimiento"
           value={kpisQ.data?.mantenimiento ?? 0}
@@ -315,8 +367,13 @@ function EquiposPage() {
             className="pl-9 text-base sm:text-sm"
           />
         </div>
-        <Select value={categoria || "__all"} onValueChange={(v) => setCategoria(v === "__all" ? "" : v)}>
-          <SelectTrigger className="md:w-44"><SelectValue placeholder="Todas las categorías" /></SelectTrigger>
+        <Select
+          value={categoria || "__all"}
+          onValueChange={(v) => setCategoria(v === "__all" ? "" : v)}
+        >
+          <SelectTrigger className="md:w-44">
+            <SelectValue placeholder="Todas las categorías" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="__all">Todas las categorías</SelectItem>
             {categoriasOpts.map((c) => (
@@ -327,7 +384,9 @@ function EquiposPage() {
           </SelectContent>
         </Select>
         <Select value={marca || "__all"} onValueChange={(v) => setMarca(v === "__all" ? "" : v)}>
-          <SelectTrigger className="md:w-40"><SelectValue placeholder="Todas las marcas" /></SelectTrigger>
+          <SelectTrigger className="md:w-40">
+            <SelectValue placeholder="Todas las marcas" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="__all">Todas las marcas</SelectItem>
             {marcasOpts.map((m) => (
@@ -337,8 +396,13 @@ function EquiposPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={etiqueta || "__all"} onValueChange={(v) => setEtiqueta(v === "__all" ? "" : v)}>
-          <SelectTrigger className="md:w-44"><SelectValue placeholder="Todas las etiquetas" /></SelectTrigger>
+        <Select
+          value={etiqueta || "__all"}
+          onValueChange={(v) => setEtiqueta(v === "__all" ? "" : v)}
+        >
+          <SelectTrigger className="md:w-44">
+            <SelectValue placeholder="Todas las etiquetas" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="__all">Todas las etiquetas</SelectItem>
             {etiquetasOpts.map((e) => (
@@ -366,7 +430,13 @@ function EquiposPage() {
           title="Ver equipos dados de baja (soft-deleted)"
           className="md:w-auto"
         >
-          {vistaPapelera ? <><Trash2 className="h-3.5 w-3.5 mr-1" /> Papelera</> : "Papelera"}
+          {vistaPapelera ? (
+            <>
+              <Trash2 className="h-3.5 w-3.5 mr-1" /> Papelera
+            </>
+          ) : (
+            "Papelera"
+          )}
         </Button>
       </div>
 
@@ -385,7 +455,11 @@ function EquiposPage() {
               {sinSerieQ.data.total} equipo
               {sinSerieQ.data.total === 1 ? "" : "s"} sin número de serie
             </span>
-            <span className="text-muted-foreground"> · cargá la serie desde el form de cada equipo (botón <span className="font-mono">N/A</span> si no aplica).</span>
+            <span className="text-muted-foreground">
+              {" "}
+              · cargá la serie desde el form de cada equipo (botón{" "}
+              <span className="font-mono">N/A</span> si no aplica).
+            </span>
           </div>
         </div>
       )}
@@ -397,30 +471,50 @@ function EquiposPage() {
             {selectedIds.size} seleccionado{selectedIds.size === 1 ? "" : "s"}
           </span>
           <Button
-            size="sm" variant="secondary"
-            onClick={() => bulkMut.mutate({ ids: [...selectedIds], action: "set_visible", visible: true })}
+            size="sm"
+            variant="secondary"
+            onClick={() =>
+              bulkMut.mutate({ ids: [...selectedIds], action: "set_visible", visible: true })
+            }
             disabled={bulkMut.isPending}
           >
             <Eye className="h-3.5 w-3.5 mr-1" /> Mostrar
           </Button>
           <Button
-            size="sm" variant="secondary"
-            onClick={() => bulkMut.mutate({ ids: [...selectedIds], action: "set_visible", visible: false })}
+            size="sm"
+            variant="secondary"
+            onClick={() =>
+              bulkMut.mutate({ ids: [...selectedIds], action: "set_visible", visible: false })
+            }
             disabled={bulkMut.isPending}
           >
             <EyeOff className="h-3.5 w-3.5 mr-1" /> Ocultar
           </Button>
           <Button
-            size="sm" variant="secondary"
-            onClick={() => bulkMut.mutate({ ids: [...selectedIds], action: "set_ficha_completa", ficha_completa: true })}
+            size="sm"
+            variant="secondary"
+            onClick={() =>
+              bulkMut.mutate({
+                ids: [...selectedIds],
+                action: "set_ficha_completa",
+                ficha_completa: true,
+              })
+            }
             disabled={bulkMut.isPending}
             title="Marcar fichas como completas"
           >
             ✓ Completas
           </Button>
           <Button
-            size="sm" variant="secondary"
-            onClick={() => bulkMut.mutate({ ids: [...selectedIds], action: "set_ficha_completa", ficha_completa: false })}
+            size="sm"
+            variant="secondary"
+            onClick={() =>
+              bulkMut.mutate({
+                ids: [...selectedIds],
+                action: "set_ficha_completa",
+                ficha_completa: false,
+              })
+            }
             disabled={bulkMut.isPending}
             title="Marcar fichas como pendientes"
           >
@@ -454,7 +548,8 @@ function EquiposPage() {
             </SelectContent>
           </Select>
           <Button
-            size="sm" variant="destructive"
+            size="sm"
+            variant="destructive"
             onClick={() => {
               // En papelera, "Eliminar" hace hard delete (delete_permanent).
               // En vista normal, soft delete (delete). #punto4
@@ -475,7 +570,8 @@ function EquiposPage() {
             {vistaPapelera ? "Eliminar permanente" : "Eliminar"}
           </Button>
           <Button
-            size="sm" variant="ghost"
+            size="sm"
+            variant="ghost"
             onClick={() => setSelectedIds(new Set())}
             className="text-background hover:text-background/70"
           >
@@ -486,19 +582,23 @@ function EquiposPage() {
 
       {/* Sub-tabs (handoff): filtros rápidos. */}
       <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none border-b hairline pb-px">
-        {([
-          ["todos", "Todos"],
-          ["destacados", "Destacados"],
-          ["nuevos", "Nuevos"],
-          ["sin-foto", "Sin foto"],
-        ] as const).map(([id, label]) => (
+        {(
+          [
+            ["todos", "Todos"],
+            ["destacados", "Destacados"],
+            ["nuevos", "Nuevos"],
+            ["sin-foto", "Sin foto"],
+          ] as const
+        ).map(([id, label]) => (
           <button
             key={id}
             type="button"
             onClick={() => setTab(id)}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-sans text-sm whitespace-nowrap transition",
-              tab === id ? "bg-muted font-bold text-ink" : "font-medium text-muted-foreground hover:text-ink",
+              tab === id
+                ? "bg-muted font-bold text-ink"
+                : "font-medium text-muted-foreground hover:text-ink",
             )}
           >
             {label}
@@ -524,7 +624,12 @@ function EquiposPage() {
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Stock</TableHead>
               <TableHead className="text-right hidden sm:table-cell">$ / jornada</TableHead>
-              <TableHead className="text-right hidden sm:table-cell w-24" title="% del valor del equipo cobrado por día (nombre tentativo)">% día</TableHead>
+              <TableHead
+                className="text-right hidden sm:table-cell w-24"
+                title="% del valor del equipo cobrado por día (nombre tentativo)"
+              >
+                % día
+              </TableHead>
               <TableHead className="hidden md:table-cell">Etiquetas</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -537,7 +642,10 @@ function EquiposPage() {
                   {(q || etiqueta) && (
                     <button
                       type="button"
-                      onClick={() => { setQ(""); setEtiqueta(""); }}
+                      onClick={() => {
+                        setQ("");
+                        setEtiqueta("");
+                      }}
                       className="underline hover:text-ink"
                     >
                       Limpiar filtros
@@ -586,7 +694,9 @@ function EquiposPage() {
                       </span>
                     )}
                     {esDestacado(eq) && (
-                      <span className="text-amber shrink-0" title="Destacado">★</span>
+                      <span className="text-amber shrink-0" title="Destacado">
+                        ★
+                      </span>
                     )}
                     {!eq.ficha_completa && (
                       <span
@@ -613,54 +723,101 @@ function EquiposPage() {
                   )}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  <StockInline equipo={eq} onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })} />
+                  <StockInline
+                    equipo={eq}
+                    onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })}
+                  />
                 </TableCell>
                 <TableCell className="text-right hidden sm:table-cell w-32">
-                  <PrecioJornadaInline equipo={eq} onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })} />
+                  <PrecioJornadaInline
+                    equipo={eq}
+                    onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })}
+                  />
                 </TableCell>
                 <TableCell className="text-right hidden sm:table-cell w-24">
-                  <RoiInline equipo={eq} onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })} />
+                  <RoiInline
+                    equipo={eq}
+                    onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })}
+                  />
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   <div className="flex flex-wrap gap-1 max-w-[180px]">
                     {(eq.etiquetas ?? []).slice(0, 2).map((t) => (
-                      <span key={t} className="inline-flex items-center rounded-full border hairline bg-surface px-2 py-0.5 text-[10px] font-medium text-ink whitespace-nowrap">
+                      <span
+                        key={t}
+                        className="inline-flex items-center rounded-full border hairline bg-surface px-2 py-0.5 text-[10px] font-medium text-ink whitespace-nowrap"
+                      >
                         {t}
                       </span>
                     ))}
                     {(eq.etiquetas ?? []).length > 2 && (
-                      <span className="text-[10px] text-muted-foreground">+{(eq.etiquetas ?? []).length - 2}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        +{(eq.etiquetas ?? []).length - 2}
+                      </span>
                     )}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
                   {/* Mobile: un botón → ActionMenu */}
-                  <Button size="icon" variant="ghost" className="sm:hidden" onClick={() => setMenuEquipo(eq)}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="sm:hidden"
+                    onClick={() => setMenuEquipo(eq)}
+                  >
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                   {/* Desktop: botones individuales */}
                   <div className="hidden sm:inline-flex gap-1">
                     <Button
-                      size="icon" variant="ghost"
+                      size="icon"
+                      variant="ghost"
                       title={eq.visible_catalogo ? "Ocultar del catálogo" : "Mostrar en catálogo"}
                       onClick={() => toggleVisibleMut.mutate(eq)}
                     >
-                      {eq.visible_catalogo ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                      {eq.visible_catalogo ? (
+                        <Eye className="h-4 w-4" />
+                      ) : (
+                        <EyeOff className="h-4 w-4" />
+                      )}
                     </Button>
-                    <Button size="icon" variant="ghost" title="Auto-completar info (B&H/Adorama)" onClick={() => setEnriching(eq)}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="Auto-completar info (B&H/Adorama)"
+                      onClick={() => setEnriching(eq)}
+                    >
                       <Sparkles className="h-4 w-4 text-amber" />
                     </Button>
-                    <Button size="icon" variant="ghost" title="Historial de alquileres" onClick={() => setHistorialEquipo(eq)}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="Historial de alquileres"
+                      onClick={() => setHistorialEquipo(eq)}
+                    >
                       <History className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" title="Mantenimiento" onClick={() => setMantenimientoEquipo(eq)}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="Mantenimiento"
+                      onClick={() => setMantenimientoEquipo(eq)}
+                    >
                       <Wrench className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" title="Editar" onClick={() => navigate({ to: "/admin/equipos/$id/editar", params: { id: String(eq.id) } })}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="Editar"
+                      onClick={() =>
+                        navigate({ to: "/admin/equipos/$id/editar", params: { id: String(eq.id) } })
+                      }
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
-                      size="icon" variant="ghost"
+                      size="icon"
+                      variant="ghost"
                       title="Duplicar (clona ficha, categorías y kit — serie vacía)"
                       onClick={() => duplicateMut.mutate(eq.id)}
                       disabled={duplicateMut.isPending}
@@ -669,7 +826,8 @@ function EquiposPage() {
                     </Button>
                     {eq.eliminado_at ? (
                       <Button
-                        size="icon" variant="ghost"
+                        size="icon"
+                        variant="ghost"
                         title="Restaurar"
                         onClick={() => restoreMut.mutate(eq.id)}
                         disabled={restoreMut.isPending}
@@ -691,12 +849,18 @@ function EquiposPage() {
 
       <ActionMenu
         open={!!menuEquipo}
-        onOpenChange={(v) => { if (!v) setMenuEquipo(null); }}
+        onOpenChange={(v) => {
+          if (!v) setMenuEquipo(null);
+        }}
         title={menuEquipo?.nombre}
         actions={[
           {
             label: menuEquipo?.visible_catalogo ? "Ocultar del catálogo" : "Mostrar en catálogo",
-            icon: menuEquipo?.visible_catalogo ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />,
+            icon: menuEquipo?.visible_catalogo ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            ),
             onClick: () => toggleVisibleMut.mutate(menuEquipo!),
           },
           {
@@ -717,7 +881,9 @@ function EquiposPage() {
           {
             label: "Editar",
             icon: <Pencil className="h-4 w-4" />,
-            onClick: () => menuEquipo && navigate({ to: "/admin/equipos/$id/editar", params: { id: String(menuEquipo.id) } }),
+            onClick: () =>
+              menuEquipo &&
+              navigate({ to: "/admin/equipos/$id/editar", params: { id: String(menuEquipo.id) } }),
           },
           {
             label: "Duplicar equipo",
@@ -734,18 +900,16 @@ function EquiposPage() {
       />
 
       {openBatch && (
-        <BatchAutocompletarDialog
-          equipos={items}
-          open={openBatch}
-          onOpenChange={setOpenBatch}
-        />
+        <BatchAutocompletarDialog equipos={items} open={openBatch} onOpenChange={setOpenBatch} />
       )}
 
       {mantenimientoEquipo && (
         <MantenimientoEquipoDialog
           equipo={mantenimientoEquipo}
           open={!!mantenimientoEquipo}
-          onOpenChange={(v) => { if (!v) setMantenimientoEquipo(null); }}
+          onOpenChange={(v) => {
+            if (!v) setMantenimientoEquipo(null);
+          }}
         />
       )}
 
@@ -753,34 +917,37 @@ function EquiposPage() {
         <HistorialEquipoDialog
           equipo={historialEquipo}
           open={!!historialEquipo}
-          onOpenChange={(v) => { if (!v) setHistorialEquipo(null); }}
+          onOpenChange={(v) => {
+            if (!v) setHistorialEquipo(null);
+          }}
         />
       )}
 
-      {openDashboard && (
-        <DashboardUsoDialog
-          open={openDashboard}
-          onOpenChange={setOpenDashboard}
-        />
-      )}
-
+      {openDashboard && <DashboardUsoDialog open={openDashboard} onOpenChange={setOpenDashboard} />}
 
       {enriching && (
         <AutocompletarEquipoDialog
           equipo={enriching}
           open={!!enriching}
-          onOpenChange={(v) => { if (!v) setEnriching(null); }}
+          onOpenChange={(v) => {
+            if (!v) setEnriching(null);
+          }}
           onApplied={invalidate}
         />
       )}
 
-      <AlertDialog open={!!deleting} onOpenChange={(v) => { if (!v) setDeleting(null); }}>
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(v) => {
+          if (!v) setDeleting(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar “{deleting?.nombre}”</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Si el equipo tiene pedidos
-              históricos, mejor marcalo como “Fuera de servicio” en lugar de borrarlo.
+              Esta acción no se puede deshacer. Si el equipo tiene pedidos históricos, mejor marcalo
+              como “Fuera de servicio” en lugar de borrarlo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -798,7 +965,6 @@ function EquiposPage() {
   );
 }
 
-
 /**
  * Editor inline del ROI %. Al cambiar:
  *  - Calcula el nuevo precio_jornada con el USD rate actual.
@@ -811,13 +977,7 @@ function EquiposPage() {
  * Editor inline del stock (cantidad). Click → input numérico → Enter/blur guarda.
  * Esc descarta. Vacío = 0 (no permite null).
  */
-function StockInline({
-  equipo,
-  onSaved,
-}: {
-  equipo: Equipo;
-  onSaved: () => void;
-}) {
+function StockInline({ equipo, onSaved }: { equipo: Equipo; onSaved: () => void }) {
   const [value, setValue] = useState<string>(String(equipo.cantidad));
   const initialRef = useRef(equipo.cantidad);
 
@@ -865,18 +1025,9 @@ function StockInline({
   );
 }
 
-
-function RoiInline({
-  equipo,
-  onSaved,
-}: {
-  equipo: Equipo;
-  onSaved: () => void;
-}) {
+function RoiInline({ equipo, onSaved }: { equipo: Equipo; onSaved: () => void }) {
   const { rate: usdRate } = useUsdRate();
-  const [value, setValue] = useState<string>(
-    equipo.roi_pct != null ? String(equipo.roi_pct) : "",
-  );
+  const [value, setValue] = useState<string>(equipo.roi_pct != null ? String(equipo.roi_pct) : "");
   const initialRef = useRef(equipo.roi_pct);
 
   // Si el equipo cambia (ej. recarga), sincronizar el input.
@@ -917,9 +1068,12 @@ function RoiInline({
     if (trimmed === "") {
       // Vacío → null (saca el ROI). Lo permitimos pero no recalcula precio.
       if (initialRef.current != null) {
-        adminApi.updateEquipo(equipo.id, { roi_pct: null }).then(onSaved).catch((e) => {
-          toast.error(`No se pudo limpiar % día: ${e instanceof Error ? e.message : ""}`);
-        });
+        adminApi
+          .updateEquipo(equipo.id, { roi_pct: null })
+          .then(onSaved)
+          .catch((e) => {
+            toast.error(`No se pudo limpiar % día: ${e instanceof Error ? e.message : ""}`);
+          });
       }
       return;
     }
@@ -929,7 +1083,7 @@ function RoiInline({
       setValue(initialRef.current != null ? String(initialRef.current) : "");
       return;
     }
-    if (num === initialRef.current) return;   // sin cambio, evitar request
+    if (num === initialRef.current) return; // sin cambio, evitar request
     saveMut.mutate(num);
   };
 
@@ -956,7 +1110,6 @@ function RoiInline({
   );
 }
 
-
 /**
  * Editor inline del precio de jornada en pesos. Espejo de RoiInline:
  *  - Editás precio → calcula nuevo ROI = precio / (precio_usd × usd_rate) × 100
@@ -970,13 +1123,7 @@ function RoiInline({
  * Si el equipo no tiene `precio_usd`, el ROI no se puede calcular: se
  * guarda solo el precio.
  */
-function PrecioJornadaInline({
-  equipo,
-  onSaved,
-}: {
-  equipo: Equipo;
-  onSaved: () => void;
-}) {
+function PrecioJornadaInline({ equipo, onSaved }: { equipo: Equipo; onSaved: () => void }) {
   const { rate: usdRate } = useUsdRate();
   const [value, setValue] = useState<string>(
     equipo.precio_jornada != null ? String(equipo.precio_jornada) : "",
@@ -1080,11 +1227,11 @@ function PrecioJornadaInline({
 }
 
 const FALTA_LABELS: Record<FaltaField, string> = {
-  foto:             "sin foto principal",
-  categoria:        "sin categoría asignada",
-  nombre_publico:   "sin nombre público",
-  descripcion:      "sin descripción extendida",
-  serie:            "sin número de serie",
+  foto: "sin foto principal",
+  categoria: "sin categoría asignada",
+  nombre_publico: "sin nombre público",
+  descripcion: "sin descripción extendida",
+  serie: "sin número de serie",
   valor_reposicion: "sin valor de reposición",
 };
 
@@ -1103,7 +1250,9 @@ function KpiCard({
     <div
       className={cn(
         "rounded-lg border bg-card px-3.5 py-3 sm:px-4 sm:py-3.5",
-        warn ? "border-[color-mix(in_oklch,var(--amber)_45%,transparent)] bg-amber-soft/40" : "hairline",
+        warn
+          ? "border-[color-mix(in_oklch,var(--amber)_45%,transparent)] bg-amber-soft/40"
+          : "hairline",
       )}
     >
       <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
@@ -1138,7 +1287,9 @@ function FaltaBanner({
           {loading ? "cargando…" : `${total} ${total === 1 ? "resultado" : "resultados"}`}
         </span>
       </div>
-      <Button variant="ghost" size="sm" onClick={onClear}>Quitar filtro</Button>
+      <Button variant="ghost" size="sm" onClick={onClear}>
+        Quitar filtro
+      </Button>
     </div>
   );
 }

@@ -12,7 +12,11 @@ import { Loader2, Plus, Trash2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,28 +25,40 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 
 import { adminApi, type Equipo, type MantenimientoInput } from "@/lib/admin/api";
 
 const TIPOS = [
-  { value: "revision",   label: "Revisión" },
+  { value: "revision", label: "Revisión" },
   { value: "reparacion", label: "Reparación" },
-  { value: "limpieza",   label: "Limpieza" },
-  { value: "otro",       label: "Otro" },
+  { value: "limpieza", label: "Limpieza" },
+  { value: "otro", label: "Otro" },
 ];
 
 const fmtFecha = (iso: string) => {
   try {
     return new Date(iso + "T00:00:00").toLocaleDateString("es-AR", {
-      day: "2-digit", month: "short", year: "numeric",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
-  } catch { return iso; }
+  } catch {
+    return iso;
+  }
 };
 
 const fmtMoneda = (n: number) =>
-  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(n);
 
 /**
  * Devuelve la fecha de HOY en formato YYYY-MM-DD según la zona horaria local.
@@ -88,9 +104,14 @@ export function MantenimientoEquipoDialog({
   const [cantidadBloqueo, setCantidadBloqueo] = useState<string>("1");
 
   const resetForm = () => {
-    setFecha(hoyISO()); setTipo("revision"); setDescripcion("");
-    setCosto(""); setProximaRevision("");
-    setBloqueaStock(false); setFechaHasta(""); setCantidadBloqueo("1");
+    setFecha(hoyISO());
+    setTipo("revision");
+    setDescripcion("");
+    setCosto("");
+    setProximaRevision("");
+    setBloqueaStock(false);
+    setFechaHasta("");
+    setCantidadBloqueo("1");
   };
 
   const addMut = useMutation({
@@ -128,7 +149,7 @@ export function MantenimientoEquipoDialog({
       costo: costo.trim() ? Math.max(0, Math.floor(Number(costo))) : null,
       proxima_revision: proximaRevision.trim() || null,
       bloquea_stock: bloqueaStock,
-      fecha_hasta: bloqueaStock ? (fechaHasta.trim() || fecha) : null,
+      fecha_hasta: bloqueaStock ? fechaHasta.trim() || fecha : null,
       cantidad: bloqueaStock ? Math.max(1, Math.floor(Number(cantidadBloqueo) || 1)) : 1,
     });
   };
@@ -141,9 +162,7 @@ export function MantenimientoEquipoDialog({
       <DialogContent className="w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Mantenimiento</DialogTitle>
-          {equipo && (
-            <p className="text-sm text-muted-foreground">{equipo.nombre}</p>
-          )}
+          {equipo && <p className="text-sm text-muted-foreground">{equipo.nombre}</p>}
         </DialogHeader>
 
         {/* Stats */}
@@ -164,29 +183,55 @@ export function MantenimientoEquipoDialog({
           <p className="text-xs font-medium text-ink/80">Nuevo evento</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="space-y-1">
-              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Fecha</Label>
+              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Fecha
+              </Label>
               <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Tipo</Label>
+              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Tipo
+              </Label>
               <Select value={tipo} onValueChange={setTipo}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {TIPOS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  {TIPOS.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Costo (ARS)</Label>
-              <Input type="number" min={0} value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="—" />
+              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Costo (ARS)
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                value={costo}
+                onChange={(e) => setCosto(e.target.value)}
+                placeholder="—"
+              />
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Próxima revisión</Label>
-              <Input type="date" value={proximaRevision} onChange={(e) => setProximaRevision(e.target.value)} />
+              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Próxima revisión
+              </Label>
+              <Input
+                type="date"
+                value={proximaRevision}
+                onChange={(e) => setProximaRevision(e.target.value)}
+              />
             </div>
           </div>
           <div className="space-y-1">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Descripción / Notas</Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Descripción / Notas
+            </Label>
             <Textarea
               rows={2}
               value={descripcion}
@@ -209,12 +254,26 @@ export function MantenimientoEquipoDialog({
             {bloqueaStock && (
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <div className="space-y-1">
-                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Fuera de servicio hasta</Label>
-                  <Input type="date" min={fecha} value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
+                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Fuera de servicio hasta
+                  </Label>
+                  <Input
+                    type="date"
+                    min={fecha}
+                    value={fechaHasta}
+                    onChange={(e) => setFechaHasta(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Unidades afectadas</Label>
-                  <Input type="number" min={1} value={cantidadBloqueo} onChange={(e) => setCantidadBloqueo(e.target.value)} />
+                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Unidades afectadas
+                  </Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={cantidadBloqueo}
+                    onChange={(e) => setCantidadBloqueo(e.target.value)}
+                  />
                 </div>
               </div>
             )}
@@ -222,9 +281,15 @@ export function MantenimientoEquipoDialog({
 
           <div className="flex justify-end">
             <Button size="sm" onClick={handleAdd} disabled={addMut.isPending}>
-              {addMut.isPending
-                ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Guardando…</>
-                : <><Plus className="h-3.5 w-3.5 mr-1" /> Agregar evento</>}
+              {addMut.isPending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Guardando…
+                </>
+              ) : (
+                <>
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Agregar evento
+                </>
+              )}
             </Button>
           </div>
         </section>
@@ -273,11 +338,14 @@ export function MantenimientoEquipoDialog({
                     )}
                   </div>
                   {ev.descripcion && (
-                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">{ev.descripcion}</p>
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                      {ev.descripcion}
+                    </p>
                   )}
                 </div>
                 <Button
-                  size="icon" variant="ghost"
+                  size="icon"
+                  variant="ghost"
                   onClick={() => {
                     if (confirm(`Eliminar evento del ${fmtFecha(ev.fecha)}?`)) {
                       deleteMut.mutate(ev.id);
@@ -294,7 +362,9 @@ export function MantenimientoEquipoDialog({
         )}
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cerrar</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cerrar
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -303,7 +373,9 @@ export function MantenimientoEquipoDialog({
 
 function Stat({ label, value, alert }: { label: string; value: string | number; alert?: boolean }) {
   return (
-    <div className={`rounded-md border hairline p-2 ${alert ? "bg-destructive/10 border-destructive/30" : "bg-muted/20"}`}>
+    <div
+      className={`rounded-md border hairline p-2 ${alert ? "bg-destructive/10 border-destructive/30" : "bg-muted/20"}`}
+    >
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
         {alert && <AlertCircle className="h-3 w-3 text-destructive" />}
         {label}

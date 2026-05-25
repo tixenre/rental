@@ -1,4 +1,8 @@
-export type DiagStep = { label: string; status: "pending" | "ok" | "fail" | "skip"; detail?: string };
+export type DiagStep = {
+  label: string;
+  status: "pending" | "ok" | "fail" | "skip";
+  detail?: string;
+};
 
 export type AutocompletarResult = {
   marca: string | null;

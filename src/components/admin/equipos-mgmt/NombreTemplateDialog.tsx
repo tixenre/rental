@@ -10,7 +10,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -44,10 +49,7 @@ export function NombreTemplateDialog({
     enabled: open,
   });
 
-  const specLabels = useMemo(
-    () => (specsQ.data?.items ?? []).map((t) => t.label),
-    [specsQ.data],
-  );
+  const specLabels = useMemo(() => (specsQ.data?.items ?? []).map((t) => t.label), [specsQ.data]);
 
   const saveMut = useMutation({
     mutationFn: (template: string) =>
@@ -82,8 +84,8 @@ export function NombreTemplateDialog({
         <DialogHeader>
           <DialogTitle>Plantilla de nombre — {categoriaNombre}</DialogTitle>
           <DialogDescription>
-            Define cómo se arma el nombre público de los equipos en esta categoría.
-            Si está vacío, se usa el nombre interno del equipo como fallback.
+            Define cómo se arma el nombre público de los equipos en esta categoría. Si está vacío,
+            se usa el nombre interno del equipo como fallback.
           </DialogDescription>
         </DialogHeader>
 
@@ -131,10 +133,15 @@ export function NombreTemplateDialog({
           <div>
             <div className="text-xs text-muted-foreground mb-1">Vista previa</div>
             <div className="rounded-md border hairline bg-muted/30 px-3 py-2 text-sm text-ink">
-              {preview ?? <span className="italic text-muted-foreground">Sin template → usa nombre interno del equipo</span>}
+              {preview ?? (
+                <span className="italic text-muted-foreground">
+                  Sin template → usa nombre interno del equipo
+                </span>
+              )}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">
-              Ejemplo simulado con marca "Sony", modelo "FX3". Los valores de specs muestran su label entre &lt;…&gt;.
+              Ejemplo simulado con marca "Sony", modelo "FX3". Los valores de specs muestran su
+              label entre &lt;…&gt;.
             </p>
           </div>
         </div>
@@ -143,10 +150,7 @@ export function NombreTemplateDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button
-            onClick={() => saveMut.mutate(value)}
-            disabled={saveMut.isPending}
-          >
+          <Button onClick={() => saveMut.mutate(value)} disabled={saveMut.isPending}>
             Guardar plantilla
           </Button>
         </DialogFooter>

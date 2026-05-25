@@ -33,9 +33,13 @@ function ClienteLayout() {
           navigate({ to: "/cliente/login" });
         }
       })
-      .catch(() => { if (alive && !isPublic) navigate({ to: "/cliente/login" }); })
+      .catch(() => {
+        if (alive && !isPublic) navigate({ to: "/cliente/login" });
+      })
       .finally(() => alive && setLoading(false));
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [navigate, isPublic]);
 
   if (loading) {

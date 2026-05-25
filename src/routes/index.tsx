@@ -1,7 +1,17 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
-import { LayoutGrid, List, ArrowRight, Sparkles, Loader2, Search, X, Check, SearchX } from "lucide-react";
+import {
+  LayoutGrid,
+  List,
+  ArrowRight,
+  Sparkles,
+  Loader2,
+  Search,
+  X,
+  Check,
+  SearchX,
+} from "lucide-react";
 import { ViewToggle } from "@/components/rental/ViewToggle";
 import { Link } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/rental/PublicLayout";
@@ -19,14 +29,28 @@ import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { ViewIntroDialog } from "@/components/rental/ViewIntroDialog";
 import { PreviewPane } from "@/components/rental/PreviewPane";
 import { SpecFilters } from "@/components/rental/SpecFilters";
-import { useEquipos, useCategorias, useMarcas, discoverFilterableSpecs, type SpecFilterDef } from "@/hooks/useEquipos";
+import {
+  useEquipos,
+  useCategorias,
+  useMarcas,
+  discoverFilterableSpecs,
+  type SpecFilterDef,
+} from "@/hooks/useEquipos";
 import type { BackendMarca, BackendCategoria } from "@/lib/api";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const POPULAR_CHIPS = ["Pack boda", "Pack entrevista", "Sony FX3", "Aputure 600d", "RØDE NTG", "Pack 3 LEDs", "Manfrotto"];
+const POPULAR_CHIPS = [
+  "Pack boda",
+  "Pack entrevista",
+  "Sony FX3",
+  "Aputure 600d",
+  "RØDE NTG",
+  "Pack 3 LEDs",
+  "Manfrotto",
+];
 
 type IndexSearch = {
   /** Modo de visualización compartible por URL. `?view=grid` o `?view=list`. */
@@ -64,7 +88,11 @@ export const Route = createFileRoute("/")({
     // Cachea por 5 min para no pegarle al backend en cada render.
     const ctx = context as {
       queryClient?: {
-        fetchQuery: <T>(opts: { queryKey: unknown[]; queryFn: () => Promise<T>; staleTime?: number }) => Promise<T>;
+        fetchQuery: <T>(opts: {
+          queryKey: unknown[];
+          queryFn: () => Promise<T>;
+          staleTime?: number;
+        }) => Promise<T>;
       };
     };
     const ogImage = ctx.queryClient
@@ -79,55 +107,53 @@ export const Route = createFileRoute("/")({
   head: ({ loaderData }) => {
     const data = loaderData as { ogImage: string } | undefined;
     const ogImage = data?.ogImage ?? `${SITE_URL}/icon-512.png`;
-    return ({
-    meta: [
-      { title: "Rambla Rental — Alquiler de equipos de cine y foto en Mar del Plata" },
-      {
-        name: "description",
-        content:
-          "Cámaras, lentes, iluminación, audio y soportes para producciones audiovisuales. Estudio de foto y video en Mar del Plata.",
-      },
-      // Open Graph (Facebook, WhatsApp, LinkedIn).
-      { property: "og:type", content: "website" },
-      { property: "og:url", content: `${SITE_URL}/` },
-      { property: "og:title", content: "Rambla Rental — Alquiler de equipos de cine y foto" },
-      {
-        property: "og:description",
-        content: "Cámaras, lentes, iluminación, audio y soportes. Estudio en Mar del Plata.",
-      },
-      { property: "og:image", content: ogImage },
-      { property: "og:image:width", content: "1200" },
-      { property: "og:image:height", content: "630" },
-      { property: "og:locale", content: "es_AR" },
-      // Twitter Cards.
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Rambla Rental" },
-      { name: "twitter:description", content: "Equipos audiovisuales · Mar del Plata" },
-      { name: "twitter:image", content: ogImage },
-    ],
-    links: [
-      { rel: "canonical", href: `${SITE_URL}/` },
-    ],
-    scripts: [
-      // WebSite + SearchAction: Google muestra una caja de búsqueda inline
-      // en los resultados cuando se busca el nombre de la marca, llevando
-      // directo al buscador del catálogo (`/?q=...`).
-      {
-        type: "application/ld+json",
-        children: JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "WebSite",
-          name: "Rambla Rental",
-          url: `${SITE_URL}/`,
-          potentialAction: {
-            "@type": "SearchAction",
-            target: `${SITE_URL}/?q={search_term_string}`,
-            "query-input": "required name=search_term_string",
-          },
-        }),
-      },
-    ],
-    });
+    return {
+      meta: [
+        { title: "Rambla Rental — Alquiler de equipos de cine y foto en Mar del Plata" },
+        {
+          name: "description",
+          content:
+            "Cámaras, lentes, iluminación, audio y soportes para producciones audiovisuales. Estudio de foto y video en Mar del Plata.",
+        },
+        // Open Graph (Facebook, WhatsApp, LinkedIn).
+        { property: "og:type", content: "website" },
+        { property: "og:url", content: `${SITE_URL}/` },
+        { property: "og:title", content: "Rambla Rental — Alquiler de equipos de cine y foto" },
+        {
+          property: "og:description",
+          content: "Cámaras, lentes, iluminación, audio y soportes. Estudio en Mar del Plata.",
+        },
+        { property: "og:image", content: ogImage },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { property: "og:locale", content: "es_AR" },
+        // Twitter Cards.
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:title", content: "Rambla Rental" },
+        { name: "twitter:description", content: "Equipos audiovisuales · Mar del Plata" },
+        { name: "twitter:image", content: ogImage },
+      ],
+      links: [{ rel: "canonical", href: `${SITE_URL}/` }],
+      scripts: [
+        // WebSite + SearchAction: Google muestra una caja de búsqueda inline
+        // en los resultados cuando se busca el nombre de la marca, llevando
+        // directo al buscador del catálogo (`/?q=...`).
+        {
+          type: "application/ld+json",
+          children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: "Rambla Rental",
+            url: `${SITE_URL}/`,
+            potentialAction: {
+              "@type": "SearchAction",
+              target: `${SITE_URL}/?q={search_term_string}`,
+              "query-input": "required name=search_term_string",
+            },
+          }),
+        },
+      ],
+    };
   },
   component: IndexOrMobile,
 });
@@ -202,8 +228,7 @@ function Index() {
   const search = useSearch({ from: "/" }) as IndexSearch;
   const navigate = useNavigate({ from: "/" });
   const defaultMode: Mode =
-    typeof window !== "undefined" &&
-    window.matchMedia?.("(max-width: 639px)").matches
+    typeof window !== "undefined" && window.matchMedia?.("(max-width: 639px)").matches
       ? "list"
       : "grid";
   const mode: Mode = search.view ?? defaultMode;
@@ -218,8 +243,8 @@ function Index() {
    *  `spec_key → value seleccionado`. Solo se aplican si el equipo
    *  pertenece a la categoría que tiene esa spec en el template. */
   const [specFilters, setSpecFilters] = useState<Record<string, string>>({});
-  const [selectedCats, setSelectedCats] = useState<Set<string>>(
-    () => (search.cat ? new Set([search.cat]) : new Set()),
+  const [selectedCats, setSelectedCats] = useState<Set<string>>(() =>
+    search.cat ? new Set([search.cat]) : new Set(),
   );
   const [brand, setBrand] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -317,7 +342,8 @@ function Index() {
   const filterableSpecs = useMemo(() => {
     const base = allEquipos.filter((e) => {
       if (selectedCats.size > 0) {
-        const inCat = selectedCats.has(e.category) ||
+        const inCat =
+          selectedCats.has(e.category) ||
           (e.categorias ?? []).some((c) => selectedCats.has(c.nombre));
         if (!inCat) return false;
       }
@@ -384,299 +410,302 @@ function Index() {
 
   return (
     <PublicLayout topBar={{ amberOnScroll: true }}>
-        <ViewIntroDialog onPick={(m) => setMode(m)} />
-        {/* Hero amarillo brand */}
-        <section ref={heroRef} className="relative overflow-hidden border-b hairline bg-amber text-ink">
-          <div className="absolute inset-0 grain opacity-40" />
-          <div className="relative px-6 py-12 lg:px-12 lg:py-16">
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] sm:tracking-[0.3em] text-ink/70 break-words">
-              Catálogo · {isLoading ? "…" : allEquipos.length} equipos · Mar del Plata
-            </div>
-            <h1 className="mt-4 wordmark text-5xl sm:text-7xl md:text-[7rem] lg:text-[8.5rem] leading-[0.9] md:leading-[0.85] text-balance break-words">
-              un lugar
-              <br />
-              donde pasan
-              <br />
-              cosas.
-            </h1>
-            <p className="mt-6 max-w-xl text-base text-ink/80">
-              Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales. Elegí
-              fechas y armá tu pedido — te lo dejamos listo para retirar.
-            </p>
-
-            {/* CTA Estudio — protagonista del banner */}
-            <div className="mt-10 inline-flex max-w-2xl flex-col gap-4 rounded-3xl border-2 border-ink bg-ink p-6 sm:flex-row sm:items-center sm:gap-6 sm:p-7 shadow-lg">
-              <div className="flex-1">
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-amber px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.25em] text-ink">
-                  <Sparkles className="h-3 w-3" /> Espacio Rambla
-                </div>
-                <div className="mt-3 font-display text-2xl sm:text-3xl text-amber">Conocé el Estudio</div>
-                <div className="text-sm text-amber/80 mt-1">
-                  Foto y video · reservá por hora · pack de luces y grips opcional
-                </div>
-              </div>
-              <Link
-                to="/estudio"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-amber px-6 py-3 text-sm font-semibold text-ink transition hover:brightness-110"
-              >
-                Ver estudio <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
+      <ViewIntroDialog onPick={(m) => setMode(m)} />
+      {/* Hero amarillo brand */}
+      <section
+        ref={heroRef}
+        className="relative overflow-hidden border-b hairline bg-amber text-ink"
+      >
+        <div className="absolute inset-0 grain opacity-40" />
+        <div className="relative px-6 py-12 lg:px-12 lg:py-16">
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] sm:tracking-[0.3em] text-ink/70 break-words">
+            Catálogo · {isLoading ? "…" : allEquipos.length} equipos · Mar del Plata
           </div>
-        </section>
+          <h1 className="mt-4 wordmark text-5xl sm:text-7xl md:text-[7rem] lg:text-[8.5rem] leading-[0.9] md:leading-[0.85] text-balance break-words">
+            un lugar
+            <br />
+            donde pasan
+            <br />
+            cosas.
+          </h1>
+          <p className="mt-6 max-w-xl text-base text-ink/80">
+            Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales. Elegí fechas
+            y armá tu pedido — te lo dejamos listo para retirar.
+          </p>
 
-        {/* Toggle Modo + búsqueda sticky. Al scrollear >65% (mismo umbral que
-            el snap del topbar) se retinta de amber soft para combinar con el
-            topbar teñido en vez de quedar como una barra blanca "rota". */}
-        <div
-          className="sticky top-16 z-30 border-b hairline backdrop-blur-xl transition-colors"
-          style={{
-            background: scrolled
-              ? "color-mix(in oklch, var(--amber) 20%, var(--background))"
-              : "var(--background)",
-          }}
-        >
-          {/* Mobile */}
-          <div className="sm:hidden px-3 py-3">
-            <MobileStickyBar
-              allEquipos={allEquipos}
-              query={query}
-              setQuery={setQuery}
-              categories={apiCategories}
-              brands={marcas}
-              selectedCategories={selectedCats}
-              onToggleCategory={toggleCat}
-              selectedBrand={brand}
-              onBrand={setBrand}
-              onClear={() => {
-                setSelectedCats(new Set());
-                setBrand(null);
-                setQuery("");
-                setSpecFilters({});
-              }}
-              resultCount={filtered.length}
-            />
-          </div>
-
-          {/* Desktop: cat-bar 2 filas (toggle+buscador / cat-tabs+disponibles)
-              siguiendo design handoff. Popular chips en su propia fila debajo
-              (solo en modo lista). */}
-          <div className="hidden sm:block">
-            {/* Fila 1: ViewToggle (izq) + Buscador (der) */}
-            <div className="flex items-center gap-4 px-6 py-2.5 border-b hairline">
-              <ViewToggle
-                options={[
-                  { value: "grid" as Mode, label: "Grid", icon: <LayoutGrid className="h-3 w-3" /> },
-                  { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
-                ]}
-                value={mode}
-                onChange={setMode}
-              />
-
-              {/* Buscador protagonista — crece hasta 520px y se alinea a la
-                  derecha (design handoff §3.1). */}
-              <div className="relative ml-auto w-full max-w-[520px]">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar equipo, marca o categoría…"
-                  className="w-full rounded-full border border-ink/15 bg-surface-elevated py-2.5 pl-11 pr-9 text-sm font-medium shadow-sm placeholder:font-normal placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
-                />
-                {query && (
-                  <button
-                    onClick={() => setQuery("")}
-                    aria-label="Limpiar"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
+          {/* CTA Estudio — protagonista del banner */}
+          <div className="mt-10 inline-flex max-w-2xl flex-col gap-4 rounded-3xl border-2 border-ink bg-ink p-6 sm:flex-row sm:items-center sm:gap-6 sm:p-7 shadow-lg">
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-amber px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.25em] text-ink">
+                <Sparkles className="h-3 w-3" /> Espacio Rambla
+              </div>
+              <div className="mt-3 font-display text-2xl sm:text-3xl text-amber">
+                Conocé el Estudio
+              </div>
+              <div className="text-sm text-amber/80 mt-1">
+                Foto y video · reservá por hora · pack de luces y grips opcional
               </div>
             </div>
-
-            {/* Fila 2: Cat-tabs (izq, scroll horizontal) + Disponibles (der) */}
-            <div className="flex items-center gap-3 pl-4 pr-6 overflow-x-auto scrollbar-none">
-              <div className="flex shrink-0">
-                {["Todo", ...apiCategories].map((cat) => {
-                  // En browse mode el highlight sigue al scroll-spy (spyCat),
-                  // sin filtrar; al filtrar/buscar vuelve a basarse en selectedCats.
-                  const isActive = browseMode
-                    ? cat === (spyCat ?? "Todo")
-                    : cat === "Todo"
-                      ? selectedCats.size === 0
-                      : selectedCats.has(cat);
-                  const count =
-                    cat === "Todo"
-                      ? allEquipos.length
-                      : categoryCounts.get(cat) ?? 0;
-                  return (
-                    <button
-                      key={cat}
-                      onClick={() => {
-                        if (cat === "Todo") setSelectedCats(new Set());
-                        else setSelectedCats(new Set([cat]));
-                      }}
-                      className={cn(
-                        "flex items-baseline gap-1.5 px-3.5 pt-2.5 pb-2 whitespace-nowrap shrink-0 border-b-[2.5px] transition",
-                        isActive ? "border-amber" : "border-transparent hover:border-hairline",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "font-sans text-sm",
-                          isActive ? "font-bold text-ink" : "font-medium text-muted-foreground",
-                        )}
-                      >
-                        {cat}
-                      </span>
-                      <span className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground tabular">
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="flex-1 min-w-2" />
-
-              {/* Filtro Disponibles — solo tiene efecto con fechas pickeadas */}
-              <button
-                type="button"
-                onClick={() => setDisponiblesOnly((v) => !v)}
-                className={cn(
-                  "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
-                  disponiblesOnly
-                    ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
-                    : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
-                )}
-                aria-pressed={disponiblesOnly}
-                title="Mostrar solo equipos disponibles para las fechas elegidas"
-              >
-                <Check className="h-3 w-3" />
-                Disponibles
-              </button>
-
-              {/* Contador */}
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular shrink-0 pl-1">
-                {query.trim() || mode === "list"
-                  ? `${filtered.length}`
-                  : `${allEquipos.length}`}
-              </div>
-            </div>
+            <Link
+              to="/estudio"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-amber px-6 py-3 text-sm font-semibold text-ink transition hover:brightness-110"
+            >
+              Ver estudio <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
+      </section>
 
-        {/* Popular bar — fila separada bajo el cat-bar, solo en modo lista.
-            No sticky: scrollea fuera con el contenido (mismo patrón que el
-            móvil — los populares no tienen sentido después de empezar a
-            scrollear). */}
-        {mode === "list" && (
-          <div className="hidden sm:flex items-center gap-2 px-6 py-2 border-b hairline bg-background overflow-x-auto scrollbar-none">
-            <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground shrink-0">
-              Populares:
-            </span>
-            {POPULAR_CHIPS.map((chip) => (
-              <button
-                key={chip}
-                onClick={() => setQuery(query === chip ? "" : chip)}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium whitespace-nowrap transition shrink-0",
-                  query === chip
-                    ? "border-amber/60 bg-amber/15 font-semibold text-ink"
-                    : "border-hairline bg-surface text-ink hover:border-ink/40 hover:bg-muted/50",
-                )}
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Loading / Error states */}
-        {isLoading ? (
-          mode === "list" ? (
-            <div className="divide-y hairline border-t hairline mt-2">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3 sm:px-6">
-                  <Skeleton className="h-16 w-16 shrink-0 rounded-md" />
-                  <div className="flex-1 min-w-0 space-y-1.5">
-                    <Skeleton className="h-2.5 w-1/4" />
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-2.5 w-2/5" />
-                  </div>
-                  <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5 px-4 lg:px-12 mt-2">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="aspect-[4/5] rounded-lg border hairline overflow-hidden flex flex-col">
-                  <Skeleton className="aspect-square w-full rounded-none shrink-0" />
-                  <div className="flex flex-1 flex-col gap-1.5 px-2.5 py-2">
-                    <Skeleton className="h-2 w-1/2" />
-                    <Skeleton className="h-3 w-full" />
-                    <Skeleton className="h-2 w-1/3" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        ) : isError ? (
-          <div className="mx-4 rounded-lg border hairline bg-surface px-6 py-16 text-center mt-8 lg:mx-12">
-            <div className="font-display text-2xl text-muted-foreground">
-              No se pudo cargar el catálogo
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Verificá tu conexión e intentá de nuevo.
-            </p>
-          </div>
-        ) : mode === "grid" ? (
-          <GridMode
+      {/* Toggle Modo + búsqueda sticky. Al scrollear >65% (mismo umbral que
+            el snap del topbar) se retinta de amber soft para combinar con el
+            topbar teñido en vez de quedar como una barra blanca "rota". */}
+      <div
+        className="sticky top-16 z-30 border-b hairline backdrop-blur-xl transition-colors"
+        style={{
+          background: scrolled
+            ? "color-mix(in oklch, var(--amber) 20%, var(--background))"
+            : "var(--background)",
+        }}
+      >
+        {/* Mobile */}
+        <div className="sm:hidden px-3 py-3">
+          <MobileStickyBar
             allEquipos={allEquipos}
-            apiCategories={apiCategories}
-            marcas={marcas}
-            selectedBrand={brand}
-            onBrandSelect={(brandName) => setBrand(brandName)}
-            onJumpToCategory={jumpToCategory}
-            selectedCats={selectedCats}
-            onClearCats={() => setSelectedCats(new Set())}
-            query={query}
-            disponiblesOnly={disponiblesOnly}
-            getDisponible={getDisponible}
-          />
-        ) : (
-          <ListMode
-            allEquipos={allEquipos}
-            apiCategories={apiCategories}
-            marcas={marcas}
             query={query}
             setQuery={setQuery}
-            selectedCats={selectedCats}
-            toggleCat={toggleCat}
-            brand={brand}
-            setBrand={setBrand}
+            categories={apiCategories}
+            brands={marcas}
+            selectedCategories={selectedCats}
+            onToggleCategory={toggleCat}
+            selectedBrand={brand}
+            onBrand={setBrand}
             onClear={() => {
               setSelectedCats(new Set());
               setBrand(null);
               setQuery("");
               setSpecFilters({});
-              setDisponiblesOnly(false);
             }}
-            filtered={filtered}
-            getDisponible={getDisponible}
-            onSuggestCategory={(c) => {
-              setSelectedCats(new Set([c]));
-              setQuery("");
-            }}
-            filterableSpecs={filterableSpecs}
-            specFilters={specFilters}
-            setSpecFilters={setSpecFilters}
+            resultCount={filtered.length}
           />
-        )}
+        </div>
 
-        <CartDrawer allEquipos={allEquipos} getDisponible={getDisponible} />
+        {/* Desktop: cat-bar 2 filas (toggle+buscador / cat-tabs+disponibles)
+              siguiendo design handoff. Popular chips en su propia fila debajo
+              (solo en modo lista). */}
+        <div className="hidden sm:block">
+          {/* Fila 1: ViewToggle (izq) + Buscador (der) */}
+          <div className="flex items-center gap-4 px-6 py-2.5 border-b hairline">
+            <ViewToggle
+              options={[
+                { value: "grid" as Mode, label: "Grid", icon: <LayoutGrid className="h-3 w-3" /> },
+                { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
+              ]}
+              value={mode}
+              onChange={setMode}
+            />
+
+            {/* Buscador protagonista — crece hasta 520px y se alinea a la
+                  derecha (design handoff §3.1). */}
+            <div className="relative ml-auto w-full max-w-[520px]">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar equipo, marca o categoría…"
+                className="w-full rounded-full border border-ink/15 bg-surface-elevated py-2.5 pl-11 pr-9 text-sm font-medium shadow-sm placeholder:font-normal placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  aria-label="Limpiar"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Fila 2: Cat-tabs (izq, scroll horizontal) + Disponibles (der) */}
+          <div className="flex items-center gap-3 pl-4 pr-6 overflow-x-auto scrollbar-none">
+            <div className="flex shrink-0">
+              {["Todo", ...apiCategories].map((cat) => {
+                // En browse mode el highlight sigue al scroll-spy (spyCat),
+                // sin filtrar; al filtrar/buscar vuelve a basarse en selectedCats.
+                const isActive = browseMode
+                  ? cat === (spyCat ?? "Todo")
+                  : cat === "Todo"
+                    ? selectedCats.size === 0
+                    : selectedCats.has(cat);
+                const count = cat === "Todo" ? allEquipos.length : (categoryCounts.get(cat) ?? 0);
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      if (cat === "Todo") setSelectedCats(new Set());
+                      else setSelectedCats(new Set([cat]));
+                    }}
+                    className={cn(
+                      "flex items-baseline gap-1.5 px-3.5 pt-2.5 pb-2 whitespace-nowrap shrink-0 border-b-[2.5px] transition",
+                      isActive ? "border-amber" : "border-transparent hover:border-hairline",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "font-sans text-sm",
+                        isActive ? "font-bold text-ink" : "font-medium text-muted-foreground",
+                      )}
+                    >
+                      {cat}
+                    </span>
+                    <span className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground tabular">
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex-1 min-w-2" />
+
+            {/* Filtro Disponibles — solo tiene efecto con fechas pickeadas */}
+            <button
+              type="button"
+              onClick={() => setDisponiblesOnly((v) => !v)}
+              className={cn(
+                "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
+                disponiblesOnly
+                  ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
+                  : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
+              )}
+              aria-pressed={disponiblesOnly}
+              title="Mostrar solo equipos disponibles para las fechas elegidas"
+            >
+              <Check className="h-3 w-3" />
+              Disponibles
+            </button>
+
+            {/* Contador */}
+            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular shrink-0 pl-1">
+              {query.trim() || mode === "list" ? `${filtered.length}` : `${allEquipos.length}`}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Popular bar — fila separada bajo el cat-bar, solo en modo lista.
+            No sticky: scrollea fuera con el contenido (mismo patrón que el
+            móvil — los populares no tienen sentido después de empezar a
+            scrollear). */}
+      {mode === "list" && (
+        <div className="hidden sm:flex items-center gap-2 px-6 py-2 border-b hairline bg-background overflow-x-auto scrollbar-none">
+          <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground shrink-0">
+            Populares:
+          </span>
+          {POPULAR_CHIPS.map((chip) => (
+            <button
+              key={chip}
+              onClick={() => setQuery(query === chip ? "" : chip)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium whitespace-nowrap transition shrink-0",
+                query === chip
+                  ? "border-amber/60 bg-amber/15 font-semibold text-ink"
+                  : "border-hairline bg-surface text-ink hover:border-ink/40 hover:bg-muted/50",
+              )}
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Loading / Error states */}
+      {isLoading ? (
+        mode === "list" ? (
+          <div className="divide-y hairline border-t hairline mt-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3 sm:px-6">
+                <Skeleton className="h-16 w-16 shrink-0 rounded-md" />
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <Skeleton className="h-2.5 w-1/4" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-2.5 w-2/5" />
+                </div>
+                <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5 px-4 lg:px-12 mt-2">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div
+                key={i}
+                className="aspect-[4/5] rounded-lg border hairline overflow-hidden flex flex-col"
+              >
+                <Skeleton className="aspect-square w-full rounded-none shrink-0" />
+                <div className="flex flex-1 flex-col gap-1.5 px-2.5 py-2">
+                  <Skeleton className="h-2 w-1/2" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-2 w-1/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : isError ? (
+        <div className="mx-4 rounded-lg border hairline bg-surface px-6 py-16 text-center mt-8 lg:mx-12">
+          <div className="font-display text-2xl text-muted-foreground">
+            No se pudo cargar el catálogo
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Verificá tu conexión e intentá de nuevo.
+          </p>
+        </div>
+      ) : mode === "grid" ? (
+        <GridMode
+          allEquipos={allEquipos}
+          apiCategories={apiCategories}
+          marcas={marcas}
+          selectedBrand={brand}
+          onBrandSelect={(brandName) => setBrand(brandName)}
+          onJumpToCategory={jumpToCategory}
+          selectedCats={selectedCats}
+          onClearCats={() => setSelectedCats(new Set())}
+          query={query}
+          disponiblesOnly={disponiblesOnly}
+          getDisponible={getDisponible}
+        />
+      ) : (
+        <ListMode
+          allEquipos={allEquipos}
+          apiCategories={apiCategories}
+          marcas={marcas}
+          query={query}
+          setQuery={setQuery}
+          selectedCats={selectedCats}
+          toggleCat={toggleCat}
+          brand={brand}
+          setBrand={setBrand}
+          onClear={() => {
+            setSelectedCats(new Set());
+            setBrand(null);
+            setQuery("");
+            setSpecFilters({});
+            setDisponiblesOnly(false);
+          }}
+          filtered={filtered}
+          getDisponible={getDisponible}
+          onSuggestCategory={(c) => {
+            setSelectedCats(new Set([c]));
+            setQuery("");
+          }}
+          filterableSpecs={filterableSpecs}
+          specFilters={specFilters}
+          setSpecFilters={setSpecFilters}
+        />
+      )}
+
+      <CartDrawer allEquipos={allEquipos} getDisponible={getDisponible} />
     </PublicLayout>
   );
 }
@@ -723,8 +752,7 @@ function GridMode({
   // Si hay categorías seleccionadas, mostramos esas como secciones — pueden
   // ser roots o sub-cats (ej. "Montura E"). Si solo hay filtro de marca o
   // búsqueda, mostramos todas las roots del backend (matches() hace el resto).
-  const visibleCategories =
-    selectedCats.size > 0 ? Array.from(selectedCats) : apiCategories;
+  const visibleCategories = selectedCats.size > 0 ? Array.from(selectedCats) : apiCategories;
 
   // Una categoría puede ser root o sub-cat. Esta helper matchea contra
   // ambos: el `category` (root inferido por el mapper) y las refs en
@@ -766,7 +794,10 @@ function GridMode({
               </span>
             ))}
             <button
-              onClick={() => { onClearCats(); onBrandSelect(null); }}
+              onClick={() => {
+                onClearCats();
+                onBrandSelect(null);
+              }}
               className="ml-1 rounded-full border hairline px-3 py-1 text-xs text-muted-foreground hover:border-ink hover:text-ink"
             >
               Ver todo
@@ -794,7 +825,6 @@ function GridMode({
           />
         </div>
       )}
-
 
       {visibleCategories.map((c) => {
         // NO re-sortear acá. allEquipos viene del backend ordenado por
@@ -884,8 +914,8 @@ function SearchEmptyState({
         </div>
         <div className="font-display text-3xl font-black text-ink">Sin resultados</div>
         <div className="font-sans text-sm text-muted-foreground max-w-md">
-          Ningún equipo coincide con "{query}". Probá con otro término o explorá las
-          categorías populares:
+          Ningún equipo coincide con "{query}". Probá con otro término o explorá las categorías
+          populares:
         </div>
         {categories.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5 justify-center">
@@ -985,7 +1015,7 @@ function ListMode({
   const hasMore = visibleCount < filtered.length;
 
   const previewItem = useMemo(
-    () => (previewId ? allEquipos.find((e) => e.id === previewId) ?? null : null),
+    () => (previewId ? (allEquipos.find((e) => e.id === previewId) ?? null) : null),
     [previewId, allEquipos],
   );
 
@@ -1057,7 +1087,13 @@ function ListMode({
                   if (!previewOpen) return;
                   const target = e.target as HTMLElement;
                   // Permitir clicks en botones (add to cart, stepper) sin interferir.
-                  if (target.closest("button")?.getAttribute("aria-label")?.match(/agregar|quitar|cart/i)) return;
+                  if (
+                    target
+                      .closest("button")
+                      ?.getAttribute("aria-label")
+                      ?.match(/agregar|quitar|cart/i)
+                  )
+                    return;
                   const rowEl = target.closest("[id^='eq-']") as HTMLElement | null;
                   if (!rowEl) return;
                   const id = rowEl.id.slice(3);
@@ -1069,11 +1105,7 @@ function ListMode({
                 }}
               >
                 {visibleItems.map((item) => (
-                  <EquipmentRow
-                    key={item.id}
-                    item={item}
-                    disponible={getDisponible(item)}
-                  />
+                  <EquipmentRow key={item.id} item={item} disponible={getDisponible(item)} />
                 ))}
               </div>
               {hasMore && (
@@ -1081,7 +1113,8 @@ function ListMode({
                   ref={sentinelRef}
                   className="flex items-center justify-center py-6 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground"
                 >
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />Cargando más equipos…
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Cargando más equipos…
                 </div>
               )}
               {!hasMore && filtered.length > PAGE_SIZE && (

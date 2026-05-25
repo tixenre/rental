@@ -14,11 +14,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  adminApi,
-  type Pedido,
-  type PedidoEstado,
-} from "@/lib/admin/api";
+import { adminApi, type Pedido, type PedidoEstado } from "@/lib/admin/api";
 import { clienteApi } from "@/lib/cliente/api";
 
 export type DraftItem = {
@@ -90,7 +86,8 @@ function shallowItemsEq(a: DraftItem[], b: DraftItem[]): boolean {
       a[i].equipo_id !== b[i].equipo_id ||
       a[i].cantidad !== b[i].cantidad ||
       a[i].precio_jornada !== b[i].precio_jornada
-    ) return false;
+    )
+      return false;
   }
   return true;
 }
@@ -125,10 +122,7 @@ export type UsePedidoDraftOptions = {
   onProposalSent?: (tipo: "directo" | "aprobacion") => void;
 };
 
-export function usePedidoDraft(
-  pedido: Pedido | undefined,
-  opts: UsePedidoDraftOptions = {},
-) {
+export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftOptions = {}) {
   const { mode = "admin", submitMode = "autosave", mensaje, onProposalSent } = opts;
   const qc = useQueryClient();
 
@@ -198,7 +192,8 @@ export function usePedidoDraft(
         fecha_desde: payload.d.fecha_desde || null,
         fecha_hasta: payload.d.fecha_hasta || null,
         items: payload.its.map((it) => ({
-          equipo_id: it.equipo_id, cantidad: it.cantidad,
+          equipo_id: it.equipo_id,
+          cantidad: it.cantidad,
         })),
         mensaje: mensaje || null,
       }),
@@ -218,10 +213,11 @@ export function usePedidoDraft(
       // El SaveIndicator muestra "Error al guardar" hasta que vuelva a
       // editar y disparar otro autosave.
       const m = e.message || "";
-      const friendly =
-        m.includes("Sin stock") ? `${m} — ajustá las cantidades o las fechas y volvemos a guardar.`
-        : m.includes("ventana") ? m
-        : `No pudimos guardar: ${m}`;
+      const friendly = m.includes("Sin stock")
+        ? `${m} — ajustá las cantidades o las fechas y volvemos a guardar.`
+        : m.includes("ventana")
+          ? m
+          : `No pudimos guardar: ${m}`;
       toast.error(friendly);
     },
   });
@@ -246,7 +242,9 @@ export function usePedidoDraft(
     if (!autosaveAdmin) return;
     if (!pedido || !datos || !serverRef.current) return;
     if (shallowDatosEq(datos, serverRef.current.datos)) return;
-    const t = setTimeout(() => { datosMut.mutate(datos); }, DEBOUNCE_MS);
+    const t = setTimeout(() => {
+      datosMut.mutate(datos);
+    }, DEBOUNCE_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datos, pedido?.id, autosaveAdmin]);
@@ -256,7 +254,9 @@ export function usePedidoDraft(
     if (!pedido || !items || !serverRef.current) return;
     if (shallowItemsEq(items, serverRef.current.items)) return;
     if (items.length === 0) return;
-    const t = setTimeout(() => { itemsMut.mutate(items); }, DEBOUNCE_MS);
+    const t = setTimeout(() => {
+      itemsMut.mutate(items);
+    }, DEBOUNCE_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, pedido?.id, autosaveAdmin]);
@@ -310,10 +310,8 @@ export function usePedidoDraft(
     await clienteMut.mutateAsync({ d: datos, its: items });
   }
 
-  const isPending =
-    datosMut.isPending || itemsMut.isPending || clienteMut.isPending;
-  const isError =
-    datosMut.isError || itemsMut.isError || clienteMut.isError;
+  const isPending = datosMut.isPending || itemsMut.isPending || clienteMut.isPending;
+  const isError = datosMut.isError || itemsMut.isError || clienteMut.isError;
 
   const saveStatus: SaveStatus = useMemo(() => {
     if (isPending) return "saving";
@@ -326,8 +324,7 @@ export function usePedidoDraft(
     return "saved";
   }, [datos, items, isPending, isError]);
 
-  const submitBlockedReason =
-    datos && items ? validateForSubmit(datos, items) : "Cargando…";
+  const submitBlockedReason = datos && items ? validateForSubmit(datos, items) : "Cargando…";
 
   return {
     datos,

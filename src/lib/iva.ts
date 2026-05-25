@@ -79,7 +79,12 @@ export function useClienteSession(): { data: ClienteSession; loading: boolean } 
       return;
     }
     let alive = true;
-    const sub = (s: ClienteSession) => { if (alive) { setData(s); setLoading(false); } };
+    const sub = (s: ClienteSession) => {
+      if (alive) {
+        setData(s);
+        setLoading(false);
+      }
+    };
     subscribers.add(sub);
     if (!pending) {
       pending = fetchClienteSession().then((s) => {
@@ -89,7 +94,10 @@ export function useClienteSession(): { data: ClienteSession; loading: boolean } 
         return s;
       });
     }
-    return () => { alive = false; subscribers.delete(sub); };
+    return () => {
+      alive = false;
+      subscribers.delete(sub);
+    };
   }, []);
 
   return { data, loading };

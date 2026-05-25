@@ -11,11 +11,7 @@ import { FilterControls } from "./FilterControls";
 
 const MAX_RESULTS = 12;
 
-const norm = (s: string) =>
-  (s ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+const norm = (s: string) => (s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /**
  * Sheet de "discovery" mobile — unifica búsqueda y filtros en una sola
@@ -324,10 +320,7 @@ function SearchBody({
             ))}
           </ul>
           {results.length > MAX_RESULTS && (
-            <button
-              onClick={onClose}
-              className="w-full py-4 text-sm font-medium text-amber"
-            >
+            <button onClick={onClose} className="w-full py-4 text-sm font-medium text-amber">
               Ver los {results.length} resultados →
             </button>
           )}

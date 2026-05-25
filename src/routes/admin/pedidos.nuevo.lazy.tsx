@@ -23,13 +23,14 @@ function NuevoPedidoPage() {
     const manana = new Date(hoy);
     manana.setDate(manana.getDate() + 1);
     const ymd = (d: Date) => d.toISOString().slice(0, 10);
-    adminApi.createPedido({
-      estado: "borrador",
-      cliente_nombre: "",
-      fecha_desde: ymd(hoy),
-      fecha_hasta: ymd(manana),
-      items: [],
-    })
+    adminApi
+      .createPedido({
+        estado: "borrador",
+        cliente_nombre: "",
+        fecha_desde: ymd(hoy),
+        fecha_hasta: ymd(manana),
+        items: [],
+      })
       .then((p) => {
         navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) }, replace: true });
       })

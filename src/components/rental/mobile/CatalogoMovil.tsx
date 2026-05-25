@@ -1,8 +1,22 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
-  Camera, Sun, Mic, Layers, Monitor, Zap, Battery,
-  Package, SlidersHorizontal, Search, User, Plus,
-  ChevronUp, ChevronRight, X, Calendar, Loader2,
+  Camera,
+  Sun,
+  Mic,
+  Layers,
+  Monitor,
+  Zap,
+  Battery,
+  Package,
+  SlidersHorizontal,
+  Search,
+  User,
+  Plus,
+  ChevronUp,
+  ChevronRight,
+  X,
+  Calendar,
+  Loader2,
   Check,
 } from "lucide-react";
 import { BottomSheet } from "@/components/mobile/BottomSheet";
@@ -25,7 +39,20 @@ import { useHorarios } from "@/lib/horarios";
 function fmtDate(d: Date | null): string {
   if (!d) return "—";
   const dias = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
-  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const meses = [
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
   return `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
 }
 
@@ -42,8 +69,18 @@ function addDays120(d: Date): Date {
 }
 
 const HORAS = [
-  "08:00", "09:00", "10:00", "11:00", "12:00",
-  "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00",
+  "08:00",
+  "09:00",
+  "10:00",
+  "11:00",
+  "12:00",
+  "13:00",
+  "14:00",
+  "15:00",
+  "16:00",
+  "17:00",
+  "18:00",
+  "19:00",
 ];
 
 const POPULAR_CHIPS = ["Sony FX3", "Aputure 600d", "RØDE", "Pack boda", "Pack entrevista"];
@@ -52,24 +89,24 @@ const POPULAR_CHIPS = ["Sony FX3", "Aputure 600d", "RØDE", "Pack boda", "Pack e
 type IconComp = React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
 
 const CAT_ICONS: Record<string, IconComp> = {
-  "Cámaras": Camera,
-  "Lentes": Sun,  // Aperture not in lucide-react standard; Sun as fallback
-  "Luces": Sun,
-  "Iluminación": Sun,
-  "Tungsteno": Sun,
-  "Sonido": Mic,
-  "Audio": Mic,
-  "Trípode": Layers,
-  "Soportes": Layers,
-  "Stands": Layers,
-  "Monitores": Monitor,
-  "Flash": Zap,
-  "Baterías": Battery,
-  "Filtros": SlidersHorizontal,
-  "Comunicación": Monitor,
-  "Modificadores": Sun,
+  Cámaras: Camera,
+  Lentes: Sun, // Aperture not in lucide-react standard; Sun as fallback
+  Luces: Sun,
+  Iluminación: Sun,
+  Tungsteno: Sun,
+  Sonido: Mic,
+  Audio: Mic,
+  Trípode: Layers,
+  Soportes: Layers,
+  Stands: Layers,
+  Monitores: Monitor,
+  Flash: Zap,
+  Baterías: Battery,
+  Filtros: SlidersHorizontal,
+  Comunicación: Monitor,
+  Modificadores: Sun,
   "Brazo Mágico": Layers,
-  "Grips": Layers,
+  Grips: Layers,
 };
 
 function CatIcon({ cat, size = 20 }: { cat: string; size?: number }) {
@@ -125,29 +162,36 @@ function HeroBanner({
 }) {
   const navigate = useNavigate();
   return (
-    <div
-      ref={heroRef}
-      className="relative bg-amber"
-      style={{ padding: "28px 20px 32px" }}
-    >
+    <div ref={heroRef} className="relative bg-amber" style={{ padding: "28px 20px 32px" }}>
       <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-4">
         Catálogo · {equipCount} equipos · Mar del Plata
       </div>
 
       <div className="font-display text-[46px] font-black text-ink leading-[1] tracking-[-0.02em] mb-[18px]">
-        un lugar<br />donde pasan<br />cosas.
+        un lugar
+        <br />
+        donde pasan
+        <br />
+        cosas.
       </div>
 
       <p className="font-sans text-[15px] leading-[1.55] text-ink/75 mb-7">
-        Cámaras, ópticas, luces, audio y soportes para producciones
-        audiovisuales. Elegí fechas y armá tu pedido — te lo dejamos listo
-        para retirar.
+        Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales. Elegí fechas y
+        armá tu pedido — te lo dejamos listo para retirar.
       </p>
 
       {/* Card Estudio — ink bg con CTA amber */}
       <div className="rounded-2xl bg-ink p-5">
         <div className="inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_oklch,var(--amber)_35%,transparent)] bg-[color-mix(in_oklch,var(--amber)_12%,transparent)] px-3 py-1 mb-3">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.8" strokeLinecap="round">
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--amber)"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          >
             <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
           </svg>
           <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-amber">
@@ -191,7 +235,12 @@ function SheetClose({ onClose }: { onClose: () => void }) {
 /* ── DateSheet ───────────────────────────────────────────────────── */
 interface DateSheetProps {
   onClose: () => void;
-  onConfirm: (v: { fechaDesde: Date; jornadas: number; horaDesde: string; horaHasta: string }) => void;
+  onConfirm: (v: {
+    fechaDesde: Date;
+    jornadas: number;
+    horaDesde: string;
+    horaHasta: string;
+  }) => void;
   initial: { fechaDesde: Date | null; jornadas: number; horaDesde: string; horaHasta: string };
   /** Días (YYYY-MM-DD) sin disponibilidad para los equipos del carrito. */
   diasBloqueados: Set<string>;
@@ -215,11 +264,13 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
   const franjaDesde = franjaParaFecha(horarios, fechaDesde);
   const franjaHasta = franjaParaFecha(horarios, fechaHasta);
   const horasDesde = useMemo(
-    () => (franjaDesde ? HORAS.filter((h) => h >= franjaDesde.desde && h <= franjaDesde.hasta) : HORAS),
+    () =>
+      franjaDesde ? HORAS.filter((h) => h >= franjaDesde.desde && h <= franjaDesde.hasta) : HORAS,
     [franjaDesde],
   );
   const horasHasta = useMemo(
-    () => (franjaHasta ? HORAS.filter((h) => h >= franjaHasta.desde && h <= franjaHasta.hasta) : HORAS),
+    () =>
+      franjaHasta ? HORAS.filter((h) => h >= franjaHasta.desde && h <= franjaHasta.hasta) : HORAS,
     [franjaHasta],
   );
   const diaDesdeCerrado = !!fechaDesde && !diaAbierto(horarios, fechaDesde);
@@ -308,7 +359,11 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
                   value={horaDesde}
                   onChange={(e) => setHoraDesde(e.target.value)}
                 >
-                  {horasDesde.map((h) => <option key={h} value={h}>{h}</option>)}
+                  {horasDesde.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
@@ -322,7 +377,11 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
                   value={horaHasta}
                   onChange={(e) => setHoraHasta(e.target.value)}
                 >
-                  {horasHasta.map((h) => <option key={h} value={h}>{h}</option>)}
+                  {horasHasta.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -332,9 +391,7 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
               <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
                 Jornadas
               </span>
-              <div
-                className="flex items-center border-[1.5px] border-hairline rounded-[var(--radius-sm)] overflow-hidden bg-background"
-              >
+              <div className="flex items-center border-[1.5px] border-hairline rounded-[var(--radius-sm)] overflow-hidden bg-background">
                 <button
                   className="px-[18px] py-[10px] text-xl font-bold text-muted-foreground hover:bg-muted hover:text-ink transition-colors leading-none"
                   onClick={() => setJornadas((j) => Math.max(1, j - 1))}
@@ -344,7 +401,12 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
                 <div
                   data-testid="jornadas-count"
                   className="flex-1 text-center border-x border-hairline py-1.5 leading-none"
-                  style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 900, color: "var(--ink)" }}
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 26,
+                    fontWeight: 900,
+                    color: "var(--ink)",
+                  }}
                 >
                   {jornadas}
                   <span className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground block">
@@ -364,17 +426,24 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
             {fechaDesde && (
               <div
                 className="px-3.5 py-3 rounded-[var(--radius-sm)] border"
-                style={{ background: "var(--amber-soft)", borderColor: "color-mix(in oklch, var(--amber) 40%, transparent)" }}
+                style={{
+                  background: "var(--amber-soft)",
+                  borderColor: "color-mix(in oklch, var(--amber) 40%, transparent)",
+                }}
               >
                 <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-1">
                   Devolución calculada
                 </div>
-                <div className="font-sans text-[15px] font-bold text-ink">{fmtDate(fechaHasta)}</div>
-                <div className="font-mono text-[11px] text-muted-foreground mt-0.5">hasta las {horaHasta}</div>
+                <div className="font-sans text-[15px] font-bold text-ink">
+                  {fmtDate(fechaHasta)}
+                </div>
+                <div className="font-mono text-[11px] text-muted-foreground mt-0.5">
+                  hasta las {horaHasta}
+                </div>
                 {timeToMinutes(horaHasta) > timeToMinutes(horaDesde) && (
                   <div className="mt-1.5 text-[11px] text-ink leading-snug">
-                    Devolvés más tarde que tu retiro ({horaDesde}) → <strong>suma 1 jornada</strong>.
-                    Devolvé {horaDesde} o antes para no sumarla.
+                    Devolvés más tarde que tu retiro ({horaDesde}) → <strong>suma 1 jornada</strong>
+                    . Devolvé {horaDesde} o antes para no sumarla.
                   </div>
                 )}
               </div>
@@ -416,8 +485,18 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
 }
 
 /* ── CartItem (subcomponent with per-item imgFailed state) ───────── */
-function CartItem({ eq, qty, fechaDesde, jornadas, jornadasEfectivas }: {
-  eq: Equipment; qty: number; fechaDesde: Date | null; jornadas: number; jornadasEfectivas: number;
+function CartItem({
+  eq,
+  qty,
+  fechaDesde,
+  jornadas,
+  jornadasEfectivas,
+}: {
+  eq: Equipment;
+  qty: number;
+  fechaDesde: Date | null;
+  jornadas: number;
+  jornadasEfectivas: number;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   return (
@@ -436,14 +515,23 @@ function CartItem({ eq, qty, fechaDesde, jornadas, jornadasEfectivas }: {
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-mono text-[8px] tracking-[0.18em] uppercase text-muted-foreground">{eq.brand}</div>
-        <div className="font-sans text-sm font-bold text-ink leading-tight mt-0.5 truncate">{eq.name}</div>
+        <div className="font-mono text-[8px] tracking-[0.18em] uppercase text-muted-foreground">
+          {eq.brand}
+        </div>
+        <div className="font-sans text-sm font-bold text-ink leading-tight mt-0.5 truncate">
+          {eq.name}
+        </div>
         <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
-          {fechaDesde ? `${qty} × ${formatARS(eq.pricePerDay)} / jorn.` : `${formatARS(eq.pricePerDay)} / jornada`}
+          {fechaDesde
+            ? `${qty} × ${formatARS(eq.pricePerDay)} / jorn.`
+            : `${formatARS(eq.pricePerDay)} / jornada`}
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <div className="font-mono text-sm font-bold text-ink" style={{ fontVariantNumeric: "tabular-nums" }}>
+        <div
+          className="font-mono text-sm font-bold text-ink"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           {formatARS(eq.pricePerDay * qty * jornadasEfectivas)}
         </div>
         <div className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground mt-0.5">
@@ -469,8 +557,14 @@ interface CartSheetProps {
 const WA_PHONE = BUSINESS_PHONE;
 
 function CartSheet({
-  onClose, onOpenDateSheet, equipos, cartItems, jornadas,
-  fechaDesde, horaDesde, horaHasta,
+  onClose,
+  onOpenDateSheet,
+  equipos,
+  cartItems,
+  jornadas,
+  fechaDesde,
+  horaDesde,
+  horaHasta,
 }: CartSheetProps) {
   const navigate = useNavigate();
   const [solicitado, setSolicitado] = useState(false);
@@ -481,7 +575,10 @@ function CartSheet({
     .filter((x) => x.eq);
 
   const jornadasEfectivas = fechaDesde ? jornadas : 1;
-  const subtotal = entries.reduce((s, { eq, qty }) => s + eq.pricePerDay * qty * jornadasEfectivas, 0);
+  const subtotal = entries.reduce(
+    (s, { eq, qty }) => s + eq.pricePerDay * qty * jornadasEfectivas,
+    0,
+  );
   const fechaHasta = fechaDesde ? deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta) : null;
 
   // Descuento por jornadas desde el backend
@@ -491,14 +588,13 @@ function CartSheet({
     staleTime: 60_000,
   });
   const descuentoPct = fechaDesde ? interpolarDescuento(descuentosPuntos, jornadas) : 0;
-  const descJornadas = descuentoPct > 0
-    ? { pct: descuentoPct, label: `${jornadas} jornadas` }
-    : null;
+  const descJornadas =
+    descuentoPct > 0 ? { pct: descuentoPct, label: `${jornadas} jornadas` } : null;
 
   // Descuento cliente — placeholder según spec del design (conectar con perfil real)
   const descCliente = { pct: 5, label: "cliente registrado" };
-  const montoDescJornadas = Math.round(subtotal * (descJornadas?.pct ?? 0) / 100);
-  const montoDescCliente = Math.round(subtotal * descCliente.pct / 100);
+  const montoDescJornadas = Math.round((subtotal * (descJornadas?.pct ?? 0)) / 100);
+  const montoDescCliente = Math.round((subtotal * descCliente.pct) / 100);
   const totalFinal = subtotal - montoDescJornadas - montoDescCliente;
 
   async function handleSubmit() {
@@ -553,12 +649,14 @@ function CartSheet({
   const waMessage = [
     "¡Hola! Acabo de solicitar un rental en Rambla:",
     ...entries.map(({ eq, qty }) => `• ${qty}× ${eq.brand} ${eq.name}`),
-    fechaDesde
-      ? `Fechas: ${fmtDate(fechaDesde)} → ${fmtDate(fechaHasta)} (${jornadas} jorn.)`
-      : "",
+    fechaDesde ? `Fechas: ${fmtDate(fechaDesde)} → ${fmtDate(fechaHasta)} (${jornadas} jorn.)` : "",
     `Total estimado: ${formatARS(totalFinal)}`,
-  ].filter(Boolean).join("\n");
-  const waHref = whatsappLink({ phone: WA_PHONE, message: waMessage }) ?? `https://wa.me/${normalizePhone(WA_PHONE)}`;
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const waHref =
+    whatsappLink({ phone: WA_PHONE, message: waMessage }) ??
+    `https://wa.me/${normalizePhone(WA_PHONE)}`;
 
   return (
     <>
@@ -569,7 +667,12 @@ function CartSheet({
       />
       <div
         className="fixed inset-x-0 bottom-0 z-[61] bg-card flex flex-col animate-in slide-in-from-bottom duration-[260ms]"
-        style={{ height: "72%", maxHeight: "72%", borderRadius: "24px 24px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)" }}
+        style={{
+          height: "72%",
+          maxHeight: "72%",
+          borderRadius: "24px 24px 0 0",
+          boxShadow: "0 -8px 40px rgba(0,0,0,0.18)",
+        }}
       >
         <div className="w-9 h-1 rounded-full bg-hairline mx-auto mt-2.5 shrink-0" />
         <div className="flex items-center justify-between px-5 py-3 border-b border-hairline shrink-0">
@@ -585,23 +688,45 @@ function CartSheet({
           >
             <div className="flex-1 flex items-center gap-2.5">
               <div>
-                <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">Salida</div>
-                <div className="font-sans text-sm font-bold leading-tight text-ink">{fmtDate(fechaDesde)}</div>
-                <div className="font-mono text-[11px] text-muted-foreground mt-0.5">{horaDesde}</div>
+                <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
+                  Salida
+                </div>
+                <div className="font-sans text-sm font-bold leading-tight text-ink">
+                  {fmtDate(fechaDesde)}
+                </div>
+                <div className="font-mono text-[11px] text-muted-foreground mt-0.5">
+                  {horaDesde}
+                </div>
               </div>
               <ChevronRight size={14} className="text-muted-foreground/50 shrink-0" />
               <div>
-                <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">Devolución</div>
-                <div className="font-sans text-sm font-bold leading-tight text-ink">{fmtDate(fechaHasta)}</div>
-                <div className="font-mono text-[11px] text-muted-foreground mt-0.5">{horaHasta}</div>
+                <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
+                  Devolución
+                </div>
+                <div className="font-sans text-sm font-bold leading-tight text-ink">
+                  {fmtDate(fechaHasta)}
+                </div>
+                <div className="font-mono text-[11px] text-muted-foreground mt-0.5">
+                  {horaHasta}
+                </div>
               </div>
             </div>
             <div
               className="text-center shrink-0 pl-3 border-l"
               style={{ borderColor: "color-mix(in oklch, var(--amber) 40%, transparent)" }}
             >
-              <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">Jorn.</div>
-              <div style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 900, color: "var(--ink)", lineHeight: 1 }}>
+              <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
+                Jorn.
+              </div>
+              <div
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 24,
+                  fontWeight: 900,
+                  color: "var(--ink)",
+                  lineHeight: 1,
+                }}
+              >
                 {jornadas}
               </div>
             </div>
@@ -609,7 +734,10 @@ function CartSheet({
         ) : (
           <div
             className="flex items-center gap-3 px-5 py-3.5 shrink-0 border-b border-hairline"
-            style={{ background: "var(--amber-soft)", borderTopColor: "color-mix(in oklch, var(--amber) 35%, transparent)" }}
+            style={{
+              background: "var(--amber-soft)",
+              borderTopColor: "color-mix(in oklch, var(--amber) 35%, transparent)",
+            }}
           >
             <div className="flex-1">
               <div className="font-sans text-[13px] font-bold text-ink leading-tight">
@@ -621,7 +749,10 @@ function CartSheet({
             </div>
             <button
               className="px-3.5 py-1.5 rounded-full bg-ink text-amber text-xs font-bold font-sans shrink-0 hover:bg-amber hover:text-ink transition-colors whitespace-nowrap"
-              onClick={() => { onClose(); onOpenDateSheet(); }}
+              onClick={() => {
+                onClose();
+                onOpenDateSheet();
+              }}
             >
               Asignar fechas
             </button>
@@ -632,15 +763,26 @@ function CartSheet({
         <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarWidth: "none" }}>
           {/* Items */}
           {entries.map(({ eq, qty }) => (
-            <CartItem key={eq.id} eq={eq} qty={qty} fechaDesde={fechaDesde} jornadas={jornadas} jornadasEfectivas={jornadasEfectivas} />
+            <CartItem
+              key={eq.id}
+              eq={eq}
+              qty={qty}
+              fechaDesde={fechaDesde}
+              jornadas={jornadas}
+              jornadasEfectivas={jornadasEfectivas}
+            />
           ))}
 
           {/* Totals — auto margin pushes to bottom when few items */}
           <div className="border-t border-hairline mt-auto">
             <div className="flex flex-col gap-2 px-5 py-3.5">
               <div className="flex justify-between items-baseline">
-                <span className="font-sans text-[13px] text-muted-foreground">Subtotal equipos</span>
-                <span className="font-mono text-[13px] font-semibold text-ink tabular-nums">{formatARS(subtotal)}</span>
+                <span className="font-sans text-[13px] text-muted-foreground">
+                  Subtotal equipos
+                </span>
+                <span className="font-mono text-[13px] font-semibold text-ink tabular-nums">
+                  {formatARS(subtotal)}
+                </span>
               </div>
 
               {descJornadas && (
@@ -670,7 +812,9 @@ function CartSheet({
               </div>
 
               <div className="flex justify-between items-baseline opacity-45">
-                <span className="font-sans text-[13px] text-muted-foreground">Depósito de seguridad</span>
+                <span className="font-sans text-[13px] text-muted-foreground">
+                  Depósito de seguridad
+                </span>
                 <span className="font-mono text-[13px] text-muted-foreground">A definir</span>
               </div>
 
@@ -678,7 +822,15 @@ function CartSheet({
                 <span className="font-sans text-[15px] font-bold text-ink">
                   {fechaDesde ? "Total estimado" : "Estimado / jornada"}
                 </span>
-                <span style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 900, color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>
+                <span
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 24,
+                    fontWeight: 900,
+                    color: "var(--ink)",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
                   {formatARS(totalFinal)}
                 </span>
               </div>
@@ -692,9 +844,14 @@ function CartSheet({
             <div className="flex flex-col gap-2.5">
               <div
                 className="px-4 py-3 rounded-[var(--radius-lg)] border"
-                style={{ background: "var(--amber-soft)", borderColor: "color-mix(in oklch, var(--amber) 40%, transparent)" }}
+                style={{
+                  background: "var(--amber-soft)",
+                  borderColor: "color-mix(in oklch, var(--amber) 40%, transparent)",
+                }}
               >
-                <div className="font-sans text-sm font-bold text-ink mb-0.5">¡Listo! Rental solicitado.</div>
+                <div className="font-sans text-sm font-bold text-ink mb-0.5">
+                  ¡Listo! Rental solicitado.
+                </div>
                 <div className="font-sans text-xs text-muted-foreground leading-relaxed">
                   Lo revisamos manualmente y te confirmamos a la brevedad.
                 </div>
@@ -707,7 +864,11 @@ function CartSheet({
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-                  <path d="M12 0C5.373 0 0 5.373 0 12c0 2.122.558 4.112 1.528 5.836L.057 23.857a.5.5 0 00.609.61l6.098-1.458A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.722.89.921-3.618-.234-.373A9.818 9.818 0 1112 21.818z" fillRule="evenodd" clipRule="evenodd" />
+                  <path
+                    d="M12 0C5.373 0 0 5.373 0 12c0 2.122.558 4.112 1.528 5.836L.057 23.857a.5.5 0 00.609.61l6.098-1.458A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.722.89.921-3.618-.234-.373A9.818 9.818 0 1112 21.818z"
+                    fillRule="evenodd"
+                    clipRule="evenodd"
+                  />
                 </svg>
                 Consultanos por WhatsApp
               </a>
@@ -718,9 +879,11 @@ function CartSheet({
               onClick={handleSubmit}
               disabled={submitting}
             >
-              {submitting
-                ? <Loader2 size={18} className="animate-spin mx-auto" />
-                : "Solicitar rental"}
+              {submitting ? (
+                <Loader2 size={18} className="animate-spin mx-auto" />
+              ) : (
+                "Solicitar rental"
+              )}
             </button>
           )}
         </div>
@@ -752,7 +915,12 @@ function FichaSheet({ eq, onClose, onAddToCart, inCart, jornadas, fechaDesde }: 
       />
       <div
         className="fixed inset-x-0 bottom-0 z-[61] bg-card flex flex-col animate-in slide-in-from-bottom duration-[260ms]"
-        style={{ height: "72%", maxHeight: "72%", borderRadius: "24px 24px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)" }}
+        style={{
+          height: "72%",
+          maxHeight: "72%",
+          borderRadius: "24px 24px 0 0",
+          boxShadow: "0 -8px 40px rgba(0,0,0,0.18)",
+        }}
       >
         <div className="w-9 h-1 rounded-full bg-hairline mx-auto mt-2.5 shrink-0" />
         <div className="flex items-start justify-between px-5 py-3 border-b border-hairline shrink-0">
@@ -791,9 +959,7 @@ function FichaSheet({ eq, onClose, onAddToCart, inCart, jornadas, fechaDesde }: 
                 className="font-mono font-bold leading-none"
                 style={{ fontSize: 22, fontVariantNumeric: "tabular-nums" }}
               >
-                {fechaDesde
-                  ? formatARS(eq.pricePerDay * jornadas)
-                  : formatARS(eq.pricePerDay)}
+                {fechaDesde ? formatARS(eq.pricePerDay * jornadas) : formatARS(eq.pricePerDay)}
               </div>
               <div className="font-mono text-[8px] tracking-[0.18em] uppercase text-muted-foreground mt-0.5">
                 {fechaDesde ? `${jornadas} jornadas` : "/ jornada"}
@@ -871,7 +1037,10 @@ function FichaSheet({ eq, onClose, onAddToCart, inCart, jornadas, fechaDesde }: 
           ) : (
             <button
               className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-[15px] font-bold hover:bg-amber hover:text-ink transition-colors"
-              onClick={() => { onAddToCart(eq.id, 1); onClose(); }}
+              onClick={() => {
+                onAddToCart(eq.id, 1);
+                onClose();
+              }}
             >
               Agregar al carrito
             </button>
@@ -894,7 +1063,16 @@ interface EquipmentRowProps {
   onFicha: () => void;
 }
 
-function EquipmentRow({ eq, inCart, isExpanded, jornadas, fechaDesde, onTap, onAdd, onFicha }: EquipmentRowProps) {
+function EquipmentRow({
+  eq,
+  inCart,
+  isExpanded,
+  jornadas,
+  fechaDesde,
+  onTap,
+  onAdd,
+  onFicha,
+}: EquipmentRowProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const priceDisplay = fechaDesde
     ? formatARS(eq.pricePerDay * jornadas)
@@ -919,9 +1097,7 @@ function EquipmentRow({ eq, inCart, isExpanded, jornadas, fechaDesde, onTap, onA
     <div
       className={cn(
         "mb-1.5 rounded-[var(--radius-lg)] overflow-hidden border bg-card transition-all duration-150",
-        isExpanded
-          ? "border-amber"
-          : "border-hairline",
+        isExpanded ? "border-amber" : "border-hairline",
       )}
       style={isExpanded ? { boxShadow: "0 0 0 1.5px var(--amber)" } : undefined}
     >
@@ -1085,9 +1261,7 @@ function EquipmentRow({ eq, inCart, isExpanded, jornadas, fechaDesde, onTap, onA
                     <span className="font-mono uppercase tracking-wider text-[9px] text-muted-foreground">
                       {f.label}
                     </span>
-                    {hasValue && (
-                      <span className="font-medium text-ink">{f.value}</span>
-                    )}
+                    {hasValue && <span className="font-medium text-ink">{f.value}</span>}
                   </span>
                 );
               })}
@@ -1097,7 +1271,10 @@ function EquipmentRow({ eq, inCart, isExpanded, jornadas, fechaDesde, onTap, onA
           {/* Ficha link */}
           <button
             className="inline-flex items-center gap-1 font-sans text-xs font-semibold text-ink border-b border-b-ink pb-px hover:text-amber hover:border-amber transition-colors"
-            onClick={(e) => { e.stopPropagation(); onFicha(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onFicha();
+            }}
           >
             Ver ficha completa
             <ChevronRight size={12} />
@@ -1186,10 +1363,7 @@ export function CatalogoMovil() {
         const heroRect = hero.getBoundingClientRect();
         const containerRect = el.getBoundingClientRect();
         const relBottom = heroRect.bottom - containerRect.top;
-        const progress = Math.min(
-          1,
-          Math.max(0, 1 - (relBottom - 53) / (heroRect.height * 0.5)),
-        );
+        const progress = Math.min(1, Math.max(0, 1 - (relBottom - 53) / (heroRect.height * 0.5)));
         topbar.style.setProperty("--amber-pct", `${Math.round(progress * 100)}%`);
         topbar.classList.toggle("topbar-snap", progress > 0.65);
       }
@@ -1275,13 +1449,16 @@ export function CatalogoMovil() {
 
   const filteredEquipos = useMemo(() => {
     const norm = (s: string) =>
-      (s ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      (s ?? "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
     return allEquipos.filter((e) => {
       const matchCat = matchesActiveTab(e);
       const matchQ =
         query === "" ||
         norm([e.name, e.brand, e.category, e.description ?? ""].join(" ")).includes(norm(query));
-      const matchStock = !stockOnly || (e.cantidad == null || e.cantidad > 0);
+      const matchStock = !stockOnly || e.cantidad == null || e.cantidad > 0;
       const matchBrand = !selectedBrand || e.brand === selectedBrand;
       return matchCat && matchQ && matchStock && matchBrand;
     });
@@ -1289,8 +1466,7 @@ export function CatalogoMovil() {
 
   // Filtros activos (para el badge del botón "Filtros"). Excluye categoría
   // (esa la elige el tab) y búsqueda (esa tiene su propio input visible).
-  const activeFiltersCount =
-    (stockOnly ? 1 : 0) + (selectedBrand ? 1 : 0);
+  const activeFiltersCount = (stockOnly ? 1 : 0) + (selectedBrand ? 1 : 0);
 
   // Cart totals
   const totalItems = Object.values(cart.items).reduce((s, q) => s + q, 0);
@@ -1299,10 +1475,13 @@ export function CatalogoMovil() {
     return s + (eq ? eq.pricePerDay * q * jornadas : 0);
   }, 0);
 
-  const handleAddToCart = useCallback((id: string, delta: number) => {
-    if (delta > 0) cart.add(id);
-    else cart.remove(id);
-  }, [cart]);
+  const handleAddToCart = useCallback(
+    (id: string, delta: number) => {
+      if (delta > 0) cart.add(id);
+      else cart.remove(id);
+    },
+    [cart],
+  );
 
   const handleRowTap = useCallback((id: string) => {
     setExpanded((prev) => (prev === id ? null : id));
@@ -1314,8 +1493,16 @@ export function CatalogoMovil() {
   }, []);
 
   const handleConfirmDates = useCallback(
-    ({ fechaDesde: fd, jornadas: j, horaDesde: hd, horaHasta: hh }: {
-      fechaDesde: Date; jornadas: number; horaDesde: string; horaHasta: string;
+    ({
+      fechaDesde: fd,
+      jornadas: j,
+      horaDesde: hd,
+      horaHasta: hh,
+    }: {
+      fechaDesde: Date;
+      jornadas: number;
+      horaDesde: string;
+      horaHasta: string;
     }) => {
       setFechaDesde(fd);
       setJornadas(j);
@@ -1361,7 +1548,6 @@ export function CatalogoMovil() {
         >
           <RamblaSeal />
 
-
           <button
             className="date-pill-snap flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3.5 rounded-full font-sans text-xs font-semibold text-ink transition-all whitespace-nowrap"
             style={{
@@ -1370,7 +1556,10 @@ export function CatalogoMovil() {
             }}
             onClick={() => setShowDateSheet(true)}
           >
-            <Calendar size={14} style={{ color: "color-mix(in oklch, var(--amber) 80%, var(--ink))", flexShrink: 0 }} />
+            <Calendar
+              size={14}
+              style={{ color: "color-mix(in oklch, var(--amber) 80%, var(--ink))", flexShrink: 0 }}
+            />
             <span>{datePillLabel}</span>
             {fechaDesde && (
               <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-muted-foreground">
@@ -1457,17 +1646,14 @@ export function CatalogoMovil() {
                   ? allEquipos.length
                   : allEquipos.filter(
                       (e) =>
-                        e.category === cat ||
-                        (e.categorias ?? []).some((c) => c.nombre === cat),
+                        e.category === cat || (e.categorias ?? []).some((c) => c.nombre === cat),
                     ).length;
               return (
                 <button
                   key={cat}
                   className={cn(
                     "flex items-baseline gap-1 py-[10px] pb-[9px] px-3 whitespace-nowrap shrink-0 border-b-[2.5px] transition-all",
-                    activeTab === cat
-                      ? "border-amber"
-                      : "border-transparent",
+                    activeTab === cat ? "border-amber" : "border-transparent",
                   )}
                   onClick={() => handleTabChange(cat)}
                 >
@@ -1502,7 +1688,15 @@ export function CatalogoMovil() {
             onClick={() => setStockOnly((s) => !s)}
           >
             {stockOnly && (
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+              >
                 <path d="M20 6L9 17l-5-5" />
               </svg>
             )}
@@ -1608,7 +1802,10 @@ export function CatalogoMovil() {
                 {formatARS(totalARS)}
               </div>
             </div>
-            <ChevronUp size={16} className="text-muted-foreground hover:text-ink transition-colors shrink-0" />
+            <ChevronUp
+              size={16}
+              className="text-muted-foreground hover:text-ink transition-colors shrink-0"
+            />
           </div>
         )}
       </div>

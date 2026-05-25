@@ -25,9 +25,9 @@ const normalize = (s: string): string =>
   s
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")  // saca tildes/diacríticos
-    .replace(/\s*\([^)]*\)\s*/g, " ")  // saca "(...)" y contenido
-    .replace(/[._\-\/]/g, " ")          // separadores → espacio
+    .replace(/[̀-ͯ]/g, "") // saca tildes/diacríticos
+    .replace(/\s*\([^)]*\)\s*/g, " ") // saca "(...)" y contenido
+    .replace(/[._\-/]/g, " ") // separadores → espacio
     .replace(/\s+/g, " ")
     .trim();
 
@@ -63,7 +63,7 @@ export const mergeSpecs = (existing: Spec[], extras: Spec[]): Spec[] => {
 export const findSpecValue = (specs: Spec[], label: string): string =>
   specs.find((s) => sameLabel(s.label, label))?.value ?? "";
 
-export const uniq = <T,>(arr: T[]): T[] => Array.from(new Set(arr));
+export const uniq = <T>(arr: T[]): T[] => Array.from(new Set(arr));
 
 /**
  * Para un spec numérico, extrae solo la parte numérica del value persistido.

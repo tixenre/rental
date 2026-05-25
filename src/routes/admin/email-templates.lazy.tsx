@@ -22,13 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
-import {
-  adminApi,
-  type EmailTemplate,
-  type EmailTemplateInput,
-} from "@/lib/admin/api";
+import { adminApi, type EmailTemplate, type EmailTemplateInput } from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
-
 
 export const Route = createLazyFileRoute("/admin/email-templates")({
   component: EmailTemplatesPage,
@@ -72,7 +67,6 @@ const AVAILABLE_VARS: { name: string; help: string }[] = [
   { name: "admin_url", help: "Link al pedido en el back-office (solo admin)" },
 ];
 
-
 function EmailTemplatesPage() {
   useDocumentTitle("Emails · Back Office");
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -93,15 +87,13 @@ function EmailTemplatesPage() {
           Emails
         </h1>
         <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-          Plantillas de los mails automáticos que envía el sistema (pedidos,
-          confirmaciones, recordatorios). Editás el subject + cuerpo HTML +
-          texto plano. Variables Jinja: <code className="font-mono text-xs">{`{{ variable }}`}</code>.
+          Plantillas de los mails automáticos que envía el sistema (pedidos, confirmaciones,
+          recordatorios). Editás el subject + cuerpo HTML + texto plano. Variables Jinja:{" "}
+          <code className="font-mono text-xs">{`{{ variable }}`}</code>.
         </p>
       </header>
 
-      {listQ.isLoading && (
-        <div className="text-sm text-muted-foreground">Cargando…</div>
-      )}
+      {listQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
 
       {!listQ.isLoading && items.length === 0 && (
         <div className="rounded-md border hairline bg-muted/20 p-8 text-center">
@@ -123,12 +115,8 @@ function EmailTemplatesPage() {
             >
               <Mail className="h-4 w-4 text-amber shrink-0 mt-0.5" />
               <div className="min-w-0 flex-1">
-                <div className="font-display text-base text-ink">
-                  {meta?.label ?? t.key}
-                </div>
-                <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                  {t.subject}
-                </div>
+                <div className="font-display text-base text-ink">{meta?.label ?? t.key}</div>
+                <div className="text-xs text-muted-foreground mt-0.5 truncate">{t.subject}</div>
                 {meta && (
                   <div className="text-[11px] text-muted-foreground/70 mt-0.5">
                     {meta.description}
@@ -140,7 +128,9 @@ function EmailTemplatesPage() {
                 {t.updated_at && (
                   <div className="opacity-60">
                     {new Date(t.updated_at).toLocaleDateString("es-AR", {
-                      day: "2-digit", month: "short", year: "2-digit",
+                      day: "2-digit",
+                      month: "short",
+                      year: "2-digit",
                     })}
                   </div>
                 )}
@@ -162,10 +152,7 @@ function EmailTemplatesPage() {
   );
 }
 
-
-function TemplateEditorModal({
-  tplKey, onClose,
-}: { tplKey: string; onClose: () => void }) {
+function TemplateEditorModal({ tplKey, onClose }: { tplKey: string; onClose: () => void }) {
   const qc = useQueryClient();
   const meta = TEMPLATE_META[tplKey];
   const [tab, setTab] = useState<"edit" | "preview" | "test">("edit");
@@ -189,8 +176,7 @@ function TemplateEditorModal({
   }, [tplQ.data, form]);
 
   const saveMut = useMutation({
-    mutationFn: (input: EmailTemplateInput) =>
-      adminApi.updateEmailTemplate(tplKey, input),
+    mutationFn: (input: EmailTemplateInput) => adminApi.updateEmailTemplate(tplKey, input),
     onSuccess: (data: EmailTemplate) => {
       toast.success("Template guardado");
       qc.setQueryData(["admin", "email-templates", tplKey], data);
@@ -209,24 +195,31 @@ function TemplateEditorModal({
         onClick={(e) => e.stopPropagation()}
       >
         <header className="border-b hairline px-4 py-3 shrink-0">
-          <div className="font-display text-base text-ink">
-            {meta?.label ?? tplKey}
-          </div>
-          <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
-            key: {tplKey}
-          </div>
+          <div className="font-display text-base text-ink">{meta?.label ?? tplKey}</div>
+          <div className="font-mono text-[10px] text-muted-foreground mt-0.5">key: {tplKey}</div>
         </header>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex-1 flex flex-col min-h-0">
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as typeof tab)}
+          className="flex-1 flex flex-col min-h-0"
+        >
           <TabsList className="mx-4 mt-3 shrink-0 w-fit">
-            <TabsTrigger value="edit"><Pencil className="h-3.5 w-3.5 mr-1.5" />Editar</TabsTrigger>
-            <TabsTrigger value="preview"><Eye className="h-3.5 w-3.5 mr-1.5" />Preview</TabsTrigger>
-            <TabsTrigger value="test"><Send className="h-3.5 w-3.5 mr-1.5" />Test</TabsTrigger>
+            <TabsTrigger value="edit">
+              <Pencil className="h-3.5 w-3.5 mr-1.5" />
+              Editar
+            </TabsTrigger>
+            <TabsTrigger value="preview">
+              <Eye className="h-3.5 w-3.5 mr-1.5" />
+              Preview
+            </TabsTrigger>
+            <TabsTrigger value="test">
+              <Send className="h-3.5 w-3.5 mr-1.5" />
+              Test
+            </TabsTrigger>
           </TabsList>
 
-          {tplQ.isLoading && (
-            <div className="p-6 text-sm text-muted-foreground">Cargando…</div>
-          )}
+          {tplQ.isLoading && <div className="p-6 text-sm text-muted-foreground">Cargando…</div>}
 
           {form && tplQ.data && (
             <>
@@ -248,10 +241,7 @@ function TemplateEditorModal({
             Cerrar
           </Button>
           {tab === "edit" && form && (
-            <Button
-              onClick={() => saveMut.mutate(form)}
-              disabled={saveMut.isPending}
-            >
+            <Button onClick={() => saveMut.mutate(form)} disabled={saveMut.isPending}>
               {saveMut.isPending ? "Guardando…" : "Guardar"}
             </Button>
           )}
@@ -261,10 +251,13 @@ function TemplateEditorModal({
   );
 }
 
-
 function EditTab({
-  form, setForm,
-}: { form: EmailTemplateInput; setForm: (f: EmailTemplateInput) => void }) {
+  form,
+  setForm,
+}: {
+  form: EmailTemplateInput;
+  setForm: (f: EmailTemplateInput) => void;
+}) {
   return (
     <div className="grid grid-cols-[1fr_220px] gap-4">
       <div className="space-y-3 min-w-0">
@@ -314,7 +307,6 @@ function EditTab({
   );
 }
 
-
 function PreviewTab({ tplKey }: { tplKey: string }) {
   const previewQ = useQuery({
     queryKey: ["admin", "email-templates", tplKey, "preview"],
@@ -326,9 +318,7 @@ function PreviewTab({ tplKey }: { tplKey: string }) {
   }
   if (previewQ.isError) {
     return (
-      <div className="text-sm text-destructive">
-        Error: {(previewQ.error as Error).message}
-      </div>
+      <div className="text-sm text-destructive">Error: {(previewQ.error as Error).message}</div>
     );
   }
   const d = previewQ.data!;
@@ -364,7 +354,6 @@ function PreviewTab({ tplKey }: { tplKey: string }) {
   );
 }
 
-
 function TestTab({ tplKey }: { tplKey: string }) {
   const [to, setTo] = useState("");
   const sendMut = useMutation({
@@ -385,8 +374,8 @@ function TestTab({ tplKey }: { tplKey: string }) {
     <div className="space-y-3 max-w-md">
       <p className="text-[11px] text-muted-foreground">
         Envía un mail real al destinatario que pongas. Se loggea en
-        <code className="font-mono ml-1">emails_log</code> con el resto.
-        Usa los cambios <strong>guardados</strong> del template (no los del editor).
+        <code className="font-mono ml-1">emails_log</code> con el resto. Usa los cambios{" "}
+        <strong>guardados</strong> del template (no los del editor).
       </p>
       <div>
         <Label className="text-xs">Enviar a</Label>
@@ -402,9 +391,15 @@ function TestTab({ tplKey }: { tplKey: string }) {
         disabled={!to || !to.includes("@") || sendMut.isPending}
       >
         {sendMut.isPending ? (
-          <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Enviando…</>
+          <>
+            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            Enviando…
+          </>
         ) : (
-          <><Send className="h-3.5 w-3.5 mr-1.5" />Enviar test</>
+          <>
+            <Send className="h-3.5 w-3.5 mr-1.5" />
+            Enviar test
+          </>
         )}
       </Button>
     </div>

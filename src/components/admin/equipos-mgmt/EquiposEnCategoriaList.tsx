@@ -22,7 +22,10 @@ import { cn } from "@/lib/utils";
 // ── Toggle ─────────────────────────────────────────────────────────────
 
 export function EquiposCountToggle({
-  count, isOpen, onToggle, onAddWhenEmpty,
+  count,
+  isOpen,
+  onToggle,
+  onAddWhenEmpty,
 }: {
   count: number;
   isOpen: boolean;
@@ -51,9 +54,7 @@ export function EquiposCountToggle({
       className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink transition shrink-0"
       title={isOpen ? "Ocultar equipos" : "Ver equipos asignados directamente"}
     >
-      <ChevronRight
-        className={cn("h-3 w-3 transition-transform", isOpen && "rotate-90")}
-      />
+      <ChevronRight className={cn("h-3 w-3 transition-transform", isOpen && "rotate-90")} />
       <span className="tabular-nums">{count}</span>
     </button>
   );
@@ -62,7 +63,10 @@ export function EquiposCountToggle({
 // ── Panel ──────────────────────────────────────────────────────────────
 
 export function EquiposPanel({
-  categoriaId, categoriaNombre, indentLevel = 1, onAddEquipos,
+  categoriaId,
+  categoriaNombre,
+  indentLevel = 1,
+  onAddEquipos,
 }: {
   categoriaId: number;
   categoriaNombre: string;
@@ -74,8 +78,7 @@ export function EquiposPanel({
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos-en-categoria", categoriaId],
-    queryFn: () =>
-      adminApi.listEquipos({ categoria: categoriaNombre, per_page: 500 }),
+    queryFn: () => adminApi.listEquipos({ categoria: categoriaNombre, per_page: 500 }),
     staleTime: 30_000,
   });
 
@@ -105,10 +108,7 @@ export function EquiposPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const indentClass =
-    indentLevel === 1 ? "ml-10"
-    : indentLevel === 2 ? "ml-16"
-    : "ml-20";
+  const indentClass = indentLevel === 1 ? "ml-10" : indentLevel === 2 ? "ml-16" : "ml-20";
 
   return (
     <div className={cn(indentClass, "border-l hairline pl-3 py-1 space-y-1")}>
@@ -149,7 +149,9 @@ export function EquiposPanel({
 }
 
 function EquipoRow({
-  equipo, onRemove, disabled,
+  equipo,
+  onRemove,
+  disabled,
 }: {
   equipo: Equipo;
   onRemove: () => void;
@@ -163,7 +165,7 @@ function EquipoRow({
             src={equipo.foto_url}
             alt={equipo.nombre}
             className="h-full w-full object-contain p-0.5"
-            onError={(e) => ((e.currentTarget.style.opacity = "0"))}
+            onError={(e) => (e.currentTarget.style.opacity = "0")}
             loading="lazy"
           />
         ) : null}

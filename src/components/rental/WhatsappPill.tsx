@@ -8,8 +8,8 @@ export function WhatsappPill({ compact = false }: { compact?: boolean }) {
   const display = phone.startsWith("+54 9")
     ? phone
     : phone.startsWith("+549")
-    ? `+54 9 ${phone.slice(4, 7)} ${phone.slice(7, 10)} ${phone.slice(10)}`
-    : phone;
+      ? `+54 9 ${phone.slice(4, 7)} ${phone.slice(7, 10)} ${phone.slice(10)}`
+      : phone;
   return (
     <a
       href={`https://wa.me/${phone.replace(/[^0-9]/g, "")}`}

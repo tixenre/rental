@@ -37,9 +37,7 @@ export const Route = createFileRoute("/preguntas-frecuentes")({
     // El structured data FAQPage (JSON-LD) se inyecta en el componente desde
     // las FAQ EN VIVO (editables en el back-office), no acá — así los rich
     // snippets de Google reflejan lo que el admin configuró. Ver FaqPage.
-    links: [
-      { rel: "canonical", href: "https://ramblarental.com/preguntas-frecuentes" },
-    ],
+    links: [{ rel: "canonical", href: "https://ramblarental.com/preguntas-frecuentes" }],
   }),
   component: FaqPage,
 });
@@ -78,12 +76,10 @@ function FaqPage() {
         <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
           Ayuda
         </div>
-        <h1 className="mt-2 wordmark text-5xl text-ink">
-          Preguntas frecuentes
-        </h1>
+        <h1 className="mt-2 wordmark text-5xl text-ink">Preguntas frecuentes</h1>
         <p className="mt-3 text-muted-foreground">
-          Todo lo que solés preguntar antes de reservar. Si tu duda no está
-          acá, escribinos por WhatsApp y te respondemos.
+          Todo lo que solés preguntar antes de reservar. Si tu duda no está acá, escribinos por
+          WhatsApp y te respondemos.
         </p>
 
         <div className="mt-10 space-y-10">
@@ -114,9 +110,7 @@ function FaqPage() {
 
         {/* CTA al final */}
         <div className="mt-12 rounded-lg border hairline bg-muted/30 p-6 text-center">
-          <p className="text-sm text-ink">
-            ¿No encontraste lo que buscabas?
-          </p>
+          <p className="text-sm text-ink">¿No encontraste lo que buscabas?</p>
           <a
             href={whatsappUrl(
               "Hola! Tengo una consulta que no está en la sección de preguntas frecuentes.",

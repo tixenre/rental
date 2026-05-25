@@ -19,9 +19,7 @@ export function PriceBlock({
         {showTotal ? formatARS(total) : formatARS(pricePerDay)}
       </div>
       <div className="mt-0.5 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
-        {showTotal
-          ? `${formatARS(pricePerDay)} × ${jornadas} jorn.`
-          : "/ jornada"}
+        {showTotal ? `${formatARS(pricePerDay)} × ${jornadas} jorn.` : "/ jornada"}
       </div>
     </div>
   );

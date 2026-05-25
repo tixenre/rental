@@ -16,11 +16,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GripVertical, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -67,10 +75,7 @@ export function DisenoSection() {
   }, [all]);
 
   // Raíces ordenadas (lo que el admin arrastra para reordenar).
-  const roots = useMemo(
-    () => childrenByParent.get(null) ?? [],
-    [childrenByParent],
-  );
+  const roots = useMemo(() => childrenByParent.get(null) ?? [], [childrenByParent]);
 
   /** Filas aplanadas en orden de árbol bajo una raíz (children + grandchildren). */
   const descendantRows = (rootId: number): TreeRow[] => {
@@ -98,16 +103,11 @@ export function DisenoSection() {
     if (oldIdx < 0 || newIdx < 0) return;
     const next = arrayMove(roots, oldIdx, newIdx);
     // Optimistic: actualizar cache para feedback instantáneo. Si falla, invalida.
-    qc.setQueryData<CategoriaAdmin[]>(
-      ["admin", "categorias-list"],
-      (prev) => {
-        if (!prev) return prev;
-        const byId = new Map(next.map((c, i) => [c.id, (i + 1) * 10] as const));
-        return prev.map((c) =>
-          byId.has(c.id) ? { ...c, prioridad: byId.get(c.id)! } : c,
-        );
-      },
-    );
+    qc.setQueryData<CategoriaAdmin[]>(["admin", "categorias-list"], (prev) => {
+      if (!prev) return prev;
+      const byId = new Map(next.map((c, i) => [c.id, (i + 1) * 10] as const));
+      return prev.map((c) => (byId.has(c.id) ? { ...c, prioridad: byId.get(c.id)! } : c));
+    });
     // Persistir todos los cambios en paralelo.
     Promise.all(
       next.map((c, i) => adminApi.adminUpdateCategoria(c.id, { prioridad: (i + 1) * 10 })),
@@ -128,10 +128,9 @@ export function DisenoSection() {
       <header>
         <h2 className="font-display text-lg text-ink">Secciones del catálogo</h2>
         <p className="text-xs text-muted-foreground">
-          Arrastrá las categorías raíz para cambiar el orden en que aparecen en el catálogo
-          público. Usá el ojo para ocultar cualquier categoría —raíz o subcategoría— sin
-          borrarla; lo oculto desaparece del mosaico, los tabs y la navegación. Vuelve cuando
-          la prendés de nuevo.
+          Arrastrá las categorías raíz para cambiar el orden en que aparecen en el catálogo público.
+          Usá el ojo para ocultar cualquier categoría —raíz o subcategoría— sin borrarla; lo oculto
+          desaparece del mosaico, los tabs y la navegación. Vuelve cuando la prendés de nuevo.
         </p>
       </header>
 
@@ -149,15 +148,8 @@ export function DisenoSection() {
       )}
 
       {roots.length > 0 && (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={roots.map((c) => c.id)}
-            strategy={verticalListSortingStrategy}
-          >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={roots.map((c) => c.id)} strategy={verticalListSortingStrategy}>
             <div className="border hairline rounded-md divide-y divide-muted/40">
               {roots.map((root) => (
                 <div key={root.id}>
@@ -187,7 +179,10 @@ export function DisenoSection() {
 
 /** Botón de ojo visible/oculto, compartido entre raíces y subcategorías. */
 function VisibilityToggle({
-  hidden, nombre, onToggle, disabled,
+  hidden,
+  nombre,
+  onToggle,
+  disabled,
 }: {
   hidden: boolean;
   nombre: string;
@@ -212,7 +207,9 @@ function VisibilityToggle({
 }
 
 function SortableRow({
-  categoria, onToggleVisible, disabled,
+  categoria,
+  onToggleVisible,
+  disabled,
 }: {
   categoria: CategoriaAdmin;
   onToggleVisible: () => void;
@@ -246,7 +243,9 @@ function SortableRow({
       </button>
 
       <div className="flex-1 min-w-0">
-        <div className={`truncate text-sm ${hidden ? "text-muted-foreground line-through" : "text-ink"}`}>
+        <div
+          className={`truncate text-sm ${hidden ? "text-muted-foreground line-through" : "text-ink"}`}
+        >
           {categoria.nombre}
         </div>
         <div className="text-[10px] text-muted-foreground tabular-nums">
@@ -266,7 +265,10 @@ function SortableRow({
 
 /** Fila de subcategoría/nieto: sin drag, indentada por profundidad, con ojo. */
 function PlainRow({
-  categoria, depth, onToggleVisible, disabled,
+  categoria,
+  depth,
+  onToggleVisible,
+  disabled,
 }: {
   categoria: CategoriaAdmin;
   depth: number;
@@ -282,15 +284,14 @@ function PlainRow({
       }`}
       style={{ paddingLeft: 12 + depth * 24 }}
     >
-      <span
-        aria-hidden
-        className="shrink-0 text-muted-foreground/60 select-none text-xs"
-      >
+      <span aria-hidden className="shrink-0 text-muted-foreground/60 select-none text-xs">
         └
       </span>
 
       <div className="flex-1 min-w-0">
-        <div className={`truncate text-sm ${hidden ? "text-muted-foreground line-through" : "text-ink"}`}>
+        <div
+          className={`truncate text-sm ${hidden ? "text-muted-foreground line-through" : "text-ink"}`}
+        >
           {categoria.nombre}
         </div>
         <div className="text-[10px] text-muted-foreground tabular-nums">

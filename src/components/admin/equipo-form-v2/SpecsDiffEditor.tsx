@@ -21,11 +21,19 @@
 
 import { Trash2, GripVertical, BookmarkCheck } from "lucide-react";
 import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -33,7 +41,11 @@ import { CSS } from "@dnd-kit/utilities";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import type { SpecTemplate } from "@/lib/admin/api";
 
@@ -43,7 +55,11 @@ import { TablaValueInput } from "./TablaValueInput";
 const lower = (s: string) => s.trim().toLowerCase();
 
 export function SpecsDiffEditor({
-  specs, propuestos, onChange, onAceptarPropuesto, onDescartarPropuesto,
+  specs,
+  propuestos,
+  onChange,
+  onAceptarPropuesto,
+  onDescartarPropuesto,
   templateItems,
 }: {
   specs: Spec[];
@@ -96,15 +112,13 @@ export function SpecsDiffEditor({
       });
     }
   }
-  const templateBoundIds = new Set(
-    templateBound.filter((x) => !x.ghost).map((x) => x.spec.id),
-  );
+  const templateBoundIds = new Set(templateBound.filter((x) => !x.ghost).map((x) => x.spec.id));
   const custom = specs.filter((s) => !templateBoundIds.has(s.id));
 
   const updateSpec = (id: string, patch: Partial<Spec>) => {
     // Si el id corresponde a un spec ya en specs[], update normal.
     if (specs.some((s) => s.id === id)) {
-      onChange(specs.map((s) => s.id === id ? { ...s, ...patch } : s));
+      onChange(specs.map((s) => (s.id === id ? { ...s, ...patch } : s)));
       return;
     }
     // Ghost: materializar agregando al specs[] con el label del template.
@@ -128,10 +142,7 @@ export function SpecsDiffEditor({
     // (el lookup por label en render no depende del orden del array, pero
     // mantenemos un array consistente: primero los template-bound en orden
     // del template, después los custom reordenados).
-    const next = [
-      ...templateBound.map((x) => x.spec),
-      ...reorderedCustom,
-    ];
+    const next = [...templateBound.map((x) => x.spec), ...reorderedCustom];
     onChange(next);
   };
 
@@ -159,25 +170,37 @@ export function SpecsDiffEditor({
       {propuestos.length > 0 && (
         <div className="rounded-md border hairline bg-amber-soft/30 p-2 space-y-1.5">
           <p className="text-[11px] text-ink/70 font-medium">
-            ✨ {propuestos.length} {propuestos.length === 1 ? "ítem propuesto" : "ítems propuestos"} del autocompletar
+            ✨ {propuestos.length} {propuestos.length === 1 ? "ítem propuesto" : "ítems propuestos"}{" "}
+            del autocompletar
           </p>
           {propuestos.map((s) => {
             const existing = specs.find((x) => sameLabel(x.label, s.label));
             return (
               <div key={s.id} className="flex items-center gap-1.5 text-xs">
                 <div className="flex-1 min-w-0">
-                  <span className="font-medium">{s.label}:</span>{" "}
-                  <span>{s.value}</span>
+                  <span className="font-medium">{s.label}:</span> <span>{s.value}</span>
                   {existing && existing.value !== s.value && (
-                    <span className="ml-1 text-muted-foreground line-through">{existing.value}</span>
+                    <span className="ml-1 text-muted-foreground line-through">
+                      {existing.value}
+                    </span>
                   )}
                 </div>
-                <Button type="button" size="sm" variant="default" className="h-6 px-1.5 text-[10px]"
-                  onClick={() => onAceptarPropuesto(s)}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="default"
+                  className="h-6 px-1.5 text-[10px]"
+                  onClick={() => onAceptarPropuesto(s)}
+                >
                   ✓
                 </Button>
-                <Button type="button" size="sm" variant="outline" className="h-6 px-1.5 text-[10px]"
-                  onClick={() => onDescartarPropuesto(s)}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-1.5 text-[10px]"
+                  onClick={() => onDescartarPropuesto(s)}
+                >
                   ✗
                 </Button>
               </div>
@@ -214,7 +237,11 @@ export function SpecsDiffEditor({
               Custom ({custom.length}) · arrastrá para reordenar
             </div>
           )}
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
             <SortableContext items={custom.map((s) => s.id)} strategy={verticalListSortingStrategy}>
               <div className="space-y-1">
                 {custom.map((s) => {
@@ -250,7 +277,9 @@ export function SpecsDiffEditor({
 // ── Template-bound row (label read-only, valor type-aware) ──────────────
 
 function TemplateBoundRow({
-  spec, tmpl, onUpdate,
+  spec,
+  tmpl,
+  onUpdate,
 }: {
   spec: Spec;
   tmpl: SpecTemplate;
@@ -269,17 +298,12 @@ function TemplateBoundRow({
         )}
       </div>
       <div className="space-y-0.5">
-        <TypedValueInput
-          tmpl={tmpl}
-          value={spec.value}
-          onChange={(v) => onUpdate({ value: v })}
-        />
+        <TypedValueInput tmpl={tmpl} value={spec.value} onChange={(v) => onUpdate({ value: v })} />
         {validation.message && (
           <div
             className={
-              "text-[10px] " + (validation.severity === "error"
-                ? "text-destructive"
-                : "text-amber-700")
+              "text-[10px] " +
+              (validation.severity === "error" ? "text-destructive" : "text-amber-700")
             }
           >
             {validation.severity === "error" ? "✗ " : "⚠ "}
@@ -333,7 +357,10 @@ function validateSpecValue(
   }
   if (tmpl.tipo === "enum" && tmpl.enum_options?.length) {
     if (!tmpl.enum_options.includes(v)) {
-      return { severity: "warn", message: `Valor no está en opciones (${tmpl.enum_options.slice(0, 3).join(", ")}…)` };
+      return {
+        severity: "warn",
+        message: `Valor no está en opciones (${tmpl.enum_options.slice(0, 3).join(", ")}…)`,
+      };
     }
   }
   if (tmpl.tipo === "multi_enum" && tmpl.enum_options?.length) {
@@ -343,7 +370,10 @@ function validateSpecValue(
         const opts = new Set(tmpl.enum_options);
         const invalid = arr.filter((x) => typeof x === "string" && !opts.has(x));
         if (invalid.length > 0) {
-          return { severity: "warn", message: `Fuera de opciones: ${invalid.slice(0, 3).join(", ")}` };
+          return {
+            severity: "warn",
+            message: `Fuera de opciones: ${invalid.slice(0, 3).join(", ")}`,
+          };
         }
       }
     } catch {
@@ -366,7 +396,9 @@ function validateSpecValue(
 }
 
 function TypedValueInput({
-  tmpl, value, onChange,
+  tmpl,
+  value,
+  onChange,
 }: {
   tmpl: SpecTemplate;
   value: string;
@@ -397,7 +429,9 @@ function TypedValueInput({
         </SelectTrigger>
         <SelectContent>
           {tmpl.enum_options.map((opt) => (
-            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+            <SelectItem key={opt} value={opt}>
+              {opt}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -409,13 +443,7 @@ function TypedValueInput({
   }
 
   if (tmpl.tipo === "tabla" && tmpl.tabla_columnas?.length) {
-    return (
-      <TablaValueInput
-        value={value}
-        columnas={tmpl.tabla_columnas}
-        onChange={onChange}
-      />
-    );
+    return <TablaValueInput value={value} columnas={tmpl.tabla_columnas} onChange={onChange} />;
   }
 
   // string (default)
@@ -441,13 +469,16 @@ function normalizeForCollision(s: string): string {
     .toLowerCase()
     .trim()
     .replace(/\s*\([^)]*\)\s*$/, "")
-    .replace(/[\/\-_]/g, " ")
+    .replace(/[/\-_]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function CustomSortableRow({
-  spec, onUpdate, onRemove, tmplCollision,
+  spec,
+  onUpdate,
+  onRemove,
+  tmplCollision,
 }: {
   spec: Spec;
   onUpdate: (patch: Partial<Spec>) => void;
@@ -455,8 +486,9 @@ function CustomSortableRow({
   /** Si esta spec custom colide con una del template, viene seteado. */
   tmplCollision: SpecTemplate | null;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: spec.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: spec.id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -494,9 +526,8 @@ function CustomSortableRow({
       </div>
       {tmplCollision && (
         <div className="ml-6 text-[10px] text-amber-700 italic">
-          ⚠ Existe la spec oficial <strong>"{tmplCollision.label}"</strong> en
-          el template — eliminala y usá la del template para que entre al
-          sistema estructurado.
+          ⚠ Existe la spec oficial <strong>"{tmplCollision.label}"</strong> en el template —
+          eliminala y usá la del template para que entre al sistema estructurado.
         </div>
       )}
     </div>
@@ -531,7 +562,9 @@ function isPrefixUnit(unidad: string): boolean {
 }
 
 function RangoValueInput({
-  value, unidad, onChange,
+  value,
+  unidad,
+  onChange,
 }: {
   value: string;
   unidad: string;
@@ -552,9 +585,7 @@ function RangoValueInput({
   };
 
   const unitSpan = (
-    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-      {unidad}
-    </span>
+    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{unidad}</span>
   );
 
   return (
@@ -597,7 +628,10 @@ function parseMedidas(raw: string, axes: 2 | 3): string[] {
 }
 
 function MedidasValueInput({
-  value, unidad, axes, onChange,
+  value,
+  unidad,
+  axes,
+  onChange,
 }: {
   value: string;
   unidad: string;
@@ -639,9 +673,7 @@ function MedidasValueInput({
             className="text-xs w-16 text-center"
             aria-label={`Medida ${i + 1} de ${axes}`}
           />
-          {i < axes - 1 && (
-            <span className="text-[11px] text-muted-foreground select-none">×</span>
-          )}
+          {i < axes - 1 && <span className="text-[11px] text-muted-foreground select-none">×</span>}
         </div>
       ))}
       {!prefix && unitChip}
@@ -665,11 +697,18 @@ function parseMultiEnum(raw: string): Set<string> {
       /* fall through */
     }
   }
-  return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
+  return new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
 }
 
 function MultiEnumValueInput({
-  value, options, onChange,
+  value,
+  options,
+  onChange,
 }: {
   value: string;
   options: string[];
@@ -710,7 +749,9 @@ function MultiEnumValueInput({
 }
 
 function NumericValueInput({
-  value, unidad, onChange,
+  value,
+  unidad,
+  onChange,
 }: {
   value: string;
   /** Unidad opcional — si está vacía, no se concatena ningún sufijo. */
@@ -771,12 +812,7 @@ function isBoolNo(v: string): boolean {
   return t === "no" || t === "false" || t === "0";
 }
 
-function BoolValueInput({
-  value, onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function BoolValueInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const yes = isBoolYes(value);
   const no = isBoolNo(value);
   return (

@@ -27,13 +27,7 @@ import { cn } from "@/lib/utils";
  * back → re-scroll" es lento y pierde fluidez. El expand inline mantiene
  * al usuario hojeando.
  */
-export function EquipmentRow({
-  item,
-  disponible,
-}: {
-  item: Equipment;
-  disponible?: number;
-}) {
+export function EquipmentRow({ item, disponible }: { item: Equipment; disponible?: number }) {
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
   const remove = useCart((s) => s.remove);
@@ -120,10 +114,12 @@ export function EquipmentRow({
                 </span>
               )}
               {disponible !== undefined && (
-                <span className={cn(
-                  "shrink-0 hidden sm:inline",
-                  sinStock ? "text-destructive/70" : stockBajo ? "text-amber" : "",
-                )}>
+                <span
+                  className={cn(
+                    "shrink-0 hidden sm:inline",
+                    sinStock ? "text-destructive/70" : stockBajo ? "text-amber" : "",
+                  )}
+                >
                   · {sinStock ? "sin stock" : `${disponible} disp.`}
                 </span>
               )}
@@ -159,11 +155,7 @@ export function EquipmentRow({
         {/* Addon pills inline — solo desktop (lg+).
          * En mobile/tablet los addons viven en el expand inline (KitSection +
          * IncludedList). Acá es el quick-peek para decidir sin click. */}
-        <AddonPills
-          items={item.includes}
-          max={3}
-          className="hidden lg:flex max-w-[280px]"
-        />
+        <AddonPills items={item.includes} max={3} className="hidden lg:flex max-w-[280px]" />
 
         {/* Precio en desktop */}
         <div className="hidden text-right sm:block">
@@ -271,9 +263,7 @@ export function EquipmentRow({
                         <span className="font-mono uppercase tracking-wider text-muted-foreground">
                           {f.label}
                         </span>
-                        {hasValue && (
-                          <span className="font-medium text-ink">{f.value}</span>
-                        )}
+                        {hasValue && <span className="font-medium text-ink">{f.value}</span>}
                       </span>
                     );
                   })}

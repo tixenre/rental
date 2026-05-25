@@ -15,14 +15,21 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { adminApi } from "@/lib/admin/api";
 
 export function AddEquiposToCategoriaDialog({
-  open, onOpenChange, categoriaId, categoriaNombre,
+  open,
+  onOpenChange,
+  categoriaId,
+  categoriaNombre,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -43,10 +50,11 @@ export function AddEquiposToCategoriaDialog({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return items;
-    return items.filter((e) =>
-      e.nombre.toLowerCase().includes(q) ||
-      (e.marca ?? "").toLowerCase().includes(q) ||
-      (e.modelo ?? "").toLowerCase().includes(q),
+    return items.filter(
+      (e) =>
+        e.nombre.toLowerCase().includes(q) ||
+        (e.marca ?? "").toLowerCase().includes(q) ||
+        (e.modelo ?? "").toLowerCase().includes(q),
     );
   }, [items, search]);
 
@@ -97,9 +105,8 @@ export function AddEquiposToCategoriaDialog({
         <DialogHeader>
           <DialogTitle>Asignar equipos a "{categoriaNombre}"</DialogTitle>
           <DialogDescription>
-            Tildá los equipos que querés agregar a esta categoría. Los que ya pertenecen
-            aparecen marcados y bloqueados — esto NO reemplaza otras categorías que cada
-            equipo ya tenga.
+            Tildá los equipos que querés agregar a esta categoría. Los que ya pertenecen aparecen
+            marcados y bloqueados — esto NO reemplaza otras categorías que cada equipo ya tenga.
           </DialogDescription>
         </DialogHeader>
 
@@ -144,7 +151,9 @@ export function AddEquiposToCategoriaDialog({
                       <div className="truncate text-sm text-ink">{e.nombre}</div>
                       <div className="text-[10px] text-muted-foreground">
                         {[e.marca, e.modelo].filter(Boolean).join(" · ") || "—"}
-                        {isIn && <span className="ml-2 text-ink/70">· ya está en esta categoría</span>}
+                        {isIn && (
+                          <span className="ml-2 text-ink/70">· ya está en esta categoría</span>
+                        )}
                       </div>
                     </div>
                   </li>
@@ -158,11 +167,10 @@ export function AddEquiposToCategoriaDialog({
           <div className="mr-auto text-xs text-muted-foreground self-center">
             {selected.size > 0 ? `${selected.size} seleccionado(s)` : "Tildá equipos para asignar"}
           </div>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button
-            onClick={handleSave}
-            disabled={selected.size === 0 || addMut.isPending}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={selected.size === 0 || addMut.isPending}>
             {addMut.isPending ? "Guardando…" : "Asignar"}
           </Button>
         </DialogFooter>

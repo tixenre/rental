@@ -35,9 +35,7 @@ export function PageHeader({ title, subtitle, onBack, action, className }: Props
 
       <div className="min-w-0 flex-1">
         <h1 className="truncate font-display text-lg leading-tight">{title}</h1>
-        {subtitle && (
-          <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
-        )}
+        {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
       </div>
 
       {action && <div className="shrink-0">{action}</div>}

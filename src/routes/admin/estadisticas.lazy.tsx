@@ -1,6 +1,16 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, Users, Package, DollarSign, Calendar, Calculator, Heart, Repeat } from "lucide-react";
+import {
+  TrendingUp,
+  TrendingDown,
+  Users,
+  Package,
+  DollarSign,
+  Calendar,
+  Calculator,
+  Heart,
+  Repeat,
+} from "lucide-react";
 
 import { adminApi } from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -61,7 +71,9 @@ function EstadisticasPage() {
             const t = data.totales;
             const ticket = t.total_pedidos ? Math.round(t.total_ars / t.total_pedidos) : 0;
             const ltv = t.total_clientes ? Math.round(t.total_ars / t.total_clientes) : 0;
-            const pedidosPorCliente = t.total_clientes ? (t.total_pedidos / t.total_clientes).toFixed(1) : "0";
+            const pedidosPorCliente = t.total_clientes
+              ? (t.total_pedidos / t.total_clientes).toFixed(1)
+              : "0";
             return (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <Kpi
@@ -90,9 +102,13 @@ function EstadisticasPage() {
             {/* Por mes (sparkline) */}
             <Section title="Facturación por mes" subtitle="Últimos 24 meses">
               <BarChart
-                data={[...data.por_mes].slice(0, 12).reverse().map((m) => ({
-                  label: m.mes, value: Number(m.total_ars) || 0,
-                }))}
+                data={[...data.por_mes]
+                  .slice(0, 12)
+                  .reverse()
+                  .map((m) => ({
+                    label: m.mes,
+                    value: Number(m.total_ars) || 0,
+                  }))}
               />
             </Section>
 
@@ -108,8 +124,13 @@ function EstadisticasPage() {
                         c.crecimiento_pct >= 0 ? "text-emerald-700" : "text-destructive"
                       }`}
                     >
-                      {c.crecimiento_pct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                      {c.crecimiento_pct >= 0 ? "+" : ""}{c.crecimiento_pct}%
+                      {c.crecimiento_pct >= 0 ? (
+                        <TrendingUp className="h-3 w-3" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3" />
+                      )}
+                      {c.crecimiento_pct >= 0 ? "+" : ""}
+                      {c.crecimiento_pct}%
                     </span>
                   </div>
                 ))}
@@ -120,7 +141,9 @@ function EstadisticasPage() {
             <Section title="Top equipos" subtitle="Por facturación">
               <RankList
                 items={data.top_equipos.map((e) => ({
-                  primary: e.equipo, secondary: `${e.veces}× alquilado`, value: fmtArs(e.total_ars),
+                  primary: e.equipo,
+                  secondary: `${e.veces}× alquilado`,
+                  value: fmtArs(e.total_ars),
                 }))}
                 icon={Package}
               />
@@ -130,7 +153,9 @@ function EstadisticasPage() {
             <Section title="Top clientes" subtitle="Por facturación">
               <RankList
                 items={data.top_clientes.map((c) => ({
-                  primary: c.cliente, secondary: `${c.pedidos} pedidos`, value: fmtArs(c.total_ars),
+                  primary: c.cliente,
+                  secondary: `${c.pedidos} pedidos`,
+                  value: fmtArs(c.total_ars),
                 }))}
                 icon={Users}
               />
@@ -140,7 +165,9 @@ function EstadisticasPage() {
             <Section title="Clientes recurrentes" subtitle="Más de 1 alquiler">
               <RankList
                 items={data.clientes_recurrentes.map((c) => ({
-                  primary: c.cliente, secondary: `${c.veces_alquiladas}× alquilado`, value: fmtArs(c.total_ars),
+                  primary: c.cliente,
+                  secondary: `${c.veces_alquiladas}× alquilado`,
+                  value: fmtArs(c.total_ars),
                 }))}
                 icon={Users}
               />
@@ -150,7 +177,9 @@ function EstadisticasPage() {
             <Section title="Por dueño" subtitle="Reparto de equipos">
               <RankList
                 items={data.por_dueno.map((d) => ({
-                  primary: d.dueno, secondary: `${d.items} ítems`, value: fmtArs(d.total_ars),
+                  primary: d.dueno,
+                  secondary: `${d.items} ítems`,
+                  value: fmtArs(d.total_ars),
                 }))}
                 icon={Package}
               />
@@ -163,10 +192,15 @@ function EstadisticasPage() {
 }
 
 function Kpi({
-  icon: Icon, label, value, sub,
+  icon: Icon,
+  label,
+  value,
+  sub,
 }: {
   icon: React.ComponentType<{ className?: string }>;
-  label: string; value: string; sub?: string;
+  label: string;
+  value: string;
+  sub?: string;
 }) {
   return (
     <div className="rounded-lg border hairline bg-background p-3">
@@ -180,7 +214,15 @@ function Kpi({
   );
 }
 
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Section({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="rounded-lg border hairline bg-background p-4">
       <h2 className="font-display text-lg text-ink">{title}</h2>
@@ -214,7 +256,8 @@ function BarChart({ data }: { data: { label: string; value: number }[] }) {
 }
 
 function RankList({
-  items, icon: Icon,
+  items,
+  icon: Icon,
 }: {
   items: { primary: string; secondary: string; value: string }[];
   icon: React.ComponentType<{ className?: string }>;

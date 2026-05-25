@@ -34,9 +34,7 @@ export function IncludedList({ item }: { item: Equipment }) {
                 <dt className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
                   {s.label}
                 </dt>
-                <dd className="truncate text-[13px] font-medium text-ink">
-                  {s.value}
-                </dd>
+                <dd className="truncate text-[13px] font-medium text-ink">{s.value}</dd>
               </div>
             ))}
             {moreSpecs > 0 && (

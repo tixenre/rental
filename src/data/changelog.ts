@@ -13,7 +13,7 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-05-22",
     type: "style",
     title: "Catálogo desktop: ajustes finales del diseño",
-    body: "Tres mejoras chicas alineadas con el prototipo de diseño: (1) el toggle Explorar/Lista del catálogo pasa a un estilo más compacto (sin uppercase ni tracking ancho) para que no compita visualmente con el título del hero; (2) las cards del listado en desktop ahora muestran inline hasta 3 \"addon pills\" con los componentes del kit (batería, cargador, tarjeta) — quick-peek sin necesidad de abrir el panel lateral; (3) la franja del carrito tiene un hover preview que muestra al pasar el mouse cada ítem con su foto, marca, modelo y precio — para chequear el carrito sin abrir el drawer. Mobile no cambia: los addons siguen apareciendo en el expand inline y no hay hover preview (es solo para desktop).",
+    body: 'Tres mejoras chicas alineadas con el prototipo de diseño: (1) el toggle Explorar/Lista del catálogo pasa a un estilo más compacto (sin uppercase ni tracking ancho) para que no compita visualmente con el título del hero; (2) las cards del listado en desktop ahora muestran inline hasta 3 "addon pills" con los componentes del kit (batería, cargador, tarjeta) — quick-peek sin necesidad de abrir el panel lateral; (3) la franja del carrito tiene un hover preview que muestra al pasar el mouse cada ítem con su foto, marca, modelo y precio — para chequear el carrito sin abrir el drawer. Mobile no cambia: los addons siguen apareciendo en el expand inline y no hay hover preview (es solo para desktop).',
     labels: ["catalogo", "desktop", "diseno"],
   },
   {
@@ -29,7 +29,7 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-05-15",
     type: "feat",
     title: "Crear equipo: campos mínimos obligatorios + invitación a completar lo recomendado",
-    body: "Al crear un equipo nuevo, ahora son obligatorios: nombre, marca, categoría, cantidad, precio por jornada y dueño. Si falta alguno, el form no deja guardar. Cuando el equipo se crea OK, si quedaron campos recomendados vacíos (foto, descripción, número de serie, valor de reposición), aparece un toast diciendo cuáles faltan con un botón \"Completar →\" que reabre el form en modo edición. En edición los campos siguen siendo todos opcionales — no romper flujos legacy.",
+    body: 'Al crear un equipo nuevo, ahora son obligatorios: nombre, marca, categoría, cantidad, precio por jornada y dueño. Si falta alguno, el form no deja guardar. Cuando el equipo se crea OK, si quedaron campos recomendados vacíos (foto, descripción, número de serie, valor de reposición), aparece un toast diciendo cuáles faltan con un botón "Completar →" que reabre el form en modo edición. En edición los campos siguen siendo todos opcionales — no romper flujos legacy.',
     labels: ["admin", "calidad-datos", "ux"],
   },
   {
@@ -37,7 +37,7 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-05-15",
     type: "feat",
     title: "Dashboard de calidad: cada fila es ahora un CTA que filtra equipos directamente",
-    body: "Las filas del dashboard /admin/equipos/calidad pasaron de ser solo lectura a ser links. Click en \"5 sin foto principal\" → te lleva a /admin/equipos filtrado a esos 5 equipos, con un banner ámbar arriba que dice \"Filtrando equipos sin foto principal · 5 resultados · Quitar filtro\". Cada campo faltante (foto, categoría, nombre público, descripción, serie, valor de reposición) tiene su filtro propio compartible vía URL.",
+    body: 'Las filas del dashboard /admin/equipos/calidad pasaron de ser solo lectura a ser links. Click en "5 sin foto principal" → te lleva a /admin/equipos filtrado a esos 5 equipos, con un banner ámbar arriba que dice "Filtrando equipos sin foto principal · 5 resultados · Quitar filtro". Cada campo faltante (foto, categoría, nombre público, descripción, serie, valor de reposición) tiene su filtro propio compartible vía URL.',
     labels: ["admin", "calidad-datos", "ux"],
   },
   {
@@ -52,7 +52,7 @@ export const changelog: ChangelogEntry[] = [
     number: 142,
     date: "2026-05-15",
     type: "feat",
-    title: "Microinteracción \"+1\" volando al carrito al agregar un equipo",
+    title: 'Microinteracción "+1" volando al carrito al agregar un equipo',
     body: "Al tocar 'Agregar' en una tarjeta del catálogo, ahora aparece un chip '+1' amarillo que sale del botón con una curva animada hacia el ícono del carrito en la barra inferior. Cuando llega, el ícono hace un pequeño pop (escala) que refuerza visualmente que el item se sumó. Es feedback inmediato típico de e-commerce mobile — sirve para no perderse el cambio del contador cuando estás scrolleando rápido.",
     labels: ["público", "ux", "mobile"],
   },
@@ -165,7 +165,7 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-05-11",
     type: "feat",
     title: "Dueño de equipo ahora es un dropdown (Rambla / Pablo / Tincho)",
-    body: "Antes el campo dueño era texto libre — generaba inconsistencias por capitalización (\"Pablo\" vs \"pablo\" vs \"PABLO\") que fragmentaban los reportes. Ahora es un selector con las 3 opciones fijas. Los valores existentes se normalizaron automáticamente via migración Alembic. Si algún equipo tiene un dueño legacy (raro), aparece como '(legacy: X)' en el form y al guardar se reemplaza por la opción elegida del dropdown.",
+    body: 'Antes el campo dueño era texto libre — generaba inconsistencias por capitalización ("Pablo" vs "pablo" vs "PABLO") que fragmentaban los reportes. Ahora es un selector con las 3 opciones fijas. Los valores existentes se normalizaron automáticamente via migración Alembic. Si algún equipo tiene un dueño legacy (raro), aparece como \'(legacy: X)\' en el form y al guardar se reemplaza por la opción elegida del dropdown.',
     labels: ["admin", "calidad-datos"],
   },
   {
@@ -277,7 +277,7 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-05-11",
     type: "feat",
     title: "Migraciones de base de datos versionadas (Alembic)",
-    body: "Los cambios al schema ahora se trackean como migraciones versionadas. Cada vez que se modifica una tabla queda registrado y aplicado en orden — antes era \"ALTER TABLE IF NOT EXISTS\" suelto sin trazabilidad. Las migraciones corren automáticamente al arrancar la app.",
+    body: 'Los cambios al schema ahora se trackean como migraciones versionadas. Cada vez que se modifica una tabla queda registrado y aplicado en orden — antes era "ALTER TABLE IF NOT EXISTS" suelto sin trazabilidad. Las migraciones corren automáticamente al arrancar la app.',
     labels: ["infra"],
   },
   {
@@ -408,7 +408,7 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-05-10",
     type: "fix",
     title: "Carrusel de marcas y fechas inválidas en pedidos",
-    body: "Carrusel de marcas mostraba 0 equipos. Fechas inválidas (\"Invalid Date\") en la sección Mis Pedidos del portal cliente.",
+    body: 'Carrusel de marcas mostraba 0 equipos. Fechas inválidas ("Invalid Date") en la sección Mis Pedidos del portal cliente.',
   },
   {
     number: 29,

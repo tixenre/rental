@@ -29,7 +29,11 @@ export function EtiquetasSection() {
 
   const createMut = useMutation({
     mutationFn: (nombre: string) => adminApi.adminCreateEtiqueta({ nombre }),
-    onSuccess: () => { invalidate(); setNueva(""); toast.success("Etiqueta creada"); },
+    onSuccess: () => {
+      invalidate();
+      setNueva("");
+      toast.success("Etiqueta creada");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const renameMut = useMutation({
@@ -40,7 +44,10 @@ export function EtiquetasSection() {
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => adminApi.adminDeleteEtiqueta(id),
-    onSuccess: () => { invalidate(); toast.success("Etiqueta eliminada"); },
+    onSuccess: () => {
+      invalidate();
+      toast.success("Etiqueta eliminada");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -56,9 +63,9 @@ export function EtiquetasSection() {
       <div>
         <h2 className="font-display text-lg text-ink">Etiquetas libres</h2>
         <p className="text-sm text-muted-foreground">
-          Bolsa de keywords para búsqueda. Marca, modelo, nombre y categorías
-          se agregan automáticamente — usá esto para palabras adicionales (ej:
-          "f/2.8", "4k60", "fullframe", "bicolor").
+          Bolsa de keywords para búsqueda. Marca, modelo, nombre y categorías se agregan
+          automáticamente — usá esto para palabras adicionales (ej: "f/2.8", "4k60", "fullframe",
+          "bicolor").
         </p>
       </div>
 
@@ -72,8 +79,11 @@ export function EtiquetasSection() {
           }}
           className="h-8 max-w-xs"
         />
-        <Button size="sm" disabled={!nueva.trim() || createMut.isPending}
-          onClick={() => createMut.mutate(nueva.trim())}>
+        <Button
+          size="sm"
+          disabled={!nueva.trim() || createMut.isPending}
+          onClick={() => createMut.mutate(nueva.trim())}
+        >
           <Plus className="h-4 w-4 mr-1" /> Agregar
         </Button>
         <div className="flex-1" />
@@ -110,10 +120,15 @@ export function EtiquetasSection() {
               <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
                 {et.total}
               </span>
-              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive"
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-destructive"
                 onClick={() => {
                   if (confirm(`Eliminar etiqueta "${et.nombre}"?`)) deleteMut.mutate(et.id);
-                }} title="Eliminar">
+                }}
+                title="Eliminar"
+              >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </li>

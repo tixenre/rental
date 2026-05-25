@@ -22,15 +22,37 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Loader2, Upload, Plus, Trash2, Sparkles, Search,
-  Link as LinkIcon, Image as ImageIcon, X, Copy, ExternalLink, ChevronDown,
+  Loader2,
+  Upload,
+  Plus,
+  Trash2,
+  Sparkles,
+  Search,
+  Link as LinkIcon,
+  Image as ImageIcon,
+  X,
+  Copy,
+  ExternalLink,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -39,7 +61,13 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DUENOS, isCanonicalDueno } from "@/lib/admin/duenos";
 import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
 
@@ -49,9 +77,7 @@ import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
 import { KitEditor } from "./KitEditor";
 import { SpecsDiffEditor } from "./SpecsDiffEditor";
-import {
-  type Spec, newSpec, withIds, sameLabel, findSpecValue, uniq,
-} from "./spec-helpers";
+import { type Spec, newSpec, withIds, sameLabel, findSpecValue, uniq } from "./spec-helpers";
 import type { AutocompletarResult } from "../autocompletar";
 import { generarNombrePublico, categoriaSoportaAutoGen } from "./nombre-publico";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
@@ -65,31 +91,29 @@ import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 // completado parcial — el dashboard de calidad ya visibiliza los huecos.
 function buildSchema(isEdit: boolean) {
   const requiredStr = (name: string) =>
-    isEdit
-      ? z.string().optional().nullable()
-      : z.string().min(1, `${name} requerido`);
+    isEdit ? z.string().optional().nullable() : z.string().min(1, `${name} requerido`);
   const requiredNum = (name: string) =>
     isEdit
       ? z.coerce.number().min(0).optional().nullable()
       : z.coerce.number().min(1, `${name} requerido`);
 
   return z.object({
-    nombre:           z.string().min(1, "Nombre requerido"),
-    marca:            requiredStr("Marca"),
-    modelo:           z.string().optional().nullable(),
-    cantidad:         z.coerce.number().int().min(1, "Cantidad requerida").default(1),
-    precio_jornada:   requiredNum("Precio/jornada"),
-    precio_usd:       z.coerce.number().min(0).optional().nullable(),
-    roi_pct:          z.coerce.number().min(0).optional().nullable(),
+    nombre: z.string().min(1, "Nombre requerido"),
+    marca: requiredStr("Marca"),
+    modelo: z.string().optional().nullable(),
+    cantidad: z.coerce.number().int().min(1, "Cantidad requerida").default(1),
+    precio_jornada: requiredNum("Precio/jornada"),
+    precio_usd: z.coerce.number().min(0).optional().nullable(),
+    roi_pct: z.coerce.number().min(0).optional().nullable(),
     valor_reposicion: z.coerce.number().min(0).optional().nullable(),
-    fecha_compra:     z.string().optional().nullable(),
-    serie:            z.string().optional().nullable(),
-    bh_url:           z.string().optional().nullable(),
-    foto_url:         z.string().optional().nullable(),
-    dueno:            requiredStr("Dueño"),
-    estado:           z.enum(["operativo", "en_mantenimiento", "fuera_servicio"]).default("operativo"),
+    fecha_compra: z.string().optional().nullable(),
+    serie: z.string().optional().nullable(),
+    bh_url: z.string().optional().nullable(),
+    foto_url: z.string().optional().nullable(),
+    dueno: requiredStr("Dueño"),
+    estado: z.enum(["operativo", "en_mantenimiento", "fuera_servicio"]).default("operativo"),
     visible_catalogo: z.boolean().default(true),
-    ficha_completa:   z.boolean().default(false),
+    ficha_completa: z.boolean().default(false),
   });
 }
 
@@ -98,11 +122,11 @@ type FormValues = z.infer<ReturnType<typeof buildSchema>>;
 /** Campos "recomendados" para un equipo (#351). Después del create, si
  *  alguno está vacío, mostramos un toast con CTA para completar. */
 const RECOMMENDED_FIELDS = ["foto", "descripcion", "serie", "valor_reposicion"] as const;
-type RecommendedField = typeof RECOMMENDED_FIELDS[number];
+type RecommendedField = (typeof RECOMMENDED_FIELDS)[number];
 const RECOMMENDED_LABELS: Record<RecommendedField, string> = {
-  foto:             "foto",
-  descripcion:      "descripción",
-  serie:            "número de serie",
+  foto: "foto",
+  descripcion: "descripción",
+  serie: "número de serie",
   valor_reposicion: "valor de reposición",
 };
 
@@ -188,7 +212,9 @@ export function EquipoFormDialogV2({
   // El URL del autocompletar es el mismo bh_url del form — un único link
   // para todo (autocompletar, buscar fotos, referencia, copiar/abrir).
   const [autocompletando, setAutocompletando] = useState(false);
-  const [importedFichaExt, setImportedFichaExt] = useState<Partial<AutocompletarResult> | null>(null);
+  const [importedFichaExt, setImportedFichaExt] = useState<Partial<AutocompletarResult> | null>(
+    null,
+  );
 
   // Specs traídos del autocompletar: se guardan en una lista separada para
   // que el usuario los apruebe uno por uno (vs los specs actuales).
@@ -204,9 +230,12 @@ export function EquipoFormDialogV2({
   // CREATE mode: archivo local que se sube después de crear el equipo.
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingFilePreview, setPendingFilePreview] = useState("");
-  useEffect(() => () => {
-    if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
-  }, [pendingFilePreview]);
+  useEffect(
+    () => () => {
+      if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+    },
+    [pendingFilePreview],
+  );
 
   // ── Manual override del precio/día ─────────────────────────────────
   const [precioJornadaManual, setPrecioJornadaManual] = useState(false);
@@ -258,10 +287,14 @@ export function EquipoFormDialogV2({
       try {
         const arr = f.keywords_json ? JSON.parse(f.keywords_json) : [];
         kws = Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
-      } catch { kws = []; }
+      } catch {
+        kws = [];
+      }
       setTags(uniq([...(initial?.etiquetas ?? []), ...kws]));
     } else if (!initial) {
-      setDescripcion(""); setNotas(""); setTags([]);
+      setDescripcion("");
+      setNotas("");
+      setTags([]);
       setNombrePublico("");
     }
   }, [fichaQ.data, initial]);
@@ -336,10 +369,7 @@ export function EquipoFormDialogV2({
     queryFn: () => adminApi.listSpecCategorias(),
     enabled: open,
   });
-  const specCatOptions = useMemo(
-    () => specCatsQ.data?.categorias ?? [],
-    [specCatsQ.data],
-  );
+  const specCatOptions = useMemo(() => specCatsQ.data?.categorias ?? [], [specCatsQ.data]);
   const [categoriaSpecs, setCategoriaSpecs] = useState<string>("");
   // Se vuelve true en cuanto el admin toca el selector. Mientras sea false,
   // dejamos que el auto-default (abajo) complete la categoría de specs desde
@@ -411,10 +441,7 @@ export function EquipoFormDialogV2({
   /** Items del template de specs de la categoría seleccionada, ordenados por
    *  prioridad ASC. SpecsDiffEditor matchea por label vs `specs`; los
    *  faltantes los renderiza como ghosts (input vacío). */
-  const templateItems = useMemo(
-    () => specTemplateQ.data?.items ?? [],
-    [specTemplateQ.data],
-  );
+  const templateItems = useMemo(() => specTemplateQ.data?.items ?? [], [specTemplateQ.data]);
 
   // Re-etiquetado: cuando llega/cambia el template de la categoría
   // seleccionada, resolvemos el label de cada spec guardado (id
@@ -486,7 +513,15 @@ export function EquipoFormDialogV2({
       resolucion: findSpecValue(specs, "Resolución"),
     });
     if (gen) setNombrePublico(gen);
-  }, [nombrePublicoAuto, categoriaRoot, categoriaTemplate, watchedMarca, watchedModelo, specs, initial?.nombre]);
+  }, [
+    nombrePublicoAuto,
+    categoriaRoot,
+    categoriaTemplate,
+    watchedMarca,
+    watchedModelo,
+    specs,
+    initial?.nombre,
+  ]);
 
   /** Hay alguna fuente de auto-gen disponible? Template DB o hardcoded. */
   const autoGenDisponible = !!categoriaTemplate || categoriaSoportaAutoGen(categoriaRoot);
@@ -555,14 +590,10 @@ export function EquipoFormDialogV2({
       // decisión (¿agregar al catálogo? ¿ignorar?). El backend obliga al
       // LLM a usar el label canónico del template via enum en el JSON
       // schema, así el match acá es por igualdad simple.
-      const tmplLabels = new Set(
-        (templateItems ?? []).map((t) => t.label.trim().toLowerCase()),
-      );
-      const autoAplicables = propuestos.filter((p) =>
-        tmplLabels.has(p.label.trim().toLowerCase()),
-      );
-      const requierenRevision = propuestos.filter((p) =>
-        !tmplLabels.has(p.label.trim().toLowerCase()),
+      const tmplLabels = new Set((templateItems ?? []).map((t) => t.label.trim().toLowerCase()));
+      const autoAplicables = propuestos.filter((p) => tmplLabels.has(p.label.trim().toLowerCase()));
+      const requierenRevision = propuestos.filter(
+        (p) => !tmplLabels.has(p.label.trim().toLowerCase()),
       );
       if (autoAplicables.length > 0) {
         setSpecs((prev) => {
@@ -601,22 +632,19 @@ export function EquipoFormDialogV2({
     const ctrl = new AbortController();
     const timeoutId = setTimeout(() => ctrl.abort(), 30_000);
     try {
-      const r = await authedJson<{ foto_candidates: string[] }>(
-        "/api/admin/equipos/buscar-fotos",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nombre: form.getValues("nombre"),
-            marca: form.getValues("marca") || null,
-            modelo: form.getValues("modelo") || null,
-            // Si hay URL en el autocompletar bar, usarla como fuente directa.
-            ...(u ? { url: u } : {}),
-            exclude: photoCands,
-          }),
-          signal: ctrl.signal,
-        },
-      );
+      const r = await authedJson<{ foto_candidates: string[] }>("/api/admin/equipos/buscar-fotos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: form.getValues("nombre"),
+          marca: form.getValues("marca") || null,
+          modelo: form.getValues("modelo") || null,
+          // Si hay URL en el autocompletar bar, usarla como fuente directa.
+          ...(u ? { url: u } : {}),
+          exclude: photoCands,
+        }),
+        signal: ctrl.signal,
+      });
       const news = (r.foto_candidates ?? []).filter((x) => !photoCands.includes(x));
       setPhotoCands((prev) => [...prev, ...news]);
       if (news.length === 0) toast.info("No se encontraron más fotos");
@@ -697,7 +725,10 @@ export function EquipoFormDialogV2({
   const addTag = () => {
     const v = tagInput.trim().toLowerCase();
     if (!v) return;
-    if (tags.includes(v)) { setTagInput(""); return; }
+    if (tags.includes(v)) {
+      setTagInput("");
+      return;
+    }
     setTags([...tags, v]);
     setTagInput("");
   };
@@ -720,278 +751,285 @@ export function EquipoFormDialogV2({
     return () => window.removeEventListener("keydown", handler);
   }, [open, saving]);
 
-  const submit = form.handleSubmit(async (values) => {
-    // Validación de creación: al menos una categoría seleccionada (#351).
-    // Las categorías viven en estado separado del schema zod, así que las
-    // chequeamos acá. En edit dejamos pasar por compat con equipos legacy.
-    if (!isEdit && selectedCats.size === 0) {
-      toast.error("Categoría requerida", {
-        description: "Elegí al menos una categoría antes de guardar.",
-      });
-      return;
-    }
-
-    // Pre-flight: validación de duplicados por serie. La serie es lo más
-    // único; si ya hay otro equipo con la misma, le pedimos confirmación al
-    // user antes de seguir (puede ser legítimo en kits, pero conviene avisar).
-    // EXCEPCIÓN: "N/A" es un placeholder común — los equipos sin serie real
-    // comparten ese valor por design, así que no avisamos.
-    const serieTrim = values.serie?.trim();
-    const isPlaceholderSerie =
-      !!serieTrim && /^(n\/?a|n\/?d|sin\s*serie|-+)$/i.test(serieTrim);
-    if (serieTrim && !isPlaceholderSerie) {
-      try {
-        const r = await adminApi.listEquipos({ q: serieTrim });
-        const dups = r.items.filter(
-          (e) => e.id !== initial?.id &&
-                 (e.serie ?? "").trim().toLowerCase() === serieTrim.toLowerCase(),
-        );
-        if (dups.length > 0) {
-          const ok = window.confirm(
-            `Ya hay otro equipo con la serie "${serieTrim}":\n  • ${dups[0].nombre}` +
-            (dups.length > 1 ? ` (+${dups.length - 1} más)` : "") +
-            `\n\n¿Guardar igual?`,
-          );
-          if (!ok) return;
-        }
-      } catch {
-        // Si la búsqueda falla, no bloqueamos el save.
-      }
-    }
-
-    // Tags unificadas (chip UI) → se envían a ambos backends: etiquetas (top-level
-    // equipo, para filtros/categorización) y keywords_json (ficha, para chips públicos).
-    const etiquetas = uniq(tags.map((t) => t.trim()).filter(Boolean));
-    const { visible_catalogo, ficha_completa, ...rest } = values;
-
-    const fotoUrlForm = rest.foto_url || null;
-    const fotoExternaPendiente =
-      !pendingFile && fotoUrlForm && !isHostedUrl(fotoUrlForm) ? fotoUrlForm : null;
-    const fotoUrlInicial = pendingFile ? null : fotoUrlForm;
-
-    const payload: EquipoInput = {
-      nombre: rest.nombre,
-      cantidad: rest.cantidad,
-      estado: rest.estado,
-      marca: rest.marca || null,
-      modelo: rest.modelo || null,
-      serie: rest.serie || null,
-      dueno: rest.dueno || null,
-      bh_url: rest.bh_url || null,
-      foto_url: fotoUrlInicial,
-      fecha_compra: rest.fecha_compra || null,
-      precio_jornada: rest.precio_jornada ?? null,
-      precio_usd: rest.precio_usd ?? null,
-      roi_pct: rest.roi_pct ?? null,
-      valor_reposicion: rest.valor_reposicion ?? null,
-      visible_catalogo: visible_catalogo ? 1 : 0,
-      ficha_completa: ficha_completa,
-      categoria_specs: categoriaSpecs || null,
-    };
-
-    const fallidos: string[] = [];
-    let equipoId: number | undefined;
-
-    try {
-      const saved = await onSubmit(payload, etiquetas);
-      equipoId = saved?.id ?? initial?.id;
-      if (!equipoId) {
-        toast.error("No se pudo guardar el equipo");
+  const submit = form.handleSubmit(
+    async (values) => {
+      // Validación de creación: al menos una categoría seleccionada (#351).
+      // Las categorías viven en estado separado del schema zod, así que las
+      // chequeamos acá. En edit dejamos pasar por compat con equipos legacy.
+      if (!isEdit && selectedCats.size === 0) {
+        toast.error("Categoría requerida", {
+          description: "Elegí al menos una categoría antes de guardar.",
+        });
         return;
       }
 
-      // Foto pendiente o externa
-      if (pendingFile) {
+      // Pre-flight: validación de duplicados por serie. La serie es lo más
+      // único; si ya hay otro equipo con la misma, le pedimos confirmación al
+      // user antes de seguir (puede ser legítimo en kits, pero conviene avisar).
+      // EXCEPCIÓN: "N/A" es un placeholder común — los equipos sin serie real
+      // comparten ese valor por design, así que no avisamos.
+      const serieTrim = values.serie?.trim();
+      const isPlaceholderSerie = !!serieTrim && /^(n\/?a|n\/?d|sin\s*serie|-+)$/i.test(serieTrim);
+      if (serieTrim && !isPlaceholderSerie) {
         try {
-          const r2url = await uploadFileToBucket(equipoId, pendingFile);
-          await adminApi.updateEquipo(equipoId, { foto_url: r2url });
-          form.setValue("foto_url", r2url, { shouldDirty: false });
-          setPendingFile(null);
-          if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
-          setPendingFilePreview("");
-        } catch (e) {
-          fallidos.push(`foto (${e instanceof Error ? e.message : "error"})`);
-        }
-      } else if (fotoExternaPendiente) {
-        try {
-          const r2url = await uploadExternalUrlToBucket(equipoId, fotoExternaPendiente);
-          await adminApi.updateEquipo(equipoId, { foto_url: r2url });
-          form.setValue("foto_url", r2url, { shouldDirty: false });
-        } catch (e) {
-          fallidos.push(`foto a R2 (${e instanceof Error ? e.message : "error"})`);
-        }
-      }
-
-      // Ficha legacy: descripción + notas + keywords + nombre público.
-      // Las specs estructuradas ya NO van acá — viven en equipo_specs y
-      // se persisten vía putEquipoSpecs (más abajo).
-      const tieneFicha = (
-        isEdit ||
-        !!descripcion || !!notas || tags.length > 0 ||
-        !!nombrePublico.trim() || !!importedFichaExt
-      );
-      if (tieneFicha) {
-        try {
-          await adminApi.setFicha(equipoId, {
-            descripcion: descripcion || null,
-            notas: notas || null,
-            keywords_json: tags.length ? JSON.stringify(tags) : null,
-            // Si el toggle "auto" está ON y tenemos un template de categoría,
-            // persistimos el TEMPLATE con tokens ("{marca} {modelo} ...").
-            // Al re-abrir el form, hasTokens detectará tokens → toggle queda ON.
-            // Cuando está OFF, guardamos el literal escrito por el dueño
-            // (override fijo, no se regenera).
-            nombre_publico_template:
-              nombrePublicoAuto && categoriaTemplate
-                ? categoriaTemplate
-                : (nombrePublico.trim() || null),
-          });
-        } catch (e) {
-          fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
-        }
-      }
-
-      // Specs estructuradas → PUT a equipo_specs (SoT única). El id de cada
-      // spec codifica su spec_def_id (`spec-${id}` para guardados, `tmpl-${id}`
-      // para los del template materializados), así que mapeamos directo sin
-      // round-trip por label —que se rompía cuando el label todavía no estaba
-      // resuelto contra el template. Los specs custom (id uuid, sin
-      // spec_def_id) no van a equipo_specs: se gestionan en /admin/equipos/specs.
-      if (isEdit && equipoSpecsQ.data) {
-        try {
-          const specsDict: Record<string, string> = {};
-          for (const s of specs) {
-            const value = s.value.trim();
-            if (!value) continue;
-            const m = /^(?:spec|tmpl)-(\d+)$/.exec(s.id);
-            if (!m) continue;
-            specsDict[m[1]] = value;
+          const r = await adminApi.listEquipos({ q: serieTrim });
+          const dups = r.items.filter(
+            (e) =>
+              e.id !== initial?.id &&
+              (e.serie ?? "").trim().toLowerCase() === serieTrim.toLowerCase(),
+          );
+          if (dups.length > 0) {
+            const ok = window.confirm(
+              `Ya hay otro equipo con la serie "${serieTrim}":\n  • ${dups[0].nombre}` +
+                (dups.length > 1 ? ` (+${dups.length - 1} más)` : "") +
+                `\n\n¿Guardar igual?`,
+            );
+            if (!ok) return;
           }
-          await adminApi.putEquipoSpecs(equipoId, specsDict);
-        } catch (e) {
-          fallidos.push(`specs (${e instanceof Error ? e.message : "error"})`);
+        } catch {
+          // Si la búsqueda falla, no bloqueamos el save.
         }
       }
 
-      // Ficha extendida (peso, dimensiones, etc.) si vino del autocompletar
-      if (importedFichaExt) {
-        try {
-          const r = importedFichaExt;
-          // Specs físicas (peso/dimensiones/montura/formato/resolucion/
-          // alimentacion) las consolida el backend en equipo_specs vía
-          // _matchear_y_persistir_specs (post-Fase F). Mandamos los
-          // campos planos del scrape — el backend hace el mapping a
-          // spec_key correspondiente.
-          const ext: Record<string, unknown> = {};
-          if (r.peso) ext.peso = r.peso;
-          if (r.dimensiones) ext.dimensiones = r.dimensiones;
-          if (r.alimentacion) ext.alimentacion = r.alimentacion;
-          if (r.montura) ext.montura = r.montura;
-          if (r.formato) ext.formato = r.formato;
-          if (r.resolucion) ext.resolucion = r.resolucion;
-          // Listas y multimedia (no son specs estructuradas)
-          if (r.video_url) ext.video_url = r.video_url;
-          if (typeof r.precio_bh_usd === "number") ext.precio_bh_usd = r.precio_bh_usd;
-          if (r.incluye?.length) ext.incluye = r.incluye;
-          if (r.conectividad?.length) ext.conectividad = r.conectividad;
-          if (r.compatible_con?.length) ext.compatible_con = r.compatible_con;
-          if (r.fuente_url) ext.fuente_url = r.fuente_url;
-          if (r.fuente_titulo) ext.fuente_titulo = r.fuente_titulo;
-          if (r.enriquecido_fuente) ext.enriquecido_fuente = r.enriquecido_fuente;
-          if (Object.keys(ext).length > 0) {
-            await adminApi.aplicarEnriquecimiento(equipoId, ext);
-          }
-        } catch (e) {
-          fallidos.push(`ficha extendida (${e instanceof Error ? e.message : "error"})`);
-        }
-      }
+      // Tags unificadas (chip UI) → se envían a ambos backends: etiquetas (top-level
+      // equipo, para filtros/categorización) y keywords_json (ficha, para chips públicos).
+      const etiquetas = uniq(tags.map((t) => t.trim()).filter(Boolean));
+      const { visible_catalogo, ficha_completa, ...rest } = values;
 
-      // Categorías (en V2 las habilitamos también en CREATE)
+      const fotoUrlForm = rest.foto_url || null;
+      const fotoExternaPendiente =
+        !pendingFile && fotoUrlForm && !isHostedUrl(fotoUrlForm) ? fotoUrlForm : null;
+      const fotoUrlInicial = pendingFile ? null : fotoUrlForm;
+
+      const payload: EquipoInput = {
+        nombre: rest.nombre,
+        cantidad: rest.cantidad,
+        estado: rest.estado,
+        marca: rest.marca || null,
+        modelo: rest.modelo || null,
+        serie: rest.serie || null,
+        dueno: rest.dueno || null,
+        bh_url: rest.bh_url || null,
+        foto_url: fotoUrlInicial,
+        fecha_compra: rest.fecha_compra || null,
+        precio_jornada: rest.precio_jornada ?? null,
+        precio_usd: rest.precio_usd ?? null,
+        roi_pct: rest.roi_pct ?? null,
+        valor_reposicion: rest.valor_reposicion ?? null,
+        visible_catalogo: visible_catalogo ? 1 : 0,
+        ficha_completa: ficha_completa,
+        categoria_specs: categoriaSpecs || null,
+      };
+
+      const fallidos: string[] = [];
+      let equipoId: number | undefined;
+
       try {
-        await adminApi.setCategorias(equipoId, [...selectedCats]);
-      } catch (e) {
-        fallidos.push(`categorías (${e instanceof Error ? e.message : "error"})`);
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al guardar");
-      return;
-    }
-
-    if (fallidos.length > 0) {
-      toast.warning(isEdit ? "Equipo actualizado con avisos" : "Equipo creado con avisos", {
-        description: `Falló: ${fallidos.join(" · ")}`,
-        duration: 7000,
-      });
-    } else {
-      // En creación, si faltan campos recomendados, ofrecemos completarlos
-      // ahora antes de cerrar — el equipo ya está creado, esto es opcional. #351
-      if (!isEdit && equipoId) {
-        // Para foto consideramos tanto foto_url ya seteada como pendingFile
-        // recién subido (que ya se aplicó arriba con setValue).
-        const missing: RecommendedField[] = [];
-        const fotoTras = form.getValues("foto_url") || pendingFile;
-        if (!fotoTras) missing.push("foto");
-        if (!descripcion?.trim()) missing.push("descripcion");
-        const serieClean = values.serie?.trim();
-        if (!serieClean) missing.push("serie");
-        if (!values.valor_reposicion || values.valor_reposicion === 0) missing.push("valor_reposicion");
-
-        if (missing.length > 0 && onCreatedWithMissingRecommended) {
-          const labels = missing.map((m) => RECOMMENDED_LABELS[m]).join(", ");
-          toast.success("Equipo creado", {
-            description: `Faltan datos recomendados: ${labels}`,
-            action: {
-              label: "Completar →",
-              onClick: () => {
-                // Reabrimos el form en edit mode con el equipo recién creado.
-                // El form vuelve a abrirse con todos los datos cargados y los
-                // campos faltantes resaltados implícitamente vía el dashboard
-                // de calidad (#349).
-                const savedEquipo = { ...(initial ?? {}), ...payload, id: equipoId } as Equipo;
-                onCreatedWithMissingRecommended(savedEquipo, missing);
-              },
-            },
-            duration: 12000,
-          });
-          onOpenChange(false);
+        const saved = await onSubmit(payload, etiquetas);
+        equipoId = saved?.id ?? initial?.id;
+        if (!equipoId) {
+          toast.error("No se pudo guardar el equipo");
           return;
         }
+
+        // Foto pendiente o externa
+        if (pendingFile) {
+          try {
+            const r2url = await uploadFileToBucket(equipoId, pendingFile);
+            await adminApi.updateEquipo(equipoId, { foto_url: r2url });
+            form.setValue("foto_url", r2url, { shouldDirty: false });
+            setPendingFile(null);
+            if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+            setPendingFilePreview("");
+          } catch (e) {
+            fallidos.push(`foto (${e instanceof Error ? e.message : "error"})`);
+          }
+        } else if (fotoExternaPendiente) {
+          try {
+            const r2url = await uploadExternalUrlToBucket(equipoId, fotoExternaPendiente);
+            await adminApi.updateEquipo(equipoId, { foto_url: r2url });
+            form.setValue("foto_url", r2url, { shouldDirty: false });
+          } catch (e) {
+            fallidos.push(`foto a R2 (${e instanceof Error ? e.message : "error"})`);
+          }
+        }
+
+        // Ficha legacy: descripción + notas + keywords + nombre público.
+        // Las specs estructuradas ya NO van acá — viven en equipo_specs y
+        // se persisten vía putEquipoSpecs (más abajo).
+        const tieneFicha =
+          isEdit ||
+          !!descripcion ||
+          !!notas ||
+          tags.length > 0 ||
+          !!nombrePublico.trim() ||
+          !!importedFichaExt;
+        if (tieneFicha) {
+          try {
+            await adminApi.setFicha(equipoId, {
+              descripcion: descripcion || null,
+              notas: notas || null,
+              keywords_json: tags.length ? JSON.stringify(tags) : null,
+              // Si el toggle "auto" está ON y tenemos un template de categoría,
+              // persistimos el TEMPLATE con tokens ("{marca} {modelo} ...").
+              // Al re-abrir el form, hasTokens detectará tokens → toggle queda ON.
+              // Cuando está OFF, guardamos el literal escrito por el dueño
+              // (override fijo, no se regenera).
+              nombre_publico_template:
+                nombrePublicoAuto && categoriaTemplate
+                  ? categoriaTemplate
+                  : nombrePublico.trim() || null,
+            });
+          } catch (e) {
+            fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
+          }
+        }
+
+        // Specs estructuradas → PUT a equipo_specs (SoT única). El id de cada
+        // spec codifica su spec_def_id (`spec-${id}` para guardados, `tmpl-${id}`
+        // para los del template materializados), así que mapeamos directo sin
+        // round-trip por label —que se rompía cuando el label todavía no estaba
+        // resuelto contra el template. Los specs custom (id uuid, sin
+        // spec_def_id) no van a equipo_specs: se gestionan en /admin/equipos/specs.
+        if (isEdit && equipoSpecsQ.data) {
+          try {
+            const specsDict: Record<string, string> = {};
+            for (const s of specs) {
+              const value = s.value.trim();
+              if (!value) continue;
+              const m = /^(?:spec|tmpl)-(\d+)$/.exec(s.id);
+              if (!m) continue;
+              specsDict[m[1]] = value;
+            }
+            await adminApi.putEquipoSpecs(equipoId, specsDict);
+          } catch (e) {
+            fallidos.push(`specs (${e instanceof Error ? e.message : "error"})`);
+          }
+        }
+
+        // Ficha extendida (peso, dimensiones, etc.) si vino del autocompletar
+        if (importedFichaExt) {
+          try {
+            const r = importedFichaExt;
+            // Specs físicas (peso/dimensiones/montura/formato/resolucion/
+            // alimentacion) las consolida el backend en equipo_specs vía
+            // _matchear_y_persistir_specs (post-Fase F). Mandamos los
+            // campos planos del scrape — el backend hace el mapping a
+            // spec_key correspondiente.
+            const ext: Record<string, unknown> = {};
+            if (r.peso) ext.peso = r.peso;
+            if (r.dimensiones) ext.dimensiones = r.dimensiones;
+            if (r.alimentacion) ext.alimentacion = r.alimentacion;
+            if (r.montura) ext.montura = r.montura;
+            if (r.formato) ext.formato = r.formato;
+            if (r.resolucion) ext.resolucion = r.resolucion;
+            // Listas y multimedia (no son specs estructuradas)
+            if (r.video_url) ext.video_url = r.video_url;
+            if (typeof r.precio_bh_usd === "number") ext.precio_bh_usd = r.precio_bh_usd;
+            if (r.incluye?.length) ext.incluye = r.incluye;
+            if (r.conectividad?.length) ext.conectividad = r.conectividad;
+            if (r.compatible_con?.length) ext.compatible_con = r.compatible_con;
+            if (r.fuente_url) ext.fuente_url = r.fuente_url;
+            if (r.fuente_titulo) ext.fuente_titulo = r.fuente_titulo;
+            if (r.enriquecido_fuente) ext.enriquecido_fuente = r.enriquecido_fuente;
+            if (Object.keys(ext).length > 0) {
+              await adminApi.aplicarEnriquecimiento(equipoId, ext);
+            }
+          } catch (e) {
+            fallidos.push(`ficha extendida (${e instanceof Error ? e.message : "error"})`);
+          }
+        }
+
+        // Categorías (en V2 las habilitamos también en CREATE)
+        try {
+          await adminApi.setCategorias(equipoId, [...selectedCats]);
+        } catch (e) {
+          fallidos.push(`categorías (${e instanceof Error ? e.message : "error"})`);
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Error al guardar");
+        return;
       }
-      toast.success(isEdit ? "Equipo actualizado" : "Equipo creado");
-    }
-    onOpenChange(false);
-  }, (errors) => {
-    // Fallaba silencioso cuando había errores de validación zod (ej. nombre
-    // vacío, número negativo). Acá los surfaceamos como toast con el primer
-    // campo problemático para que el usuario sepa qué corregir.
-    const FIELD_LABELS: Record<string, string> = {
-      nombre: "Nombre",
-      marca: "Marca",
-      modelo: "Modelo",
-      cantidad: "Cantidad",
-      precio_jornada: "Precio jornada",
-      precio_usd: "Precio USD",
-      roi_pct: "% día",
-      valor_reposicion: "Valor reposición",
-      fecha_compra: "Fecha de compra",
-      serie: "Serie",
-      bh_url: "Link de fuente",
-      foto_url: "Foto",
-      dueno: "Dueño",
-      estado: "Estado",
-    };
-    const entries = Object.entries(errors);
-    if (entries.length === 0) {
-      toast.error("Hay errores en el formulario, revisalos.");
-      return;
-    }
-    const [field, error] = entries[0];
-    const label = FIELD_LABELS[field] ?? field;
-    const msg = (error as { message?: string } | undefined)?.message ?? "valor inválido";
-    toast.error(`${label}: ${msg}`, {
-      description: entries.length > 1 ? `Y ${entries.length - 1} campo(s) más con errores.` : undefined,
-    });
-  });
+
+      if (fallidos.length > 0) {
+        toast.warning(isEdit ? "Equipo actualizado con avisos" : "Equipo creado con avisos", {
+          description: `Falló: ${fallidos.join(" · ")}`,
+          duration: 7000,
+        });
+      } else {
+        // En creación, si faltan campos recomendados, ofrecemos completarlos
+        // ahora antes de cerrar — el equipo ya está creado, esto es opcional. #351
+        if (!isEdit && equipoId) {
+          // Para foto consideramos tanto foto_url ya seteada como pendingFile
+          // recién subido (que ya se aplicó arriba con setValue).
+          const missing: RecommendedField[] = [];
+          const fotoTras = form.getValues("foto_url") || pendingFile;
+          if (!fotoTras) missing.push("foto");
+          if (!descripcion?.trim()) missing.push("descripcion");
+          const serieClean = values.serie?.trim();
+          if (!serieClean) missing.push("serie");
+          if (!values.valor_reposicion || values.valor_reposicion === 0)
+            missing.push("valor_reposicion");
+
+          if (missing.length > 0 && onCreatedWithMissingRecommended) {
+            const labels = missing.map((m) => RECOMMENDED_LABELS[m]).join(", ");
+            toast.success("Equipo creado", {
+              description: `Faltan datos recomendados: ${labels}`,
+              action: {
+                label: "Completar →",
+                onClick: () => {
+                  // Reabrimos el form en edit mode con el equipo recién creado.
+                  // El form vuelve a abrirse con todos los datos cargados y los
+                  // campos faltantes resaltados implícitamente vía el dashboard
+                  // de calidad (#349).
+                  const savedEquipo = { ...(initial ?? {}), ...payload, id: equipoId } as Equipo;
+                  onCreatedWithMissingRecommended(savedEquipo, missing);
+                },
+              },
+              duration: 12000,
+            });
+            onOpenChange(false);
+            return;
+          }
+        }
+        toast.success(isEdit ? "Equipo actualizado" : "Equipo creado");
+      }
+      onOpenChange(false);
+    },
+    (errors) => {
+      // Fallaba silencioso cuando había errores de validación zod (ej. nombre
+      // vacío, número negativo). Acá los surfaceamos como toast con el primer
+      // campo problemático para que el usuario sepa qué corregir.
+      const FIELD_LABELS: Record<string, string> = {
+        nombre: "Nombre",
+        marca: "Marca",
+        modelo: "Modelo",
+        cantidad: "Cantidad",
+        precio_jornada: "Precio jornada",
+        precio_usd: "Precio USD",
+        roi_pct: "% día",
+        valor_reposicion: "Valor reposición",
+        fecha_compra: "Fecha de compra",
+        serie: "Serie",
+        bh_url: "Link de fuente",
+        foto_url: "Foto",
+        dueno: "Dueño",
+        estado: "Estado",
+      };
+      const entries = Object.entries(errors);
+      if (entries.length === 0) {
+        toast.error("Hay errores en el formulario, revisalos.");
+        return;
+      }
+      const [field, error] = entries[0];
+      const label = FIELD_LABELS[field] ?? field;
+      const msg = (error as { message?: string } | undefined)?.message ?? "valor inválido";
+      toast.error(`${label}: ${msg}`, {
+        description:
+          entries.length > 1 ? `Y ${entries.length - 1} campo(s) más con errores.` : undefined,
+      });
+    },
+  );
 
   // ════════════════════════════════════════════════════════════════════
   // Render
@@ -1021,444 +1059,480 @@ export function EquipoFormDialogV2({
 
   const formSections = (
     <>
-
-          {/* ════════════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════════════════
               STATUS STRIP — switches de estado (visible + ficha completa)
           ════════════════════════════════════════════════════════════════ */}
-          <div className="flex flex-wrap items-center gap-4 text-xs pb-2 border-b hairline">
-            <label className="flex items-center gap-1.5 cursor-pointer">
-              <Switch
-                checked={form.watch("visible_catalogo")}
-                onCheckedChange={(v) => form.setValue("visible_catalogo", v, { shouldDirty: true })}
-              />
-              <span className={form.watch("visible_catalogo") ? "text-ink" : "text-muted-foreground"}>
-                {form.watch("visible_catalogo") ? "Visible en catálogo" : "Oculto del catálogo"}
-              </span>
-            </label>
-            <label className="flex items-center gap-1.5 cursor-pointer">
-              <Switch
-                checked={form.watch("ficha_completa")}
-                onCheckedChange={(v) => form.setValue("ficha_completa", v, { shouldDirty: true })}
-              />
-              <span className={form.watch("ficha_completa") ? "text-ink" : "text-muted-foreground"}>
-                {form.watch("ficha_completa") ? "Ficha completa" : "Ficha pendiente"}
-              </span>
-            </label>
-          </div>
+      <div className="flex flex-wrap items-center gap-4 text-xs pb-2 border-b hairline">
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <Switch
+            checked={form.watch("visible_catalogo")}
+            onCheckedChange={(v) => form.setValue("visible_catalogo", v, { shouldDirty: true })}
+          />
+          <span className={form.watch("visible_catalogo") ? "text-ink" : "text-muted-foreground"}>
+            {form.watch("visible_catalogo") ? "Visible en catálogo" : "Oculto del catálogo"}
+          </span>
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <Switch
+            checked={form.watch("ficha_completa")}
+            onCheckedChange={(v) => form.setValue("ficha_completa", v, { shouldDirty: true })}
+          />
+          <span className={form.watch("ficha_completa") ? "text-ink" : "text-muted-foreground"}>
+            {form.watch("ficha_completa") ? "Ficha completa" : "Ficha pendiente"}
+          </span>
+        </label>
+      </div>
 
-          {/* ════════════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════════════════
               AUTOCOMPLETAR BAR — sticky en mobile para no perderla al scrollear
           ════════════════════════════════════════════════════════════════ */}
-          <section className="rounded-md border hairline bg-amber-soft/40 p-3 space-y-2 sticky top-0 z-10 sm:static">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-ink/80">
-              <LinkIcon className="h-3.5 w-3.5" />
-              Link del producto (B&amp;H, Adorama, sitio oficial)
-            </div>
-            <LinkInput
-              value={form.watch("bh_url") ?? ""}
-              onChange={(v) => form.setValue("bh_url", v, { shouldDirty: true })}
-              placeholder="https://www.bhphotovideo.com/c/product/..."
-            />
-            <div className="flex flex-wrap gap-1.5">
-              <Button
-                type="button" size="sm" variant="outline"
-                onClick={buscarFotos}
-                disabled={photoSearching}
-              >
-                {photoSearching
-                  ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Buscando…</>
-                  : <><ImageIcon className="h-3.5 w-3.5 mr-1" /> Buscar foto (~5s)</>}
-              </Button>
-              <Button
-                type="button" size="sm"
-                onClick={autocompletar}
-                disabled={autocompletando}
-              >
-                {autocompletando
-                  ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Buscando…</>
-                  : <><Sparkles className="h-3.5 w-3.5 mr-1" /> Buscar specs (~15s)</>}
-              </Button>
-            </div>
-          </section>
+      <section className="rounded-md border hairline bg-amber-soft/40 p-3 space-y-2 sticky top-0 z-10 sm:static">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-ink/80">
+          <LinkIcon className="h-3.5 w-3.5" />
+          Link del producto (B&amp;H, Adorama, sitio oficial)
+        </div>
+        <LinkInput
+          value={form.watch("bh_url") ?? ""}
+          onChange={(v) => form.setValue("bh_url", v, { shouldDirty: true })}
+          placeholder="https://www.bhphotovideo.com/c/product/..."
+        />
+        <div className="flex flex-wrap gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={buscarFotos}
+            disabled={photoSearching}
+          >
+            {photoSearching ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Buscando…
+              </>
+            ) : (
+              <>
+                <ImageIcon className="h-3.5 w-3.5 mr-1" /> Buscar foto (~5s)
+              </>
+            )}
+          </Button>
+          <Button type="button" size="sm" onClick={autocompletar} disabled={autocompletando}>
+            {autocompletando ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Buscando…
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5 mr-1" /> Buscar specs (~15s)
+              </>
+            )}
+          </Button>
+        </div>
+      </section>
 
-          {/* ════════════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════════════════
               IDENTIFICACIÓN — foto + nombres + marca/modelo
           ════════════════════════════════════════════════════════════════ */}
-          <section className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-3">
-              {/* Foto card */}
-              <div className="space-y-1">
-                <PhotoCard
-                url={fotoActual}
-                pendingFile={pendingFile}
-                hasInitial={!!initial?.id}
-                onClear={() => {
-                  setPendingFile(null);
-                  if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
-                  setPendingFilePreview("");
-                  form.setValue("foto_url", "", { shouldDirty: true });
-                }}
-                onUpload={handleUpload}
-                onSubirAR2={subirFotoUrlAR2}
-                uploading={uploading}
-                uploadingToR2={uploadingToR2}
+      <section className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-3">
+          {/* Foto card */}
+          <div className="space-y-1">
+            <PhotoCard
+              url={fotoActual}
+              pendingFile={pendingFile}
+              hasInitial={!!initial?.id}
+              onClear={() => {
+                setPendingFile(null);
+                if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+                setPendingFilePreview("");
+                form.setValue("foto_url", "", { shouldDirty: true });
+              }}
+              onUpload={handleUpload}
+              onSubirAR2={subirFotoUrlAR2}
+              uploading={uploading}
+              uploadingToR2={uploadingToR2}
+            />
+          </div>
+
+          <div className="space-y-3">
+            <Field
+              label="Nombre interno (técnico, para vos)"
+              error={form.formState.errors.nombre?.message}
+            >
+              <Input
+                {...form.register("nombre")}
+                placeholder="Ej: Sony ILME-FX30B Cuerpo"
+                autoFocus
               />
+            </Field>
+
+            <Field label="Nombre público (cómo se ve en el catálogo)">
+              <div className="space-y-1.5">
+                <Input
+                  value={nombrePublico}
+                  onChange={(e) => setNombrePublico(e.target.value)}
+                  placeholder={
+                    autoGenDisponible
+                      ? "Generado automático según la categoría"
+                      : "Ej: Cable HDMI 2.0 50cm"
+                  }
+                />
+                {autoGenDisponible && (
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Switch checked={nombrePublicoAuto} onCheckedChange={setNombrePublicoAuto} />
+                    Generar automático desde {categoriaRoot?.toLowerCase()}
+                    {!nombrePublicoAuto && (
+                      <span className="opacity-60">
+                        (off — el valor escrito se guarda como override fijo)
+                      </span>
+                    )}
+                  </label>
+                )}
+                {autoGenDisponible && nombrePublicoAuto && (
+                  <p className="text-[10px] text-muted-foreground italic">
+                    Tu edición se mantiene en esta sesión. Si cambia el template o los specs, el
+                    campo se regenera (toggle OFF para fijarlo).
+                  </p>
+                )}
+                {!autoGenDisponible && categoriaRoot && (
+                  <p className="text-[11px] text-muted-foreground italic">
+                    Sin template auto para "{categoriaRoot}". Escribilo a mano.
+                  </p>
+                )}
               </div>
+            </Field>
 
-              <div className="space-y-3">
-                <Field
-                  label="Nombre interno (técnico, para vos)"
-                  error={form.formState.errors.nombre?.message}
-                >
-                  <Input
-                    {...form.register("nombre")}
-                    placeholder="Ej: Sony ILME-FX30B Cuerpo"
-                    autoFocus
-                  />
-                </Field>
-
-                <Field label="Nombre público (cómo se ve en el catálogo)">
-                  <div className="space-y-1.5">
-                    <Input
-                      value={nombrePublico}
-                      onChange={(e) => setNombrePublico(e.target.value)}
-                      placeholder={autoGenDisponible ? "Generado automático según la categoría" : "Ej: Cable HDMI 2.0 50cm"}
-                    />
-                    {autoGenDisponible && (
-                      <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Switch
-                          checked={nombrePublicoAuto}
-                          onCheckedChange={setNombrePublicoAuto}
-                        />
-                        Generar automático desde {categoriaRoot?.toLowerCase()}
-                        {!nombrePublicoAuto && <span className="opacity-60">(off — el valor escrito se guarda como override fijo)</span>}
-                      </label>
-                    )}
-                    {autoGenDisponible && nombrePublicoAuto && (
-                      <p className="text-[10px] text-muted-foreground italic">
-                        Tu edición se mantiene en esta sesión. Si cambia el template o los specs, el campo se regenera (toggle OFF para fijarlo).
-                      </p>
-                    )}
-                    {!autoGenDisponible && categoriaRoot && (
-                      <p className="text-[11px] text-muted-foreground italic">
-                        Sin template auto para "{categoriaRoot}". Escribilo a mano.
-                      </p>
-                    )}
-                  </div>
-                </Field>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Field label="Marca">
-                    <Input
-                      {...form.register("marca")}
-                      placeholder="Sony"
-                      list="marca-options"
-                      autoComplete="off"
-                    />
-                    <datalist id="marca-options">
-                      {marcasOptions.map((m) => (
-                        <option key={m.id} value={m.nombre} />
-                      ))}
-                    </datalist>
-                  </Field>
-                  <Field label="Modelo">
-                    <Input {...form.register("modelo")} placeholder="FX30" />
-                  </Field>
-                </div>
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Marca">
+                <Input
+                  {...form.register("marca")}
+                  placeholder="Sony"
+                  list="marca-options"
+                  autoComplete="off"
+                />
+                <datalist id="marca-options">
+                  {marcasOptions.map((m) => (
+                    <option key={m.id} value={m.nombre} />
+                  ))}
+                </datalist>
+              </Field>
+              <Field label="Modelo">
+                <Input {...form.register("modelo")} placeholder="FX30" />
+              </Field>
             </div>
+          </div>
+        </div>
 
-            {/* Candidatos de foto (si hay) */}
-            {photoCands.length > 0 && (
-              <div>
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Fotos encontradas ({photoCands.length}) · click para elegir
-                </Label>
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {photoCands.map((u) => {
-                    const isPicking = pickingPhotoUrl === u;
-                    const isSelected = form.watch("foto_url") === u;
-                    return (
-                      <button
-                        key={u} type="button"
-                        onClick={() => elegirFoto(u)}
-                        disabled={isPicking}
-                        className={`relative h-14 w-14 rounded border bg-background overflow-hidden ${isSelected ? "ring-2 ring-amber" : ""}`}
-                      >
-                        <img src={u} alt="" className="h-full w-full object-contain" />
-                        {isPicking && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                            <Loader2 className="h-4 w-4 animate-spin text-white" />
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </section>
+        {/* Candidatos de foto (si hay) */}
+        {photoCands.length > 0 && (
+          <div>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+              Fotos encontradas ({photoCands.length}) · click para elegir
+            </Label>
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {photoCands.map((u) => {
+                const isPicking = pickingPhotoUrl === u;
+                const isSelected = form.watch("foto_url") === u;
+                return (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => elegirFoto(u)}
+                    disabled={isPicking}
+                    className={`relative h-14 w-14 rounded border bg-background overflow-hidden ${isSelected ? "ring-2 ring-amber" : ""}`}
+                  >
+                    <img src={u} alt="" className="h-full w-full object-contain" />
+                    {isPicking && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </section>
 
-          {/* ════════════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════════════════
               PRECIO Y STOCK
           ════════════════════════════════════════════════════════════════ */}
-          <section className="space-y-3 pt-2 border-t hairline">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <Field label="Stock">
-                <div className="flex gap-1">
-                  <Button
-                    type="button" size="icon" variant="outline"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => {
-                      const raw = Number(form.getValues("cantidad") ?? 0);
-                      const current = Number.isFinite(raw) ? raw : 0;
-                      form.setValue("cantidad", Math.max(0, current - 1), { shouldDirty: true });
-                    }}
-                    aria-label="Restar 1 al stock"
-                  >−</Button>
-                  <Input type="number" min={0} className="text-center" {...form.register("cantidad")} />
-                  <Button
-                    type="button" size="icon" variant="outline"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => {
-                      const raw = Number(form.getValues("cantidad") ?? 0);
-                      const current = Number.isFinite(raw) ? raw : 0;
-                      form.setValue("cantidad", current + 1, { shouldDirty: true });
-                    }}
-                    aria-label="Sumar 1 al stock"
-                  >+</Button>
-                </div>
-              </Field>
-              <Field label="Valor USD">
-                <Input type="number" step="0.01" {...form.register("precio_usd")} />
-              </Field>
-              <Field label="% día">
-                <Input type="number" step="0.1" {...form.register("roi_pct")} />
-              </Field>
-              <Field label={precioJornadaManual ? "Precio/día (manual)" : "Precio/día (auto)"}>
-                <div className="flex gap-1">
-                  <Input
-                    type="number"
-                    {...form.register("precio_jornada", {
-                      onChange: () => setPrecioJornadaManual(true),
-                    })}
-                  />
-                  {precioJornadaManual && (
-                    <Button
-                      type="button" size="icon" variant="ghost"
-                      title="Recalcular automático"
-                      onClick={() => setPrecioJornadaManual(false)}
-                    >
-                      ↺
-                    </Button>
-                  )}
-                </div>
-              </Field>
-            </div>
-
-            <Field label="Dueño">
-              <Select
-                value={form.watch("dueno") ?? ""}
-                onValueChange={(v) => form.setValue("dueno", v, { shouldDirty: true })}
+      <section className="space-y-3 pt-2 border-t hairline">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <Field label="Stock">
+            <div className="flex gap-1">
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="h-9 w-9 shrink-0"
+                onClick={() => {
+                  const raw = Number(form.getValues("cantidad") ?? 0);
+                  const current = Number.isFinite(raw) ? raw : 0;
+                  form.setValue("cantidad", Math.max(0, current - 1), { shouldDirty: true });
+                }}
+                aria-label="Restar 1 al stock"
               >
-                <SelectTrigger><SelectValue placeholder="Seleccionar…" /></SelectTrigger>
-                <SelectContent>
-                  {DUENOS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                  {form.watch("dueno") && !isCanonicalDueno(form.watch("dueno") ?? "") && (
-                    <SelectItem value={form.watch("dueno") ?? ""}>{form.watch("dueno")} (custom)</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </Field>
-          </section>
+                −
+              </Button>
+              <Input type="number" min={0} className="text-center" {...form.register("cantidad")} />
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="h-9 w-9 shrink-0"
+                onClick={() => {
+                  const raw = Number(form.getValues("cantidad") ?? 0);
+                  const current = Number.isFinite(raw) ? raw : 0;
+                  form.setValue("cantidad", current + 1, { shouldDirty: true });
+                }}
+                aria-label="Sumar 1 al stock"
+              >
+                +
+              </Button>
+            </div>
+          </Field>
+          <Field label="Valor USD">
+            <Input type="number" step="0.01" {...form.register("precio_usd")} />
+          </Field>
+          <Field label="% día">
+            <Input type="number" step="0.1" {...form.register("roi_pct")} />
+          </Field>
+          <Field label={precioJornadaManual ? "Precio/día (manual)" : "Precio/día (auto)"}>
+            <div className="flex gap-1">
+              <Input
+                type="number"
+                {...form.register("precio_jornada", {
+                  onChange: () => setPrecioJornadaManual(true),
+                })}
+              />
+              {precioJornadaManual && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  title="Recalcular automático"
+                  onClick={() => setPrecioJornadaManual(false)}
+                >
+                  ↺
+                </Button>
+              )}
+            </div>
+          </Field>
+        </div>
 
-          {/* ════════════════════════════════════════════════════════════════
+        <Field label="Dueño">
+          <Select
+            value={form.watch("dueno") ?? ""}
+            onValueChange={(v) => form.setValue("dueno", v, { shouldDirty: true })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar…" />
+            </SelectTrigger>
+            <SelectContent>
+              {DUENOS.map((d) => (
+                <SelectItem key={d} value={d}>
+                  {d}
+                </SelectItem>
+              ))}
+              {form.watch("dueno") && !isCanonicalDueno(form.watch("dueno") ?? "") && (
+                <SelectItem value={form.watch("dueno") ?? ""}>
+                  {form.watch("dueno")} (custom)
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </Field>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════════════
               DESCRIPCIÓN — campo de marketing/catálogo, separado de la
               ficha técnica. Va en una sección propia para evitar confusión
               con specs.
           ════════════════════════════════════════════════════════════════ */}
-          <CollapsibleSection
-            title="Descripción (catálogo público)"
-            defaultOpen={!!descripcion}
-          >
-            <Field label="Texto descriptivo">
-              <Textarea
-                rows={3}
-                value={descripcion}
-                onChange={(e) => setDescripcion(e.target.value)}
-                placeholder="Texto de marketing visible en la ficha del catálogo. Ej: ventajas, casos de uso típicos, diferenciales."
-              />
-            </Field>
-          </CollapsibleSection>
+      <CollapsibleSection title="Descripción (catálogo público)" defaultOpen={!!descripcion}>
+        <Field label="Texto descriptivo">
+          <Textarea
+            rows={3}
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+            placeholder="Texto de marketing visible en la ficha del catálogo. Ej: ventajas, casos de uso típicos, diferenciales."
+          />
+        </Field>
+      </CollapsibleSection>
 
-          {/* ════════════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════════════════
               FICHA TÉCNICA — colapsable. Solo specs estructuradas (template
               + custom). La descripción está separada en su propia sección.
           ════════════════════════════════════════════════════════════════ */}
-          <CollapsibleSection
-            title="Ficha técnica"
-            defaultOpen={specsPropuestos.length > 0 || specs.length > 0 || !!categoriaSpecs}
-          >
-            <div className="space-y-3">
-              <Field label="Categoría de specs">
-                <Select
-                  value={categoriaSpecs || "__none__"}
-                  onValueChange={(v) => {
-                    specsTouchedRef.current = true;
-                    setCategoriaSpecs(v === "__none__" ? "" : v);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sin categoría de specs" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Sin categoría de specs</SelectItem>
-                    {specCatOptions.map((c) => (
-                      <SelectItem key={c.id} value={c.nombre}>{c.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Define qué specs técnicas aplican y el nombre público. Al elegirla aparecen
-                  los specs abajo. Independiente del catálogo.
-                </p>
-              </Field>
+      <CollapsibleSection
+        title="Ficha técnica"
+        defaultOpen={specsPropuestos.length > 0 || specs.length > 0 || !!categoriaSpecs}
+      >
+        <div className="space-y-3">
+          <Field label="Categoría de specs">
+            <Select
+              value={categoriaSpecs || "__none__"}
+              onValueChange={(v) => {
+                specsTouchedRef.current = true;
+                setCategoriaSpecs(v === "__none__" ? "" : v);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sin categoría de specs" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Sin categoría de specs</SelectItem>
+                {specCatOptions.map((c) => (
+                  <SelectItem key={c.id} value={c.nombre}>
+                    {c.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Define qué specs técnicas aplican y el nombre público. Al elegirla aparecen los specs
+              abajo. Independiente del catálogo.
+            </p>
+          </Field>
 
-              <SpecsDiffEditor
-                specs={specs}
-                propuestos={specsPropuestos}
-                templateItems={templateItems}
-                onChange={setSpecs}
-                onAceptarPropuesto={(s) => {
-                  setSpecs((prev) => {
-                    const idx = prev.findIndex((x) => sameLabel(x.label, s.label));
-                    if (idx >= 0) {
-                      const next = [...prev];
-                      next[idx] = { ...next[idx], value: s.value };
-                      return next;
+          <SpecsDiffEditor
+            specs={specs}
+            propuestos={specsPropuestos}
+            templateItems={templateItems}
+            onChange={setSpecs}
+            onAceptarPropuesto={(s) => {
+              setSpecs((prev) => {
+                const idx = prev.findIndex((x) => sameLabel(x.label, s.label));
+                if (idx >= 0) {
+                  const next = [...prev];
+                  next[idx] = { ...next[idx], value: s.value };
+                  return next;
+                }
+                return [...prev, newSpec(s.label, s.value)];
+              });
+              setSpecsPropuestos((prev) => prev.filter((x) => x.id !== s.id));
+            }}
+            onDescartarPropuesto={(s) => {
+              setSpecsPropuestos((prev) => prev.filter((x) => x.id !== s.id));
+            }}
+          />
+
+          <Field label="Etiquetas">
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap gap-1">
+                {tags.map((t) => (
+                  <Badge key={t} variant="secondary" className="text-[10px] gap-1">
+                    {t}
+                    <button type="button" onClick={() => setTags(tags.filter((x) => x !== t))}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                {tags.length === 0 && (
+                  <span className="text-xs text-muted-foreground italic">Sin etiquetas</span>
+                )}
+              </div>
+              <div className="flex gap-1">
+                <Input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addTag();
                     }
-                    return [...prev, newSpec(s.label, s.value)];
-                  });
-                  setSpecsPropuestos((prev) => prev.filter((x) => x.id !== s.id));
-                }}
-                onDescartarPropuesto={(s) => {
-                  setSpecsPropuestos((prev) => prev.filter((x) => x.id !== s.id));
-                }}
-              />
-
-              <Field label="Etiquetas">
-                <div className="space-y-1.5">
-                  <div className="flex flex-wrap gap-1">
-                    {tags.map((t) => (
-                      <Badge key={t} variant="secondary" className="text-[10px] gap-1">
-                        {t}
-                        <button type="button" onClick={() => setTags(tags.filter((x) => x !== t))}>
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                    {tags.length === 0 && (
-                      <span className="text-xs text-muted-foreground italic">Sin etiquetas</span>
-                    )}
-                  </div>
-                  <div className="flex gap-1">
-                    <Input
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") { e.preventDefault(); addTag(); }
-                      }}
-                      placeholder="Etiqueta y Enter… (ej. 4K, full frame, cinema)"
-                    />
-                    <Button type="button" size="icon" variant="outline" onClick={addTag}>
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Se usan para búsqueda, filtros del catálogo y chips visibles en la ficha pública.
-                  </p>
-                </div>
-              </Field>
+                  }}
+                  placeholder="Etiqueta y Enter… (ej. 4K, full frame, cinema)"
+                />
+                <Button type="button" size="icon" variant="outline" onClick={addTag}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Se usan para búsqueda, filtros del catálogo y chips visibles en la ficha pública.
+              </p>
             </div>
-          </CollapsibleSection>
+          </Field>
+        </div>
+      </CollapsibleSection>
 
-          {/* ════════════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════════════════
               CATEGORÍAS DEL CATÁLOGO — agrupación para el front-office, separada
               de la categoría de specs (que vive en Ficha técnica).
           ════════════════════════════════════════════════════════════════ */}
-          <section className="pt-2 border-t hairline space-y-3">
-            <div>
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                Categorías del catálogo
-              </Label>
-              <CategoriaSugeridaChip
-                categoriaSugerida={importedFichaExt?.categoria_sugerida ?? null}
-                categorias={catsQ.data ?? []}
-                selected={selectedCats}
-                onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
-              />
-              <CategoriasPicker
-                categorias={catsQ.data ?? []}
-                selected={selectedCats}
-                onChange={setSelectedCats}
-              />
-            </div>
-          </section>
+      <section className="pt-2 border-t hairline space-y-3">
+        <div>
+          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+            Categorías del catálogo
+          </Label>
+          <CategoriaSugeridaChip
+            categoriaSugerida={importedFichaExt?.categoria_sugerida ?? null}
+            categorias={catsQ.data ?? []}
+            selected={selectedCats}
+            onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
+          />
+          <CategoriasPicker
+            categorias={catsQ.data ?? []}
+            selected={selectedCats}
+            onChange={setSelectedCats}
+          />
+        </div>
+      </section>
 
-          {/* ════════════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════════════════
               KIT — colapsable, solo en EDIT (necesita id del equipo)
           ════════════════════════════════════════════════════════════════ */}
-          {isEdit && initial && (
-            <CollapsibleSection title="Kit (componentes incluidos)">
-              <KitEditor equipoId={initial.id} />
-            </CollapsibleSection>
-          )}
+      {isEdit && initial && (
+        <CollapsibleSection title="Kit (componentes incluidos)">
+          <KitEditor equipoId={initial.id} />
+        </CollapsibleSection>
+      )}
 
-          {/* ════════════════════════════════════════════════════════════════
+      {/* ════════════════════════════════════════════════════════════════
               AVANZADO — colapsable
           ════════════════════════════════════════════════════════════════ */}
-          <CollapsibleSection title="Avanzado">
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <Field label="Estado">
-                  <Select
-                    value={form.watch("estado")}
-                    onValueChange={(v) => form.setValue("estado", v as FormValues["estado"], { shouldDirty: true })}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="operativo">Operativo</SelectItem>
-                      <SelectItem value="en_mantenimiento">En mantenimiento</SelectItem>
-                      <SelectItem value="fuera_servicio">Fuera de servicio</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
+      <CollapsibleSection title="Avanzado">
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Field label="Estado">
+              <Select
+                value={form.watch("estado")}
+                onValueChange={(v) =>
+                  form.setValue("estado", v as FormValues["estado"], { shouldDirty: true })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="operativo">Operativo</SelectItem>
+                  <SelectItem value="en_mantenimiento">En mantenimiento</SelectItem>
+                  <SelectItem value="fuera_servicio">Fuera de servicio</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Field label="Valor reposición (USD)">
-                  <Input type="number" step="0.01" {...form.register("valor_reposicion")} />
-                </Field>
-                <Field label="Fecha de compra">
-                  <MonthYearPicker
-                    value={form.watch("fecha_compra") ?? ""}
-                    onChange={(v) => form.setValue("fecha_compra", v, { shouldDirty: true })}
-                  />
-                </Field>
-                <Field label="N° de serie">
-                  <Input
-                    {...form.register("serie")}
-                    placeholder="N/A si no tenés"
-                  />
-                </Field>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <Field label="Valor reposición (USD)">
+              <Input type="number" step="0.01" {...form.register("valor_reposicion")} />
+            </Field>
+            <Field label="Fecha de compra">
+              <MonthYearPicker
+                value={form.watch("fecha_compra") ?? ""}
+                onChange={(v) => form.setValue("fecha_compra", v, { shouldDirty: true })}
+              />
+            </Field>
+            <Field label="N° de serie">
+              <Input {...form.register("serie")} placeholder="N/A si no tenés" />
+            </Field>
+          </div>
 
-              <Field label="Notas internas (no se muestran al cliente)">
-                <Textarea rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} />
-              </Field>
-            </div>
-          </CollapsibleSection>
-
+          <Field label="Notas internas (no se muestran al cliente)">
+            <Textarea rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} />
+          </Field>
+        </div>
+      </CollapsibleSection>
     </>
   );
 
@@ -1477,7 +1551,13 @@ export function EquipoFormDialogV2({
         Cancelar
       </Button>
       <Button type="submit" form={formId} disabled={saving}>
-        {saving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Guardando…</> : "Guardar"}
+        {saving ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Guardando…
+          </>
+        ) : (
+          "Guardar"
+        )}
       </Button>
     </>
   );
@@ -1488,8 +1568,7 @@ export function EquipoFormDialogV2({
         <AlertDialogHeader>
           <AlertDialogTitle>Tenés cambios sin guardar</AlertDialogTitle>
           <AlertDialogDescription>
-            Si salís ahora, los cambios que hiciste en este equipo se pierden.
-            ¿Querés salir igual?
+            Si salís ahora, los cambios que hiciste en este equipo se pierden. ¿Querés salir igual?
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -1539,22 +1618,36 @@ export function EquipoFormDialogV2({
                     {form.watch("nombre") || "Equipo sin nombre"}
                   </div>
                   {nombrePublico && (
-                    <div className="text-xs text-muted-foreground italic mt-0.5">{nombrePublico}</div>
+                    <div className="text-xs text-muted-foreground italic mt-0.5">
+                      {nombrePublico}
+                    </div>
                   )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
-                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">$ / jornada</div>
-                  <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">${kpiFmt(form.watch("precio_jornada"))}</div>
+                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                    $ / jornada
+                  </div>
+                  <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
+                    ${kpiFmt(form.watch("precio_jornada"))}
+                  </div>
                 </div>
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
-                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">% día</div>
-                  <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">{kpiFmt(form.watch("roi_pct"))}%</div>
+                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                    % día
+                  </div>
+                  <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
+                    {kpiFmt(form.watch("roi_pct"))}%
+                  </div>
                 </div>
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5 col-span-2">
-                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Valor reposición</div>
-                  <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">${kpiFmt(form.watch("valor_reposicion"))}</div>
+                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                    Valor reposición
+                  </div>
+                  <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
+                    ${kpiFmt(form.watch("valor_reposicion"))}
+                  </div>
                 </div>
               </div>
             </aside>
@@ -1570,21 +1663,19 @@ export function EquipoFormDialogV2({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={handleCloseRequest}>
-      <DialogContent className="w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="font-display text-2xl">{titleText}</DialogTitle>
-          {publicHint}
-        </DialogHeader>
-        <form id={formId} onSubmit={submit} className="space-y-5" data-equipo-form-v2>
-          {formSections}
-          <DialogFooter className="pt-2 border-t hairline">
-            {footerActions}
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-    {confirmCloseDialog}
+      <Dialog open={open} onOpenChange={handleCloseRequest}>
+        <DialogContent className="w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl">{titleText}</DialogTitle>
+            {publicHint}
+          </DialogHeader>
+          <form id={formId} onSubmit={submit} className="space-y-5" data-equipo-form-v2>
+            {formSections}
+            <DialogFooter className="pt-2 border-t hairline">{footerActions}</DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {confirmCloseDialog}
     </>
   );
 }
@@ -1594,8 +1685,16 @@ export function EquipoFormDialogV2({
 // ════════════════════════════════════════════════════════════════════
 
 function Field({
-  label, error, children, actions,
-}: { label: string; error?: string; children: React.ReactNode; actions?: React.ReactNode }) {
+  label,
+  error,
+  children,
+  actions,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
@@ -1609,8 +1708,16 @@ function Field({
 }
 
 function CollapsibleSection({
-  title, defaultOpen = false, children, actions,
-}: { title: string; defaultOpen?: boolean; children: React.ReactNode; actions?: React.ReactNode }) {
+  title,
+  defaultOpen = false,
+  children,
+  actions,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   // Re-abre la sección si defaultOpen transiciona false→true (ej. llegaron
   // specs propuestos por cache). No fuerza cerrar si transiciona al revés —
@@ -1634,22 +1741,28 @@ function CollapsibleSection({
         </CollapsibleTrigger>
         {actions}
       </div>
-      <CollapsibleContent className="pt-2">
-        {children}
-      </CollapsibleContent>
+      <CollapsibleContent className="pt-2">{children}</CollapsibleContent>
     </Collapsible>
   );
 }
 
 function LinkInput({
-  value, onChange, placeholder,
-}: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
   const valid = useMemo(() => {
     if (!value.trim()) return false;
     try {
       const u = new URL(value);
       return u.protocol === "http:" || u.protocol === "https:";
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   }, [value]);
 
   const copiar = async () => {
@@ -1672,14 +1785,18 @@ function LinkInput({
       {valid && (
         <>
           <Button
-            type="button" size="icon" variant="outline"
+            type="button"
+            size="icon"
+            variant="outline"
             title="Copiar al portapapeles"
             onClick={copiar}
           >
             <Copy className="h-3.5 w-3.5" />
           </Button>
           <Button
-            type="button" size="icon" variant="outline"
+            type="button"
+            size="icon"
+            variant="outline"
             title="Abrir en nueva pestaña"
             asChild
           >
@@ -1694,7 +1811,14 @@ function LinkInput({
 }
 
 function PhotoCard({
-  url, pendingFile, hasInitial, onClear, onUpload, onSubirAR2, uploading, uploadingToR2,
+  url,
+  pendingFile,
+  hasInitial,
+  onClear,
+  onUpload,
+  onSubirAR2,
+  uploading,
+  uploadingToR2,
 }: {
   url?: string | null;
   pendingFile: File | null;
@@ -1724,9 +1848,21 @@ function PhotoCard({
               <X className="h-3 w-3" />
             </button>
             <div className="absolute bottom-1 left-1">
-              {pendingFile && <Badge variant="secondary" className="text-[9px]">Local — al guardar</Badge>}
-              {isHosted && <Badge variant="default" className="text-[9px]">✓ En R2</Badge>}
-              {isExternal && <Badge variant="outline" className="text-[9px]">URL externa</Badge>}
+              {pendingFile && (
+                <Badge variant="secondary" className="text-[9px]">
+                  Local — al guardar
+                </Badge>
+              )}
+              {isHosted && (
+                <Badge variant="default" className="text-[9px]">
+                  ✓ En R2
+                </Badge>
+              )}
+              {isExternal && (
+                <Badge variant="outline" className="text-[9px]">
+                  URL externa
+                </Badge>
+              )}
             </div>
           </>
         ) : (
@@ -1750,25 +1886,39 @@ function PhotoCard({
           }}
         />
         <Button
-          type="button" size="sm" variant="outline"
+          type="button"
+          size="sm"
+          variant="outline"
           className="text-xs"
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
         >
-          {uploading
-            ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo…</>
-            : <><Upload className="h-3 w-3 mr-1" /> Subir foto</>}
+          {uploading ? (
+            <>
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo…
+            </>
+          ) : (
+            <>
+              <Upload className="h-3 w-3 mr-1" /> Subir foto
+            </>
+          )}
         </Button>
         {isExternal && hasInitial && (
           <Button
-            type="button" size="sm" variant="outline"
+            type="button"
+            size="sm"
+            variant="outline"
             className="text-xs"
             onClick={onSubirAR2}
             disabled={uploadingToR2}
           >
-            {uploadingToR2
-              ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo…</>
-              : "Subir a R2"}
+            {uploadingToR2 ? (
+              <>
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo…
+              </>
+            ) : (
+              "Subir a R2"
+            )}
           </Button>
         )}
       </div>
@@ -1797,8 +1947,7 @@ function CategoriaSugeridaChip({
 }) {
   if (!categoriaSugerida) return null;
 
-  const norm = (s: string) =>
-    s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
   const target = norm(categoriaSugerida);
 
   const match = categorias.find((c) => norm(c.nombre) === target);
@@ -1821,7 +1970,9 @@ function CategoriaSugeridaChip({
 }
 
 function CategoriasPicker({
-  categorias, selected, onChange,
+  categorias,
+  selected,
+  onChange,
 }: {
   categorias: CategoriaAdmin[];
   selected: Set<number>;
@@ -1830,7 +1981,8 @@ function CategoriasPicker({
   const [q, setQ] = useState("");
   const toggle = (id: number) => {
     const next = new Set(selected);
-    if (next.has(id)) next.delete(id); else next.add(id);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
     onChange(next);
   };
   const roots = categorias.filter((c) => c.parent_id == null);
@@ -1856,18 +2008,27 @@ function CategoriasPicker({
           className="w-full text-sm rounded-md border hairline px-3 py-1.5 pr-7 outline-none focus:ring-1 focus:ring-ring bg-background"
         />
         {q && (
-          <button type="button" onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={() => setQ("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
             <X className="w-3.5 h-3.5" />
           </button>
         )}
       </div>
       <div className="space-y-2 max-h-60 overflow-y-auto rounded-md border hairline p-2">
         {visibleRoots.map((root) => {
-          const visibleChildren = childrenOf(root.id).filter((c) => matchesName(c.nombre) || matchesName(root.nombre));
+          const visibleChildren = childrenOf(root.id).filter(
+            (c) => matchesName(c.nombre) || matchesName(root.nombre),
+          );
           return (
             <div key={root.id}>
               <button type="button" onClick={() => toggle(root.id)}>
-                <Badge variant={selected.has(root.id) ? "default" : "outline"} className="cursor-pointer">
+                <Badge
+                  variant={selected.has(root.id) ? "default" : "outline"}
+                  className="cursor-pointer"
+                >
                   {root.nombre}
                 </Badge>
               </button>
@@ -1875,7 +2036,10 @@ function CategoriasPicker({
                 <div className="flex flex-wrap gap-1 mt-1 ml-3">
                   {visibleChildren.map((c) => (
                     <button key={c.id} type="button" onClick={() => toggle(c.id)}>
-                      <Badge variant={selected.has(c.id) ? "default" : "secondary"} className="cursor-pointer text-[10px]">
+                      <Badge
+                        variant={selected.has(c.id) ? "default" : "secondary"}
+                        className="cursor-pointer text-[10px]"
+                      >
                         {c.nombre}
                       </Badge>
                     </button>

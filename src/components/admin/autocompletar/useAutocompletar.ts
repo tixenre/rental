@@ -100,19 +100,16 @@ export function useAutocompletar({
     setFotoUrl("");
     setUploadingFotoUrl("");
     try {
-      const r = await authedJson<{ foto_candidates: string[] }>(
-        "/api/admin/equipos/buscar-fotos",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nombre: equipo.nombre,
-            marca: equipo.marca,
-            modelo: equipo.modelo,
-            url: customUrl.trim() || null,
-          }),
-        },
-      );
+      const r = await authedJson<{ foto_candidates: string[] }>("/api/admin/equipos/buscar-fotos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: equipo.nombre,
+          marca: equipo.marca,
+          modelo: equipo.modelo,
+          url: customUrl.trim() || null,
+        }),
+      });
       const cands = r.foto_candidates ?? [];
       setFotosResult(cands);
       if (cands.length > 0) {
@@ -142,15 +139,15 @@ export function useAutocompletar({
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await authedFetch(
-        "/api/admin/equipos/autocompletar-from-html",
-        { method: "POST", body: formData },
-      );
+      const response = await authedFetch("/api/admin/equipos/autocompletar-from-html", {
+        method: "POST",
+        body: formData,
+      });
       if (!response.ok) {
         const detail = await response.json().catch(() => ({}));
         throw new Error(detail?.detail ?? `HTTP ${response.status}`);
       }
-      const r = await response.json() as AutocompletarResult;
+      const r = (await response.json()) as AutocompletarResult;
       setResult(r);
       setMarca(r.marca ?? "");
       setModelo(r.modelo ?? "");
@@ -158,12 +155,14 @@ export function useAutocompletar({
       setAplicarMarca(!equipo.marca && !!r.marca);
       setAplicarModelo(!equipo.modelo && !!r.modelo);
       setAplicarBh(!equipo.bh_url);
-      setAplicarDescripcion(false);  // HTML extractor no genera descripción
+      setAplicarDescripcion(false); // HTML extractor no genera descripción
       setAplicarSpecs(r.specs.length > 0);
       setKeywords(r.keywords ?? []);
       setAplicarKeywords((r.keywords ?? []).length > 0);
       const tieneFichaExt = !!(
-        r.peso || r.dimensiones || r.alimentacion ||
+        r.peso ||
+        r.dimensiones ||
+        r.alimentacion ||
         (r.incluye?.length ?? 0) > 0
       );
       setAplicarFichaExtendida(tieneFichaExt);
@@ -222,7 +221,9 @@ export function useAutocompletar({
       if (fotosSettled.status === "fulfilled") {
         allCands.push(...(fotosSettled.value.foto_candidates ?? []));
       } else {
-        toast.error("Error buscando fotos: " + ((fotosSettled.reason as Error)?.message ?? "desconocido"));
+        toast.error(
+          "Error buscando fotos: " + ((fotosSettled.reason as Error)?.message ?? "desconocido"),
+        );
       }
 
       if (specsSettled.status === "fulfilled") {
@@ -239,17 +240,26 @@ export function useAutocompletar({
         setKeywords(r.keywords ?? []);
         setAplicarKeywords((r.keywords ?? []).length > 0);
         const tieneFichaExt = !!(
-          r.peso || r.dimensiones || r.montura || r.formato || r.resolucion || r.alimentacion ||
-          r.video_url || typeof r.precio_bh_usd === "number" ||
-          (r.incluye?.length ?? 0) > 0 || (r.conectividad?.length ?? 0) > 0 ||
+          r.peso ||
+          r.dimensiones ||
+          r.montura ||
+          r.formato ||
+          r.resolucion ||
+          r.alimentacion ||
+          r.video_url ||
+          typeof r.precio_bh_usd === "number" ||
+          (r.incluye?.length ?? 0) > 0 ||
+          (r.conectividad?.length ?? 0) > 0 ||
           (r.compatible_con?.length ?? 0) > 0
         );
         setAplicarFichaExtendida(tieneFichaExt);
-        for (const u of (r.foto_candidates ?? [])) {
+        for (const u of r.foto_candidates ?? []) {
           if (!allCands.includes(u)) allCands.push(u);
         }
       } else {
-        toast.error("Error buscando specs: " + ((specsSettled.reason as Error)?.message ?? "desconocido"));
+        toast.error(
+          "Error buscando specs: " + ((specsSettled.reason as Error)?.message ?? "desconocido"),
+        );
       }
 
       setFotosResult(allCands);
@@ -296,19 +306,16 @@ export function useAutocompletar({
 
     update(1, { status: "pending" });
     try {
-      const response = await authedFetch(
-        `/api/admin/equipos/${equipoId}/upload-foto-from-url`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: externalUrl, bypass_whitelist: true }),
-        },
-      );
+      const response = await authedFetch(`/api/admin/equipos/${equipoId}/upload-foto-from-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: externalUrl, bypass_whitelist: true }),
+      });
       if (!response.ok) {
         const detail = await response.json().catch(() => ({}));
         throw new Error(detail?.detail ?? `upload → ${response.status}`);
       }
-      const res = await response.json() as {
+      const res = (await response.json()) as {
         public_url: string;
         path: string | null;
         size?: number;
@@ -351,11 +358,19 @@ export function useAutocompletar({
   const buscarMasFotos = async () => {
     setSearchingPhotos(true);
     try {
-      const known = [...fotosResult, ...(fotoUrl && !fotosResult.includes(fotoUrl) ? [fotoUrl] : [])];
+      const known = [
+        ...fotosResult,
+        ...(fotoUrl && !fotosResult.includes(fotoUrl) ? [fotoUrl] : []),
+      ];
       const r = await authedJson<{ foto_candidates: string[] }>("/api/admin/equipos/buscar-fotos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre: equipo.nombre, marca: equipo.marca, modelo: equipo.modelo, exclude: known }),
+        body: JSON.stringify({
+          nombre: equipo.nombre,
+          marca: equipo.marca,
+          modelo: equipo.modelo,
+          exclude: known,
+        }),
       });
       const news = (r.foto_candidates ?? []).filter((u) => !known.includes(u));
       setFotosResult((prev) => [...prev, ...news]);
@@ -374,7 +389,10 @@ export function useAutocompletar({
   const addKeyword = () => {
     const v = keywordInput.trim().toLowerCase();
     if (!v) return;
-    if (keywords.includes(v)) { setKeywordInput(""); return; }
+    if (keywords.includes(v)) {
+      setKeywordInput("");
+      return;
+    }
     setKeywords([...keywords, v]);
     setKeywordInput("");
   };
@@ -382,19 +400,29 @@ export function useAutocompletar({
   const removeKeyword = (k: string) => setKeywords(keywords.filter((x) => x !== k));
 
   const setAll = (v: boolean) => {
-    setAplicarMarca(v); setAplicarModelo(v); setAplicarFoto(v); setAplicarBh(v);
-    setAplicarDescripcion(v); setAplicarSpecs(v); setAplicarKeywords(v);
+    setAplicarMarca(v);
+    setAplicarModelo(v);
+    setAplicarFoto(v);
+    setAplicarBh(v);
+    setAplicarDescripcion(v);
+    setAplicarSpecs(v);
+    setAplicarKeywords(v);
     setAplicarFichaExtendida(v);
   };
 
-  const fichaExtendidaTieneDatos = !!result && (
-    !!result.peso || !!result.dimensiones || !!result.montura || !!result.formato ||
-    !!result.resolucion || !!result.alimentacion || !!result.video_url ||
-    typeof result.precio_bh_usd === "number" ||
-    (result.incluye?.length ?? 0) > 0 ||
-    (result.conectividad?.length ?? 0) > 0 ||
-    (result.compatible_con?.length ?? 0) > 0
-  );
+  const fichaExtendidaTieneDatos =
+    !!result &&
+    (!!result.peso ||
+      !!result.dimensiones ||
+      !!result.montura ||
+      !!result.formato ||
+      !!result.resolucion ||
+      !!result.alimentacion ||
+      !!result.video_url ||
+      typeof result.precio_bh_usd === "number" ||
+      (result.incluye?.length ?? 0) > 0 ||
+      (result.conectividad?.length ?? 0) > 0 ||
+      (result.compatible_con?.length ?? 0) > 0);
 
   const aplicar = async () => {
     if (!result) return;
@@ -500,26 +528,54 @@ export function useAutocompletar({
   };
 
   return {
-    loading, loadingFoto, saving, result, error,
-    marca, setMarca,
-    modelo, setModelo,
-    fotoUrl, setFotoUrl,
-    uploadingFotoUrl, selectFoto,
-    bhUrl, setBhUrl,
-    aplicarMarca, setAplicarMarca,
-    aplicarModelo, setAplicarModelo,
-    aplicarFoto, setAplicarFoto,
-    aplicarBh, setAplicarBh,
-    aplicarDescripcion, setAplicarDescripcion,
-    aplicarSpecs, setAplicarSpecs,
-    keywords, keywordInput, setKeywordInput,
-    aplicarKeywords, setAplicarKeywords,
-    aplicarFichaExtendida, setAplicarFichaExtendida,
+    loading,
+    loadingFoto,
+    saving,
+    result,
+    error,
+    marca,
+    setMarca,
+    modelo,
+    setModelo,
+    fotoUrl,
+    setFotoUrl,
+    uploadingFotoUrl,
+    selectFoto,
+    bhUrl,
+    setBhUrl,
+    aplicarMarca,
+    setAplicarMarca,
+    aplicarModelo,
+    setAplicarModelo,
+    aplicarFoto,
+    setAplicarFoto,
+    aplicarBh,
+    setAplicarBh,
+    aplicarDescripcion,
+    setAplicarDescripcion,
+    aplicarSpecs,
+    setAplicarSpecs,
+    keywords,
+    keywordInput,
+    setKeywordInput,
+    aplicarKeywords,
+    setAplicarKeywords,
+    aplicarFichaExtendida,
+    setAplicarFichaExtendida,
     photoDiag,
     fotosResult,
     searchingPhotos,
-    customUrl, setCustomUrl,
+    customUrl,
+    setCustomUrl,
     fichaExtendidaTieneDatos,
-    buscarFoto, runSearch, runSearchFromHtml, aplicarSoloFoto, buscarMasFotos, addKeyword, removeKeyword, setAll, aplicar,
+    buscarFoto,
+    runSearch,
+    runSearchFromHtml,
+    aplicarSoloFoto,
+    buscarMasFotos,
+    addKeyword,
+    removeKeyword,
+    setAll,
+    aplicar,
   };
 }

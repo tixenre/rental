@@ -75,8 +75,8 @@ export function EquipmentCard({
         selected
           ? "border-amber/60 shadow-[0_0_0_1px_var(--amber)]"
           : sinStock
-          ? "hairline opacity-50"
-          : "hairline hover:border-foreground/20",
+            ? "hairline opacity-50"
+            : "hairline hover:border-foreground/20",
       )}
     >
       <button
@@ -151,8 +151,8 @@ export function EquipmentCard({
                   sinStock
                     ? "text-destructive"
                     : stockBajo
-                    ? "text-amber-600"
-                    : "text-muted-foreground",
+                      ? "text-amber-600"
+                      : "text-muted-foreground",
                 )}
               >
                 {sinStock ? "—" : `${disponible} disp.`}

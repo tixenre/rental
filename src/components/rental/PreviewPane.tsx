@@ -76,8 +76,7 @@ function PreviewEmpty() {
         <ShoppingBag className="h-12 w-12" strokeWidth={1.2} />
       </div>
       <div className="font-sans text-[13px] leading-[1.5]">
-        Hacé click en un equipo de la lista para ver su detalle, precio y
-        agregarlo al rental.
+        Hacé click en un equipo de la lista para ver su detalle, precio y agregarlo al rental.
       </div>
     </div>
   );
@@ -196,7 +195,9 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
 
           <button
             type="button"
-            onClick={() => navigate({ to: "/equipo/$slug", params: { slug: buildEquipoSlug(item) } })}
+            onClick={() =>
+              navigate({ to: "/equipo/$slug", params: { slug: buildEquipoSlug(item) } })
+            }
             className="inline-flex items-center gap-1.5 self-start font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-ink transition"
           >
             Ver ficha completa <ArrowRight className="h-3 w-3" />
@@ -226,9 +227,7 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
               <Minus className="h-4 w-4" />
             </button>
             <div className="text-center">
-              <div className="font-display text-[22px] font-black text-ink leading-none">
-                {qty}
-              </div>
+              <div className="font-display text-[22px] font-black text-ink leading-none">{qty}</div>
               <div className="font-mono text-[8px] uppercase tracking-[0.15em] text-ink/70">
                 {qty === 1 ? "unidad" : "unidades"}
               </div>

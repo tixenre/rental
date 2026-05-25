@@ -15,12 +15,12 @@ export const Route = createFileRoute("/cliente/login")({
 });
 
 const ERROR_MESSAGES: Record<string, string> = {
-  not_allowed:    "Tu cuenta de Google no está autorizada.",
+  not_allowed: "Tu cuenta de Google no está autorizada.",
   state_mismatch: "Error de seguridad en el flujo de login. Intentá de nuevo.",
-  token_error:    "No se pudo completar la autenticación con Google. Intentá de nuevo.",
+  token_error: "No se pudo completar la autenticación con Google. Intentá de nuevo.",
   userinfo_error: "No se pudo obtener tu información de Google. Intentá de nuevo.",
-  no_email:       "Google no devolvió un email. Verificá los permisos de tu cuenta.",
-  no_code:        "Google no devolvió el código de autorización. Intentá de nuevo.",
+  no_email: "Google no devolvió un email. Verificá los permisos de tu cuenta.",
+  no_code: "Google no devolvió el código de autorización. Intentá de nuevo.",
 };
 
 function ClienteLoginPage() {
@@ -53,8 +53,8 @@ function ClienteLoginPage() {
               Acceso
             </h1>
             <p className="font-sans text-[13px] text-muted-foreground leading-[1.55] mt-1.5">
-              Ingresá con la cuenta de Google con la que hiciste tu reserva
-              para ver tus pedidos, descargar remitos y consultar pagos.
+              Ingresá con la cuenta de Google con la que hiciste tu reserva para ver tus pedidos,
+              descargar remitos y consultar pagos.
             </p>
           </div>
 
@@ -65,7 +65,9 @@ function ClienteLoginPage() {
           )}
 
           <button
-            onClick={() => { window.location.href = "/cliente/auth/google"; }}
+            onClick={() => {
+              window.location.href = "/cliente/auth/google";
+            }}
             className="flex items-center justify-center gap-2.5 rounded-md border-[1.5px] hairline bg-card py-[13px] font-sans text-sm font-semibold text-ink transition hover:border-ink hover:bg-background"
           >
             <GoogleIcon />
@@ -100,10 +102,22 @@ function ClienteLoginPage() {
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-      <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.7 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13 17.8 9.5 24 9.5z" />
-      <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.1z" />
-      <path fill="#FBBC05" d="M10.5 28.7A14.6 14.6 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.7 10.7l7.8-6z" />
-      <path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.6-5.9c-2 1.4-4.6 2.2-7.6 2.2-6.2 0-11.5-4.2-13.4-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z" />
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.7 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13 17.8 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.1z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.5 28.7A14.6 14.6 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.7 10.7l7.8-6z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.6-5.9c-2 1.4-4.6 2.2-7.6 2.2-6.2 0-11.5-4.2-13.4-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z"
+      />
     </svg>
   );
 }

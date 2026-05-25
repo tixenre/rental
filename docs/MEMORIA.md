@@ -55,6 +55,18 @@
   debe avisar al acercarse el lanzamiento** (ej. issues con `launch-blocker`, o pedido explícito de
   publicar).
 
+### 2026-05-25 — Gate de estilo en CI: formato bloquea, lógica de React avisa
+- **Contexto:** el repo tenía `eslint.config.js` pero el tooling nunca se instaló ni corría; al
+  medir, ~98% de la deuda era formato auto-arreglable (prettier), no bugs.
+- **Decisión:** el CI bloquea por **formato (prettier)** — es automático y sin criterio, mantiene el
+  código parejo. Las **reglas de lógica de React** (`exhaustive-deps`, `react-refresh`) quedan como
+  **aviso, no bloqueante**, para no frenar el trabajo por deuda preexistente.
+- **Consecuencias:** los cambios nuevos deben pasar `npm run lint` sin errores de formato; los
+  avisos de React se revisan pero no impiden mergear.
+- **Pendiente (para que el aviso no se vuelva ruido permanente):** triagear los ~22 avisos, arreglar
+  los bugs reales (sobre todo `exhaustive-deps`) y promover a bloqueante las reglas que valgan →
+  issue de tracking **#476**.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

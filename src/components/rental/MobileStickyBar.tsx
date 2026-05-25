@@ -68,9 +68,7 @@ export function MobileStickyBar({
               </span>
             </div>
           ) : (
-            <div className="flex-1 min-w-0 text-[13px] font-medium leading-none">
-              Elegir fechas
-            </div>
+            <div className="flex-1 min-w-0 text-[13px] font-medium leading-none">Elegir fechas</div>
           )}
         </button>
 
@@ -80,9 +78,7 @@ export function MobileStickyBar({
           aria-label="Buscar"
         >
           <Search className="h-4 w-4" />
-          {query && (
-            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber" />
-          )}
+          {query && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber" />}
         </button>
 
         <button

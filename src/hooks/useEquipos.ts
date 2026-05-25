@@ -1,8 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiGetEquipos, apiGetCategorias, apiGetMarcs, type BackendEquipo, type BackendMarca } from "@/lib/api";
+import {
+  apiGetEquipos,
+  apiGetCategorias,
+  apiGetMarcs,
+  type BackendEquipo,
+  type BackendMarca,
+} from "@/lib/api";
 import { type Equipment, type Category, equipment as MOCK_EQUIPMENT } from "@/data/equipment";
 import { format } from "date-fns";
-
 
 /* ─── Inferencia de categoría desde nombre/marca/etiquetas ────────────── */
 //
@@ -15,19 +20,67 @@ type Rule = { keywords: string[]; category: Category };
 // Orden importa: más específico primero
 const RULES: Rule[] = [
   // Baterías (antes de genéricos como "canon", "sony")
-  { keywords: ["batería", "bateria", "battery", "v-mount", "vmount", "np-f", "lp-e", "np-fz", "kit baterías", "kit bateria"], category: "Baterías" },
+  {
+    keywords: [
+      "batería",
+      "bateria",
+      "battery",
+      "v-mount",
+      "vmount",
+      "np-f",
+      "lp-e",
+      "np-fz",
+      "kit baterías",
+      "kit bateria",
+    ],
+    category: "Baterías",
+  },
 
   // Filtros
-  { keywords: ["filtro", "filter", "polarizador", "difusión", "pro-mist", "tiffen"], category: "Filtros" },
+  {
+    keywords: ["filtro", "filter", "polarizador", "difusión", "pro-mist", "tiffen"],
+    category: "Filtros",
+  },
 
   // Cámaras (antes de lentes para que "Canon" no matchee lentes)
-  { keywords: ["cámara", "camara", "camera", "gopro", "insta360", "komodo", "fx3", "zv-e1", "a7 v", "c200", "cinema line"], category: "Cámaras" },
+  {
+    keywords: [
+      "cámara",
+      "camara",
+      "camera",
+      "gopro",
+      "insta360",
+      "komodo",
+      "fx3",
+      "zv-e1",
+      "a7 v",
+      "c200",
+      "cinema line",
+    ],
+    category: "Cámaras",
+  },
 
   // Lentes
-  { keywords: ["lente", "lens", "lentes", "kit lentes", "laowa", "tokina", "zeiss", "speedbooster", "montura"], category: "Lentes" },
+  {
+    keywords: [
+      "lente",
+      "lens",
+      "lentes",
+      "kit lentes",
+      "laowa",
+      "tokina",
+      "zeiss",
+      "speedbooster",
+      "montura",
+    ],
+    category: "Lentes",
+  },
 
   // Monitores
-  { keywords: ["monitor", "video assist", "smallhd", "lilliput", "viltrox", "atomos"], category: "Monitores" },
+  {
+    keywords: ["monitor", "video assist", "smallhd", "lilliput", "viltrox", "atomos"],
+    category: "Monitores",
+  },
 
   // Comunicación
   { keywords: ["intercom", "solidcom", "hollyland"], category: "Comunicación" },
@@ -36,28 +89,134 @@ const RULES: Rule[] = [
   { keywords: ["flash"], category: "Flash" },
 
   // Sonido (antes de "wireless" genérico)
-  { keywords: ["micrófono", "microfono", "microphone", "lavalier", "shotgun", "wireless go", "dji mic", "rodecaster", "caña boom", "boom arm", "sennheiser", "zeppelin", "inalámbrico rode"], category: "Sonido" },
+  {
+    keywords: [
+      "micrófono",
+      "microfono",
+      "microphone",
+      "lavalier",
+      "shotgun",
+      "wireless go",
+      "dji mic",
+      "rodecaster",
+      "caña boom",
+      "boom arm",
+      "sennheiser",
+      "zeppelin",
+      "inalámbrico rode",
+    ],
+    category: "Sonido",
+  },
 
   // Brazo Mágico
-  { keywords: ["brazo mágico", "brazo magico", "brazo articulado", "brazo avenger", "brazo con rótula", "magic arm", "superflex"], category: "Brazo Mágico" },
+  {
+    keywords: [
+      "brazo mágico",
+      "brazo magico",
+      "brazo articulado",
+      "brazo avenger",
+      "brazo con rótula",
+      "magic arm",
+      "superflex",
+    ],
+    category: "Brazo Mágico",
+  },
 
   // Stands
   { keywords: ["c-stand", "stand", "backdrop"], category: "Stands" },
 
   // Tungsteno (antes de "luz" genérico)
-  { keywords: ["tungsteno", "fresnel tungsteno", "par mil", "mole richardson", "fresnel arri", "lowel"], category: "Tungsteno" },
+  {
+    keywords: [
+      "tungsteno",
+      "fresnel tungsteno",
+      "par mil",
+      "mole richardson",
+      "fresnel arri",
+      "lowel",
+    ],
+    category: "Tungsteno",
+  },
 
   // Modificadores de luz
-  { keywords: ["softbox", "bandera negra", "frame difusión", "frame difusion", "reflector", "fresnel attachment", "globo china", "lantern", "modificador"], category: "Modificadores" },
+  {
+    keywords: [
+      "softbox",
+      "bandera negra",
+      "frame difusión",
+      "frame difusion",
+      "reflector",
+      "fresnel attachment",
+      "globo china",
+      "lantern",
+      "modificador",
+    ],
+    category: "Modificadores",
+  },
 
   // Luces (genérico, después de Tungsteno y Modificadores)
-  { keywords: ["luz ", "luz led", "luz on-camera", "luz open face", "spotlight", "fresnel", "kino flo", "nanlite", "amaran", "aputure", "godox vl", "godox tl", "godox m1", "arri", "dracast", "yongnuo", "pampa tubo", "máquina de humo", "maquina de humo"], category: "Luces" },
+  {
+    keywords: [
+      "luz ",
+      "luz led",
+      "luz on-camera",
+      "luz open face",
+      "spotlight",
+      "fresnel",
+      "kino flo",
+      "nanlite",
+      "amaran",
+      "aputure",
+      "godox vl",
+      "godox tl",
+      "godox m1",
+      "arri",
+      "dracast",
+      "yongnuo",
+      "pampa tubo",
+      "máquina de humo",
+      "maquina de humo",
+    ],
+    category: "Luces",
+  },
 
   // Trípode / movimiento
-  { keywords: ["trípode", "tripode", "tripod", "manfrotto", "sachtler", "slider", "riel dolly", "dolly", "steadicam", "gimbal", "ronin", "glidecam", "follow focus", "nucleus"], category: "Trípode" },
+  {
+    keywords: [
+      "trípode",
+      "tripode",
+      "tripod",
+      "manfrotto",
+      "sachtler",
+      "slider",
+      "riel dolly",
+      "dolly",
+      "steadicam",
+      "gimbal",
+      "ronin",
+      "glidecam",
+      "follow focus",
+      "nucleus",
+    ],
+    category: "Trípode",
+  },
 
   // Grips
-  { keywords: ["clamp", "car mount", "jaw clamp", "junior pin", "baby pin", "wall plate", "pinza", "sopapa", "matebox", "matte box"], category: "Grips" },
+  {
+    keywords: [
+      "clamp",
+      "car mount",
+      "jaw clamp",
+      "junior pin",
+      "baby pin",
+      "wall plate",
+      "pinza",
+      "sopapa",
+      "matebox",
+      "matte box",
+    ],
+    category: "Grips",
+  },
 ];
 
 function inferCategory(nombre: string, marca: string): Category {
@@ -95,7 +254,9 @@ function resolveCategory(etiquetas: string[], nombre: string, marca: string): Ca
 export function buildPublicName(e: BackendEquipo): string {
   // El backend es single source of truth: si calculó el nombre_publico
   // (via el template configurado en /admin/specs), usamos eso.
-  const backendNombre = ((e as unknown as { nombre_publico?: string | null }).nombre_publico ?? "").trim();
+  const backendNombre = (
+    (e as unknown as { nombre_publico?: string | null }).nombre_publico ?? ""
+  ).trim();
   if (backendNombre) return backendNombre;
 
   // Sin template configurado (o template que rindió vacío) → fallback al
@@ -152,12 +313,11 @@ export function formatSpecValueForDisplay(raw: unknown): string {
   }
 }
 
-
 /* ─── Adaptador backend → tipo frontend ─────────────────────────────── */
 
 export function backendToEquipment(e: BackendEquipo): Equipment {
   const nombre = e.nombre ?? "";
-  const marca  = e.marca  ?? "";
+  const marca = e.marca ?? "";
   const publicName = buildPublicName(e);
   const fallbackName = [nombre, e.modelo].filter(Boolean).join(" ") || "Sin nombre";
   const name = publicName || fallbackName;
@@ -227,11 +387,18 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
       return [];
     }
   };
-  const parsedIncluye        = parseStringList(ficha?.incluye_json);
-  const parsedConectividad   = parseStringList(ficha?.conectividad_json);
-  const parsedCompatibleCon  = parseStringList(ficha?.compatible_con_json);
+  const parsedIncluye = parseStringList(ficha?.incluye_json);
+  const parsedConectividad = parseStringList(ficha?.conectividad_json);
+  const parsedCompatibleCon = parseStringList(ficha?.compatible_con_json);
 
-  const kit = Array.isArray(e.kit) ? e.kit as Array<{ componente_id: number; nombre: string; cantidad: number; foto_url?: string | null }> : [];
+  const kit = Array.isArray(e.kit)
+    ? (e.kit as Array<{
+        componente_id: number;
+        nombre: string;
+        cantidad: number;
+        foto_url?: string | null;
+      }>)
+    : [];
   const includes = kit.map((k) => ({
     id: String(k.componente_id),
     name: k.nombre,
@@ -241,10 +408,11 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
 
   return {
     id: String(e.id),
-    slug: `${marca}-${nombre}`
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") || `equipo-${e.id}`,
+    slug:
+      `${marca}-${nombre}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") || `equipo-${e.id}`,
     name,
     brand: marca || "—",
     category: e.categorias?.[0]?.nombre ?? resolveCategory(e.etiquetas ?? [], nombre, marca),
@@ -262,25 +430,24 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     includes,
     _backendId: e.id,
     // Ficha extendida — fuente única equipo_specs (Fase F).
-    peso:           specByKey("peso_g"),
-    dimensiones:    specByKey("dimensions_mm"),
-    montura:        specByKey("lens_mount"),
-    formato:        specByKey("formato"),
-    resolucion:     specByKey("resolucion_max"),
-    alimentacion:   specByKey("alimentacion"),
-    incluye:        parsedIncluye,
-    conectividad:   parsedConectividad,
-    compatibleCon:  parsedCompatibleCon,
-    videoUrl:       ficha?.video_url     ?? null,
-    precioBhUsd:    ficha?.precio_bh_usd ?? null,
-    disponible:     e.disponible,
+    peso: specByKey("peso_g"),
+    dimensiones: specByKey("dimensions_mm"),
+    montura: specByKey("lens_mount"),
+    formato: specByKey("formato"),
+    resolucion: specByKey("resolucion_max"),
+    alimentacion: specByKey("alimentacion"),
+    incluye: parsedIncluye,
+    conectividad: parsedConectividad,
+    compatibleCon: parsedCompatibleCon,
+    videoUrl: ficha?.video_url ?? null,
+    precioBhUsd: ficha?.precio_bh_usd ?? null,
+    disponible: e.disponible,
     // Dict raw de specs estructuradas (Fase H: filtros públicos).
     // Cada entry tiene {value, label, tipo, prioridad, en_filtros, ...}
     // para que el catálogo arme filtros dinámicos.
-    specsRaw:       e.specs ?? {},
+    specsRaw: e.specs ?? {},
   };
 }
-
 
 /* ─── Filtros dinámicos por specs (Fase H) ──────────────────────────── */
 
@@ -300,11 +467,14 @@ export type SpecFilterDef = {
  *  2 valores únicos presentes (filtrar por 1 valor no aporta). */
 export function discoverFilterableSpecs(equipos: Equipment[]): SpecFilterDef[] {
   // Acumulamos {spec_key: {label, prioridad, values: Set}}
-  const acc = new Map<string, {
-    label: string;
-    prioridad: number;
-    values: Set<string>;
-  }>();
+  const acc = new Map<
+    string,
+    {
+      label: string;
+      prioridad: number;
+      values: Set<string>;
+    }
+  >();
   for (const eq of equipos) {
     const specsRaw = eq.specsRaw || {};
     for (const [key, s] of Object.entries(specsRaw)) {
@@ -337,7 +507,7 @@ type EquiposQueryResult = { items: Equipment[]; usingFallback: boolean };
 
 export function useEquipos(startDate?: Date, endDate?: Date) {
   const desde = startDate ? format(startDate, "yyyy-MM-dd") : undefined;
-  const hasta  = endDate   ? format(endDate,   "yyyy-MM-dd") : undefined;
+  const hasta = endDate ? format(endDate, "yyyy-MM-dd") : undefined;
 
   const q = useQuery<EquiposQueryResult>({
     queryKey: ["equipos", desde, hasta],

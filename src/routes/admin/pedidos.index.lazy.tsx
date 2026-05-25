@@ -10,11 +10,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
@@ -40,22 +51,22 @@ export const Route = createLazyFileRoute("/admin/pedidos/")({
 type EstadoFilter = "activos" | "presupuesto" | "confirmado" | "cerrados" | "todos";
 
 const ESTADO_FILTERS: { id: EstadoFilter; label: string }[] = [
-  { id: "activos",     label: "Activos" },
+  { id: "activos", label: "Activos" },
   { id: "presupuesto", label: "Solicitados" },
-  { id: "confirmado",  label: "Confirmados" },
-  { id: "cerrados",    label: "Cerrados" },
-  { id: "todos",       label: "Todos" },
+  { id: "confirmado", label: "Confirmados" },
+  { id: "cerrados", label: "Cerrados" },
+  { id: "todos", label: "Todos" },
 ];
 
 const ESTADO_CLASS: Record<string, string> = {
-  borrador:    "bg-muted/60 text-muted-foreground border-transparent",
+  borrador: "bg-muted/60 text-muted-foreground border-transparent",
   presupuesto: "bg-blue-50 text-blue-700 border-blue-200",
-  solicitado:  "bg-amber-50 text-amber-700 border-amber-200",
-  confirmado:  "bg-green-50 text-green-700 border-green-200",
-  retirado:    "bg-green-100 text-green-800 border-green-300",
-  devuelto:    "bg-slate-100 text-slate-600 border-slate-300",
-  finalizado:  "bg-slate-100 text-slate-500 border-slate-200",
-  cancelado:   "bg-red-50 text-red-600 border-red-200",
+  solicitado: "bg-amber-50 text-amber-700 border-amber-200",
+  confirmado: "bg-green-50 text-green-700 border-green-200",
+  retirado: "bg-green-100 text-green-800 border-green-300",
+  devuelto: "bg-slate-100 text-slate-600 border-slate-300",
+  finalizado: "bg-slate-100 text-slate-500 border-slate-200",
+  cancelado: "bg-red-50 text-red-600 border-red-200",
 };
 
 const fmtArs = (n: number | null | undefined) =>
@@ -114,12 +125,13 @@ function PedidosPage() {
 
   const pedidosQ = useQuery({
     queryKey: ["admin", "pedidos", { q, filter, conSaldo }],
-    queryFn: () => adminApi.listPedidos({
-      q: q || undefined,
-      estado: conSaldo ? undefined : backendEstado,
-      con_saldo: conSaldo || undefined,
-      per_page: 200,
-    }),
+    queryFn: () =>
+      adminApi.listPedidos({
+        q: q || undefined,
+        estado: conSaldo ? undefined : backendEstado,
+        con_saldo: conSaldo || undefined,
+        per_page: 200,
+      }),
     refetchInterval: 5000,
   });
 
@@ -150,8 +162,10 @@ function PedidosPage() {
   const items = useMemo(() => {
     const raw = pedidosQ.data?.items ?? [];
     if (conSaldo) return raw;
-    if (filter === "activos") return raw.filter((p) => p.estado !== "finalizado" && p.estado !== "cancelado");
-    if (filter === "cerrados") return raw.filter((p) => p.estado === "finalizado" || p.estado === "cancelado");
+    if (filter === "activos")
+      return raw.filter((p) => p.estado !== "finalizado" && p.estado !== "cancelado");
+    if (filter === "cerrados")
+      return raw.filter((p) => p.estado === "finalizado" || p.estado === "cancelado");
     return raw;
   }, [pedidosQ.data, filter, conSaldo]);
   const total = pedidosQ.data?.total ?? 0;
@@ -169,10 +183,7 @@ function PedidosPage() {
             {pedidosQ.isLoading ? "Cargando…" : `${total} en total.`}
           </p>
         </div>
-        <Button
-          onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}
-          className="hidden md:flex"
-        >
+        <Button onClick={() => navigate({ to: "/admin/pedidos/nuevo" })} className="hidden md:flex">
           <Plus className="h-4 w-4 mr-1" /> Nuevo pedido
         </Button>
       </header>
@@ -182,7 +193,10 @@ function PedidosPage() {
       <div className="flex items-center gap-1 border-b hairline -mb-1">
         <button
           type="button"
-          onClick={() => { setConSaldo(false); setFilter("activos"); }}
+          onClick={() => {
+            setConSaldo(false);
+            setFilter("activos");
+          }}
           className={cn(
             "px-3 py-2 text-sm font-medium border-b-2 transition",
             !conSaldo
@@ -194,7 +208,10 @@ function PedidosPage() {
         </button>
         <button
           type="button"
-          onClick={() => { setConSaldo(true); setFilter("todos"); }}
+          onClick={() => {
+            setConSaldo(true);
+            setFilter("todos");
+          }}
           className={cn(
             "px-3 py-2 text-sm font-medium border-b-2 transition inline-flex items-center gap-1.5",
             conSaldo
@@ -253,21 +270,24 @@ function PedidosPage() {
       </div>
 
       {/* Banner de totales cuando estás viendo cobranzas */}
-      {conSaldo && pedidosQ.data && (() => {
-        const items = pedidosQ.data.items;
-        const totalSaldo = items.reduce(
-          (s, p) => s + Math.max(0, (p.monto_total ?? 0) - (p.monto_pagado ?? 0)),
-          0,
-        );
-        return (
-          <div className="rounded-md border border-amber/40 bg-amber-soft/50 px-3.5 py-2.5 flex items-center justify-between gap-2 text-sm">
-            <span className="text-ink">
-              <strong>{items.length}</strong> pedido{items.length !== 1 ? "s" : ""} con saldo pendiente
-            </span>
-            <span className="font-display text-lg tabular text-ink">{fmtArs(totalSaldo)}</span>
-          </div>
-        );
-      })()}
+      {conSaldo &&
+        pedidosQ.data &&
+        (() => {
+          const items = pedidosQ.data.items;
+          const totalSaldo = items.reduce(
+            (s, p) => s + Math.max(0, (p.monto_total ?? 0) - (p.monto_pagado ?? 0)),
+            0,
+          );
+          return (
+            <div className="rounded-md border border-amber/40 bg-amber-soft/50 px-3.5 py-2.5 flex items-center justify-between gap-2 text-sm">
+              <span className="text-ink">
+                <strong>{items.length}</strong> pedido{items.length !== 1 ? "s" : ""} con saldo
+                pendiente
+              </span>
+              <span className="font-display text-lg tabular text-ink">{fmtArs(totalSaldo)}</span>
+            </div>
+          );
+        })()}
 
       {pedidosQ.error && (
         <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -277,9 +297,8 @@ function PedidosPage() {
 
       {/* Mobile: cards (< md) */}
       <div className="md:hidden space-y-3 pb-24">
-        {pedidosQ.isLoading && Array.from({ length: 3 }).map((_, i) => (
-          <MobileCardSkeleton key={i} />
-        ))}
+        {pedidosQ.isLoading &&
+          Array.from({ length: 3 }).map((_, i) => <MobileCardSkeleton key={i} />)}
         {!pedidosQ.isLoading && items.length === 0 && (
           <div className="py-12 text-center text-sm text-muted-foreground">Sin pedidos.</div>
         )}
@@ -308,15 +327,9 @@ function PedidosPage() {
                 {fmtFechaMobile(p.fecha_desde)} → {fmtFechaMobile(p.fecha_hasta)}
               </AdminCardMeta>
               <AdminCardFooter>
-                <AdminCardPrice
-                  total={p.monto_total ?? 0}
-                  saldo={saldo > 0 ? saldo : null}
-                />
+                <AdminCardPrice total={p.monto_total ?? 0} saldo={saldo > 0 ? saldo : null} />
                 <AdminCardActions>
-                  <div
-                    className="flex gap-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     <WhatsAppButton pedido={p} phone={p.cliente_telefono} variant="icon" />
                     <Button size="icon" variant="ghost" onClick={() => openPedido(p.id)}>
                       <ExternalLink className="h-4 w-4" />
@@ -347,17 +360,32 @@ function PedidosPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {pedidosQ.isLoading && Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={`sk-${i}`}>
-                <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-28" /></TableCell>
-                <TableCell className="hidden sm:table-cell text-right"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                <TableCell className="hidden md:table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
-                <TableCell className="text-right"><Skeleton className="h-7 w-16 ml-auto" /></TableCell>
-              </TableRow>
-            ))}
+            {pedidosQ.isLoading &&
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={`sk-${i}`}>
+                  <TableCell>
+                    <Skeleton className="h-4 w-12" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-32" />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <Skeleton className="h-4 w-28" />
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell text-right">
+                    <Skeleton className="h-4 w-20 ml-auto" />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-right">
+                    <Skeleton className="h-4 w-16 ml-auto" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Skeleton className="h-7 w-16 ml-auto" />
+                  </TableCell>
+                </TableRow>
+              ))}
             {items.length === 0 && !pedidosQ.isLoading && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
@@ -372,9 +400,7 @@ function PedidosPage() {
                   className="cursor-pointer hover:bg-accent/30"
                   onClick={() => openPedido(p.id)}
                 >
-                  <TableCell className="font-mono text-xs">
-                    {p.numero_pedido ?? "—"}
-                  </TableCell>
+                  <TableCell className="font-mono text-xs">{p.numero_pedido ?? "—"}</TableCell>
                   <TableCell>
                     <div className="text-ink">{p.cliente_nombre || "Sin cliente"}</div>
                     {p.cliente_email && (
@@ -382,17 +408,16 @@ function PedidosPage() {
                     )}
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground tabular-nums">
-                    {fmtFecha(p.fecha_desde)} <span className="text-muted-foreground/50 mx-0.5">→</span> {fmtFecha(p.fecha_hasta)}
+                    {fmtFecha(p.fecha_desde)}{" "}
+                    <span className="text-muted-foreground/50 mx-0.5">→</span>{" "}
+                    {fmtFecha(p.fecha_hasta)}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                     {p.items?.length ?? 0} equipos
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <Badge
-                        variant="outline"
-                        className={ESTADO_CLASS[p.estado] ?? ""}
-                      >
+                      <Badge variant="outline" className={ESTADO_CLASS[p.estado] ?? ""}>
                         {estadoLabel(p.estado)}
                       </Badge>
                       {p.tiene_solicitud_pendiente && (
@@ -404,12 +429,16 @@ function PedidosPage() {
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     <div className="text-ink font-medium">{fmtArs(p.monto_total)}</div>
-                    <div className={cn(
-                      "font-mono text-[10px] mt-0.5",
-                      (p.monto_pagado ?? 0) >= (p.monto_total ?? 0) ? "text-verde"
-                      : (p.monto_pagado ?? 0) > 0 ? "text-muted-foreground"
-                      : "text-destructive",
-                    )}>
+                    <div
+                      className={cn(
+                        "font-mono text-[10px] mt-0.5",
+                        (p.monto_pagado ?? 0) >= (p.monto_total ?? 0)
+                          ? "text-verde"
+                          : (p.monto_pagado ?? 0) > 0
+                            ? "text-muted-foreground"
+                            : "text-destructive",
+                      )}
+                    >
                       {(p.monto_pagado ?? 0) >= (p.monto_total ?? 0)
                         ? "pagado"
                         : (p.monto_pagado ?? 0) === 0
@@ -442,11 +471,17 @@ function PedidosPage() {
         label="Nuevo pedido"
       />
 
-      <AlertDialog open={!!deleting} onOpenChange={(v) => { if (!v) setDeleting(null); }}>
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(v) => {
+          if (!v) setDeleting(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Eliminar pedido {deleting?.numero_pedido ? `#${deleting.numero_pedido}` : `#${deleting?.id}`}
+              Eliminar pedido{" "}
+              {deleting?.numero_pedido ? `#${deleting.numero_pedido}` : `#${deleting?.id}`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               Se borrarán también sus ítems y pagos. Esta acción no se puede deshacer.

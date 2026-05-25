@@ -19,11 +19,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Pencil, X, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -32,11 +40,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
 import {
@@ -75,7 +93,10 @@ export function SpecTemplatesSection({
   const [editing, setEditing] = useState<SpecTemplate | "new" | null>(null);
   // Si abrimos "new" desde una sugerencia de orphan, este state pre-llena
   // el key + label en el modal. Null = creación desde cero.
-  const [prefillFromOrphan, setPrefillFromOrphan] = useState<{ key: string; sampleValues: string[] } | null>(null);
+  const [prefillFromOrphan, setPrefillFromOrphan] = useState<{
+    key: string;
+    sampleValues: string[];
+  } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SpecTemplate | null>(null);
   const qc = useQueryClient();
 
@@ -88,14 +109,21 @@ export function SpecTemplatesSection({
   const catsFlat = useMemo(() => {
     const all = catsQ.data ?? [];
     const flat: { id: number; nombre: string; path: string; prioridad: number }[] = [];
-    const roots = all.filter((c) => c.parent_id == null)
+    const roots = all
+      .filter((c) => c.parent_id == null)
       .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
     for (const root of roots) {
       flat.push({ id: root.id, nombre: root.nombre, path: root.nombre, prioridad: root.prioridad });
-      const hijos = all.filter((c) => c.parent_id === root.id)
+      const hijos = all
+        .filter((c) => c.parent_id === root.id)
         .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
       for (const h of hijos) {
-        flat.push({ id: h.id, nombre: h.nombre, path: `${root.nombre} › ${h.nombre}`, prioridad: h.prioridad });
+        flat.push({
+          id: h.id,
+          nombre: h.nombre,
+          path: `${root.nombre} › ${h.nombre}`,
+          prioridad: h.prioridad,
+        });
       }
     }
     return flat;
@@ -140,19 +168,14 @@ export function SpecTemplatesSection({
     // re-orden visual sea instantáneo. Si falla, invalidamos para refetch.
     onMutate: async (next) => {
       await qc.cancelQueries({ queryKey: ["admin", "spec-templates", catId] });
-      const prev = qc.getQueryData<{ items: SpecTemplate[] }>([
-        "admin", "spec-templates", catId,
-      ]);
+      const prev = qc.getQueryData<{ items: SpecTemplate[] }>(["admin", "spec-templates", catId]);
       if (prev) {
         const byId = new Map(next.map((n) => [n.id, n.prioridad] as const));
-        qc.setQueryData<{ items: SpecTemplate[] }>(
-          ["admin", "spec-templates", catId],
-          {
-            items: prev.items
-              .map((t) => ({ ...t, prioridad: byId.get(t.id) ?? t.prioridad }))
-              .sort((a, b) => a.prioridad - b.prioridad || a.label.localeCompare(b.label)),
-          },
-        );
+        qc.setQueryData<{ items: SpecTemplate[] }>(["admin", "spec-templates", catId], {
+          items: prev.items
+            .map((t) => ({ ...t, prioridad: byId.get(t.id) ?? t.prioridad }))
+            .sort((a, b) => a.prioridad - b.prioridad || a.label.localeCompare(b.label)),
+        });
       }
       return { prev };
     },
@@ -186,13 +209,17 @@ export function SpecTemplatesSection({
   };
 
   return (
-    <section className={showHeader ? "rounded-lg border hairline bg-background p-4 space-y-4" : "space-y-4"}>
+    <section
+      className={
+        showHeader ? "rounded-lg border hairline bg-background p-4 space-y-4" : "space-y-4"
+      }
+    >
       {showHeader && (
         <header className="space-y-1">
           <h2 className="font-display text-lg text-ink">Specs por categoría</h2>
           <p className="text-xs text-muted-foreground">
-            Definí qué campos técnicos pide cada categoría al cargar un equipo. Estos
-            mismos labels guían la IA al importar desde URL.
+            Definí qué campos técnicos pide cada categoría al cargar un equipo. Estos mismos labels
+            guían la IA al importar desde URL.
           </p>
         </header>
       )}
@@ -201,7 +228,9 @@ export function SpecTemplatesSection({
       {fixedCategoriaId == null && (
         <div className="flex items-end gap-2">
           <div className="flex-1 max-w-md">
-            <Label htmlFor="cat-select" className="text-xs">Categoría</Label>
+            <Label htmlFor="cat-select" className="text-xs">
+              Categoría
+            </Label>
             <Select
               value={catId != null ? String(catId) : ""}
               onValueChange={(v) => setCatId(Number(v))}
@@ -211,7 +240,9 @@ export function SpecTemplatesSection({
               </SelectTrigger>
               <SelectContent>
                 {catsFlat.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.path}</SelectItem>
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.path}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -274,9 +305,7 @@ export function SpecTemplatesSection({
         </div>
       )}
 
-      {items.length > 0 && (
-        <DestacadasCounter items={items} />
-      )}
+      {items.length > 0 && <DestacadasCounter items={items} />}
 
       {items.length > 0 && (
         <div className="rounded-md border hairline overflow-hidden">
@@ -293,10 +322,7 @@ export function SpecTemplatesSection({
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext
-              items={items.map((t) => t.id)}
-              strategy={verticalListSortingStrategy}
-            >
+            <SortableContext items={items.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               <div className="divide-y hairline">
                 {items.map((t) => (
                   <SortableSpecRow
@@ -311,8 +337,8 @@ export function SpecTemplatesSection({
             </SortableContext>
           </DndContext>
           <p className="border-t hairline px-3 py-2 text-[10px] text-muted-foreground bg-muted/20">
-            Arrastrá una fila para cambiar el orden — la primera es la más prominente
-            en el form de equipo y en la card del catálogo.
+            Arrastrá una fila para cambiar el orden — la primera es la más prominente en el form de
+            equipo y en la card del catálogo.
           </p>
         </div>
       )}
@@ -367,9 +393,9 @@ export function SpecTemplatesSection({
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar spec del template</AlertDialogTitle>
             <AlertDialogDescription>
-              Vas a borrar <strong>{confirmDelete?.label}</strong> ({confirmDelete?.spec_key})
-              del template de esta categoría. Los valores ya cargados en equipos NO se borran:
-              quedan como "extras" sin schema (los podés ver en la ficha del equipo).
+              Vas a borrar <strong>{confirmDelete?.label}</strong> ({confirmDelete?.spec_key}) del
+              template de esta categoría. Los valores ya cargados en equipos NO se borran: quedan
+              como "extras" sin schema (los podés ver en la ficha del equipo).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -401,7 +427,8 @@ function OrphansPanel({
   return (
     <div className="rounded-md border hairline border-amber/30 bg-amber-soft/30 overflow-hidden">
       <header className="px-3 py-2 text-xs font-mono uppercase tracking-widest text-muted-foreground border-b hairline">
-        Sugerencias del autocompletar — {orphans.length} {orphans.length === 1 ? "spec" : "specs"} cargadas en equipos que no están en el template
+        Sugerencias del autocompletar — {orphans.length} {orphans.length === 1 ? "spec" : "specs"}{" "}
+        cargadas en equipos que no están en el template
       </header>
       <ul className="divide-y hairline">
         {orphans.map((o) => (
@@ -409,8 +436,11 @@ function OrphansPanel({
             <div className="flex-1 min-w-0">
               <div className="font-mono text-xs text-ink">{o.spec_key}</div>
               <div className="text-[11px] text-muted-foreground">
-                {o.count_equipos} {o.count_equipos === 1 ? "equipo" : "equipos"} ·
-                {" "}ejemplos: {o.sample_values.slice(0, 3).map((v) => `"${v}"`).join(", ")}
+                {o.count_equipos} {o.count_equipos === 1 ? "equipo" : "equipos"} · ejemplos:{" "}
+                {o.sample_values
+                  .slice(0, 3)
+                  .map((v) => `"${v}"`)
+                  .join(", ")}
               </div>
             </div>
             <Button size="sm" variant="outline" onClick={() => onConvert(o)}>
@@ -420,8 +450,8 @@ function OrphansPanel({
         ))}
       </ul>
       <p className="px-3 py-2 text-[10px] text-muted-foreground bg-amber-soft/50">
-        Estos specs vinieron del autocompletar o de cargas anteriores y quedaron como "custom"
-        en cada equipo. Si querés que aparezcan formateados en todos los equipos de esta categoría,
+        Estos specs vinieron del autocompletar o de cargas anteriores y quedaron como "custom" en
+        cada equipo. Si querés que aparezcan formateados en todos los equipos de esta categoría,
         agregalos al template con el tipo y unidad correctos.
       </p>
     </div>
@@ -437,38 +467,44 @@ function DestacadasCounter({ items }: { items: SpecTemplate[] }) {
   const max = 4;
   const over = total > max;
   return (
-    <div className={`flex items-center gap-2 text-xs ${over ? "text-amber-700" : "text-muted-foreground"}`}>
+    <div
+      className={`flex items-center gap-2 text-xs ${over ? "text-amber-700" : "text-muted-foreground"}`}
+    >
       <span className="font-mono uppercase tracking-widest">
         Ficha técnica destacada: {total}/{max}
       </span>
-      {over && (
-        <span>
-          — recomendado {max} máx para no saturar la card del catálogo público.
-        </span>
-      )}
+      {over && <span>— recomendado {max} máx para no saturar la card del catálogo público.</span>}
     </div>
   );
 }
 
-function Badge({ children, tone = "default" }: { children: React.ReactNode; tone?: "default" | "amber" }) {
-  const cls = tone === "amber"
-    ? "bg-amber/15 text-ink"
-    : "bg-muted text-muted-foreground";
+function Badge({
+  children,
+  tone = "default",
+}: {
+  children: React.ReactNode;
+  tone?: "default" | "amber";
+}) {
+  const cls = tone === "amber" ? "bg-amber/15 text-ink" : "bg-muted text-muted-foreground";
   return (
     <span className={`inline-flex items-center rounded px-1.5 py-0.5 ${cls}`}>{children}</span>
   );
 }
 
 function SortableSpecRow({
-  template, onEdit, onDelete, disabled,
+  template,
+  onEdit,
+  onDelete,
+  disabled,
 }: {
   template: SpecTemplate;
   onEdit: () => void;
   onDelete: () => void;
   disabled: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: template.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: template.id,
+  });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -501,7 +537,13 @@ function SortableSpecRow({
 
       <div className="text-xs min-w-0">
         {TIPO_LABEL[template.tipo]}
-        {(template.tipo === "number" || template.tipo === "rango" || template.tipo === "wxh" || template.tipo === "wxhxd") && template.unidad ? ` · ${template.unidad}` : ""}
+        {(template.tipo === "number" ||
+          template.tipo === "rango" ||
+          template.tipo === "wxh" ||
+          template.tipo === "wxhxd") &&
+        template.unidad
+          ? ` · ${template.unidad}`
+          : ""}
         {template.tipo === "enum" && template.enum_options ? (
           <div className="text-[10px] text-muted-foreground truncate">
             {template.enum_options.join(", ")}
@@ -539,7 +581,13 @@ function SortableSpecRow({
 // ─────────────────────────────────────────────────────────────────────
 
 function SpecTemplateFormModal({
-  categoriaId, template, prefillKey, prefillSampleValues, categoriaPath, onClose, onSaved,
+  categoriaId,
+  template,
+  prefillKey,
+  prefillSampleValues,
+  categoriaPath,
+  onClose,
+  onSaved,
 }: {
   categoriaId: number;
   template: SpecTemplate | null;
@@ -616,33 +664,31 @@ function SpecTemplateFormModal({
       .filter((d) => !ya.has(d.id))
       .filter((d) => {
         if (!q) return true;
-        return (
-          d.label.toLowerCase().includes(q) ||
-          d.spec_key.toLowerCase().includes(q)
-        );
+        return d.label.toLowerCase().includes(q) || d.spec_key.toLowerCase().includes(q);
       })
       .sort((a, b) =>
-        a.validado === b.validado
-          ? a.label.localeCompare(b.label)
-          : a.validado ? -1 : 1,
+        a.validado === b.validado ? a.label.localeCompare(b.label) : a.validado ? -1 : 1,
       );
   }, [defsQ.data, yaAsignadasIds.data, search]);
 
   // Spec del catálogo seleccionada (modo asignar) o derivada del template (edit).
   const specInfo: SpecDefinition | undefined = isNew
     ? defsQ.data?.items.find((d) => d.id === selectedDefId)
-    : defsQ.data?.items.find((d) => d.id === template?.spec_def_id) ?? (template ? {
-        id: template.spec_def_id,
-        spec_key: template.spec_key,
-        label: template.label,
-        tipo: template.tipo,
-        unidad: template.unidad,
-        enum_options: template.enum_options,
-        ayuda: template.ayuda,
-        es_compatibilidad: template.es_compatibilidad,
-        compatibilidad_modo: template.compatibilidad_modo,
-        validado: false,
-      } as SpecDefinition : undefined);
+    : (defsQ.data?.items.find((d) => d.id === template?.spec_def_id) ??
+      (template
+        ? ({
+            id: template.spec_def_id,
+            spec_key: template.spec_key,
+            label: template.label,
+            tipo: template.tipo,
+            unidad: template.unidad,
+            enum_options: template.enum_options,
+            ayuda: template.ayuda,
+            es_compatibilidad: template.es_compatibilidad,
+            compatibilidad_modo: template.compatibilidad_modo,
+            validado: false,
+          } as SpecDefinition)
+        : undefined));
 
   const showRolField =
     specInfo?.es_compatibilidad &&
@@ -727,7 +773,8 @@ function SpecTemplateFormModal({
                 Valores en equipos: {prefillSampleValues.map((v) => `"${v}"`).join(", ")}
               </div>
               <p className="text-muted-foreground mt-1 text-[10px]">
-                Buscá una spec del catálogo que matchee, o creala en Gear Compatibility si no existe.
+                Buscá una spec del catálogo que matchee, o creala en Gear Compatibility si no
+                existe.
               </p>
             </div>
           )}
@@ -745,8 +792,10 @@ function SpecTemplateFormModal({
                   autoFocus
                 />
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  Las specs validadas aparecen arriba. Si no encontrás la que buscás,
-                  {" "}<a href="/admin/gear-compatibility" className="text-amber underline">creala en Gear Compatibility →</a>
+                  Las specs validadas aparecen arriba. Si no encontrás la que buscás,{" "}
+                  <a href="/admin/gear-compatibility" className="text-amber underline">
+                    creala en Gear Compatibility →
+                  </a>
                 </p>
               </div>
               <div className="border hairline rounded-md max-h-64 overflow-y-auto divide-y hairline">
@@ -773,9 +822,12 @@ function SpecTemplateFormModal({
                     <div className="flex items-center gap-1.5">
                       {d.validado && <span className="text-emerald-600">✓</span>}
                       <span className="text-ink font-medium">{d.label}</span>
-                      <span className="font-mono text-[9px] text-muted-foreground">{d.spec_key}</span>
+                      <span className="font-mono text-[9px] text-muted-foreground">
+                        {d.spec_key}
+                      </span>
                       <span className="text-[9px] text-muted-foreground ml-auto">
-                        {TIPO_LABEL[d.tipo]}{d.unidad ? ` · ${d.unidad}` : ""}
+                        {TIPO_LABEL[d.tipo]}
+                        {d.unidad ? ` · ${d.unidad}` : ""}
                       </span>
                     </div>
                   </button>
@@ -789,9 +841,12 @@ function SpecTemplateFormModal({
             <div className="rounded-md border hairline bg-muted/20 px-3 py-2 space-y-0.5">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-xs font-medium text-ink">{specInfo.label}</span>
-                <span className="font-mono text-[9px] text-muted-foreground">{specInfo.spec_key}</span>
+                <span className="font-mono text-[9px] text-muted-foreground">
+                  {specInfo.spec_key}
+                </span>
                 <span className="text-[9px] text-muted-foreground">
-                  · {TIPO_LABEL[specInfo.tipo]}{specInfo.unidad ? ` · ${specInfo.unidad}` : ""}
+                  · {TIPO_LABEL[specInfo.tipo]}
+                  {specInfo.unidad ? ` · ${specInfo.unidad}` : ""}
                 </span>
                 {specInfo.es_compatibilidad && (
                   <span className="text-[9px] bg-amber-soft/60 text-amber-800 px-1 rounded">
@@ -839,19 +894,20 @@ function SpecTemplateFormModal({
               />
               {showRolField && (
                 <div>
-                  <Label className="text-xs">
-                    Rol en compatibilidad jerárquica
-                  </Label>
+                  <Label className="text-xs">Rol en compatibilidad jerárquica</Label>
                   <Select
                     value={flags.rol_compatibilidad ?? "ninguno"}
                     onValueChange={(v) =>
                       setFlags({
                         ...flags,
-                        rol_compatibilidad: v === "ninguno" ? null : (v as "contenedor" | "contenido"),
+                        rol_compatibilidad:
+                          v === "ninguno" ? null : (v as "contenedor" | "contenido"),
                       })
                     }
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ninguno">No participa</SelectItem>
                       <SelectItem value="contenedor">Contenedor (proyecta — ej. lente)</SelectItem>
@@ -859,8 +915,8 @@ function SpecTemplateFormModal({
                     </SelectContent>
                   </Select>
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    El modo jerárquico de la spec global decide; acá solo definís
-                    cómo participa esta categoría.
+                    El modo jerárquico de la spec global decide; acá solo definís cómo participa
+                    esta categoría.
                   </p>
                 </div>
               )}
@@ -869,7 +925,9 @@ function SpecTemplateFormModal({
         </div>
 
         <footer className="border-t hairline px-4 py-3 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
           <Button onClick={handleSave} disabled={busy || (isNew && !selectedDefId)}>
             {busy ? "Guardando…" : isNew ? "Asignar" : "Guardar"}
           </Button>
@@ -879,7 +937,15 @@ function SpecTemplateFormModal({
   );
 }
 
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
     <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
       <input

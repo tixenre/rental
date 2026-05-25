@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { LayoutGrid, List } from "lucide-react";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +47,11 @@ export function ViewIntroDialog({ onPick }: { onPick: (mode: "grid" | "list") =>
   }, []);
 
   const markSeen = () => {
-    try { localStorage.setItem(STORAGE_KEY, "1"); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(STORAGE_KEY, "1");
+    } catch {
+      /* ignore */
+    }
   };
 
   const handlePick = (mode: "grid" | "list") => {
@@ -62,12 +70,10 @@ export function ViewIntroDialog({ onPick }: { onPick: (mode: "grid" | "list") =>
     >
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">
-            ¿Cómo querés ver el catálogo?
-          </DialogTitle>
+          <DialogTitle className="font-display text-2xl">¿Cómo querés ver el catálogo?</DialogTitle>
           <DialogDescription>
-            Hay dos formas. Elegí la que te resulte más cómoda — podés cambiar cuando
-            quieras desde el botón con los íconos de grilla y lista, arriba a la derecha.
+            Hay dos formas. Elegí la que te resulte más cómoda — podés cambiar cuando quieras desde
+            el botón con los íconos de grilla y lista, arriba a la derecha.
           </DialogDescription>
         </DialogHeader>
 
@@ -105,7 +111,11 @@ export function ViewIntroDialog({ onPick }: { onPick: (mode: "grid" | "list") =>
 }
 
 function ViewOption({
-  icon, label, tagline, bullets, onClick,
+  icon,
+  label,
+  tagline,
+  bullets,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -130,7 +140,9 @@ function ViewOption({
       <ul className="space-y-1 text-[11px] text-muted-foreground leading-snug">
         {bullets.map((b) => (
           <li key={b} className="flex gap-1.5">
-            <span className="text-amber shrink-0" aria-hidden>·</span>
+            <span className="text-amber shrink-0" aria-hidden>
+              ·
+            </span>
             <span>{b}</span>
           </li>
         ))}

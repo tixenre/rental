@@ -17,9 +17,15 @@ function ClienteEditarPedido() {
   useEffect(() => {
     let alive = true;
     authedFetch("/api/cliente/me")
-      .then((r) => { if (alive) setAuthed(r.ok); })
-      .catch(() => { if (alive) setAuthed(false); });
-    return () => { alive = false; };
+      .then((r) => {
+        if (alive) setAuthed(r.ok);
+      })
+      .catch(() => {
+        if (alive) setAuthed(false);
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -29,9 +35,7 @@ function ClienteEditarPedido() {
   if (!authed) {
     return (
       <PublicLayout topBar={{ variant: "cliente" }}>
-        <div className="grid place-items-center py-24 text-sm text-muted-foreground">
-          Cargando…
-        </div>
+        <div className="grid place-items-center py-24 text-sm text-muted-foreground">Cargando…</div>
       </PublicLayout>
     );
   }

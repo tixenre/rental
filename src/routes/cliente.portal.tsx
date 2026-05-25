@@ -6,18 +6,46 @@ import { PublicLayout } from "@/components/rental/PublicLayout";
 import { StatCard } from "@/components/rental/StatCard";
 import { EstadoBadge } from "@/components/rental/EstadoBadge";
 import {
-  ArrowRight, ChevronDown, ShoppingBag, Pencil, Clock, X as XIcon,
-  CheckCircle2, XCircle, Info, FileText, FileSignature, Truck,
-  MessageCircle, Search, Mail, Phone, MapPin, Building2, Receipt,
-  LogOut, CircleCheckBig,
+  ArrowRight,
+  ChevronDown,
+  ShoppingBag,
+  Pencil,
+  Clock,
+  X as XIcon,
+  CheckCircle2,
+  XCircle,
+  Info,
+  FileText,
+  FileSignature,
+  Truck,
+  MessageCircle,
+  Search,
+  Mail,
+  Phone,
+  MapPin,
+  Building2,
+  Receipt,
+  LogOut,
+  CircleCheckBig,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useBusinessPhone } from "@/lib/business";
@@ -65,9 +93,13 @@ type SolicitudPortal = {
   created_at: string;
 };
 type Pedido = {
-  id: number; numero_pedido: string; estado: string;
-  fecha_desde?: string; fecha_hasta?: string;
-  monto_total?: number; monto_pagado?: number;
+  id: number;
+  numero_pedido: string;
+  estado: string;
+  fecha_desde?: string;
+  fecha_hasta?: string;
+  monto_total?: number;
+  monto_pagado?: number;
   descuento_pct?: number | null;
   notas?: string | null;
   created_at?: string | null;
@@ -93,24 +125,29 @@ const DOC_LABEL: Record<DocTipo, string> = {
 
 const DOC_DESCRIPTION: Partial<Record<DocTipo, string>> = {
   contrato: "Es el documento de alquiler firmado entre vos y nosotros.",
-  albaran:  "Te sirve para tener constancia ante tu aseguradora.",
+  albaran: "Te sirve para tener constancia ante tu aseguradora.",
 };
 
 // Sólo Contrato y Albarán disparan el popup one-shot. Remito se incluye en el
 // listado de docs pero no es trigger (mismo evento que Contrato).
 const DOC_NOTIFICABLE: DocTipo[] = ["contrato", "albaran"];
 
-const docSeenKey = (pedidoId: number, tipo: DocTipo) =>
-  `rambla.doc_seen.${pedidoId}.${tipo}`;
+const docSeenKey = (pedidoId: number, tipo: DocTipo) => `rambla.doc_seen.${pedidoId}.${tipo}`;
 
 function wasDocSeen(pedidoId: number, tipo: DocTipo): boolean {
-  try { return localStorage.getItem(docSeenKey(pedidoId, tipo)) === "1"; }
-  catch { return false; }
+  try {
+    return localStorage.getItem(docSeenKey(pedidoId, tipo)) === "1";
+  } catch {
+    return false;
+  }
 }
 
 function markDocSeen(pedidoId: number, tipo: DocTipo): void {
-  try { localStorage.setItem(docSeenKey(pedidoId, tipo), "1"); }
-  catch { /* ignore */ }
+  try {
+    localStorage.setItem(docSeenKey(pedidoId, tipo), "1");
+  } catch {
+    /* ignore */
+  }
 }
 
 type Filtro = "todos" | "activos" | "historial";
@@ -123,14 +160,31 @@ const TAB_OPTIONS: { value: Filtro; label: string }[] = [
 
 function fmt(n?: number) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 function fmtDate(s?: string) {
   if (!s) return "—";
   // slice(0,10) normaliza "YYYY-MM-DD HH:MM:SS" y "YYYY-MM-DDTHH:MM:SS" a "YYYY-MM-DD"
   const d = new Date(s.slice(0, 10) + "T12:00:00");
   const dias = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
-  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const meses = [
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
   return `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
 }
 function fmtTime(s?: string) {
@@ -161,22 +215,31 @@ export default function ClientePortal() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([
-      authedFetch("/api/cliente/me"),
-      authedFetch("/api/cliente/pedidos"),
-    ]).then(async ([rp, ro]) => {
-      if (!alive) return;
-      if (!rp.ok || !ro.ok) { navigate({ to: "/cliente/login" }); return; }
-      setPerfil(await rp.json());
-      setPedidos(await ro.json());
-    }).catch(() => navigate({ to: "/cliente/login" }))
+    Promise.all([authedFetch("/api/cliente/me"), authedFetch("/api/cliente/pedidos")])
+      .then(async ([rp, ro]) => {
+        if (!alive) return;
+        if (!rp.ok || !ro.ok) {
+          navigate({ to: "/cliente/login" });
+          return;
+        }
+        setPerfil(await rp.json());
+        setPedidos(await ro.json());
+      })
+      .catch(() => navigate({ to: "/cliente/login" }))
       .finally(() => alive && setLoading(false));
 
-    clienteApi.modificacionConfig()
-      .then((c) => { if (alive) setVentanaHoras(c.ventana_horas); })
-      .catch(() => { /* default 24 */ });
+    clienteApi
+      .modificacionConfig()
+      .then((c) => {
+        if (alive) setVentanaHoras(c.ventana_horas);
+      })
+      .catch(() => {
+        /* default 24 */
+      });
 
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [navigate]);
 
   // Calculamos los documentos "nuevos" (disponibles + no vistos antes) cada
@@ -221,24 +284,37 @@ export default function ClientePortal() {
   // tira el error #310 ("Rendered more hooks than during the previous
   // render"). Las dependencias usan `pedidos` que arranca como [] mientras
   // loading=true, así que es seguro evaluarlas.
-  const tabFiltered = useMemo(() => (
-    tab === "activos"   ? pedidos.filter((p) => ACTIVE_STATES.has(p.estado))
-    : tab === "historial" ? pedidos.filter((p) => HIST_STATES.has(p.estado))
-    : pedidos
-  ), [tab, pedidos]);
+  const tabFiltered = useMemo(
+    () =>
+      tab === "activos"
+        ? pedidos.filter((p) => ACTIVE_STATES.has(p.estado))
+        : tab === "historial"
+          ? pedidos.filter((p) => HIST_STATES.has(p.estado))
+          : pedidos,
+    [tab, pedidos],
+  );
 
   const q = query.trim().toLowerCase();
   const filteredPedidos = useMemo(() => {
     if (!q) return tabFiltered;
     return tabFiltered.filter((p) => {
-      if (String(p.numero_pedido ?? "").toLowerCase().includes(q)) return true;
+      if (
+        String(p.numero_pedido ?? "")
+          .toLowerCase()
+          .includes(q)
+      )
+        return true;
       if (p.estado.toLowerCase().includes(q)) return true;
       if ((p.notas ?? "").toLowerCase().includes(q)) return true;
-      if (p.items.some((it) =>
-        (it.nombre_publico ?? it.nombre).toLowerCase().includes(q) ||
-        (it.marca ?? "").toLowerCase().includes(q) ||
-        (it.modelo ?? "").toLowerCase().includes(q)
-      )) return true;
+      if (
+        p.items.some(
+          (it) =>
+            (it.nombre_publico ?? it.nombre).toLowerCase().includes(q) ||
+            (it.marca ?? "").toLowerCase().includes(q) ||
+            (it.modelo ?? "").toLowerCase().includes(q),
+        )
+      )
+        return true;
       return false;
     });
   }, [tabFiltered, q]);
@@ -249,12 +325,18 @@ export default function ClientePortal() {
         <div className="w-full px-5 lg:px-12 xl:px-[72px] pt-8 pb-20">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-9">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-[88px] rounded-md border hairline bg-muted/30 animate-pulse" />
+              <div
+                key={i}
+                className="h-[88px] rounded-md border hairline bg-muted/30 animate-pulse"
+              />
             ))}
           </div>
           <div className="flex flex-col gap-2.5">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 rounded-xl border border-[var(--hairline)] bg-muted/20 animate-pulse" />
+              <div
+                key={i}
+                className="h-14 rounded-xl border border-[var(--hairline)] bg-muted/20 animate-pulse"
+              />
             ))}
           </div>
         </div>
@@ -280,7 +362,8 @@ export default function ClientePortal() {
       const d = p.fecha_desde ? new Date(p.fecha_desde).getTime() : NaN;
       const h = p.fecha_hasta ? new Date(p.fecha_hasta).getTime() : NaN;
       if (!Number.isNaN(d) && d >= ahora) ev.push({ ts: d, iso: p.fecha_desde!, tipo: "retiro" });
-      if (!Number.isNaN(h) && h >= ahora) ev.push({ ts: h, iso: p.fecha_hasta!, tipo: "devolución" });
+      if (!Number.isNaN(h) && h >= ahora)
+        ev.push({ ts: h, iso: p.fecha_hasta!, tipo: "devolución" });
       return ev;
     })
     .sort((a, b) => a.ts - b.ts)[0];
@@ -333,11 +416,7 @@ export default function ClientePortal() {
               meta={pendientePago > 0 ? "saldo pendiente" : "todo al día"}
               valueClassName={pendientePago === 0 ? "text-verde" : undefined}
             />
-            <StatCard
-              label="Histórico"
-              value={String(historico)}
-              meta="pedidos completados"
-            />
+            <StatCard label="Histórico" value={String(historico)} meta="pedidos completados" />
           </div>
         )}
 
@@ -407,11 +486,7 @@ export default function ClientePortal() {
         )}
 
         {pedidos.length === 0 ? (
-          <PedidoEmpty
-            title="Sin pedidos aún"
-            sub="Todavía no tenés pedidos registrados."
-            cta
-          />
+          <PedidoEmpty title="Sin pedidos aún" sub="Todavía no tenés pedidos registrados." cta />
         ) : filteredPedidos.length === 0 ? (
           q ? (
             <PedidoEmpty
@@ -449,11 +524,7 @@ export default function ClientePortal() {
         )}
       </div>
 
-      <DocAvailablePopup
-        nuevos={docsNuevos}
-        onDismiss={dismissDocsPopup}
-        onVerPedido={verPedido}
-      />
+      <DocAvailablePopup nuevos={docsNuevos} onDismiss={dismissDocsPopup} onVerPedido={verPedido} />
 
       {perfil && (
         <ProfileDrawer
@@ -470,7 +541,12 @@ export default function ClientePortal() {
 }
 
 function PedidoEmpty({
-  title, sub, cta, actionLabel, onAction, icon = "bag",
+  title,
+  sub,
+  cta,
+  actionLabel,
+  onAction,
+  icon = "bag",
 }: {
   title: string;
   sub: string;
@@ -495,20 +571,27 @@ function PedidoEmpty({
         >
           {actionLabel} <XIcon className="h-3.5 w-3.5" />
         </button>
-      ) : cta && (
-        <Link
-          to="/"
-          className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-2.5 font-sans text-[13px] font-bold text-amber transition hover:bg-amber hover:text-ink"
-        >
-          Explorar catálogo <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
+      ) : (
+        cta && (
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-2.5 font-sans text-[13px] font-bold text-amber transition hover:bg-amber hover:text-ink"
+          >
+            Explorar catálogo <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        )
       )}
     </div>
   );
 }
 
 function PedidoCard({
-  pedido, expanded, onToggle, ventanaHoras, onChanged, perfilImpuestos,
+  pedido,
+  expanded,
+  onToggle,
+  ventanaHoras,
+  onChanged,
+  perfilImpuestos,
 }: {
   pedido: Pedido;
   expanded: boolean;
@@ -547,13 +630,16 @@ function PedidoCard({
   // Última solicitud que el cliente debe ver: aprobada, rechazada, o
   // cancelada por el sistema (cuando el pedido cambia de estado). Las
   // canceladas por el propio cliente las ocultamos: él la canceló.
-  const ultimaResuelta = !pendiente ? (pedido.solicitudes ?? [])
-    .filter((s) => {
-      if (s.estado === "aprobada" || s.estado === "rechazada") return true;
-      if (s.estado === "cancelada" && s.resolved_by === "system") return true;
-      return false;
-    })
-    .sort((a, b) => (b.resolved_at ?? b.created_at).localeCompare(a.resolved_at ?? a.created_at))[0]
+  const ultimaResuelta = !pendiente
+    ? (pedido.solicitudes ?? [])
+        .filter((s) => {
+          if (s.estado === "aprobada" || s.estado === "rechazada") return true;
+          if (s.estado === "cancelada" && s.resolved_by === "system") return true;
+          return false;
+        })
+        .sort((a, b) =>
+          (b.resolved_at ?? b.created_at).localeCompare(a.resolved_at ?? a.created_at),
+        )[0]
     : undefined;
 
   const dentroVentana = (() => {
@@ -564,8 +650,7 @@ function PedidoCard({
     return desde - Date.now() >= ms;
   })();
 
-  const puedeModificar =
-    MODIFICABLE_STATES.has(pedido.estado) && !pendiente && dentroVentana;
+  const puedeModificar = MODIFICABLE_STATES.has(pedido.estado) && !pendiente && dentroVentana;
 
   async function cancelarSolicitud() {
     if (!pendiente) return;
@@ -581,7 +666,7 @@ function PedidoCard({
   const subtotalItems = pedido.items.reduce((acc, it) => acc + it.subtotal, 0);
   const descuentoPct = pedido.descuento_pct ?? 0;
   const descuentoMonto = Math.round(subtotalItems * (descuentoPct / 100));
-  const totalNeto = pedido.monto_total ?? (subtotalItems - descuentoMonto);
+  const totalNeto = pedido.monto_total ?? subtotalItems - descuentoMonto;
   const conIva = perfilImpuestos === "responsable_inscripto";
   const ivaMonto = conIva ? Math.round(totalNeto * 0.21) : 0;
   const total = totalNeto + ivaMonto;
@@ -656,7 +741,6 @@ function PedidoCard({
 
       {expanded && (
         <div className="border-t border-dashed border-[var(--hairline)] px-4 sm:px-[18px] pt-[18px] pb-[22px] grid gap-y-5 gap-x-7 animate-[expand-in_.22s_ease-out] [grid-template-areas:'banner''timeline''main''side'] lg:[grid-template-columns:minmax(0,1fr)_clamp(20rem,26%,25rem)] lg:[grid-template-areas:'banner_banner''timeline_timeline''main_side']">
-
           {/* ── Banner: solicitud pendiente / resuelta (full width) ── */}
           {(pendiente || ultimaResuelta) && (
             <div className="[grid-area:banner] flex flex-col gap-3">
@@ -668,7 +752,8 @@ function PedidoCard({
                       Solicitud de modificación pendiente
                     </div>
                     <div className="font-sans text-xs text-ink/70 mt-0.5">
-                      Estamos revisando los cambios que pediste. Te avisamos por mail cuando los resolvamos.
+                      Estamos revisando los cambios que pediste. Te avisamos por mail cuando los
+                      resolvamos.
                     </div>
                   </div>
                   <button
@@ -681,39 +766,45 @@ function PedidoCard({
                 </section>
               )}
 
-              {ultimaResuelta && (() => {
-                const isAprobada  = ultimaResuelta.estado === "aprobada";
-                const isRechazada = ultimaResuelta.estado === "rechazada";
-                const isSystemCancel = ultimaResuelta.estado === "cancelada"; // ya filtramos por resolved_by='system'
-                const titulo =
-                  isAprobada  ? "Tu última solicitud fue aprobada"
-                  : isRechazada ? "Tu última solicitud fue rechazada"
-                  : "Tu solicitud quedó sin efecto";
-                return (
-                  <section
-                    className={cn(
-                      "rounded-md border px-3.5 py-3 flex items-start gap-2.5",
-                      isAprobada  ? "border-emerald-300 bg-emerald-50"
-                      : isRechazada ? "border-rose-300 bg-rose-50"
-                      : "border-violet-300 bg-violet-50",
-                    )}
-                  >
-                    {isAprobada  ? <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
-                    : isRechazada ? <XCircle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />
-                    : <Info className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-sans text-[13px] font-semibold text-ink">
-                        {titulo}
-                      </div>
-                      {ultimaResuelta.respuesta && (
-                        <div className="font-sans text-xs text-ink/80 mt-0.5 whitespace-pre-wrap">
-                          {isSystemCancel ? ultimaResuelta.respuesta : ultimaResuelta.respuesta}
-                        </div>
+              {ultimaResuelta &&
+                (() => {
+                  const isAprobada = ultimaResuelta.estado === "aprobada";
+                  const isRechazada = ultimaResuelta.estado === "rechazada";
+                  const isSystemCancel = ultimaResuelta.estado === "cancelada"; // ya filtramos por resolved_by='system'
+                  const titulo = isAprobada
+                    ? "Tu última solicitud fue aprobada"
+                    : isRechazada
+                      ? "Tu última solicitud fue rechazada"
+                      : "Tu solicitud quedó sin efecto";
+                  return (
+                    <section
+                      className={cn(
+                        "rounded-md border px-3.5 py-3 flex items-start gap-2.5",
+                        isAprobada
+                          ? "border-emerald-300 bg-emerald-50"
+                          : isRechazada
+                            ? "border-rose-300 bg-rose-50"
+                            : "border-violet-300 bg-violet-50",
                       )}
-                    </div>
-                  </section>
-                );
-              })()}
+                    >
+                      {isAprobada ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
+                      ) : isRechazada ? (
+                        <XCircle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />
+                      ) : (
+                        <Info className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-sans text-[13px] font-semibold text-ink">{titulo}</div>
+                        {ultimaResuelta.respuesta && (
+                          <div className="font-sans text-xs text-ink/80 mt-0.5 whitespace-pre-wrap">
+                            {isSystemCancel ? ultimaResuelta.respuesta : ultimaResuelta.respuesta}
+                          </div>
+                        )}
+                      </div>
+                    </section>
+                  );
+                })()}
             </div>
           )}
 
@@ -737,18 +828,36 @@ function PedidoCard({
           <div className="[grid-area:main] flex flex-col gap-5 min-w-0">
             <section className="grid grid-cols-3 gap-2">
               <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
-                <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">Retiro</div>
-                <div className="font-sans text-sm font-semibold text-ink mt-0.5">{fmtDate(pedido.fecha_desde)}</div>
-                {retiroTime && <div className="font-mono text-[10px] text-muted-foreground">{retiroTime}</div>}
+                <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">
+                  Retiro
+                </div>
+                <div className="font-sans text-sm font-semibold text-ink mt-0.5">
+                  {fmtDate(pedido.fecha_desde)}
+                </div>
+                {retiroTime && (
+                  <div className="font-mono text-[10px] text-muted-foreground">{retiroTime}</div>
+                )}
               </div>
               <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
-                <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">Devolución</div>
-                <div className="font-sans text-sm font-semibold text-ink mt-0.5">{fmtDate(pedido.fecha_hasta)}</div>
-                {devolucionTime && <div className="font-mono text-[10px] text-muted-foreground">{devolucionTime}</div>}
+                <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">
+                  Devolución
+                </div>
+                <div className="font-sans text-sm font-semibold text-ink mt-0.5">
+                  {fmtDate(pedido.fecha_hasta)}
+                </div>
+                {devolucionTime && (
+                  <div className="font-mono text-[10px] text-muted-foreground">
+                    {devolucionTime}
+                  </div>
+                )}
               </div>
               <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
-                <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">Jornadas</div>
-                <div className="font-display text-2xl font-black text-ink tabular-nums leading-none mt-1">{jornadas}</div>
+                <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">
+                  Jornadas
+                </div>
+                <div className="font-display text-2xl font-black text-ink tabular-nums leading-none mt-1">
+                  {jornadas}
+                </div>
               </div>
             </section>
 
@@ -773,7 +882,10 @@ function PedidoCard({
                         />
                       ) : (
                         <div className="h-10 w-10 rounded-sm border border-[var(--hairline)] bg-white grid place-items-center shrink-0">
-                          <ShoppingBag className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                          <ShoppingBag
+                            className="h-4 w-4 text-muted-foreground"
+                            strokeWidth={1.5}
+                          />
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
@@ -802,10 +914,12 @@ function PedidoCard({
               <section>
                 <button
                   type="button"
-                  onClick={() => navigate({
-                    to: "/cliente/pedidos/$id/editar",
-                    params: { id: String(pedido.id) },
-                  })}
+                  onClick={() =>
+                    navigate({
+                      to: "/cliente/pedidos/$id/editar",
+                      params: { id: String(pedido.id) },
+                    })
+                  }
                   className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 font-sans text-[13px] font-bold text-amber hover:bg-amber hover:text-ink transition"
                 >
                   <Pencil className="h-3.5 w-3.5" /> Modificar pedido
@@ -818,11 +932,15 @@ function PedidoCard({
               </section>
             )}
 
-            {!puedeModificar && MODIFICABLE_STATES.has(pedido.estado) && !pendiente && !dentroVentana && (
-              <section className="rounded-md border border-dashed border-[var(--hairline)] px-3.5 py-2.5 font-sans text-xs text-muted-foreground">
-                No es posible modificar este pedido a menos de {ventanaHoras} h del retiro. Contactanos directamente.
-              </section>
-            )}
+            {!puedeModificar &&
+              MODIFICABLE_STATES.has(pedido.estado) &&
+              !pendiente &&
+              !dentroVentana && (
+                <section className="rounded-md border border-dashed border-[var(--hairline)] px-3.5 py-2.5 font-sans text-xs text-muted-foreground">
+                  No es posible modificar este pedido a menos de {ventanaHoras} h del retiro.
+                  Contactanos directamente.
+                </section>
+              )}
 
             {(() => {
               const waHref = whatsappLink({
@@ -865,13 +983,19 @@ function PedidoCard({
                   )}
                   {docs.contrato && (
                     <DocActions
-                      pedidoId={pedido.id} numero={numero} tipo="contrato" label="Contrato"
+                      pedidoId={pedido.id}
+                      numero={numero}
+                      tipo="contrato"
+                      label="Contrato"
                       description={DOC_DESCRIPTION.contrato}
                     />
                   )}
                   {docs.albaran && (
                     <DocActions
-                      pedidoId={pedido.id} numero={numero} tipo="albaran" label="Albarán"
+                      pedidoId={pedido.id}
+                      numero={numero}
+                      tipo="albaran"
+                      label="Albarán"
                       description={DOC_DESCRIPTION.albaran}
                     />
                   )}
@@ -882,7 +1006,9 @@ function PedidoCard({
             <section className="flex flex-col gap-1.5 rounded-md border border-[var(--hairline)] bg-card px-3.5 py-3">
               <div className="flex justify-between items-baseline font-sans text-[13px]">
                 <span className="text-muted-foreground">Subtotal equipos</span>
-                <span className="font-mono font-semibold text-ink tabular-nums">{fmt(subtotalItems)}</span>
+                <span className="font-mono font-semibold text-ink tabular-nums">
+                  {fmt(subtotalItems)}
+                </span>
               </div>
               {descuentoPct > 0 && (
                 <div className="flex justify-between items-baseline font-sans text-[13px]">
@@ -896,11 +1022,15 @@ function PedidoCard({
                 <>
                   <div className="flex justify-between items-baseline font-sans text-[13px]">
                     <span className="text-muted-foreground">Subtotal neto</span>
-                    <span className="font-mono font-semibold text-ink tabular-nums">{fmt(totalNeto)}</span>
+                    <span className="font-mono font-semibold text-ink tabular-nums">
+                      {fmt(totalNeto)}
+                    </span>
                   </div>
                   <div className="flex justify-between items-baseline font-sans text-[13px]">
                     <span className="text-muted-foreground">IVA 21%</span>
-                    <span className="font-mono font-semibold text-ink tabular-nums">+{fmt(ivaMonto)}</span>
+                    <span className="font-mono font-semibold text-ink tabular-nums">
+                      +{fmt(ivaMonto)}
+                    </span>
                   </div>
                 </>
               )}
@@ -908,17 +1038,28 @@ function PedidoCard({
                 <span className="font-sans text-[15px] font-bold text-ink">
                   Total{conIva ? " · IVA incluído" : ""}
                 </span>
-                <span className="font-display text-[22px] font-black text-ink tabular-nums">{fmt(total)}</span>
+                <span className="font-display text-[22px] font-black text-ink tabular-nums">
+                  {fmt(total)}
+                </span>
               </div>
               {pagado > 0 && (
                 <>
                   <div className="flex justify-between items-baseline font-sans text-[13px]">
                     <span className="text-muted-foreground">Pagado</span>
-                    <span className="font-mono font-semibold tabular-nums text-verde">{fmt(pagado)}</span>
+                    <span className="font-mono font-semibold tabular-nums text-verde">
+                      {fmt(pagado)}
+                    </span>
                   </div>
                   <div className="flex justify-between items-baseline font-sans text-[13px]">
-                    <span className="text-muted-foreground">{balance > 0 ? "Balance pendiente" : "Saldo"}</span>
-                    <span className={cn("font-mono font-bold tabular-nums", balance > 0 ? "text-ink" : "text-verde")}>
+                    <span className="text-muted-foreground">
+                      {balance > 0 ? "Balance pendiente" : "Saldo"}
+                    </span>
+                    <span
+                      className={cn(
+                        "font-mono font-bold tabular-nums",
+                        balance > 0 ? "text-ink" : "text-verde",
+                      )}
+                    >
                       {fmt(balance)}
                     </span>
                   </div>
@@ -928,14 +1069,22 @@ function PedidoCard({
 
             {pedido.pagos && pedido.pagos.length > 0 && (
               <section>
-                <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">Pagos</h3>
+                <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+                  Pagos
+                </h3>
                 <ul className="flex flex-col gap-1">
                   {pedido.pagos.map((pg, i) => (
-                    <li key={i} className="flex items-center justify-between gap-2 font-sans text-xs text-muted-foreground">
+                    <li
+                      key={i}
+                      className="flex items-center justify-between gap-2 font-sans text-xs text-muted-foreground"
+                    >
                       <span className="truncate">
-                        {fmtDate(pg.fecha)}{pg.concepto ? ` · ${pg.concepto}` : ""}
+                        {fmtDate(pg.fecha)}
+                        {pg.concepto ? ` · ${pg.concepto}` : ""}
                       </span>
-                      <span className="font-mono tabular-nums text-verde shrink-0">{fmt(pg.monto)}</span>
+                      <span className="font-mono tabular-nums text-verde shrink-0">
+                        {fmt(pg.monto)}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -944,7 +1093,9 @@ function PedidoCard({
 
             {pedido.notas && (
               <section>
-                <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">Notas</h3>
+                <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+                  Notas
+                </h3>
                 <div className="rounded-md border border-[color-mix(in_oklch,var(--amber)_40%,transparent)] bg-amber-soft px-3.5 py-3 font-sans text-xs text-ink leading-[1.5] whitespace-pre-wrap">
                   {pedido.notas}
                 </div>
@@ -964,7 +1115,12 @@ function PedidoCard({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Volver</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setAskCancel(false); cancelarSolicitud(); }}>
+            <AlertDialogAction
+              onClick={() => {
+                setAskCancel(false);
+                cancelarSolicitud();
+              }}
+            >
               Cancelar solicitud
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -977,8 +1133,7 @@ function PedidoCard({
 const DOC_ICONS: Record<"remito" | "contrato" | "albaran", string> = {
   remito:
     "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
-  contrato:
-    "M9 11l3 3 8-8 M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11",
+  contrato: "M9 11l3 3 8-8 M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11",
   albaran:
     "M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z",
 };
@@ -986,8 +1141,19 @@ const DOC_ICONS: Record<"remito" | "contrato" | "albaran", string> = {
 function DocPath({ tipo }: { tipo: keyof typeof DOC_ICONS }) {
   const paths = DOC_ICONS[tipo].split(" M");
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      {paths.map((p, i) => <path key={i} d={i === 0 ? p : `M${p}`} />)}
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {paths.map((p, i) => (
+        <path key={i} d={i === 0 ? p : `M${p}`} />
+      ))}
     </svg>
   );
 }
@@ -1014,7 +1180,7 @@ function DocActions({
   // notificables). El estado vive en localStorage; lo trackeamos con un
   // ref local para que el badge desaparezca instantáneamente al tocar.
   const [seen, setSeen] = useState<boolean>(() =>
-    tipo === "remito" ? true : wasDocSeen(pedidoId, tipo)
+    tipo === "remito" ? true : wasDocSeen(pedidoId, tipo),
   );
   const showNewBadge = !seen;
 
@@ -1029,7 +1195,10 @@ function DocActions({
       <div className="flex items-stretch gap-1">
         <button
           type="button"
-          onClick={() => { markSeen(); setPreviewOpen(true); }}
+          onClick={() => {
+            markSeen();
+            setPreviewOpen(true);
+          }}
           className="flex-1 relative flex items-center gap-2.5 rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5 text-left transition hover:border-ink hover:bg-muted"
         >
           {showNewBadge && (
@@ -1061,7 +1230,16 @@ function DocActions({
           title={`Descargar ${label} en PDF`}
           aria-label={`Descargar ${label} en PDF`}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
@@ -1142,11 +1320,7 @@ function DocPreviewModal({
             </button>
           </div>
         </header>
-        <iframe
-          src={url}
-          title={title}
-          className="flex-1 w-full bg-white border-0"
-        />
+        <iframe src={url} title={title} className="flex-1 w-full bg-white border-0" />
       </div>
     </div>
   );
@@ -1158,7 +1332,9 @@ function DocPreviewModal({
  * localStorage al cerrar para no volver a aparecer.
  */
 function DocAvailablePopup({
-  nuevos, onDismiss, onVerPedido,
+  nuevos,
+  onDismiss,
+  onVerPedido,
 }: {
   nuevos: Array<{ pedidoId: number; numero: string; tipo: DocTipo }>;
   onDismiss: () => void;
@@ -1166,7 +1342,12 @@ function DocAvailablePopup({
 }) {
   const open = nuevos.length > 0;
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onDismiss(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onDismiss();
+      }}
+    >
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Tenés documentos nuevos disponibles</DialogTitle>
@@ -1177,9 +1358,7 @@ function DocAvailablePopup({
         <ul className="space-y-2.5 my-2">
           {nuevos.map((d) => {
             const Icon =
-              d.tipo === "contrato" ? FileSignature
-              : d.tipo === "albaran" ? Truck
-              : FileText;
+              d.tipo === "contrato" ? FileSignature : d.tipo === "albaran" ? Truck : FileText;
             return (
               <li
                 key={`${d.pedidoId}-${d.tipo}`}
@@ -1191,7 +1370,9 @@ function DocAvailablePopup({
                 <div className="min-w-0 flex-1">
                   <div className="font-sans text-sm font-semibold text-ink">
                     {DOC_LABEL[d.tipo]}
-                    <span className="text-muted-foreground font-mono text-xs ml-1.5">#{d.numero}</span>
+                    <span className="text-muted-foreground font-mono text-xs ml-1.5">
+                      #{d.numero}
+                    </span>
                   </div>
                   {DOC_DESCRIPTION[d.tipo] && (
                     <div className="font-sans text-xs text-muted-foreground mt-0.5">
@@ -1238,26 +1419,29 @@ type TLStep = {
 };
 
 const FLOW_STEPS: ReadonlyArray<{ tipo: string; label: string; desc: string }> = [
-  { tipo: "solicitado", label: "Solicitado",
-    desc: "Recibimos tu pedido. Lo revisamos y te confirmamos disponibilidad." },
-  { tipo: "confirmado", label: "Confirmado",
-    desc: "Equipos reservados a tu nombre. Listo para retirar en la fecha." },
-  { tipo: "retirado",   label: "Retirado",
-    desc: "Pasaste por el local y te llevaste el equipo." },
-  { tipo: "devuelto",   label: "Devuelto",
-    desc: "Recibimos el equipo de vuelta y lo revisamos." },
-  { tipo: "finalizado", label: "Finalizado",
-    desc: "Pedido cerrado. Gracias por elegirnos." },
+  {
+    tipo: "solicitado",
+    label: "Solicitado",
+    desc: "Recibimos tu pedido. Lo revisamos y te confirmamos disponibilidad.",
+  },
+  {
+    tipo: "confirmado",
+    label: "Confirmado",
+    desc: "Equipos reservados a tu nombre. Listo para retirar en la fecha.",
+  },
+  { tipo: "retirado", label: "Retirado", desc: "Pasaste por el local y te llevaste el equipo." },
+  { tipo: "devuelto", label: "Devuelto", desc: "Recibimos el equipo de vuelta y lo revisamos." },
+  { tipo: "finalizado", label: "Finalizado", desc: "Pedido cerrado. Gracias por elegirnos." },
 ];
 
 // Cuántos FLOW_STEPS están completados según el estado actual.
 const ESTADO_PROGRESS: Record<string, number> = {
-  borrador:    0,
+  borrador: 0,
   presupuesto: 1,
-  confirmado:  2,
-  retirado:    3,
-  devuelto:    4,
-  finalizado:  5,
+  confirmado: 2,
+  retirado: 3,
+  devuelto: 4,
+  finalizado: 5,
 };
 
 function buildTimelineSteps(pedido: Pedido): TLStep[] {
@@ -1270,7 +1454,7 @@ function buildTimelineSteps(pedido: Pedido): TLStep[] {
     desc: step.desc,
     // Solo el primer paso ("solicitado") tiene fecha exacta — viene de
     // created_at del pedido. Los demás no se loggean en backend (gap).
-    fecha: step.tipo === "solicitado" ? pedido.created_at ?? null : null,
+    fecha: step.tipo === "solicitado" ? (pedido.created_at ?? null) : null,
     state: idx < progress ? "done" : "pending",
   }));
 
@@ -1319,8 +1503,9 @@ function buildTimelineSteps(pedido: Pedido): TLStep[] {
 
   // Mezclar: ítems con fecha en orden cronológico + flow sin fecha
   // mantienen su posición relativa después.
-  const withDate = [...flow.filter((s) => s.fecha), ...mods.filter((m) => m.fecha)]
-    .sort((a, b) => (a.fecha ?? "").localeCompare(b.fecha ?? ""));
+  const withDate = [...flow.filter((s) => s.fecha), ...mods.filter((m) => m.fecha)].sort((a, b) =>
+    (a.fecha ?? "").localeCompare(b.fecha ?? ""),
+  );
   const withoutDate = flow.filter((s) => !s.fecha);
 
   let merged: TLStep[] = [...withDate, ...withoutDate];
@@ -1357,7 +1542,20 @@ function fmtTimelineDateTime(s?: string | null): string | null {
   const d = new Date(dStr + "T" + (s.length >= 16 ? s.slice(11, 16) : "12:00") + ":00");
   if (Number.isNaN(d.getTime())) return null;
   const dias = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
-  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const meses = [
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
   return `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]} · ${hh}:${mm}`;
@@ -1370,20 +1568,29 @@ function PedidoTimeline({ pedido }: { pedido: Pedido }) {
       {steps.map((s, i) => {
         const isLast = i === steps.length - 1;
         const dotCls =
-          s.state === "done"     ? "border-ink bg-ink text-amber"
-          : s.state === "current" ? "border-amber bg-amber text-ink shadow-[0_0_0_4px_var(--amber-soft)]"
-          : s.state === "rejected" ? "border-destructive bg-destructive text-white"
-          : "border-[var(--hairline)] bg-background text-muted-foreground border-dashed";
+          s.state === "done"
+            ? "border-ink bg-ink text-amber"
+            : s.state === "current"
+              ? "border-amber bg-amber text-ink shadow-[0_0_0_4px_var(--amber-soft)]"
+              : s.state === "rejected"
+                ? "border-destructive bg-destructive text-white"
+                : "border-[var(--hairline)] bg-background text-muted-foreground border-dashed";
         const connectorCls =
-          s.state === "done"     ? "after:bg-ink/25"
-          : s.state === "current" ? "after:bg-[image:linear-gradient(to_right,var(--amber)_0%,var(--amber)_50%,var(--hairline)_50%)]"
-          : s.state === "rejected" ? "after:bg-destructive/30"
-          : "after:bg-[var(--hairline)]";
+          s.state === "done"
+            ? "after:bg-ink/25"
+            : s.state === "current"
+              ? "after:bg-[image:linear-gradient(to_right,var(--amber)_0%,var(--amber)_50%,var(--hairline)_50%)]"
+              : s.state === "rejected"
+                ? "after:bg-destructive/30"
+                : "after:bg-[var(--hairline)]";
         const Icon =
-          s.state === "rejected" ? XCircle
-          : s.state === "current" ? Clock
-          : s.state === "done"     ? CircleCheckBig
-          : Clock;
+          s.state === "rejected"
+            ? XCircle
+            : s.state === "current"
+              ? Clock
+              : s.state === "done"
+                ? CircleCheckBig
+                : Clock;
         return (
           <div
             key={s.key}
@@ -1406,7 +1613,9 @@ function PedidoTimeline({ pedido }: { pedido: Pedido }) {
               <div
                 className={cn(
                   "font-sans text-xs leading-tight truncate",
-                  s.state === "pending" ? "text-muted-foreground font-semibold" : "font-bold text-ink",
+                  s.state === "pending"
+                    ? "text-muted-foreground font-semibold"
+                    : "font-bold text-ink",
                 )}
               >
                 {s.label}
@@ -1427,7 +1636,12 @@ function PedidoTimeline({ pedido }: { pedido: Pedido }) {
 // — la edición sigue viviendo en `/cliente/perfil` (link "Editar datos").
 
 function ProfileDrawer({
-  open, perfil, pedidosCount, totalAlquilado, onClose, onLogout,
+  open,
+  perfil,
+  pedidosCount,
+  totalAlquilado,
+  onClose,
+  onLogout,
 }: {
   open: boolean;
   perfil: Perfil;
@@ -1516,18 +1730,22 @@ function ProfileDrawer({
 
           {(perfil.cuit || perfil.perfil_impuestos) && (
             <ProfileSection title="Facturación">
-              {perfil.cuit && (
-                <ProfileField icon={Receipt} label="CUIT" value={perfil.cuit} mono />
-              )}
+              {perfil.cuit && <ProfileField icon={Receipt} label="CUIT" value={perfil.cuit} mono />}
               {perfil.perfil_impuestos && (
-                <ProfileField icon={Building2} label="Condición" value={
-                  ({
-                    consumidor_final: "Consumidor Final",
-                    responsable_inscripto: "Responsable Inscripto",
-                    monotributo: "Monotributo",
-                    exento: "Exento",
-                  } as Record<string, string>)[perfil.perfil_impuestos] ?? perfil.perfil_impuestos
-                } />
+                <ProfileField
+                  icon={Building2}
+                  label="Condición"
+                  value={
+                    (
+                      {
+                        consumidor_final: "Consumidor Final",
+                        responsable_inscripto: "Responsable Inscripto",
+                        monotributo: "Monotributo",
+                        exento: "Exento",
+                      } as Record<string, string>
+                    )[perfil.perfil_impuestos] ?? perfil.perfil_impuestos
+                  }
+                />
               )}
             </ProfileSection>
           )}
@@ -1535,13 +1753,17 @@ function ProfileDrawer({
           <ProfileSection title="Resumen histórico">
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-md border border-[var(--hairline)] bg-surface px-3.5 py-3">
-                <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Pedidos</div>
+                <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Pedidos
+                </div>
                 <div className="font-display text-[22px] font-black text-ink tabular-nums leading-none mt-1">
                   {pedidosCount}
                 </div>
               </div>
               <div className="rounded-md border border-[var(--hairline)] bg-surface px-3.5 py-3">
-                <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Total alquilado</div>
+                <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Total alquilado
+                </div>
                 <div className="font-display text-[22px] font-black text-ink tabular-nums leading-none mt-1">
                   {fmt(totalAlquilado)}
                 </div>
@@ -1587,7 +1809,10 @@ function ProfileSection({ title, children }: { title: string; children: React.Re
 }
 
 function ProfileField({
-  icon: Icon, label, value, mono,
+  icon: Icon,
+  label,
+  value,
+  mono,
 }: {
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   label: string;

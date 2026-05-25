@@ -1,7 +1,26 @@
 import { useRef } from "react";
-import { Sparkles, ExternalLink, Loader2, Check, X, Plus, Image as ImageIcon, FileText, Link as LinkIcon, CloudUpload, Upload } from "lucide-react";
+import {
+  Sparkles,
+  ExternalLink,
+  Loader2,
+  Check,
+  X,
+  Plus,
+  Image as ImageIcon,
+  FileText,
+  Link as LinkIcon,
+  CloudUpload,
+  Upload,
+} from "lucide-react";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,26 +68,55 @@ export function AutocompletarEquipoDialog({
   onApplied: () => void;
 }) {
   const {
-    loading, loadingFoto, saving, result, error,
-    marca, setMarca,
-    modelo, setModelo,
-    fotoUrl, setFotoUrl, uploadingFotoUrl, selectFoto,
-    bhUrl, setBhUrl,
-    aplicarMarca, setAplicarMarca,
-    aplicarModelo, setAplicarModelo,
-    aplicarFoto, setAplicarFoto,
-    aplicarBh, setAplicarBh,
-    aplicarDescripcion, setAplicarDescripcion,
-    aplicarSpecs, setAplicarSpecs,
-    keywords, keywordInput, setKeywordInput,
-    aplicarKeywords, setAplicarKeywords,
-    aplicarFichaExtendida, setAplicarFichaExtendida,
+    loading,
+    loadingFoto,
+    saving,
+    result,
+    error,
+    marca,
+    setMarca,
+    modelo,
+    setModelo,
+    fotoUrl,
+    setFotoUrl,
+    uploadingFotoUrl,
+    selectFoto,
+    bhUrl,
+    setBhUrl,
+    aplicarMarca,
+    setAplicarMarca,
+    aplicarModelo,
+    setAplicarModelo,
+    aplicarFoto,
+    setAplicarFoto,
+    aplicarBh,
+    setAplicarBh,
+    aplicarDescripcion,
+    setAplicarDescripcion,
+    aplicarSpecs,
+    setAplicarSpecs,
+    keywords,
+    keywordInput,
+    setKeywordInput,
+    aplicarKeywords,
+    setAplicarKeywords,
+    aplicarFichaExtendida,
+    setAplicarFichaExtendida,
     photoDiag,
     fotosResult,
     searchingPhotos,
-    customUrl, setCustomUrl,
+    customUrl,
+    setCustomUrl,
     fichaExtendidaTieneDatos,
-    buscarFoto, runSearch, runSearchFromHtml, aplicarSoloFoto, buscarMasFotos, addKeyword, removeKeyword, setAll, aplicar,
+    buscarFoto,
+    runSearch,
+    runSearchFromHtml,
+    aplicarSoloFoto,
+    buscarMasFotos,
+    addKeyword,
+    removeKeyword,
+    setAll,
+    aplicar,
   } = useAutocompletar({ equipo, open, onApplied, onOpenChange });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -107,7 +155,9 @@ export function AutocompletarEquipoDialog({
               <Input
                 value={customUrl}
                 onChange={(e) => setCustomUrl(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") void buscarFoto(); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void buscarFoto();
+                }}
                 placeholder="https://www.bhphotovideo.com/… o sitio oficial"
                 className="font-mono text-xs h-9"
                 autoFocus
@@ -120,8 +170,7 @@ export function AutocompletarEquipoDialog({
                 Buscar foto
               </Button>
               <Button onClick={() => void runSearch()} variant="outline" className="w-full">
-                <FileText className="h-4 w-4 mr-2" />
-                + Specs también
+                <FileText className="h-4 w-4 mr-2" />+ Specs también
               </Button>
             </div>
 
@@ -135,7 +184,9 @@ export function AutocompletarEquipoDialog({
                 <div className="w-full border-t border-muted" />
               </div>
               <div className="relative flex justify-center text-[11px] uppercase tracking-wide">
-                <span className="bg-background px-2 text-muted-foreground">o si B&H bloquea el scraper</span>
+                <span className="bg-background px-2 text-muted-foreground">
+                  o si B&H bloquea el scraper
+                </span>
               </div>
             </div>
 
@@ -148,7 +199,7 @@ export function AutocompletarEquipoDialog({
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) void runSearchFromHtml(f);
-                  e.target.value = "";  // reset para permitir re-subir mismo archivo
+                  e.target.value = ""; // reset para permitir re-subir mismo archivo
                 }}
               />
               <Button
@@ -160,8 +211,9 @@ export function AutocompletarEquipoDialog({
                 Subir HTML guardado
               </Button>
               <p className="text-[11px] text-muted-foreground">
-                Workflow: en la página B&H/manufacturer hacer <kbd>Cmd+S</kbd> → <em>Webpage Complete</em> → subir el <code>.html</code>.
-                Calidad idéntica al seed (JSON-LD + normalizer).
+                Workflow: en la página B&H/manufacturer hacer <kbd>Cmd+S</kbd> →{" "}
+                <em>Webpage Complete</em> → subir el <code>.html</code>. Calidad idéntica al seed
+                (JSON-LD + normalizer).
               </p>
             </div>
           </div>
@@ -186,14 +238,18 @@ export function AutocompletarEquipoDialog({
                 src={fotoUrl}
                 alt="Preview"
                 className="w-full max-h-64 object-contain"
-                onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.opacity = "0.3";
+                }}
               />
               <div className="absolute top-2 right-2">
                 <FotoBadge fotoUrl={fotoUrl} uploadingFotoUrl={uploadingFotoUrl} />
               </div>
               <button
                 type="button"
-                onClick={() => { setFotoUrl(""); }}
+                onClick={() => {
+                  setFotoUrl("");
+                }}
                 className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-background/80 p-1 hover:bg-destructive/10"
                 title="Quitar foto"
               >
@@ -228,8 +284,12 @@ export function AutocompletarEquipoDialog({
           <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
             {error}
             <div className="mt-2 flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => void buscarFoto()}>Reintentar foto</Button>
-              <Button variant="outline" size="sm" onClick={() => void runSearch()}>Reintentar specs</Button>
+              <Button variant="outline" size="sm" onClick={() => void buscarFoto()}>
+                Reintentar foto
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => void runSearch()}>
+                Reintentar specs
+              </Button>
             </div>
           </div>
         )}
@@ -266,7 +326,9 @@ export function AutocompletarEquipoDialog({
                   src={fotoUrl}
                   alt="Preview"
                   className="w-full max-h-64 object-contain"
-                  onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.opacity = "0.3";
+                  }}
                 />
                 <div className="absolute top-2 right-2">
                   <FotoBadge fotoUrl={fotoUrl} uploadingFotoUrl={uploadingFotoUrl} />
@@ -294,35 +356,83 @@ export function AutocompletarEquipoDialog({
 
             {!fotoUrl && result.foto_motivo && (
               <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                <strong>Sin foto válida:</strong> {result.foto_motivo}. Pegá una URL manualmente abajo o dejá el campo vacío.
+                <strong>Sin foto válida:</strong> {result.foto_motivo}. Pegá una URL manualmente
+                abajo o dejá el campo vacío.
               </div>
             )}
 
             <div className="flex items-center justify-between gap-2 -mb-1">
               <span className="text-xs uppercase tracking-wide text-muted-foreground">Campos</span>
               <div className="flex gap-1">
-                <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAll(true)}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => setAll(true)}
+                >
                   Aplicar todos
                 </Button>
-                <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAll(false)}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => setAll(false)}
+                >
                   Ninguno
                 </Button>
               </div>
             </div>
 
             <div className="space-y-3">
-              <FieldRow label="Marca" value={marca} onChange={setMarca} checked={aplicarMarca} onCheckedChange={setAplicarMarca} current={equipo.marca} />
-              <FieldRow label="Modelo" value={modelo} onChange={setModelo} checked={aplicarModelo} onCheckedChange={setAplicarModelo} current={equipo.modelo} />
-              <FieldRow label="URL foto" value={fotoUrl} onChange={setFotoUrl} checked={aplicarFoto} onCheckedChange={setAplicarFoto} current={equipo.foto_url} mono />
-              <FieldRow label="URL fuente (bh_url)" value={bhUrl} onChange={setBhUrl} checked={aplicarBh} onCheckedChange={setAplicarBh} current={equipo.bh_url} mono />
+              <FieldRow
+                label="Marca"
+                value={marca}
+                onChange={setMarca}
+                checked={aplicarMarca}
+                onCheckedChange={setAplicarMarca}
+                current={equipo.marca}
+              />
+              <FieldRow
+                label="Modelo"
+                value={modelo}
+                onChange={setModelo}
+                checked={aplicarModelo}
+                onCheckedChange={setAplicarModelo}
+                current={equipo.modelo}
+              />
+              <FieldRow
+                label="URL foto"
+                value={fotoUrl}
+                onChange={setFotoUrl}
+                checked={aplicarFoto}
+                onCheckedChange={setAplicarFoto}
+                current={equipo.foto_url}
+                mono
+              />
+              <FieldRow
+                label="URL fuente (bh_url)"
+                value={bhUrl}
+                onChange={setBhUrl}
+                checked={aplicarBh}
+                onCheckedChange={setAplicarBh}
+                current={equipo.bh_url}
+                mono
+              />
             </div>
 
             {result.descripcion && (
               <div>
                 <div className="flex items-center justify-between gap-2">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Descripción</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Descripción
+                  </Label>
                   <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                    <Checkbox checked={aplicarDescripcion} onCheckedChange={(v) => setAplicarDescripcion(!!v)} />
+                    <Checkbox
+                      checked={aplicarDescripcion}
+                      onCheckedChange={(v) => setAplicarDescripcion(!!v)}
+                    />
                     Aplicar
                   </label>
                 </div>
@@ -337,7 +447,10 @@ export function AutocompletarEquipoDialog({
                     Specs ({result.specs.length})
                   </Label>
                   <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                    <Checkbox checked={aplicarSpecs} onCheckedChange={(v) => setAplicarSpecs(!!v)} />
+                    <Checkbox
+                      checked={aplicarSpecs}
+                      onCheckedChange={(v) => setAplicarSpecs(!!v)}
+                    />
                     Aplicar
                   </label>
                 </div>
@@ -358,12 +471,16 @@ export function AutocompletarEquipoDialog({
                   Palabras clave ({keywords.length})
                 </Label>
                 <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                  <Checkbox checked={aplicarKeywords} onCheckedChange={(v) => setAplicarKeywords(!!v)} />
+                  <Checkbox
+                    checked={aplicarKeywords}
+                    onCheckedChange={(v) => setAplicarKeywords(!!v)}
+                  />
                   Aplicar
                 </label>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Tags editoriales (ej. <em>bicolor</em>, <em>global shutter</em>). Aparecen como chips en el catálogo.
+                Tags editoriales (ej. <em>bicolor</em>, <em>global shutter</em>). Aparecen como
+                chips en el catálogo.
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {keywords.map((k) => (
@@ -383,18 +500,31 @@ export function AutocompletarEquipoDialog({
                   </span>
                 ))}
                 {keywords.length === 0 && (
-                  <span className="text-[11px] text-muted-foreground italic">Sin keywords aún.</span>
+                  <span className="text-[11px] text-muted-foreground italic">
+                    Sin keywords aún.
+                  </span>
                 )}
               </div>
               <div className="mt-2 flex gap-1.5">
                 <Input
                   value={keywordInput}
                   onChange={(e) => setKeywordInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addKeyword(); } }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addKeyword();
+                    }
+                  }}
                   placeholder="Agregar palabra clave…"
                   className="h-8 text-xs"
                 />
-                <Button type="button" size="sm" variant="outline" onClick={addKeyword} className="h-8">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={addKeyword}
+                  className="h-8"
+                >
                   <Plus className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -407,25 +537,36 @@ export function AutocompletarEquipoDialog({
                     Ficha técnica extendida
                   </Label>
                   <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                    <Checkbox checked={aplicarFichaExtendida} onCheckedChange={(v) => setAplicarFichaExtendida(!!v)} />
+                    <Checkbox
+                      checked={aplicarFichaExtendida}
+                      onCheckedChange={(v) => setAplicarFichaExtendida(!!v)}
+                    />
                     Aplicar todo el bloque
                   </label>
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Datos físicos / técnicos detectados. Se guardan en la ficha y aparecen en el catálogo.
+                  Datos físicos / técnicos detectados. Se guardan en la ficha y aparecen en el
+                  catálogo.
                 </p>
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
                   {result.peso && <FichaCell label="Peso" value={result.peso} />}
-                  {result.dimensiones && <FichaCell label="Dimensiones" value={result.dimensiones} />}
+                  {result.dimensiones && (
+                    <FichaCell label="Dimensiones" value={result.dimensiones} />
+                  )}
                   {result.montura && <FichaCell label="Montura" value={result.montura} />}
                   {result.formato && <FichaCell label="Formato" value={result.formato} />}
                   {result.resolucion && <FichaCell label="Resolución" value={result.resolucion} />}
-                  {result.alimentacion && <FichaCell label="Alimentación" value={result.alimentacion} />}
+                  {result.alimentacion && (
+                    <FichaCell label="Alimentación" value={result.alimentacion} />
+                  )}
                   {result.categoria_sugerida && (
                     <FichaCell label="Categoría sugerida" value={result.categoria_sugerida} />
                   )}
                   {typeof result.precio_bh_usd === "number" && (
-                    <FichaCell label="Precio B&H (USD)" value={`$${result.precio_bh_usd.toLocaleString("en-US")}`} />
+                    <FichaCell
+                      label="Precio B&H (USD)"
+                      value={`$${result.precio_bh_usd.toLocaleString("en-US")}`}
+                    />
                   )}
                   {result.video_url && (
                     <FichaCell label="Video demo" value={new URL(result.video_url).hostname} />
@@ -452,24 +593,39 @@ export function AutocompletarEquipoDialog({
             Cancelar
           </Button>
           {isFotoOnly && (
-            <Button onClick={() => void aplicarSoloFoto()} disabled={saving || !fotoUrl || !!uploadingFotoUrl}>
+            <Button
+              onClick={() => void aplicarSoloFoto()}
+              disabled={saving || !fotoUrl || !!uploadingFotoUrl}
+            >
               {saving ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</>
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…
+                </>
               ) : (
-                <><Check className="h-4 w-4 mr-2" /> Aplicar foto</>
+                <>
+                  <Check className="h-4 w-4 mr-2" /> Aplicar foto
+                </>
               )}
             </Button>
           )}
           {result && (
             <>
-              <Button variant="outline" onClick={() => void runSearch()} disabled={loading || saving}>
+              <Button
+                variant="outline"
+                onClick={() => void runSearch()}
+                disabled={loading || saving}
+              >
                 Re-buscar
               </Button>
               <Button onClick={() => void aplicar()} disabled={saving}>
                 {saving ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</>
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…
+                  </>
                 ) : (
-                  <><Check className="h-4 w-4 mr-2" /> Aplicar al equipo</>
+                  <>
+                    <Check className="h-4 w-4 mr-2" /> Aplicar al equipo
+                  </>
                 )}
               </Button>
             </>

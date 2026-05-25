@@ -29,11 +29,13 @@ export function ActiveFiltersChips({
         Filtros:
       </span>
       {trimmed && (
-        <Chip onRemove={() => onQuery("")} label={`"${trimmed}"`} icon={<Search className="h-3 w-3" />} />
+        <Chip
+          onRemove={() => onQuery("")}
+          label={`"${trimmed}"`}
+          icon={<Search className="h-3 w-3" />}
+        />
       )}
-      {selectedBrand && (
-        <Chip onRemove={() => onBrand(null)} label={selectedBrand} />
-      )}
+      {selectedBrand && <Chip onRemove={() => onBrand(null)} label={selectedBrand} />}
       {[...selectedCategories].map((c) => (
         <Chip key={c} onRemove={() => onToggleCategory(c)} label={c} />
       ))}

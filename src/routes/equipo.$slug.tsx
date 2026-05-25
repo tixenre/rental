@@ -164,12 +164,14 @@ export const Route = createFileRoute("/equipo/$slug")({
                 item: `${SITE_URL}/`,
               },
               ...(equipo.category
-                ? [{
-                    "@type": "ListItem",
-                    position: 2,
-                    name: equipo.category,
-                    item: `${SITE_URL}/categoria/${buildCategoriaSlug(equipo.category)}`,
-                  }]
+                ? [
+                    {
+                      "@type": "ListItem",
+                      position: 2,
+                      name: equipo.category,
+                      item: `${SITE_URL}/categoria/${buildCategoriaSlug(equipo.category)}`,
+                    },
+                  ]
                 : []),
               {
                 "@type": "ListItem",
@@ -188,7 +190,11 @@ export const Route = createFileRoute("/equipo/$slug")({
 function EquipoPage() {
   const { slug } = Route.useParams();
   const navigate = useNavigate();
-  const { data: equipo, isLoading, isError } = useQuery({
+  const {
+    data: equipo,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ["equipo", slug],
     queryFn: () => fetchEquipo(slug),
     staleTime: 60_000,
@@ -224,12 +230,10 @@ function EquipoPage() {
           >
             <ArrowLeft className="h-4 w-4" /> Volver al catálogo
           </button>
-          <h1 className="font-display text-3xl text-ink mb-2">
-            Equipo no encontrado
-          </h1>
+          <h1 className="font-display text-3xl text-ink mb-2">Equipo no encontrado</h1>
           <p className="text-sm text-muted-foreground">
-            Tal vez fue retirado del catálogo o el link es viejo. Volvé al
-            catálogo para ver lo disponible.
+            Tal vez fue retirado del catálogo o el link es viejo. Volvé al catálogo para ver lo
+            disponible.
           </p>
         </div>
       </PublicLayout>
@@ -346,9 +350,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           )}
         </div>
         <div className="flex items-start justify-between gap-3">
-          <h1 className="font-display text-3xl md:text-4xl text-ink leading-tight">
-            {item.name}
-          </h1>
+          <h1 className="font-display text-3xl md:text-4xl text-ink leading-tight">{item.name}</h1>
           <button
             onClick={handleShare}
             className="flex items-center gap-1.5 rounded-full border hairline px-3 py-1.5 text-xs hover:border-foreground/40 transition shrink-0"
@@ -408,14 +410,10 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           <SpecsDestacadosRow item={item} />
 
           {/* "Incluye" (kit): qué viene con el equipo, con fotos y cantidades. */}
-          {item.includes && item.includes.length > 0 && (
-            <KitSection item={item} />
-          )}
+          {item.includes && item.includes.length > 0 && <KitSection item={item} />}
 
           {/* Keywords */}
-          {item.keywords && item.keywords.length > 0 && (
-            <KeywordChips keywords={item.keywords} />
-          )}
+          {item.keywords && item.keywords.length > 0 && <KeywordChips keywords={item.keywords} />}
 
           {/* Descripción */}
           {desc && (
@@ -460,7 +458,9 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                   {item.specs.map((s, i) => (
                     <div key={i} className="flex justify-between gap-3 border-b hairline py-2">
                       <dt className="text-sm text-muted-foreground">{s.label}</dt>
-                      <dd className="text-sm font-medium text-ink text-right whitespace-pre-line">{s.value}</dd>
+                      <dd className="text-sm font-medium text-ink text-right whitespace-pre-line">
+                        {s.value}
+                      </dd>
                     </div>
                   ))}
                 </dl>
@@ -678,7 +678,9 @@ function YouTubeEmbed({ url }: { url: string }) {
         const m = u.pathname.match(/\/(?:embed|shorts)\/([\w-]+)/);
         if (m) return m[1];
       }
-    } catch { /* invalid url */ }
+    } catch {
+      /* invalid url */
+    }
     return null;
   })();
   if (!id) return null;
@@ -687,7 +689,10 @@ function YouTubeEmbed({ url }: { url: string }) {
       <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
         Video demo
       </h2>
-      <div className="relative w-full overflow-hidden rounded-md border hairline" style={{ aspectRatio: "16 / 9" }}>
+      <div
+        className="relative w-full overflow-hidden rounded-md border hairline"
+        style={{ aspectRatio: "16 / 9" }}
+      >
         <iframe
           src={`https://www.youtube.com/embed/${id}`}
           title="Video demo"
@@ -706,7 +711,11 @@ function YouTubeEmbed({ url }: { url: string }) {
 // ─────────────────────────────────────────────────────────────────────────
 
 function Lightbox({
-  open, onClose, photos, index, onIndexChange,
+  open,
+  onClose,
+  photos,
+  index,
+  onIndexChange,
 }: {
   open: boolean;
   onClose: () => void;
@@ -745,7 +754,10 @@ function Lightbox({
         </span>
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
           className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 transition"
           aria-label="Cerrar"
         >
@@ -781,7 +793,10 @@ function Lightbox({
           {index > 0 && (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onIndexChange(index - 1); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onIndexChange(index - 1);
+              }}
               className="hidden sm:grid absolute left-3 top-1/2 -translate-y-1/2 h-12 w-12 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
               aria-label="Foto anterior"
             >
@@ -791,7 +806,10 @@ function Lightbox({
           {index < photos.length - 1 && (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onIndexChange(index + 1); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onIndexChange(index + 1);
+              }}
               className="hidden sm:grid absolute right-3 top-1/2 -translate-y-1/2 h-12 w-12 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
               aria-label="Foto siguiente"
             >

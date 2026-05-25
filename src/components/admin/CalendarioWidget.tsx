@@ -9,8 +9,18 @@ import { adminApi, ESTADO_LABEL, type CalendarioPedido } from "@/lib/admin/api";
 import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 
 const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
 ];
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -125,8 +135,7 @@ export function CalendarioWidget({
     else d.setMonth(d.getMonth() + 1);
     setCursor(d);
   };
-  const goToday = () =>
-    setCursor(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+  const goToday = () => setCursor(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
 
   return (
     <div className="space-y-3">
@@ -148,7 +157,9 @@ export function CalendarioWidget({
                 type="button"
                 onClick={() => setView("semana")}
                 className={`px-3 py-1 font-mono uppercase tracking-[0.15em] ${
-                  view === "semana" ? "bg-ink text-background" : "text-muted-foreground hover:text-ink"
+                  view === "semana"
+                    ? "bg-ink text-background"
+                    : "text-muted-foreground hover:text-ink"
                 }`}
               >
                 Semana
@@ -158,7 +169,9 @@ export function CalendarioWidget({
           <Button variant="outline" size="icon" onClick={goPrev} aria-label="Anterior">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="outline" onClick={goToday}>Hoy</Button>
+          <Button variant="outline" onClick={goToday}>
+            Hoy
+          </Button>
           <Button variant="outline" size="icon" onClick={goNext} aria-label="Siguiente">
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -239,9 +252,13 @@ export function CalendarioWidget({
         </div>
         {showLegend && (
           <div className="flex flex-wrap gap-1.5 text-xs">
-            {(["presupuesto", "confirmado", "retirado", "devuelto", "finalizado"] as const).map((e) => (
-              <Badge key={e} variant={pedidoEstadoVariant(e)}>{ESTADO_LABEL[e]}</Badge>
-            ))}
+            {(["presupuesto", "confirmado", "retirado", "devuelto", "finalizado"] as const).map(
+              (e) => (
+                <Badge key={e} variant={pedidoEstadoVariant(e)}>
+                  {ESTADO_LABEL[e]}
+                </Badge>
+              ),
+            )}
           </div>
         )}
       </div>

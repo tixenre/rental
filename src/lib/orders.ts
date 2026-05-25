@@ -117,10 +117,7 @@ function timePart(d: Date | null, fallback: string) {
 function adaptOrder(b: Record<string, unknown>): Order {
   const fd = b.fecha_desde ? new Date(String(b.fecha_desde)) : null;
   const fh = b.fecha_hasta ? new Date(String(b.fecha_hasta)) : null;
-  const days =
-    fd && fh
-      ? Math.max(1, Math.ceil((fh.getTime() - fd.getTime()) / 86_400_000))
-      : 1;
+  const days = fd && fh ? Math.max(1, Math.ceil((fh.getTime() - fd.getTime()) / 86_400_000)) : 1;
   return {
     id: String(b.id),
     status: ESTADO_MAP[String(b.estado)] ?? "solicitado",
@@ -150,9 +147,7 @@ const SOLIC_MAP: Record<string, ChangeRequest["status"]> = {
   rechazada: "rechazado",
 };
 
-function adaptChangeRequests(
-  arr: Array<Record<string, unknown>>,
-): ChangeRequest[] {
+function adaptChangeRequests(arr: Array<Record<string, unknown>>): ChangeRequest[] {
   return arr.map((s) => ({
     id: String(s.id),
     status: SOLIC_MAP[String(s.estado)] ?? "pendiente",
@@ -185,9 +180,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   }
 
   const body = {
-    fecha_desde: input.startDate
-      ? fmtIsoLocal(input.startDate, input.startTime)
-      : null,
+    fecha_desde: input.startDate ? fmtIsoLocal(input.startDate, input.startTime) : null,
     fecha_hasta: input.endDate ? fmtIsoLocal(input.endDate, input.endTime) : null,
     notas: input.notes ?? null,
     items: items.map((it) => ({
@@ -197,17 +190,12 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     })),
   };
 
-  const created = await authedPostJson<Record<string, unknown>>(
-    "/api/cliente/pedidos",
-    body,
-  );
+  const created = await authedPostJson<Record<string, unknown>>("/api/cliente/pedidos", body);
   return adaptOrder(created);
 }
 
 export async function listOrders(): Promise<Order[]> {
-  const arr = await authedJson<Array<Record<string, unknown>>>(
-    "/api/cliente/pedidos",
-  );
+  const arr = await authedJson<Array<Record<string, unknown>>>("/api/cliente/pedidos");
   return arr.map(adaptOrder);
 }
 
@@ -232,16 +220,12 @@ export const DOCUMENTO_HINT: Record<DocumentoTipo, string> = {
 };
 
 export async function getOrder(id: string) {
-  const b = await authedJson<Record<string, unknown>>(
-    `/api/cliente/pedidos/${id}`,
-  );
+  const b = await authedJson<Record<string, unknown>>(`/api/cliente/pedidos/${id}`);
   const docs = (b.documentos_disponibles ?? {}) as Partial<DocumentosDisponibles>;
   return {
     order: adaptOrder(b),
     items: adaptItems((b.items as Array<Record<string, unknown>>) ?? []),
-    changeRequests: adaptChangeRequests(
-      (b.solicitudes as Array<Record<string, unknown>>) ?? [],
-    ),
+    changeRequests: adaptChangeRequests((b.solicitudes as Array<Record<string, unknown>>) ?? []),
     documentosDisponibles: {
       remito: !!docs.remito,
       contrato: !!docs.contrato,
@@ -251,14 +235,10 @@ export async function getOrder(id: string) {
 }
 
 /** Descarga un PDF del pedido como Blob (con Authorization header). */
-export async function fetchOrderDocument(
-  orderId: string,
-  tipo: DocumentoTipo,
-): Promise<Blob> {
-  const res = await authedFetch(
-    `/api/cliente/pedidos/${orderId}/${tipo}.pdf`,
-    { headers: { Accept: "application/pdf" } },
-  );
+export async function fetchOrderDocument(orderId: string, tipo: DocumentoTipo): Promise<Blob> {
+  const res = await authedFetch(`/api/cliente/pedidos/${orderId}/${tipo}.pdf`, {
+    headers: { Accept: "application/pdf" },
+  });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
     throw new Error(detail?.detail ?? `No se pudo descargar el ${tipo}.`);
@@ -267,10 +247,7 @@ export async function fetchOrderDocument(
 }
 
 /** Abre el PDF en una nueva pestaña. Devuelve la URL para limpiar luego. */
-export async function openOrderDocument(
-  orderId: string,
-  tipo: DocumentoTipo,
-): Promise<void> {
+export async function openOrderDocument(orderId: string, tipo: DocumentoTipo): Promise<void> {
   const blob = await fetchOrderDocument(orderId, tipo);
   const url = URL.createObjectURL(blob);
   window.open(url, "_blank", "noopener,noreferrer");
@@ -278,10 +255,7 @@ export async function openOrderDocument(
 }
 
 /** Fuerza la descarga del PDF con nombre amigable. */
-export async function downloadOrderDocument(
-  orderId: string,
-  tipo: DocumentoTipo,
-): Promise<void> {
+export async function downloadOrderDocument(orderId: string, tipo: DocumentoTipo): Promise<void> {
   const blob = await fetchOrderDocument(orderId, tipo);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -302,4 +276,3 @@ export async function cancelOrder(id: string): Promise<void> {
     throw new Error(err?.detail ?? `PATCH cancelar → ${res.status}`);
   }
 }
-

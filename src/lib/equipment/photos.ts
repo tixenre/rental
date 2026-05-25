@@ -38,10 +38,7 @@ export function isHostedUrl(url: string | null | undefined): boolean {
 export const isBucketUrl = isHostedUrl;
 
 /** Sube un File del browser al backend. Devuelve la URL pública. */
-export async function uploadFileToBucket(
-  equipoId: number | string,
-  file: File,
-): Promise<string> {
+export async function uploadFileToBucket(equipoId: number | string, file: File): Promise<string> {
   const fd = new FormData();
   fd.append("file", file);
 
@@ -67,14 +64,11 @@ export async function uploadExternalUrlToBucket(
   if (!externalUrl) throw new Error("URL vacía");
   if (isHostedUrl(externalUrl)) return externalUrl;
 
-  const res = await authedFetch(
-    `/api/admin/equipos/${equipoId}/upload-foto-from-url`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: externalUrl }),
-    },
-  );
+  const res = await authedFetch(`/api/admin/equipos/${equipoId}/upload-foto-from-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: externalUrl }),
+  });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
     throw new Error(detail?.detail ?? `upload-foto-from-url → ${res.status}`);

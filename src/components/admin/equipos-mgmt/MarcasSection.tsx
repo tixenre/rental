@@ -16,16 +16,32 @@ import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  Loader2, GripVertical, AlertTriangle, ArrowRight, Star,
-  MoreHorizontal, Upload, Pencil, ExternalLink, Trash2,
+  Loader2,
+  GripVertical,
+  AlertTriangle,
+  ArrowRight,
+  Star,
+  MoreHorizontal,
+  Upload,
+  Pencil,
+  ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -33,14 +49,27 @@ import { CSS } from "@dnd-kit/utilities";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { adminApi, type MarcaAdmin } from "@/lib/admin/api";
@@ -76,8 +105,7 @@ export function MarcasSection() {
   });
 
   const reorderMut = useMutation({
-    mutationFn: (reorder: { id: number; orden: number }[]) =>
-      adminApi.adminReorderMarcas(reorder),
+    mutationFn: (reorder: { id: number; orden: number }[]) => adminApi.adminReorderMarcas(reorder),
     onSuccess: invalidate,
     onError: (e: Error) => toast.error(e.message),
   });
@@ -116,11 +144,7 @@ export function MarcasSection() {
   // ── Detección de duplicadas (intacta vs versión anterior) ──────────────
   const duplicateGroups = useMemo(() => {
     const norm = (s: string) =>
-      s.toLowerCase()
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
-        .trim()
-        .split(/\s+/)[0] ?? "";
+      s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim().split(/\s+/)[0] ?? "";
     const groups = new Map<string, MarcaAdmin[]>();
     for (const m of allMarcas) {
       const k = norm(m.nombre);
@@ -235,8 +259,8 @@ export function MarcasSection() {
         <div>
           <h2 className="font-display text-lg text-ink">Marcas</h2>
           <p className="text-sm text-muted-foreground">
-            Tocá la estrella para que aparezcan en el carrusel público. Arrastrá las destacadas
-            para cambiar el orden. Usá el menú ⋯ para subir logo, renombrar o eliminar.
+            Tocá la estrella para que aparezcan en el carrusel público. Arrastrá las destacadas para
+            cambiar el orden. Usá el menú ⋯ para subir logo, renombrar o eliminar.
           </p>
         </div>
         <div className="text-xs text-muted-foreground tabular-nums">
@@ -287,7 +311,8 @@ export function MarcasSection() {
             return (
               <div key={gi} className="rounded bg-background/60 px-3 py-2 text-xs space-y-1.5">
                 <div className="text-muted-foreground">
-                  Mantener <span className="font-medium text-ink">{target.nombre}</span> ({target.total} equipos):
+                  Mantener <span className="font-medium text-ink">{target.nombre}</span> (
+                  {target.total} equipos):
                 </div>
                 {sources.map((src) => (
                   <div key={src.id} className="flex items-center gap-2">
@@ -420,8 +445,8 @@ export function MarcasSection() {
             />
             {renaming && renaming.total > 0 && (
               <p className="text-xs text-muted-foreground">
-                Esta marca tiene <strong>{renaming.total} equipos</strong> asociados. Al cambiar
-                el nombre, los productos siguen asociados al mismo registro.
+                Esta marca tiene <strong>{renaming.total} equipos</strong> asociados. Al cambiar el
+                nombre, los productos siguen asociados al mismo registro.
               </p>
             )}
           </div>
@@ -564,7 +589,9 @@ function SortableMarcaRow(props: RowProps) {
             : "text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted"
         }`}
         title={marca.destacada ? "Quitar de destacadas" : "Destacar en home"}
-        aria-label={marca.destacada ? `Quitar ${marca.nombre} de destacadas` : `Destacar ${marca.nombre}`}
+        aria-label={
+          marca.destacada ? `Quitar ${marca.nombre} de destacadas` : `Destacar ${marca.nombre}`
+        }
       >
         <Star className={`h-4 w-4 ${marca.destacada ? "fill-current" : ""}`} />
       </button>

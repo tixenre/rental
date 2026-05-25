@@ -32,7 +32,9 @@ function NuevoEquipoRoute() {
       initial={null}
       saving={saveMut.isPending}
       onSubmit={(data, etiquetas) => saveMut.mutateAsync({ data, etiquetas })}
-      onOpenChange={(v) => { if (!v) goBack(); }}
+      onOpenChange={(v) => {
+        if (!v) goBack();
+      }}
       onCreatedWithMissingRecommended={(equipo: Equipo) => {
         // Tras crear, ir al editor del equipo nuevo para completar lo que falte.
         navigate({ to: "/admin/equipos/$id/editar", params: { id: String(equipo.id) } });

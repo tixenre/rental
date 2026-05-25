@@ -44,22 +44,30 @@ export function AdminCardHeader({
           </div>
         )}
         <div className="truncate font-medium text-ink">{title}</div>
-        {subtitle && (
-          <div className="truncate text-xs text-muted-foreground">{subtitle}</div>
-        )}
+        {subtitle && <div className="truncate text-xs text-muted-foreground">{subtitle}</div>}
       </div>
       {badge && <div className="shrink-0">{badge}</div>}
     </div>
   );
 }
 
-export function AdminCardMeta({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={cn("text-sm text-muted-foreground", className)}>{children}</div>
-  );
+export function AdminCardMeta({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <div className={cn("text-sm text-muted-foreground", className)}>{children}</div>;
 }
 
-export function AdminCardFooter({ children, className }: { children: React.ReactNode; className?: string }) {
+export function AdminCardFooter({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <div className={cn("flex items-center justify-between gap-2 pt-0.5", className)}>
       {children}
@@ -67,20 +75,12 @@ export function AdminCardFooter({ children, className }: { children: React.React
   );
 }
 
-export function AdminCardPrice({
-  total,
-  saldo,
-}: {
-  total: number;
-  saldo?: number | null;
-}) {
+export function AdminCardPrice({ total, saldo }: { total: number; saldo?: number | null }) {
   return (
     <div className="flex items-baseline gap-2">
       <span className="font-semibold tabular text-ink">{formatARS(total)}</span>
       {saldo != null && saldo > 0 && (
-        <span className="text-xs tabular text-destructive">
-          saldo {formatARS(saldo)}
-        </span>
+        <span className="text-xs tabular text-destructive">saldo {formatARS(saldo)}</span>
       )}
     </div>
   );

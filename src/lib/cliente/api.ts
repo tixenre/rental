@@ -58,10 +58,9 @@ export const clienteApi = {
 
   /** Cancela una solicitud pendiente que el propio cliente creó. */
   cancelarSolicitud: async (pedidoId: number, sm_id: number) => {
-    const res = await authedFetch(
-      `/api/cliente/pedidos/${pedidoId}/modificacion/${sm_id}`,
-      { method: "DELETE" },
-    );
+    const res = await authedFetch(`/api/cliente/pedidos/${pedidoId}/modificacion/${sm_id}`, {
+      method: "DELETE",
+    });
     if (!res.ok) {
       const detail = await res.json().catch(() => ({}));
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
@@ -69,9 +68,7 @@ export const clienteApi = {
   },
 
   /** Disponibilidad por equipo en un rango, excluyendo el pedido actual. */
-  getDisponibilidad: (
-    pedidoId: number, fechaDesde: string, fechaHasta: string,
-  ) => {
+  getDisponibilidad: (pedidoId: number, fechaDesde: string, fechaHasta: string) => {
     const sp = new URLSearchParams({ fecha_desde: fechaDesde, fecha_hasta: fechaHasta });
     return authedJson<Record<string, number>>(
       `/api/cliente/pedidos/${pedidoId}/disponibilidad?${sp.toString()}`,

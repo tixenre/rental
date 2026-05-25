@@ -4,14 +4,22 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter,
-  DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 
 import { adminApi, type Cliente, type ClienteInput } from "@/lib/admin/api";
@@ -36,8 +44,14 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
 
   const form = useForm<ClienteInput>({
     defaultValues: {
-      nombre: "", apellido: "", telefono: "", email: "",
-      direccion: "", cuit: "", descuento: 0, perfil_impuestos: "consumidor_final",
+      nombre: "",
+      apellido: "",
+      telefono: "",
+      email: "",
+      direccion: "",
+      cuit: "",
+      descuento: 0,
+      perfil_impuestos: "consumidor_final",
     },
   });
 
@@ -86,9 +100,7 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>{editing ? "Editar cliente" : "Nuevo cliente"}</DialogTitle>
-          <DialogDescription>
-            Datos de contacto y condiciones fiscales.
-          </DialogDescription>
+          <DialogDescription>Datos de contacto y condiciones fiscales.</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={submit} className="grid grid-cols-2 gap-3">
@@ -118,7 +130,11 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
           </div>
           <div className="space-y-1">
             <Label>Descuento %</Label>
-            <Input type="number" step="0.01" {...form.register("descuento", { valueAsNumber: true })} />
+            <Input
+              type="number"
+              step="0.01"
+              {...form.register("descuento", { valueAsNumber: true })}
+            />
           </div>
           <div className="space-y-1 col-span-2">
             <Label>Perfil de impuestos</Label>
@@ -126,17 +142,23 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
               value={perfil ?? "consumidor_final"}
               onValueChange={(v) => form.setValue("perfil_impuestos", v)}
             >
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {PERFILES.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
           <DialogFooter className="col-span-2 mt-2">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
             <Button type="submit" disabled={mut.isPending}>
               {mut.isPending ? "Guardando…" : editing ? "Guardar cambios" : "Crear cliente"}
             </Button>

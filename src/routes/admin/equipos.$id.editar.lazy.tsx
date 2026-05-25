@@ -58,7 +58,9 @@ function EditarEquipoRoute() {
       initial={equipoQ.data}
       saving={saveMut.isPending}
       onSubmit={(data, etiquetas) => saveMut.mutateAsync({ data, etiquetas })}
-      onOpenChange={(v) => { if (!v) goBack(); }}
+      onOpenChange={(v) => {
+        if (!v) goBack();
+      }}
     />
   );
 }

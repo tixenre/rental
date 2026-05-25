@@ -18,7 +18,12 @@ import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { adminApi, type CalidadInventario, type FaltaField, type Sugerencia } from "@/lib/admin/api";
+import {
+  adminApi,
+  type CalidadInventario,
+  type FaltaField,
+  type Sugerencia,
+} from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/equipos/calidad")({
@@ -44,8 +49,8 @@ function CalidadPage() {
           Calidad del inventario
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Qué equipos tienen datos faltantes. Solo lectura — los CTAs para
-          completar llegan en una segunda iteración (#350).
+          Qué equipos tienen datos faltantes. Solo lectura — los CTAs para completar llegan en una
+          segunda iteración (#350).
         </p>
       </header>
 
@@ -141,7 +146,12 @@ function SugerenciasSection() {
                     {isIgnoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Ignorar"}
                   </Button>
                   {s.equipo_id && (
-                    <Button asChild size="sm" variant="outline" title="Abrir el equipo para revisar manualmente">
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      title="Abrir el equipo para revisar manualmente"
+                    >
                       <Link to="/admin/equipos" search={{ q: String(s.equipo_id) }}>
                         Editar →
                       </Link>
@@ -168,7 +178,10 @@ function SugerenciasSection() {
                     <li key={m.id} className="font-mono tabular">
                       {idx === 0 ? "→ " : "   "}
                       <span className={idx === 0 ? "text-ink font-medium" : ""}>{m.nombre}</span>
-                      <span className="opacity-70"> · id={m.id} · {m.equipos} equipos · {m.cant_pedidos} pedidos</span>
+                      <span className="opacity-70">
+                        {" "}
+                        · id={m.id} · {m.equipos} equipos · {m.cant_pedidos} pedidos
+                      </span>
                       {idx === 0 && <span className="ml-2 text-amber">(canonical)</span>}
                     </li>
                   ))}
@@ -201,12 +214,12 @@ function SugerenciasSection() {
 
 function CalidadView({ data }: { data: CalidadInventario }) {
   const filas: Array<{ key: FaltaField; label: string; icon: LucideIcon }> = [
-    { key: "foto",             label: "sin foto principal",           icon: Camera },
-    { key: "categoria",        label: "sin categoría asignada",       icon: Folder },
-    { key: "nombre_publico",   label: "sin nombre público",           icon: Tag },
-    { key: "descripcion",      label: "sin descripción extendida",    icon: FileText },
-    { key: "serie",            label: "sin número de serie",          icon: Hash },
-    { key: "valor_reposicion", label: "sin valor de reposición",      icon: DollarSign },
+    { key: "foto", label: "sin foto principal", icon: Camera },
+    { key: "categoria", label: "sin categoría asignada", icon: Folder },
+    { key: "nombre_publico", label: "sin nombre público", icon: Tag },
+    { key: "descripcion", label: "sin descripción extendida", icon: FileText },
+    { key: "serie", label: "sin número de serie", icon: Hash },
+    { key: "valor_reposicion", label: "sin valor de reposición", icon: DollarSign },
   ];
 
   return (
@@ -279,10 +292,7 @@ function ProgressBar({ pct }: { pct: number }) {
   const safe = Math.max(0, Math.min(100, pct));
   return (
     <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-      <div
-        className="h-full bg-amber transition-all"
-        style={{ width: `${safe}%` }}
-      />
+      <div className="h-full bg-amber transition-all" style={{ width: `${safe}%` }} />
     </div>
   );
 }

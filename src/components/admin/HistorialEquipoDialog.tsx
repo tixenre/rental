@@ -11,12 +11,21 @@ import { Loader2, ExternalLink } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 
 import { adminApi, type Equipo } from "@/lib/admin/api";
@@ -28,13 +37,21 @@ const fmtFecha = (iso: string) => {
     // toLocaleDateString no shiftee al día anterior por timezone (es-AR es UTC-3).
     const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso + "T00:00:00" : iso;
     return new Date(dateOnly).toLocaleDateString("es-AR", {
-      day: "2-digit", month: "short", year: "numeric",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
-  } catch { return iso; }
+  } catch {
+    return iso;
+  }
 };
 
 const fmtMoneda = (n: number) =>
-  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(n);
 
 export function HistorialEquipoDialog({
   equipo,
@@ -55,9 +72,7 @@ export function HistorialEquipoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">
-            Historial de alquileres
-          </DialogTitle>
+          <DialogTitle className="font-display text-xl">Historial de alquileres</DialogTitle>
           {equipo && (
             <p className="text-sm text-muted-foreground">
               {equipo.nombre}
@@ -87,9 +102,11 @@ export function HistorialEquipoDialog({
               <Stat label="Revenue" value={fmtMoneda(histQ.data.stats.total_revenue)} />
               <Stat
                 label="Último alquiler"
-                value={histQ.data.stats.ultimo_alquiler
-                  ? fmtFecha(histQ.data.stats.ultimo_alquiler)
-                  : "—"}
+                value={
+                  histQ.data.stats.ultimo_alquiler
+                    ? fmtFecha(histQ.data.stats.ultimo_alquiler)
+                    : "—"
+                }
               />
             </div>
 
@@ -118,7 +135,9 @@ export function HistorialEquipoDialog({
                         <TableCell>
                           <div className="flex items-center gap-1.5">
                             <span className="font-mono text-xs">{h.numero_pedido}</span>
-                            <Badge variant="outline" className="text-[10px]">{h.estado}</Badge>
+                            <Badge variant="outline" className="text-[10px]">
+                              {h.estado}
+                            </Badge>
                           </div>
                         </TableCell>
                         <TableCell className="text-sm">{h.cliente}</TableCell>
@@ -126,7 +145,9 @@ export function HistorialEquipoDialog({
                           {fmtFecha(h.fecha_desde)} → {fmtFecha(h.fecha_hasta)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{h.cantidad}</TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">{h.dias}</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {h.dias}
+                        </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {h.precio_item ? fmtMoneda(h.precio_item) : "—"}
                         </TableCell>
@@ -147,7 +168,9 @@ export function HistorialEquipoDialog({
         )}
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cerrar</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cerrar
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
