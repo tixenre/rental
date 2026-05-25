@@ -256,7 +256,8 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
   const price = priceBreakdown(item.pricePerDay, jornadas, 1);
   const showPeriodTotal = hasDateRange && jornadas > 1;
-  const [specsOpen, setSpecsOpen] = useState(false);
+  // Ficha técnica: abierta por default si son pocas specs, colapsada si hay muchas.
+  const [specsOpen, setSpecsOpen] = useState(() => (item.specs?.length ?? 0) <= 12);
   const [descExpanded, setDescExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -359,43 +360,8 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
         </div>
       </header>
 
-      {/* Foto — hero image: fetchPriority alta para LCP, abre lightbox al tap */}
-      <button
-        type="button"
-        onClick={() => setLightboxOpen(true)}
-        disabled={!item.fotoUrl}
-        className="relative aspect-[4/3] md:aspect-[16/9] overflow-hidden rounded-lg bg-white border hairline group cursor-zoom-in disabled:cursor-default"
-        aria-label={item.fotoUrl ? `Ver foto ampliada de ${item.name}` : item.name}
-      >
-        {item.fotoUrl ? (
-          <>
-            <img
-              src={item.fotoUrl}
-              alt={item.name}
-              loading="eager"
-              decoding="async"
-              fetchPriority="high"
-              className="h-full w-full object-contain p-6 transition group-hover:scale-[1.01]"
-            />
-            <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink/70 text-white text-[10px] font-medium px-2 py-1 opacity-0 group-hover:opacity-100 transition pointer-events-none">
-              <Maximize2 className="h-3 w-3" /> Ampliar
-            </span>
-          </>
-        ) : (
-          <EmptyImage category={item.category} brand={item.brand} />
-        )}
-      </button>
-
-      {/* "Incluye" arriba de todo (foto → incluye → descripción → specs).
-       *  Lo más útil para el cliente al decidir el alquiler: ver qué kit
-       *  viene incluido con fotos y cantidades. Solo si hay items con
-       *  data rica (kit components); el componente IncludedList se sigue
-       *  renderando abajo para keywords + spec highlights. */}
-      {item.includes && item.includes.length > 0 && (
-        <KitSection item={item} />
-      )}
-
-      {/* Precio + agregar al carrito (sticky en mobile) */}
+      {/* Precio + agregar (sticky en mobile bottom bar). En desktop el precio
+       *  vive en la columna derecha sticky. */}
       <div className="md:hidden sticky bottom-0 -mx-4 z-10 bg-background border-t hairline px-4 py-3 flex items-center justify-between gap-3">
         <PriceBlock price={price} item={item} showPeriodTotal={showPeriodTotal} />
         <CartButtons
@@ -407,93 +373,136 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
         />
       </div>
 
-      {/* Keywords */}
-      {item.keywords && item.keywords.length > 0 && (
-        <KeywordChips keywords={item.keywords} />
-      )}
-
-      {/* Descripción */}
-      {desc && (
-        <section className="space-y-2">
-          <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            Descripción
-          </h2>
-          <p className="text-base leading-relaxed text-foreground/90 whitespace-pre-line">
-            {shownDesc}
-          </p>
-          {isLongDesc && (
-            <button
-              type="button"
-              onClick={() => setDescExpanded((v) => !v)}
-              className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground underline-offset-4 transition hover:text-ink hover:underline"
-            >
-              {descExpanded ? "Ver menos" : "Ver más"}
-            </button>
-          )}
-        </section>
-      )}
-
-      <QuickFactsRow item={item} />
-
-      {/* Specs colapsable */}
-      {item.specs && item.specs.length > 0 && (
-        <section className="border-t border-b hairline">
+      {/* Layout: 2 columnas en desktop (60/40), una sola en mobile. */}
+      <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-5 md:gap-8 md:items-start">
+        {/* ── Columna izquierda (60%): foto, destacados, descripción, ficha ── */}
+        <div className="md:col-span-3 space-y-6">
+          {/* Foto — hero image: fetchPriority alta para LCP, abre lightbox al tap */}
           <button
             type="button"
-            onClick={() => setSpecsOpen((v) => !v)}
-            aria-expanded={specsOpen}
-            className="flex w-full items-center justify-between gap-3 py-4 text-left transition hover:text-ink"
+            onClick={() => setLightboxOpen(true)}
+            disabled={!item.fotoUrl}
+            className="relative aspect-[4/3] md:aspect-[16/9] w-full overflow-hidden rounded-lg bg-white border hairline group cursor-zoom-in disabled:cursor-default"
+            aria-label={item.fotoUrl ? `Ver foto ampliada de ${item.name}` : item.name}
           >
-            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-              Especificaciones
-              <span className="ml-2 text-ink/60">({item.specs.length})</span>
-            </span>
-            <ChevronDown
-              className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${specsOpen ? "rotate-180" : ""}`}
-            />
+            {item.fotoUrl ? (
+              <>
+                <img
+                  src={item.fotoUrl}
+                  alt={item.name}
+                  loading="eager"
+                  decoding="async"
+                  fetchPriority="high"
+                  className="h-full w-full object-contain p-6 transition group-hover:scale-[1.01]"
+                />
+                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink/70 text-white text-[10px] font-medium px-2 py-1 opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                  <Maximize2 className="h-3 w-3" /> Ampliar
+                </span>
+              </>
+            ) : (
+              <EmptyImage category={item.category} brand={item.brand} />
+            )}
           </button>
-          {specsOpen && (
-            <div className="pb-4">
-              <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
-                {item.specs.map((s, i) => (
-                  <div key={i} className="flex justify-between gap-3 border-b hairline py-2 text-sm">
-                    <dt className="text-muted-foreground">{s.label}</dt>
-                    <dd className="text-right font-medium text-ink tabular whitespace-pre-line">{s.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
+
+          {/* Specs destacados — siempre visibles, antes de la descripción */}
+          <SpecsDestacadosRow item={item} />
+
+          {/* "Incluye" (kit): qué viene con el equipo, con fotos y cantidades. */}
+          {item.includes && item.includes.length > 0 && (
+            <KitSection item={item} />
           )}
-        </section>
-      )}
 
-      {item.incluye && item.incluye.length > 0 && (
-        <FichaPillSection title="Incluye en la caja" items={item.incluye} />
-      )}
-      {item.conectividad && item.conectividad.length > 0 && (
-        <FichaPillSection title="Conectividad" items={item.conectividad} />
-      )}
-      {item.compatibleCon && item.compatibleCon.length > 0 && (
-        <FichaPillSection title="Compatible con" items={item.compatibleCon} />
-      )}
+          {/* Keywords */}
+          {item.keywords && item.keywords.length > 0 && (
+            <KeywordChips keywords={item.keywords} />
+          )}
 
-      {item.videoUrl && <YouTubeEmbed url={item.videoUrl} />}
+          {/* Descripción */}
+          {desc && (
+            <section className="space-y-2">
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                Descripción
+              </h2>
+              <p className="text-base leading-relaxed text-foreground/90 whitespace-pre-line">
+                {shownDesc}
+              </p>
+              {isLongDesc && (
+                <button
+                  type="button"
+                  onClick={() => setDescExpanded((v) => !v)}
+                  className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground underline-offset-4 transition hover:text-ink hover:underline"
+                >
+                  {descExpanded ? "Ver menos" : "Ver más"}
+                </button>
+              )}
+            </section>
+          )}
 
-      {/* IncludedList: keywords + specs highlights. El kit ya se rendereó
-       *  arriba via KitSection si hay items. */}
-      <IncludedList item={item} />
+          {/* Ficha técnica — colapsable. El botón siempre visible. */}
+          {item.specs && item.specs.length > 0 && (
+            <section className="border-t border-b hairline">
+              <button
+                type="button"
+                onClick={() => setSpecsOpen((v) => !v)}
+                aria-expanded={specsOpen}
+                className="flex w-full items-center justify-between gap-3 py-4 text-left transition hover:text-ink"
+              >
+                <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                  Ficha técnica
+                  <span className="ml-2 text-ink/60">({item.specs.length})</span>
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${specsOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              {specsOpen && (
+                <dl className="grid grid-cols-1 gap-x-8 sm:grid-cols-2 pb-4">
+                  {item.specs.map((s, i) => (
+                    <div key={i} className="flex justify-between gap-3 border-b hairline py-2">
+                      <dt className="text-sm text-muted-foreground">{s.label}</dt>
+                      <dd className="text-sm font-medium text-ink text-right whitespace-pre-line">{s.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </section>
+          )}
 
+          {item.videoUrl && <YouTubeEmbed url={item.videoUrl} />}
 
-      {/* Precio + agregar al carrito (desktop) */}
-      <div className="hidden md:flex items-end justify-between gap-3 border-t hairline pt-6">
-        <PriceBlock price={price} item={item} showPeriodTotal={showPeriodTotal} large />
-        <CartButtons
-          qty={qty}
-          sinStock={sinStock}
-          canAddMore={canAddMore}
-          onAdd={() => add(item.id)}
-          onRemove={() => remove(item.id)}
-        />
+          {/* IncludedList: keywords + specs highlights. El kit ya se rendereó
+           *  arriba via KitSection si hay items. */}
+          <IncludedList item={item} />
+        </div>
+
+        {/* ── Columna derecha (40%): sticky con precio, agregar, quick facts ── */}
+        <aside className="md:col-span-2">
+          <div className="md:sticky md:top-20 space-y-6">
+            {/* Precio + agregar al carrito (desktop) */}
+            <div className="hidden md:flex items-end justify-between gap-3">
+              <PriceBlock price={price} item={item} showPeriodTotal={showPeriodTotal} large />
+              <CartButtons
+                qty={qty}
+                sinStock={sinStock}
+                canAddMore={canAddMore}
+                onAdd={() => add(item.id)}
+                onRemove={() => remove(item.id)}
+              />
+            </div>
+
+            <QuickFactsRow item={item} />
+
+            {item.incluye && item.incluye.length > 0 && (
+              <FichaPillSection title="Incluye en la caja" items={item.incluye} />
+            )}
+            {item.conectividad && item.conectividad.length > 0 && (
+              <FichaPillSection title="Conectividad" items={item.conectividad} />
+            )}
+            {item.compatibleCon && item.compatibleCon.length > 0 && (
+              <FichaPillSection title="Compatible con" items={item.compatibleCon} />
+            )}
+          </div>
+        </aside>
       </div>
 
       <Lightbox
@@ -504,6 +513,29 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
         onIndexChange={setLightboxIndex}
       />
     </article>
+  );
+}
+
+/** Specs destacados (destacado=true en el registry) como fila de pills
+ *  horizontales scrolleables. Siempre visibles, antes de la descripción.
+ *  Si no hay destacados, no renderiza nada. */
+function SpecsDestacadosRow({ item }: { item: Equipment }) {
+  const destacados = item.specsDestacados ?? [];
+  if (destacados.length === 0) return null;
+  return (
+    <div className="flex gap-2 overflow-x-auto snap-x pb-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+      {destacados.map((s, i) => (
+        <div
+          key={`${s.label}-${i}`}
+          className="snap-start shrink-0 bg-surface border hairline rounded-lg px-3 py-2"
+        >
+          <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+            {s.label}
+          </div>
+          <div className="font-medium text-ink text-sm">{s.value}</div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -590,20 +622,19 @@ function CartButtons({
 }
 
 function QuickFactsRow({ item }: { item: Equipment }) {
-  const facts: { label: string; value: string }[] = [];
-  if (item.montura) facts.push({ label: "Montura", value: item.montura });
-  if (item.formato) facts.push({ label: "Formato", value: item.formato });
-  if (item.resolucion) facts.push({ label: "Resolución", value: item.resolucion });
-  if (item.peso) facts.push({ label: "Peso", value: item.peso });
-  if (item.dimensiones) facts.push({ label: "Dimensiones", value: item.dimensiones });
-  if (item.alimentacion) facts.push({ label: "Alimentación", value: item.alimentacion });
+  // Dinámico: usa los specs destacados del registry si hay; sino, los
+  // primeros 4 specs (ya vienen ordenados por prioridad desde el backend).
+  const facts =
+    item.specsDestacados && item.specsDestacados.length > 0
+      ? item.specsDestacados
+      : (item.specs ?? []).slice(0, 4);
   if (facts.length === 0) return null;
 
   return (
     <div className="flex flex-wrap gap-1.5">
-      {facts.map((f) => (
+      {facts.map((f, i) => (
         <span
-          key={f.label}
+          key={`${f.label}-${i}`}
           className="inline-flex items-center gap-1.5 rounded-full border hairline bg-muted/30 px-2.5 py-1 text-[11px]"
         >
           <span className="font-mono uppercase tracking-wider text-muted-foreground">
