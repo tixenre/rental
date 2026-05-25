@@ -125,13 +125,32 @@ def _parse_path(path: str) -> tuple[Optional[str], int]:
 
 
 def _is_prefix_unit(unidad: Optional[str]) -> bool:
-    """Algunas unidades van ANTES del número (f/, $, €) en vez de después
-    (mm, kg, K). Convención: termina en "/" o empieza con símbolo monetario.
-    Espejo de `isPrefixUnit` del frontend (SpecsDiffEditor.tsx)."""
+    """Unidades que van PEGADAS antes del número (f/, $, €) en vez de después.
+    Convención: termina en "/" o empieza con símbolo monetario. Espejo de
+    `isPrefixUnit` del frontend (SpecsDiffEditor.tsx)."""
     u = (unidad or "").strip()
     if not u:
         return False
     return u.endswith("/") or u[:1] in "$€£¥"
+
+
+def _apply_unit(text: str, unidad: Optional[str]) -> str:
+    """Pega la unidad al valor según su estilo:
+    - prefijo pegado: `f/`, `$` → "f/2.8", "$100"
+    - prefijo con espacio: `ISO` → "ISO 80 - 102400"
+    - sufijo pegado: `°` → "84°"
+    - sufijo con espacio (default): mm, g, W, K, fps… → "640 g"
+    """
+    u = (unidad or "").strip()
+    if not u or not text:
+        return text
+    if _is_prefix_unit(u):
+        return f"{u}{text}"
+    if u.lower() == "iso":
+        return f"{u} {text}"
+    if u == "°":
+        return f"{text}°"
+    return f"{text} {u}"
 
 
 def _format_value_by_tipo(
@@ -175,9 +194,7 @@ def _format_value_by_tipo(
                         out = f"{items[0]} - {items[1]}"
                     else:
                         return ""
-                    if unidad:
-                        out = f"{unidad}{out}" if _is_prefix_unit(unidad) else f"{out} {unidad}"
-                    return out
+                    return _apply_unit(out, unidad)
             except Exception:
                 pass
         # value no es JSON — devolver tal cual
@@ -205,9 +222,7 @@ def render_spec_value(
     """
     base = _format_value_by_tipo(value, tipo, unidad)
     if tipo == "number" and unidad and base:
-        u = unidad.strip()
-        if u:
-            return f"{u}{base}" if _is_prefix_unit(u) else f"{base} {u}"
+        return _apply_unit(base, unidad)
     return base
 
 

@@ -185,8 +185,18 @@ def test_render_rango_min_max():
 
 
 def test_render_rango_con_unidad():
+    # ISO va adelante con espacio: "ISO 80 - 102400".
     out = render_spec_placeholder("[80, 102400]", "rango", None, None, "", unidad="ISO")
-    assert out == "80 - 102400 ISO"
+    assert out == "ISO 80 - 102400"
+
+
+def test_render_spec_value_iso_prefijo():
+    assert render_spec_value("[80, 102400]", "rango", "ISO") == "ISO 80 - 102400"
+
+
+def test_render_spec_value_grados_pegado():
+    assert render_spec_value("[24, 70]", "rango", "°") == "24 - 70°"
+    assert render_spec_value("114", "number", "°") == "114°"
 
 
 def test_render_rango_valor_unico():
