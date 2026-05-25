@@ -125,6 +125,16 @@ export function apiGetCategorias() {
   return get<BackendCategoria[]>("/api/categorias");
 }
 
+/** Días (YYYY-MM-DD) sin disponibilidad para los equipos del carrito, en el
+ *  rango pedido. `items` = "equipo_id:cantidad" separado por coma. */
+export function apiGetDiasBloqueados(items: string, desde: string, hasta: string) {
+  return get<{ dias_bloqueados: string[] }>("/api/disponibilidad-dias", {
+    items,
+    desde,
+    hasta,
+  });
+}
+
 export type DescuentoJornada = { id: number; jornadas: number; pct: number };
 
 export function apiGetDescuentosJornada() {

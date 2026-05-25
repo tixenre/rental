@@ -3,6 +3,7 @@ routes/pedidos.py — CRUD de pedidos, disponibilidad y generación de PDFs.
 """
 
 import datetime
+import json
 import logging
 from math import ceil
 from typing import Optional
@@ -11,7 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Query, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 
-from database import get_db, row_to_dict, to_datetime, to_iso
+from database import get_db, row_to_dict, to_datetime, to_iso, now_ar
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin
 from services.email import send_email
@@ -268,6 +269,21 @@ def _parse_precio(v) -> int:
         return 0
 
 
+def _validar_fecha_iso(v):
+    """Valida que una fecha sea ISO parseable (o None/''). Se usa como
+    field_validator en los modelos de pedido para rechazar fechas malformadas
+    en el borde (422) en vez de explotar como 500 más adentro al castear."""
+    if v is None or v == "":
+        return None
+    try:
+        datetime.datetime.fromisoformat(str(v))
+    except (ValueError, TypeError):
+        raise ValueError(
+            f"fecha inválida: '{v}'. Formato esperado ISO (yyyy-mm-dd o yyyy-mm-ddThh:mm)"
+        )
+    return str(v)
+
+
 class PedidoItem(BaseModel):
     equipo_id:      int
     cantidad:       int
@@ -306,6 +322,11 @@ class PedidoCreate(BaseModel):
     items:            list[PedidoItem] = []
     estado:           Optional[str] = "presupuesto"
 
+    @field_validator("fecha_desde", "fecha_hasta")
+    @classmethod
+    def _v_fechas(cls, v):
+        return _validar_fecha_iso(v)
+
 
 class PedidoEstado(BaseModel):
     estado: str
@@ -332,6 +353,11 @@ class PedidoDatos(BaseModel):
     notas:            Optional[str]   = None
     descuento_pct:    Optional[float] = None
 
+    @field_validator("fecha_desde", "fecha_hasta")
+    @classmethod
+    def _v_fechas(cls, v):
+        return _validar_fecha_iso(v)
+
     @field_validator("descuento_pct")
     @classmethod
     def validate_descuento(cls, v):
@@ -348,10 +374,49 @@ class PedidoItemUpdate(BaseModel):
 
 # ── Disponibilidad ───────────────────────────────────────────────────────────
 
-def _get_buffer_dias(conn) -> int:
-    """Días de prep/revisión exigidos entre alquileres (setting global)."""
+_DIAS_HORARIO = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]
+
+
+def _validar_horarios_habilitados(conn, fecha_desde, fecha_hasta) -> None:
+    """Valida que retiro/devolución caigan en días/horas habilitados (setting
+    `horarios_retiro`). Sin config → no restringe. Pensado para el flujo del
+    cliente, que manda hora real (el admin carga date-only y no se restringe).
+    Lanza HTTPException 400 si algo cae fuera."""
     row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = ?", ("buffer_dias_alquiler",)
+        "SELECT value FROM app_settings WHERE key = ?", ("horarios_retiro",)
+    ).fetchone()
+    if not row or not row["value"]:
+        return
+    try:
+        horarios = json.loads(row["value"])
+    except (ValueError, TypeError):
+        return
+    if not isinstance(horarios, dict) or not horarios:
+        return
+
+    def _check(dt_raw, etiqueta: str):
+        if not dt_raw:
+            return
+        dt = to_datetime(dt_raw)
+        franja = horarios.get(_DIAS_HORARIO[dt.weekday()])
+        if not franja:
+            raise HTTPException(400, f"El {etiqueta} cae en un día no habilitado")
+        hhmm = dt.strftime("%H:%M")
+        if hhmm < franja["desde"] or hhmm > franja["hasta"]:
+            raise HTTPException(
+                400,
+                f"El horario de {etiqueta} ({hhmm}) está fuera del rango "
+                f"habilitado ({franja['desde']}–{franja['hasta']})",
+            )
+
+    _check(fecha_desde, "retiro")
+    _check(fecha_hasta, "devolución")
+
+
+def _get_buffer_horas(conn) -> int:
+    """Horas de prep/revisión exigidas entre alquileres (setting global)."""
+    row = conn.execute(
+        "SELECT value FROM app_settings WHERE key = ?", ("buffer_horas_alquiler",)
     ).fetchone()
     if not row:
         return 0
@@ -361,17 +426,19 @@ def _get_buffer_dias(conn) -> int:
         return 0
 
 
-def _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias: int):
-    """Expande [desde, hasta] en `buffer_dias` por cada lado. Expandir el rango
-    nuevo equivale a exigir `buffer_dias` de gap contra los alquileres
-    existentes (el overlap es simétrico). Devuelve fechas ISO YYYY-MM-DD.
+def _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas: int):
+    """Expande [desde, hasta] en `buffer_horas` por cada lado. Expandir el
+    rango nuevo equivale a exigir `buffer_horas` de gap contra los alquileres
+    existentes (el overlap es simétrico). Devuelve datetimes ISO completos
+    (con hora) para que el overlap respete la hora de retiro/devolución —no se
+    trunca a día.
 
     Acepta str ISO o datetime (las columnas son TIMESTAMP)."""
-    if buffer_dias <= 0:
+    if buffer_horas <= 0:
         return fecha_desde, fecha_hasta
     try:
-        d0 = to_datetime(fecha_desde).date() - datetime.timedelta(days=buffer_dias)
-        d1 = to_datetime(fecha_hasta).date() + datetime.timedelta(days=buffer_dias)
+        d0 = to_datetime(fecha_desde) - datetime.timedelta(hours=buffer_horas)
+        d1 = to_datetime(fecha_hasta) + datetime.timedelta(hours=buffer_horas)
         return d0.isoformat(), d1.isoformat()
     except (ValueError, TypeError, AttributeError):
         return fecha_desde, fecha_hasta
@@ -395,6 +462,139 @@ def _unidades_en_mantenimiento(conn, equipo_id: int, fecha_desde: str, fecha_has
     return int((row[0] if row else 0) or 0)
 
 
+def _dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> list[str]:
+    """Días (YYYY-MM-DD) en [desde, hasta] donde algún equipo de `items`
+    ({equipo_id: cantidad_requerida}) NO tiene unidades libres suficientes.
+
+    Refleja la MISMA semántica que `get_disponibilidad` (reservas directas +
+    vía kit + mantenimiento + buffer), evaluada día por día. Fuente para
+    bloquear días en el calendario del cliente sin divergir del chequeo real
+    que corre al confirmar el pedido.
+    """
+    if not items:
+        return []
+    ids = list(items.keys())
+    ph = ",".join("?" for _ in ids)
+
+    d_desde = to_datetime(desde)
+    d_hasta = to_datetime(hasta)
+    if d_desde is None or d_hasta is None or d_hasta < d_desde:
+        return []
+    buffer_horas = _get_buffer_horas(conn)
+    buf = datetime.timedelta(hours=buffer_horas)
+    # Ventana amplia para traer segmentos relevantes (incluye buffer).
+    win_lo = (d_desde - buf).isoformat()
+    win_hi = (d_hasta + datetime.timedelta(days=1) + buf).isoformat()
+
+    stock = {
+        r["id"]: r["cantidad"]
+        for r in conn.execute(
+            f"SELECT id, cantidad FROM equipos WHERE id IN ({ph})", ids
+        ).fetchall()
+    }
+
+    # Segmentos de reserva (directos + vía kit), con su cantidad por equipo.
+    segs: dict[int, list[tuple]] = {eid: [] for eid in ids}
+    directas = conn.execute(
+        f"""
+        SELECT pi.equipo_id AS eid, p.fecha_desde AS fd, p.fecha_hasta AS fh, pi.cantidad AS cant
+        FROM alquiler_items pi
+        JOIN alquileres p ON p.id = pi.pedido_id
+        WHERE p.estado IN {ESTADOS_RESERVADO}
+          AND pi.equipo_id IN ({ph})
+          AND p.fecha_hasta > ? AND p.fecha_desde < ?
+        """,
+        (*ids, win_lo, win_hi),
+    ).fetchall()
+    for r in directas:
+        segs[r["eid"]].append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
+
+    via_kit = conn.execute(
+        f"""
+        SELECT kc.componente_id AS eid, p.fecha_desde AS fd, p.fecha_hasta AS fh,
+               pi.cantidad * kc.cantidad AS cant
+        FROM kit_componentes kc
+        JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
+        JOIN alquileres p ON p.id = pi.pedido_id
+        WHERE p.estado IN {ESTADOS_RESERVADO}
+          AND kc.componente_id IN ({ph})
+          AND p.fecha_hasta > ? AND p.fecha_desde < ?
+        """,
+        (*ids, win_lo, win_hi),
+    ).fetchall()
+    for r in via_kit:
+        segs.setdefault(r["eid"], []).append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
+
+    # Mantenimiento (sin buffer).
+    mant: dict[int, list[tuple]] = {eid: [] for eid in ids}
+    mrows = conn.execute(
+        f"""
+        SELECT equipo_id AS eid, fecha AS fd, COALESCE(fecha_hasta, fecha) AS fh, cantidad AS cant
+        FROM equipo_mantenimiento
+        WHERE bloquea_stock = TRUE
+          AND equipo_id IN ({ph})
+          AND COALESCE(fecha_hasta, fecha) > ? AND fecha < ?
+        """,
+        (*ids, win_lo, win_hi),
+    ).fetchall()
+    for r in mrows:
+        mant.setdefault(r["eid"], []).append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
+
+    bloqueados: list[str] = []
+    dia = d_desde.replace(hour=0, minute=0, second=0, microsecond=0)
+    fin = d_hasta.replace(hour=0, minute=0, second=0, microsecond=0)
+    while dia <= fin:
+        dia_next = dia + datetime.timedelta(days=1)
+        # Buffer expande la ventana del día (mismo criterio que _rango_con_buffer).
+        lo = dia - buf
+        hi = dia_next + buf
+        for eid, qty in items.items():
+            reservado = sum(
+                c for (sd, sh, c) in segs.get(eid, [])
+                if sd is not None and sh is not None and sd < hi and sh > lo
+            )
+            en_mant = sum(
+                c for (sd, sh, c) in mant.get(eid, [])
+                if sd is not None and sh is not None and sd < dia_next and sh > dia
+            )
+            disp = stock.get(eid, 0) - reservado - en_mant
+            if disp < max(1, qty):
+                bloqueados.append(dia.date().isoformat())
+                break
+        dia = dia_next
+    return bloqueados
+
+
+@router.get("/disponibilidad-dias")
+def get_disponibilidad_dias(
+    items: str = Query(..., description="Lista 'equipo_id:cantidad' separada por coma"),
+    desde: str = Query(...),
+    hasta: str = Query(...),
+):
+    """Días sin disponibilidad para los equipos pedidos, en [desde, hasta].
+    Lo usa el calendario del cliente para bloquear días según las reservas
+    reales de los equipos que tiene en el carrito."""
+    parsed: dict[int, int] = {}
+    for tok in (items or "").split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        eid_str, _, qty_str = tok.partition(":")
+        try:
+            eid = int(eid_str)
+            qty = int(qty_str) if qty_str else 1
+        except ValueError:
+            raise HTTPException(400, f"Item inválido: '{tok}' (se espera 'id' o 'id:cantidad')")
+        parsed[eid] = max(parsed.get(eid, 0), max(1, qty))
+    if not parsed:
+        return {"dias_bloqueados": []}
+    conn = get_db()
+    try:
+        return {"dias_bloqueados": _dias_no_disponibles(conn, parsed, desde, hasta)}
+    finally:
+        conn.close()
+
+
 @router.get("/disponibilidad")
 def get_disponibilidad(
     fecha_desde: str = Query(...),
@@ -407,8 +607,8 @@ def get_disponibilidad(
 
     try:
         # Buffer: expandimos el rango consultado para exigir gap entre alquileres.
-        buffer_dias = _get_buffer_dias(conn)
-        fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias)
+        buffer_horas = _get_buffer_horas(conn)
+        fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
 
         directas = conn.execute(f"""
             SELECT e.id, e.cantidad,
@@ -552,10 +752,15 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                 cliente_telefono = cliente_telefono or c["telefono"]
                 descuento_pct    = c["descuento"] or 0.0
 
+        # Ambas fechas o ninguna: un pedido con una sola fecha es incoherente
+        # (no se puede calcular jornadas ni chequear stock).
+        if bool(data.fecha_desde) != bool(data.fecha_hasta):
+            raise HTTPException(400, "Indicá fecha de retiro y devolución, o ninguna")
+
         if data.fecha_desde and data.fecha_hasta:
             d0 = to_datetime(data.fecha_desde)
             d1 = to_datetime(data.fecha_hasta)
-            hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
 
             if d0 >= d1:
                 raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
@@ -821,8 +1026,8 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
 
     # Buffer entre alquileres: expandimos el rango para exigir gap. Mantenimiento
     # usa el rango original (ventana exacta).
-    buffer_dias = _get_buffer_dias(conn)
-    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias)
+    buffer_horas = _get_buffer_horas(conn)
+    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
 
     problemas = []
     for it in consolidated.values():
@@ -902,7 +1107,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
                 try:
                     d0 = to_datetime(p_row["fecha_desde"])
                     d1 = to_datetime(p_row["fecha_hasta"])
-                    hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                    hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
 
                     if d0 >= d1:
                         errores.append("fecha_hasta debe ser posterior a fecha_desde")
@@ -1139,7 +1344,7 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
         if nueva_desde and nueva_hasta:
             d0 = to_datetime(nueva_desde)
             d1 = to_datetime(nueva_hasta)
-            hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
 
             if d0 >= d1:
                 raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")

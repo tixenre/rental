@@ -343,10 +343,7 @@ export function usePedidoDraft(
   };
 }
 
-export function jornadasEntre(d1?: string, d2?: string): number {
-  if (!d1 || !d2) return 1;
-  const a = new Date(d1 + "T12:00:00").getTime();
-  const b = new Date(d2 + "T12:00:00").getTime();
-  if (Number.isNaN(a) || Number.isNaN(b) || b < a) return 1;
-  return Math.max(1, Math.ceil((b - a) / 86_400_000) + 1);
-}
+// Re-export del cálculo canónico (modelo 24h, espejo del backend). Antes este
+// helper sumaba +1 (días inclusivos), lo que mostraba 1 jornada de más
+// respecto a lo que factura el backend.
+export { jornadasFromISO as jornadasEntre } from "@/lib/rental-dates";

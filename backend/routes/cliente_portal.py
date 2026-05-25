@@ -7,10 +7,10 @@ import json
 import logging
 from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
-from database import get_db, row_to_dict, to_datetime
+from database import get_db, row_to_dict, to_datetime, now_ar
 from routes.auth import get_session, signer, COOKIE_SECURE, SESSION_MAX_AGE
 from admin_guard import require_admin
 from itsdangerous import BadSignature, SignatureExpired
@@ -44,7 +44,7 @@ def _ventana_cumple(fecha_desde: Optional[str], ventana_horas: int) -> bool:
         return True
     if d0 is None:
         return True
-    return (d0 - datetime.datetime.now()).total_seconds() >= ventana_horas * 3600
+    return (d0 - now_ar()).total_seconds() >= ventana_horas * 3600
 
 
 # ── Documentos disponibles según estado del pedido ───────────────────────────
@@ -277,6 +277,12 @@ class PedidoClienteCreate(BaseModel):
     notas:       Optional[str] = None
     items:       list[CartItemIn] = []
 
+    @field_validator("fecha_desde", "fecha_hasta")
+    @classmethod
+    def _v_fechas(cls, v):
+        from routes.alquileres import _validar_fecha_iso
+        return _validar_fecha_iso(v)
+
 
 @router.post("/api/cliente/pedidos", status_code=201)
 def cliente_crear_pedido(
@@ -288,6 +294,16 @@ def cliente_crear_pedido(
 
     if not data.items:
         raise HTTPException(400, "El pedido debe tener al menos un ítem")
+    if not data.fecha_desde or not data.fecha_hasta:
+        raise HTTPException(400, "Elegí la fecha de retiro y de devolución")
+
+    # Horas habilitadas de retiro/devolución (setting `horarios_retiro`).
+    from routes.alquileres import _validar_horarios_habilitados
+    _conn = get_db()
+    try:
+        _validar_horarios_habilitados(_conn, data.fecha_desde, data.fecha_hasta)
+    finally:
+        _conn.close()
 
     # Reusamos la lógica de creación del back-office para mantener una sola fuente.
     from routes.alquileres import create_pedido, PedidoCreate, PedidoItem
@@ -469,6 +485,12 @@ class ModificacionIn(BaseModel):
     items:       list[ModificacionItemIn] = Field(..., max_length=100)
     mensaje:     Optional[str] = Field(None, max_length=2000)
 
+    @field_validator("fecha_desde", "fecha_hasta")
+    @classmethod
+    def _v_fechas(cls, v):
+        from routes.alquileres import _validar_fecha_iso
+        return _validar_fecha_iso(v)
+
 
 def _validar_fechas_propuestas(
     fecha_desde: Optional[str], fecha_hasta: Optional[str],
@@ -489,7 +511,7 @@ def _validar_fechas_propuestas(
         raise HTTPException(400, "Formato de fechas inválido")
     if d0 >= d1:
         raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
-    hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
     if d0 < hoy:
         raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 
@@ -559,14 +581,14 @@ def _check_stock_hipotetico(
     """
     from routes.alquileres import (
         ESTADOS_RESERVADO, _consolidar_items_por_equipo,
-        _get_buffer_dias, _rango_con_buffer, _unidades_en_mantenimiento,
+        _get_buffer_horas, _rango_con_buffer, _unidades_en_mantenimiento,
     )
     if not items or not fecha_desde or not fecha_hasta:
         return []
 
     # Buffer entre alquileres (mantenimiento usa rango original).
-    buffer_dias = _get_buffer_dias(conn)
-    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_dias)
+    buffer_horas = _get_buffer_horas(conn)
+    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
 
     # Resolver nombre + stock total + agrupar por equipo_id.
     enriched = []
@@ -708,6 +730,16 @@ def cliente_modificar_pedido(
             data.fecha_desde, data.fecha_hasta,
             pedido["fecha_desde"], pedido["fecha_hasta"],
         )
+        # Horarios habilitados: solo si el cliente propone fechas nuevas (no
+        # bloqueamos ediciones de solo-items aunque el admin haya cambiado los
+        # horarios después de creado el pedido).
+        if data.fecha_desde is not None or data.fecha_hasta is not None:
+            from routes.alquileres import _validar_horarios_habilitados
+            _validar_horarios_habilitados(
+                conn,
+                data.fecha_desde if data.fecha_desde is not None else pedido["fecha_desde"],
+                data.fecha_hasta if data.fecha_hasta is not None else pedido["fecha_hasta"],
+            )
 
         # Rellenar precios desde el pedido actual o catálogo (el cliente no
         # puede definir precios).

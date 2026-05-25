@@ -18,14 +18,9 @@ import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
-import { apiGetDescuentosJornada, interpolarDescuento } from "@/lib/api";
-
-/* ── Helpers ─────────────────────────────────────────────────────── */
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
+import { apiGetDescuentosJornada, interpolarDescuento, apiGetDiasBloqueados } from "@/lib/api";
+import { deriveEndDate, franjaParaFecha, diaAbierto } from "@/lib/rental-dates";
+import { useHorarios } from "@/lib/horarios";
 
 function fmtDate(d: Date | null): string {
   if (!d) return "—";
@@ -38,6 +33,12 @@ function ymd(d: Date | null): string {
   if (!d) return "";
   const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 10);
+}
+
+function addDays120(d: Date): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + 120);
+  return x;
 }
 
 const HORAS = [
@@ -192,18 +193,57 @@ interface DateSheetProps {
   onClose: () => void;
   onConfirm: (v: { fechaDesde: Date; jornadas: number; horaDesde: string; horaHasta: string }) => void;
   initial: { fechaDesde: Date | null; jornadas: number; horaDesde: string; horaHasta: string };
+  /** Días (YYYY-MM-DD) sin disponibilidad para los equipos del carrito. */
+  diasBloqueados: Set<string>;
 }
 
-function DateSheet({ onClose, onConfirm, initial }: DateSheetProps) {
+function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetProps) {
   const [fechaDesde, setFechaDesde] = useState<Date | null>(initial.fechaDesde);
   const [jornadas, setJornadas] = useState(initial.jornadas);
   const [horaDesde, setHoraDesde] = useState(initial.horaDesde);
   const [horaHasta, setHoraHasta] = useState(initial.horaHasta);
 
   const fechaHasta = useMemo(
-    () => (fechaDesde ? addDays(fechaDesde, jornadas - 1) : null),
-    [fechaDesde, jornadas],
+    () => (fechaDesde ? deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta) : null),
+    [fechaDesde, jornadas, horaDesde, horaHasta],
   );
+
+  // Horarios habilitados: filtramos las horas según la franja del día y
+  // bloqueamos confirmar si retiro o devolución caen en día cerrado. El
+  // backend valida igual; esto es el feedback en la UI.
+  const horarios = useHorarios();
+  const franjaDesde = franjaParaFecha(horarios, fechaDesde);
+  const franjaHasta = franjaParaFecha(horarios, fechaHasta);
+  const horasDesde = useMemo(
+    () => (franjaDesde ? HORAS.filter((h) => h >= franjaDesde.desde && h <= franjaDesde.hasta) : HORAS),
+    [franjaDesde],
+  );
+  const horasHasta = useMemo(
+    () => (franjaHasta ? HORAS.filter((h) => h >= franjaHasta.desde && h <= franjaHasta.hasta) : HORAS),
+    [franjaHasta],
+  );
+  const diaDesdeCerrado = !!fechaDesde && !diaAbierto(horarios, fechaDesde);
+  const diaHastaCerrado = !!fechaHasta && !diaAbierto(horarios, fechaHasta);
+  // ¿El período cruza un día sin disponibilidad para los equipos del carrito?
+  const rangoCruzaBloqueado = useMemo(() => {
+    if (!fechaDesde || !fechaHasta || diasBloqueados.size === 0) return false;
+    const d = new Date(fechaDesde);
+    d.setHours(0, 0, 0, 0);
+    const fin = new Date(fechaHasta);
+    fin.setHours(0, 0, 0, 0);
+    while (d <= fin) {
+      if (diasBloqueados.has(ymd(d))) return true;
+      d.setDate(d.getDate() + 1);
+    }
+    return false;
+  }, [fechaDesde, fechaHasta, diasBloqueados]);
+  // Snap de la hora a una opción válida cuando cambia la franja del día.
+  useEffect(() => {
+    if (horasDesde.length && !horasDesde.includes(horaDesde)) setHoraDesde(horasDesde[0]);
+  }, [horasDesde, horaDesde]);
+  useEffect(() => {
+    if (horasHasta.length && !horasHasta.includes(horaHasta)) setHoraHasta(horasHasta[0]);
+  }, [horasHasta, horaHasta]);
 
   const selectStyle: React.CSSProperties = {
     cursor: "pointer",
@@ -267,7 +307,7 @@ function DateSheet({ onClose, onConfirm, initial }: DateSheetProps) {
                   value={horaDesde}
                   onChange={(e) => setHoraDesde(e.target.value)}
                 >
-                  {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+                  {horasDesde.map((h) => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
@@ -280,7 +320,7 @@ function DateSheet({ onClose, onConfirm, initial }: DateSheetProps) {
                   value={horaHasta}
                   onChange={(e) => setHoraHasta(e.target.value)}
                 >
-                  {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+                  {horasHasta.map((h) => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
             </div>
@@ -336,11 +376,23 @@ function DateSheet({ onClose, onConfirm, initial }: DateSheetProps) {
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-hairline shrink-0" style={{ paddingBottom: 20 }}>
+          {(diaDesdeCerrado || diaHastaCerrado || rangoCruzaBloqueado) && (
+            <p className="mb-2 text-[12px] text-destructive text-center">
+              {diaDesdeCerrado
+                ? "El día de salida está cerrado — elegí otro."
+                : diaHastaCerrado
+                  ? `La devolución (${fmtDate(fechaHasta)}) cae en un día cerrado — ajustá las jornadas.`
+                  : "El período incluye días sin disponibilidad para algún equipo del carrito."}
+            </p>
+          )}
           <button
-            disabled={!fechaDesde}
+            disabled={!fechaDesde || diaDesdeCerrado || diaHastaCerrado || rangoCruzaBloqueado}
             className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-[15px] font-bold text-center hover:bg-amber hover:text-ink transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-ink disabled:hover:text-amber"
             onClick={() =>
               fechaDesde &&
+              !diaDesdeCerrado &&
+              !diaHastaCerrado &&
+              !rangoCruzaBloqueado &&
               onConfirm({ fechaDesde, jornadas, horaDesde, horaHasta })
             }
           >
@@ -421,7 +473,7 @@ function CartSheet({
 
   const jornadasEfectivas = fechaDesde ? jornadas : 1;
   const subtotal = entries.reduce((s, { eq, qty }) => s + eq.pricePerDay * qty * jornadasEfectivas, 0);
-  const fechaHasta = fechaDesde ? addDays(fechaDesde, jornadas - 1) : null;
+  const fechaHasta = fechaDesde ? deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta) : null;
 
   // Descuento por jornadas desde el backend
   const { data: descuentosPuntos = [] } = useQuery({
@@ -466,7 +518,7 @@ function CartSheet({
       await createOrder({
         status: "solicitado",
         startDate: fechaDesde,
-        endDate: addDays(fechaDesde, jornadas - 1),
+        endDate: deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta),
         startTime: horaDesde,
         endTime: horaHasta,
         days: jornadas,
@@ -1076,6 +1128,26 @@ export function CatalogoMovil() {
   const [horaDesde, setHoraDesde] = useState("10:00");
   const [horaHasta, setHoraHasta] = useState("10:00");
 
+  // Días sin disponibilidad para los equipos del carrito (reservas reales).
+  const itemsParam = useMemo(
+    () =>
+      Object.entries(cart.items)
+        .filter(([id, qty]) => /^\d+$/.test(id) && qty > 0)
+        .map(([id, qty]) => `${id}:${qty}`)
+        .join(","),
+    [cart.items],
+  );
+  const diasBloqueadosQ = useQuery({
+    queryKey: ["dias-bloqueados", itemsParam],
+    queryFn: () => apiGetDiasBloqueados(itemsParam, ymd(new Date()), ymd(addDays120(new Date()))),
+    enabled: itemsParam !== "",
+    staleTime: 60_000,
+  });
+  const diasBloqueados = useMemo(
+    () => new Set(diasBloqueadosQ.data?.dias_bloqueados ?? []),
+    [diasBloqueadosQ.data],
+  );
+
   // Sheet state
   const [showDateSheet, setShowDateSheet] = useState(false);
   const [showCartSheet, setShowCartSheet] = useState(false);
@@ -1120,8 +1192,8 @@ export function CatalogoMovil() {
 
   // Derived date values
   const fechaHasta = useMemo(
-    () => (fechaDesde ? addDays(fechaDesde, jornadas - 1) : null),
-    [fechaDesde, jornadas],
+    () => (fechaDesde ? deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta) : null),
+    [fechaDesde, jornadas, horaDesde, horaHasta],
   );
 
   const datePillLabel = useMemo(() => {
@@ -1241,7 +1313,7 @@ export function CatalogoMovil() {
       setHoraDesde(hd);
       setHoraHasta(hh);
       // Sync to cart store for cross-page consistency
-      cart.setDates(fd, addDays(fd, j - 1));
+      cart.setDates(fd, deriveEndDate(fd, j, hd, hh));
       cart.setStartTime(hd);
       cart.setEndTime(hh);
       setShowDateSheet(false);
@@ -1548,6 +1620,7 @@ export function CatalogoMovil() {
           onClose={() => setShowDateSheet(false)}
           onConfirm={handleConfirmDates}
           initial={{ fechaDesde, jornadas, horaDesde, horaHasta }}
+          diasBloqueados={diasBloqueados}
         />
       )}
       {showCartSheet && (
