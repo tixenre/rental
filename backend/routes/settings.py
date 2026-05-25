@@ -8,11 +8,17 @@ JSON bidireccional. Para migrar datos legacy ahora se usa el CLI:
     python -m backend.dataio.cli import
 """
 
+import json
+import re
+
 from fastapi import APIRouter, Request, HTTPException
 from database import get_db, row_to_dict
 from routes.auth import get_session
 
 router = APIRouter()
+
+DIAS_VALIDOS = {"lun", "mar", "mie", "jue", "vie", "sab", "dom"}
+_HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -22,6 +28,35 @@ def require_admin(request: Request) -> dict:
     if not session:
         raise HTTPException(401, "No autenticado")
     return session
+
+
+def _validar_horarios(value: str) -> str:
+    """Valida y normaliza el JSON de horarios habilitados.
+
+    Forma: { "lun": {"desde":"08:00","hasta":"18:00"}, ..., "dom": null }.
+    `null` en un día = cerrado. Cada franja exige desde < hasta en HH:MM."""
+    try:
+        data = json.loads(value)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, f"horarios_retiro debe ser JSON válido ({e})")
+    if not isinstance(data, dict):
+        raise HTTPException(400, "horarios_retiro debe ser un objeto por día")
+    out: dict = {}
+    for dia, franja in data.items():
+        if dia not in DIAS_VALIDOS:
+            raise HTTPException(400, f"Día inválido: '{dia}'")
+        if franja is None:
+            out[dia] = None
+            continue
+        if not isinstance(franja, dict) or "desde" not in franja or "hasta" not in franja:
+            raise HTTPException(400, f"Franja inválida para '{dia}'")
+        desde, hasta = str(franja["desde"]), str(franja["hasta"])
+        if not _HHMM.match(desde) or not _HHMM.match(hasta):
+            raise HTTPException(400, f"Horas inválidas para '{dia}' (formato HH:MM)")
+        if desde >= hasta:
+            raise HTTPException(400, f"'{dia}': la apertura debe ser anterior al cierre")
+        out[dia] = {"desde": desde, "hasta": hasta}
+    return json.dumps(out)
 
 
 # ── App settings (key/value config global) ───────────────────────────────────
@@ -43,6 +78,7 @@ ALLOWED_SETTINGS_KEYS = {
     "email_from",        # From address de mails ('Rambla <pedidos@rambla.com.uy>'). Pisado por env EMAIL_FROM.
     "email_admin_to",    # Destinatario de notif al admin cuando entra un pedido. Pisado por env EMAIL_ADMIN_TO.
     "buffer_horas_alquiler",  # Horas de prep/revisión exigidas entre alquileres. Int >= 0.
+    "horarios_retiro",   # Horas habilitadas de retiro/devolución por día de semana. JSON.
 }
 
 
@@ -120,6 +156,8 @@ def update_setting(key: str, payload: dict, request: Request):
             value = str(v)
         except (ValueError, TypeError) as e:
             raise HTTPException(400, f"Valor inválido para '{key}': debe ser un entero >= 0 ({e})")
+    if key == "horarios_retiro":
+        value = _validar_horarios(value)
     actor = (session.get("email") or session.get("user_id") or "admin")[:255]
     conn = get_db()
     try:

@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { useCart } from "@/lib/cart-store";
-import { deriveEndDate } from "@/lib/rental-dates";
+import { deriveEndDate, diaAbierto, franjaParaFecha } from "@/lib/rental-dates";
+import { useHorarios } from "@/lib/horarios";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { TimeStepSelect } from "./TimeStepSelect";
 import { useEffect, useState } from "react";
@@ -57,9 +58,26 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   } = useCart();
   const jornadas = days();
   const isMobile = useIsMobile();
+  const horarios = useHorarios();
 
   const today = startOfDay(new Date());
   const busy = buildBusyDays();
+
+  // Franja habilitada según el día de retiro/devolución (misma config para
+  // ambos). null = sin restricción → TimeStepSelect muestra todo el rango.
+  const franjaRetiro = franjaParaFecha(horarios, startDate);
+  const franjaDevolucion = franjaParaFecha(horarios, endDate);
+
+  // Si al cambiar de día la hora queda fuera de la franja, la clampeamos al
+  // inicio de la franja para no dejar una selección inválida.
+  useEffect(() => {
+    if (franjaRetiro && startTime < franjaRetiro.desde) setStartTime(franjaRetiro.desde);
+    else if (franjaRetiro && startTime > franjaRetiro.hasta) setStartTime(franjaRetiro.hasta);
+  }, [franjaRetiro, startTime, setStartTime]);
+  useEffect(() => {
+    if (franjaDevolucion && endTime < franjaDevolucion.desde) setEndTime(franjaDevolucion.desde);
+    else if (franjaDevolucion && endTime > franjaDevolucion.hasta) setEndTime(franjaDevolucion.hasta);
+  }, [franjaDevolucion, endTime, setEndTime]);
 
   // Setea la fecha de devolución para alcanzar `target` jornadas exactas
   // (deriveEndDate vive en el util compartido, espejo del backend).
@@ -142,6 +160,8 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
                 <TimeStepSelect
                   value={startTime}
                   onChange={setStartTime}
+                  min={franjaRetiro?.desde}
+                  max={franjaRetiro?.hasta}
                   aria-label="Hora de retiro"
                   className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
                 />
@@ -196,6 +216,8 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
               <TimeStepSelect
                 value={endTime}
                 onChange={setEndTime}
+                min={franjaDevolucion?.desde}
+                max={franjaDevolucion?.hasta}
                 aria-label="Hora de devolución"
                 className="text-sm font-mono tabular-nums text-ink/80 hover:text-ink rounded-md px-2 py-1 bg-background border hairline"
               />
@@ -217,7 +239,7 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
             onSelect={handleStartSelect}
             numberOfMonths={isMobile ? 1 : 2}
             locale={es}
-            disabled={{ before: today }}
+            disabled={(date: Date) => date < today || !diaAbierto(horarios, date)}
             modifiers={
               startDate && endDate
                 ? { busy, rango: { from: startDate, to: endDate } }

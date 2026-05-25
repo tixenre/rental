@@ -78,3 +78,63 @@ export function deriveEndDate(
   const dayDiff = Math.max(0, Math.max(1, jornadas) - (endsLater ? 1 : 0));
   return addDays(startOfDay(startDate), dayDiff);
 }
+
+// ── Horarios habilitados (retiro/devolución) ────────────────────────────────
+// Config settable en el back-office: una franja apertura–cierre por día de
+// semana, misma para retiro y devolución. Se guarda como JSON en el setting
+// `horarios_retiro`, keyed por día (3 letras, índice = Date.getDay()).
+
+export type FranjaHoraria = { desde: string; hasta: string };
+/** Mapa día→franja. `null` en un día = cerrado. */
+export type HorariosSemana = Record<string, FranjaHoraria | null>;
+
+/** Índice por Date.getDay(): 0=domingo … 6=sábado. */
+export const DIAS_KEY = ["dom", "lun", "mar", "mie", "jue", "vie", "sab"] as const;
+export const DIAS_LABEL: Record<string, string> = {
+  lun: "Lunes", mar: "Martes", mie: "Miércoles", jue: "Jueves",
+  vie: "Viernes", sab: "Sábado", dom: "Domingo",
+};
+
+export function diaKey(date: Date): string {
+  return DIAS_KEY[date.getDay()];
+}
+
+/** Parsea el JSON del setting. Devuelve null = sin restricción (todo abierto). */
+export function parseHorarios(raw?: string | null): HorariosSemana | null {
+  if (!raw) return null;
+  try {
+    const o = JSON.parse(raw);
+    return o && typeof o === "object" ? (o as HorariosSemana) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Franja del día de esa fecha. null = cerrado o sin restricción (ver diaAbierto). */
+export function franjaParaFecha(
+  horarios: HorariosSemana | null,
+  date: Date | undefined,
+): FranjaHoraria | null {
+  if (!horarios || !date) return null;
+  return horarios[diaKey(date)] ?? null;
+}
+
+/** ¿El día está habilitado? Sin config global → siempre abierto. */
+export function diaAbierto(
+  horarios: HorariosSemana | null,
+  date: Date | undefined,
+): boolean {
+  if (!horarios || !date) return true;
+  return !!horarios[diaKey(date)];
+}
+
+/** Slots de 30 min dentro de [desde, hasta] inclusive. */
+export function slotsEntre(desde: string, hasta: string): string[] {
+  const out: string[] = [];
+  const start = timeToMinutes(desde);
+  const end = timeToMinutes(hasta);
+  for (let t = start; t <= end; t += 30) {
+    out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
+  }
+  return out;
+}

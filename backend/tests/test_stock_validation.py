@@ -312,6 +312,66 @@ class TestBuffer:
         assert _get_buffer_horas(conn) == 12
 
 
+# ── Horarios habilitados de retiro/devolución ───────────────────────────────
+
+import json as _json
+
+_DIAS = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]
+_ALL_OPEN = _json.dumps({d: {"desde": "08:00", "hasta": "18:00"} for d in _DIAS})
+_ALL_CLOSED = _json.dumps({d: None for d in _DIAS})
+
+
+class HorariosFakeConn:
+    """Conn que devuelve un JSON de horarios para la query a app_settings."""
+    def __init__(self, value):
+        self.value = value
+
+    def execute(self, sql, params=()):
+        if "app_settings" in sql.lower():
+            rows = [FakeRow(value=self.value)] if self.value is not None else []
+            return FakeCursor(rows)
+        return FakeCursor([])
+
+
+class TestHorariosHabilitados:
+    def test_sin_config_no_restringe(self):
+        from routes.alquileres import _validar_horarios_habilitados
+        # No debe lanzar.
+        _validar_horarios_habilitados(
+            HorariosFakeConn(None), "2026-06-01T07:00:00", "2026-06-02T23:00:00"
+        )
+
+    def test_dentro_de_franja_ok(self):
+        from routes.alquileres import _validar_horarios_habilitados
+        _validar_horarios_habilitados(
+            HorariosFakeConn(_ALL_OPEN), "2026-06-01T09:00:00", "2026-06-02T17:30:00"
+        )
+
+    def test_retiro_fuera_de_franja_falla(self):
+        from fastapi import HTTPException
+        from routes.alquileres import _validar_horarios_habilitados
+        with pytest.raises(HTTPException):
+            _validar_horarios_habilitados(
+                HorariosFakeConn(_ALL_OPEN), "2026-06-01T07:00:00", "2026-06-02T10:00:00"
+            )
+
+    def test_devolucion_fuera_de_franja_falla(self):
+        from fastapi import HTTPException
+        from routes.alquileres import _validar_horarios_habilitados
+        with pytest.raises(HTTPException):
+            _validar_horarios_habilitados(
+                HorariosFakeConn(_ALL_OPEN), "2026-06-01T09:00:00", "2026-06-02T19:00:00"
+            )
+
+    def test_dia_cerrado_falla(self):
+        from fastapi import HTTPException
+        from routes.alquileres import _validar_horarios_habilitados
+        with pytest.raises(HTTPException):
+            _validar_horarios_habilitados(
+                HorariosFakeConn(_ALL_CLOSED), "2026-06-01T09:00:00", "2026-06-02T10:00:00"
+            )
+
+
 # ── _crea_ciclo_kit — detección de ciclos ────────────────────────────────
 
 class CycleFakeConn:

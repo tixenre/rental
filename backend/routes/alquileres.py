@@ -3,6 +3,7 @@ routes/pedidos.py — CRUD de pedidos, disponibilidad y generación de PDFs.
 """
 
 import datetime
+import json
 import logging
 from math import ceil
 from typing import Optional
@@ -347,6 +348,45 @@ class PedidoItemUpdate(BaseModel):
 
 
 # ── Disponibilidad ───────────────────────────────────────────────────────────
+
+_DIAS_HORARIO = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]
+
+
+def _validar_horarios_habilitados(conn, fecha_desde, fecha_hasta) -> None:
+    """Valida que retiro/devolución caigan en días/horas habilitados (setting
+    `horarios_retiro`). Sin config → no restringe. Pensado para el flujo del
+    cliente, que manda hora real (el admin carga date-only y no se restringe).
+    Lanza HTTPException 400 si algo cae fuera."""
+    row = conn.execute(
+        "SELECT value FROM app_settings WHERE key = ?", ("horarios_retiro",)
+    ).fetchone()
+    if not row or not row["value"]:
+        return
+    try:
+        horarios = json.loads(row["value"])
+    except (ValueError, TypeError):
+        return
+    if not isinstance(horarios, dict) or not horarios:
+        return
+
+    def _check(dt_raw, etiqueta: str):
+        if not dt_raw:
+            return
+        dt = to_datetime(dt_raw)
+        franja = horarios.get(_DIAS_HORARIO[dt.weekday()])
+        if not franja:
+            raise HTTPException(400, f"El {etiqueta} cae en un día no habilitado")
+        hhmm = dt.strftime("%H:%M")
+        if hhmm < franja["desde"] or hhmm > franja["hasta"]:
+            raise HTTPException(
+                400,
+                f"El horario de {etiqueta} ({hhmm}) está fuera del rango "
+                f"habilitado ({franja['desde']}–{franja['hasta']})",
+            )
+
+    _check(fecha_desde, "retiro")
+    _check(fecha_hasta, "devolución")
+
 
 def _get_buffer_horas(conn) -> int:
     """Horas de prep/revisión exigidas entre alquileres (setting global)."""

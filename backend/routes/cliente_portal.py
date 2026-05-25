@@ -289,6 +289,14 @@ def cliente_crear_pedido(
     if not data.items:
         raise HTTPException(400, "El pedido debe tener al menos un ítem")
 
+    # Horas habilitadas de retiro/devolución (setting `horarios_retiro`).
+    from routes.alquileres import _validar_horarios_habilitados
+    _conn = get_db()
+    try:
+        _validar_horarios_habilitados(_conn, data.fecha_desde, data.fecha_hasta)
+    finally:
+        _conn.close()
+
     # Reusamos la lógica de creación del back-office para mantener una sola fuente.
     from routes.alquileres import create_pedido, PedidoCreate, PedidoItem
 
