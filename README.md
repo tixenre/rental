@@ -139,5 +139,5 @@ Producción corre en Railway. Detalle de variables, build, troubleshooting:
 - [docs/DEPLOY_RAILWAY.md](docs/DEPLOY_RAILWAY.md) — setup de Railway
 - [docs/DISEÑO_SPECS.md](docs/DISEÑO_SPECS.md) — diseño del sistema de specs por categoría
 - [docs/DATASET_ILUMINACION.md](docs/DATASET_ILUMINACION.md) — dataset curado de luces + workflow seed por categoría
-- [docs/MEJORAS.md](docs/MEJORAS.md) — backlog histórico (deprecated, referencia)
-- [docs/BUGS.md](docs/BUGS.md) — histórico de bugs (mayo 2026, referencia)
+- [docs/MEMORIA.md](docs/MEMORIA.md) — memoria viva: decisiones de criterio + preferencias (curado)
+- [docs/archive/](docs/archive/) — histórico archivado (auditoría de bugs y backlog de mayo 2026)

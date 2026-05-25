@@ -11,8 +11,8 @@
 | [DISEÑO_SPECS.md](DISEÑO_SPECS.md) | Diseño técnico del sistema de specs por categoría. |
 | [MOBILE.md](MOBILE.md) + [MOBILE_AUDIT.md](MOBILE_AUDIT.md) | Guidelines mobile y checklist de audit. |
 | [ISSUE_LABELS.md](ISSUE_LABELS.md) | Convenciones de labels de GitHub Issues. |
-| [MEJORAS.md](MEJORAS.md) | **DEPRECATED** — backlog histórico con marca de qué se hizo. Items todavía abiertos pueden convertirse en issues. |
-| [BUGS.md](BUGS.md) | **HISTÓRICO** — bugs cerrados en mayo 2026. Bugs activos viven en GitHub Issues. |
+| [archive/MEJORAS.md](archive/MEJORAS.md) | **ARCHIVADO** — backlog histórico (mayo 2026). Items abiertos pueden convertirse en issues. |
+| [archive/BUGS.md](archive/BUGS.md) | **ARCHIVADO** — bugs cerrados en mayo 2026. Bugs activos viven en GitHub Issues. |
 
 ## Convención
 
