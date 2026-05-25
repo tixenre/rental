@@ -19,7 +19,7 @@ import { authedFetch } from "@/lib/authedFetch";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
 import { apiGetDescuentosJornada, interpolarDescuento, apiGetDiasBloqueados } from "@/lib/api";
-import { deriveEndDate, franjaParaFecha, diaAbierto } from "@/lib/rental-dates";
+import { deriveEndDate, franjaParaFecha, diaAbierto, timeToMinutes } from "@/lib/rental-dates";
 import { useHorarios } from "@/lib/horarios";
 
 function fmtDate(d: Date | null): string {
@@ -302,6 +302,7 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
                   Hora de salida
                 </span>
                 <select
+                  aria-label="Hora de salida"
                   className="w-full px-3.5 py-[11px] rounded-[var(--radius-sm)] border-[1.5px] border-hairline bg-background text-ink text-sm outline-none focus:border-amber transition-colors"
                   style={{ ...selectStyle, fontFamily: "var(--font-sans)" }}
                   value={horaDesde}
@@ -315,6 +316,7 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
                   Hora de devolución
                 </span>
                 <select
+                  aria-label="Hora de devolución"
                   className="w-full px-3.5 py-[11px] rounded-[var(--radius-sm)] border-[1.5px] border-hairline bg-background text-ink text-sm outline-none focus:border-amber transition-colors"
                   style={{ ...selectStyle, fontFamily: "var(--font-sans)" }}
                   value={horaHasta}
@@ -340,6 +342,7 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
                   −
                 </button>
                 <div
+                  data-testid="jornadas-count"
                   className="flex-1 text-center border-x border-hairline py-1.5 leading-none"
                   style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 900, color: "var(--ink)" }}
                 >
@@ -368,6 +371,12 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
                 </div>
                 <div className="font-sans text-[15px] font-bold text-ink">{fmtDate(fechaHasta)}</div>
                 <div className="font-mono text-[11px] text-muted-foreground mt-0.5">hasta las {horaHasta}</div>
+                {timeToMinutes(horaHasta) > timeToMinutes(horaDesde) && (
+                  <div className="mt-1.5 text-[11px] text-ink leading-snug">
+                    Devolvés más tarde que tu retiro ({horaDesde}) → <strong>suma 1 jornada</strong>.
+                    Devolvé {horaDesde} o antes para no sumarla.
+                  </div>
+                )}
               </div>
             )}
             <div className="h-2" />

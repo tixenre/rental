@@ -59,6 +59,39 @@ def _validar_horarios(value: str) -> str:
     return json.dumps(out)
 
 
+def _validar_faq(value: str) -> str:
+    """Valida y normaliza el JSON de preguntas frecuentes.
+
+    Forma: [{ "title": str, "items": [{ "q": str, "a": str }] }]."""
+    try:
+        data = json.loads(value)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, f"faq_json debe ser JSON válido ({e})")
+    if not isinstance(data, list):
+        raise HTTPException(400, "faq_json debe ser una lista de grupos")
+    out = []
+    for g in data:
+        if not isinstance(g, dict):
+            raise HTTPException(400, "Cada grupo debe ser un objeto")
+        title = str(g.get("title", "")).strip()
+        if not title:
+            raise HTTPException(400, "Cada grupo necesita un título")
+        items_in = g.get("items", [])
+        if not isinstance(items_in, list):
+            raise HTTPException(400, f"'{title}': items debe ser una lista")
+        items_out = []
+        for it in items_in:
+            if not isinstance(it, dict):
+                raise HTTPException(400, f"'{title}': cada pregunta debe ser un objeto")
+            q = str(it.get("q", "")).strip()
+            a = str(it.get("a", "")).strip()
+            if not q or not a:
+                raise HTTPException(400, f"'{title}': cada pregunta necesita texto y respuesta")
+            items_out.append({"q": q, "a": a})
+        out.append({"title": title, "items": items_out})
+    return json.dumps(out, ensure_ascii=False)
+
+
 # ── App settings (key/value config global) ───────────────────────────────────
 #
 # Tipo de cambio, defaults y otras configs globales que el admin edita
@@ -79,6 +112,7 @@ ALLOWED_SETTINGS_KEYS = {
     "email_admin_to",    # Destinatario de notif al admin cuando entra un pedido. Pisado por env EMAIL_ADMIN_TO.
     "buffer_horas_alquiler",  # Horas de prep/revisión exigidas entre alquileres. Int >= 0.
     "horarios_retiro",   # Horas habilitadas de retiro/devolución por día de semana. JSON.
+    "faq_json",          # Preguntas frecuentes editables. JSON [{title, items:[{q,a}]}].
 }
 
 
@@ -158,6 +192,8 @@ def update_setting(key: str, payload: dict, request: Request):
             raise HTTPException(400, f"Valor inválido para '{key}': debe ser un entero >= 0 ({e})")
     if key == "horarios_retiro":
         value = _validar_horarios(value)
+    if key == "faq_json":
+        value = _validar_faq(value)
     actor = (session.get("email") or session.get("user_id") or "admin")[:255]
     conn = get_db()
     try:

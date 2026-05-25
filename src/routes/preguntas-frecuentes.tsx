@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { MessageCircle } from "lucide-react";
 
 import {
@@ -8,7 +9,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { PublicLayout } from "@/components/rental/PublicLayout";
-import { FAQ_GROUPS } from "@/data/faq";
+import { useFaqGroups } from "@/data/faq";
 import { whatsappUrl } from "@/data/contact";
 
 export const Route = createFileRoute("/preguntas-frecuentes")({
@@ -33,24 +34,9 @@ export const Route = createFileRoute("/preguntas-frecuentes")({
       { name: "twitter:title", content: "Preguntas frecuentes — Rambla Rental" },
       { name: "twitter:description", content: "Reservas, pago, retiro, devolución, seguros." },
     ],
-    // Structured data FAQPage: Google muestra rich snippets con las preguntas
-    // en los resultados de búsqueda (gran impacto visual + click-through).
-    scripts: [
-      {
-        type: "application/ld+json",
-        children: JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "FAQPage",
-          mainEntity: FAQ_GROUPS.flatMap((g) =>
-            g.items.map((q) => ({
-              "@type": "Question",
-              name: q.q,
-              acceptedAnswer: { "@type": "Answer", text: q.a },
-            })),
-          ),
-        }),
-      },
-    ],
+    // El structured data FAQPage (JSON-LD) se inyecta en el componente desde
+    // las FAQ EN VIVO (editables en el back-office), no acá — así los rich
+    // snippets de Google reflejan lo que el admin configuró. Ver FaqPage.
     links: [
       { rel: "canonical", href: "https://ramblarental.com/preguntas-frecuentes" },
     ],
@@ -59,6 +45,33 @@ export const Route = createFileRoute("/preguntas-frecuentes")({
 });
 
 function FaqPage() {
+  const groups = useFaqGroups();
+
+  // Structured data FAQPage (rich snippets de Google) inyectado desde las FAQ
+  // en vivo, así refleja lo editado en el back-office. SPA sin SSR: se inyecta
+  // client-side (Google ejecuta JS al indexar).
+  useEffect(() => {
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: groups.flatMap((g) =>
+        g.items.map((it) => ({
+          "@type": "Question",
+          name: it.q,
+          acceptedAnswer: { "@type": "Answer", text: it.a },
+        })),
+      ),
+    };
+    const el = document.createElement("script");
+    el.type = "application/ld+json";
+    el.dataset.faqJsonld = "true";
+    el.textContent = JSON.stringify(schema);
+    document.head.appendChild(el);
+    return () => {
+      el.remove();
+    };
+  }, [groups]);
+
   return (
     <PublicLayout>
       <div className="px-6 lg:px-12 py-12 max-w-3xl mx-auto w-full">
@@ -74,7 +87,7 @@ function FaqPage() {
         </p>
 
         <div className="mt-10 space-y-10">
-          {FAQ_GROUPS.map((group) => (
+          {groups.map((group) => (
             <section key={group.title}>
               <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-3">
                 {group.title}
