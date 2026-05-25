@@ -1,12 +1,13 @@
 # Manifiesto — Rambla Rental
 
-> **Memoria para Claude.** Este archivo es el prompt que se carga al inicio de
-> cualquier sesión con Claude. Acá vive lo que necesita saber para no
-> arrancar desde cero: qué es el proyecto, cómo trabajamos, decisiones tomadas,
-> qué está pendiente.
+> **Contexto del proyecto para Claude.** Acá vive lo que necesita saber para no
+> arrancar desde cero: qué es el proyecto, cómo trabajamos, decisiones tomadas.
+> No se pega a mano: lo apunta [`CLAUDE.md`](CLAUDE.md) (el front door que Claude Code
+> auto-carga al inicio de cada sesión). El supervisor lo lee en su propia ventana.
 >
-> Si algo cambia (workflow, decisión, herramienta), se actualiza acá.
-> El [`README.md`](README.md) cubre la cara de GitHub (setup, stack, links). Este archivo cubre el contexto.
+> Si algo cambia (workflow, decisión, herramienta), se actualiza acá. Las **decisiones
+> de criterio y preferencias nuevas** van a [`docs/MEMORIA.md`](docs/MEMORIA.md) (memoria
+> viva, curada). El [`README.md`](README.md) cubre la cara de GitHub (setup, stack, links).
 
 ---
 
@@ -44,43 +45,28 @@ Detalles de setup en [`README.md`](README.md). Detalles de Railway en [`docs/DEP
 
 ### Workflow
 
-**Modo default: desarrollo local-first sobre `main`.**
+**Branch + PR siempre.** Todo cambio va en una rama dedicada y se mergea por PR contra `main` — corra Claude donde corra (apps de Mac/iPhone sobre sesiones en la nube, o la CLI local). **No se commitea directo a `main`.**
 
-Claude trabaja directamente en `/Users/tincho/rental` (sin worktree, sin branch intermedia), commiteando atómico a `main` local. El dev server refleja los cambios al instante en localhost. Cada tanto, cuando hay un chunk listo, se pushea `main` a GitHub.
+Una **iniciativa** = una **rama** (`claude/<descripcion>`) = una **PR** con N commits atómicos adentro. El dev server (local) o el deploy reflejan los cambios para probar.
 
 ```
-Edit → commit atómico en main local → ver en localhost → (N veces) → push main a GitHub
+Edit → commit atómico en la rama → (N veces) → push → PR → supervisor + CI → merge
 ```
 
-**La memoria del proyecto vive en GitHub vía:**
+**La memoria del proyecto vive en capas** (detalle en §8):
 
-- **Commit history**: cada commit es Conventional Commits en español (`fix(scope):`, `feat(scope):`). `git log --grep="^fix"` ya es el registro de bugs; `git log --grep="^feat"` el de features. GitHub lo renderiza buscable y permanente.
-- **GitHub Issues**: para trabajo planeado o bugs con discusión / contexto largo. No es obligatorio para cada commit — solo cuando hace falta tracking explícito.
+- **[`docs/MEMORIA.md`](docs/MEMORIA.md)** — decisiones de criterio + preferencias (el *por qué*, curado y duradero). Lo que el supervisor hace cumplir.
+- **Commit history** — registro de cambios. Conventional Commits en español; `git log --grep="^fix"` / `"^feat"` son el log buscable.
+- **GitHub Issues** — trabajo pendiente (la cola). No es obligatorio por commit.
 
-**Cuándo abrir PR en vez de pushear directo a `main`:**
+### Modus operandi durable, sesión efímera
 
-- Cambio sensible que quiere review humana antes de mergear.
-- Iniciativa grande con múltiples commits que quiero revisar como bloque.
-- Cambio arquitectónico / decisión de diseño que deja registro discutible.
+El **cómo se trabaja acá** es durable y vive en estos docs + `docs/MEMORIA.md`. La sesión es efímera: carga la forma establecida vía `CLAUDE.md` y **ejecuta**. No re-discute el modus operandi.
 
-Para esos casos, sí: branch dedicada + PR contra `main` (workflow histórico, descrito abajo).
+El **plan de una tarea** depende del alcance:
 
-Excepciones al local-first:
-
-- **Decisiones de arquitectura / diseño** → docs en `docs/` (ej. `DISEÑO_SPECS.md`).
-- **Ideas tempranas sin compromiso** → issue con `priority:low` (o conversación con el dueño antes de abrirlo).
-
-### Planes multi-fase → issues
-
-Cuando Claude diseña un plan que se ejecuta en varias fases (refactor grande, feature con backend + frontend, migración por pasos), **cada fase es un GitHub issue independiente**. El plan no vive en un archivo markdown ni en la memoria de una sesión.
-
-Por qué:
-
-- **Sesión-agnóstico**: cualquier sesión nueva puede tomar una fase pendiente y avanzarla sin contexto perdido.
-- **Tracking real**: el estado del trabajo se ve en `gh issue list`, no releyendo conversaciones viejas.
-- **Reordenar prioridades**: si una fase queda obsoleta o cambia de prioridad, se edita / cierra el issue, no se reescribe el plan entero.
-
-Cada issue describe la fase con: contexto, scope (checklist accionable), cómo (pasos concretos), verificación, y por qué de los labels.
+- **Cabe en una sesión** → se planea en la sesión (plan mode) y se ejecuta. No necesita persistencia.
+- **Iniciativa que cruza varias sesiones** → un **issue de tracking por iniciativa** (con checklist de fases adentro — **NO un issue por fase**), **auto-mantenido por la sesión** que ejecuta (marca fases hechas, anota desvíos). Así una sesión nueva la retoma sin perder contexto. El supervisor verifica que esté actualizado antes de mergear.
 
 ### Una iniciativa = una rama = una PR
 
@@ -111,12 +97,14 @@ Body explica el **por qué**, no el **qué**. Bullets si hay varios efectos.
 ### PRs
 
 - Título: igual al commit principal.
-- Body: 3 secciones — Summary / Cambios / Test plan.
-- Linkear el issue con `Closes #N`.
-- CI debe estar verde antes de mergear (TypeScript typecheck, Python tests, Build frontend, mobile-smoke).
-- **Auto-merge habilitado por default**: cada PR que Claude crea queda con auto-merge enabled. Cuando CI verde → GitHub mergea sola, borra la branch, listo. El dueño no tiene que clickear "Merge" en cada PR.
-  - **Gate humano**: si una PR no debería mergearse sin revisión visual (cambio sensible, decisión arquitectónica, UI grande), dejarla como **draft**. GitHub no auto-mergea drafts.
-  - **Opt-out por PR**: pedir explícitamente "no auto-merge esta" — Claude la deja sin habilitar.
+- Body: 3 secciones — Summary / Cambios / **Test plan en lenguaje claro** (el dueño testea, no lee código: "andá a /X, hacé Y, tenés que ver Z").
+- Si la iniciativa tiene issue de tracking: linkear con `Closes #N`.
+- **CI verde antes de mergear** (TypeScript typecheck, Python tests, Build frontend, mobile-smoke). La sesión **no propone merge con CI en rojo**.
+- **Antes de abrir/mergear: despachar el agente `supervisor`** — revisión read-only de scope / forma / drift, que resume en claro y deja el plan de prueba. (Instrucción, no gate de sistema: en las apps no hay hooks.)
+- **Merge según tamaño** (el supervisor ayuda a clasificar):
+  - **Trivial / small** con CI verde + supervisor OK → **auto-merge** (CI verde → GitHub mergea sola, borra la branch).
+  - **Sensible / arquitectónico / grande**, o que toca lo que ve el usuario → **PR draft + el dueño prueba** antes de mergear. GitHub no auto-mergea drafts. (Pre-lanzamiento: el dueño prueba en prod, ver §6.)
+  - **Opt-out por PR**: pedir explícitamente "no auto-merge esta" — se deja sin habilitar.
 - Conflicts con main: rebase / merge desde el branch (no force-push a main).
 
 Detalle completo del flow en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
@@ -182,6 +170,16 @@ Puntos de entrada para no grepear:
 ## 6. Decisiones del proyecto
 
 > Lecciones aprendidas y elecciones arquitectónicas. Útil para no re-discutir cosas.
+>
+> **Baseline fundacional.** Estas son las decisiones de arquitectura que vinieron con el
+> proyecto. Las **decisiones nuevas y preferencias** van a [`docs/MEMORIA.md`](docs/MEMORIA.md)
+> (fechadas, curadas) — no se agregan acá. El supervisor lee ambos.
+>
+> **Pre-lanzamiento (con disparador):** la web aún no es pública; el dueño es el único usuario
+> de prueba, así que **probar en producción está OK** (no hay clientes que se crucen algo roto).
+> **Disparador:** al salir al público, esto se vence → recién ahí hace falta preview/staging y
+> dejar de probar en prod. El supervisor avisa al acercarse el lanzamiento. (Registrada en
+> `docs/MEMORIA.md`.)
 
 ### Auth
 
@@ -636,24 +634,27 @@ Si una spec_key debe ser compartida con otra cat (compat matching): declararla i
 
 ## 8. Dónde encontrar cosas
 
-### Backlog, changelog, decisiones puntuales
+### Memoria en capas — cada cosa en su lugar
 
-**Todo vive en GitHub Issues.** Este manifiesto no duplica el contenido — solo apunta.
+La memoria está separada por propósito (no se duplica):
 
-| Querés saber… | Comando |
+| Querés saber… | Dónde |
 |---|---|
-| Qué hay pendiente | `gh issue list --state open` |
-| Qué features están en curso | `gh issue list --state open --label feature` |
-| Qué bugs hay reportados | `gh issue list --state open --label bug` |
-| Qué se entregó (changelog) | `gh issue list --state closed --sort created --order desc` |
-| Por qué algo está como está | abrir el issue cerrado de esa iniciativa |
+| **Por qué decidimos algo / cómo quiere el dueño que se hagan las cosas** | [`docs/MEMORIA.md`](docs/MEMORIA.md) — decisiones de criterio + preferencias, curado y fechado. **El supervisor lo hace cumplir.** |
+| Decisiones de arquitectura fundacionales | §6 de este manifiesto (baseline congelado) |
+| Qué hay pendiente / en curso | GitHub Issues (la cola). `gh issue list` localmente, o las tools de GitHub en la nube |
+| Qué cambió y cuándo | Commit history (`git log --grep="^feat"` / `"^fix"`) |
 
-Si una funcionalidad existe en código y no en issues, es un gap → crear el issue retroactivo. Excepción documental: `docs/BUGS.md` conserva la auditoría inicial del 2026-05-10 (precede la convención).
+Regla: **trabajo pendiente** → Issues. **Registro de cambios** → commits/PRs. **El *por qué* y las
+preferencias** → `docs/MEMORIA.md` (curado, no exhaustivo: solo lo que tiene consecuencia
+duradera o se repite). Si una funcionalidad existe en código y no está trackeada, crear el issue.
+Histórico: `docs/archive/` conserva auditorías viejas (`BUGS.md`, `MEJORAS.md`).
 
 ### Docs auxiliares
 
 | Archivo | Cuándo |
 |---|---|
+| [`docs/MEMORIA.md`](docs/MEMORIA.md) | Decisiones de criterio + preferencias (memoria viva, curada) |
 | [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Workflow de PRs, auditoría, mobile gate |
 | [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md) | Deploy y rollback |
 | [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md) | Checklist mobile + status por ruta |
@@ -667,4 +668,4 @@ Aclaración para no buscarlas en vano: pagos online (Stripe/MercadoPago), notifi
 
 ### Sesión nueva pierde el rumbo
 
-Si Claude se pierde a mitad de sesión: `Releé MANIFIESTO.md y los issues abiertos en https://github.com/tixenre/rental/issues`.
+Si Claude se pierde a mitad de sesión: `Releé CLAUDE.md, MANIFIESTO.md, docs/MEMORIA.md y los issues abiertos en https://github.com/tixenre/rental/issues`.

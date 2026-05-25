@@ -114,9 +114,9 @@ CI corre `pytest` automáticamente en cada PR a `main` (job `python-tests` en `.
 
 ## Workflow de desarrollo
 
-Cada cambio va por PR contra `main` con `Closes #N` linkeando un Issue. Branch corta por PR (`claude/<descripcion>` para sesiones con Claude). Después de mergear: borrar la branch local y remota.
+Branch + PR siempre: una **iniciativa** = una **rama** (`claude/<descripcion>`) = una **PR** con N commits atómicos. Antes de mergear corre el agente `supervisor` (revisión de scope/forma/drift) y CI tiene que estar verde. Merge según tamaño (trivial → auto-merge; sensible → draft + prueba del dueño). Después de mergear: borrar la branch local y remota.
 
-Detalle del flow + decisiones del proyecto en [`MANIFIESTO.md`](MANIFIESTO.md). Protocolo de auditoría + PRs en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
+El contexto se auto-carga vía [`CLAUDE.md`](CLAUDE.md). Detalle del flow + decisiones en [`MANIFIESTO.md`](MANIFIESTO.md); memoria viva (decisiones + preferencias) en [`docs/MEMORIA.md`](docs/MEMORIA.md); protocolo de auditoría + PRs en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
 
 ## Tracking (GitHub Issues)
 
