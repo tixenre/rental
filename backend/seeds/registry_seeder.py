@@ -1,18 +1,23 @@
-"""seeds/registry_seeder.py — Seeder canónico para specs por categoría.
+"""seeds/registry_seeder.py — Persiste el registry de specs a la DB.
 
-Lee `backend/specs/registry.py` y escribe a la DB en un solo pase
-idempotente:
+Lee `backend/specs/categorias/*.py` (via specs.REGISTRY) y escribe a la
+DB en un solo pase idempotente:
   1. Categoría raíz (la crea si falta)
   2. Sub-categorías declaradas (Foto/Video/Acción, Zoom/Fijo/..., etc.)
   3. spec_definitions (composite key: categoria_raiz_id + spec_key)
   4. categoria_spec_templates (asignaciones a la categoría raíz)
 
 Las sub-cats "on-the-fly" (monturas en Lentes/Adaptadores, diámetros en
-Filtros) NO se crean acá — el seed de cada cat las crea al cargar los
-equipos del dataset (porque dependen del stock real).
+Filtros) NO se crean acá — se crean al cargar equipos del dataset
+(porque dependen del stock real).
 
-Cada per-cat seed delega esto a `seed_categoria_from_registry()` y
-después se ocupa solo de equipos + equipo_specs.
+Llamado desde `main._seed_registry()` en cada boot. La función
+`serialize_spec_value` se reusa también en `tools/specs_import_preview.py`
+para serializar valores con la misma semántica que el seeding.
+
+Históricamente había seeders por categoría (`seeds/{cat}.py`) que cargaban
+equipos junto con sus specs. Eliminados en Fase C — hoy ese flujo se hace
+vía `tools/specs_import_preview.py` + `dataio.cli import`.
 """
 
 from __future__ import annotations
