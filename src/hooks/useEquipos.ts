@@ -189,7 +189,9 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
       }));
   }
 
-  // Helpers para leer del nuevo formato (e.specs) con fallback al legacy.
+  // Fase F: fuente única es e.specs (equipo_specs). Sin fallback a
+  // columnas legacy de ficha — esas fueron migradas con backfill y
+  // droppeadas en la migration a1b3c5e7f9d2.
   const specByKey = (key: string): string | null => {
     const s = e.specs?.[key];
     return s && s.value != null && String(s.value).trim() !== "" ? String(s.value) : null;
@@ -256,13 +258,13 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     destacado: (e.relevancia_manual ?? 100) <= 30,
     includes,
     _backendId: e.id,
-    // Ficha extendida — preferir e.specs (Fase D), fallback a ficha.* legacy.
-    peso:           specByKey("peso_g")        ?? ficha?.peso          ?? null,
-    dimensiones:    specByKey("dimensions_mm") ?? ficha?.dimensiones   ?? null,
-    montura:        specByKey("lens_mount")    ?? ficha?.montura       ?? null,
-    formato:        specByKey("formato")       ?? ficha?.formato       ?? null,
-    resolucion:     specByKey("resolucion_max") ?? ficha?.resolucion   ?? null,
-    alimentacion:   specByKey("alimentacion")  ?? ficha?.alimentacion  ?? null,
+    // Ficha extendida — fuente única equipo_specs (Fase F).
+    peso:           specByKey("peso_g"),
+    dimensiones:    specByKey("dimensions_mm"),
+    montura:        specByKey("lens_mount"),
+    formato:        specByKey("formato"),
+    resolucion:     specByKey("resolucion_max"),
+    alimentacion:   specByKey("alimentacion"),
     incluye:        parsedIncluye,
     conectividad:   parsedConectividad,
     compatibleCon:  parsedCompatibleCon,

@@ -84,15 +84,9 @@ export type EquipoAfuera = {
 export type Ficha = {
   descripcion:   string | null;
   notas:         string | null;
-  montura:       string | null;
-  formato:       string | null;
-  resolucion:    string | null;
   keywords_json: string | null;
   nombre_publico_template?: string | null;
-  // Ficha extendida (enriquecimiento)
-  peso?:                string | null;
-  dimensiones?:         string | null;
-  alimentacion?:        string | null;
+  // Listas / multimedia del enriquecimiento (no son specs estructuradas)
   incluye_json?:        string | null;
   conectividad_json?:   string | null;
   compatible_con_json?: string | null;
@@ -102,7 +96,8 @@ export type Ficha = {
   fuente_titulo?:       string | null;
   enriquecido_at?:      string | null;
   enriquecido_fuente?:  string | null;
-  // specs_json y raw_json eliminados en Fase E.
+  // Fase F: montura/formato/resolucion/peso/dimensiones/alimentacion
+  // se droppearon de equipo_fichas. Las specs viven en equipo_specs.
 };
 
 export type CategoriaRef = {

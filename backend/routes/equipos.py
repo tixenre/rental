@@ -392,19 +392,15 @@ class EquipoUpdate(BaseModel):
 
 
 class FichaUpdate(BaseModel):
-    """Update parcial de equipo_fichas. `specs_json` y `raw_json` eliminados
-    en Fase E — las specs viven en equipo_specs (vía putEquipoSpecs)."""
+    """Update parcial de equipo_fichas. Las specs físicas (montura/
+    formato/resolucion/peso/dimensiones/alimentacion) viven en
+    equipo_specs desde Fase F — actualizar vía PUT /admin/equipos/{id}/specs.
+    `specs_json` y `raw_json` eliminados en Fase E."""
     descripcion:   Optional[str] = None
     notas:         Optional[str] = None
-    montura:       Optional[str] = None
-    formato:       Optional[str] = None
-    resolucion:    Optional[str] = None
     keywords_json: Optional[str] = None
     nombre_publico_template: Optional[str] = None
-    # Ficha extendida (enriquecimiento IA — Fase F migración pendiente)
-    peso:                Optional[str]   = None
-    dimensiones:         Optional[str]   = None
-    alimentacion:        Optional[str]   = None
+    # Listas y multimedia del enriquecimiento (no son specs estructuradas)
     incluye_json:        Optional[str]   = None
     conectividad_json:   Optional[str]   = None
     compatible_con_json: Optional[str]   = None

@@ -115,12 +115,14 @@ class TestEquipoFicha:
         assert f.descripcion is None
 
     def test_completo(self):
+        # Fase F: peso/dimensiones migraron a equipo_specs. EquipoFicha ya
+        # no las acepta — solo descripcion/notas/keywords/multimedia.
         f = schema.EquipoFicha(
             equipo_slug="sony-fx3",
             descripcion="Cinema camera",
-            peso="640g",
-            dimensiones="129x77x84mm",
+            notas="Sin tarjetas",
             precio_bh_usd=3899.0,
+            fuente_url="https://bhphotovideo.com/...",
         )
         assert f.precio_bh_usd == 3899.0
 

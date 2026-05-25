@@ -192,14 +192,8 @@ class EquipoFicha(_Base):
     equipo_slug: str
     descripcion: str | None = None
     notas: str | None = None
-    montura: str | None = None
-    formato: str | None = None
-    resolucion: str | None = None
     keywords_json: str | None = None
     nombre_publico_template: str | None = None
-    peso: str | None = None
-    dimensiones: str | None = None
-    alimentacion: str | None = None
     incluye_json: str | None = None
     conectividad_json: str | None = None
     compatible_con_json: str | None = None
@@ -209,7 +203,9 @@ class EquipoFicha(_Base):
     fuente_titulo: str | None = None
     enriquecido_at: str | None = None
     enriquecido_fuente: str | None = None
-    # specs_json y raw_json eliminados en Fase E (las specs viven en equipo_specs).
+    # Fase F: montura/formato/resolucion/peso/dimensiones/alimentacion
+    # se migraron a equipo_specs y se droppearon de equipo_fichas.
+    # Fase E: specs_json y raw_json eliminados.
 
 
 # ─────────────────────────────────────────────────────────────────────────────

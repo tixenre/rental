@@ -36,25 +36,22 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 export type BackendFicha = {
   descripcion: string | null;
   notas: string | null;
-  montura: string | null;
-  formato: string | null;
-  resolucion: string | null;
   keywords_json: string | null;
   nombre_publico_template?: string | null;
-  // Ficha extendida (enriquecimiento IA — Fase F migración pendiente a equipo_specs)
-  peso?: string | null;
-  dimensiones?: string | null;
-  alimentacion?: string | null;
+  // Listas estructuradas que aún no son specs (Fase G migración futura)
   incluye_json?: string | null;
   conectividad_json?: string | null;
   compatible_con_json?: string | null;
+  // Multimedia y referencias (no son specs estructuradas)
   video_url?: string | null;
   precio_bh_usd?: number | null;
   fuente_url?: string | null;
   fuente_titulo?: string | null;
   enriquecido_at?: string | null;
   enriquecido_fuente?: string | null;
-  // specs_json y raw_json eliminados en Fase E.
+  // Columnas legacy montura/formato/resolucion/peso/dimensiones/alimentacion
+  // se droppearon en Fase F — las specs viven en equipo_specs.
+  // specs_json y raw_json se droppearon en Fase E.
 };
 
 export type BackendCategoriaRef = {

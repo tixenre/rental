@@ -385,13 +385,9 @@ def init_db():
             updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # specs_json fue droppeada en Fase E (migration d7e9b3c5a8f2).
-    # Las specs estructuradas viven en `equipo_specs`.
-    # Campos extra para construir el "nombre público" en el catálogo
-    # (Cámara Sony FX3 Montura E Full Frame 4K).
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS montura   TEXT")
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS formato   TEXT")
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS resolucion TEXT")
+    # specs_json + raw_json fueron droppeados en Fase E (d7e9b3c5a8f2).
+    # montura/formato/resolucion/peso/dimensiones/alimentacion fueron
+    # droppeados en Fase F (a1b3c5e7f9d2). Las specs viven en equipo_specs.
     # Keywords/palabras clave libres por equipo (array JSON de strings).
     # Distintas de las etiquetas de búsqueda: estas son selling-points editoriales
     # ("bicolor", "silenciosa", "V-mount", "global shutter") visibles en la ficha.
@@ -401,10 +397,9 @@ def init_db():
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS nombre_publico_template TEXT")
 
     # ── Ficha extendida (enriquecimiento con IA + scraping) ─────────────
-    # Datos físicos / técnicos estructurados
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS peso TEXT")              # ej: "640g"
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS dimensiones TEXT")       # ej: "129.7 x 77.8 x 84.5 mm"
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS alimentacion TEXT")      # ej: "NP-FZ100", "V-mount", "AC 220V"
+    # Las specs físicas (peso/dimensiones/alimentacion/montura/formato/
+    # resolucion) viven en equipo_specs desde Fase F. Acá quedan solo
+    # las listas y multimedia que aún no son specs estructuradas.
     # Listas estructuradas (TEXT con JSON, igual que keywords_json)
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS incluye_json TEXT")          # ["Cuerpo", "Tapa", "Cargador", "Correa"]
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS conectividad_json TEXT")    # ["USB-C", "HDMI Type-A", "XLR x2"]
@@ -1279,11 +1274,13 @@ def attach_categorias(conn, equipos: list[dict]) -> list[dict]:
 
 
 def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
-    """Agrega la ficha técnica (descripcion, notas, columnas de enriquecimiento IA).
+    """Agrega la ficha textual (descripcion, notas, keywords, enriquecimiento
+    extra). Las specs estructuradas viven en `equipo_specs` y se atachan
+    vía `attach_specs_estructuradas`.
 
-    Las specs estructuradas viven en `equipo_specs` y se atachan vía
-    `attach_specs_estructuradas`. `specs_json` y `raw_json` (legacy)
-    fueron droppeados en Fase E.
+    Post-Fase F: montura/formato/resolucion/peso/dimensiones/alimentacion
+    fueron droppeadas — esos campos son specs en equipo_specs.
+    Post-Fase E: specs_json y raw_json fueron droppeados.
     """
     if not equipos:
         return equipos
@@ -1291,9 +1288,8 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     placeholders = ",".join(["%s"] * len(ids))
     cur = conn.cursor()
     cur.execute(f"""
-        SELECT equipo_id, descripcion, notas, montura, formato, resolucion,
+        SELECT equipo_id, descripcion, notas,
                keywords_json, nombre_publico_template,
-               peso, dimensiones, alimentacion,
                incluye_json, conectividad_json, compatible_con_json,
                video_url, precio_bh_usd, fuente_url, fuente_titulo,
                enriquecido_at, enriquecido_fuente
@@ -1302,9 +1298,8 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     """, ids)
     rows = cur.fetchall()
     _ficha_keys = (
-        "descripcion", "notas", "montura", "formato", "resolucion",
+        "descripcion", "notas",
         "keywords_json", "nombre_publico_template",
-        "peso", "dimensiones", "alimentacion",
         "incluye_json", "conectividad_json", "compatible_con_json",
         "video_url", "precio_bh_usd", "fuente_url", "fuente_titulo",
         "enriquecido_at", "enriquecido_fuente",
