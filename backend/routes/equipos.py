@@ -392,15 +392,16 @@ class EquipoUpdate(BaseModel):
 
 
 class FichaUpdate(BaseModel):
+    """Update parcial de equipo_fichas. `specs_json` y `raw_json` eliminados
+    en Fase E — las specs viven en equipo_specs (vía putEquipoSpecs)."""
     descripcion:   Optional[str] = None
     notas:         Optional[str] = None
-    specs_json:    Optional[str] = None
     montura:       Optional[str] = None
     formato:       Optional[str] = None
     resolucion:    Optional[str] = None
     keywords_json: Optional[str] = None
     nombre_publico_template: Optional[str] = None
-    # Ficha extendida (enriquecimiento)
+    # Ficha extendida (enriquecimiento IA — Fase F migración pendiente)
     peso:                Optional[str]   = None
     dimensiones:         Optional[str]   = None
     alimentacion:        Optional[str]   = None
@@ -411,7 +412,6 @@ class FichaUpdate(BaseModel):
     precio_bh_usd:       Optional[float] = None
     fuente_url:          Optional[str]   = None
     fuente_titulo:       Optional[str]   = None
-    raw_json:            Optional[str]   = None
     enriquecido_fuente:  Optional[str]   = None
 
 
@@ -688,12 +688,11 @@ def list_equipos(
                 SELECT 1 FROM equipo_fichas ef
                 WHERE ef.equipo_id = e.id AND (
                     COALESCE(ef.descripcion, '') ILIKE ?
-                    OR COALESCE(ef.specs_json, '') ILIKE ?
                     OR COALESCE(ef.keywords_json, '') ILIKE ?
                 )
             )
         )"""
-        params += [like] * 7
+        params += [like] * 6
     if categoria:
         # Filtro recursivo: si es padre, incluye descendientes (árbol de `categorias`).
         # Acepta id numérico o nombre.
@@ -785,17 +784,6 @@ def list_equipos(
         # equipo recibe `specs: {spec_key: {label, value, ...}}` desde
         # equipo_specs JOIN spec_definitions JOIN template.
         equipos = attach_specs_estructuradas(conn, equipos)
-        # Formatear specs_json values tipo tabla con conectores legibles
-        # (deuda legacy — el catálogo nuevo lee `equipo.specs`).
-        # Cargamos las defs UNA vez (no por equipo) para evitar N queries.
-        tabla_defs_by_label = _load_tabla_defs_by_label(conn)
-        if tabla_defs_by_label:
-            for eq in equipos:
-                ficha = eq.get("ficha") or {}
-                if ficha.get("specs_json"):
-                    ficha["specs_json"] = _apply_tabla_defs_to_specs_json(
-                        ficha["specs_json"], tabla_defs_by_label
-                    )
         equipos = attach_specs_destacados(conn, equipos)
 
         if desde and hasta:
@@ -837,63 +825,6 @@ def _load_tabla_defs_by_label(conn) -> dict[str, dict]:
     return out
 
 
-def _apply_tabla_defs_to_specs_json(
-    raw_specs_json: Optional[str],
-    defs_by_label: dict[str, dict],
-) -> Optional[str]:
-    """Post-procesa `specs_json` del ficha: para items cuyo label matchea
-    una spec_definition tipo tabla, formatea el value crudo (JSON) a texto
-    legible con conectores y agrega `value_raw` con el JSON original (sirve
-    para placeholders tipo `{spec:Label.colKey}` que extraen celdas
-    específicas en lugar del texto completo). El resto queda intacto."""
-    import json as _json
-    if not raw_specs_json or not defs_by_label:
-        return raw_specs_json
-    try:
-        arr = _json.loads(raw_specs_json)
-    except Exception:
-        return raw_specs_json
-    if not isinstance(arr, list):
-        return raw_specs_json
-    changed = False
-    out: list[dict] = []
-    for item in arr:
-        if not isinstance(item, dict) or "label" not in item or "value" not in item:
-            out.append(item)
-            continue
-        label = item.get("label") or ""
-        value = item.get("value")
-        if not isinstance(value, str):
-            out.append(item)
-            continue
-        sd = defs_by_label.get(norm_spec_label(label))
-        if sd and sd.get("tipo") == "tabla":
-            cols = sd.get("tabla_columnas") or []
-            output_config = sd.get("output_config")
-            formatted = format_tabla_value(value, cols, output_config)
-            if formatted != value:
-                # Mantenemos `value_raw` con el JSON original para que el
-                # frontend pueda extraer celdas via `{spec:Label.colKey}`.
-                # Adjuntamos output_config para que el front aplique la
-                # misma row_strategy en el preview live del editor.
-                extra = {"value": formatted, "value_raw": value}
-                if output_config:
-                    extra["output_config"] = output_config
-                out.append({**item, **extra})
-                changed = True
-                continue
-        out.append(item)
-    return _json.dumps(out, ensure_ascii=False) if changed else raw_specs_json
-
-
-def _format_specs_json_with_definitions(conn, raw_specs_json: Optional[str]) -> Optional[str]:
-    """Versión single-equipo: carga defs internamente. Usar para endpoints
-    que sirven 1 equipo (detalle). Para listas, usar load_tabla_defs +
-    apply_tabla_defs separados para evitar N queries."""
-    defs = _load_tabla_defs_by_label(conn)
-    return _apply_tabla_defs_to_specs_json(raw_specs_json, defs)
-
-
 @router.get("/equipos/{id_or_slug}")
 def get_equipo(id_or_slug: str):
     """Devuelve el detalle de un equipo.
@@ -930,13 +861,6 @@ def get_equipo(id_or_slug: str):
         # `equipo.specs` (dict keyed por spec_key) en vez de las columnas
         # legacy de equipo_fichas. Mantenemos `ficha` para back-compat.
         equipo = attach_specs_estructuradas(conn, [equipo])[0]
-        # Post-procesar `specs_json` para formatear values tipo tabla con
-        # sus conectores (deuda legacy — el catálogo nuevo lee `specs`).
-        ficha = equipo.get("ficha") or {}
-        if ficha.get("specs_json"):
-            ficha["specs_json"] = _format_specs_json_with_definitions(
-                conn, ficha["specs_json"]
-            )
         kit = conn.execute("""
             SELECT kc.componente_id, kc.cantidad, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
             FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id

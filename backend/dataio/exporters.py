@@ -408,7 +408,6 @@ def export_equipo_fichas(conn) -> list[dict]:
                 equipo_slug=r["equipo_slug"],
                 descripcion=r["descripcion"],
                 notas=r["notas"],
-                specs_json=r["specs_json"],
                 montura=r["montura"],
                 formato=r["formato"],
                 resolucion=r["resolucion"],
@@ -424,7 +423,6 @@ def export_equipo_fichas(conn) -> list[dict]:
                 precio_bh_usd=r["precio_bh_usd"],
                 fuente_url=r["fuente_url"],
                 fuente_titulo=r["fuente_titulo"],
-                raw_json=r["raw_json"],
                 enriquecido_at=_to_iso(r["enriquecido_at"]),
                 enriquecido_fuente=r["enriquecido_fuente"],
             ).model_dump()

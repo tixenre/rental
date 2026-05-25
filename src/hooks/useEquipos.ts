@@ -171,40 +171,22 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
   };
   let parsedSpecs: ParsedSpec[] = [];
 
-  // Fase D: si el backend envía `e.specs` (dict keyed por spec_key, fuente
-  // estructurada desde equipo_specs), preferirlo. Si no, fallback a
-  // `ficha.specs_json` (legacy, parse del JSON guardado en equipo_fichas).
+  // Fase E: specs estructuradas desde equipo_specs (fuente única).
+  // El fallback a `ficha.specs_json` se eliminó — esa columna fue
+  // droppeada en la migration de Fase E.
   if (e.specs && Object.keys(e.specs).length > 0) {
     parsedSpecs = Object.values(e.specs)
-      // Filtrar bool=false y values vacíos. Render igual que el flujo legacy.
       .filter((s) => s.value != null && String(s.value).trim() !== "")
       .filter((s) => {
         if (s.tipo !== "bool") return true;
         const v = String(s.value).toLowerCase();
         return v === "sí" || v === "si" || v === "true" || v === "1";
       })
-      // Ordenar por prioridad del template (igual que el panel del admin).
       .sort((a, b) => (a.prioridad ?? 999) - (b.prioridad ?? 999))
       .map((s) => ({
         label: s.label,
         value: formatSpecValueForDisplay(s.value),
       }));
-  } else if (ficha?.specs_json) {
-    try {
-      const arr = JSON.parse(ficha.specs_json);
-      if (Array.isArray(arr)) {
-        parsedSpecs = arr
-          .filter((s) => s && typeof s === "object" && s.label && s.value != null && s.value !== "")
-          .map((s: { label: string; value: string; value_raw?: string; output_config?: ParsedSpec["output_config"] }) => ({
-            label: String(s.label),
-            value: formatSpecValueForDisplay(s.value),
-            ...(s.value_raw ? { value_raw: String(s.value_raw) } : {}),
-            ...(s.output_config ? { output_config: s.output_config } : {}),
-          }));
-      }
-    } catch {
-      /* ignore malformed specs */
-    }
   }
 
   // Helpers para leer del nuevo formato (e.specs) con fallback al legacy.

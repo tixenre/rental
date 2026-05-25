@@ -36,13 +36,12 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 export type BackendFicha = {
   descripcion: string | null;
   notas: string | null;
-  specs_json: string | null;
   montura: string | null;
   formato: string | null;
   resolucion: string | null;
   keywords_json: string | null;
   nombre_publico_template?: string | null;
-  // Ficha extendida (enriquecimiento)
+  // Ficha extendida (enriquecimiento IA — Fase F migración pendiente a equipo_specs)
   peso?: string | null;
   dimensiones?: string | null;
   alimentacion?: string | null;
@@ -55,6 +54,7 @@ export type BackendFicha = {
   fuente_titulo?: string | null;
   enriquecido_at?: string | null;
   enriquecido_fuente?: string | null;
+  // specs_json y raw_json eliminados en Fase E.
 };
 
 export type BackendCategoriaRef = {

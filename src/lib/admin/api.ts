@@ -84,7 +84,6 @@ export type EquipoAfuera = {
 export type Ficha = {
   descripcion:   string | null;
   notas:         string | null;
-  specs_json:    string | null;
   montura:       string | null;
   formato:       string | null;
   resolucion:    string | null;
@@ -103,9 +102,7 @@ export type Ficha = {
   fuente_titulo?:       string | null;
   enriquecido_at?:      string | null;
   enriquecido_fuente?:  string | null;
-  /** Scrape raw cacheado del autocompletar. Lo usa el form para re-aplicar
-   *  campos por sección sin volver a scrapear. */
-  raw_json?:            string | null;
+  // specs_json y raw_json eliminados en Fase E.
 };
 
 export type CategoriaRef = {

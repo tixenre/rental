@@ -192,7 +192,6 @@ class EquipoFicha(_Base):
     equipo_slug: str
     descripcion: str | None = None
     notas: str | None = None
-    specs_json: str | None = None
     montura: str | None = None
     formato: str | None = None
     resolucion: str | None = None
@@ -208,9 +207,9 @@ class EquipoFicha(_Base):
     precio_bh_usd: float | None = None
     fuente_url: str | None = None
     fuente_titulo: str | None = None
-    raw_json: str | None = None
     enriquecido_at: str | None = None
     enriquecido_fuente: str | None = None
+    # specs_json y raw_json eliminados en Fase E (las specs viven en equipo_specs).
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -382,10 +382,11 @@ def init_db():
             equipo_id   INTEGER PRIMARY KEY REFERENCES equipos(id) ON DELETE CASCADE,
             descripcion TEXT,
             notas       TEXT,
-            specs_json  TEXT,
             updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # specs_json fue droppeada en Fase E (migration d7e9b3c5a8f2).
+    # Las specs estructuradas viven en `equipo_specs`.
     # Campos extra para construir el "nombre público" en el catálogo
     # (Cámara Sony FX3 Montura E Full Frame 4K).
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS montura   TEXT")
@@ -404,7 +405,7 @@ def init_db():
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS peso TEXT")              # ej: "640g"
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS dimensiones TEXT")       # ej: "129.7 x 77.8 x 84.5 mm"
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS alimentacion TEXT")      # ej: "NP-FZ100", "V-mount", "AC 220V"
-    # Listas estructuradas (TEXT con JSON, igual que specs_json/keywords_json)
+    # Listas estructuradas (TEXT con JSON, igual que keywords_json)
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS incluye_json TEXT")          # ["Cuerpo", "Tapa", "Cargador", "Correa"]
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS conectividad_json TEXT")    # ["USB-C", "HDMI Type-A", "XLR x2"]
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS compatible_con_json TEXT")  # ["Sony E-mount", "Full-frame"]
@@ -413,8 +414,7 @@ def init_db():
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS precio_bh_usd FLOAT")        # precio listado en B&H (referencia)
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS fuente_url TEXT")            # canonical (B&H si hubo)
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS fuente_titulo TEXT")
-    # Trazabilidad del enriquecimiento — guardamos todo el raw para no perder data
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS raw_json TEXT")              # JSON completo de la última extracción
+    # raw_json eliminada en Fase E (migration d7e9b3c5a8f2).
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS enriquecido_at TIMESTAMP")
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS enriquecido_fuente TEXT")    # 'firecrawl-bh' | 'firecrawl-oficial' | 'manual'
 
@@ -1279,14 +1279,19 @@ def attach_categorias(conn, equipos: list[dict]) -> list[dict]:
 
 
 def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
-    """Agrega la ficha técnica (descripcion, montura, formato, resolucion, specs_json)."""
+    """Agrega la ficha técnica (descripcion, notas, columnas de enriquecimiento IA).
+
+    Las specs estructuradas viven en `equipo_specs` y se atachan vía
+    `attach_specs_estructuradas`. `specs_json` y `raw_json` (legacy)
+    fueron droppeados en Fase E.
+    """
     if not equipos:
         return equipos
     ids = [e["id"] for e in equipos]
     placeholders = ",".join(["%s"] * len(ids))
     cur = conn.cursor()
     cur.execute(f"""
-        SELECT equipo_id, descripcion, notas, specs_json, montura, formato, resolucion,
+        SELECT equipo_id, descripcion, notas, montura, formato, resolucion,
                keywords_json, nombre_publico_template,
                peso, dimensiones, alimentacion,
                incluye_json, conectividad_json, compatible_con_json,
@@ -1297,7 +1302,7 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     """, ids)
     rows = cur.fetchall()
     _ficha_keys = (
-        "descripcion", "notas", "specs_json", "montura", "formato", "resolucion",
+        "descripcion", "notas", "montura", "formato", "resolucion",
         "keywords_json", "nombre_publico_template",
         "peso", "dimensiones", "alimentacion",
         "incluye_json", "conectividad_json", "compatible_con_json",
