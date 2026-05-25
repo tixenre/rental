@@ -372,6 +372,27 @@ class TestHorariosHabilitados:
             )
 
 
+class TestValidarFechaIso:
+    def test_none_y_vacio_ok(self):
+        from routes.alquileres import _validar_fecha_iso
+        assert _validar_fecha_iso(None) is None
+        assert _validar_fecha_iso("") is None
+
+    def test_date_only_ok(self):
+        from routes.alquileres import _validar_fecha_iso
+        assert _validar_fecha_iso("2026-06-01") == "2026-06-01"
+
+    def test_datetime_ok(self):
+        from routes.alquileres import _validar_fecha_iso
+        assert _validar_fecha_iso("2026-06-01T09:30:00") == "2026-06-01T09:30:00"
+
+    def test_malformada_falla(self):
+        from routes.alquileres import _validar_fecha_iso
+        for bad in ("ayer", "2026-13-99", "32/05/2026", "T:00", "2026-06-01T99:99"):
+            with pytest.raises(ValueError):
+                _validar_fecha_iso(bad)
+
+
 # ── _crea_ciclo_kit — detección de ciclos ────────────────────────────────
 
 class CycleFakeConn:

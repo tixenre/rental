@@ -269,6 +269,21 @@ def _parse_precio(v) -> int:
         return 0
 
 
+def _validar_fecha_iso(v):
+    """Valida que una fecha sea ISO parseable (o None/''). Se usa como
+    field_validator en los modelos de pedido para rechazar fechas malformadas
+    en el borde (422) en vez de explotar como 500 más adentro al castear."""
+    if v is None or v == "":
+        return None
+    try:
+        datetime.datetime.fromisoformat(str(v))
+    except (ValueError, TypeError):
+        raise ValueError(
+            f"fecha inválida: '{v}'. Formato esperado ISO (yyyy-mm-dd o yyyy-mm-ddThh:mm)"
+        )
+    return str(v)
+
+
 class PedidoItem(BaseModel):
     equipo_id:      int
     cantidad:       int
@@ -307,6 +322,11 @@ class PedidoCreate(BaseModel):
     items:            list[PedidoItem] = []
     estado:           Optional[str] = "presupuesto"
 
+    @field_validator("fecha_desde", "fecha_hasta")
+    @classmethod
+    def _v_fechas(cls, v):
+        return _validar_fecha_iso(v)
+
 
 class PedidoEstado(BaseModel):
     estado: str
@@ -332,6 +352,11 @@ class PedidoDatos(BaseModel):
     fecha_hasta:      Optional[str]   = None
     notas:            Optional[str]   = None
     descuento_pct:    Optional[float] = None
+
+    @field_validator("fecha_desde", "fecha_hasta")
+    @classmethod
+    def _v_fechas(cls, v):
+        return _validar_fecha_iso(v)
 
     @field_validator("descuento_pct")
     @classmethod
@@ -593,6 +618,11 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                 cliente_email    = cliente_email    or c["email"]
                 cliente_telefono = cliente_telefono or c["telefono"]
                 descuento_pct    = c["descuento"] or 0.0
+
+        # Ambas fechas o ninguna: un pedido con una sola fecha es incoherente
+        # (no se puede calcular jornadas ni chequear stock).
+        if bool(data.fecha_desde) != bool(data.fecha_hasta):
+            raise HTTPException(400, "Indicá fecha de retiro y devolución, o ninguna")
 
         if data.fecha_desde and data.fecha_hasta:
             d0 = to_datetime(data.fecha_desde)

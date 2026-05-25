@@ -7,7 +7,7 @@ import json
 import logging
 from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 from database import get_db, row_to_dict, to_datetime
@@ -277,6 +277,12 @@ class PedidoClienteCreate(BaseModel):
     notas:       Optional[str] = None
     items:       list[CartItemIn] = []
 
+    @field_validator("fecha_desde", "fecha_hasta")
+    @classmethod
+    def _v_fechas(cls, v):
+        from routes.alquileres import _validar_fecha_iso
+        return _validar_fecha_iso(v)
+
 
 @router.post("/api/cliente/pedidos", status_code=201)
 def cliente_crear_pedido(
@@ -288,6 +294,8 @@ def cliente_crear_pedido(
 
     if not data.items:
         raise HTTPException(400, "El pedido debe tener al menos un ítem")
+    if not data.fecha_desde or not data.fecha_hasta:
+        raise HTTPException(400, "Elegí la fecha de retiro y de devolución")
 
     # Horas habilitadas de retiro/devolución (setting `horarios_retiro`).
     from routes.alquileres import _validar_horarios_habilitados
@@ -476,6 +484,12 @@ class ModificacionIn(BaseModel):
     fecha_hasta: Optional[str] = None
     items:       list[ModificacionItemIn] = Field(..., max_length=100)
     mensaje:     Optional[str] = Field(None, max_length=2000)
+
+    @field_validator("fecha_desde", "fecha_hasta")
+    @classmethod
+    def _v_fechas(cls, v):
+        from routes.alquileres import _validar_fecha_iso
+        return _validar_fecha_iso(v)
 
 
 def _validar_fechas_propuestas(
