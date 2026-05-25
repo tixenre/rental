@@ -8,7 +8,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { PublicLayout } from "@/components/rental/PublicLayout";
-import { FAQ_GROUPS } from "@/data/faq";
+import { FAQ_GROUPS, useFaqGroups } from "@/data/faq";
 import { whatsappUrl } from "@/data/contact";
 
 export const Route = createFileRoute("/preguntas-frecuentes")({
@@ -59,6 +59,7 @@ export const Route = createFileRoute("/preguntas-frecuentes")({
 });
 
 function FaqPage() {
+  const groups = useFaqGroups();
   return (
     <PublicLayout>
       <div className="px-6 lg:px-12 py-12 max-w-3xl mx-auto w-full">
@@ -74,7 +75,7 @@ function FaqPage() {
         </p>
 
         <div className="mt-10 space-y-10">
-          {FAQ_GROUPS.map((group) => (
+          {groups.map((group) => (
             <section key={group.title}>
               <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-3">
                 {group.title}

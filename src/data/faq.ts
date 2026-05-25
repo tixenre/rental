@@ -8,12 +8,43 @@
  * Las marcadas con [BORRADOR] son redacción tentativa.
  */
 
+import { useQuery } from "@tanstack/react-query";
+
 export type FaqItem = { q: string; a: string };
 
 export type FaqGroup = {
   title: string;
   items: FaqItem[];
 };
+
+/** Parsea el JSON del setting `faq_json`. null si vacío/ inválido. */
+export function parseFaq(raw?: string | null): FaqGroup[] | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? (parsed as FaqGroup[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * FAQ pública: lee el setting editable `faq_json`; si no está configurado
+ * (o falla), cae a `FAQ_GROUPS` hardcodeado. El admin las edita desde Settings.
+ */
+export function useFaqGroups(): FaqGroup[] {
+  const q = useQuery({
+    queryKey: ["settings", "faq_json"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/faq_json");
+      if (!res.ok) return null;
+      const data = await res.json();
+      return parseFaq(data?.value as string | undefined);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  return q.data ?? FAQ_GROUPS;
+}
 
 export const FAQ_GROUPS: FaqGroup[] = [
   {
@@ -114,6 +145,40 @@ export const FAQ_GROUPS: FaqGroup[] = [
           "[BORRADOR] Los equipos están cubiertos para uso interno. Para producciones " +
           "que requieran seguro técnico específico, consultanos antes — podemos " +
           "ayudarte a contratar uno por la fecha del rodaje.",
+      },
+    ],
+  },
+  {
+    title: "Cómo funciona el alquiler",
+    items: [
+      {
+        q: "¿Cómo se cuentan las jornadas?",
+        a:
+          "Una jornada es un período de 24 horas desde el retiro. Por ejemplo, si " +
+          "retirás el lunes a las 9:00 y devolvés el martes a las 9:00, es 1 jornada. " +
+          "Si devolvés más tarde que la hora de retiro, se cuenta una jornada más. " +
+          "El total de jornadas que ves al elegir las fechas es exactamente lo que se cobra.",
+      },
+      {
+        q: "¿En qué horarios puedo retirar y devolver?",
+        a:
+          "Trabajamos con horarios de atención que pueden variar según el día de la " +
+          "semana. Cuando elegís las fechas, el sistema te muestra solo los horarios " +
+          "disponibles de cada día — los días en que estamos cerrados no se pueden elegir.",
+      },
+      {
+        q: "¿Cómo sé si un equipo está disponible en mis fechas?",
+        a:
+          "Al elegir las fechas, el catálogo te muestra cuántas unidades de cada equipo " +
+          "quedan disponibles. Si un día ya está reservado, aparece bloqueado en el " +
+          "calendario y no vas a poder elegir ese período para ese equipo.",
+      },
+      {
+        q: "¿Por qué a veces un equipo no está disponible justo después de otra reserva?",
+        a:
+          "Entre un alquiler y el siguiente dejamos un margen de preparación y revisión " +
+          "del equipo. Por eso puede que un equipo no esté disponible inmediatamente " +
+          "después de que vuelve de otra reserva.",
       },
     ],
   },
