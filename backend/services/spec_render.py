@@ -124,6 +124,16 @@ def _parse_path(path: str) -> tuple[Optional[str], int]:
     return path or None, 0
 
 
+def _is_prefix_unit(unidad: Optional[str]) -> bool:
+    """Algunas unidades van ANTES del número (f/, $, €) en vez de después
+    (mm, kg, K). Convención: termina en "/" o empieza con símbolo monetario.
+    Espejo de `isPrefixUnit` del frontend (SpecsDiffEditor.tsx)."""
+    u = (unidad or "").strip()
+    if not u:
+        return False
+    return u.endswith("/") or u[:1] in "$€£¥"
+
+
 def _format_value_by_tipo(
     value: str, tipo: Optional[str], unidad: Optional[str] = None
 ) -> str:
@@ -133,7 +143,7 @@ def _format_value_by_tipo(
     - `multi_enum`: parsea JSON array → join con ` · `. Si el value es string
       simple (legacy), lo devuelve tal cual.
     - `rango`: parsea JSON array → `"min - max"` o solo `"v"` si es fijo. Si
-      hay unidad, la agrega.
+      hay unidad, la agrega (prefijo para `f/`/monedas, sufijo para el resto).
     - `bool`: `"true"` → "Sí", `"false"` → "" (vacío para colapsar conectores).
     - resto (string, number, enum): devuelve value tal cual.
     """
@@ -166,7 +176,7 @@ def _format_value_by_tipo(
                     else:
                         return ""
                     if unidad:
-                        out = f"{out} {unidad}"
+                        out = f"{unidad}{out}" if _is_prefix_unit(unidad) else f"{out} {unidad}"
                     return out
             except Exception:
                 pass
@@ -180,6 +190,25 @@ def _format_value_by_tipo(
         return ""
 
     return v
+
+
+def render_spec_value(
+    value: str, tipo: Optional[str], unidad: Optional[str] = None
+) -> str:
+    """Render de display de un valor de spec — fuente ÚNICA para la ficha
+    pública y los specs destacados (quick facts). Comparte la lógica de
+    `_format_value_by_tipo` (rango/multi_enum/bool) que también alimenta el
+    nombre público, así un mismo valor se ve idéntico en todos lados.
+
+    Diferencia con el nombre: acá un `number` con unidad la muestra inline
+    (ej. "82 mm", "640 g") — en el nombre la unidad la pone el template.
+    """
+    base = _format_value_by_tipo(value, tipo, unidad)
+    if tipo == "number" and unidad and base:
+        u = unidad.strip()
+        if u:
+            return f"{u}{base}" if _is_prefix_unit(u) else f"{base} {u}"
+    return base
 
 
 def render_spec_placeholder(

@@ -19,7 +19,40 @@ from services.spec_render import (
     format_tabla_value,
     norm_spec_label,
     render_spec_placeholder,
+    render_spec_value,
 )
+
+
+# ── Unidad prefijo (f/, $) + render_spec_value (display ficha/destacados) ──
+
+def test_rango_prefijo_apertura():
+    # f/ es unidad prefijo → "f/2.8", no "2.8 f/".
+    assert render_spec_placeholder("[2.8]", "rango", None, None, "", unidad="f/") == "f/2.8"
+
+
+def test_rango_prefijo_apertura_variable():
+    assert render_spec_placeholder("[2.8, 4]", "rango", None, None, "", unidad="f/") == "f/2.8 - 4"
+
+
+def test_render_spec_value_rango_sufijo():
+    assert render_spec_value("[24, 70]", "rango", "mm") == "24 - 70 mm"
+
+
+def test_render_spec_value_rango_prefijo():
+    assert render_spec_value("[2.8]", "rango", "f/") == "f/2.8"
+
+
+def test_render_spec_value_number_con_unidad():
+    assert render_spec_value("82", "number", "mm") == "82 mm"
+
+
+def test_render_spec_value_enum_tal_cual():
+    assert render_spec_value("Full-frame", "enum", None) == "Full-frame"
+    assert render_spec_value("E", "enum", None) == "E"
+
+
+def test_render_spec_value_bool_vacio_si_false():
+    assert render_spec_value("false", "bool", None) == ""
 
 
 COLS_LUMEN = [
