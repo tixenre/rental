@@ -1,0 +1,404 @@
+{
+  "products": {
+    "angler_quickopen": {
+      "marca": "Angler",
+      "modelo": "Quick-Open Deep Parabolic Softbox V2 (48\")",
+      "url_source": "",
+      "specs": {
+        "modificador_subtipo": "Softbox",
+        "forma": "Hexadecagon",
+        "diametro_cm": 122,
+        "dimensions_mm": "ø: 121.9 x H: 66 cm (Open)",
+        "montura_luz": "Bowens",
+        "incluye_grid": false,
+        "incluye_difusor": true,
+        "plegable": true,
+        "light_loss_stops": 0.0,
+        "materials": "Fabric",
+        "peso_g": 1700
+      },
+      "ficha": {
+        "Key Specs": [
+          {
+            "label": "Item Type",
+            "value": "48\" Parabolic Softbox (16-Sided Hexadecagon Shape)"
+          },
+          {
+            "label": "Interior Color",
+            "value": "Silver"
+          },
+          {
+            "label": "Light Compatibility",
+            "value": "Built-In Speed Ring with Bowens S Mount"
+          },
+          {
+            "label": "Accepts Grids",
+            "value": "Yes (Not Included)"
+          },
+          {
+            "label": "Quick Open Type",
+            "value": "Click/Locking Type"
+          },
+          {
+            "label": "Removable Front Face",
+            "value": "Yes"
+          },
+          {
+            "label": "Interior Baffle",
+            "value": "Yes, Removable"
+          },
+          {
+            "label": "Light Loss/Gain",
+            "value": "No"
+          },
+          {
+            "label": "Materials",
+            "value": "Fabric"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 48 x H: 26\" / ø: 121.9 x H: 66 cm (Open)"
+          },
+          {
+            "label": "Weight",
+            "value": "3.8 lb / 1.7 kg"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "7.2 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "38.8 x 8 x 8\""
+          }
+        ]
+      }
+    },
+    "aputure_aa07060383": {
+      "marca": "Aputure",
+      "modelo": "Quick Dome 60",
+      "url_source": "",
+      "specs": {
+        "modificador_subtipo": "Softbox",
+        "forma": "Hexadecagon",
+        "diametro_cm": 58,
+        "dimensions_mm": "ø: 58 x H: 32.7 cm (Open)",
+        "montura_luz": "Bowens",
+        "incluye_grid": true,
+        "incluye_difusor": true,
+        "plegable": true,
+        "light_loss_stops": 1.0,
+        "materials": "Fabric, Steel",
+        "peso_g": 760
+      },
+      "ficha": {
+        "Key Specs": [
+          {
+            "label": "Item Type",
+            "value": "Parabolic Softbox (16-Sided Hexadecagon Shape)"
+          },
+          {
+            "label": "Interior Color",
+            "value": "Silver"
+          },
+          {
+            "label": "Light Compatibility",
+            "value": "Includes Speed Ring with Bowens S Mount:  For Aputure STORM"
+          },
+          {
+            "label": "Accepts Grids",
+            "value": "Yes (Included)"
+          },
+          {
+            "label": "Quick Open Type",
+            "value": "Foldable"
+          },
+          {
+            "label": "Removable Front Face",
+            "value": "Yes"
+          },
+          {
+            "label": "Interior Baffle",
+            "value": "Yes, Removable"
+          },
+          {
+            "label": "Light Loss/Gain",
+            "value": "1-Stop Loss (with Diffuser)"
+          },
+          {
+            "label": "Materials",
+            "value": "Fabric, Steel"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 22.8 x H: 12.9\" / ø: 58 x H: 32.7 cm (Open)"
+          },
+          {
+            "label": "Weight",
+            "value": "1.7 lb / 760 g"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "3.46 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "25.5 x 11.9 x 4\""
+          }
+        ]
+      }
+    },
+    "aputure_aa07060382": {
+      "marca": "Aputure",
+      "modelo": "Quick Dome 90",
+      "url_source": "",
+      "specs": {
+        "modificador_subtipo": "Softbox",
+        "forma": "Hexadecagon",
+        "diametro_cm": 89,
+        "dimensions_mm": "ø: 89 x H: 60 cm (Open)",
+        "montura_luz": "Bowens",
+        "incluye_grid": true,
+        "incluye_difusor": true,
+        "plegable": true,
+        "light_loss_stops": 1.0,
+        "materials": "Fabric",
+        "peso_g": 1400
+      },
+      "ficha": {
+        "Key Specs": [
+          {
+            "label": "Item Type",
+            "value": "Parabolic Softbox (16-Sided Hexadecagon Shape)"
+          },
+          {
+            "label": "Interior Color",
+            "value": "Silver"
+          },
+          {
+            "label": "Light Compatibility",
+            "value": "Includes Speed Ring with Bowens S Mount:  For Aputure STORM"
+          },
+          {
+            "label": "Accepts Grids",
+            "value": "Yes (Included)"
+          },
+          {
+            "label": "Quick Open Type",
+            "value": "Foldable"
+          },
+          {
+            "label": "Removable Front Face",
+            "value": "Yes"
+          },
+          {
+            "label": "Interior Baffle",
+            "value": "Yes, Removable"
+          },
+          {
+            "label": "Light Loss/Gain",
+            "value": "1-Stop Loss (with Diffuser)"
+          },
+          {
+            "label": "Materials",
+            "value": "Fabric"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 35 x H: 23.6\" / ø: 89 x H: 60 cm (Open)"
+          },
+          {
+            "label": "Weight",
+            "value": "3.1 lb / 1.4 kg"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "6.22 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "36.2 x 10.3 x 5.6\""
+          }
+        ]
+      }
+    },
+    "godox_collapsible": {
+      "marca": "Godox",
+      "modelo": "Collapsible Lantern Softbox with Bowens Mount (33.5\")",
+      "url_source": "",
+      "specs": {
+        "modificador_subtipo": "Softbox",
+        "forma": "Lantern Round",
+        "diametro_cm": 85,
+        "dimensions_mm": "ø: 85 cm",
+        "montura_luz": "Bowens",
+        "incluye_grid": false,
+        "incluye_difusor": true,
+        "plegable": true,
+        "light_loss_stops": 1.0,
+        "materials": "Fabric"
+      },
+      "ficha": {
+        "Key Specs": [
+          {
+            "label": "Item Type",
+            "value": "33.5\" Lantern Softbox (Rounded Shape)"
+          },
+          {
+            "label": "Interior Color",
+            "value": "White (Translucent)"
+          },
+          {
+            "label": "Light Compatibility",
+            "value": "Includes Speed Ring with Bowens S Mount"
+          },
+          {
+            "label": "Accepts Grids",
+            "value": "No"
+          },
+          {
+            "label": "Quick Open Type",
+            "value": "Click/Locking Type"
+          },
+          {
+            "label": "Removable Front Face",
+            "value": "No"
+          },
+          {
+            "label": "Interior Baffle",
+            "value": "Yes"
+          },
+          {
+            "label": "Light Loss/Gain",
+            "value": "1-Stop Loss"
+          },
+          {
+            "label": "Materials",
+            "value": "Fabric"
+          },
+          {
+            "label": "Dimensions",
+            "value": "ø: 33.5\" / ø: 85 cm"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "5.44 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "44.5 x 7.13 x 7.13\""
+          }
+        ]
+      }
+    },
+    "nanlite_fresnel": {
+      "marca": "Nanlite",
+      "modelo": "Fresnel Lens for Forza 300 and 500",
+      "url_source": "",
+      "specs": {
+        "modificador_subtipo": "Fresnel",
+        "diametro_cm": 24,
+        "montura_luz": "Bowens",
+        "materials": "Glass, Metal",
+        "beam_angle": [
+          10.0,
+          45.0
+        ],
+        "peso_g": 800
+      },
+      "ficha": {
+        "Specs": [
+          {
+            "label": "Material of Construction",
+            "value": "Glass, Metal"
+          },
+          {
+            "label": "Beam Angle",
+            "value": "10-45°"
+          },
+          {
+            "label": "Lens",
+            "value": "Glass Fresnel"
+          },
+          {
+            "label": "Diameter",
+            "value": "9.3\" / 23.6 cm"
+          },
+          {
+            "label": "Weight",
+            "value": "1.76 lb / 0.8 kg"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "8.47 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "15.8 x 13.4 x 8.4\""
+          }
+        ]
+      }
+    },
+    "amaran_spotlight": {
+      "marca": "Amaran",
+      "modelo": "Spotlight SE 36° Lens Kit",
+      "url_source": "",
+      "specs": {
+        "modificador_subtipo": "Spotlight",
+        "montura_luz": "Bowens",
+        "materials": "Metal",
+        "peso_g": 621
+      },
+      "ficha": {
+        "General": [
+          {
+            "label": "Compatibility",
+            "value": "amaran"
+          }
+        ],
+        "Physical": [
+          {
+            "label": "Mounting",
+            "value": "1x Bowens Mount"
+          },
+          {
+            "label": "Color",
+            "value": "Black"
+          },
+          {
+            "label": "Material of Construction",
+            "value": "Metal"
+          },
+          {
+            "label": "Environmental Resistance",
+            "value": "No"
+          },
+          {
+            "label": "Weight",
+            "value": "1.37 lb / 621 g (Body)"
+          }
+        ],
+        "Packaging Info": [
+          {
+            "label": "Package Weight",
+            "value": "4.51 lb"
+          },
+          {
+            "label": "Box Dimensions (LxWxH)",
+            "value": "14 x 11.7 x 6.75\""
+          }
+        ]
+      }
+    }
+  }
+}

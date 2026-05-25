@@ -19,7 +19,6 @@ from pydantic import BaseModel
 from database import get_db, row_to_dict
 from routes.auth import get_session
 from services.clasificador_heuristico import clasificar_lote
-from services.migracion_specs import migrar_specs_todos
 from services.nombre_service import (
     actualizar_nombres_de,
     calcular_nombres_para,

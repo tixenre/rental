@@ -171,9 +171,21 @@ SPECS_ORDER = [
     "potencia_w",
     "color_modes",
     "lumens_at_5600k", "lumens_at_3200k",
-    "cri", "temperatura_k",
+    "lux_at_1m_5600k", "lux_at_1m_3200k",
+    "cri", "tlci", "r9",
+    "temperatura_k",
     "dimming",
-    "control_inalambrico", "alimentacion", "montaje", "peso",
+    "control_inalambrico", "alimentacion", "montura_luz",
+    "peso_g",
+    "power_consumption_w", "battery", "power_pass_thru",
+    "beam_angle", "cooling_system", "display",
+    "mobile_app_compatible",
+    "umbrella_mount", "effects",
+    "wireless_range_m",
+    "dimensions_mm",
+    "environmental_resistance", "operating_conditions",
+    "incluye_estuche", "incluye_modificador",
+    "materials", "certifications",
 ]
 
 
@@ -258,16 +270,13 @@ def canonicalizar_specs(specs: dict) -> dict:
     return out
 
 EXTRAS_ORDER = [
+    # Solo keys que NO están en el registry (descriptivos legacy).
     "item_type", "bulb_type", "base_type",
-    "beam_angle", "cooling", "ip_rating",
-    "dimensiones", "photometrics_1m",
-    "cri", "tlci",
-    "display", "app_compatible",
-    "modificador_incluido", "case_incluido",
+    "ip_rating", "photometrics_1m",
     "vida_util_horas",
     "yoke", "fixture_mount", "accessory_diameter",
-    "wireless_range", "io", "cable_length",
-    "voltaje", "materiales", "certificaciones", "reflector", "serie",
+    "io", "cable_length",
+    "voltaje", "reflector", "serie",
 ]
 
 
@@ -303,7 +312,9 @@ def normalizar():
         p["marca"] = canon_brand(p.get("marca", ""))
         p["modelo"] = canon_modelo(p.get("modelo", ""))
         p["specs"] = reorder(canonicalizar_specs(p.get("specs", {})), SPECS_ORDER)
-        p["extras"] = reorder(clean_extras(p.get("extras", {})), EXTRAS_ORDER)
+        # `extras` removido (no se persistía a DB). Si el dataset legacy
+        # todavía tiene la key, la quitamos para mantener el JSON limpio.
+        p.pop("extras", None)
         # Reorder top-level
         ordered = {
             "marca": p["marca"],

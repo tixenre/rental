@@ -3,8 +3,8 @@
 Reemplaza al viejo test_seed_split_tipo.py que validaba el split en una
 arquitectura intermedia (8 cats viejas). Ahora el contrato es:
 
-1. Registry tiene 5 cats (Cámaras/Lentes/Iluminación/Adaptadores/Filtros)
-   con sus specs únicos.
+1. Registry tiene 6 cats (Cámaras/Lentes/Iluminación/Modificadores/
+   Adaptadores/Filtros) con sus specs únicos.
 2. No hay spec_key "tipo" colisionando — cada subtipo usa su prefix de cat.
 3. Shared keys (lens_mount, formato, peso_g, diametro_filtro) están
    declaradas IDÉNTICAMENTE en las cats que las usan (mismo tipo, mismas
@@ -32,10 +32,12 @@ from specs import (
 
 DOCS = Path(__file__).resolve().parent.parent.parent / "docs"
 
-EXPECTED_CATEGORIAS = {"Cámaras", "Lentes", "Iluminación", "Adaptadores", "Filtros"}
+EXPECTED_CATEGORIAS = {
+    "Cámaras", "Lentes", "Iluminación", "Modificadores", "Adaptadores", "Filtros",
+}
 
 
-def test_registry_tiene_las_5_cats_activas():
+def test_registry_tiene_las_categorias_activas():
     assert set(REGISTRY.categorias.keys()) == EXPECTED_CATEGORIAS
 
 
@@ -141,11 +143,12 @@ def test_enum_options_no_vacios_si_tipo_enum():
 # ── Datasets validan contra el registry ─────────────────────────────────
 
 DATASET_FILES = {
-    "Cámaras":     "camaras.json",
-    "Lentes":      "lentes.json",
-    "Iluminación": "iluminacion.json",
-    "Adaptadores": "adaptadores.json",
-    "Filtros":     "filtros.json",
+    "Cámaras":       "camaras.json",
+    "Lentes":        "lentes.json",
+    "Iluminación":   "iluminacion.json",
+    "Modificadores": "modificadores.json",
+    "Adaptadores":   "adaptadores.json",
+    "Filtros":       "filtros.json",
 }
 
 

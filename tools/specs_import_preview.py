@@ -46,11 +46,12 @@ DEFAULT_OUT = Path("/tmp/import_preview")
 MATCH_FILE = ROOT / "docs" / "equipos_match.json"
 
 DATASETS = [
-    ("Cámaras",     ROOT / "docs" / "camaras.json"),
-    ("Lentes",      ROOT / "docs" / "lentes.json"),
-    ("Adaptadores", ROOT / "docs" / "adaptadores.json"),
-    ("Filtros",     ROOT / "docs" / "filtros.json"),
-    ("Iluminación", ROOT / "docs" / "iluminacion.json"),
+    ("Cámaras",       ROOT / "docs" / "camaras.json"),
+    ("Lentes",        ROOT / "docs" / "lentes.json"),
+    ("Adaptadores",   ROOT / "docs" / "adaptadores.json"),
+    ("Filtros",       ROOT / "docs" / "filtros.json"),
+    ("Iluminación",   ROOT / "docs" / "iluminacion.json"),
+    ("Modificadores", ROOT / "docs" / "modificadores.json"),
 ]
 
 # Importar helpers existentes del backend

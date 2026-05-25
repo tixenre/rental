@@ -28,25 +28,21 @@
           "V-mount",
           "Batería integrada"
         ],
-        "montaje": "Propietario",
-        "peso_g": 390
-      },
-      "extras": {
-        "item_type": "1x LED Flexible Light",
-        "beam_angle": "180°",
-        "cooling": "Passive",
-        "dimensiones": "60.0 × 30.0 × 0.5 cm",
-        "photometrics_1m": "3200K: 298 fc / 3208 Lux",
+        "montura_luz": "Propietario",
+        "peso_g": 390,
+        "beam_angle": [
+          180.0
+        ],
+        "cooling_system": "Passive",
         "display": "OLED",
-        "app_compatible": true,
-        "modificador_incluido": "1x Softbox with Removable Grid",
-        "case_incluido": "Yes",
-        "vida_util_horas": "50,000 Hours",
-        "fixture_mount": "1x 5/8\" Receiver",
-        "wireless_range": "262.5' / 80 m (Bluetooth)",
-        "io": "1x USB-C DMX Input",
-        "materiales": "Plastic (Housing)",
-        "certificaciones": "CE"
+        "mobile_app_compatible": true,
+        "wireless_range_m": 80.0,
+        "dimensions_mm": "60.0 × 30.0 × 0.5 cm",
+        "environmental_resistance": "No",
+        "incluye_estuche": true,
+        "incluye_modificador": "1x Softbox with Removable Grid",
+        "materials": "Plastic (Housing)",
+        "certifications": "CE"
       },
       "ficha": {
         "Key Specs": [
@@ -297,17 +293,14 @@
         "alimentacion": [
           "Batería integrada"
         ],
-        "peso_g": 240
-      },
-      "extras": {
-        "item_type": "1x LED Light Panel",
-        "cooling": "Passive",
-        "dimensiones": "14.5 × 7.0 × 1.5 cm",
+        "peso_g": 240,
+        "cooling_system": "Passive",
         "display": "LCD",
-        "case_incluido": "Yes",
-        "fixture_mount": "Multiple x 1/4\"-20 Female Thread",
-        "io": "1x USB-C Power Input",
-        "materiales": "Aluminum (Housing)"
+        "dimensions_mm": "14.5 × 7.0 × 1.5 cm",
+        "environmental_resistance": "No",
+        "operating_conditions": "14 to 104°F / -10 to 40°C",
+        "incluye_estuche": true,
+        "materials": "Aluminum (Housing)"
       },
       "ficha": {
         "Key Specs": [
@@ -514,20 +507,17 @@
         "alimentacion": [
           "AC"
         ],
-        "montaje": "Bowens",
-        "peso_g": 3160
-      },
-      "extras": {
-        "item_type": "1x LED Monolight",
-        "beam_angle": "120°",
-        "cooling": "Fan",
-        "dimensiones": "37.31 × 24.64 × 14.91 cm",
-        "photometrics_1m": "2700K: 1516 fc / 16,320 Lux",
+        "montura_luz": "Bowens",
+        "peso_g": 3160,
+        "beam_angle": [
+          120.0
+        ],
+        "cooling_system": "Active (Fan)",
         "display": "Yes",
-        "app_compatible": true,
-        "case_incluido": "Yes",
-        "yoke": "Manually-Operated Yoke",
-        "fixture_mount": "1x 5/8\" Receiver (Via Yoke Mount)"
+        "mobile_app_compatible": true,
+        "dimensions_mm": "37.31 × 24.64 × 14.91 cm",
+        "environmental_resistance": "No",
+        "incluye_estuche": true
       },
       "ficha": {
         "Key Specs": [
@@ -731,23 +721,20 @@
         "alimentacion": [
           "AC"
         ],
-        "montaje": "Bowens",
-        "peso_g": 3300
-      },
-      "extras": {
-        "item_type": "1x COB LED Monolight",
-        "beam_angle": "70°",
-        "cooling": "Fan",
-        "ip_rating": "IP54",
-        "dimensiones": "25.5 × 16.51 × 14.81 cm",
-        "photometrics_1m": "70° at 3200K: 1477 fc / 15,900 Lux (Unmodified)",
+        "montura_luz": "Bowens",
+        "peso_g": 3300,
+        "beam_angle": [
+          70.0
+        ],
+        "cooling_system": "Active (Fan)",
         "display": "LCD",
-        "app_compatible": true,
-        "modificador_incluido": "1x Reflector",
-        "case_incluido": "Yes",
-        "fixture_mount": "1x 5/8\" Receiver (Via Swivel Mount)",
-        "wireless_range": "262.5' / 80 m (Bluetooth)",
-        "io": "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)"
+        "mobile_app_compatible": true,
+        "wireless_range_m": 80.0,
+        "dimensions_mm": "25.5 × 16.51 × 14.81 cm",
+        "environmental_resistance": "Dust/Water-Resistant (IP54)",
+        "operating_conditions": "14 to 104°F / -10 to 40°C",
+        "incluye_estuche": true,
+        "incluye_modificador": "1x Reflector"
       },
       "ficha": {
         "Key Specs": [
@@ -983,23 +970,20 @@
         "alimentacion": [
           "AC"
         ],
-        "montaje": "Propietario",
-        "peso_g": 16250
-      },
-      "extras": {
-        "item_type": "1x LED Array LED Light Panel",
-        "beam_angle": "35°",
-        "cooling": "Fan",
-        "ip_rating": "IP65",
-        "dimensiones": "69.1 × 38.9 × 13.7 cm",
-        "photometrics_1m": "35° at 3200K: 18,059 fc / 194,400 Lux (Unmodified)",
+        "montura_luz": "Propietario",
+        "peso_g": 16250,
+        "beam_angle": [
+          35.0
+        ],
+        "cooling_system": "Active (Fan)",
         "display": "Yes",
-        "app_compatible": true,
-        "modificador_incluido": "1x Diffuser",
-        "yoke": "Manually-Operated Yoke",
-        "fixture_mount": "1x 1-1/8\" Stud (Via Yoke Mount)",
-        "wireless_range": "328.1' / 100 m",
-        "io": "1x Unspecified AC Power Input (100 to 240 VAC, 50 / 60 Hz)"
+        "mobile_app_compatible": true,
+        "wireless_range_m": 100.0,
+        "dimensions_mm": "69.1 × 38.9 × 13.7 cm",
+        "environmental_resistance": "Dust/Weather/Water-Resistant (IP65)",
+        "operating_conditions": "-4 to 113°F / -20 to 45°C",
+        "incluye_estuche": false,
+        "incluye_modificador": "1x Diffuser"
       },
       "ficha": {
         "Key Specs": [
@@ -1224,21 +1208,18 @@
         "alimentacion": [
           "AC"
         ],
-        "montaje": "Fresnel",
-        "peso_g": 6400
-      },
-      "extras": {
-        "item_type": "1x LED Fresnel",
-        "beam_angle": "13-54°",
-        "cooling": "Passive",
-        "ip_rating": "IP30",
-        "dimensiones": "52.3 × 35.6 × 30.5 cm",
-        "photometrics_1m": "Flood Beam at 3200K: 1394 fc / 15,016 Lux",
-        "yoke": "Manually-Operated Yoke",
-        "fixture_mount": "1x 1-1/8\" Stud (Via Yoke Mount)",
-        "io": "1x powerCON Power Input",
-        "materiales": "Aluminum, Steel (Housing)",
-        "certificaciones": "RoHS"
+        "montura_luz": "Sin montura",
+        "peso_g": 6400,
+        "beam_angle": [
+          13.0,
+          54.0
+        ],
+        "cooling_system": "Passive",
+        "dimensions_mm": "52.3 × 35.6 × 30.5 cm",
+        "environmental_resistance": "Dust-Resistant (IP30)",
+        "incluye_estuche": false,
+        "materials": "Aluminum, Steel (Housing)",
+        "certifications": "RoHS"
       },
       "ficha": {
         "Key Specs": [
@@ -1444,20 +1425,16 @@
           "AC",
           "Batería integrada"
         ],
-        "montaje": "Propietario",
-        "peso_g": 730
-      },
-      "extras": {
-        "item_type": "1x LED Light Tube/Wand",
-        "cooling": "Passive",
-        "dimensiones": "29.5 x 1.9\" / 75 x 4.8 cm (Fixture)",
-        "photometrics_1m": "5600K: 39 fc / 421 Lux",
+        "montura_luz": "Propietario",
+        "peso_g": 730,
+        "cooling_system": "Passive",
         "display": "LCD",
-        "app_compatible": true,
-        "case_incluido": "Yes",
-        "fixture_mount": "2x 1/4\"-20 Female Thread (Via Mounting Clip)",
-        "wireless_range": "98.4' / 30 m (Bluetooth)",
-        "io": "1x Barrel / Coax Power Input (20 VDC at 2.4 A)"
+        "mobile_app_compatible": true,
+        "wireless_range_m": 30.0,
+        "dimensions_mm": "29.5 x 1.9\" / 75 x 4.8 cm (Fixture)",
+        "environmental_resistance": "No",
+        "operating_conditions": "14 to 104°F / -10 to 40°C",
+        "incluye_estuche": true
       },
       "ficha": {
         "Key Specs": [
@@ -1689,12 +1666,8 @@
         "alimentacion": [
           "AC"
         ],
-        "peso_g": 210
-      },
-      "extras": {
-        "item_type": "1x  LED Lamp",
-        "base_type": "E26/E27",
-        "dimensiones": "11.5 × 7 cm (alto × diámetro)"
+        "peso_g": 210,
+        "dimensions_mm": "11.5 × 7 cm (alto × diámetro)"
       },
       "ficha": {
         "Specs": [
@@ -1772,15 +1745,11 @@
         "alimentacion": [
           "AC"
         ],
-        "montaje": "Bowens",
-        "peso_g": 860
-      },
-      "extras": {
-        "cooling": "Fan",
-        "dimensiones": "21.0 × 11.5 × 3.6 cm",
+        "montura_luz": "Bowens",
+        "peso_g": 860,
+        "cooling_system": "Active (Fan)",
         "display": "LED",
-        "yoke": "Manually-Operated Yoke",
-        "io": "Light Fixture"
+        "dimensions_mm": "21.0 × 11.5 × 3.6 cm"
       },
       "ficha": {
         "Key Specs": [
@@ -1948,19 +1917,15 @@
           "V-mount",
           "Batería integrada"
         ],
-        "montaje": "Bowens",
-        "peso_g": 2400
-      },
-      "extras": {
-        "item_type": "1x COB LED Monolight",
-        "cooling": "Fan",
-        "dimensiones": "29.2 × 27.2 × 17.6 cm",
-        "photometrics_1m": "5600K: 1077 fc / 11,600 Lux",
+        "montura_luz": "Bowens",
+        "peso_g": 2400,
+        "cooling_system": "Active (Fan)",
         "display": "Yes",
-        "app_compatible": true,
-        "case_incluido": "Yes",
-        "fixture_mount": "Support Mount",
-        "io": "Light Fixture"
+        "mobile_app_compatible": true,
+        "dimensions_mm": "29.2 × 27.2 × 17.6 cm",
+        "environmental_resistance": "No",
+        "operating_conditions": "14 to 104°F / -10 to 40°C",
+        "incluye_estuche": true
       },
       "ficha": {
         "Key Specs": [
@@ -2181,16 +2146,14 @@
         "alimentacion": [
           "AC"
         ],
-        "montaje": "Bowens",
-        "peso_g": 2490
-      },
-      "extras": {
-        "beam_angle": "55°",
-        "cooling": "Fan",
-        "dimensiones": "30.7 × 20.6 × 14.2 cm",
+        "montura_luz": "Bowens",
+        "peso_g": 2490,
+        "beam_angle": [
+          55.0
+        ],
+        "cooling_system": "Active (Fan)",
         "display": "Yes",
-        "yoke": "Manually-Operated Yoke",
-        "io": "Light Fixture"
+        "dimensions_mm": "30.7 × 20.6 × 14.2 cm"
       },
       "ficha": {
         "Key Specs": [
@@ -2370,19 +2333,13 @@
           "NP-F",
           "Batería integrada"
         ],
-        "montaje": "Propietario",
-        "peso_g": 830
-      },
-      "extras": {
-        "item_type": "1x LED Monolight",
-        "cooling": "Fan",
-        "dimensiones": "19.89 × 8.51 × 10.49 cm",
-        "photometrics_1m": "5600K: 1748 fc / 18,820 Lux (with Reflector)",
+        "montura_luz": "Propietario",
+        "peso_g": 830,
+        "cooling_system": "Active (Fan)",
         "display": "Yes",
-        "app_compatible": false,
-        "case_incluido": "1x Case",
-        "yoke": "Manually-Operated Yoke",
-        "fixture_mount": "1x 5/8\" Receiver"
+        "mobile_app_compatible": false,
+        "dimensions_mm": "19.89 × 8.51 × 10.49 cm",
+        "incluye_estuche": false
       },
       "ficha": {
         "Key Specs": [
@@ -2586,21 +2543,19 @@
           "AC",
           "Batería integrada"
         ],
-        "montaje": "Bowens",
-        "peso_g": 2600
-      },
-      "extras": {
-        "item_type": "1x LED Monolight",
-        "beam_angle": "90°",
-        "cooling": "Fan",
-        "dimensiones": "25.1 × 24.9 × 19.3 cm",
-        "photometrics_1m": "90° at 3200K: 698 fc / 7520 Lux",
+        "montura_luz": "Bowens",
+        "peso_g": 2600,
+        "beam_angle": [
+          90.0
+        ],
+        "cooling_system": "Active (Fan)",
         "display": "LCD",
-        "app_compatible": true,
-        "case_incluido": "Yes",
-        "fixture_mount": "1x 5/8\" Receiver",
-        "wireless_range": "328.1' / 100 m (Bluetooth)",
-        "io": "1x XLR 3-Pin Power Input"
+        "mobile_app_compatible": true,
+        "wireless_range_m": 100.0,
+        "dimensions_mm": "25.1 × 24.9 × 19.3 cm",
+        "environmental_resistance": "No",
+        "operating_conditions": "14 to 104°F / -10 to 40°C",
+        "incluye_estuche": true
       },
       "ficha": {
         "Key Specs": [
@@ -2828,21 +2783,20 @@
           "V-mount",
           "Batería integrada"
         ],
-        "montaje": "Bowens",
-        "peso_g": 1560
-      },
-      "extras": {
-        "item_type": "1x COB LED Monolight",
-        "beam_angle": "26°",
-        "cooling": "Fan",
-        "dimensiones": "20.32 × 12.7 × 12.7 cm",
-        "photometrics_1m": "111° at 3200K: 523 fc / 5630 Lux (Unmodified)",
+        "montura_luz": "Bowens",
+        "peso_g": 1560,
+        "beam_angle": [
+          26.0
+        ],
+        "cooling_system": "Active (Fan)",
         "display": "LCD",
-        "app_compatible": true,
-        "modificador_incluido": "1x Reflector",
-        "fixture_mount": "1x 5/8\" Receiver",
-        "wireless_range": "328.1' / 100 m (Bluetooth)",
-        "io": "1x XLR 4-Pin Power Input"
+        "mobile_app_compatible": true,
+        "wireless_range_m": 100.0,
+        "dimensions_mm": "20.32 × 12.7 × 12.7 cm",
+        "environmental_resistance": "No",
+        "operating_conditions": "14 to 104°F / -10 to 40°C",
+        "incluye_estuche": false,
+        "incluye_modificador": "1x Reflector"
       },
       "ficha": {
         "Key Specs": [
@@ -3079,11 +3033,9 @@
         "alimentacion": [
           "AC"
         ],
-        "peso_g": 619
-      },
-      "extras": {
-        "dimensiones": "7.59 × 20.6 × 7.14 cm",
-        "app_compatible": false
+        "peso_g": 619,
+        "mobile_app_compatible": false,
+        "dimensions_mm": "7.59 × 20.6 × 7.14 cm"
       },
       "ficha": {
         "Key Specs": [
@@ -3228,22 +3180,16 @@
         "alimentacion": [
           "AC"
         ],
-        "montaje": "Fresnel",
-        "peso_g": 3000
-      },
-      "extras": {
-        "item_type": "Tungsten Fresnel",
-        "bulb_type": "GY9.5 — CP89 FRL/FRK 650W (acepta CP82 500W / CP81 300W)",
-        "beam_angle": "12-52°",
-        "cooling": "Passive",
-        "ip_rating": "IP20",
-        "dimensiones": "30 × 22 × 19 cm",
-        "fixture_mount": "Socket 5/8\" (16 mm)",
-        "accessory_diameter": "168 mm / 6.6\"",
-        "voltaje": "230 V / 120 V",
-        "certificaciones": "CE, UKCA, CB, GS, cNRTLus",
-        "reflector": "Esférico especular de aluminio de alta pureza",
-        "serie": "ARRI Junior"
+        "montura_luz": "Sin montura",
+        "peso_g": 3000,
+        "beam_angle": [
+          12,
+          52
+        ],
+        "cooling_system": "Passive",
+        "dimensions_mm": "30 × 22 × 19 cm",
+        "materials": "Acero esmaltado / aluminio fundido",
+        "certifications": "CE, UKCA, CB, GS, cNRTLus"
       },
       "ficha": {
         "Technical Data": [
@@ -3401,19 +3347,14 @@
         "alimentacion": [
           "AC"
         ],
-        "montaje": "Fresnel",
-        "peso_g": 6240
-      },
-      "extras": {
-        "item_type": "Tungsten Fresnel Spotlight",
-        "bulb_type": "Medium Bi-post (2000W tungsten) — el chassis 407 es nominal 1000W; el usuario opera con bulb 2kW",
-        "beam_angle": "15-58°",
-        "cooling": "Passive",
-        "dimensiones": "28.6 × 21.9 × 26.7 cm",
-        "fixture_mount": "Yoke con spud 5/8\" (16 mm)",
-        "accessory_diameter": "6 5/8\" (168 mm)",
-        "cable_length": "25 ft (7.6 m) Type SO",
-        "voltaje": "120 / 240 VAC"
+        "montura_luz": "Sin montura",
+        "peso_g": 6240,
+        "beam_angle": [
+          15,
+          58
+        ],
+        "cooling_system": "Passive",
+        "dimensions_mm": "28.6 × 21.9 × 26.7 cm"
       },
       "ficha": {
         "Technical Specifications": [

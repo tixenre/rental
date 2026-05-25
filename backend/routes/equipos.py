@@ -1411,31 +1411,11 @@ def get_ficha(id: int):
             "montura": None, "formato": None, "resolucion": None, "keywords_json": None,
             "nombre_publico_template": None,
         }
-        # Adjuntar specs estructuradas (equipo_specs) para que el form del admin
-        # pueda hidratar los inputs del template. Lista de {label, value,
-        # spec_def_id} ordenada por prioridad del template.
-        specs_estructuradas = [
-            {
-                "label": r["label"],
-                "value": r["value"],
-                "spec_def_id": r["spec_def_id"],
-                "spec_key": r["spec_key"],
-            }
-            for r in conn.execute(
-                """
-                SELECT sd.id AS spec_def_id, sd.spec_key, sd.label, es.value,
-                       COALESCE(MIN(cst.prioridad), 999) AS prioridad
-                FROM equipo_specs es
-                JOIN spec_definitions sd ON es.spec_def_id = sd.id
-                LEFT JOIN categoria_spec_templates cst ON cst.spec_def_id = sd.id
-                WHERE es.equipo_id = ?
-                GROUP BY sd.id, sd.spec_key, sd.label, es.value
-                ORDER BY prioridad ASC, sd.label ASC
-                """,
-                (id,),
-            ).fetchall()
-        ]
-        base["specs_estructuradas"] = specs_estructuradas
+        # Las specs estructuradas se sirven por separado vía
+        # GET /admin/equipos/{id}/specs (post-PR #456). Este endpoint
+        # devuelve sólo los campos de equipo_fichas (descripción, notas,
+        # nombre_publico_template, keywords_json + columnas legacy que el
+        # catálogo público todavía usa).
         return base
     finally:
         conn.close()

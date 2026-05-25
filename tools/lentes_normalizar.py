@@ -164,7 +164,7 @@ LENTE_SPECS_ORDER = [
     "hojas_diafragma",
     "estabilizacion", "autofocus",
     "construccion_optica",
-    "peso_g", "dimensiones",
+    "peso_g", "dimensions_mm",
 ]
 
 ADAPTADOR_SPECS_ORDER = [
@@ -179,7 +179,7 @@ FILTRO_SPECS_ORDER = [
 ]
 
 LENTE_EXTRAS_ORDER = [
-    "estabilizacion_sistema", "focus_type",
+    "estabilizacion_sistema",
     "format_coverage_raw", "aperture_raw", "iris_blades_raw",
     "optical_design_raw", "angle_of_view_raw",
     "filter_size_raw", "min_focus_raw", "magnificacion_raw",
@@ -232,11 +232,11 @@ def normalizar_dataset(curado_path: Path, raw_path: Path, kind: str):
         raw = json.load(f)
 
     if kind == "lente":
-        specs_order, extras_order = LENTE_SPECS_ORDER, LENTE_EXTRAS_ORDER
+        specs_order = LENTE_SPECS_ORDER
     elif kind == "adaptador":
-        specs_order, extras_order = ADAPTADOR_SPECS_ORDER, ADAPTADOR_EXTRAS_ORDER
+        specs_order = ADAPTADOR_SPECS_ORDER
     else:  # filtro
-        specs_order, extras_order = FILTRO_SPECS_ORDER, FILTRO_EXTRAS_ORDER
+        specs_order = FILTRO_SPECS_ORDER
 
     new_products = {}
     id_remaps = []
@@ -249,7 +249,8 @@ def normalizar_dataset(curado_path: Path, raw_path: Path, kind: str):
         p["marca"] = canon_brand(p.get("marca", ""))
         p["modelo"] = canon_modelo(p.get("modelo", ""))
         p["specs"] = reorder(p.get("specs", {}), specs_order)
-        p["extras"] = reorder(clean_extras(p.get("extras", {})), extras_order)
+        # `extras` removido del output (no se persistía a DB).
+        p.pop("extras", None)
 
         ordered = {
             "marca": p["marca"],

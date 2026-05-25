@@ -51,22 +51,7 @@
         "autofocus": true,
         "construccion_optica": "17 elementos / 14 grupos",
         "peso_g": 847,
-        "dimensiones": "Ø97.6 × 137 mm"
-      },
-      "extras": {
-        "focus_type": "Autofocus",
-        "format_coverage_raw": "Full-Frame",
-        "aperture_raw": "Maximum: f/2.8\nMinimum: f/22",
-        "iris_blades_raw": "9, Rounded",
-        "optical_design_raw": "17 Elements in 14 Groups",
-        "angle_of_view_raw": "122° to 84°",
-        "filter_size_raw": "Gel Filter (Rear)",
-        "min_focus_raw": "11.02\" / 28 cm",
-        "magnificacion_raw": "1:7 Macro Reproduction Ratio\n0.14x Magnification",
-        "dimensions_raw": "ø: 3.84 x L: 5.39\" / ø: 97.6 x L: 137 mm",
-        "weight_raw": "1.86 lb / 847 g",
-        "package_weight": "2.92 lb",
-        "box_dimensions": "9.8 x 5.6 x 5.1\""
+        "dimensions_mm": "Ø97.6 × 137 mm"
       },
       "ficha": {
         "Specs (JSON-LD)": [
@@ -233,22 +218,7 @@
         "autofocus": true,
         "construccion_optica": "20 elementos / 15 grupos",
         "peso_g": 695,
-        "dimensiones": "Ø87.8 × 119.9 mm"
-      },
-      "extras": {
-        "focus_type": "Autofocus",
-        "format_coverage_raw": "Full-Frame",
-        "aperture_raw": "Maximum: f/2.8\nMinimum: f/22",
-        "iris_blades_raw": "11, Rounded",
-        "optical_design_raw": "20 Elements in 15 Groups",
-        "angle_of_view_raw": "84° to 34°",
-        "filter_size_raw": "82 mm (Front)",
-        "min_focus_raw": "8.3\" / 21 cm",
-        "magnificacion_raw": "1:3.13 Macro Reproduction Ratio\n0.32x Magnification",
-        "dimensions_raw": "ø: 3.5 x L: 4.7\" / ø: 87.8 x L: 119.9 mm",
-        "weight_raw": "1.5 lb / 695 g",
-        "package_weight": "2.595 lb",
-        "box_dimensions": "8.4 x 5.8 x 5\""
+        "dimensions_mm": "Ø87.8 × 119.9 mm"
       },
       "ficha": {
         "Specs (JSON-LD)": [
@@ -414,22 +384,7 @@
         "autofocus": true,
         "construccion_optica": "17 elementos / 14 grupos",
         "peso_g": 1045,
-        "dimensiones": "Ø88 × 200 mm"
-      },
-      "extras": {
-        "focus_type": "Autofocus",
-        "format_coverage_raw": "Full-Frame",
-        "aperture_raw": "Maximum: f/2.8\nMinimum: f/22",
-        "iris_blades_raw": "11, Rounded",
-        "optical_design_raw": "17 Elements in 14 Groups",
-        "angle_of_view_raw": "34° to 12° 30'",
-        "filter_size_raw": "77 mm (Front)",
-        "min_focus_raw": "15.7\" / 40 cm",
-        "tripod_mounting": "Removable and Rotating Collar",
-        "dimensions_raw": "ø: 3.46 x L: 7.87\" / ø: 88 x L: 200 mm",
-        "weight_raw": "2.3 lb / 1045 g",
-        "package_weight": "4.13 lb",
-        "box_dimensions": "12 x 6.2 x 5.5\""
+        "dimensions_mm": "Ø88 × 200 mm"
       },
       "ficha": {
         "Specs (JSON-LD)": [
@@ -596,22 +551,7 @@
         "autofocus": true,
         "construccion_optica": "17 elementos / 12 grupos",
         "peso_g": 810,
-        "dimensiones": "Ø78 × 121 mm"
-      },
-      "extras": {
-        "focus_type": "Autofocus",
-        "format_coverage_raw": "APS-C",
-        "aperture_raw": "Maximum: f/1.8\nMinimum: f/16",
-        "iris_blades_raw": "9, Rounded",
-        "optical_design_raw": "17 Elements in 12 Groups",
-        "angle_of_view_raw": "76.5° to 44.2°",
-        "filter_size_raw": "72 mm (Front)",
-        "min_focus_raw": "11.02\" / 28 cm",
-        "magnificacion_raw": "1:4.3 Macro Reproduction Ratio\n0.23x Magnification",
-        "dimensions_raw": "ø: 3.07 x L: 4.76\" / ø: 78 x L: 121 mm",
-        "weight_raw": "1.78 lb / 810 g",
-        "package_weight": "2.465 lb",
-        "box_dimensions": "7.1 x 5.5 x 4.8\""
+        "dimensions_mm": "Ø78 × 121 mm"
       },
       "ficha": {
         "Specs (JSON-LD)": [
@@ -778,22 +718,7 @@
         "autofocus": true,
         "construccion_optica": "19 elementos / 14 grupos",
         "peso_g": 1020,
-        "dimensiones": "Ø88 × 107.6 mm"
-      },
-      "extras": {
-        "focus_type": "Autofocus",
-        "format_coverage_raw": "Full-Frame",
-        "aperture_raw": "Maximum: f/2.8\nMinimum: f/22",
-        "iris_blades_raw": "9, Rounded",
-        "optical_design_raw": "19 Elements in 14 Groups",
-        "angle_of_view_raw": "84.1° to 34.3°",
-        "filter_size_raw": "82 mm (Front)",
-        "min_focus_raw": "1.21' / 37 cm",
-        "magnificacion_raw": "1:4.8 Macro Reproduction Ratio\n0.21x Magnification",
-        "dimensions_raw": "ø: 3.46 x L: 4.24\" / ø: 88 x L: 107.6 mm",
-        "weight_raw": "2.24 lb / 1020 g",
-        "package_weight": "2.93 lb",
-        "box_dimensions": "7.4 x 4.8 x 4.7\""
+        "dimensions_mm": "Ø88 × 107.6 mm"
       },
       "ficha": {
         "Specs (JSON-LD)": [
@@ -958,22 +883,7 @@
         "autofocus": true,
         "construccion_optica": "13 elementos / 11 grupos",
         "peso_g": 665,
-        "dimensiones": "Ø77 × 94 mm"
-      },
-      "extras": {
-        "focus_type": "Autofocus",
-        "format_coverage_raw": "Full-Frame",
-        "aperture_raw": "Maximum: f/1.4\nMinimum: f/16",
-        "iris_blades_raw": "9, Rounded",
-        "optical_design_raw": "13 Elements in 11 Groups",
-        "angle_of_view_raw": "63.4°",
-        "filter_size_raw": "67 mm (Front)",
-        "min_focus_raw": "11.81\" / 30 cm",
-        "magnificacion_raw": "1:5.26 Macro Reproduction Ratio\n0.19x Magnification",
-        "dimensions_raw": "ø: 3.03 x L: 3.7\" / ø: 77 x L: 94 mm",
-        "weight_raw": "1.46 lb / 665 g",
-        "package_weight": "2.11 lb",
-        "box_dimensions": "5.7 x 5.4 x 4.6\""
+        "dimensions_mm": "Ø77 × 94 mm"
       },
       "ficha": {
         "Specs (JSON-LD)": [
@@ -1138,22 +1048,7 @@
         "autofocus": true,
         "construccion_optica": "13 elementos / 8 grupos",
         "peso_g": 815,
-        "dimensiones": "Ø85.34 × 99.82 mm"
-      },
-      "extras": {
-        "focus_type": "Autofocus",
-        "format_coverage_raw": "Full-Frame",
-        "aperture_raw": "Maximum: f/1.4\nMinimum: f/16",
-        "iris_blades_raw": "9, Rounded",
-        "optical_design_raw": "13 Elements in 8 Groups",
-        "angle_of_view_raw": "46.8°",
-        "filter_size_raw": "77 mm (Front)",
-        "min_focus_raw": "1.31' / 40 cm",
-        "magnificacion_raw": "1:5.55 Macro Reproduction Ratio\n0.18x Magnification",
-        "dimensions_raw": "ø: 3.36 x L: 3.93\" / ø: 85.34 x L: 99.82 mm",
-        "weight_raw": "1.79 lb / 815 g",
-        "package_weight": "2.54 lb",
-        "box_dimensions": "7.5 x 4.9 x 4.7\""
+        "dimensions_mm": "Ø85.34 × 99.82 mm"
       },
       "ficha": {
         "Specs (JSON-LD)": [
@@ -1319,23 +1214,7 @@
         "autofocus": true,
         "construccion_optica": "18 elementos / 15 grupos",
         "peso_g": 1310,
-        "dimensiones": "Ø84.6 × 193.6 mm"
-      },
-      "extras": {
-        "focus_type": "Autofocus",
-        "format_coverage_raw": "Full-Frame",
-        "aperture_raw": "Maximum: f/2.8\nMinimum: f/32",
-        "iris_blades_raw": "8, Rounded",
-        "optical_design_raw": "18 Elements in 15 Groups",
-        "angle_of_view_raw": "34° to 12°",
-        "filter_size_raw": "77 mm (Front)",
-        "min_focus_raw": "4.9' / 1.5 m",
-        "magnificacion_raw": "1:6.25 Macro Reproduction Ratio\n0.16x Magnification",
-        "tripod_mounting": "Removable and Rotating Collar",
-        "dimensions_raw": "ø: 3.33 x L: 7.62\" / ø: 84.6 x L: 193.6 mm",
-        "weight_raw": "2.9 lb / 1310 g",
-        "package_weight": "4.16 lb",
-        "box_dimensions": "12.1 x 6 x 5.9\""
+        "dimensions_mm": "Ø84.6 × 193.6 mm"
       },
       "ficha": {
         "Specs (JSON-LD)": [
@@ -1507,21 +1386,7 @@
         "autofocus": false,
         "construccion_optica": "27 elementos / 19 grupos",
         "peso_g": 474,
-        "dimensiones": "Ø38 × 408 mm"
-      },
-      "extras": {
-        "focus_type": "Manual Focus",
-        "format_coverage_raw": "Full-Frame",
-        "aperture_raw": "Maximum: f/14\nMinimum: f/40",
-        "iris_blades_raw": "7",
-        "optical_design_raw": "27 Elements in 19 Groups",
-        "angle_of_view_raw": "85°",
-        "min_focus_raw": "1.54' / 47 cm",
-        "magnificacion_raw": "2:1 Macro Reproduction Ratio\n2x Magnification",
-        "dimensions_raw": "ø: 1.5 x L: 16.06\" / ø: 38 x L: 408 mm",
-        "weight_raw": "1 lb / 474 g",
-        "package_weight": "4.65 lb",
-        "box_dimensions": "20.1 x 7.3 x 6.2\""
+        "dimensions_mm": "Ø38 × 408 mm"
       },
       "ficha": {
         "Specs (JSON-LD)": [
@@ -1674,15 +1539,7 @@
         "autofocus": false,
         "construccion_optica": "6 elementos / 5 grupos",
         "peso_g": 250,
-        "dimensiones": "Ø63 × 55 mm"
-      },
-      "extras": {
-        "coating": "Single-coated (mono)",
-        "anio_produccion": "~1965-1975 (versión temprana 'auto')",
-        "tipo_diseno": "Planar-type (doble Gauss)",
-        "particularidad": "Versión Thorium: vidrio radiactivo (común en óptica alemana de los 60s/70s). Genera cast amarillento por degradación radiactiva del torio — reversible con exposición UV prolongada (varios días al sol).",
-        "construccion": "Metal + glass (sin plástico)",
-        "variantes_versiones": "Pancolar tuvo varias versiones: zebra (1965-71), early auto (1971-78) — esta versión con 8 hojas y thorium. La MC tardía (post-1978) tiene 6 hojas y vidrio no radiactivo."
+        "dimensions_mm": "Ø63 × 55 mm"
       },
       "ficha": {
         "Specs Carl Zeiss Jena (oficiales)": [
@@ -1776,14 +1633,7 @@
         "autofocus": false,
         "construccion_optica": "6 elementos / 6 grupos",
         "peso_g": 240,
-        "dimensiones": "Ø63 × 56 mm"
-      },
-      "extras": {
-        "coating": "MC (multi-coated)",
-        "anio_produccion": "~1976-1990 (MC late)",
-        "tipo_diseno": "Retrofocus — primer Zeiss en usar este esquema (anterior al Distagon de Oberkochen)",
-        "particularidad": "Récord de close-focus para 35mm de la época (~20 cm). Versión MC mejorada sobre la mono-coated original. Muy buscada para vídeo digital adaptado con anillo M42→E/RF.",
-        "construccion": "Metal + glass (sin plástico)"
+        "dimensions_mm": "Ø63 × 56 mm"
       },
       "ficha": {
         "Specs Carl Zeiss Jena (oficiales)": [
@@ -1876,14 +1726,7 @@
         "autofocus": false,
         "construccion_optica": "4 elementos / 3 grupos",
         "peso_g": 365,
-        "dimensiones": "Ø51 × 89 mm"
-      },
-      "extras": {
-        "coating": "MC (multi-coated)",
-        "anio_produccion": "1967-1990 (MC late)",
-        "tipo_diseno": "Sonnar clásico (4 elementos / 3 grupos)",
-        "particularidad": "Diseño Sonnar de 4 elementos — bokeh suave característico, ideal para retrato y telefoto adaptado a mirrorless via anillo M42→E/RF. Algunas variantes tardías llegan a 430g.",
-        "construccion": "Metal + glass (versión DDR — alemana oriental)"
+        "dimensions_mm": "Ø51 × 89 mm"
       },
       "ficha": {
         "Specs Carl Zeiss Jena (oficiales)": [

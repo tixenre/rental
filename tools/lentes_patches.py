@@ -120,7 +120,7 @@ def apply_patches():
             "autofocus": False,
             "construccion_optica": "6 elementos / 5 grupos",
             "peso_g": 250,
-            "dimensiones": "Ø63 × 55 mm",
+            "dimensions_mm": "Ø63 × 55 mm",
         },
         "extras": {
             "coating": "Single-coated (mono)",
@@ -165,7 +165,7 @@ def apply_patches():
             "autofocus": False,
             "construccion_optica": "6 elementos / 6 grupos",
             "peso_g": 240,
-            "dimensiones": "Ø63 × 56 mm",
+            "dimensions_mm": "Ø63 × 56 mm",
         },
         "extras": {
             "coating": "MC (multi-coated)",
@@ -210,7 +210,7 @@ def apply_patches():
             "autofocus": False,
             "construccion_optica": "4 elementos / 3 grupos",
             "peso_g": 365,
-            "dimensiones": "Ø51 × 89 mm",
+            "dimensions_mm": "Ø51 × 89 mm",
         },
         "extras": {
             "coating": "MC (multi-coated)",

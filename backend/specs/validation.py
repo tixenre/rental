@@ -24,7 +24,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from .models import SpecDef
-from .registry import REGISTRY
 
 
 @dataclass
@@ -93,6 +92,9 @@ def validate_dataset(categoria_raiz: str, products: dict) -> list[ValidationErro
         categoria_raiz: nombre de la cat raíz en el registry.
         products: dict {prod_id: {specs: {key: value, ...}, ...}}.
     """
+    # Import lazy para evitar circular: `specs.__init__` importa de aquí
+    # y a la vez define REGISTRY.
+    from . import REGISTRY
     cat = REGISTRY.get(categoria_raiz)
     if cat is None:
         return [ValidationError("", "", f"categoría '{categoria_raiz}' no está en registry")]
