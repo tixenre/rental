@@ -10,10 +10,13 @@
     "changelog:draft": "./scripts/changelog-draft.sh",
     "changelog:build": "bun run scripts/build-changelog.ts",
     "test:mobile": "playwright test",
-    "test:admin": "PLAYWRIGHT_ADMIN=1 playwright test admin-"
+    "test:admin": "PLAYWRIGHT_ADMIN=1 playwright test admin-",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\""
   },
   "dependencies": {
-    "@sentry/react": "^8.0.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -45,6 +48,7 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@radix-ui/react-visually-hidden": "^1.2.3",
+    "@sentry/react": "^8.0.0",
     "@supabase/supabase-js": "^2.39.8",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.83.0",
@@ -75,13 +79,22 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.51.0",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "globals": "^15.15.0",
+    "prettier": "^3.8.3",
     "rollup-plugin-visualizer": "^7.0.1",
     "typescript": "^5.8.3",
+    "typescript-eslint": "^8.60.0",
     "vite": "^7.3.1"
   }
 }

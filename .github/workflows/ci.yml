@@ -24,6 +24,19 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
 
+  lint:
+    name: Lint + formato (eslint/prettier)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      # eslint corre prettier embebido (formato = error, reglas de React = aviso)
+      - run: npm run lint
+
   python-syntax:
     name: Python syntax check
     runs-on: ubuntu-latest
