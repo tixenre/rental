@@ -716,6 +716,16 @@ def cliente_modificar_pedido(
             data.fecha_desde, data.fecha_hasta,
             pedido["fecha_desde"], pedido["fecha_hasta"],
         )
+        # Horarios habilitados: solo si el cliente propone fechas nuevas (no
+        # bloqueamos ediciones de solo-items aunque el admin haya cambiado los
+        # horarios después de creado el pedido).
+        if data.fecha_desde is not None or data.fecha_hasta is not None:
+            from routes.alquileres import _validar_horarios_habilitados
+            _validar_horarios_habilitados(
+                conn,
+                data.fecha_desde if data.fecha_desde is not None else pedido["fecha_desde"],
+                data.fecha_hasta if data.fecha_hasta is not None else pedido["fecha_hasta"],
+            )
 
         # Rellenar precios desde el pedido actual o catálogo (el cliente no
         # puede definir precios).
