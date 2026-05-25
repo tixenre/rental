@@ -493,7 +493,7 @@ def map_lente_specs(secciones: dict, title: str = "") -> dict:
 
     _add("construccion_optica", _parse_construccion_optica(secciones))
     _add("peso_g", _parse_peso_g(secciones))  # alineado a iluminación/cámaras (peso_g int)
-    _add("dimensiones", _parse_dimensiones_lens(secciones))
+    _add("dimensions_mm", _parse_dimensiones_lens(secciones))
     return result
 
 
@@ -502,7 +502,7 @@ def map_lente_extras(secciones: dict, title: str = "") -> dict:
     result: dict = {}
     FIELD_MAP = [
         ("Image Stabilization",     "estabilizacion_sistema"),
-        ("Focus Type",              "focus_type"),
+        # focus_type eliminado del registry (duplicaba el bool `autofocus`).
         ("Tripod Mounting",         "tripod_mounting"),
         ("Lens Format Coverage",    "format_coverage_raw"),
         ("Magnification",           "magnificacion_raw"),
@@ -980,17 +980,17 @@ def main(html_paths: list[Path]):
             "secciones": result["secciones"],
         }
 
-        # Dispatch a dataset correspondiente
+        # Dispatch a dataset correspondiente. `extras` removido del output:
+        # no se persistía a DB. Las funciones map_*_extras quedan en el
+        # módulo como helpers de debugging, sin caller activo.
         if clase == "lente":
             specs = map_lente_specs(result["secciones"], title=result["title"])
-            extras = map_lente_extras(result["secciones"], title=result["title"])
             curado_target = lentes_curado
             raw_target = lentes_raw
             prod_id = _build_lens_id(result["marca"], specs, result["title"])
             raw_entry["categoria_raiz"] = "Lentes"
         elif clase == "filtro":
             specs = map_filtro_specs(result["secciones"], title=result["title"])
-            extras = map_accesorio_extras(result["secciones"], title=result["title"])
             prod_id = _build_filter_id(result["marca"], specs, result["title"])
             result["modelo"] = _build_accesorio_model(result["marca"], specs, result["title"])
             curado_target = filtros_curado
@@ -998,7 +998,6 @@ def main(html_paths: list[Path]):
             raw_entry["categoria_raiz"] = "Filtros"
         else:  # adaptador
             specs = map_adaptador_specs(result["secciones"], title=result["title"])
-            extras = map_accesorio_extras(result["secciones"], title=result["title"])
             prod_id = _build_adapter_id(result["marca"], specs, result["title"])
             result["modelo"] = _build_accesorio_model(result["marca"], specs, result["title"])
             curado_target = adaptadores_curado
@@ -1018,10 +1017,9 @@ def main(html_paths: list[Path]):
             "url_source": result["url_source"],
             "image_url": result["image_url"],
             "specs": specs,
-            "extras": extras,
             "ficha": result["secciones"],
         }
-        print(f"  + {clase} agregado ({prod_id}) — {len(specs)} specs, {len(extras)} extras")
+        print(f"  + {clase} agregado ({prod_id}) — {len(specs)} specs")
 
     save_raw(lentes_raw, LENTES_RAW_PATH)
     save_raw(adaptadores_raw, ADAPTADORES_RAW_PATH)

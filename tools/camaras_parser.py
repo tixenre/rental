@@ -776,15 +776,8 @@ def map_camara_extras(secciones: dict, title: str = "") -> dict:
         ("Autofocus System",      "autofocus_system"),
         ("Focus Mode",            "focus_modes"),
         ("Focus Modes",           "focus_modes"),
-        ("Focus Type",            "focus_type"),
-
-        # Flash
-        ("External Flash Connection", "external_flash"),
-        ("Maximum Sync Speed",    "max_sync_speed"),
-        ("Flash Modes",           "flash_modes"),
-        ("Flash Compensation",    "flash_compensation"),
-        ("Dedicated Flash System", "dedicated_flash"),
-        ("Built-In Flash/Light",  "built_in_flash"),
+        # focus_type, flash_*, built_in_flash, external_flash, max_sync_speed
+        # eliminados: no aplican al inventario actual (cine/mirrorless modernas).
         ("Built-In Light",        "built_in_light"),
 
         # Stills / file
@@ -827,7 +820,7 @@ def map_camara_extras(secciones: dict, title: str = "") -> dict:
     # Campos cuyo "No" debe PRESERVARSE (son bool en el registry → mapean a false)
     BOOL_DESTINATIONS = {
         "built_in_nd", "built_in_cc", "internal_filter_holder",
-        "built_in_flash", "built_in_light",
+        "built_in_light",
     }
 
     seen_keys = set()
@@ -1102,15 +1095,17 @@ def main(html_paths: list[Path]):
             added_raw += 1
             print(f"  + raw agregado ({prod_id})")
 
+        # `extras` removido del output: no se persistía a DB ni se leía
+        # desde el frontend. Si en el futuro se necesita re-habilitar
+        # campos descriptivos no-canónicos, declararlos en el registry
+        # y emitirlos via `map_camara_specs`.
         specs = map_camara_specs(raw["secciones"], title=raw["modelo"])
-        extras = map_camara_extras(raw["secciones"], title=raw["modelo"])
         curado["products"][prod_id] = {
             "marca": raw["marca"],
             "modelo": raw["modelo"],
             "url_source": raw.get("url_source", ""),
             "image_url": raw.get("image_url", ""),
             "specs": specs,
-            "extras": extras,
             "ficha": raw["secciones"],
         }
         added_curado += 1

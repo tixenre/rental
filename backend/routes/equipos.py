@@ -18,7 +18,8 @@ from pydantic import BaseModel, Field
 
 from database import (
     get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
-    attach_ficha, attach_specs_destacados, regenerate_auto_tags,
+    attach_ficha, attach_specs_destacados, attach_specs_estructuradas,
+    regenerate_auto_tags,
 )
 from routes.auth import get_session
 from admin_guard import require_admin
@@ -391,18 +392,15 @@ class EquipoUpdate(BaseModel):
 
 
 class FichaUpdate(BaseModel):
+    """Update parcial de equipo_fichas. Las specs físicas (montura/
+    formato/resolucion/peso/dimensiones/alimentacion) viven en
+    equipo_specs desde Fase F — actualizar vía PUT /admin/equipos/{id}/specs.
+    `specs_json` y `raw_json` eliminados en Fase E."""
     descripcion:   Optional[str] = None
     notas:         Optional[str] = None
-    specs_json:    Optional[str] = None
-    montura:       Optional[str] = None
-    formato:       Optional[str] = None
-    resolucion:    Optional[str] = None
     keywords_json: Optional[str] = None
     nombre_publico_template: Optional[str] = None
-    # Ficha extendida (enriquecimiento)
-    peso:                Optional[str]   = None
-    dimensiones:         Optional[str]   = None
-    alimentacion:        Optional[str]   = None
+    # Listas y multimedia del enriquecimiento (no son specs estructuradas)
     incluye_json:        Optional[str]   = None
     conectividad_json:   Optional[str]   = None
     compatible_con_json: Optional[str]   = None
@@ -410,7 +408,6 @@ class FichaUpdate(BaseModel):
     precio_bh_usd:       Optional[float] = None
     fuente_url:          Optional[str]   = None
     fuente_titulo:       Optional[str]   = None
-    raw_json:            Optional[str]   = None
     enriquecido_fuente:  Optional[str]   = None
 
 
@@ -687,12 +684,11 @@ def list_equipos(
                 SELECT 1 FROM equipo_fichas ef
                 WHERE ef.equipo_id = e.id AND (
                     COALESCE(ef.descripcion, '') ILIKE ?
-                    OR COALESCE(ef.specs_json, '') ILIKE ?
                     OR COALESCE(ef.keywords_json, '') ILIKE ?
                 )
             )
         )"""
-        params += [like] * 7
+        params += [like] * 6
     if categoria:
         # Filtro recursivo: si es padre, incluye descendientes (árbol de `categorias`).
         # Acepta id numérico o nombre.
@@ -780,16 +776,10 @@ def list_equipos(
         equipos = attach_kit(conn, equipos)
         equipos = attach_categorias(conn, equipos)
         equipos = attach_ficha(conn, equipos)
-        # Formatear specs_json values tipo tabla con conectores legibles.
-        # Cargamos las defs UNA vez (no por equipo) para evitar N queries.
-        tabla_defs_by_label = _load_tabla_defs_by_label(conn)
-        if tabla_defs_by_label:
-            for eq in equipos:
-                ficha = eq.get("ficha") or {}
-                if ficha.get("specs_json"):
-                    ficha["specs_json"] = _apply_tabla_defs_to_specs_json(
-                        ficha["specs_json"], tabla_defs_by_label
-                    )
+        # Fase D: specs estructuradas para el catálogo público. Cada
+        # equipo recibe `specs: {spec_key: {label, value, ...}}` desde
+        # equipo_specs JOIN spec_definitions JOIN template.
+        equipos = attach_specs_estructuradas(conn, equipos)
         equipos = attach_specs_destacados(conn, equipos)
 
         if desde and hasta:
@@ -831,63 +821,6 @@ def _load_tabla_defs_by_label(conn) -> dict[str, dict]:
     return out
 
 
-def _apply_tabla_defs_to_specs_json(
-    raw_specs_json: Optional[str],
-    defs_by_label: dict[str, dict],
-) -> Optional[str]:
-    """Post-procesa `specs_json` del ficha: para items cuyo label matchea
-    una spec_definition tipo tabla, formatea el value crudo (JSON) a texto
-    legible con conectores y agrega `value_raw` con el JSON original (sirve
-    para placeholders tipo `{spec:Label.colKey}` que extraen celdas
-    específicas en lugar del texto completo). El resto queda intacto."""
-    import json as _json
-    if not raw_specs_json or not defs_by_label:
-        return raw_specs_json
-    try:
-        arr = _json.loads(raw_specs_json)
-    except Exception:
-        return raw_specs_json
-    if not isinstance(arr, list):
-        return raw_specs_json
-    changed = False
-    out: list[dict] = []
-    for item in arr:
-        if not isinstance(item, dict) or "label" not in item or "value" not in item:
-            out.append(item)
-            continue
-        label = item.get("label") or ""
-        value = item.get("value")
-        if not isinstance(value, str):
-            out.append(item)
-            continue
-        sd = defs_by_label.get(norm_spec_label(label))
-        if sd and sd.get("tipo") == "tabla":
-            cols = sd.get("tabla_columnas") or []
-            output_config = sd.get("output_config")
-            formatted = format_tabla_value(value, cols, output_config)
-            if formatted != value:
-                # Mantenemos `value_raw` con el JSON original para que el
-                # frontend pueda extraer celdas via `{spec:Label.colKey}`.
-                # Adjuntamos output_config para que el front aplique la
-                # misma row_strategy en el preview live del editor.
-                extra = {"value": formatted, "value_raw": value}
-                if output_config:
-                    extra["output_config"] = output_config
-                out.append({**item, **extra})
-                changed = True
-                continue
-        out.append(item)
-    return _json.dumps(out, ensure_ascii=False) if changed else raw_specs_json
-
-
-def _format_specs_json_with_definitions(conn, raw_specs_json: Optional[str]) -> Optional[str]:
-    """Versión single-equipo: carga defs internamente. Usar para endpoints
-    que sirven 1 equipo (detalle). Para listas, usar load_tabla_defs +
-    apply_tabla_defs separados para evitar N queries."""
-    defs = _load_tabla_defs_by_label(conn)
-    return _apply_tabla_defs_to_specs_json(raw_specs_json, defs)
-
-
 @router.get("/equipos/{id_or_slug}")
 def get_equipo(id_or_slug: str):
     """Devuelve el detalle de un equipo.
@@ -920,13 +853,10 @@ def get_equipo(id_or_slug: str):
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         equipo = attach_ficha(conn, [equipo])[0]
         equipo = attach_categorias(conn, [equipo])[0]
-        # Post-procesar `specs_json` para formatear values tipo tabla con
-        # sus conectores. El frontend recibe texto legible directo.
-        ficha = equipo.get("ficha") or {}
-        if ficha.get("specs_json"):
-            ficha["specs_json"] = _format_specs_json_with_definitions(
-                conn, ficha["specs_json"]
-            )
+        # Specs estructuradas (Fase D): el catálogo público lee
+        # `equipo.specs` (dict keyed por spec_key) en vez de las columnas
+        # legacy de equipo_fichas. Mantenemos `ficha` para back-compat.
+        equipo = attach_specs_estructuradas(conn, [equipo])[0]
         kit = conn.execute("""
             SELECT kc.componente_id, kc.cantidad, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
             FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id
@@ -1407,35 +1337,14 @@ def get_ficha(id: int):
             "SELECT * FROM equipo_fichas WHERE equipo_id = ?", (id,)
         ).fetchone()
         base = row_to_dict(row) if row else {
-            "equipo_id": id, "descripcion": None, "notas": None, "specs_json": None,
-            "montura": None, "formato": None, "resolucion": None, "keywords_json": None,
-            "nombre_publico_template": None,
+            "equipo_id": id, "descripcion": None, "notas": None,
+            "keywords_json": None, "nombre_publico_template": None,
         }
-        # Adjuntar specs estructuradas (equipo_specs) para que el form del admin
-        # pueda hidratar los inputs del template. Lista de {label, value,
-        # spec_def_id} ordenada por prioridad del template.
-        specs_estructuradas = [
-            {
-                "label": r["label"],
-                "value": r["value"],
-                "spec_def_id": r["spec_def_id"],
-                "spec_key": r["spec_key"],
-            }
-            for r in conn.execute(
-                """
-                SELECT sd.id AS spec_def_id, sd.spec_key, sd.label, es.value,
-                       COALESCE(MIN(cst.prioridad), 999) AS prioridad
-                FROM equipo_specs es
-                JOIN spec_definitions sd ON es.spec_def_id = sd.id
-                LEFT JOIN categoria_spec_templates cst ON cst.spec_def_id = sd.id
-                WHERE es.equipo_id = ?
-                GROUP BY sd.id, sd.spec_key, sd.label, es.value
-                ORDER BY prioridad ASC, sd.label ASC
-                """,
-                (id,),
-            ).fetchall()
-        ]
-        base["specs_estructuradas"] = specs_estructuradas
+        # Las specs estructuradas se sirven por separado vía
+        # GET /admin/equipos/{id}/specs (post-PR #456). Este endpoint
+        # devuelve sólo los campos de equipo_fichas (descripción, notas,
+        # nombre_publico_template, keywords_json + columnas legacy que el
+        # catálogo público todavía usa).
         return base
     finally:
         conn.close()
@@ -1466,12 +1375,10 @@ def upsert_ficha(id: int, data: FichaUpdate):
                 f"UPDATE equipo_fichas SET {set_clause} WHERE equipo_id = ?",
                 list(patch.values()) + [id],
             )
-            # Hook: si cambió el template de nombre o specs estructuradas
-            # (montura/formato/resolucion legacy), recalcular nombre_publico.
-            keys_que_afectan_nombre = {
-                "nombre_publico_template", "montura", "formato", "resolucion",
-            }
-            if any(k in patch for k in keys_que_afectan_nombre):
+            # Hook: si cambió el template de nombre, recalcular nombre_publico.
+            # (Post-Fase F las specs físicas viven en equipo_specs, no en
+            # equipo_fichas — cambiarlas no pasa por este endpoint.)
+            if "nombre_publico_template" in patch:
                 try:
                     actualizar_nombres_de(conn, id, commit=False)
                 except Exception:
@@ -2909,16 +2816,20 @@ class BatchEnriquecerInput(BaseModel):
 @router.post("/admin/equipos/batch-enriquecer")
 def admin_batch_enriquecer(payload: BatchEnriquecerInput, request: Request):
     """
-    Procesa un chunk de equipos: para cada uno, scrapea su bh_url y guarda el
-    resultado en `equipo_fichas.raw_json` (cache). El admin después aplica los
-    campos por sección con los botones ✨ del form V2.
+    Procesa un chunk de equipos: para cada uno, scrapea su bh_url y aplica
+    los specs estructurados directo a equipo_specs.
+
+    Post-Fase F del refactor: ya no cacheamos `raw_json` (esa columna se
+    droppeó y los botones ✨ del form V2 se eliminaron). El scrape se
+    persiste directamente — el admin puede ver el resultado en la ficha
+    técnica del equipo.
 
     Límite: 3 equipos por request. El frontend re-batchea hasta terminar.
     Entre cada scrape duerme 1s para no rate-limitear B&H.
 
-    NO sobrescribe campos no vacíos del equipo. Solo llena marca/modelo/foto_url
-    si están vacíos. Specs y descripción siempre van al cache; el admin decide
-    qué aplicar después.
+    NO sobrescribe campos no vacíos del equipo. Solo llena marca/modelo/
+    foto_url si están vacíos. Las specs van a equipo_specs vía
+    `_matchear_y_persistir_specs` (mismo flujo que aplicar-enriquecimiento).
     """
     require_admin(request)
 
@@ -2960,16 +2871,42 @@ def admin_batch_enriquecer(payload: BatchEnriquecerInput, request: Request):
                     request,
                 )
 
-                # Persistir raw_json en equipo_fichas (cache para botones ✨)
+                # Tracking del enriquecimiento (sin cache de raw_json).
                 conn.execute(
-                    """INSERT INTO equipo_fichas (equipo_id, raw_json, fuente_url, enriquecido_at)
-                       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    """INSERT INTO equipo_fichas (equipo_id, fuente_url, enriquecido_at, enriquecido_fuente)
+                       VALUES (?, ?, CURRENT_TIMESTAMP, ?)
                        ON CONFLICT (equipo_id) DO UPDATE
-                       SET raw_json = EXCLUDED.raw_json,
-                           fuente_url = COALESCE(EXCLUDED.fuente_url, equipo_fichas.fuente_url),
-                           enriquecido_at = EXCLUDED.enriquecido_at""",
-                    (eid, _json.dumps(scrape, ensure_ascii=False), scrape.get("fuente_url") or eq_d["bh_url"]),
+                       SET fuente_url = COALESCE(EXCLUDED.fuente_url, equipo_fichas.fuente_url),
+                           enriquecido_at = EXCLUDED.enriquecido_at,
+                           enriquecido_fuente = COALESCE(EXCLUDED.enriquecido_fuente, equipo_fichas.enriquecido_fuente)""",
+                    (eid, scrape.get("fuente_url") or eq_d["bh_url"], scrape.get("enriquecido_fuente") or "batch-bh"),
                 )
+
+                # Specs estructuradas: el scrape devuelve `specs` como list
+                # of {label, value} o como dict {spec_key: value}. Consolidamos
+                # con los campos planos legacy (montura/formato/peso/etc.)
+                # del scrape — todos se intentan persistir a equipo_specs.
+                specs_payload: dict = {}
+                raw_specs = scrape.get("specs")
+                if isinstance(raw_specs, dict):
+                    specs_payload.update(raw_specs)
+                elif isinstance(raw_specs, list):
+                    for item in raw_specs:
+                        if isinstance(item, dict) and "label" in item and "value" in item:
+                            specs_payload.setdefault(item["label"], item["value"])
+                _LEGACY_TO_SPEC_KEY_BATCH = {
+                    "montura": "lens_mount", "formato": "formato",
+                    "resolucion": "resolucion_max", "peso": "peso_g",
+                    "dimensiones": "dimensions_mm", "alimentacion": "alimentacion",
+                }
+                for legacy_k, spec_k in _LEGACY_TO_SPEC_KEY_BATCH.items():
+                    if scrape.get(legacy_k):
+                        specs_payload.setdefault(spec_k, scrape[legacy_k])
+                if specs_payload:
+                    try:
+                        _matchear_y_persistir_specs(conn, eid, specs_payload)
+                    except Exception:
+                        logger.exception("matchear specs falló para equipo %s", eid)
 
                 # Llenar campos top-level del equipo si están vacíos
                 patch = {}
@@ -4343,11 +4280,13 @@ def admin_aplicar_enriquecimiento(id: int, payload: AplicarEnriquecimientoInput,
         )
 
         # Mapeo: API → columna DB. Listas/dicts → JSON string.
+        # Post-Fase F: las specs físicas (montura/formato/resolucion/peso/
+        # dimensiones/alimentacion) NO van a equipo_fichas — se persisten
+        # en equipo_specs vía `_matchear_y_persistir_specs` (más abajo).
+        # `specs_json` y `raw_json` se droppearon en Fase E.
         ficha_fields: dict = {}
         if "descripcion" in body:
             ficha_fields["descripcion"] = body["descripcion"]
-        if "specs" in body and body["specs"] is not None:
-            ficha_fields["specs_json"] = _json.dumps(body["specs"], ensure_ascii=False)
         if "keywords" in body and body["keywords"] is not None:
             ficha_fields["keywords_json"] = _json.dumps(body["keywords"], ensure_ascii=False)
         if "incluye" in body and body["incluye"] is not None:
@@ -4356,13 +4295,28 @@ def admin_aplicar_enriquecimiento(id: int, payload: AplicarEnriquecimientoInput,
             ficha_fields["conectividad_json"] = _json.dumps(body["conectividad"], ensure_ascii=False)
         if "compatible_con" in body and body["compatible_con"] is not None:
             ficha_fields["compatible_con_json"] = _json.dumps(body["compatible_con"], ensure_ascii=False)
-        for k in ("peso", "dimensiones", "montura", "formato", "resolucion",
-                  "alimentacion", "video_url", "precio_bh_usd",
+        for k in ("video_url", "precio_bh_usd",
                   "fuente_url", "fuente_titulo", "enriquecido_fuente"):
             if k in body:
                 ficha_fields[k] = body[k]
-        if "raw" in body and body["raw"] is not None:
-            ficha_fields["raw_json"] = _json.dumps(body["raw"], ensure_ascii=False)
+
+        # Specs físicas legacy del payload: se mergean al dict `specs` para
+        # que `_matchear_y_persistir_specs` las grabe en equipo_specs.
+        # El cliente puede mandar tanto el dict `specs` como los campos
+        # planos del payload (montura/formato/etc.) — ambos se consolidan.
+        specs_consolidadas: dict = dict(body.get("specs") or {})
+        _LEGACY_TO_SPEC_KEY = {
+            "montura": "lens_mount",
+            "formato": "formato",
+            "resolucion": "resolucion_max",
+            "peso": "peso_g",
+            "dimensiones": "dimensions_mm",
+            "alimentacion": "alimentacion",
+        }
+        for legacy_key, spec_key in _LEGACY_TO_SPEC_KEY.items():
+            if legacy_key in body and body[legacy_key]:
+                # No pisa si el cliente también mandó la spec estructurada.
+                specs_consolidadas.setdefault(spec_key, body[legacy_key])
 
         # Si vino algún dato de ficha, marcar enriquecido_at
         if ficha_fields:
@@ -4378,9 +4332,11 @@ def admin_aplicar_enriquecimiento(id: int, payload: AplicarEnriquecimientoInput,
         # Las specs que matchean con lo asignado al equipo se cargan en
         # equipo_specs (estructurado). Lo que no matchea genera propuestas
         # en spec_propuestas_pendientes (assign_spec o spec_nueva).
+        # Incluye specs físicas legacy (montura/formato/peso/etc.) que
+        # vinieron como campos planos del payload — consolidadas arriba.
         matching_result = {"aplicadas": [], "propuestas": [], "saltadas": []}
-        if "specs" in body and isinstance(body["specs"], dict) and body["specs"]:
-            matching_result = _matchear_y_persistir_specs(conn, id, body["specs"])
+        if specs_consolidadas:
+            matching_result = _matchear_y_persistir_specs(conn, id, specs_consolidadas)
 
         conn.commit()
 

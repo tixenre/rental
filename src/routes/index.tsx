@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
 import { LayoutGrid, List, ArrowRight, Sparkles, Loader2, Search, X, Check, SearchX } from "lucide-react";
 import { ViewToggle } from "@/components/rental/ViewToggle";
@@ -18,7 +18,8 @@ import { ListFilters } from "@/components/rental/ListFilters";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { ViewIntroDialog } from "@/components/rental/ViewIntroDialog";
 import { PreviewPane } from "@/components/rental/PreviewPane";
-import { useEquipos, useCategorias, useMarcas } from "@/hooks/useEquipos";
+import { SpecFilters } from "@/components/rental/SpecFilters";
+import { useEquipos, useCategorias, useMarcas, discoverFilterableSpecs, type SpecFilterDef } from "@/hooks/useEquipos";
 import type { BackendMarca, BackendCategoria } from "@/lib/api";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
@@ -213,6 +214,10 @@ function Index() {
     });
   };
 
+  /** Filtros por specs estructuradas (Fase H). Mapeo
+   *  `spec_key → value seleccionado`. Solo se aplican si el equipo
+   *  pertenece a la categoría que tiene esa spec en el template. */
+  const [specFilters, setSpecFilters] = useState<Record<string, string>>({});
   const [selectedCats, setSelectedCats] = useState<Set<string>>(
     () => (search.cat ? new Set([search.cat]) : new Set()),
   );
@@ -279,6 +284,19 @@ function Index() {
     if (disponiblesOnly) {
       list = list.filter((e) => e.disponible === undefined || e.disponible > 0);
     }
+    // Filtros por specs estructuradas (Fase H): match exacto del value
+    // contra `equipo.specsRaw[key].value`. Si el equipo no tiene esa
+    // spec (porque no está en su template de categoría), no matchea.
+    const activeSpecFilters = Object.entries(specFilters).filter(([, v]) => v);
+    if (activeSpecFilters.length > 0) {
+      list = list.filter((eq) => {
+        const specs = eq.specsRaw || {};
+        return activeSpecFilters.every(([key, value]) => {
+          const sp = specs[key];
+          return sp && String(sp.value).trim() === value;
+        });
+      });
+    }
     if (query.trim()) {
       // Cada palabra de la query debe aparecer en el "haystack" del equipo.
       const tokens = norm(query).split(/\s+/).filter(Boolean);
@@ -291,7 +309,23 @@ function Index() {
       });
     }
     return list;
-  }, [selectedCats, brand, query, disponiblesOnly, allEquipos]);
+  }, [selectedCats, brand, query, disponiblesOnly, allEquipos, specFilters]);
+
+  // Specs filtrables — descubiertas del subset cat/brand/query (sin
+  // aplicar spec-filters todavía, para que los valores disponibles no
+  // desaparezcan al elegir uno).
+  const filterableSpecs = useMemo(() => {
+    const base = allEquipos.filter((e) => {
+      if (selectedCats.size > 0) {
+        const inCat = selectedCats.has(e.category) ||
+          (e.categorias ?? []).some((c) => selectedCats.has(c.nombre));
+        if (!inCat) return false;
+      }
+      if (brand && e.brand !== brand) return false;
+      return true;
+    });
+    return discoverFilterableSpecs(base);
+  }, [allEquipos, selectedCats, brand]);
 
   const jumpToCategory = (c: string) => {
     setSelectedCats(new Set([c]));
@@ -418,6 +452,7 @@ function Index() {
                 setSelectedCats(new Set());
                 setBrand(null);
                 setQuery("");
+                setSpecFilters({});
               }}
               resultCount={filtered.length}
             />
@@ -626,6 +661,7 @@ function Index() {
               setSelectedCats(new Set());
               setBrand(null);
               setQuery("");
+              setSpecFilters({});
               setDisponiblesOnly(false);
             }}
             filtered={filtered}
@@ -634,6 +670,9 @@ function Index() {
               setSelectedCats(new Set([c]));
               setQuery("");
             }}
+            filterableSpecs={filterableSpecs}
+            specFilters={specFilters}
+            setSpecFilters={setSpecFilters}
           />
         )}
 
@@ -881,6 +920,9 @@ function ListMode({
   filtered,
   getDisponible,
   onSuggestCategory,
+  filterableSpecs,
+  specFilters,
+  setSpecFilters,
 }: {
   allEquipos: Equipment[];
   apiCategories: string[];
@@ -895,6 +937,9 @@ function ListMode({
   filtered: Equipment[];
   getDisponible: (item: Equipment) => number | undefined;
   onSuggestCategory: (c: string) => void;
+  filterableSpecs: SpecFilterDef[];
+  specFilters: Record<string, string>;
+  setSpecFilters: Dispatch<SetStateAction<Record<string, string>>>;
 }) {
   const PAGE_SIZE = 20;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -976,6 +1021,26 @@ function ListMode({
             onQuery={setQuery}
             onClear={onClear}
           />
+          {/* Filtros dinámicos por specs estructuradas (Fase H).
+              Solo aparece si el dataset filtrado por cat/brand tiene
+              specs con `en_filtros=true` y 2+ valores únicos. */}
+          {filterableSpecs.length > 0 && (
+            <div className="mb-3 rounded-lg border hairline bg-card/40 p-3">
+              <SpecFilters
+                filterableSpecs={filterableSpecs}
+                selected={specFilters}
+                onChange={(key, value) => {
+                  setSpecFilters((prev) => {
+                    const next = { ...prev };
+                    if (value == null) delete next[key];
+                    else next[key] = value;
+                    return next;
+                  });
+                }}
+                layout="stacked"
+              />
+            </div>
+          )}
           {filtered.length === 0 ? (
             <SearchEmptyState
               query={query || "los filtros activos"}

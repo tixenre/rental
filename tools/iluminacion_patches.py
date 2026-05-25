@@ -91,21 +91,22 @@ def apply_patches():
             "iluminacion_subtipo": "Fresnel",
             "potencia_w": 650, "cri": 100, "temperatura_k": "3200K",
             "bicolor": False, "rgb": False, "dimming": True,
-            "alimentacion": ["AC"], "montaje": "Fresnel", "peso_g": 3000,
+            "alimentacion": ["AC"], "montura_luz": "Sin montura", "peso_g": 3000,
+            "beam_angle": [12, 52],
+            "cooling_system": "Passive",
+            "dimensions_mm": "30 × 22 × 19 cm",
+            "materials": "Acero esmaltado / aluminio fundido",
+            "certifications": "CE, UKCA, CB, GS, cNRTLus",
         },
         "extras": {
             "item_type": "Tungsten Fresnel",
             "bulb_type": "GY9.5 — CP89 FRL/FRK 650W (acepta CP82 500W / CP81 300W)",
-            "beam_angle": "12-52°",
-            "cooling": "Passive",
             "ip_rating": "IP20",
-            "dimensiones": "30 × 22 × 19 cm",
             "fixture_mount": "Socket 5/8\" (16 mm)",
             "accessory_diameter": "168 mm / 6.6\"",
             "voltaje": "230 V / 120 V",
             "reflector": "Esférico especular de aluminio de alta pureza",
             "serie": "ARRI Junior",
-            "certificaciones": "CE, UKCA, CB, GS, cNRTLus",
         },
         "ficha": ARRI_FICHA,
         "_nota": "Datos oficiales arri.com (33 campos exactos)",
@@ -132,14 +133,14 @@ def apply_patches():
             "iluminacion_subtipo": "Fresnel",
             "potencia_w": 2000, "cri": 100, "temperatura_k": "3200K",
             "bicolor": False, "rgb": False, "dimming": True,
-            "alimentacion": ["AC"], "montaje": "Fresnel", "peso_g": 6240,
+            "alimentacion": ["AC"], "montura_luz": "Sin montura", "peso_g": 6240,
+            "beam_angle": [15, 58],
+            "cooling_system": "Passive",
+            "dimensions_mm": "28.6 × 21.9 × 26.7 cm",
         },
         "extras": {
             "item_type": "Tungsten Fresnel Spotlight",
             "bulb_type": "Medium Bi-post (2000W tungsten) — el chassis 407 es nominal 1000W; el usuario opera con bulb 2kW",
-            "beam_angle": "15-58°",
-            "cooling": "Passive",
-            "dimensiones": "28.6 × 21.9 × 26.7 cm",
             "fixture_mount": "Yoke con spud 5/8\" (16 mm)",
             "accessory_diameter": "6 5/8\" (168 mm)",
             "voltaje": "120 / 240 VAC",
@@ -175,9 +176,8 @@ def apply_patches():
         b7c_specs = curado["products"]["aputure_b7c"]["specs"]
         if b7c_specs.get("peso_g") is None:
             b7c_specs["peso_g"] = 210
-        b7c_extras = curado["products"]["aputure_b7c"].setdefault("extras", {})
-        if "dimensiones" not in b7c_extras:
-            b7c_extras["dimensiones"] = "11.5 × 7 cm (alto × diámetro)"
+        if "dimensions_mm" not in b7c_specs:
+            b7c_specs["dimensions_mm"] = "11.5 × 7 cm (alto × diámetro)"
 
     with open(CURADO_PATH, "w") as f:
         json.dump(curado, f, indent=2, ensure_ascii=False)

@@ -474,31 +474,42 @@ def _parse_alimentacion(secciones: dict) -> list[str]:
     return sorted(found, key=lambda x: PRIORITY.index(x) if x in PRIORITY else 99)
 
 
-def _parse_montaje(secciones: dict) -> str | None:
-    # Si el fixture es un Fresnel, no tiene montaje de modificador estándar
+def _parse_montura_luz(secciones: dict) -> str | None:
+    """Lado-luz del acople con modificadores. Enum unificado con
+    Modificadores: Bowens, Elinchrom, Profoto, Nanlite Forza,
+    Propietario, Sin montura. Las luces Fresnel tradicionales (ARRI 650,
+    Mole) devuelven 'Sin montura' — no aceptan softboxes Bowens-style."""
     item_type = (_find_value(secciones, "Item Type") or "").lower()
     lens_type = (_find_value(secciones, "Lens Type") or "").lower()
     if "fresnel" in item_type or "fresnel" in lens_type:
-        return "Fresnel"
+        # Algunas Fresnel modernas SÍ aceptan modificadores (Nanlite Forza).
+        # Si tienen 'Mounting' con marca conocida, usamos eso; sino, "Sin montura".
+        pass  # caer al fallback de Mounting
 
     val = _find_value(secciones, "Front Accessory Mount", "Accessory Mount", "Mounting")
-    if not val:
-        return None
-    val_lower = val.lower()
+    val_lower = (val or "").lower()
     if "bowens" in val_lower:
         return "Bowens"
     if "profoto" in val_lower:
         return "Profoto"
     if "elinchrom" in val_lower:
         return "Elinchrom"
+    if "nanlite" in val_lower or "forza" in val_lower:
+        # Las Nanlite Forza usan Bowens estándar (no propietario).
+        return "Bowens"
     if "proprietary" in val_lower or "propietario" in val_lower:
         return "Propietario"
-    if val_lower.strip() in ("none", "n/a", "no"):
+    # Fresnel tradicional (sin mount estándar) → "Sin montura".
+    if "fresnel" in item_type or "fresnel" in lens_type:
+        return "Sin montura"
+    if not val or val_lower.strip() in ("none", "n/a", "no"):
         return None
-    # Ignorar valores que son stud/receiver (montaje de fixture, no de modificador)
+    # Stud/receiver son montaje de fixture, no de modificador. None.
     if re.search(r'\d/\d["\']|stud|receiver|yoke', val_lower):
         return None
-    return val.split("\n")[0].strip()
+    # Valor desconocido pero presente → Propietario (mejor que None para
+    # que el motor de compat tenga algo).
+    return "Propietario"
 
 
 def _parse_peso_g(secciones: dict) -> int | None:
@@ -558,29 +569,40 @@ def _parse_tipo(secciones: dict, title: str = "") -> str | None:
     return None
 
 
-def _parse_beam_angle(secciones: dict) -> str | None:
+def _parse_beam_angle(secciones: dict) -> list[float] | None:
+    """tipo=rango: emite lista. '45°' → [45.0], '15-54°' → [15.0, 54.0].
+    Patrón consistente con `angulo_vision` de Lentes y `beam_angle` de
+    Modificadores."""
     val = _find_value(secciones, "Beam Angle")
     if not val:
         return None
     line = val.splitlines()[0].strip()
     # "13 to 54°" → "13-54°"
     line = re.sub(r"(\d+)\s+to\s+(\d+)", r"\1-\2", line)
-    # Quitar calificadores comunes: "Unmodified", "with Included Reflector", etc.
-    line = re.sub(r"\s+(?:Unmodified|with\s+Included\s+Reflector|with\s+Reflector|\(Unmodified\)|\(With\s+Reflector\))\s*$",
-                  "", line, flags=re.IGNORECASE)
-    return line.strip()
+    # Buscar el rango primero, después el valor único.
+    m = re.search(r"([\d.]+)\s*[-–]\s*([\d.]+)\s*°", line)
+    if m:
+        return [float(m.group(1)), float(m.group(2))]
+    m1 = re.search(r"([\d.]+)\s*°", line)
+    if m1:
+        return [float(m1.group(1))]
+    return None
 
 
-def _parse_cooling(secciones: dict) -> str | None:
+def _parse_cooling_system(secciones: dict) -> str | None:
+    """Devuelve valor del enum del registry: 'Active (Fan)', 'Passive',
+    'Smart Fan' (o None)."""
     val = _find_value(secciones, "Cooling System")
     if not val:
         return None
     v = val.strip().lower()
+    if "smart" in v and "fan" in v:
+        return "Smart Fan"
     if "fan" in v:
-        return "Fan"
+        return "Active (Fan)"
     if "passive" in v:
         return "Passive"
-    return val.strip()
+    return None
 
 
 def _parse_ip_rating(secciones: dict) -> str | None:
@@ -664,43 +686,38 @@ def _parse_display(secciones: dict) -> str | None:
 
 
 def map_luz_extras(secciones: dict, title: str = "") -> dict:
-    """Campos extra estructurados para ficha técnica (no son para comparación primaria)."""
+    """Campos descriptivos que NO están en el registry (informativos para
+    la ficha pero no participan del motor de compatibilidad ni filtros).
+
+    Las specs canónicas se emiten desde `map_luz_specs` (incluido
+    `beam_angle`, `dimensions_mm`, `materials`, etc. — eso se movió a
+    specs para alinearse con el registry).
+    """
     result: dict = {}
 
-    def _add(key, val):
-        if val is not None and val != "":
-            result[key] = val
-
-    # `tipo` ahora vive en specs como `iluminacion_subtipo`. Acá solo dejamos
-    # campos descriptivos (no canónicos) que no llegan a spec_definitions.
-    _add("beam_angle", _parse_beam_angle(secciones))
-    _add("cooling", _parse_cooling(secciones))
-    _add("ip_rating", _parse_ip_rating(secciones))
-    _add("dimensiones", _parse_dimensiones(secciones))
-    _add("photometrics_1m", _parse_photometrics(secciones))
-    _add("tlci", _parse_tlci(secciones))
-    _add("app_compatible", _parse_app_compatible(secciones))
-    _add("display", _parse_display(secciones))
-
-    # Otros campos útiles directos del raw
-    for src_label, dst_key in [
+    # Específicos de iluminación legacy / referencia (no en registry)
+    extras_simples = [
         ("Item Type", "item_type"),
-        ("Included Light Modifier", "modificador_incluido"),
-        ("Included Storage Case", "case_incluido"),
         ("Bulb Type", "bulb_type"),
         ("Base Type", "base_type"),
         ("Expected Lamp Life", "vida_util_horas"),
         ("Yoke Type", "yoke"),
         ("Fixture Mounting", "fixture_mount"),
         ("Cable Length", "cable_length"),
-        ("Materials", "materiales"),
-        ("Certifications", "certificaciones"),
-        ("Wireless Range", "wireless_range"),
         ("Inputs/Outputs", "io"),
-    ]:
+    ]
+    for src_label, dst_key in extras_simples:
         v = _find_value(secciones, src_label)
         if v:
             result[dst_key] = v.split("\n")[0].strip() if "\n" in v else v.strip()
+
+    # IP rating y photometrics — descriptivos, no son spec canónico.
+    ip = _parse_ip_rating(secciones)
+    if ip:
+        result["ip_rating"] = ip
+    photo = _parse_photometrics(secciones)
+    if photo:
+        result["photometrics_1m"] = photo
 
     return result
 
@@ -741,13 +758,66 @@ def map_luz_specs(secciones: dict, title: str = "") -> dict:
     if alimentacion:
         result["alimentacion"] = alimentacion
 
-    montaje = _parse_montaje(secciones)
-    if montaje:
-        result["montaje"] = montaje
+    montura = _parse_montura_luz(secciones)
+    if montura:
+        result["montura_luz"] = montura
 
     peso = _parse_peso_g(secciones)
     if peso is not None:
         result["peso_g"] = peso
+
+    # ─── Specs adicionales del registry (antes vivían en extras) ──────
+    # Patrón: mappers existentes pero promovidos a `specs` para que se
+    # persistan en equipo_specs y participen del template del admin.
+    beam = _parse_beam_angle(secciones)
+    if beam:
+        result["beam_angle"] = beam
+
+    dim = _parse_dimensiones(secciones)
+    if dim:
+        result["dimensions_mm"] = dim
+
+    cooling = _parse_cooling_system(secciones)
+    if cooling:
+        result["cooling_system"] = cooling
+
+    app_compat = _parse_app_compatible(secciones)
+    if app_compat is not None:
+        result["mobile_app_compatible"] = app_compat
+
+    display = _parse_display(secciones)
+    if display:
+        result["display"] = display
+
+    tlci = _parse_tlci(secciones)
+    if tlci is not None:
+        result["tlci"] = tlci
+
+    # Strings directos del raw cuyo label en registry coincide o se mapea.
+    label_to_specs_key = [
+        ("Materials", "materials"),
+        ("Certifications", "certifications"),
+        ("Included Storage Case", "incluye_estuche_label"),  # marker, se procesa abajo
+        ("Included Light Modifier", "incluye_modificador"),
+        ("Wireless Range", "wireless_range_m"),
+        ("Operating Conditions", "operating_conditions"),
+        ("Environmental Resistance", "environmental_resistance"),
+    ]
+    for src_label, dst_key in label_to_specs_key:
+        v = _find_value(secciones, src_label)
+        if not v:
+            continue
+        v = v.split("\n")[0].strip() if "\n" in v else v.strip()
+        if dst_key == "incluye_estuche_label":
+            # `incluye_estuche` es bool en el registry → True si trae estuche.
+            result["incluye_estuche"] = v.lower().startswith(("yes", "sí", "si", "included"))
+        elif dst_key == "wireless_range_m":
+            # Extraer número en metros. "656' / 200 m" → 200
+            m = re.search(r"([\d.]+)\s*m\b", v)
+            if m:
+                result[dst_key] = float(m.group(1))
+        else:
+            result[dst_key] = v
 
     return result
 
@@ -871,16 +941,16 @@ def main(html_paths: list[Path]):
             added_raw += 1
             print(f"  + raw agregado ({prod_id})")
 
-        # Curado: siempre regenerar (para reflectar el mapper actualizado)
+        # Curado: siempre regenerar (para reflectar el mapper actualizado).
+        # `extras` removido del output: no se persistía a DB. La función
+        # `map_luz_extras` queda en el módulo como helper de debugging.
         specs = map_luz_specs(raw["secciones"], title=raw["modelo"])
-        extras = map_luz_extras(raw["secciones"], title=raw["modelo"])
         curado["products"][prod_id] = {
             "marca": raw["marca"],
             "modelo": raw["modelo"],
             "url_source": raw.get("url_source", ""),
-            "specs": specs,         # 11 normalizados para comparación
-            "extras": extras,        # campos estructurados extra (tipo, beam_angle, etc.)
-            "ficha": raw["secciones"],  # todas las secciones B&H completas
+            "specs": specs,
+            "ficha": raw["secciones"],  # secciones B&H completas (referencia)
         }
         added_curado += 1
         print(f"  + curado: {specs}")

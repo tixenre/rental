@@ -563,25 +563,18 @@ def import_equipo_fichas(
         cur = conn.execute(
             """
             INSERT INTO equipo_fichas (
-                equipo_id, descripcion, notas, specs_json, montura, formato,
-                resolucion, keywords_json, nombre_publico_template, peso,
-                dimensiones, alimentacion, incluye_json, conectividad_json,
+                equipo_id, descripcion, notas,
+                keywords_json, nombre_publico_template,
+                incluye_json, conectividad_json,
                 compatible_con_json, video_url, precio_bh_usd, fuente_url,
-                fuente_titulo, raw_json, enriquecido_at, enriquecido_fuente
+                fuente_titulo, enriquecido_at, enriquecido_fuente
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (equipo_id) DO UPDATE SET
                 descripcion = EXCLUDED.descripcion,
                 notas = EXCLUDED.notas,
-                specs_json = EXCLUDED.specs_json,
-                montura = EXCLUDED.montura,
-                formato = EXCLUDED.formato,
-                resolucion = EXCLUDED.resolucion,
                 keywords_json = EXCLUDED.keywords_json,
                 nombre_publico_template = EXCLUDED.nombre_publico_template,
-                peso = EXCLUDED.peso,
-                dimensiones = EXCLUDED.dimensiones,
-                alimentacion = EXCLUDED.alimentacion,
                 incluye_json = EXCLUDED.incluye_json,
                 conectividad_json = EXCLUDED.conectividad_json,
                 compatible_con_json = EXCLUDED.compatible_con_json,
@@ -589,19 +582,17 @@ def import_equipo_fichas(
                 precio_bh_usd = EXCLUDED.precio_bh_usd,
                 fuente_url = EXCLUDED.fuente_url,
                 fuente_titulo = EXCLUDED.fuente_titulo,
-                raw_json = EXCLUDED.raw_json,
                 enriquecido_at = EXCLUDED.enriquecido_at,
                 enriquecido_fuente = EXCLUDED.enriquecido_fuente,
                 updated_at = CURRENT_TIMESTAMP
             RETURNING (xmax = 0) AS inserted
             """,
             (
-                equipo_id, f.descripcion, f.notas, f.specs_json, f.montura,
-                f.formato, f.resolucion, f.keywords_json,
-                f.nombre_publico_template, f.peso, f.dimensiones,
-                f.alimentacion, f.incluye_json, f.conectividad_json,
+                equipo_id, f.descripcion, f.notas,
+                f.keywords_json, f.nombre_publico_template,
+                f.incluye_json, f.conectividad_json,
                 f.compatible_con_json, f.video_url, f.precio_bh_usd,
-                f.fuente_url, f.fuente_titulo, f.raw_json, f.enriquecido_at,
+                f.fuente_url, f.fuente_titulo, f.enriquecido_at,
                 f.enriquecido_fuente,
             ),
         )

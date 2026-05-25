@@ -335,7 +335,6 @@ EXTRAS_BOOL_RENAMES = {
     "built_in_nd":            "built_in_nd",
     "built_in_cc":            "built_in_cc",
     "internal_filter_holder": "internal_filter_holder",
-    "built_in_flash":         "built_in_flash",
     "built_in_light":         "built_in_light",
 }
 
@@ -424,7 +423,7 @@ EXTRAS_ORDER = [
     "sensor", "sensor_size", "total_pixels", "effective_pixels",
     "tipo_estabilizacion", "af_puntos",
     "autofocus_system", "autofocus_sensitivity",
-    "focus_modes", "focus_type",
+    "focus_modes",
     # Stills
     "image_file_format", "still_image_support", "interval_recording", "creative_effects",
     # Video meta
@@ -440,10 +439,9 @@ EXTRAS_ORDER = [
     # Lens / filters
     "focal_length", "zoom", "field_of_view",
     "built_in_nd", "built_in_cc", "internal_filter_holder", "color_filter_system",
-    # Flash
-    "built_in_flash", "built_in_light",
-    "external_flash", "max_sync_speed", "flash_modes",
-    "flash_compensation", "dedicated_flash",
+    # Flash (entries específicas eliminadas del registry — solo queda
+    # built_in_light que sí aparece en algunos productos)
+    "built_in_light",
     # Display / viewfinder
     "pantalla", "visor_evf",
     "viewfinder_coverage", "viewfinder_magnification",
@@ -499,10 +497,12 @@ def normalizar():
 
         p["marca"] = canon_brand(p.get("marca", ""))
         p["modelo"] = canon_modelo(p.get("modelo", ""))
-        # Rescatar extras → specs ANTES de reorder (extras se preserva tal cual)
+        # Rescatar extras → specs (datasets legacy aún pueden tener `extras`).
+        # El parser actual ya no emite `extras`, pero el rescate queda como
+        # red de seguridad para regeneraciones sobre JSONs viejos.
         rescued_specs = canonicalizar_specs(p.get("specs", {}), p.get("extras", {}))
         p["specs"] = reorder(rescued_specs, SPECS_ORDER)
-        p["extras"] = reorder(clean_extras(p.get("extras", {})), EXTRAS_ORDER)
+        p.pop("extras", None)
 
         ordered = {
             "marca": p["marca"],

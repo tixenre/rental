@@ -24,17 +24,6 @@
         "densidad": "1.2-Stop",
         "material": "Vidrio"
       },
-      "extras": {
-        "filter_type_raw": "Circular Polarizer",
-        "filter_material": "Glass",
-        "filter_thickness": "0.2\" / 5 mm",
-        "exposure_reduction_raw": "1.2-Stop",
-        "size_raw": "82 mm Rear Filter Thread",
-        "front_thread": "82 mm",
-        "ring_material": "Aluminum",
-        "package_weight": "0.18 lb",
-        "box_dimensions": "4.35 x 3.55 x 0.6\""
-      },
       "ficha": {
         "Specs (JSON-LD)": [
           {
@@ -135,15 +124,6 @@
         "material": "Vidrio",
         "grade": "1/4"
       },
-      "extras": {
-        "filter_type_raw": "Black Mist (Grade 1/4)",
-        "filter_material": "Glass",
-        "size_raw": "82 mm Rear Filter Thread",
-        "front_thread": "82 mm",
-        "ring_material": "Aluminum",
-        "package_weight": "0.19 lb",
-        "box_dimensions": "4.35 x 3.6 x 0.6\""
-      },
       "ficha": {
         "Specs (JSON-LD)": [
           {
@@ -228,15 +208,6 @@
         "material": "Vidrio",
         "grade": "1/8"
       },
-      "extras": {
-        "filter_type_raw": "Black Mist (Grade 1/8)",
-        "filter_material": "Glass",
-        "size_raw": "82 mm Rear Filter Thread",
-        "front_thread": "82 mm",
-        "ring_material": "Aluminum",
-        "package_weight": "0.185 lb",
-        "box_dimensions": "4.35 x 3.6 x 0.6\""
-      },
       "ficha": {
         "Specs (JSON-LD)": [
           {
@@ -320,16 +291,6 @@
         "diametro_filtro": 82,
         "densidad": "2 to 8-Stop",
         "material": "Vidrio"
-      },
-      "extras": {
-        "filter_type_raw": "Variable ND",
-        "filter_material": "Glass",
-        "filter_thickness": "0.35\" / 9 mm",
-        "exposure_reduction_raw": "2 to 8-Stop",
-        "size_raw": "82 mm Rear Filter Thread",
-        "ring_material": "Aluminum",
-        "package_weight": "0.35 lb",
-        "box_dimensions": "6 x 5.6 x 1.15\""
       },
       "ficha": {
         "Specs (JSON-LD)": [

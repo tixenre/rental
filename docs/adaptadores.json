@@ -25,15 +25,6 @@
         "electronica": true,
         "incluye_iris": false
       },
-      "extras": {
-        "item_type": "1x Lens Mount Adapter",
-        "camera_compat_raw": "Sony E Mount",
-        "lens_compat_raw": "Canon EF Mount",
-        "materiales": "Metal",
-        "inputs_outputs": "1x Unspecified USB Input",
-        "package_weight": "0.705 lb",
-        "box_dimensions": "4.95 x 4.25 x 2.65\""
-      },
       "ficha": {
         "Specs (JSON-LD)": [
           {
@@ -119,16 +110,6 @@
         "electronica": true,
         "incluye_iris": false,
         "magnificacion": "0.71x"
-      },
-      "extras": {
-        "item_type": "1x Reducing Lens Mount Adapter",
-        "camera_compat_raw": "Canon RF Mount",
-        "lens_compat_raw": "Canon EF Mount",
-        "magnificacion": "0.71x",
-        "exposure_change": "1-Stop Light Gain",
-        "materiales": "Metal",
-        "package_weight": "0.98 lb",
-        "box_dimensions": "7.3 x 5.4 x 4.8\""
       },
       "ficha": {
         "Specs (JSON-LD)": [
@@ -224,16 +205,6 @@
         "incluye_iris": true,
         "peso_g": 121
       },
-      "extras": {
-        "item_type": "1x Lens Mount Adapter with Drop-In Filter Support (1.5 to 9-Stop Variable ND Included)",
-        "camera_compat_raw": "Canon RF Mount",
-        "lens_compat_raw": "Canon EF/EF-S Mount",
-        "materiales": "Metal",
-        "dimensions_raw": "Diameter: 2.9\" / 73.66 mm\nDepth: 1\" / 25.4 mm",
-        "weight_raw": "4.27 oz / 121 g",
-        "package_weight": "0.635 lb",
-        "box_dimensions": "13.5 x 4.9 x 3.7\""
-      },
       "ficha": {
         "Specs (JSON-LD)": [
           {
@@ -326,14 +297,6 @@
         "lens_mount_out": "M42",
         "electronica": false,
         "incluye_iris": false
-      },
-      "extras": {
-        "item_type": "1x Lens Mount Adapter",
-        "camera_compat_raw": "Sony E Mount",
-        "lens_compat_raw": "M42 Mount",
-        "materiales": "Zinc Alloy",
-        "package_weight": "0.24 lb",
-        "box_dimensions": "2.9 x 2.8 x 1.75\""
       },
       "ficha": {
         "Specs (JSON-LD)": [

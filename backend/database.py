@@ -382,15 +382,12 @@ def init_db():
             equipo_id   INTEGER PRIMARY KEY REFERENCES equipos(id) ON DELETE CASCADE,
             descripcion TEXT,
             notas       TEXT,
-            specs_json  TEXT,
             updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Campos extra para construir el "nombre público" en el catálogo
-    # (Cámara Sony FX3 Montura E Full Frame 4K).
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS montura   TEXT")
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS formato   TEXT")
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS resolucion TEXT")
+    # specs_json + raw_json fueron droppeados en Fase E (d7e9b3c5a8f2).
+    # montura/formato/resolucion/peso/dimensiones/alimentacion fueron
+    # droppeados en Fase F (a1b3c5e7f9d2). Las specs viven en equipo_specs.
     # Keywords/palabras clave libres por equipo (array JSON de strings).
     # Distintas de las etiquetas de búsqueda: estas son selling-points editoriales
     # ("bicolor", "silenciosa", "V-mount", "global shutter") visibles en la ficha.
@@ -400,11 +397,10 @@ def init_db():
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS nombre_publico_template TEXT")
 
     # ── Ficha extendida (enriquecimiento con IA + scraping) ─────────────
-    # Datos físicos / técnicos estructurados
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS peso TEXT")              # ej: "640g"
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS dimensiones TEXT")       # ej: "129.7 x 77.8 x 84.5 mm"
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS alimentacion TEXT")      # ej: "NP-FZ100", "V-mount", "AC 220V"
-    # Listas estructuradas (TEXT con JSON, igual que specs_json/keywords_json)
+    # Las specs físicas (peso/dimensiones/alimentacion/montura/formato/
+    # resolucion) viven en equipo_specs desde Fase F. Acá quedan solo
+    # las listas y multimedia que aún no son specs estructuradas.
+    # Listas estructuradas (TEXT con JSON, igual que keywords_json)
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS incluye_json TEXT")          # ["Cuerpo", "Tapa", "Cargador", "Correa"]
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS conectividad_json TEXT")    # ["USB-C", "HDMI Type-A", "XLR x2"]
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS compatible_con_json TEXT")  # ["Sony E-mount", "Full-frame"]
@@ -413,8 +409,7 @@ def init_db():
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS precio_bh_usd FLOAT")        # precio listado en B&H (referencia)
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS fuente_url TEXT")            # canonical (B&H si hubo)
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS fuente_titulo TEXT")
-    # Trazabilidad del enriquecimiento — guardamos todo el raw para no perder data
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS raw_json TEXT")              # JSON completo de la última extracción
+    # raw_json eliminada en Fase E (migration d7e9b3c5a8f2).
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS enriquecido_at TIMESTAMP")
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS enriquecido_fuente TEXT")    # 'firecrawl-bh' | 'firecrawl-oficial' | 'manual'
 
@@ -1279,16 +1274,22 @@ def attach_categorias(conn, equipos: list[dict]) -> list[dict]:
 
 
 def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
-    """Agrega la ficha técnica (descripcion, montura, formato, resolucion, specs_json)."""
+    """Agrega la ficha textual (descripcion, notas, keywords, enriquecimiento
+    extra). Las specs estructuradas viven en `equipo_specs` y se atachan
+    vía `attach_specs_estructuradas`.
+
+    Post-Fase F: montura/formato/resolucion/peso/dimensiones/alimentacion
+    fueron droppeadas — esos campos son specs en equipo_specs.
+    Post-Fase E: specs_json y raw_json fueron droppeados.
+    """
     if not equipos:
         return equipos
     ids = [e["id"] for e in equipos]
     placeholders = ",".join(["%s"] * len(ids))
     cur = conn.cursor()
     cur.execute(f"""
-        SELECT equipo_id, descripcion, notas, specs_json, montura, formato, resolucion,
+        SELECT equipo_id, descripcion, notas,
                keywords_json, nombre_publico_template,
-               peso, dimensiones, alimentacion,
                incluye_json, conectividad_json, compatible_con_json,
                video_url, precio_bh_usd, fuente_url, fuente_titulo,
                enriquecido_at, enriquecido_fuente
@@ -1297,9 +1298,8 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     """, ids)
     rows = cur.fetchall()
     _ficha_keys = (
-        "descripcion", "notas", "specs_json", "montura", "formato", "resolucion",
+        "descripcion", "notas",
         "keywords_json", "nombre_publico_template",
-        "peso", "dimensiones", "alimentacion",
         "incluye_json", "conectividad_json", "compatible_con_json",
         "video_url", "precio_bh_usd", "fuente_url", "fuente_titulo",
         "enriquecido_at", "enriquecido_fuente",
@@ -1361,6 +1361,62 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
 
     for e in equipos:
         e["specs_destacados"] = dest_map[e["id"]]
+    return equipos
+
+
+def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
+    """Agrega `specs` (dict) a cada equipo con TODAS las specs estructuradas
+    desde equipo_specs JOIN spec_definitions JOIN categoria_spec_templates.
+
+    Shape: {spec_key: {label, value, tipo, unidad, prioridad, en_card,
+    destacado}}. El catálogo público lee esto en vez de las columnas
+    legacy (montura/formato/specs_json) de equipo_fichas.
+
+    Solo incluye specs cuyo `spec_def` esté asignado al template de
+    alguna categoría del equipo (descartando orfanos cross-cat).
+    """
+    if not equipos:
+        return equipos
+    ids = [e["id"] for e in equipos]
+    placeholders = ",".join(["%s"] * len(ids))
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT DISTINCT ON (es.equipo_id, sd.id)
+            es.equipo_id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
+            es.value, t.prioridad,
+            t.visible_en_card AS en_card,
+            t.visible_en_filtros AS en_filtros,
+            t.destacado
+        FROM equipo_specs es
+        JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
+        JOIN spec_definitions sd ON sd.id = es.spec_def_id
+        JOIN categoria_spec_templates t
+            ON t.spec_def_id = es.spec_def_id
+           AND t.categoria_id = ec.categoria_id
+        WHERE es.equipo_id IN ({placeholders})
+        ORDER BY es.equipo_id, sd.id, t.prioridad
+    """, ids)
+    rows = cur.fetchall()
+    cur.close()
+
+    specs_map: dict[int, dict[str, dict]] = {e["id"]: {} for e in equipos}
+    for r in rows:
+        eid = r["equipo_id"]
+        key = r["spec_key"]
+        if key in specs_map[eid]:
+            continue  # dedup: mantenemos el de mayor prioridad (DISTINCT ON)
+        specs_map[eid][key] = {
+            "label": r["label"],
+            "value": r["value"],
+            "tipo": r["tipo"],
+            "unidad": r["unidad"],
+            "prioridad": r["prioridad"],
+            "en_card": bool(r["en_card"]),
+            "en_filtros": bool(r["en_filtros"]),
+            "destacado": bool(r["destacado"]),
+        }
+    for e in equipos:
+        e["specs"] = specs_map[e["id"]]
     return equipos
 
 

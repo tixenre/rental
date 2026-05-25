@@ -170,27 +170,32 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     output_config?: { row_strategy?: "all" | "first" | "last" } | null;
   };
   let parsedSpecs: ParsedSpec[] = [];
-  if (ficha?.specs_json) {
-    try {
-      const arr = JSON.parse(ficha.specs_json);
-      if (Array.isArray(arr)) {
-        parsedSpecs = arr
-          .filter((s) => s && typeof s === "object" && s.label && s.value != null && s.value !== "")
-          .map((s: { label: string; value: string; value_raw?: string; output_config?: ParsedSpec["output_config"] }) => ({
-            label: String(s.label),
-            value: formatSpecValueForDisplay(s.value),
-            // value_raw + output_config los agrega el backend para specs tipo
-            // tabla — los preservamos para que el placeholder
-            // {spec:Label.colKey} pueda parsear el JSON crudo y aplicar la
-            // row_strategy correcta al extraer celdas.
-            ...(s.value_raw ? { value_raw: String(s.value_raw) } : {}),
-            ...(s.output_config ? { output_config: s.output_config } : {}),
-          }));
-      }
-    } catch {
-      /* ignore malformed specs */
-    }
+
+  // Fase E: specs estructuradas desde equipo_specs (fuente única).
+  // El fallback a `ficha.specs_json` se eliminó — esa columna fue
+  // droppeada en la migration de Fase E.
+  if (e.specs && Object.keys(e.specs).length > 0) {
+    parsedSpecs = Object.values(e.specs)
+      .filter((s) => s.value != null && String(s.value).trim() !== "")
+      .filter((s) => {
+        if (s.tipo !== "bool") return true;
+        const v = String(s.value).toLowerCase();
+        return v === "sí" || v === "si" || v === "true" || v === "1";
+      })
+      .sort((a, b) => (a.prioridad ?? 999) - (b.prioridad ?? 999))
+      .map((s) => ({
+        label: s.label,
+        value: formatSpecValueForDisplay(s.value),
+      }));
   }
+
+  // Fase F: fuente única es e.specs (equipo_specs). Sin fallback a
+  // columnas legacy de ficha — esas fueron migradas con backfill y
+  // droppeadas en la migration a1b3c5e7f9d2.
+  const specByKey = (key: string): string | null => {
+    const s = e.specs?.[key];
+    return s && s.value != null && String(s.value).trim() !== "" ? String(s.value) : null;
+  };
 
   let parsedKeywords: string[] = [];
   if (ficha?.keywords_json) {
@@ -253,20 +258,74 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     destacado: (e.relevancia_manual ?? 100) <= 30,
     includes,
     _backendId: e.id,
-    // Ficha extendida
-    peso:           ficha?.peso          ?? null,
-    dimensiones:    ficha?.dimensiones   ?? null,
-    montura:        ficha?.montura       ?? null,
-    formato:        ficha?.formato       ?? null,
-    resolucion:     ficha?.resolucion    ?? null,
-    alimentacion:   ficha?.alimentacion  ?? null,
+    // Ficha extendida — fuente única equipo_specs (Fase F).
+    peso:           specByKey("peso_g"),
+    dimensiones:    specByKey("dimensions_mm"),
+    montura:        specByKey("lens_mount"),
+    formato:        specByKey("formato"),
+    resolucion:     specByKey("resolucion_max"),
+    alimentacion:   specByKey("alimentacion"),
     incluye:        parsedIncluye,
     conectividad:   parsedConectividad,
     compatibleCon:  parsedCompatibleCon,
     videoUrl:       ficha?.video_url     ?? null,
     precioBhUsd:    ficha?.precio_bh_usd ?? null,
     disponible:     e.disponible,
+    // Dict raw de specs estructuradas (Fase H: filtros públicos).
+    // Cada entry tiene {value, label, tipo, prioridad, en_filtros, ...}
+    // para que el catálogo arme filtros dinámicos.
+    specsRaw:       e.specs ?? {},
   };
+}
+
+
+/* ─── Filtros dinámicos por specs (Fase H) ──────────────────────────── */
+
+export type SpecFilterDef = {
+  /** spec_key del registry, ej. "lens_mount". */
+  key: string;
+  /** Label visible al usuario, ej. "Montura". */
+  label: string;
+  /** Valores únicos presentes en el dataset filtrado, ordenados alfa. */
+  values: string[];
+  /** prioridad del template (menor = más arriba en la UI). */
+  prioridad: number;
+};
+
+/** Descubre qué specs son filtrables para el conjunto de equipos dado.
+ *  Solo incluye specs con `en_filtros=true` en el template y al menos
+ *  2 valores únicos presentes (filtrar por 1 valor no aporta). */
+export function discoverFilterableSpecs(equipos: Equipment[]): SpecFilterDef[] {
+  // Acumulamos {spec_key: {label, prioridad, values: Set}}
+  const acc = new Map<string, {
+    label: string;
+    prioridad: number;
+    values: Set<string>;
+  }>();
+  for (const eq of equipos) {
+    const specsRaw = eq.specsRaw || {};
+    for (const [key, s] of Object.entries(specsRaw)) {
+      if (!s.en_filtros) continue;
+      // Solo enums/strings discretas para filtros (number/rango son
+      // siders, no chips). Por ahora limitamos a enum/string.
+      if (s.tipo !== "enum" && s.tipo !== "string") continue;
+      const val = String(s.value || "").trim();
+      if (!val) continue;
+      if (!acc.has(key)) {
+        acc.set(key, { label: s.label, prioridad: s.prioridad, values: new Set() });
+      }
+      acc.get(key)!.values.add(val);
+    }
+  }
+  return Array.from(acc.entries())
+    .filter(([, v]) => v.values.size >= 2)
+    .map(([key, v]) => ({
+      key,
+      label: v.label,
+      prioridad: v.prioridad,
+      values: Array.from(v.values).sort((a, b) => a.localeCompare(b, "es")),
+    }))
+    .sort((a, b) => a.prioridad - b.prioridad);
 }
 
 /* ─── Hooks ─────────────────────────────────────────────────────────── */

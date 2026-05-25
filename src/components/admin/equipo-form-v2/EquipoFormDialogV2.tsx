@@ -877,10 +877,19 @@ export function EquipoFormDialogV2({
       if (importedFichaExt) {
         try {
           const r = importedFichaExt;
+          // Specs físicas (peso/dimensiones/montura/formato/resolucion/
+          // alimentacion) las consolida el backend en equipo_specs vía
+          // _matchear_y_persistir_specs (post-Fase F). Mandamos los
+          // campos planos del scrape — el backend hace el mapping a
+          // spec_key correspondiente.
           const ext: Record<string, unknown> = {};
           if (r.peso) ext.peso = r.peso;
           if (r.dimensiones) ext.dimensiones = r.dimensiones;
           if (r.alimentacion) ext.alimentacion = r.alimentacion;
+          if (r.montura) ext.montura = r.montura;
+          if (r.formato) ext.formato = r.formato;
+          if (r.resolucion) ext.resolucion = r.resolucion;
+          // Listas y multimedia (no son specs estructuradas)
           if (r.video_url) ext.video_url = r.video_url;
           if (typeof r.precio_bh_usd === "number") ext.precio_bh_usd = r.precio_bh_usd;
           if (r.incluye?.length) ext.incluye = r.incluye;
@@ -889,12 +898,6 @@ export function EquipoFormDialogV2({
           if (r.fuente_url) ext.fuente_url = r.fuente_url;
           if (r.fuente_titulo) ext.fuente_titulo = r.fuente_titulo;
           if (r.enriquecido_fuente) ext.enriquecido_fuente = r.enriquecido_fuente;
-          // Guardar el AutocompletarResult completo como raw para que los
-          // botones ✨ por sección puedan re-aplicar campos normalizados.
-          // Antes guardábamos sólo r.raw (AI extracted) pero eso quedaba
-          // pre-normalización (EN/imperial), inconsistente con el batch que
-          // guarda el result post-normalización (ES/métrico). #punto4
-          ext.raw = r;
           if (Object.keys(ext).length > 0) {
             await adminApi.aplicarEnriquecimiento(equipoId, ext);
           }
