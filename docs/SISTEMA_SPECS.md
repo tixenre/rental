@@ -340,7 +340,7 @@ DB Postgres
 | Adaptadores | 7 | `adaptador_subtipo` | lens_mount, lens_mount_out, electronica, magnificacion |
 | Filtros | 6 | `filtro_subtipo` | diametro_filtro, densidad, material, grade |
 | Iluminación | 17 | `iluminacion_subtipo` | potencia_w, color_modes (multi_enum), temperatura_k (rango), cri, alimentacion (multi_enum) |
-| Modificadores | 9 | `modificador_subtipo` | forma, diametro_cm, montura_luz, light_loss_stops, beam_angle |
+| Modificadores | 12 | `modificador_subtipo` | forma, diametro_cm, dimensions_mm, montura_luz, light_loss_stops, beam_angle, peso_g |
 
 **Specs compartidas semánticamente** (mismo `spec_key` declarado en varias cats con metadata idéntica):
 - `lens_mount` — Cámaras ↔ Lentes ↔ Adaptadores (match exacto)
