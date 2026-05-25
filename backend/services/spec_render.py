@@ -191,7 +191,7 @@ def _format_value_by_tipo(
                     if len(items) == 1:
                         out = items[0]
                     elif len(items) >= 2:
-                        out = f"{items[0]} - {items[1]}"
+                        out = f"{items[0]}-{items[1]}"
                     else:
                         return ""
                     return _apply_unit(out, unidad)

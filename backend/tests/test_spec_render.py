@@ -31,11 +31,11 @@ def test_rango_prefijo_apertura():
 
 
 def test_rango_prefijo_apertura_variable():
-    assert render_spec_placeholder("[2.8, 4]", "rango", None, None, "", unidad="f/") == "f/2.8 - 4"
+    assert render_spec_placeholder("[2.8, 4]", "rango", None, None, "", unidad="f/") == "f/2.8-4"
 
 
 def test_render_spec_value_rango_sufijo():
-    assert render_spec_value("[24, 70]", "rango", "mm") == "24 - 70 mm"
+    assert render_spec_value("[24, 70]", "rango", "mm") == "24-70 mm"
 
 
 def test_render_spec_value_rango_prefijo():
@@ -181,21 +181,21 @@ def test_render_multi_enum_con_name_format():
 def test_render_rango_min_max():
     value = "[80, 102400]"
     out = render_spec_placeholder(value, "rango", None, None, "")
-    assert out == "80 - 102400"
+    assert out == "80-102400"
 
 
 def test_render_rango_con_unidad():
-    # ISO va adelante con espacio: "ISO 80 - 102400".
+    # ISO va adelante con espacio: "ISO 80-102400".
     out = render_spec_placeholder("[80, 102400]", "rango", None, None, "", unidad="ISO")
-    assert out == "ISO 80 - 102400"
+    assert out == "ISO 80-102400"
 
 
 def test_render_spec_value_iso_prefijo():
-    assert render_spec_value("[80, 102400]", "rango", "ISO") == "ISO 80 - 102400"
+    assert render_spec_value("[80, 102400]", "rango", "ISO") == "ISO 80-102400"
 
 
 def test_render_spec_value_grados_pegado():
-    assert render_spec_value("[24, 70]", "rango", "°") == "24 - 70°"
+    assert render_spec_value("[24, 70]", "rango", "°") == "24-70°"
     assert render_spec_value("114", "number", "°") == "114°"
 
 
