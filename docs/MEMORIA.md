@@ -84,3 +84,35 @@
 - **Why:** mantener la atención del dueño en lo que aporta valor (criterio), no en mecánica.
 - **How to apply:** el trabajo pesado de revisión va al subagente `supervisor` (contexto aislado);
   a la conversación llega el veredicto en claro + el plan de prueba.
+
+### 2026-05-25 — Barra de calidad de ingeniería (cómo construimos)
+- **What:** el estándar de calidad del código del proyecto. El supervisor lo hace cumplir en cada PR.
+  1. **Modularidad a prueba de balas.** Lógica que se repite (caso testigo: las fechas de reserva
+     estaban implementadas distinto en ~5 lugares) se extrae a un módulo/función único y robusto.
+     Nada de copiar-pegar variantes "parecidas pero distintas". Modularizar cuando sea coherente.
+  2. **Nada de hotfixes.** Implementaciones pensadas y a prueba de errores, no parches. Vale más
+     tardar y hacerlo robusto que parchar.
+  3. **Mobile-first + performance + sin bugs.** La UX (y especialmente la mobile) es prioridad:
+     que cargue rápido y funcione. (Refuerza el mobile gate de §3 del MANIFIESTO.)
+  4. **Consistencia visual / design system.** Estilos y componentes centralizados y reusables,
+     no estilo ad-hoc por pantalla. (La inconsistencia actual es en parte falta de modularización.)
+  5. **Código prolijo aunque el dueño no lo lea.** Legibilidad y orden son requisito, no opcional.
+  6. **El core de reservas es sagrado.** Cero overlap de pedidos; la disponibilidad tiene que ser
+     correcta siempre.
+- **Why:** el dueño está seteando las bases para un sistema robusto y de largo plazo, no un MVP
+  descartable. La deuda y la inconsistencia se pagan caro después.
+- **How to apply:** el supervisor marca como hallazgo (no bloqueante salvo que sea grave) cuando un
+  cambio viola estos principios — ej. duplica lógica en vez de reusar, mete un hotfix, agrega
+  estilo ad-hoc, o toca reservas sin cuidar el overlap.
+
+### 2026-05-25 — Protocolo de brain-dumps del dueño
+- **What:** el dueño tira ideas en lotes grandes y desordenados (varias cosas mezcladas, a mitad de
+  otra tarea, sin terminar el plan de la anterior). Eso está bien — la sesión lo ordena.
+- **Why:** que nada se pierda y que el desorden al pedir no se traduzca en desorden en el proyecto.
+- **How to apply:** la sesión **triagea cada ítem en el acto** y devuelve un mapa corto de dónde fue
+  cada cosa. Cada ítem cae en: **principio durable** → propuesta a esta memoria (con aprobación del
+  dueño); **trabajo** (bug/feature/iniciativa) → GitHub Issue (lo que no es para ahora queda
+  `priority:low`; la cola *es* el backlog); **pregunta** → respuesta; **idea cruda / "más adelante"**
+  → igual va a issue. **Nada se borra.** Si la sesión nota algo y no lo arregla en el momento, lo
+  deja como issue, no lo descarta.
+
