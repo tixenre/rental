@@ -16,13 +16,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, type Unidad, type UnidadInput } from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
-
 
 export const Route = createLazyFileRoute("/admin/unidades")({
   component: UnidadesPage,
@@ -56,10 +61,11 @@ function UnidadesPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return items;
-    return items.filter((u) =>
-      u.simbolo.toLowerCase().includes(q) ||
-      u.nombre.toLowerCase().includes(q) ||
-      (u.dimension ?? "").toLowerCase().includes(q),
+    return items.filter(
+      (u) =>
+        u.simbolo.toLowerCase().includes(q) ||
+        u.nombre.toLowerCase().includes(q) ||
+        (u.dimension ?? "").toLowerCase().includes(q),
     );
   }, [items, search]);
 
@@ -96,9 +102,8 @@ function UnidadesPage() {
             Unidades
           </h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Catálogo global de unidades (lm, K, V…). Las specs tipo tabla con
-            columnas valor+unidad pueden referenciar este catálogo para mostrar
-            listas cerradas en lugar de input libre.
+            Catálogo global de unidades (lm, K, V…). Las specs tipo tabla con columnas valor+unidad
+            pueden referenciar este catálogo para mostrar listas cerradas en lugar de input libre.
           </p>
         </div>
         <Button onClick={() => setEditing("new")}>
@@ -106,9 +111,7 @@ function UnidadesPage() {
         </Button>
       </header>
 
-      {listQ.isLoading && (
-        <div className="text-sm text-muted-foreground">Cargando…</div>
-      )}
+      {listQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
 
       {!listQ.isLoading && items.length === 0 && (
         <div className="rounded-md border hairline border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -161,10 +164,18 @@ function UnidadesPage() {
                       {u.dimension ?? "—"}
                     </span>
                     <div className="flex justify-end gap-1">
-                      <button onClick={() => setEditing(u)} className="rounded p-1 hover:bg-muted/50" title="Editar">
+                      <button
+                        onClick={() => setEditing(u)}
+                        className="rounded p-1 hover:bg-muted/50"
+                        title="Editar"
+                      >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => setConfirmDelete(u)} className="rounded p-1 hover:bg-destructive/10 text-destructive" title="Borrar">
+                      <button
+                        onClick={() => setConfirmDelete(u)}
+                        className="rounded p-1 hover:bg-destructive/10 text-destructive"
+                        title="Borrar"
+                      >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -195,8 +206,8 @@ function UnidadesPage() {
               <AlertDialogTitle>Borrar unidad</AlertDialogTitle>
               <AlertDialogDescription>
                 ¿Borrar la unidad <strong>{confirmDelete.simbolo}</strong> ({confirmDelete.nombre})?
-                Si alguna spec la estaba usando, queda como string huérfano (no se rompe nada,
-                pero el dropdown deja de ofrecerla).
+                Si alguna spec la estaba usando, queda como string huérfano (no se rompe nada, pero
+                el dropdown deja de ofrecerla).
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -215,9 +226,10 @@ function UnidadesPage() {
   );
 }
 
-
 function UnidadFormModal({
-  unidad, onClose, onSaved,
+  unidad,
+  onClose,
+  onSaved,
 }: {
   unidad: Unidad | null;
   onClose: () => void;
@@ -308,7 +320,9 @@ function UnidadFormModal({
         </div>
 
         <footer className="border-t hairline px-4 py-3 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
           <Button onClick={handleSave} disabled={busy}>
             {busy ? "Guardando…" : isNew ? "Crear" : "Guardar"}
           </Button>

@@ -17,10 +17,7 @@ export function KeywordChips({
 }) {
   if (!keywords || keywords.length === 0) return null;
   const list = max ? keywords.slice(0, max) : keywords;
-  const sizes =
-    size === "xs"
-      ? "px-1.5 py-0.5 text-[9px]"
-      : "px-2 py-0.5 text-[10px]";
+  const sizes = size === "xs" ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]";
   return (
     <ul className={cn("flex flex-wrap items-center gap-1", className)}>
       {list.map((k) => (

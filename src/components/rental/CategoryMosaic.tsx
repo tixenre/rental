@@ -54,9 +54,7 @@ export function CategoryMosaic({
               </span>
               <div className="flex w-full items-baseline justify-between gap-2">
                 <span className="font-display text-base leading-tight text-ink">{c}</span>
-                <span className="font-mono text-[10px] tabular text-muted-foreground">
-                  {count}
-                </span>
+                <span className="font-mono text-[10px] tabular text-muted-foreground">{count}</span>
               </div>
             </button>
           </div>

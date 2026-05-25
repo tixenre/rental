@@ -39,20 +39,19 @@ function AdminDashboard() {
       {isLoading && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="min-h-[5.5rem] rounded-xl border hairline bg-surface animate-pulse" />
+            <div
+              key={i}
+              className="min-h-[5.5rem] rounded-xl border hairline bg-surface animate-pulse"
+            />
           ))}
         </div>
       )}
 
       {isError && (
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-6 text-sm text-destructive">
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] mb-2">
-            Error
-          </div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.25em] mb-2">Error</div>
           <div>{(error as Error)?.message ?? "No se pudo cargar el dashboard"}</div>
-          <div className="mt-2 text-xs opacity-80">
-            Verificá que el backend esté corriendo.
-          </div>
+          <div className="mt-2 text-xs opacity-80">Verificá que el backend esté corriendo.</div>
         </div>
       )}
 
@@ -65,11 +64,7 @@ function AdminDashboard() {
               icon={<ClipboardList className="h-4 w-4" />}
               tone="amber"
             />
-            <Stat
-              label="Activos"
-              value={data.activos}
-              icon={<Package className="h-4 w-4" />}
-            />
+            <Stat label="Activos" value={data.activos} icon={<Package className="h-4 w-4" />} />
             <Stat
               label="Ingresos mes"
               value={formatARS(Number(data.ingresos_mes ?? 0))}
@@ -154,7 +149,10 @@ function Stat({
         </div>
         <div className="text-muted-foreground">{icon}</div>
       </div>
-      <div className="mt-2 font-display text-xl sm:text-2xl text-ink truncate" title={String(value)}>
+      <div
+        className="mt-2 font-display text-xl sm:text-2xl text-ink truncate"
+        title={String(value)}
+      >
         {value}
       </div>
     </div>
@@ -208,7 +206,17 @@ function PedidosCard({
   );
 }
 
-function EquiposAfueraCard({ items }: { items: { nombre: string; marca: string | null; cantidad: number; cliente_nombre: string; fecha_hasta: string }[] }) {
+function EquiposAfueraCard({
+  items,
+}: {
+  items: {
+    nombre: string;
+    marca: string | null;
+    cantidad: number;
+    cliente_nombre: string;
+    fecha_hasta: string;
+  }[];
+}) {
   return (
     <div className="rounded-xl border hairline bg-surface overflow-hidden">
       <div className="px-4 py-3 border-b hairline flex items-center gap-2">

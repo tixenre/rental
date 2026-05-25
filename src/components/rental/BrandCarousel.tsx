@@ -41,7 +41,8 @@ export function BrandCarousel({
   const destacadas = useMemo(() => {
     const counts = brands.map((b) => ({
       brand: b,
-      count: allEquipos.filter((e) => (e.brand as string).toLowerCase() === b.nombre.toLowerCase()).length,
+      count: allEquipos.filter((e) => (e.brand as string).toLowerCase() === b.nombre.toLowerCase())
+        .length,
     }));
 
     const manualPicks = counts.filter((x) => x.brand.destacada);
@@ -51,8 +52,7 @@ export function BrandCarousel({
       // Curación manual del admin: respetar el `orden` (drag-drop del
       // back office). Si dos tienen el mismo orden, desempata por count.
       manualPicks.sort(
-        (a, b) =>
-          (a.brand.orden ?? 100) - (b.brand.orden ?? 100) || b.count - a.count,
+        (a, b) => (a.brand.orden ?? 100) - (b.brand.orden ?? 100) || b.count - a.count,
       );
       list = manualPicks;
     } else {
@@ -65,9 +65,7 @@ export function BrandCarousel({
       (x) => !!selectedBrand && x.brand.nombre.toLowerCase() === selectedBrand.toLowerCase(),
     );
     if (!isSelectedInList && selectedBrand) {
-      const sel = counts.find(
-        (x) => x.brand.nombre.toLowerCase() === selectedBrand.toLowerCase(),
-      );
+      const sel = counts.find((x) => x.brand.nombre.toLowerCase() === selectedBrand.toLowerCase());
       if (sel) return [sel, ...list];
     }
     return list;

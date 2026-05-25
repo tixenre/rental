@@ -22,7 +22,14 @@ export function PhotoGrid({
         Sin resultados. Probá con otra búsqueda o cargá una URL manual.
         <div className="mt-3">
           <Button variant="outline" size="sm" onClick={onBuscarMas} disabled={searching}>
-            {searching ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Buscando…</> : "Buscar más"}
+            {searching ? (
+              <>
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Buscando…
+              </>
+            ) : (
+              "Buscar más"
+            )}
           </Button>
         </div>
       </div>
@@ -34,11 +41,24 @@ export function PhotoGrid({
         <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
           {candidates.length} fotos — tocá para elegir
         </span>
-        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={onBuscarMas} disabled={searching}>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs"
+          onClick={onBuscarMas}
+          disabled={searching}
+        >
           {searching ? (
-            <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Buscando…</>
+            <>
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              Buscando…
+            </>
           ) : (
-            <><Sparkles className="h-3 w-3 mr-1 text-amber" />Buscar más</>
+            <>
+              <Sparkles className="h-3 w-3 mr-1 text-amber" />
+              Buscar más
+            </>
           )}
         </Button>
       </div>
@@ -63,7 +83,9 @@ export function PhotoGrid({
                 src={u}
                 alt=""
                 className="h-full w-full object-contain bg-white"
-                onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.2"; }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.opacity = "0.2";
+                }}
               />
               {isLoading && (
                 <div className="absolute inset-0 grid place-items-center bg-background/70">

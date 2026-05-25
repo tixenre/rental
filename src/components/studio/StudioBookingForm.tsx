@@ -1,12 +1,7 @@
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import {
-  Calendar as CalendarIcon,
-  Minus,
-  Plus,
-  MessageCircle,
-} from "lucide-react";
+import { Calendar as CalendarIcon, Minus, Plus, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -51,9 +46,7 @@ export function StudioBookingForm() {
   const subtotal = STUDIO.pricePerHour * hours;
   const slot = slots.find((s) => s.value === startSlot)!;
 
-  const dateLabel = date
-    ? format(date, "EEEE d 'de' MMMM, yyyy", { locale: es })
-    : "Elegir fecha";
+  const dateLabel = date ? format(date, "EEEE d 'de' MMMM, yyyy", { locale: es }) : "Elegir fecha";
 
   const canSend = !!date;
 
@@ -170,9 +163,7 @@ export function StudioBookingForm() {
           <label
             className={cn(
               "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition",
-              withAddon
-                ? "border-amber bg-amber/10"
-                : "hairline hover:border-ink",
+              withAddon ? "border-amber bg-amber/10" : "hairline hover:border-ink",
             )}
           >
             <Checkbox
@@ -189,26 +180,20 @@ export function StudioBookingForm() {
                     : "Consultar"}
                 </div>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {STUDIO.addon.description}
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{STUDIO.addon.description}</p>
             </div>
           </label>
 
           <div className="rounded-xl bg-foreground p-4 text-background">
             <div className="flex items-center justify-between text-xs text-background/70">
               <span>Estudio · {hours} h</span>
-              <span className="tabular">
-                {subtotal > 0 ? formatARS(subtotal) : "—"}
-              </span>
+              <span className="tabular">{subtotal > 0 ? formatARS(subtotal) : "—"}</span>
             </div>
             {withAddon && (
               <div className="mt-1 flex items-center justify-between text-xs text-background/70">
                 <span>{STUDIO.addon.name}</span>
                 <span className="tabular">
-                  {STUDIO.addon.pricePerDay > 0
-                    ? formatARS(STUDIO.addon.pricePerDay)
-                    : "—"}
+                  {STUDIO.addon.pricePerDay > 0 ? formatARS(STUDIO.addon.pricePerDay) : "—"}
                 </span>
               </div>
             )}

@@ -10,12 +10,21 @@ import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, AlertCircle, BarChart3, DollarSign } from "lucide-react";
 
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 
 import { adminApi } from "@/lib/admin/api";
@@ -23,7 +32,9 @@ import { adminApi } from "@/lib/admin/api";
 const fmtMoneda = (n: number | null | undefined) => {
   if (n == null) return "—";
   return new Intl.NumberFormat("es-AR", {
-    style: "currency", currency: "ARS", maximumFractionDigits: 0,
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
   }).format(n);
 };
 
@@ -32,9 +43,13 @@ const fmtFecha = (iso: string | null) => {
   try {
     const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso + "T00:00:00" : iso;
     return new Date(dateOnly).toLocaleDateString("es-AR", {
-      day: "2-digit", month: "short", year: "numeric",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
-  } catch { return iso; }
+  } catch {
+    return iso;
+  }
 };
 
 const diasDesde = (iso: string | null): number | null => {
@@ -43,7 +58,9 @@ const diasDesde = (iso: string | null): number | null => {
     const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso + "T00:00:00" : iso;
     const d = new Date(dateOnly);
     return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 };
 
 export function DashboardUsoDialog({
@@ -63,17 +80,13 @@ export function DashboardUsoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full sm:max-w-4xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">
-            Dashboard de uso
-          </DialogTitle>
+          <DialogTitle className="font-display text-2xl">Dashboard de uso</DialogTitle>
           <p className="text-sm text-muted-foreground">
             Top alquilados · Sin movimiento · Revenue por categoría
           </p>
         </DialogHeader>
 
-        {dataQ.isLoading && (
-          <p className="text-sm text-muted-foreground py-6">Cargando…</p>
-        )}
+        {dataQ.isLoading && <p className="text-sm text-muted-foreground py-6">Cargando…</p>}
 
         {dataQ.error && (
           <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -85,10 +98,26 @@ export function DashboardUsoDialog({
           <div className="space-y-5">
             {/* Stats globales */}
             <section className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <Stat icon={<BarChart3 className="h-3.5 w-3.5" />} label="Equipos activos" value={dataQ.data.totales.total_equipos} />
-              <Stat icon={<BarChart3 className="h-3.5 w-3.5" />} label="Visibles" value={dataQ.data.totales.total_visibles} />
-              <Stat icon={<TrendingUp className="h-3.5 w-3.5" />} label="Pedidos" value={dataQ.data.totales.total_pedidos} />
-              <Stat icon={<DollarSign className="h-3.5 w-3.5" />} label="Revenue" value={fmtMoneda(dataQ.data.totales.revenue_total)} />
+              <Stat
+                icon={<BarChart3 className="h-3.5 w-3.5" />}
+                label="Equipos activos"
+                value={dataQ.data.totales.total_equipos}
+              />
+              <Stat
+                icon={<BarChart3 className="h-3.5 w-3.5" />}
+                label="Visibles"
+                value={dataQ.data.totales.total_visibles}
+              />
+              <Stat
+                icon={<TrendingUp className="h-3.5 w-3.5" />}
+                label="Pedidos"
+                value={dataQ.data.totales.total_pedidos}
+              />
+              <Stat
+                icon={<DollarSign className="h-3.5 w-3.5" />}
+                label="Revenue"
+                value={fmtMoneda(dataQ.data.totales.revenue_total)}
+              />
             </section>
 
             {/* Top alquilados */}
@@ -105,10 +134,20 @@ export function DashboardUsoDialog({
                   </div>
                 ) : (
                   dataQ.data.top_alquilados.map((e) => (
-                    <div key={e.id} className="rounded-md border hairline p-3 flex items-center gap-3">
-                      {e.foto_url
-                        ? <img src={e.foto_url} alt="" className="h-10 w-10 rounded object-cover bg-muted/30 shrink-0" loading="lazy" />
-                        : <div className="h-10 w-10 rounded bg-muted/30 shrink-0" />}
+                    <div
+                      key={e.id}
+                      className="rounded-md border hairline p-3 flex items-center gap-3"
+                    >
+                      {e.foto_url ? (
+                        <img
+                          src={e.foto_url}
+                          alt=""
+                          className="h-10 w-10 rounded object-cover bg-muted/30 shrink-0"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded bg-muted/30 shrink-0" />
+                      )}
                       <div className="min-w-0 flex-1">
                         <div className="font-medium text-sm truncate">{e.nombre}</div>
                         <div className="text-[11px] text-muted-foreground truncate">
@@ -116,8 +155,15 @@ export function DashboardUsoDialog({
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="font-medium tabular-nums text-sm">{e.cant_pedidos} <span className="text-[10px] text-muted-foreground font-normal">pedidos</span></div>
-                        <div className="text-[11px] text-muted-foreground tabular-nums">{fmtMoneda(e.revenue_total)}</div>
+                        <div className="font-medium tabular-nums text-sm">
+                          {e.cant_pedidos}{" "}
+                          <span className="text-[10px] text-muted-foreground font-normal">
+                            pedidos
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground tabular-nums">
+                          {fmtMoneda(e.revenue_total)}
+                        </div>
                       </div>
                     </div>
                   ))
@@ -138,7 +184,10 @@ export function DashboardUsoDialog({
                   <TableBody>
                     {dataQ.data.top_alquilados.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground py-4 text-sm">
+                        <TableCell
+                          colSpan={4}
+                          className="text-center text-muted-foreground py-4 text-sm"
+                        >
                           Sin historial.
                         </TableCell>
                       </TableRow>
@@ -146,9 +195,15 @@ export function DashboardUsoDialog({
                     {dataQ.data.top_alquilados.map((e) => (
                       <TableRow key={e.id}>
                         <TableCell>
-                          {e.foto_url
-                            ? <img src={e.foto_url} alt="" className="h-7 w-7 rounded object-cover bg-muted/30" />
-                            : <div className="h-7 w-7 rounded bg-muted/30" />}
+                          {e.foto_url ? (
+                            <img
+                              src={e.foto_url}
+                              alt=""
+                              className="h-7 w-7 rounded object-cover bg-muted/30"
+                            />
+                          ) : (
+                            <div className="h-7 w-7 rounded bg-muted/30" />
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="font-medium text-xs">{e.nombre}</div>
@@ -156,8 +211,12 @@ export function DashboardUsoDialog({
                             {[e.marca, e.modelo].filter(Boolean).join(" / ")}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right tabular-nums font-medium text-sm">{e.cant_pedidos}</TableCell>
-                        <TableCell className="text-right tabular-nums text-xs">{fmtMoneda(e.revenue_total)}</TableCell>
+                        <TableCell className="text-right tabular-nums font-medium text-sm">
+                          {e.cant_pedidos}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {fmtMoneda(e.revenue_total)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -170,7 +229,9 @@ export function DashboardUsoDialog({
               <h2 className="text-sm font-medium mb-2 flex items-center gap-1.5">
                 <AlertCircle className="h-4 w-4 text-amber" />
                 Sin movimiento hace +{dataQ.data.dias_sin_uso_threshold} días
-                <span className="text-xs text-muted-foreground font-normal">· candidatos a revisar/vender</span>
+                <span className="text-xs text-muted-foreground font-normal">
+                  · candidatos a revisar/vender
+                </span>
               </h2>
 
               {/* Mobile: cards */}
@@ -183,10 +244,20 @@ export function DashboardUsoDialog({
                   dataQ.data.sin_uso.map((e) => {
                     const dias = diasDesde(e.ultimo_alquiler);
                     return (
-                      <div key={e.id} className="rounded-md border hairline p-3 flex items-center gap-3">
-                        {e.foto_url
-                          ? <img src={e.foto_url} alt="" className="h-10 w-10 rounded object-cover bg-muted/30 shrink-0" loading="lazy" />
-                          : <div className="h-10 w-10 rounded bg-muted/30 shrink-0" />}
+                      <div
+                        key={e.id}
+                        className="rounded-md border hairline p-3 flex items-center gap-3"
+                      >
+                        {e.foto_url ? (
+                          <img
+                            src={e.foto_url}
+                            alt=""
+                            className="h-10 w-10 rounded object-cover bg-muted/30 shrink-0"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="h-10 w-10 rounded bg-muted/30 shrink-0" />
+                        )}
                         <div className="min-w-0 flex-1">
                           <div className="font-medium text-sm truncate">{e.nombre}</div>
                           <div className="text-[11px] text-muted-foreground truncate">
@@ -201,13 +272,17 @@ export function DashboardUsoDialog({
                                 </Badge>
                               </>
                             ) : (
-                              <Badge variant="destructive" className="text-[10px]">Nunca alquilado</Badge>
+                              <Badge variant="destructive" className="text-[10px]">
+                                Nunca alquilado
+                              </Badge>
                             )}
                           </div>
                         </div>
                         <div className="text-right shrink-0">
                           <div className="text-xs tabular-nums font-medium">
-                            {e.valor_reposicion ? `USD ${e.valor_reposicion.toLocaleString("es-AR")}` : "—"}
+                            {e.valor_reposicion
+                              ? `USD ${e.valor_reposicion.toLocaleString("es-AR")}`
+                              : "—"}
                           </div>
                           <div className="text-[10px] text-muted-foreground tabular-nums">
                             {e.total_alquileres} total
@@ -234,7 +309,10 @@ export function DashboardUsoDialog({
                   <TableBody>
                     {dataQ.data.sin_uso.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-4 text-sm">
+                        <TableCell
+                          colSpan={5}
+                          className="text-center text-muted-foreground py-4 text-sm"
+                        >
                           Todos los equipos tuvieron movimiento reciente.
                         </TableCell>
                       </TableRow>
@@ -244,9 +322,15 @@ export function DashboardUsoDialog({
                       return (
                         <TableRow key={e.id}>
                           <TableCell>
-                            {e.foto_url
-                              ? <img src={e.foto_url} alt="" className="h-7 w-7 rounded object-cover bg-muted/30" />
-                              : <div className="h-7 w-7 rounded bg-muted/30" />}
+                            {e.foto_url ? (
+                              <img
+                                src={e.foto_url}
+                                alt=""
+                                className="h-7 w-7 rounded object-cover bg-muted/30"
+                              />
+                            ) : (
+                              <div className="h-7 w-7 rounded bg-muted/30" />
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="font-medium text-xs">{e.nombre}</div>
@@ -263,14 +347,18 @@ export function DashboardUsoDialog({
                                 </Badge>
                               </div>
                             ) : (
-                              <Badge variant="destructive" className="text-[10px]">Nunca</Badge>
+                              <Badge variant="destructive" className="text-[10px]">
+                                Nunca
+                              </Badge>
                             )}
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-muted-foreground text-xs">
                             {e.total_alquileres}
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-xs">
-                            {e.valor_reposicion ? `USD ${e.valor_reposicion.toLocaleString("es-AR")}` : "—"}
+                            {e.valor_reposicion
+                              ? `USD ${e.valor_reposicion.toLocaleString("es-AR")}`
+                              : "—"}
                           </TableCell>
                         </TableRow>
                       );
@@ -289,12 +377,15 @@ export function DashboardUsoDialog({
                 </span>
               </h2>
               <div className="rounded-md border hairline bg-amber-soft/30 p-3 mb-2">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total adeudado</div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Total adeudado
+                </div>
                 <div className="text-2xl font-medium tabular-nums">
                   {fmtMoneda(dataQ.data.por_cobrar.total)}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {dataQ.data.por_cobrar.count} pedido{dataQ.data.por_cobrar.count === 1 ? "" : "s"} con saldo
+                  {dataQ.data.por_cobrar.count} pedido{dataQ.data.por_cobrar.count === 1 ? "" : "s"}{" "}
+                  con saldo
                 </div>
               </div>
               {dataQ.data.por_cobrar.items.length > 0 && (
@@ -308,7 +399,9 @@ export function DashboardUsoDialog({
                             <span className="font-mono text-xs shrink-0">
                               {p.numero_pedido ?? `#${p.id}`}
                             </span>
-                            <Badge variant="outline" className="text-[10px]">{p.estado}</Badge>
+                            <Badge variant="outline" className="text-[10px]">
+                              {p.estado}
+                            </Badge>
                           </div>
                           <div className="text-right shrink-0">
                             <div className="text-xs tabular-nums font-medium text-amber-700">
@@ -327,7 +420,8 @@ export function DashboardUsoDialog({
                     ))}
                     {dataQ.data.por_cobrar.count > dataQ.data.por_cobrar.items.length && (
                       <p className="text-[11px] text-muted-foreground italic text-center pt-1">
-                        Mostrando top {dataQ.data.por_cobrar.items.length} de {dataQ.data.por_cobrar.count}.
+                        Mostrando top {dataQ.data.por_cobrar.items.length} de{" "}
+                        {dataQ.data.por_cobrar.count}.
                       </p>
                     )}
                   </div>
@@ -352,7 +446,9 @@ export function DashboardUsoDialog({
                                 <span className="font-mono text-xs">
                                   {p.numero_pedido ?? `#${p.id}`}
                                 </span>
-                                <Badge variant="outline" className="text-[10px]">{p.estado}</Badge>
+                                <Badge variant="outline" className="text-[10px]">
+                                  {p.estado}
+                                </Badge>
                               </div>
                             </TableCell>
                             <TableCell className="text-xs">{p.cliente}</TableCell>
@@ -371,7 +467,8 @@ export function DashboardUsoDialog({
                     </Table>
                     {dataQ.data.por_cobrar.count > dataQ.data.por_cobrar.items.length && (
                       <p className="text-[11px] text-muted-foreground italic px-2 py-1.5 bg-muted/20">
-                        Mostrando top {dataQ.data.por_cobrar.items.length} de {dataQ.data.por_cobrar.count} — el resto suma al total de arriba.
+                        Mostrando top {dataQ.data.por_cobrar.items.length} de{" "}
+                        {dataQ.data.por_cobrar.count} — el resto suma al total de arriba.
                       </p>
                     )}
                   </div>
@@ -419,7 +516,10 @@ export function DashboardUsoDialog({
                   <TableBody>
                     {dataQ.data.por_categoria.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={3} className="text-center text-muted-foreground py-4 text-sm">
+                        <TableCell
+                          colSpan={3}
+                          className="text-center text-muted-foreground py-4 text-sm"
+                        >
                           Sin datos.
                         </TableCell>
                       </TableRow>
@@ -427,8 +527,12 @@ export function DashboardUsoDialog({
                     {dataQ.data.por_categoria.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium text-sm">{c.nombre}</TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">{c.cant_pedidos}</TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">{fmtMoneda(c.revenue_total)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">
+                          {c.cant_pedidos}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">
+                          {fmtMoneda(c.revenue_total)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -439,7 +543,9 @@ export function DashboardUsoDialog({
         )}
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cerrar</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cerrar
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -447,8 +553,14 @@ export function DashboardUsoDialog({
 }
 
 function Stat({
-  icon, label, value,
-}: { icon: React.ReactNode; label: string; value: string | number }) {
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+}) {
   return (
     <div className="rounded-md border hairline bg-muted/20 p-3">
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">

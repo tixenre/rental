@@ -8,11 +8,19 @@ import { Loader2, Plus, Trash2, Search, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 
 import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -39,43 +47,71 @@ export function KitEditor({ equipoId }: { equipoId: number }) {
 
   const load = async () => {
     setLoading(true);
-    try { setItems(await adminApi.getKit(equipoId)); }
-    catch (e) { toast.error(`Kit: ${e instanceof Error ? e.message : ""}`); }
-    finally { setLoading(false); }
+    try {
+      setItems(await adminApi.getKit(equipoId));
+    } catch (e) {
+      toast.error(`Kit: ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [equipoId]);
+  useEffect(() => {
+    void load(); /* eslint-disable-next-line */
+  }, [equipoId]);
 
   useEffect(() => {
-    if (!search.trim() || search.trim().length < 2) { setResults([]); return; }
+    if (!search.trim() || search.trim().length < 2) {
+      setResults([]);
+      return;
+    }
     const t = setTimeout(async () => {
       setSearching(true);
       try {
         const r = await adminApi.listEquipos({ q: search.trim(), per_page: 15 });
         setResults(r.items.filter((e) => e.id !== equipoId));
-      } finally { setSearching(false); }
+      } finally {
+        setSearching(false);
+      }
     }, 250);
     return () => clearTimeout(t);
   }, [search, equipoId]);
 
   const add = async (componente_id: number) => {
     setBusy(componente_id);
-    try { await adminApi.addKitItem(equipoId, componente_id, 1); await load(); setSearch(""); setResults([]); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Error"); }
-    finally { setBusy(null); }
+    try {
+      await adminApi.addKitItem(equipoId, componente_id, 1);
+      await load();
+      setSearch("");
+      setResults([]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(null);
+    }
   };
   const updateQty = async (cid: number, cantidad: number) => {
     if (cantidad < 1) return;
     setBusy(cid);
-    try { await adminApi.addKitItem(equipoId, cid, cantidad); await load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Error"); }
-    finally { setBusy(null); }
+    try {
+      await adminApi.addKitItem(equipoId, cid, cantidad);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(null);
+    }
   };
   const remove = async (cid: number) => {
     setBusy(cid);
-    try { await adminApi.removeKitItem(equipoId, cid); await load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Error"); }
-    finally { setBusy(null); }
+    try {
+      await adminApi.removeKitItem(equipoId, cid);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(null);
+    }
   };
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -85,8 +121,15 @@ export function KitEditor({ equipoId }: { equipoId: number }) {
     if (oldIdx === -1 || newIdx === -1) return;
     const reordered = arrayMove(items, oldIdx, newIdx);
     setItems(reordered);
-    try { await adminApi.reorderKit(equipoId, reordered.map((i) => i.componente_id)); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Error al reordenar"); await load(); }
+    try {
+      await adminApi.reorderKit(
+        equipoId,
+        reordered.map((i) => i.componente_id),
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al reordenar");
+      await load();
+    }
   };
 
   return (
@@ -108,23 +151,34 @@ export function KitEditor({ equipoId }: { equipoId: number }) {
         <div className="max-h-56 overflow-y-auto rounded-md border hairline divide-y shadow-sm">
           {results.map((r) => (
             <button
-              key={r.id} type="button"
+              key={r.id}
+              type="button"
               className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-accent text-left disabled:opacity-50"
               onClick={() => add(r.id)}
               disabled={busy === r.id || items.some((i) => i.componente_id === r.id)}
             >
-              {r.foto_url
-                ? <img src={r.foto_url} alt="" className="h-7 w-7 object-contain rounded bg-muted/30 shrink-0" />
-                : <div className="h-7 w-7 rounded bg-muted/30 shrink-0" />}
+              {r.foto_url ? (
+                <img
+                  src={r.foto_url}
+                  alt=""
+                  className="h-7 w-7 object-contain rounded bg-muted/30 shrink-0"
+                />
+              ) : (
+                <div className="h-7 w-7 rounded bg-muted/30 shrink-0" />
+              )}
               <div className="flex-1 min-w-0">
                 <div className="text-sm truncate">{r.nombre}</div>
                 <div className="text-[11px] text-muted-foreground truncate">
                   {[r.marca, r.modelo].filter(Boolean).join(" / ")} · stock {r.cantidad}
                 </div>
               </div>
-              {items.some((i) => i.componente_id === r.id)
-                ? <Badge variant="secondary" className="text-[10px]">en kit</Badge>
-                : <Plus className="h-4 w-4 text-muted-foreground shrink-0" />}
+              {items.some((i) => i.componente_id === r.id) ? (
+                <Badge variant="secondary" className="text-[10px]">
+                  en kit
+                </Badge>
+              ) : (
+                <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
             </button>
           ))}
         </div>
@@ -149,7 +203,11 @@ export function KitEditor({ equipoId }: { equipoId: number }) {
             Sin componentes. Usá el buscador de arriba.
           </p>
         ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
             <SortableContext
               items={items.map((i) => i.componente_id)}
               strategy={verticalListSortingStrategy}
@@ -174,15 +232,19 @@ export function KitEditor({ equipoId }: { equipoId: number }) {
 }
 
 function SortableKitItem({
-  item, busy, onUpdateQty, onRemove,
+  item,
+  busy,
+  onUpdateQty,
+  onRemove,
 }: {
   item: KitComponente;
   busy: number | null;
   onUpdateQty: (id: number, qty: number) => void;
   onRemove: (id: number) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: item.componente_id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.componente_id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -206,9 +268,15 @@ function SortableKitItem({
         <GripVertical className="h-4 w-4" />
       </button>
 
-      {item.foto_url
-        ? <img src={item.foto_url} alt="" className="h-8 w-8 object-contain rounded bg-muted/30 shrink-0" />
-        : <div className="h-8 w-8 rounded bg-muted/30 shrink-0" />}
+      {item.foto_url ? (
+        <img
+          src={item.foto_url}
+          alt=""
+          className="h-8 w-8 object-contain rounded bg-muted/30 shrink-0"
+        />
+      ) : (
+        <div className="h-8 w-8 rounded bg-muted/30 shrink-0" />
+      )}
 
       <div className="flex-1 min-w-0">
         <div className="text-sm truncate">{item.nombre}</div>
@@ -216,15 +284,22 @@ function SortableKitItem({
       </div>
 
       <Input
-        type="number" min={1}
+        type="number"
+        min={1}
         value={item.cantidad}
         className="w-16 h-8 text-center"
-        onChange={(e) => onUpdateQty(item.componente_id, Math.max(1, parseInt(e.target.value || "1", 10)))}
+        onChange={(e) =>
+          onUpdateQty(item.componente_id, Math.max(1, parseInt(e.target.value || "1", 10)))
+        }
         disabled={busy === item.componente_id}
       />
-      <Button type="button" size="icon" variant="ghost"
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
         onClick={() => onRemove(item.componente_id)}
-        disabled={busy === item.componente_id}>
+        disabled={busy === item.componente_id}
+      >
         <Trash2 className="h-4 w-4" />
       </Button>
     </div>

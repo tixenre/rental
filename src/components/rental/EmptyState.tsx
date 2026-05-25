@@ -15,7 +15,9 @@ export function EmptyState({
   children?: ReactNode;
 }) {
   return (
-    <div className={cn("flex flex-col items-center justify-center gap-4 py-12 text-center", className)}>
+    <div
+      className={cn("flex flex-col items-center justify-center gap-4 py-12 text-center", className)}
+    >
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber/15 text-amber">
         {icon}
       </div>

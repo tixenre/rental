@@ -8,12 +8,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { ActionMenu, BottomSheet } from "@/components/mobile";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, ESTADO_LABEL, type Cliente } from "@/lib/admin/api";
@@ -135,7 +146,12 @@ function ClientesPage() {
                 </TableCell>
                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                   {/* Mobile: un botón → ActionMenu */}
-                  <Button size="icon" variant="ghost" className="md:hidden" onClick={() => setMenuCliente(c)}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="md:hidden"
+                    onClick={() => setMenuCliente(c)}
+                  >
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                   {/* Desktop: botones individuales */}
@@ -159,29 +175,61 @@ function ClientesPage() {
 
       <ActionMenu
         open={!!menuCliente}
-        onOpenChange={(v) => { if (!v) setMenuCliente(null); }}
-        title={menuCliente ? [menuCliente.apellido, menuCliente.nombre].filter(Boolean).join(", ") || menuCliente.nombre : undefined}
+        onOpenChange={(v) => {
+          if (!v) setMenuCliente(null);
+        }}
+        title={
+          menuCliente
+            ? [menuCliente.apellido, menuCliente.nombre].filter(Boolean).join(", ") ||
+              menuCliente.nombre
+            : undefined
+        }
         actions={[
-          { label: "Ver historial", icon: <Eye className="h-4 w-4" />, onClick: () => setViewing(menuCliente!) },
-          { label: "Editar datos",  icon: <Pencil className="h-4 w-4" />, onClick: () => setEditing(menuCliente!) },
-          { label: "Eliminar",      icon: <Trash2 className="h-4 w-4" />, variant: "destructive", onClick: () => setDeleting(menuCliente!) },
+          {
+            label: "Ver historial",
+            icon: <Eye className="h-4 w-4" />,
+            onClick: () => setViewing(menuCliente!),
+          },
+          {
+            label: "Editar datos",
+            icon: <Pencil className="h-4 w-4" />,
+            onClick: () => setEditing(menuCliente!),
+          },
+          {
+            label: "Eliminar",
+            icon: <Trash2 className="h-4 w-4" />,
+            variant: "destructive",
+            onClick: () => setDeleting(menuCliente!),
+          },
         ]}
       />
 
       <ClienteFormDialog open={creating} onOpenChange={setCreating} cliente={null} />
       <ClienteFormDialog
         open={!!editing}
-        onOpenChange={(v) => { if (!v) setEditing(null); }}
+        onOpenChange={(v) => {
+          if (!v) setEditing(null);
+        }}
         cliente={editing}
       />
 
       <ClienteHistorialSheet
         cliente={viewing}
-        onOpenChange={(v) => { if (!v) setViewing(null); }}
-        onEdit={(c) => { setViewing(null); setEditing(c); }}
+        onOpenChange={(v) => {
+          if (!v) setViewing(null);
+        }}
+        onEdit={(c) => {
+          setViewing(null);
+          setEditing(c);
+        }}
       />
 
-      <AlertDialog open={!!deleting} onOpenChange={(v) => { if (!v) setDeleting(null); }}>
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(v) => {
+          if (!v) setDeleting(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -207,7 +255,9 @@ function ClientesPage() {
 }
 
 function ClienteHistorialSheet({
-  cliente, onOpenChange, onEdit,
+  cliente,
+  onOpenChange,
+  onEdit,
 }: {
   cliente: Cliente | null;
   onOpenChange: (v: boolean) => void;
@@ -228,87 +278,99 @@ function ClienteHistorialSheet({
       <BottomSheet
         open={!!cliente}
         onOpenChange={onOpenChange}
-        title={cliente ? [cliente.apellido, cliente.nombre].filter(Boolean).join(", ") || cliente.nombre : ""}
+        title={
+          cliente
+            ? [cliente.apellido, cliente.nombre].filter(Boolean).join(", ") || cliente.nombre
+            : ""
+        }
         showClose
         maxH="max-h-[90vh]"
       >
-          {cliente && (
-            <div className="px-4 pb-6 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {cliente.email || cliente.telefono || "Sin contacto registrado"}
-              </p>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <Info label="CUIT" value={cliente.cuit || "—"} />
-                <Info label="Descuento" value={cliente.descuento ? `${cliente.descuento}%` : "—"} />
-                <Info label="Dirección" value={cliente.direccion || "—"} className="col-span-2" />
-                <Info label="Perfil" value={cliente.perfil_impuestos || "—"} />
+        {cliente && (
+          <div className="px-4 pb-6 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {cliente.email || cliente.telefono || "Sin contacto registrado"}
+            </p>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <Info label="CUIT" value={cliente.cuit || "—"} />
+              <Info label="Descuento" value={cliente.descuento ? `${cliente.descuento}%` : "—"} />
+              <Info label="Dirección" value={cliente.direccion || "—"} className="col-span-2" />
+              <Info label="Perfil" value={cliente.perfil_impuestos || "—"} />
+            </div>
+
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => onEdit(cliente)}>
+                <Pencil className="h-4 w-4 mr-1" /> Editar datos
+              </Button>
+            </div>
+
+            <div className="border-t hairline pt-4">
+              <div className="flex items-baseline justify-between mb-2">
+                <h3 className="font-display text-lg text-ink">Historial de pedidos</h3>
+                <div className="font-mono text-xs text-muted-foreground">
+                  {pedidos.length} pedidos · {fmtArs(totalGastado)}
+                </div>
               </div>
 
-              <div className="flex justify-end">
-                <Button variant="outline" size="sm" onClick={() => onEdit(cliente)}>
-                  <Pencil className="h-4 w-4 mr-1" /> Editar datos
-                </Button>
-              </div>
+              {pedidosQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
+              {!pedidosQ.isLoading && pedidos.length === 0 && (
+                <div className="text-sm text-muted-foreground">Sin pedidos.</div>
+              )}
 
-              <div className="border-t hairline pt-4">
-                <div className="flex items-baseline justify-between mb-2">
-                  <h3 className="font-display text-lg text-ink">Historial de pedidos</h3>
-                  <div className="font-mono text-xs text-muted-foreground">
-                    {pedidos.length} pedidos · {fmtArs(totalGastado)}
-                  </div>
-                </div>
-
-                {pedidosQ.isLoading && (
-                  <div className="text-sm text-muted-foreground">Cargando…</div>
-                )}
-                {!pedidosQ.isLoading && pedidos.length === 0 && (
-                  <div className="text-sm text-muted-foreground">Sin pedidos.</div>
-                )}
-
-                <div className="space-y-2">
-                  {pedidos.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })}
-                      className="w-full text-left rounded-md border hairline p-3 hover:bg-accent/30 transition-colors"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="font-mono text-xs text-muted-foreground">
-                          #{p.numero_pedido ?? p.id}
-                        </div>
-                        <Badge variant={pedidoEstadoVariant(p.estado)}>
-                          {ESTADO_LABEL[p.estado]}
-                        </Badge>
+              <div className="space-y-2">
+                {pedidos.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() =>
+                      navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })
+                    }
+                    className="w-full text-left rounded-md border hairline p-3 hover:bg-accent/30 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-mono text-xs text-muted-foreground">
+                        #{p.numero_pedido ?? p.id}
                       </div>
-                      <div className="text-sm mt-1">
-                        {fmtFecha(p.fecha_desde)} → {fmtFecha(p.fecha_hasta)}
+                      <Badge variant={pedidoEstadoVariant(p.estado)}>
+                        {ESTADO_LABEL[p.estado]}
+                      </Badge>
+                    </div>
+                    <div className="text-sm mt-1">
+                      {fmtFecha(p.fecha_desde)} → {fmtFecha(p.fecha_hasta)}
+                    </div>
+                    {p.equipos && (
+                      <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                        {p.equipos}
                       </div>
-                      {p.equipos && (
-                        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                          {p.equipos}
-                        </div>
-                      )}
-                      <div className="flex justify-between mt-1.5 text-sm tabular-nums">
-                        <span className="text-muted-foreground">
-                          {fmtArs(p.monto_pagado)} pagado
-                        </span>
-                        <span className="text-ink">{fmtArs(p.monto_total)}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                    )}
+                    <div className="flex justify-between mt-1.5 text-sm tabular-nums">
+                      <span className="text-muted-foreground">{fmtArs(p.monto_pagado)} pagado</span>
+                      <span className="text-ink">{fmtArs(p.monto_total)}</span>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
-          )}
+          </div>
+        )}
       </BottomSheet>
     </>
   );
 }
 
-function Info({ label, value, className = "" }: { label: string; value: string; className?: string }) {
+function Info({
+  label,
+  value,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
   return (
     <div className={className}>
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        {label}
+      </div>
       <div className="text-ink">{value}</div>
     </div>
   );

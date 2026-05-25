@@ -39,10 +39,7 @@ export function SpecFilters({
       {filterableSpecs.map((spec) => (
         <div
           key={spec.key}
-          className={cn(
-            "flex gap-1.5",
-            layout === "stacked" ? "flex-col" : "flex-col min-w-0",
-          )}
+          className={cn("flex gap-1.5", layout === "stacked" ? "flex-col" : "flex-col min-w-0")}
         >
           <label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-medium">
             {spec.label}

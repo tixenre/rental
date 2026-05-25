@@ -39,7 +39,10 @@ function PerfilPage() {
     authedFetch("/api/cliente/me")
       .then(async (r) => {
         if (!alive) return;
-        if (!r.ok) { navigate({ to: "/cliente/login" }); return; }
+        if (!r.ok) {
+          navigate({ to: "/cliente/login" });
+          return;
+        }
         const data = (await r.json()) as Perfil;
         setPerfil(data);
         setForm({
@@ -56,7 +59,9 @@ function PerfilPage() {
       })
       .catch(() => navigate({ to: "/cliente/login" }))
       .finally(() => alive && setLoading(false));
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [navigate]);
 
   async function handleLogout() {
@@ -95,9 +100,7 @@ function PerfilPage() {
   if (loading) {
     return (
       <PublicLayout topBar={{ variant: "cliente" }}>
-        <div className="grid place-items-center py-24 text-sm text-muted-foreground">
-          Cargando…
-        </div>
+        <div className="grid place-items-center py-24 text-sm text-muted-foreground">Cargando…</div>
       </PublicLayout>
     );
   }
@@ -106,9 +109,7 @@ function PerfilPage() {
   const userName = `${perfil.nombre} ${perfil.apellido}`.trim();
 
   return (
-    <PublicLayout
-      topBar={{ variant: "cliente", userName, onLogout: handleLogout }}
-    >
+    <PublicLayout topBar={{ variant: "cliente", userName, onLogout: handleLogout }}>
       {/* Sub-header amarillo */}
       <div className="bg-amber border-b hairline">
         <div className="max-w-xl mx-auto px-4 py-5">
@@ -186,10 +187,15 @@ function PerfilPage() {
             />
           </Field>
 
-          <Field label="Perfil impositivo" hint="Determina cómo se discrimina el IVA en tus facturas">
+          <Field
+            label="Perfil impositivo"
+            hint="Determina cómo se discrimina el IVA en tus facturas"
+          >
             <select
               value={form.perfil_impuestos ?? "consumidor_final"}
-              onChange={(e) => setForm({ ...form, perfil_impuestos: e.target.value as PerfilImpuestos })}
+              onChange={(e) =>
+                setForm({ ...form, perfil_impuestos: e.target.value as PerfilImpuestos })
+              }
               className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm text-ink"
             >
               <option value="consumidor_final">Consumidor final</option>
@@ -223,7 +229,10 @@ function PerfilPage() {
                   className="w-full rounded-md border hairline bg-background px-3 py-2 text-sm text-ink"
                 />
               </Field>
-              <Field label="Email de facturación" hint="Si querés que la factura llegue a otro email">
+              <Field
+                label="Email de facturación"
+                hint="Si querés que la factura llegue a otro email"
+              >
                 <input
                   type="email"
                   value={form.email_facturacion ?? ""}
@@ -242,7 +251,9 @@ function PerfilPage() {
               className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-ink py-3 text-sm font-medium uppercase tracking-widest text-amber transition hover:brightness-110 disabled:opacity-50"
             >
               {saving ? (
-                <><Loader2 className="h-4 w-4 animate-spin" /> Guardando…</>
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Guardando…
+                </>
               ) : (
                 "Guardar cambios"
               )}
@@ -255,7 +266,9 @@ function PerfilPage() {
 }
 
 function Field({
-  label, hint, children,
+  label,
+  hint,
+  children,
 }: {
   label: string;
   hint?: string;
@@ -267,9 +280,7 @@ function Field({
         <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
           {label}
         </span>
-        {hint && (
-          <span className="block text-[11px] text-muted-foreground/80 mt-0.5">{hint}</span>
-        )}
+        {hint && <span className="block text-[11px] text-muted-foreground/80 mt-0.5">{hint}</span>}
       </label>
       {children}
     </div>

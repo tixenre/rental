@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
-import { Check, X as XIcon, MessageSquare, Calendar, Package as PackageIcon, Pencil, Plus, Minus, RotateCcw } from "lucide-react";
+import {
+  Check,
+  X as XIcon,
+  MessageSquare,
+  Calendar,
+  Package as PackageIcon,
+  Pencil,
+  Plus,
+  Minus,
+  RotateCcw,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { authedFetch, authedJson } from "@/lib/authedFetch";
@@ -11,8 +21,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
 export const Route = createLazyFileRoute("/admin/solicitudes")({
@@ -48,8 +64,10 @@ type Solicitud = {
 
 type Equipo = { id: number; nombre: string; nombre_publico?: string | null };
 type PedidoLite = {
-  id: number; numero_pedido: number | null;
-  fecha_desde: string | null; fecha_hasta: string | null;
+  id: number;
+  numero_pedido: number | null;
+  fecha_desde: string | null;
+  fecha_hasta: string | null;
   items: { equipo_id: number; cantidad: number; nombre: string; nombre_publico?: string | null }[];
 };
 
@@ -58,7 +76,11 @@ function fmtFecha(s?: string | null) {
   return s.slice(0, 10).split("-").reverse().join("-");
 }
 function fmtArs(n: number) {
-  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
 function SolicitudesPage() {
@@ -93,7 +115,9 @@ function SolicitudesPage() {
     onSuccess: (_d, vars) => {
       const label =
         vars.estado === "aprobada"
-          ? (vars.cambios_override ? "Aprobada con cambios del admin" : "Solicitud aprobada")
+          ? vars.cambios_override
+            ? "Aprobada con cambios del admin"
+            : "Solicitud aprobada"
           : "Solicitud rechazada";
       toast.success(label);
       qc.invalidateQueries({ queryKey: ["admin", "solicitudes"] });
@@ -115,9 +139,7 @@ function SolicitudesPage() {
         </p>
       </header>
 
-      {listQ.isLoading && (
-        <div className="text-sm text-muted-foreground">Cargando…</div>
-      )}
+      {listQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
 
       {!listQ.isLoading && pendientes.length === 0 && (
         <div className="rounded-md border border-dashed hairline px-6 py-10 text-center text-sm text-muted-foreground">
@@ -129,14 +151,21 @@ function SolicitudesPage() {
         <section className="space-y-3">
           <h2 className="text-sm font-medium text-ink">Pendientes ({pendientes.length})</h2>
           {pendientes.map((s) => (
-            <SolicitudCard key={s.id} solicitud={s} onResolve={resolverMut.mutate} isPending={resolverMut.isPending} />
+            <SolicitudCard
+              key={s.id}
+              solicitud={s}
+              onResolve={resolverMut.mutate}
+              isPending={resolverMut.isPending}
+            />
           ))}
         </section>
       )}
 
       {resueltas.length > 0 && (
         <section className="space-y-3 pt-6 border-t hairline">
-          <h2 className="text-sm font-medium text-muted-foreground">Resueltas ({resueltas.length})</h2>
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Resueltas ({resueltas.length})
+          </h2>
           <div className="space-y-2">
             {resueltas.map((s) => (
               <ResueltaRow key={s.id} solicitud={s} />
@@ -149,7 +178,9 @@ function SolicitudesPage() {
 }
 
 function SolicitudCard({
-  solicitud, onResolve, isPending,
+  solicitud,
+  onResolve,
+  isPending,
 }: {
   solicitud: Solicitud;
   onResolve: (args: {
@@ -211,19 +242,21 @@ function SolicitudCard({
     const after = new Map<number, number>();
     for (const it of cambios.items) after.set(it.equipo_id, it.cantidad);
     const all = new Set<number>([...before.keys(), ...after.keys()]);
-    return Array.from(all).map((eq_id) => ({
-      equipo_id: eq_id,
-      antes: before.get(eq_id) ?? 0,
-      despues: after.get(eq_id) ?? 0,
-      nombre: equipos.get(eq_id)?.nombre_publico ?? equipos.get(eq_id)?.nombre ?? `equipo #${eq_id}`,
-    })).filter((d) => d.antes !== d.despues);
+    return Array.from(all)
+      .map((eq_id) => ({
+        equipo_id: eq_id,
+        antes: before.get(eq_id) ?? 0,
+        despues: after.get(eq_id) ?? 0,
+        nombre:
+          equipos.get(eq_id)?.nombre_publico ?? equipos.get(eq_id)?.nombre ?? `equipo #${eq_id}`,
+      }))
+      .filter((d) => d.antes !== d.despues);
   })();
 
   const fechasCambian = !!(
-    cambios && (
-      (cambios.fecha_desde ?? null) !== (solicitud.pedido_fecha_desde?.slice(0, 10) ?? null) ||
-      (cambios.fecha_hasta ?? null) !== (solicitud.pedido_fecha_hasta?.slice(0, 10) ?? null)
-    )
+    cambios &&
+    ((cambios.fecha_desde ?? null) !== (solicitud.pedido_fecha_desde?.slice(0, 10) ?? null) ||
+      (cambios.fecha_hasta ?? null) !== (solicitud.pedido_fecha_hasta?.slice(0, 10) ?? null))
   );
 
   // Detectar si el admin tweakeó algo (genera contrapropuesta).
@@ -286,13 +319,16 @@ function SolicitudCard({
             >
               #{solicitud.numero_pedido ?? solicitud.pedido_id}
             </Link>
-            <Badge variant="outline">{solicitud.cliente_nombre} {solicitud.cliente_apellido ?? ""}</Badge>
+            <Badge variant="outline">
+              {solicitud.cliente_nombre} {solicitud.cliente_apellido ?? ""}
+            </Badge>
             {solicitud.cliente_email && (
               <span className="text-xs text-muted-foreground">{solicitud.cliente_email}</span>
             )}
           </div>
           <div className="text-xs text-muted-foreground mt-1">
-            Solicitado el {fmtFecha(solicitud.created_at)} · Total actual: {fmtArs(solicitud.monto_total)}
+            Solicitado el {fmtFecha(solicitud.created_at)} · Total actual:{" "}
+            {fmtArs(solicitud.monto_total)}
           </div>
         </div>
         <Badge variant="secondary">Pendiente</Badge>
@@ -364,7 +400,11 @@ function SolicitudCard({
           <div className="flex items-center gap-2">
             <Pencil className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium text-ink">Aprobar con cambios</span>
-            {hayOverride && <Badge variant="outline" className="text-[10px]">Modificada</Badge>}
+            {hayOverride && (
+              <Badge variant="outline" className="text-[10px]">
+                Modificada
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-1">
             {hayOverride && (
@@ -412,10 +452,12 @@ function SolicitudCard({
             </div>
             <ul className="divide-y hairline -mx-3">
               {Array.from(overrideItems.entries()).map(([equipo_id, cant]) => {
-                const nombre = equipos.get(equipo_id)?.nombre_publico
-                  ?? equipos.get(equipo_id)?.nombre
-                  ?? `equipo #${equipo_id}`;
-                const original = (cambios.items ?? []).find((it) => it.equipo_id === equipo_id)?.cantidad ?? 0;
+                const nombre =
+                  equipos.get(equipo_id)?.nombre_publico ??
+                  equipos.get(equipo_id)?.nombre ??
+                  `equipo #${equipo_id}`;
+                const original =
+                  (cambios.items ?? []).find((it) => it.equipo_id === equipo_id)?.cantidad ?? 0;
                 const dirty = cant !== original;
                 return (
                   <li key={equipo_id} className="px-3 py-1.5 flex items-center gap-2">
@@ -460,7 +502,8 @@ function SolicitudCard({
               })}
             </ul>
             <p className="text-xs text-muted-foreground">
-              Si cambiás algo, al aprobar se aplica tu versión en lugar de la del cliente. Cantidades en 0 quitan el equipo del pedido.
+              Si cambiás algo, al aprobar se aplica tu versión en lugar de la del cliente.
+              Cantidades en 0 quitan el equipo del pedido.
             </p>
           </div>
         )}
@@ -507,14 +550,16 @@ function SolicitudCard({
           <AlertDialogHeader>
             <AlertDialogTitle>
               {ask === "aprobada"
-                ? (hayOverride ? "Aprobar con tus cambios" : "Aprobar solicitud")
+                ? hayOverride
+                  ? "Aprobar con tus cambios"
+                  : "Aprobar solicitud"
                 : "Rechazar solicitud"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {ask === "aprobada"
-                ? (hayOverride
-                    ? "Se aplicará TU versión modificada en lugar de la del cliente, y se le notificará."
-                    : "Se aplicarán los cambios al pedido y se notificará al cliente.")
+                ? hayOverride
+                  ? "Se aplicará TU versión modificada en lugar de la del cliente, y se le notificará."
+                  : "Se aplicarán los cambios al pedido y se notificará al cliente."
                 : "Se notificará al cliente que la solicitud fue rechazada. El pedido no se modifica."}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -543,9 +588,11 @@ function SolicitudCard({
 
 function ResueltaRow({ solicitud }: { solicitud: Solicitud }) {
   const variant: "default" | "secondary" | "destructive" | "outline" =
-    solicitud.estado === "aprobada" ? "default"
-    : solicitud.estado === "rechazada" ? "destructive"
-    : "outline";
+    solicitud.estado === "aprobada"
+      ? "default"
+      : solicitud.estado === "rechazada"
+        ? "destructive"
+        : "outline";
   return (
     <div className="rounded-md border hairline px-3 py-2 text-sm flex items-center gap-3">
       <Link
@@ -559,7 +606,9 @@ function ResueltaRow({ solicitud }: { solicitud: Solicitud }) {
         {solicitud.cliente_nombre} · {fmtFecha(solicitud.created_at)}
         {solicitud.tipo === "directo" && " · aplicada directo"}
       </span>
-      <Badge variant={variant} className="shrink-0 capitalize">{solicitud.estado}</Badge>
+      <Badge variant={variant} className="shrink-0 capitalize">
+        {solicitud.estado}
+      </Badge>
     </div>
   );
 }

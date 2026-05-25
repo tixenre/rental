@@ -42,11 +42,7 @@ export type NombreTemplateVars = {
 };
 
 function normalizeLabel(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim();
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
 /** Algunas unidades se escriben antes del número (f/, $, €). Si el value
@@ -159,11 +155,16 @@ export function renderNombrePublicoTemplate(
       return lookupSpec(vars.specs, key.slice("spec:".length));
     }
     switch (key.toLowerCase()) {
-      case "marca": return (vars.marca ?? "").trim();
-      case "modelo": return (vars.modelo ?? "").trim();
-      case "tipo": return (vars.tipo ?? "").trim();
-      case "nombre": return (vars.nombre ?? "").trim();
-      default: return "";
+      case "marca":
+        return (vars.marca ?? "").trim();
+      case "modelo":
+        return (vars.modelo ?? "").trim();
+      case "tipo":
+        return (vars.tipo ?? "").trim();
+      case "nombre":
+        return (vars.nombre ?? "").trim();
+      default:
+        return "";
     }
   });
 
@@ -171,10 +172,10 @@ export function renderNombrePublicoTemplate(
   //   "Cámara  · "  → "Cámara"
   //   "Cámara · ·"  → "Cámara"
   const cleaned = replaced
-    .replace(/\s+/g, " ")            // múltiples espacios → uno
+    .replace(/\s+/g, " ") // múltiples espacios → uno
     .replace(/\s*·\s*·+\s*/g, " · ") // bullets duplicados
-    .replace(/\s*·\s*$/g, "")        // bullet final
-    .replace(/^\s*·\s*/g, "")        // bullet inicial
+    .replace(/\s*·\s*$/g, "") // bullet final
+    .replace(/^\s*·\s*/g, "") // bullet inicial
     .trim();
 
   return cleaned || null;

@@ -47,7 +47,9 @@ export function BrandingSection() {
     setUploading(true);
     try {
       const r = await adminApi.uploadOgImage(file);
-      toast.success("Imagen actualizada. Demora unos minutos hasta que WhatsApp/Facebook refresquen el cache.");
+      toast.success(
+        "Imagen actualizada. Demora unos minutos hasta que WhatsApp/Facebook refresquen el cache.",
+      );
       qc.setQueryData(["settings", "og_image_url"], r.url);
     } catch (e) {
       toast.error((e as Error).message);
@@ -89,9 +91,9 @@ export function BrandingSection() {
           <h2 className="font-display text-lg text-ink">Imagen para compartir</h2>
         </div>
         <p className="text-xs text-muted-foreground">
-          Esta foto aparece cuando alguien comparte el link del sitio por WhatsApp,
-          Instagram o Facebook. Se recomienda 1200×630 px y que el centro tenga el
-          logo o el mensaje principal (los bordes se recortan en algunas plataformas).
+          Esta foto aparece cuando alguien comparte el link del sitio por WhatsApp, Instagram o
+          Facebook. Se recomienda 1200×630 px y que el centro tenga el logo o el mensaje principal
+          (los bordes se recortan en algunas plataformas).
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 items-start">
@@ -129,9 +131,14 @@ export function BrandingSection() {
               className="w-full sm:w-auto"
             >
               {uploading ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Subiendo…</>
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Subiendo…
+                </>
               ) : (
-                <><Upload className="h-4 w-4 mr-2" /> {ogQ.data ? "Reemplazar imagen" : "Subir imagen"}</>
+                <>
+                  <Upload className="h-4 w-4 mr-2" />{" "}
+                  {ogQ.data ? "Reemplazar imagen" : "Subir imagen"}
+                </>
               )}
             </Button>
             <p className="text-[11px] text-muted-foreground">
@@ -148,8 +155,8 @@ export function BrandingSection() {
           <h2 className="font-display text-lg text-ink">WhatsApp del negocio</h2>
         </div>
         <p className="text-xs text-muted-foreground">
-          Número que se usa para el botón "Consulta por WhatsApp" en el catálogo
-          y en cada card de pedido del portal del cliente. Formato internacional:
+          Número que se usa para el botón "Consulta por WhatsApp" en el catálogo y en cada card de
+          pedido del portal del cliente. Formato internacional:
           <code className="ml-1 font-mono text-[11px] bg-muted px-1 rounded">+549...</code>
         </p>
 
@@ -166,9 +173,13 @@ export function BrandingSection() {
             onClick={() => phoneMut.mutate(phoneInput.trim())}
           >
             {phoneMut.isPending ? (
-              <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Guardando…</>
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Guardando…
+              </>
             ) : (
-              <><Check className="h-4 w-4 mr-1" /> Guardar</>
+              <>
+                <Check className="h-4 w-4 mr-1" /> Guardar
+              </>
             )}
           </Button>
         </div>

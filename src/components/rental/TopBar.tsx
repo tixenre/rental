@@ -33,9 +33,17 @@ export type TopBarProps = {
   amberOnScroll?: boolean;
 };
 
-export function TopBar({ variant = "default", userName, onLogout, onProfileClick, amberOnScroll }: TopBarProps = {}) {
+export function TopBar({
+  variant = "default",
+  userName,
+  onLogout,
+  onProfileClick,
+  amberOnScroll,
+}: TopBarProps = {}) {
   if (variant === "cliente") {
-    return <ClienteTopBar userName={userName} onLogout={onLogout} onProfileClick={onProfileClick} />;
+    return (
+      <ClienteTopBar userName={userName} onLogout={onLogout} onProfileClick={onProfileClick} />
+    );
   }
   return <DefaultTopBar amberOnScroll={amberOnScroll} />;
 }
@@ -129,13 +137,20 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
               )}
               aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
             >
-              <CalendarIcon className={cn("h-5 w-5 shrink-0", snapped ? "text-amber" : "text-amber")} />
+              <CalendarIcon
+                className={cn("h-5 w-5 shrink-0", snapped ? "text-amber" : "text-amber")}
+              />
               {hasDates ? (
                 <span className="text-base font-semibold tabular-nums">
                   {format(startDate!, "EEE dd MMM", { locale: es })} {startTime}
                   <span className="mx-2 opacity-50">→</span>
                   {format(endDate!, "EEE dd MMM", { locale: es })} {endTime}
-                  <span className={cn("ml-2 font-mono text-[11px] uppercase tracking-wider", snapped ? "text-ink/60" : "text-muted-foreground")}>
+                  <span
+                    className={cn(
+                      "ml-2 font-mono text-[11px] uppercase tracking-wider",
+                      snapped ? "text-ink/60" : "text-muted-foreground",
+                    )}
+                  >
                     · {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
                   </span>
                 </span>
@@ -180,7 +195,11 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
   );
 }
 
-function ClienteTopBar({ userName, onLogout, onProfileClick }: {
+function ClienteTopBar({
+  userName,
+  onLogout,
+  onProfileClick,
+}: {
   userName?: string;
   onLogout?: () => void;
   onProfileClick?: () => void;
@@ -194,9 +213,7 @@ function ClienteTopBar({ userName, onLogout, onProfileClick }: {
         {initial ?? <User className="h-3.5 w-3.5" />}
       </div>
       {firstName && (
-        <span className="hidden sm:block pr-1 text-sm font-semibold text-ink">
-          {firstName}
-        </span>
+        <span className="hidden sm:block pr-1 text-sm font-semibold text-ink">{firstName}</span>
       )}
     </>
   );

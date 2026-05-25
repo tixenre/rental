@@ -62,12 +62,7 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
             </div>
             <div className="max-h-[240px] overflow-y-auto">
               {previewItems.map(({ equipo, qty }) => (
-                <CartPreviewRow
-                  key={equipo.id}
-                  equipo={equipo}
-                  qty={qty}
-                  days={days}
-                />
+                <CartPreviewRow key={equipo.id} equipo={equipo} qty={qty} days={days} />
               ))}
             </div>
           </div>
@@ -93,9 +88,7 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
               {isEmpty ? "Carrito vacío" : `${count} ${count === 1 ? "ítem" : "ítems"}`}
             </div>
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              {isEmpty
-                ? "Sumá equipos"
-                : `${days} ${days === 1 ? "jornada" : "jornadas"}`}
+              {isEmpty ? "Sumá equipos" : `${days} ${days === 1 ? "jornada" : "jornadas"}`}
             </div>
           </div>
         </div>
@@ -104,9 +97,7 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
           <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Total
           </div>
-          <div className="text-base font-semibold tabular sm:text-lg">
-            {formatARS(total)}
-          </div>
+          <div className="text-base font-semibold tabular sm:text-lg">{formatARS(total)}</div>
         </div>
 
         <button
@@ -121,15 +112,7 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
   );
 }
 
-function CartPreviewRow({
-  equipo,
-  qty,
-  days,
-}: {
-  equipo: Equipment;
-  qty: number;
-  days: number;
-}) {
+function CartPreviewRow({ equipo, qty, days }: { equipo: Equipment; qty: number; days: number }) {
   const periodTotal = equipo.pricePerDay * qty * Math.max(days, 1);
   return (
     <div className="flex items-center gap-2.5 py-1">
@@ -155,17 +138,13 @@ function CartPreviewRow({
         <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
           {equipo.brand}
         </div>
-        <div className="truncate text-[13px] leading-tight text-ink">
-          {equipo.name}
-        </div>
+        <div className="truncate text-[13px] leading-tight text-ink">{equipo.name}</div>
       </div>
       <div className="shrink-0 text-right">
         <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
           {days > 1 ? `${days} j · total` : "/ jornada"}
         </div>
-        <div className="font-mono text-[12px] tabular text-ink">
-          {formatARS(periodTotal)}
-        </div>
+        <div className="font-mono text-[12px] tabular text-ink">{formatARS(periodTotal)}</div>
       </div>
     </div>
   );

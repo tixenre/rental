@@ -17,7 +17,10 @@ import { useQuery } from "@tanstack/react-query";
  *  - Usá `isSvgUrl(url)` para decidir entre InlineSvg y <img>.
  */
 export function InlineSvg({
-  url, className, ariaLabel, fallback,
+  url,
+  className,
+  ariaLabel,
+  fallback,
 }: {
   url: string;
   className?: string;

@@ -9,10 +9,26 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { Link, useRouter, useBlocker } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ChevronLeft, ChevronDown, ChevronRight,
-  Plus, Minus, Search, X, Trash2, AlertTriangle,
-  Check, FileText, FileSignature, Truck, MoreHorizontal,
-  Loader2, CloudOff, CloudCheck, Eye, Download, ShoppingCart,
+  ChevronLeft,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Minus,
+  Search,
+  X,
+  Trash2,
+  AlertTriangle,
+  Check,
+  FileText,
+  FileSignature,
+  Truck,
+  MoreHorizontal,
+  Loader2,
+  CloudOff,
+  CloudCheck,
+  Eye,
+  Download,
+  ShoppingCart,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,24 +39,42 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { BottomSheet, ActionMenu } from "@/components/mobile";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuTrigger, DropdownMenuSeparator,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 import {
-  adminApi, ESTADO_LABEL, pedidoPdfUrl,
-  type PedidoEstado, type Equipo, type Cliente, type PedidoHistorialItem,
+  adminApi,
+  ESTADO_LABEL,
+  pedidoPdfUrl,
+  type PedidoEstado,
+  type Equipo,
+  type Cliente,
+  type PedidoHistorialItem,
 } from "@/lib/admin/api";
 import { clienteApi } from "@/lib/cliente/api";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
-  usePedidoDraft, jornadasEntre,
-  type DraftItem, type DraftDatos, type SaveStatus, type PedidoMode,
+  usePedidoDraft,
+  jornadasEntre,
+  type DraftItem,
+  type DraftDatos,
+  type SaveStatus,
+  type PedidoMode,
 } from "./usePedidoDraft";
 
 // ── Formatters ────────────────────────────────────────────────────────────
@@ -57,8 +91,14 @@ const fmtFecha = (s: string) => {
 // ── Avatar ────────────────────────────────────────────────────────────────
 
 const AVATAR_COLORS = [
-  "bg-blue-500", "bg-violet-500", "bg-emerald-500", "bg-amber-600",
-  "bg-rose-500", "bg-cyan-600", "bg-orange-500", "bg-teal-600",
+  "bg-blue-500",
+  "bg-violet-500",
+  "bg-emerald-500",
+  "bg-amber-600",
+  "bg-rose-500",
+  "bg-cyan-600",
+  "bg-orange-500",
+  "bg-teal-600",
 ];
 
 function avatarBg(name: string) {
@@ -75,10 +115,12 @@ function nameInitials(name: string) {
 
 function ClienteAvatar({ name }: { name: string }) {
   return (
-    <div className={cn(
-      "h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0",
-      avatarBg(name),
-    )}>
+    <div
+      className={cn(
+        "h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0",
+        avatarBg(name),
+      )}
+    >
       {nameInitials(name)}
     </div>
   );
@@ -87,7 +129,10 @@ function ClienteAvatar({ name }: { name: string }) {
 // ── Sidebar collapsible section ────────────────────────────────────────────
 
 function SidebarSection({
-  title, badge, defaultOpen = true, children,
+  title,
+  badge,
+  defaultOpen = true,
+  children,
 }: {
   title: string;
   badge?: number;
@@ -110,7 +155,12 @@ function SidebarSection({
             </span>
           )}
         </span>
-        <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", !open && "-rotate-90")} />
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 text-muted-foreground transition-transform",
+            !open && "-rotate-90",
+          )}
+        />
       </button>
       {open && <div className="px-4 pb-4">{children}</div>}
     </div>
@@ -121,11 +171,23 @@ function SidebarSection({
 
 function SaveIndicator({ status }: { status: SaveStatus }) {
   if (status === "saving" || status === "dirty")
-    return <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Guardando…</span>;
+    return (
+      <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1">
+        <Loader2 className="h-3 w-3 animate-spin" /> Guardando…
+      </span>
+    );
   if (status === "saved")
-    return <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1"><CloudCheck className="h-3 w-3" /> Guardado</span>;
+    return (
+      <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1">
+        <CloudCheck className="h-3 w-3" /> Guardado
+      </span>
+    );
   if (status === "error")
-    return <span className="hidden sm:flex text-xs text-destructive items-center gap-1"><CloudOff className="h-3 w-3" /> Error al guardar</span>;
+    return (
+      <span className="hidden sm:flex text-xs text-destructive items-center gap-1">
+        <CloudOff className="h-3 w-3" /> Error al guardar
+      </span>
+    );
   return null;
 }
 
@@ -143,13 +205,13 @@ export type PedidoPageProps = {
 
 // Pill de estado coloreado por estado (paleta del mock del handoff).
 const ESTADO_PILL: Record<string, string> = {
-  borrador:    "bg-muted/60 text-muted-foreground border-transparent",
+  borrador: "bg-muted/60 text-muted-foreground border-transparent",
   presupuesto: "bg-amber-soft text-amber-700 border-amber/40",
-  confirmado:  "bg-green-50 text-green-700 border-green-200",
-  retirado:    "bg-indigo-50 text-indigo-700 border-indigo-200",
-  devuelto:    "bg-emerald-50 text-emerald-700 border-emerald-200",
-  finalizado:  "bg-slate-100 text-slate-500 border-slate-200",
-  cancelado:   "bg-red-50 text-red-600 border-red-200",
+  confirmado: "bg-green-50 text-green-700 border-green-200",
+  retirado: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  devuelto: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  finalizado: "bg-slate-100 text-slate-500 border-slate-200",
+  cancelado: "bg-red-50 text-red-600 border-red-200",
 };
 // El mock muestra "Solicitado" para el estado interno 'presupuesto'.
 const estadoLabel = (e: PedidoEstado) => (e === "presupuesto" ? "Solicitado" : ESTADO_LABEL[e]);
@@ -225,9 +287,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
     shouldBlockFn: () => {
       if (skipBlockerRef.current) return false;
       if (!dirtyRef.current) return false;
-      return !window.confirm(
-        "Tenés cambios sin enviar. ¿Querés salir y perderlos?"
-      );
+      return !window.confirm("Tenés cambios sin enviar. ¿Querés salir y perderlos?");
     },
     enableBeforeUnload: false,
   });
@@ -240,13 +300,27 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
   // (Rules of Hooks → React error #310). Usamos `?.` y `enabled` para que
   // no corran cuando los datos todavía no llegaron.
   const adminDispoQ = useQuery({
-    queryKey: ["admin", "disponibilidad", draft.datos?.fecha_desde, draft.datos?.fecha_hasta, pedido?.id],
-    queryFn: () => adminApi.getDisponibilidad(draft.datos!.fecha_desde, draft.datos!.fecha_hasta, pedido!.id),
+    queryKey: [
+      "admin",
+      "disponibilidad",
+      draft.datos?.fecha_desde,
+      draft.datos?.fecha_hasta,
+      pedido?.id,
+    ],
+    queryFn: () =>
+      adminApi.getDisponibilidad(draft.datos!.fecha_desde, draft.datos!.fecha_hasta, pedido!.id),
     enabled: !isCliente && !!pedido && !!draft.datos?.fecha_desde && !!draft.datos?.fecha_hasta,
   });
   const clienteDispoQ = useQuery({
-    queryKey: ["cliente", "disponibilidad", pedido?.id, draft.datos?.fecha_desde, draft.datos?.fecha_hasta],
-    queryFn: () => clienteApi.getDisponibilidad(pedido!.id, draft.datos!.fecha_desde, draft.datos!.fecha_hasta),
+    queryKey: [
+      "cliente",
+      "disponibilidad",
+      pedido?.id,
+      draft.datos?.fecha_desde,
+      draft.datos?.fecha_hasta,
+    ],
+    queryFn: () =>
+      clienteApi.getDisponibilidad(pedido!.id, draft.datos!.fecha_desde, draft.datos!.fecha_hasta),
     enabled: isCliente && !!pedido && !!draft.datos?.fecha_desde && !!draft.datos?.fecha_hasta,
   });
 
@@ -277,8 +351,9 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
   const stockMap: Record<string, { cantidad: number; reservado: number }> = isCliente
     ? Object.fromEntries(
         Object.entries(clienteDispoQ.data ?? {}).map(([k, v]) => [
-          k, { cantidad: Number(v) || 0, reservado: 0 },
-        ])
+          k,
+          { cantidad: Number(v) || 0, reservado: 0 },
+        ]),
       )
     : (adminDispoQ.data ?? {});
 
@@ -289,25 +364,39 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
     return it.cantidad > max;
   });
 
-  const submitBlocked = draft.submitBlockedReason ?? (hasOverstock ? "Algún equipo excede el stock disponible" : null);
+  const submitBlocked =
+    draft.submitBlockedReason ?? (hasOverstock ? "Algún equipo excede el stock disponible" : null);
 
   const nextAction = (() => {
     switch (pedido.estado) {
-      case "borrador":    return { label: "Confirmar presupuesto", estado: "presupuesto" as PedidoEstado, needsItems: true };
-      case "presupuesto": return { label: "Confirmar pedido",      estado: "confirmado"  as PedidoEstado, needsItems: true };
-      case "confirmado":  return { label: "Marcar retirado",       estado: "retirado"    as PedidoEstado };
-      case "retirado":    return { label: "Marcar devuelto",       estado: "devuelto"    as PedidoEstado };
-      case "devuelto":    return { label: "Finalizar",             estado: "finalizado"  as PedidoEstado };
-      default:            return null;
+      case "borrador":
+        return {
+          label: "Confirmar presupuesto",
+          estado: "presupuesto" as PedidoEstado,
+          needsItems: true,
+        };
+      case "presupuesto":
+        return {
+          label: "Confirmar pedido",
+          estado: "confirmado" as PedidoEstado,
+          needsItems: true,
+        };
+      case "confirmado":
+        return { label: "Marcar retirado", estado: "retirado" as PedidoEstado };
+      case "retirado":
+        return { label: "Marcar devuelto", estado: "devuelto" as PedidoEstado };
+      case "devuelto":
+        return { label: "Finalizar", estado: "finalizado" as PedidoEstado };
+      default:
+        return null;
     }
   })();
 
-  const actionDisabled = draft.estadoMut.isPending ||
-    (nextAction?.needsItems === true && draft.items.length === 0);
+  const actionDisabled =
+    draft.estadoMut.isPending || (nextAction?.needsItems === true && draft.items.length === 0);
 
   return (
     <div className="-mx-4 md:-mx-6 -my-6 bg-muted/40">
-
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 bg-background border-b hairline px-4 md:px-6 py-3 flex items-center gap-3">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -321,7 +410,10 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
               <ChevronLeft className="h-4 w-4" />
             </button>
           ) : (
-            <Link to="/admin/pedidos" className="text-muted-foreground hover:text-ink transition shrink-0">
+            <Link
+              to="/admin/pedidos"
+              className="text-muted-foreground hover:text-ink transition shrink-0"
+            >
               <ChevronLeft className="h-4 w-4" />
             </Link>
           )}
@@ -406,7 +498,12 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
             </DropdownMenu>
           )}
           {!isCliente && (
-            <Button size="icon" variant="ghost" className="sm:hidden" onClick={() => setOpenActionMenu(true)}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="sm:hidden"
+              onClick={() => setOpenActionMenu(true)}
+            >
               <MoreHorizontal className="h-5 w-5" />
             </Button>
           )}
@@ -415,10 +512,8 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
 
       {/* ── 2-column body: main (2/3) + sidebar (1/3) ─────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_300px] gap-4 lg:gap-6 p-4 md:p-6 items-start">
-
         {/* ── Columna principal ── */}
         <div className="space-y-4">
-
           {/* Cliente + Recogida — una sola card, lado a lado */}
           <section className="rounded-lg border hairline bg-background overflow-hidden">
             <div className="grid grid-cols-1 sm:grid-cols-2">
@@ -431,7 +526,9 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-ink truncate">{clienteNombre}</div>
                       {draft.datos.cliente_email && (
-                        <div className="text-xs text-muted-foreground truncate">{draft.datos.cliente_email}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {draft.datos.cliente_email}
+                        </div>
                       )}
                     </div>
                     {!isCliente && draft.datos.cliente_id && (
@@ -450,21 +547,25 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                   <>
                     <ClienteAutocomplete
                       datos={draft.datos}
-                      onPick={(c) => draft.setDatos({
-                        ...draft.datos!,
-                        cliente_id: c.id,
-                        cliente_nombre: `${c.apellido}, ${c.nombre}`,
-                        cliente_email: c.email ?? "",
-                        cliente_telefono: c.telefono ?? "",
-                        descuento_pct: c.descuento ?? draft.datos!.descuento_pct,
-                      })}
+                      onPick={(c) =>
+                        draft.setDatos({
+                          ...draft.datos!,
+                          cliente_id: c.id,
+                          cliente_nombre: `${c.apellido}, ${c.nombre}`,
+                          cliente_email: c.email ?? "",
+                          cliente_telefono: c.telefono ?? "",
+                          descuento_pct: c.descuento ?? draft.datos!.descuento_pct,
+                        })
+                      }
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <Label className="text-xs">Nombre</Label>
                         <Input
                           value={draft.datos.cliente_nombre}
-                          onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_nombre: e.target.value })}
+                          onChange={(e) =>
+                            draft.setDatos({ ...draft.datos!, cliente_nombre: e.target.value })
+                          }
                           className="h-8 text-sm text-base sm:text-sm"
                         />
                       </div>
@@ -472,7 +573,9 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                         <Label className="text-xs">Email</Label>
                         <Input
                           value={draft.datos.cliente_email}
-                          onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_email: e.target.value })}
+                          onChange={(e) =>
+                            draft.setDatos({ ...draft.datos!, cliente_email: e.target.value })
+                          }
                           className="h-8 text-sm text-base sm:text-sm"
                         />
                       </div>
@@ -480,7 +583,9 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                         <Label className="text-xs">Teléfono</Label>
                         <Input
                           value={draft.datos.cliente_telefono}
-                          onChange={(e) => draft.setDatos({ ...draft.datos!, cliente_telefono: e.target.value })}
+                          onChange={(e) =>
+                            draft.setDatos({ ...draft.datos!, cliente_telefono: e.target.value })
+                          }
                           className="h-8 text-sm text-base sm:text-sm"
                         />
                       </div>
@@ -489,7 +594,11 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                 )}
                 {isCliente && (
                   <div className="text-xs text-muted-foreground">
-                    Para actualizar tus datos, andá a <Link to="/cliente/perfil" className="underline">tu perfil</Link>.
+                    Para actualizar tus datos, andá a{" "}
+                    <Link to="/cliente/perfil" className="underline">
+                      tu perfil
+                    </Link>
+                    .
                   </div>
                 )}
               </div>
@@ -508,7 +617,10 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                       value={draft.datos.fecha_desde}
                       onChange={(e) => {
                         const v = e.target.value;
-                        if (draft.datos!.fecha_hasta && new Date(draft.datos!.fecha_hasta) < new Date(v)) {
+                        if (
+                          draft.datos!.fecha_hasta &&
+                          new Date(draft.datos!.fecha_hasta) < new Date(v)
+                        ) {
                           draft.setDatos({ ...draft.datos!, fecha_desde: v, fecha_hasta: v });
                         } else {
                           draft.setDatos({ ...draft.datos!, fecha_desde: v });
@@ -528,7 +640,9 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                       type="date"
                       value={draft.datos.fecha_hasta}
                       min={draft.datos.fecha_desde || undefined}
-                      onChange={(e) => draft.setDatos({ ...draft.datos!, fecha_hasta: e.target.value })}
+                      onChange={(e) =>
+                        draft.setDatos({ ...draft.datos!, fecha_hasta: e.target.value })
+                      }
                       className="mt-2 h-11 sm:h-8 text-base sm:text-sm"
                     />
                   </div>
@@ -567,10 +681,12 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
         {/* ── Sidebar: Pagos + Docs + Notas — todo el alto ──
             En modo cliente sólo trae "Resumen" — info redundante con
             TotalesCard. Lo ocultamos en mobile y se ve en desktop. */}
-        <div className={cn(
-          "rounded-lg border hairline bg-background overflow-hidden lg:sticky lg:top-16",
-          isCliente && "hidden lg:block",
-        )}>
+        <div
+          className={cn(
+            "rounded-lg border hairline bg-background overflow-hidden lg:sticky lg:top-16",
+            isCliente && "hidden lg:block",
+          )}
+        >
           {!isCliente && (
             <SidebarSection title="Pagos" defaultOpen>
               <PagosSidebar
@@ -614,13 +730,12 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                 </div>
                 {clienteSubmitMode === "propose" && (
                   <p className="pt-3 text-xs">
-                    Tu pedido está confirmado. Los cambios se enviarán como solicitud para que los aprobemos.
+                    Tu pedido está confirmado. Los cambios se enviarán como solicitud para que los
+                    aprobemos.
                   </p>
                 )}
                 {clienteSubmitMode === "autosave" && (
-                  <p className="pt-3 text-xs">
-                    Los cambios se guardan automáticamente.
-                  </p>
+                  <p className="pt-3 text-xs">Los cambios se guardan automáticamente.</p>
                 )}
               </div>
             </SidebarSection>
@@ -680,16 +795,24 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
           onOpenChange={setOpenActionMenu}
           title={numero}
           actions={[
-            ...(nextAction ? [{
-              label: nextAction.label,
-              icon: <Check className="h-4 w-4" />,
-              onClick: () => draft.estadoMut.mutate(nextAction.estado),
-            }] : []),
-            ...(pedido.estado !== "cancelado" ? [{
-              label: "Cancelar pedido",
-              icon: <X className="h-4 w-4" />,
-              onClick: () => draft.estadoMut.mutate("cancelado"),
-            }] : []),
+            ...(nextAction
+              ? [
+                  {
+                    label: nextAction.label,
+                    icon: <Check className="h-4 w-4" />,
+                    onClick: () => draft.estadoMut.mutate(nextAction.estado),
+                  },
+                ]
+              : []),
+            ...(pedido.estado !== "cancelado"
+              ? [
+                  {
+                    label: "Cancelar pedido",
+                    icon: <X className="h-4 w-4" />,
+                    onClick: () => draft.estadoMut.mutate("cancelado"),
+                  },
+                ]
+              : []),
             {
               label: "Eliminar pedido",
               icon: <Trash2 className="h-4 w-4" />,
@@ -743,7 +866,11 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
 // ─────────────────────────────────────────────────────────────────────────
 
 function ItemsCard({
-  items, setItems, jornadas, stockMap, mode = "admin",
+  items,
+  setItems,
+  jornadas,
+  stockMap,
+  mode = "admin",
 }: {
   items: DraftItem[];
   setItems: (v: DraftItem[]) => void;
@@ -755,7 +882,7 @@ function ItemsCard({
   const isCliente = mode === "cliente";
 
   const updateItem = (equipoId: number, patch: Partial<DraftItem>) =>
-    setItems(items.map((it) => it.equipo_id === equipoId ? { ...it, ...patch } : it));
+    setItems(items.map((it) => (it.equipo_id === equipoId ? { ...it, ...patch } : it)));
 
   const removeItem = (equipoId: number) => {
     if (items.length === 1) {
@@ -815,16 +942,23 @@ function ItemsCard({
                   <div className="text-xs text-muted-foreground">
                     {it.marca ?? "—"}
                     {stock && (
-                      <span className={cn("ml-1.5 inline-flex items-center rounded px-1.5 py-0.5 text-[10px]",
-                        disponible <= 0 ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
-                      )}>
+                      <span
+                        className={cn(
+                          "ml-1.5 inline-flex items-center rounded px-1.5 py-0.5 text-[10px]",
+                          disponible <= 0
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                      >
                         {disponible <= 0 ? `${disponible} restante` : `${disponible} libres`}
                       </span>
                     )}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-sm tabular-nums font-medium text-ink">{fmtArs(subtotal)}</div>
+                  <div className="text-sm tabular-nums font-medium text-ink">
+                    {fmtArs(subtotal)}
+                  </div>
                   <div className="text-[11px] text-muted-foreground">{jornadas}j</div>
                 </div>
                 <button
@@ -840,20 +974,30 @@ function ItemsCard({
               <div className="flex items-center gap-2 pl-13">
                 <div className="flex items-center gap-1">
                   <Button
-                    size="icon" variant="outline"
+                    size="icon"
+                    variant="outline"
                     className="h-9 w-9 sm:h-7 sm:w-7"
-                    onClick={() => updateItem(it.equipo_id, { cantidad: Math.max(1, it.cantidad - 1) })}
+                    onClick={() =>
+                      updateItem(it.equipo_id, { cantidad: Math.max(1, it.cantidad - 1) })
+                    }
                   >
                     <Minus className="h-3 w-3" />
                   </Button>
                   <Input
-                    type="number" min={1}
+                    type="number"
+                    min={1}
                     value={it.cantidad}
-                    onChange={(e) => updateItem(it.equipo_id, { cantidad: parseInt(e.target.value) || 1 })}
-                    className={cn("h-9 w-10 text-center text-sm p-0 sm:h-7", overstock && "border-destructive text-destructive")}
+                    onChange={(e) =>
+                      updateItem(it.equipo_id, { cantidad: parseInt(e.target.value) || 1 })
+                    }
+                    className={cn(
+                      "h-9 w-10 text-center text-sm p-0 sm:h-7",
+                      overstock && "border-destructive text-destructive",
+                    )}
                   />
                   <Button
-                    size="icon" variant="outline"
+                    size="icon"
+                    variant="outline"
                     className="h-9 w-9 sm:h-7 sm:w-7"
                     onClick={() => updateItem(it.equipo_id, { cantidad: it.cantidad + 1 })}
                   >
@@ -867,9 +1011,12 @@ function ItemsCard({
                     </div>
                   ) : (
                     <Input
-                      type="number" min={0}
+                      type="number"
+                      min={0}
                       value={it.precio_jornada}
-                      onChange={(e) => updateItem(it.equipo_id, { precio_jornada: parseInt(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        updateItem(it.equipo_id, { precio_jornada: parseInt(e.target.value) || 0 })
+                      }
                       className="h-9 w-24 text-sm text-base sm:text-sm sm:h-7"
                     />
                   )}
@@ -898,14 +1045,17 @@ function ItemsCard({
             updateItem(eq.id, { cantidad: items[idx].cantidad + 1 });
             toast.success(`+1 ${display}`);
           } else {
-            setItems([...items, {
-              equipo_id: eq.id,
-              cantidad: 1,
-              precio_jornada: eq.precio_jornada ?? 0,
-              nombre: eq.nombre,
-              marca: eq.marca,
-              nombre_publico: eq.nombre_publico ?? null,
-            }]);
+            setItems([
+              ...items,
+              {
+                equipo_id: eq.id,
+                cantidad: 1,
+                precio_jornada: eq.precio_jornada ?? 0,
+                nombre: eq.nombre,
+                marca: eq.marca,
+                nombre_publico: eq.nombre_publico ?? null,
+              },
+            ]);
             toast.success(`Agregado: ${display}`);
           }
           setOpenSearch(false);
@@ -920,7 +1070,14 @@ function ItemsCard({
 // ─────────────────────────────────────────────────────────────────────────
 
 function TotalesCard({
-  bruto, total, jornadas, descuentoPct, setDescuentoPct, pagado, saldo, mode = "admin",
+  bruto,
+  total,
+  jornadas,
+  descuentoPct,
+  setDescuentoPct,
+  pagado,
+  saldo,
+  mode = "admin",
 }: {
   bruto: number;
   total: number;
@@ -950,7 +1107,10 @@ function TotalesCard({
           <div className="flex items-center justify-between gap-3">
             <span className="text-muted-foreground">Descuento %</span>
             <Input
-              type="number" min={0} max={100} step="0.5"
+              type="number"
+              min={0}
+              max={100}
+              step="0.5"
               value={descuentoPct}
               onChange={(e) => {
                 // Clamp 0–100: el atributo max no impide tipear >100, y el
@@ -987,7 +1147,11 @@ function TotalesCard({
 // ─────────────────────────────────────────────────────────────────────────
 
 function PagosSidebar({
-  pedidoId, total, pagado, saldo, pagos,
+  pedidoId,
+  total,
+  pagado,
+  saldo,
+  pagos,
 }: {
   pedidoId: number;
   total: number;
@@ -1004,7 +1168,9 @@ function PagosSidebar({
     mutationFn: () => adminApi.addPago(pedidoId, parseInt(monto || "0", 10), concepto || undefined),
     onSuccess: () => {
       toast.success("Pago registrado");
-      setMonto(""); setConcepto(""); setShowForm(false);
+      setMonto("");
+      setConcepto("");
+      setShowForm(false);
       qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
       qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
     },
@@ -1026,12 +1192,12 @@ function PagosSidebar({
   return (
     <div className="space-y-3">
       {/* Badge estado + importes */}
-      <div className={cn(
-        "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-        estadoPago === "pagado"
-          ? "bg-green-100 text-green-700"
-          : "bg-amber-100 text-amber-700",
-      )}>
+      <div
+        className={cn(
+          "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
+          estadoPago === "pagado" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700",
+        )}
+      >
         {estadoPago === "pagado" ? "Pagado" : "Pago pendiente"}
       </div>
       <div className="text-sm space-y-1">
@@ -1052,7 +1218,10 @@ function PagosSidebar({
             <div key={pg.id} className="flex items-center justify-between px-3 py-2 text-xs">
               <div>
                 <div className="tabular-nums font-medium text-ink">{fmtArs(pg.monto)}</div>
-                <div className="text-muted-foreground">{pg.fecha}{pg.concepto ? ` · ${pg.concepto}` : ""}</div>
+                <div className="text-muted-foreground">
+                  {pg.fecha}
+                  {pg.concepto ? ` · ${pg.concepto}` : ""}
+                </div>
               </div>
               <button
                 type="button"
@@ -1092,7 +1261,8 @@ function PagosSidebar({
           </div>
           <div className="flex gap-2">
             <Button
-              size="sm" className="flex-1"
+              size="sm"
+              className="flex-1"
               onClick={() => {
                 const n = parseInt(monto || "0", 10);
                 if (!n || n <= 0) return toast.error("Monto inválido");
@@ -1100,8 +1270,12 @@ function PagosSidebar({
               }}
               disabled={addMut.isPending}
             >
-              {addMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-              {" "}Guardar
+              {addMut.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Check className="h-3.5 w-3.5" />
+              )}{" "}
+              Guardar
             </Button>
             <Button size="sm" variant="outline" onClick={() => setShowForm(false)}>
               Cancelar
@@ -1123,9 +1297,9 @@ function PagosSidebar({
 
 function DocumentosSidebar({ pedidoId }: { pedidoId: number }) {
   const docs: { kind: "pdf" | "albaran" | "contrato"; label: string; icon: React.ReactNode }[] = [
-    { kind: "contrato", label: "Contrato",    icon: <FileSignature className="h-4 w-4" /> },
-    { kind: "pdf",      label: "Presupuesto", icon: <FileText className="h-4 w-4" /> },
-    { kind: "albaran",  label: "Albarán",     icon: <Truck className="h-4 w-4" /> },
+    { kind: "contrato", label: "Contrato", icon: <FileSignature className="h-4 w-4" /> },
+    { kind: "pdf", label: "Presupuesto", icon: <FileText className="h-4 w-4" /> },
+    { kind: "albaran", label: "Albarán", icon: <Truck className="h-4 w-4" /> },
   ];
 
   return (
@@ -1163,7 +1337,11 @@ function DocumentosSidebar({ pedidoId }: { pedidoId: number }) {
 // ─────────────────────────────────────────────────────────────────────────
 
 function EquipoSearchSheet({
-  open, onOpenChange, existing, stockMap, onAdd,
+  open,
+  onOpenChange,
+  existing,
+  stockMap,
+  onAdd,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -1187,11 +1365,13 @@ function EquipoSearchSheet({
     const ql = q.trim().toLowerCase();
     return all
       .filter((e) => e.estado !== "fuera_servicio")
-      .filter((e) => !ql ||
-        e.nombre.toLowerCase().includes(ql) ||
-        (e.nombre_publico ?? "").toLowerCase().includes(ql) ||
-        (e.marca ?? "").toLowerCase().includes(ql) ||
-        (e.modelo ?? "").toLowerCase().includes(ql),
+      .filter(
+        (e) =>
+          !ql ||
+          e.nombre.toLowerCase().includes(ql) ||
+          (e.nombre_publico ?? "").toLowerCase().includes(ql) ||
+          (e.marca ?? "").toLowerCase().includes(ql) ||
+          (e.modelo ?? "").toLowerCase().includes(ql),
       );
   }, [equiposQ.data, q]);
 
@@ -1229,7 +1409,8 @@ function EquipoSearchSheet({
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            autoFocus value={q}
+            autoFocus
+            value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar…"
             className="pl-9 text-base sm:text-sm"
@@ -1255,11 +1436,15 @@ function EquipoSearchSheet({
                 return (
                   <li key={eq.id} className="flex items-center justify-between gap-2 py-3">
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm text-ink truncate">{eq.nombre_publico || eq.nombre}</div>
+                      <div className="text-sm text-ink truncate">
+                        {eq.nombre_publico || eq.nombre}
+                      </div>
                       <div className="text-xs text-muted-foreground truncate">
                         {[eq.marca, eq.modelo].filter(Boolean).join(" / ")}
                         {" · "}
-                        <span className={disponible <= 0 ? "text-destructive" : ""}>{disponible} libres</span>
+                        <span className={disponible <= 0 ? "text-destructive" : ""}>
+                          {disponible} libres
+                        </span>
                         {eq.precio_jornada ? ` · ${fmtArs(eq.precio_jornada)}/día` : ""}
                       </div>
                     </div>
@@ -1288,7 +1473,8 @@ function EquipoSearchSheet({
 // ─────────────────────────────────────────────────────────────────────────
 
 function ClienteAutocomplete({
-  datos, onPick,
+  datos,
+  onPick,
 }: {
   datos: DraftDatos;
   onPick: (c: Cliente) => void;
@@ -1313,7 +1499,10 @@ function ClienteAutocomplete({
       <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
       <Input
         value={q}
-        onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+        }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="Buscar ficha existente…"
@@ -1321,7 +1510,9 @@ function ClienteAutocomplete({
       />
       {open && q.trim().length > 0 && (
         <div className="absolute z-30 left-0 right-0 mt-1 rounded-md border hairline bg-background shadow-md max-h-52 overflow-auto">
-          {clientesQ.isLoading && <div className="p-3 text-xs text-muted-foreground">Buscando…</div>}
+          {clientesQ.isLoading && (
+            <div className="p-3 text-xs text-muted-foreground">Buscando…</div>
+          )}
           {clientesQ.data?.items.length === 0 && (
             <div className="p-3 text-xs text-muted-foreground">Sin resultados</div>
           )}
@@ -1329,11 +1520,20 @@ function ClienteAutocomplete({
             <button
               key={c.id}
               type="button"
-              onMouseDown={(e) => { e.preventDefault(); onPick(c); setQ(""); setOpen(false); }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onPick(c);
+                setQ("");
+                setOpen(false);
+              }}
               className="w-full text-left px-3 py-2 hover:bg-accent/50 transition"
             >
-              <div className="text-sm text-ink">{c.apellido ? `${c.apellido}, ${c.nombre}` : c.nombre}</div>
-              <div className="text-xs text-muted-foreground">{[c.email, c.telefono].filter(Boolean).join(" · ") || "—"}</div>
+              <div className="text-sm text-ink">
+                {c.apellido ? `${c.apellido}, ${c.nombre}` : c.nombre}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {[c.email, c.telefono].filter(Boolean).join(" · ") || "—"}
+              </div>
             </button>
           ))}
         </div>
@@ -1346,7 +1546,10 @@ function ClienteAutocomplete({
 // Historial de modificaciones del cliente (sidebar admin)
 // ─────────────────────────────────────────────────────────────────────────
 
-const HIST_ESTADO_VARIANT: Record<PedidoHistorialItem["estado"], "default" | "secondary" | "destructive" | "outline"> = {
+const HIST_ESTADO_VARIANT: Record<
+  PedidoHistorialItem["estado"],
+  "default" | "secondary" | "destructive" | "outline"
+> = {
   pendiente: "secondary",
   aprobada: "default",
   rechazada: "destructive",
@@ -1370,15 +1573,15 @@ function HistorialModificaciones({ items }: { items: PedidoHistorialItem[] }) {
         const isDirecto = h.tipo === "directo";
         // Si lo aplicado difiere de lo propuesto, marcamos "Modificada por admin".
         const overrideAplicado = !!(
-          a && c && (
-            (a.fecha_desde ?? null) !== (c.fecha_desde ?? null) ||
+          a &&
+          c &&
+          ((a.fecha_desde ?? null) !== (c.fecha_desde ?? null) ||
             (a.fecha_hasta ?? null) !== (c.fecha_hasta ?? null) ||
             (a.items?.length ?? 0) !== (c.items?.length ?? 0) ||
             (a.items ?? []).some((ai) => {
               const ci = (c.items ?? []).find((x) => x.equipo_id === ai.equipo_id);
               return !ci || ci.cantidad !== ai.cantidad;
-            })
-          )
+            }))
         );
         return (
           <li key={h.id} className="rounded border hairline bg-card px-2.5 py-2">
@@ -1441,11 +1644,26 @@ function HistorialModificaciones({ items }: { items: PedidoHistorialItem[] }) {
 // ─────────────────────────────────────────────────────────────────────────
 
 function SolicitudDiffDialog({
-  open, onOpenChange, original, datos, items, isSubmitting, onConfirm,
+  open,
+  onOpenChange,
+  original,
+  datos,
+  items,
+  isSubmitting,
+  onConfirm,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  original: { fecha_desde: string | null; fecha_hasta: string | null; items: { equipo_id: number; cantidad: number; nombre: string; nombre_publico?: string | null }[] };
+  original: {
+    fecha_desde: string | null;
+    fecha_hasta: string | null;
+    items: {
+      equipo_id: number;
+      cantidad: number;
+      nombre: string;
+      nombre_publico?: string | null;
+    }[];
+  };
   datos: DraftDatos;
   items: DraftItem[];
   isSubmitting: boolean;
@@ -1536,7 +1754,10 @@ function SolicitudDiffDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isSubmitting}>Volver</AlertDialogCancel>
           <AlertDialogAction
-            onClick={(e) => { e.preventDefault(); onConfirm(); }}
+            onClick={(e) => {
+              e.preventDefault();
+              onConfirm();
+            }}
             disabled={isSubmitting || (!fechasCambian && itemsDiff.length === 0)}
           >
             {isSubmitting ? "Enviando…" : "Enviar solicitud"}

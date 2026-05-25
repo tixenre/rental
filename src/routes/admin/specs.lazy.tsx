@@ -42,7 +42,16 @@ export const Route = createLazyFileRoute("/admin/specs")({
   component: SpecsConsolidadasPage,
 });
 
-type SpecTipo = "string" | "number" | "enum" | "multi_enum" | "bool" | "rango" | "wxh" | "wxhxd" | "tabla";
+type SpecTipo =
+  | "string"
+  | "number"
+  | "enum"
+  | "multi_enum"
+  | "bool"
+  | "rango"
+  | "wxh"
+  | "wxhxd"
+  | "tabla";
 
 interface Spec {
   id: number;
@@ -103,9 +112,7 @@ function SpecsConsolidadasPage() {
         </p>
       </header>
 
-      {q.isLoading && (
-        <div className="text-sm text-muted-foreground">Cargando specs…</div>
-      )}
+      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando specs…</div>}
       {q.isError && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-2">
           <div className="text-sm font-medium text-destructive">Error cargando specs.</div>
@@ -113,7 +120,8 @@ function SpecsConsolidadasPage() {
             {(q.error as Error)?.message ?? "Error desconocido"}
           </div>
           <div className="text-xs text-muted-foreground">
-            Si el deploy es reciente, esperá un minuto y refrescá. Si persiste, revisá que la migración
+            Si el deploy es reciente, esperá un minuto y refrescá. Si persiste, revisá que la
+            migración
             <code className="mx-1 bg-muted px-1 rounded">e5a7b9d2c4f1_spec_def_flags</code>
             haya corrido en producción.
           </div>
@@ -140,20 +148,14 @@ function SpecsConsolidadasPage() {
           </TabsList>
           {categorias.map((cat) => (
             <TabsContent key={cat.id} value={String(cat.id)} className="mt-4">
-              <CategoriaPanel
-                categoria={cat}
-                onSelectSpec={(s) => setSelectedSpec(s)}
-              />
+              <CategoriaPanel categoria={cat} onSelectSpec={(s) => setSelectedSpec(s)} />
             </TabsContent>
           ))}
         </Tabs>
       )}
 
       {selectedSpec && (
-        <SpecDetailDrawer
-          spec={selectedSpec}
-          onClose={() => setSelectedSpec(null)}
-        />
+        <SpecDetailDrawer spec={selectedSpec} onClose={() => setSelectedSpec(null)} />
       )}
     </div>
   );
@@ -235,22 +237,14 @@ function CategoriaPanel({
         specsEnNombre={sortedSpecs.filter((s) => s.en_nombre)}
       />
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext
           items={sortedSpecs.map((s) => s.id)}
           strategy={verticalListSortingStrategy}
         >
           <div className="space-y-1">
             {sortedSpecs.map((spec) => (
-              <SortableSpecRow
-                key={spec.id}
-                spec={spec}
-                onSelect={() => onSelectSpec(spec)}
-              />
+              <SortableSpecRow key={spec.id} spec={spec} onSelect={() => onSelectSpec(spec)} />
             ))}
           </div>
         </SortableContext>
@@ -261,8 +255,9 @@ function CategoriaPanel({
 
 function SortableSpecRow({ spec, onSelect }: { spec: Spec; onSelect: () => void }) {
   const queryClient = useQueryClient();
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: spec.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: spec.id,
+  });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -282,20 +277,15 @@ function SortableSpecRow({ spec, onSelect }: { spec: Spec; onSelect: () => void 
         "admin",
         "specs-por-categoria",
       ]);
-      queryClient.setQueryData<PorCategoriaResponse>(
-        ["admin", "specs-por-categoria"],
-        (old) => {
-          if (!old) return old;
-          return {
-            categorias: old.categorias.map((cat) => ({
-              ...cat,
-              specs: cat.specs.map((s) =>
-                s.id === spec.id ? { ...s, ...changes } : s,
-              ),
-            })),
-          };
-        },
-      );
+      queryClient.setQueryData<PorCategoriaResponse>(["admin", "specs-por-categoria"], (old) => {
+        if (!old) return old;
+        return {
+          categorias: old.categorias.map((cat) => ({
+            ...cat,
+            specs: cat.specs.map((s) => (s.id === spec.id ? { ...s, ...changes } : s)),
+          })),
+        };
+      });
       return { previous };
     },
     onError: (_err, _changes, context) => {
@@ -325,10 +315,7 @@ function SortableSpecRow({ spec, onSelect }: { spec: Spec; onSelect: () => void 
         <GripVertical className="h-4 w-4" />
       </button>
 
-      <div
-        className="flex-1 min-w-0 cursor-pointer"
-        onClick={onSelect}
-      >
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={onSelect}>
         <div className="flex items-baseline gap-2">
           <span className="text-sm font-medium text-ink truncate">{spec.label}</span>
           <Badge variant="outline" className="text-[10px] font-mono px-1 py-0">
@@ -401,8 +388,7 @@ function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () => void }
   const { data: fresh = spec } = useQuery({
     queryKey: ["admin", "specs-por-categoria"],
     queryFn: () => authedJson<PorCategoriaResponse>("/api/admin/specs/por-categoria"),
-    select: (data) =>
-      data.categorias.flatMap((c) => c.specs).find((s) => s.id === spec.id) ?? spec,
+    select: (data) => data.categorias.flatMap((c) => c.specs).find((s) => s.id === spec.id) ?? spec,
   });
 
   return (
@@ -430,14 +416,20 @@ function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () => void }
 
         <div className="mt-6 space-y-4 text-sm">
           <DetailRow label="Tipo">
-            <Badge variant="outline" className="font-mono">{fresh.tipo}</Badge>
+            <Badge variant="outline" className="font-mono">
+              {fresh.tipo}
+            </Badge>
             {fresh.unidad && (
-              <span className="text-muted-foreground ml-2">unidad: <code>{fresh.unidad}</code></span>
+              <span className="text-muted-foreground ml-2">
+                unidad: <code>{fresh.unidad}</code>
+              </span>
             )}
           </DetailRow>
 
           {(fresh.tipo === "enum" || fresh.tipo === "multi_enum") && (
-            <DetailRow label={`Valores posibles${fresh.tipo === "multi_enum" ? " (multi-selección)" : ""}`}>
+            <DetailRow
+              label={`Valores posibles${fresh.tipo === "multi_enum" ? " (multi-selección)" : ""}`}
+            >
               {fresh.enum_options && fresh.enum_options.length > 0 ? (
                 <ul className="space-y-1 mt-1">
                   {fresh.enum_options.map((opt) => (
@@ -482,9 +474,7 @@ function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () => void }
 
           <DetailRow label="Prioridad">
             <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{fresh.prioridad}</code>
-            <span className="text-xs text-muted-foreground ml-2">
-              (orden con drag-and-drop)
-            </span>
+            <span className="text-xs text-muted-foreground ml-2">(orden con drag-and-drop)</span>
           </DetailRow>
 
           {fresh.ayuda && (
@@ -535,7 +525,8 @@ function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () => void }
                 Motor de compatibilidad
               </h3>
               <div className="text-xs">
-                Modo: <code className="bg-muted px-1.5 py-0.5 rounded">{fresh.compatibilidad_modo}</code>
+                Modo:{" "}
+                <code className="bg-muted px-1.5 py-0.5 rounded">{fresh.compatibilidad_modo}</code>
               </div>
             </div>
           )}
@@ -569,9 +560,7 @@ function FlagDisplay({
 }) {
   return (
     <div className="flex items-start gap-2.5">
-      <div className={`mt-1 ${checked ? "text-amber" : "text-muted-foreground/40"}`}>
-        {icon}
-      </div>
+      <div className={`mt-1 ${checked ? "text-amber" : "text-muted-foreground/40"}`}>{icon}</div>
       <div className="flex-1">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-ink">{label}</span>
@@ -580,7 +569,9 @@ function FlagDisplay({
               ON
             </Badge>
           ) : (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">OFF</Badge>
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+              OFF
+            </Badge>
           )}
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
@@ -656,9 +647,7 @@ function NombreTemplateEditor({
     >
       <summary className="px-4 py-3 cursor-pointer flex items-center gap-2 hover:bg-muted/50 transition-colors">
         <FileText className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium text-ink">
-          Plantilla del nombre auto-generado
-        </span>
+        <span className="text-sm font-medium text-ink">Plantilla del nombre auto-generado</span>
         {currentTemplate && (
           <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
             configurado
@@ -671,10 +660,11 @@ function NombreTemplateEditor({
 
       <div className="px-4 py-4 border-t space-y-3">
         <div className="text-xs text-muted-foreground">
-          Usá placeholders <code className="bg-muted px-1 rounded font-mono">{`{spec:Label}`}</code> para insertar valores
-          de specs. Los placeholders <code className="bg-muted px-1 rounded font-mono">{`{Marca}`}</code>,
-          <code className="bg-muted px-1 rounded font-mono mx-1">{`{Modelo}`}</code>
-          y <code className="bg-muted px-1 rounded font-mono">{`{Nombre}`}</code> también funcionan.
+          Usá placeholders <code className="bg-muted px-1 rounded font-mono">{`{spec:Label}`}</code>{" "}
+          para insertar valores de specs. Los placeholders{" "}
+          <code className="bg-muted px-1 rounded font-mono">{`{Marca}`}</code>,
+          <code className="bg-muted px-1 rounded font-mono mx-1">{`{Modelo}`}</code>y{" "}
+          <code className="bg-muted px-1 rounded font-mono">{`{Nombre}`}</code> también funcionan.
         </div>
 
         <input
@@ -793,8 +783,8 @@ function NameFormatEditor({ spec }: { spec: Spec }) {
       </h3>
       <div className="text-xs text-muted-foreground">
         Cómo se renderiza este spec cuando lo insertás como{" "}
-        <code className="bg-muted px-1 rounded font-mono">{`{spec:${spec.label}}`}</code>
-        {" "}en el template del nombre. Placeholders:{" "}
+        <code className="bg-muted px-1 rounded font-mono">{`{spec:${spec.label}}`}</code> en el
+        template del nombre. Placeholders:{" "}
         <code className="bg-muted px-1 rounded font-mono">{`{value}`}</code>,{" "}
         <code className="bg-muted px-1 rounded font-mono">{`{unidad}`}</code>.
       </div>

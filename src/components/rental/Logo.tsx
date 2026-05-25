@@ -29,7 +29,9 @@ export function Logo({
   const { data: logoSetting } = useQuery({
     queryKey: ["settings", "logo_url"],
     queryFn: () =>
-      fetch("/api/settings/logo_url").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch("/api/settings/logo_url")
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
     // Cache buster (?v=<ts>) del setting invalida el cache del navegador.
     staleTime: 30_000,
   });

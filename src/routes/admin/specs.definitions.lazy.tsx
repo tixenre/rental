@@ -2,19 +2,45 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Sparkles, Library, AlertCircle, ArrowLeftRight, ListOrdered, CheckCircle2, Circle, Search, X, FolderTree, List, HelpCircle } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Sparkles,
+  Library,
+  AlertCircle,
+  ArrowLeftRight,
+  ListOrdered,
+  CheckCircle2,
+  Circle,
+  Search,
+  X,
+  FolderTree,
+  List,
+  HelpCircle,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
 import {
@@ -58,7 +84,7 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
   const [editing, setEditing] = useState<SpecDefinition | "new" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SpecDefinition | null>(null);
   const [search, setSearch] = useState("");
-  const [catFilter, setCatFilter] = useState<string | null>(null);   // nombre de categoría o "__sin__" o null
+  const [catFilter, setCatFilter] = useState<string | null>(null); // nombre de categoría o "__sin__" o null
   const [soloValidadas, setSoloValidadas] = useState(false);
 
   const listQ = useQuery({
@@ -85,7 +111,9 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
       adminApi.updateSpecDefinition(def.id, {
         es_compatibilidad: !def.es_compatibilidad,
         // Al apagar, no toco el modo (queda persistido para re-encender luego).
-        ...(def.es_compatibilidad ? {} : { compatibilidad_modo: def.compatibilidad_modo ?? "exacta" }),
+        ...(def.es_compatibilidad
+          ? {}
+          : { compatibilidad_modo: def.compatibilidad_modo ?? "exacta" }),
       }),
     onSuccess: (_data, def) => {
       toast.success(def.es_compatibilidad ? "Driver desactivado" : "Driver activado");
@@ -109,9 +137,7 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
           items: prev.items
             .map((d) => (d.id === def.id ? { ...d, validado: !d.validado } : d))
             .sort((a, b) =>
-              a.validado === b.validado
-                ? a.label.localeCompare(b.label)
-                : a.validado ? -1 : 1,
+              a.validado === b.validado ? a.label.localeCompare(b.label) : a.validado ? -1 : 1,
             ),
         });
       }
@@ -131,7 +157,7 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
   // Universo base sobre el que se calculan chips y filtros: si solo validadas
   // está activo, los chips también muestran counts de validadas solamente.
   const universo = useMemo(
-    () => soloValidadas ? allItems.filter((d) => d.validado) : allItems,
+    () => (soloValidadas ? allItems.filter((d) => d.validado) : allItems),
     [allItems, soloValidadas],
   );
 
@@ -192,17 +218,28 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
       map.set(key, arr);
     }
     // Orden: dominios conocidos por prioridad declarada, "_general" al final.
-    const order = ["camara", "lente", "video", "audio", "signal", "bateria", "modificador", "stand", "filtro", "_general"];
+    const order = [
+      "camara",
+      "lente",
+      "video",
+      "audio",
+      "signal",
+      "bateria",
+      "modificador",
+      "stand",
+      "filtro",
+      "_general",
+    ];
     return order
       .filter((k) => map.has(k))
       .map((k) => ({
         key: k,
         label: k === "_general" ? "General" : DOMAIN_LABELS[k],
-        items: (map.get(k) ?? []).slice().sort((a, b) =>
-          a.validado === b.validado
-            ? a.label.localeCompare(b.label)
-            : a.validado ? -1 : 1,
-        ),
+        items: (map.get(k) ?? [])
+          .slice()
+          .sort((a, b) =>
+            a.validado === b.validado ? a.label.localeCompare(b.label) : a.validado ? -1 : 1,
+          ),
       }));
   }, [items]);
 
@@ -225,7 +262,7 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
       let cur = byId.get(catId);
       const seen = new Set<number>();
       while (cur && cur.parent_id != null) {
-        if (seen.has(cur.id)) return null;  // safety: ciclo defensivo
+        if (seen.has(cur.id)) return null; // safety: ciclo defensivo
         seen.add(cur.id);
         cur = byId.get(cur.parent_id);
       }
@@ -254,7 +291,10 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
       .filter((c) => c.parent_id == null)
       .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
     const sections = roots
-      .map((r) => ({ root: r, specs: (map.get(r.id) ?? []).slice().sort((a, b) => a.label.localeCompare(b.label)) }))
+      .map((r) => ({
+        root: r,
+        specs: (map.get(r.id) ?? []).slice().sort((a, b) => a.label.localeCompare(b.label)),
+      }))
       .filter((s) => s.specs.length > 0);
     return { sections, sinCat };
   }, [items, catsQ.data]);
@@ -280,15 +320,19 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
               Back-office › Specs
             </div>
           )}
-          <h1 className={embedded
-            ? "font-display text-xl text-ink flex items-center gap-2"
-            : "font-display text-3xl text-ink flex items-center gap-2"}>
+          <h1
+            className={
+              embedded
+                ? "font-display text-xl text-ink flex items-center gap-2"
+                : "font-display text-3xl text-ink flex items-center gap-2"
+            }
+          >
             <Library className={embedded ? "h-5 w-5 text-amber" : "h-6 w-6 text-amber"} />
             Specs
           </h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Definiciones reutilizables (montura, formato, lúmenes…). Editar
-            afecta a todas las categorías que la usan.
+            Definiciones reutilizables (montura, formato, lúmenes…). Editar afecta a todas las
+            categorías que la usan.
           </p>
         </div>
         <Button onClick={() => setEditing("new")}>
@@ -296,15 +340,13 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
         </Button>
       </header>
 
-      {listQ.isLoading && (
-        <div className="text-sm text-muted-foreground">Cargando…</div>
-      )}
+      {listQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
 
       {!listQ.isLoading && allItems.length === 0 && (
         <div className="rounded-md border hairline border-dashed p-6 text-center text-sm text-muted-foreground">
-          No hay definiciones todavía. El seed las crea al iniciar el backend
-          desde <code className="font-mono">backend/seeds/spec_templates.py</code>,
-          o creá la primera con el botón "Nueva definición".
+          No hay definiciones todavía. El seed las crea al iniciar el backend desde{" "}
+          <code className="font-mono">backend/seeds/spec_templates.py</code>, o creá la primera con
+          el botón "Nueva definición".
         </div>
       )}
 
@@ -437,7 +479,9 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
                         onEdit={() => setEditing(def)}
                         onDelete={() => setConfirmDelete(def)}
                         onToggleCompat={() => toggleCompatMut.mutate(def)}
-                        togglingCompat={toggleCompatMut.isPending && toggleCompatMut.variables?.id === def.id}
+                        togglingCompat={
+                          toggleCompatMut.isPending && toggleCompatMut.variables?.id === def.id
+                        }
                         onToggleValidado={() => toggleValidadoMut.mutate(def)}
                       />
                     </div>
@@ -451,11 +495,13 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
             {catsQ.isLoading && (
               <div className="text-sm text-muted-foreground">Cargando categorías…</div>
             )}
-            {!catsQ.isLoading && specsByRoot.sections.length === 0 && specsByRoot.sinCat.length === 0 && (
-              <div className="rounded-md border hairline border-dashed p-6 text-center text-sm text-muted-foreground">
-                Ningún resultado con los filtros actuales.
-              </div>
-            )}
+            {!catsQ.isLoading &&
+              specsByRoot.sections.length === 0 &&
+              specsByRoot.sinCat.length === 0 && (
+                <div className="rounded-md border hairline border-dashed p-6 text-center text-sm text-muted-foreground">
+                  Ningún resultado con los filtros actuales.
+                </div>
+              )}
             {specsByRoot.sections.map((section) => (
               <RootSection
                 key={section.root.id}
@@ -464,7 +510,9 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onEdit={(def) => setEditing(def)}
                 onDelete={(def) => setConfirmDelete(def)}
                 onToggleCompat={(def) => toggleCompatMut.mutate(def)}
-                togglingCompatId={toggleCompatMut.isPending ? (toggleCompatMut.variables?.id ?? null) : null}
+                togglingCompatId={
+                  toggleCompatMut.isPending ? (toggleCompatMut.variables?.id ?? null) : null
+                }
                 onToggleValidado={(def) => toggleValidadoMut.mutate(def)}
               />
             ))}
@@ -477,7 +525,9 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
                 onEdit={(def) => setEditing(def)}
                 onDelete={(def) => setConfirmDelete(def)}
                 onToggleCompat={(def) => toggleCompatMut.mutate(def)}
-                togglingCompatId={toggleCompatMut.isPending ? (toggleCompatMut.variables?.id ?? null) : null}
+                togglingCompatId={
+                  toggleCompatMut.isPending ? (toggleCompatMut.variables?.id ?? null) : null
+                }
                 onToggleValidado={(def) => toggleValidadoMut.mutate(def)}
               />
             )}
@@ -511,10 +561,9 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
             <AlertDialogTitle>Borrar definición</AlertDialogTitle>
             <AlertDialogDescription>
               Vas a borrar <strong>{confirmDelete?.label}</strong> (
-              <code className="font-mono">{confirmDelete?.spec_key}</code>) del
-              catálogo global. Solo funciona si la spec NO está asignada a
-              ninguna categoría y NO tiene valores cargados en equipos —
-              sino el backend rechaza con 409.
+              <code className="font-mono">{confirmDelete?.spec_key}</code>) del catálogo global.
+              Solo funciona si la spec NO está asignada a ninguna categoría y NO tiene valores
+              cargados en equipos — sino el backend rechaza con 409.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -536,8 +585,14 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
 // ── Sección de specs agrupadas por categoría raíz ──────────────────────
 
 function RootSection({
-  title, specs, onEdit, onDelete, onToggleCompat, togglingCompatId,
-  onToggleValidado, muted,
+  title,
+  specs,
+  onEdit,
+  onDelete,
+  onToggleCompat,
+  togglingCompatId,
+  onToggleValidado,
+  muted,
 }: {
   title: string;
   specs: SpecDefinition[];
@@ -556,23 +611,23 @@ function RootSection({
         onClick={() => setOpen((v) => !v)}
         className={
           "w-full flex items-center justify-between px-3 py-2 text-left transition " +
-          (muted
-            ? "bg-muted/20 hover:bg-muted/40"
-            : "bg-amber-soft/30 hover:bg-amber-soft/50")
+          (muted ? "bg-muted/20 hover:bg-muted/40" : "bg-amber-soft/30 hover:bg-amber-soft/50")
         }
       >
         <div className="flex items-center gap-2">
-          <FolderTree className={"h-3.5 w-3.5 " + (muted ? "text-muted-foreground" : "text-amber")} />
-          <span className={"font-display text-sm " + (muted ? "text-muted-foreground" : "text-ink")}>
+          <FolderTree
+            className={"h-3.5 w-3.5 " + (muted ? "text-muted-foreground" : "text-amber")}
+          />
+          <span
+            className={"font-display text-sm " + (muted ? "text-muted-foreground" : "text-ink")}
+          >
             {title}
           </span>
           <Badge variant="outline" className="text-[10px] h-5">
             {specs.length}
           </Badge>
         </div>
-        <span className="text-[10px] text-muted-foreground font-mono">
-          {open ? "▾" : "▸"}
-        </span>
+        <span className="text-[10px] text-muted-foreground font-mono">{open ? "▾" : "▸"}</span>
       </button>
       {open && (
         <div className="divide-y hairline">
@@ -594,7 +649,9 @@ function RootSection({
 }
 
 function CategoryChip({
-  label, active, onClick,
+  label,
+  active,
+  onClick,
 }: {
   label: string;
   active: boolean;
@@ -617,7 +674,12 @@ function CategoryChip({
 }
 
 function DefinitionRow({
-  def, onEdit, onDelete, onToggleCompat, togglingCompat, onToggleValidado,
+  def,
+  onEdit,
+  onDelete,
+  onToggleCompat,
+  togglingCompat,
+  onToggleValidado,
 }: {
   def: SpecDefinition;
   onEdit: () => void;
@@ -651,13 +713,17 @@ function DefinitionRow({
         {def.unidad && <span className="text-muted-foreground/70"> · {def.unidad}</span>}
       </div>
       <div className="hidden md:block text-[10px] text-muted-foreground min-w-0">
-        {(def.tipo === "enum" || def.tipo === "multi_enum") && (def.enum_options?.length ?? 0) > 0 && (
-          <div className="truncate">{(def.enum_options ?? []).join(", ")}</div>
-        )}
+        {(def.tipo === "enum" || def.tipo === "multi_enum") &&
+          (def.enum_options?.length ?? 0) > 0 && (
+            <div className="truncate">{(def.enum_options ?? []).join(", ")}</div>
+          )}
         {(def.categorias?.length ?? 0) > 0 ? (
           <div className="flex flex-wrap gap-1 mt-0.5">
             {(def.categorias ?? []).slice(0, 3).map((cat) => (
-              <span key={cat.id} className="inline-block rounded bg-muted/60 px-1 py-0.5 text-[9px]">
+              <span
+                key={cat.id}
+                className="inline-block rounded bg-muted/60 px-1 py-0.5 text-[9px]"
+              >
                 {cat.nombre}
               </span>
             ))}
@@ -679,7 +745,11 @@ function DefinitionRow({
           type="button"
           onClick={onToggleCompat}
           disabled={togglingCompat}
-          title={def.es_compatibilidad ? "Desactivar driver de compatibilidad" : "Activar driver de compatibilidad"}
+          title={
+            def.es_compatibilidad
+              ? "Desactivar driver de compatibilidad"
+              : "Activar driver de compatibilidad"
+          }
           className={
             "inline-flex flex-col items-end gap-0.5 rounded-md px-1.5 py-0.5 border hairline transition " +
             (def.es_compatibilidad
@@ -710,7 +780,11 @@ function DefinitionRow({
         <button onClick={onEdit} className="rounded p-1 hover:bg-muted/50" title="Editar">
           <Pencil className="h-3.5 w-3.5" />
         </button>
-        <button onClick={onDelete} className="rounded p-1 hover:bg-destructive/10 text-destructive" title="Borrar">
+        <button
+          onClick={onDelete}
+          className="rounded p-1 hover:bg-destructive/10 text-destructive"
+          title="Borrar"
+        >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -719,7 +793,9 @@ function DefinitionRow({
 }
 
 function DefinitionFormModal({
-  definition, onClose, onSaved,
+  definition,
+  onClose,
+  onSaved,
 }: {
   definition: SpecDefinition | null;
   onClose: () => void;
@@ -745,7 +821,7 @@ function DefinitionFormModal({
   // marcar/desmarcar. Al guardar, hace el diff y asigna/desasigna lo cambiado.
   const initialCatIds = useMemo(
     () => new Set((definition?.categorias ?? []).map((c) => c.id)),
-    [definition?.id],   // eslint-disable-line react-hooks/exhaustive-deps
+    [definition?.id], // eslint-disable-line react-hooks/exhaustive-deps
   );
   // Lookup catId → flags por categoría (destacado/prioridad/ayuda) para
   // mostrar inline en cada checkbox. Read-only — el detalle se edita en
@@ -756,7 +832,7 @@ function DefinitionFormModal({
       map.set(c.id, { destacado: c.destacado, prioridad: c.prioridad, ayuda: c.ayuda });
     }
     return map;
-  }, [definition?.id]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [definition?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [selectedCatIds, setSelectedCatIds] = useState<Set<number>>(initialCatIds);
   const catsQ = useQuery({
     queryKey: ["admin", "categorias"],
@@ -766,11 +842,13 @@ function DefinitionFormModal({
   const catsFlat = useMemo(() => {
     const all = catsQ.data ?? [];
     const out: { id: number; path: string; prioridad: number }[] = [];
-    const roots = all.filter((c) => c.parent_id == null)
+    const roots = all
+      .filter((c) => c.parent_id == null)
       .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
     for (const root of roots) {
       out.push({ id: root.id, path: root.nombre, prioridad: root.prioridad });
-      const hijos = all.filter((c) => c.parent_id === root.id)
+      const hijos = all
+        .filter((c) => c.parent_id === root.id)
         .sort((a, b) => a.prioridad - b.prioridad || a.nombre.localeCompare(b.nombre));
       for (const h of hijos) {
         out.push({ id: h.id, path: `${root.nombre} › ${h.nombre}`, prioridad: h.prioridad });
@@ -801,7 +879,10 @@ function DefinitionFormModal({
     }
     const wantsEnum = form.tipo === "enum" || form.tipo === "multi_enum";
     const enumArr = wantsEnum
-      ? enumInput.split(",").map((s) => s.trim()).filter(Boolean)
+      ? enumInput
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
       : null;
     if (wantsEnum && (!enumArr || enumArr.length === 0)) {
       toast.error("Para tipo enum / lista tenés que listar al menos una opción");
@@ -967,10 +1048,26 @@ function DefinitionFormModal({
               value={form.tipo}
               onValueChange={(v: SpecTipo) => setForm({ ...form, tipo: v })}
             >
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {(["string", "number", "rango", "wxh", "wxhxd", "enum", "multi_enum", "bool", "tabla"] as SpecTipo[]).map((t) => (
-                  <SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>
+                {(
+                  [
+                    "string",
+                    "number",
+                    "rango",
+                    "wxh",
+                    "wxhxd",
+                    "enum",
+                    "multi_enum",
+                    "bool",
+                    "tabla",
+                  ] as SpecTipo[]
+                ).map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {TIPO_LABEL[t]}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -983,9 +1080,7 @@ function DefinitionFormModal({
                 onChange={(cols) => setForm({ ...form, tabla_columnas: cols })}
               />
               <div>
-                <Label className="text-xs">
-                  Estrategia de filas en placeholder
-                </Label>
+                <Label className="text-xs">Estrategia de filas en placeholder</Label>
                 <Select
                   value={form.output_config?.row_strategy ?? "all"}
                   onValueChange={(v: "all" | "first" | "last") =>
@@ -995,7 +1090,9 @@ function DefinitionFormModal({
                     })
                   }
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas las filas (default)</SelectItem>
                     <SelectItem value="first">Solo primera fila</SelectItem>
@@ -1003,15 +1100,19 @@ function DefinitionFormModal({
                   </SelectContent>
                 </Select>
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  Qué filas se rinden cuando aparece <code className="font-mono">{"{spec:Label}"}</code> en
-                  el nombre público (sin selector de columna). "Primera" / "última" sirven cuando el nombre
-                  es single-line y solo querés mostrar una fila representativa.
+                  Qué filas se rinden cuando aparece{" "}
+                  <code className="font-mono">{"{spec:Label}"}</code> en el nombre público (sin
+                  selector de columna). "Primera" / "última" sirven cuando el nombre es single-line
+                  y solo querés mostrar una fila representativa.
                 </p>
               </div>
             </>
           )}
 
-          {(form.tipo === "number" || form.tipo === "rango" || form.tipo === "wxh" || form.tipo === "wxhxd") && (
+          {(form.tipo === "number" ||
+            form.tipo === "rango" ||
+            form.tipo === "wxh" ||
+            form.tipo === "wxhxd") && (
             <div>
               <Label className="text-xs">
                 Unidad {form.tipo !== "number" && <span className="text-destructive">*</span>}
@@ -1033,7 +1134,9 @@ function DefinitionFormModal({
               <Input
                 value={enumInput}
                 onChange={(e) => setEnumInput(e.target.value)}
-                placeholder={form.tipo === "multi_enum" ? "ej. Wi-Fi, USB-C, SDI" : "ej. E, RF, EF, MFT, PL"}
+                placeholder={
+                  form.tipo === "multi_enum" ? "ej. Wi-Fi, USB-C, SDI" : "ej. E, RF, EF, MFT, PL"
+                }
               />
             </div>
           )}
@@ -1086,11 +1189,7 @@ function DefinitionFormModal({
                           ›
                         </span>
                       )}
-                      <span
-                        className={
-                          "truncate " + (depth === 0 ? "font-medium text-ink" : "")
-                        }
-                      >
+                      <span className={"truncate " + (depth === 0 ? "font-medium text-ink" : "")}>
                         {lastSegment}
                       </span>
                       {(() => {
@@ -1143,8 +1242,8 @@ function DefinitionFormModal({
               </div>
             )}
             <p className="text-[10px] text-muted-foreground">
-              Cambios se aplican al guardar. Los flags por categoría
-              (destacado, prioridad, ayuda override) se editan desde "Specs por categoría".
+              Cambios se aplican al guardar. Los flags por categoría (destacado, prioridad, ayuda
+              override) se editan desde "Specs por categoría".
             </p>
           </fieldset>
 
@@ -1162,9 +1261,8 @@ function DefinitionFormModal({
                   Driver de compatibilidad
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-0.5">
-                  Si está marcada, equipos con el mismo valor en esta spec se
-                  consideran compatibles. Se usa en
-                  GET /equipos/&#123;id&#125;/compatibles.
+                  Si está marcada, equipos con el mismo valor en esta spec se consideran
+                  compatibles. Se usa en GET /equipos/&#123;id&#125;/compatibles.
                 </div>
               </div>
             </label>
@@ -1178,7 +1276,9 @@ function DefinitionFormModal({
                     setForm({ ...form, compatibilidad_modo: v })
                   }
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="exacta">
                       <div className="flex items-center gap-2">
@@ -1206,10 +1306,10 @@ function DefinitionFormModal({
                 </Select>
                 {form.compatibilidad_modo === "jerarquia" && (
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    Ordená las <strong>opciones</strong> de menor a mayor (ej. MFT,
-                    APS-C, S35, Full-frame, Medium Format). En la asignación por
-                    categoría definís el <em>rol</em> (contenedor/contenido) para
-                    que el algoritmo entienda viñeteo vs crop.
+                    Ordená las <strong>opciones</strong> de menor a mayor (ej. MFT, APS-C, S35,
+                    Full-frame, Medium Format). En la asignación por categoría definís el{" "}
+                    <em>rol</em> (contenedor/contenido) para que el algoritmo entienda viñeteo vs
+                    crop.
                   </p>
                 )}
               </div>
@@ -1221,14 +1321,17 @@ function DefinitionFormModal({
               <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-700 mt-0.5" />
               <span className="text-muted-foreground">
                 Cambiar <strong>tipo</strong> está bloqueado si hay equipos con valores cargados.
-                Cambiar <strong>label</strong> o <strong>unidad</strong> sí se permite — afecta a todas las categorías que usan esta spec.
+                Cambiar <strong>label</strong> o <strong>unidad</strong> sí se permite — afecta a
+                todas las categorías que usan esta spec.
               </span>
             </div>
           )}
         </div>
 
         <footer className="border-t hairline px-4 py-3 flex justify-end gap-2 shrink-0">
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
           <Button onClick={handleSave} disabled={busy}>
             {busy ? "Guardando…" : isNew ? "Crear" : "Guardar"}
           </Button>
@@ -1291,7 +1394,12 @@ function UnidadesPicker({
     return (
       <div className="text-[10px] text-muted-foreground italic">
         No hay unidades en el catálogo.{" "}
-        <a href="/admin/unidades" className="underline hover:text-ink" target="_blank" rel="noreferrer">
+        <a
+          href="/admin/unidades"
+          className="underline hover:text-ink"
+          target="_blank"
+          rel="noreferrer"
+        >
           Crear unidades →
         </a>
       </div>
@@ -1301,7 +1409,9 @@ function UnidadesPicker({
     <div className="space-y-1">
       <div className="text-[10px] text-muted-foreground">
         Unidades permitidas (click para seleccionar):{" "}
-        <span className="text-ink/70">{selected.length} de {unidades.length}</span>
+        <span className="text-ink/70">
+          {selected.length} de {unidades.length}
+        </span>
       </div>
       <div className="max-h-32 overflow-y-auto border hairline rounded p-1 space-y-1 bg-background">
         {grupos.map((g) => (
@@ -1336,7 +1446,6 @@ function UnidadesPicker({
     </div>
   );
 }
-
 
 // ── Editor de columnas para spec tipo `tabla` ───────────────────────────
 
@@ -1404,12 +1513,10 @@ function TablaColumnasEditor({
 
   return (
     <fieldset className="border hairline rounded-md p-2 space-y-2">
-      <legend className="px-1 text-xs text-muted-foreground">
-        Columnas de la tabla
-      </legend>
+      <legend className="px-1 text-xs text-muted-foreground">Columnas de la tabla</legend>
       <p className="text-[10px] text-muted-foreground -mt-1">
-        Cada columna tiene un nombre y (opcional) una unidad. Al cargar un equipo
-        agregás filas con un valor por columna.
+        Cada columna tiene un nombre y (opcional) una unidad. Al cargar un equipo agregás filas con
+        un valor por columna.
       </p>
       {columnas.length === 0 && (
         <div className="text-[11px] text-muted-foreground italic py-1">
@@ -1464,10 +1571,16 @@ function TablaColumnasEditor({
                     value={c.tipo}
                     onValueChange={(v: SpecTablaColTipo) => update(idx, { tipo: v })}
                   >
-                    <SelectTrigger className="h-6 text-[11px] w-[120px] px-1.5"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-6 text-[11px] w-[120px] px-1.5">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      {(["valor_unidad", "number", "string", "enum", "bool"] as SpecTablaColTipo[]).map((t) => (
-                        <SelectItem key={t} value={t} className="text-xs">{COL_TIPO_LABEL[t]}</SelectItem>
+                      {(
+                        ["valor_unidad", "number", "string", "enum", "bool"] as SpecTablaColTipo[]
+                      ).map((t) => (
+                        <SelectItem key={t} value={t} className="text-xs">
+                          {COL_TIPO_LABEL[t]}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -1477,7 +1590,10 @@ function TablaColumnasEditor({
                     value={(c.options ?? []).join(", ")}
                     onChange={(e) =>
                       update(idx, {
-                        options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
+                        options: e.target.value
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean),
                       })
                     }
                     placeholder="opciones: 2700K, 3200K…"
@@ -1495,7 +1611,8 @@ function TablaColumnasEditor({
                   onClick={() => toggleAdvanced(idx)}
                   className="text-[9px] text-muted-foreground hover:text-ink font-mono w-full text-left px-1"
                 >
-                  {showAdvanced.has(idx) ? "▾" : "▸"} key: <span className="text-ink/70">{c.key || "(auto)"}</span>
+                  {showAdvanced.has(idx) ? "▾" : "▸"} key:{" "}
+                  <span className="text-ink/70">{c.key || "(auto)"}</span>
                 </button>
                 {showAdvanced.has(idx) && (
                   <Input
@@ -1532,4 +1649,3 @@ function TablaColumnasEditor({
     </fieldset>
   );
 }
-

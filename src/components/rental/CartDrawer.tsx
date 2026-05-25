@@ -1,5 +1,14 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Trash2, Plus, Minus, Loader2, AlertCircle, Calendar as CalendarIcon, ShoppingBag } from "lucide-react";
+import {
+  X,
+  Trash2,
+  Plus,
+  Minus,
+  Loader2,
+  AlertCircle,
+  Calendar as CalendarIcon,
+  ShoppingBag,
+} from "lucide-react";
 import { EmptyState } from "./EmptyState";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -78,7 +87,7 @@ export function CartDrawer({
     staleTime: 60_000,
   });
   const descuentoPct = d > 0 ? interpolarDescuento(descuentosPuntos, d) : 0;
-  const descuentoMonto = Math.round(subtotalTotal * descuentoPct / 100);
+  const descuentoMonto = Math.round((subtotalTotal * descuentoPct) / 100);
   const totalNeto = subtotalTotal - descuentoMonto;
 
   const { data: clienteSession } = useClienteSession();
@@ -114,9 +123,9 @@ export function CartDrawer({
       if (e.key !== "Tab") return;
       const root = dialogRef.current;
       if (!root) return;
-      const nodes = Array.from(
-        root.querySelectorAll<HTMLElement>(FOCUSABLE),
-      ).filter((n) => n.offsetParent !== null || n === document.activeElement);
+      const nodes = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (n) => n.offsetParent !== null || n === document.activeElement,
+      );
       if (nodes.length === 0) {
         e.preventDefault();
         return;
@@ -288,9 +297,13 @@ export function CartDrawer({
                 <CalendarIcon className="h-4 w-4 shrink-0 text-amber" />
                 {startDate && endDate ? (
                   <span className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-sm font-semibold tabular-nums">
-                    <span>{format(startDate, "EEE dd MMM", { locale: es })} {startTime}</span>
+                    <span>
+                      {format(startDate, "EEE dd MMM", { locale: es })} {startTime}
+                    </span>
                     <span className="text-muted-foreground">→</span>
-                    <span>{format(endDate, "EEE dd MMM", { locale: es })} {endTime}</span>
+                    <span>
+                      {format(endDate, "EEE dd MMM", { locale: es })} {endTime}
+                    </span>
                     <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                       · {d} {d === 1 ? "jornada" : "jornadas"}
                     </span>
@@ -304,10 +317,13 @@ export function CartDrawer({
             {/* Contenido */}
             {submitted ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-                <div className="text-4xl" aria-hidden="true">✓</div>
+                <div className="text-4xl" aria-hidden="true">
+                  ✓
+                </div>
                 <div className="font-display text-2xl">¡Pedido enviado!</div>
                 <p className="text-sm text-muted-foreground">
-                  Recibimos tu solicitud. Te contactaremos a la brevedad para confirmar disponibilidad y coordinar el retiro.
+                  Recibimos tu solicitud. Te contactaremos a la brevedad para confirmar
+                  disponibilidad y coordinar el retiro.
                 </p>
                 <button
                   onClick={reset}
@@ -340,8 +356,9 @@ export function CartDrawer({
                           const cap = getDisponible?.(it) ?? it.cantidad ?? Infinity;
                           const reachedMax = qty >= cap;
                           const lineaBruta = it.pricePerDay * qty * (d || 1);
-                          const lineaDto   = descuentoPct > 0 ? Math.round(lineaBruta * descuentoPct / 100) : 0;
-                          const lineaNeta  = lineaBruta - lineaDto;
+                          const lineaDto =
+                            descuentoPct > 0 ? Math.round((lineaBruta * descuentoPct) / 100) : 0;
+                          const lineaNeta = lineaBruta - lineaDto;
                           return (
                             <li
                               key={it.id}
@@ -403,9 +420,17 @@ export function CartDrawer({
                                     {d > 0 && (
                                       <div className="hidden sm:flex items-center justify-end gap-1 mt-0.5 text-[11px] tabular">
                                         {lineaDto > 0 && (
-                                          <span className="line-through text-muted-foreground/60">{formatARS(lineaBruta)}</span>
+                                          <span className="line-through text-muted-foreground/60">
+                                            {formatARS(lineaBruta)}
+                                          </span>
                                         )}
-                                        <span className={lineaDto > 0 ? "text-emerald-600 font-medium" : "text-muted-foreground"}>
+                                        <span
+                                          className={
+                                            lineaDto > 0
+                                              ? "text-emerald-600 font-medium"
+                                              : "text-muted-foreground"
+                                          }
+                                        >
                                           {formatARS(lineaNeta)}
                                         </span>
                                       </div>
@@ -442,7 +467,10 @@ export function CartDrawer({
                         </div>
                       )}
                       {submitError && (
-                        <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+                        <div
+                          role="alert"
+                          className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+                        >
                           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                           <span>{submitError}</span>
                         </div>
@@ -457,12 +485,16 @@ export function CartDrawer({
                   style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
                 >
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal · {d} {d === 1 ? "jornada" : "jornadas"}</span>
+                    <span className="text-muted-foreground">
+                      Subtotal · {d} {d === 1 ? "jornada" : "jornadas"}
+                    </span>
                     <span className="tabular">{formatARS(subtotalTotal)}</span>
                   </div>
                   {descuentoPct > 0 && (
                     <div className="flex items-center justify-between text-sm text-emerald-600">
-                      <span>Descuento {descuentoPct}% ({d} {d === 1 ? "jornada" : "jornadas"})</span>
+                      <span>
+                        Descuento {descuentoPct}% ({d} {d === 1 ? "jornada" : "jornadas"})
+                      </span>
                       <span className="tabular">−{formatARS(descuentoMonto)}</span>
                     </div>
                   )}
@@ -510,7 +542,7 @@ export function CartDrawer({
                     )}
                   </button>
 
-                  {(!startDate || !endDate) ? (
+                  {!startDate || !endDate ? (
                     <p className="flex items-center justify-center gap-1.5 text-center text-xs text-amber-700">
                       <AlertCircle className="h-3.5 w-3.5" />
                       Elegí fechas para confirmar

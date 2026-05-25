@@ -1,12 +1,15 @@
 import { es } from "date-fns/locale";
 import { addDays, format, startOfDay } from "date-fns";
-import { X, Calendar as CalendarIcon, Clock, Eraser, Minus, Plus, AlertTriangle } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  X,
+  Calendar as CalendarIcon,
+  Clock,
+  Eraser,
+  Minus,
+  Plus,
+  AlertTriangle,
+} from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { useCart } from "@/lib/cart-store";
 import { deriveEndDate, diaAbierto, franjaParaFecha, timeToMinutes } from "@/lib/rental-dates";
@@ -123,7 +126,8 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   }, [franjaRetiro, startTime, setStartTime]);
   useEffect(() => {
     if (franjaDevolucion && endTime < franjaDevolucion.desde) setEndTime(franjaDevolucion.desde);
-    else if (franjaDevolucion && endTime > franjaDevolucion.hasta) setEndTime(franjaDevolucion.hasta);
+    else if (franjaDevolucion && endTime > franjaDevolucion.hasta)
+      setEndTime(franjaDevolucion.hasta);
   }, [franjaDevolucion, endTime, setEndTime]);
 
   // Setea la fecha de devolución para alcanzar `target` jornadas exactas
@@ -275,16 +279,15 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
             <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-[11px] text-ink">
               <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
               <span>
-                Devolvés a las <strong>{endTime}</strong>, más tarde que tu retiro
-                ({startTime}) → <strong>suma 1 jornada</strong>. Devolvé {startTime} o antes
-                para no sumarla.
+                Devolvés a las <strong>{endTime}</strong>, más tarde que tu retiro ({startTime}) →{" "}
+                <strong>suma 1 jornada</strong>. Devolvé {startTime} o antes para no sumarla.
               </span>
             </p>
           ) : (
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <Clock className="h-3 w-3" />
-              Horarios cada 30 min — sujeto a confirmación. Devolver más tarde que la hora de
-              retiro suma una jornada.
+              Horarios cada 30 min — sujeto a confirmación. Devolver más tarde que la hora de retiro
+              suma una jornada.
             </p>
           )}
 
@@ -299,8 +302,8 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
           {!devolucionCerrada && rangoCruzaBloqueado && (
             <p className="flex items-center gap-1.5 text-[11px] text-destructive">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              El período elegido incluye días sin disponibilidad para algún equipo de tu
-              carrito. Probá con otras fechas o menos jornadas.
+              El período elegido incluye días sin disponibilidad para algún equipo de tu carrito.
+              Probá con otras fechas o menos jornadas.
             </p>
           )}
         </div>

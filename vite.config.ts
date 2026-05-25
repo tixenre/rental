@@ -56,9 +56,7 @@ export default defineConfig({
     modulePreload: {
       polyfill: false,
       resolveDependencies(_filename, deps) {
-        return deps.filter(
-          (d) => !/(\/|^)(admin|vendor-dnd)-/.test(d),
-        );
+        return deps.filter((d) => !/(\/|^)(admin|vendor-dnd)-/.test(d));
       },
     },
     rollupOptions: {

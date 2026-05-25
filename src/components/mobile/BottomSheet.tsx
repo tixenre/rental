@@ -1,9 +1,4 @@
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerClose, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -30,12 +25,7 @@ export function BottomSheet({
 }: Props) {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent
-        className={cn(
-          "flex flex-col rounded-t-2xl p-0",
-          maxH,
-        )}
-      >
+      <DrawerContent className={cn("flex flex-col rounded-t-2xl p-0", maxH)}>
         {title && (
           <div className="sticky top-0 z-10 shrink-0 border-b hairline bg-background/95 px-4 py-3 backdrop-blur-xl">
             <div className="flex items-center justify-between">
@@ -49,9 +39,7 @@ export function BottomSheet({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto overscroll-contain">
-          {children}
-        </div>
+        <div className="flex-1 overflow-y-auto overscroll-contain">{children}</div>
 
         {footer && (
           <div

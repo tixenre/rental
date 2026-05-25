@@ -42,15 +42,20 @@ export function ClasificacionSection() {
             <Sparkles className="h-4 w-4" /> Clasificación automática de equipos
           </h2>
           <p className="text-sm text-muted-foreground">
-            Aplica reglas por nombre/marca/modelo para asignar etiquetas hoja a cada equipo.
-            Equipos como la a7 V se asignan a Foto y Video. Revisá el preview antes de aplicar
-            — al aplicar, las etiquetas existentes de cada equipo con match se reemplazan.
+            Aplica reglas por nombre/marca/modelo para asignar etiquetas hoja a cada equipo. Equipos
+            como la a7 V se asignan a Foto y Video. Revisá el preview antes de aplicar — al aplicar,
+            las etiquetas existentes de cada equipo con match se reemplazan.
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" disabled={dryRunMut.isPending} onClick={() => dryRunMut.mutate()}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={dryRunMut.isPending}
+          onClick={() => dryRunMut.mutate()}
+        >
           {dryRunMut.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
           Generar preview
         </Button>
@@ -59,7 +64,11 @@ export function ClasificacionSection() {
             size="sm"
             disabled={applyMut.isPending || preview.matched === 0}
             onClick={() => {
-              if (confirm(`Aplicar clasificación a ${preview.matched} equipos? Las etiquetas existentes serán reemplazadas.`)) {
+              if (
+                confirm(
+                  `Aplicar clasificación a ${preview.matched} equipos? Las etiquetas existentes serán reemplazadas.`,
+                )
+              ) {
                 applyMut.mutate();
               }
             }}
@@ -73,9 +82,15 @@ export function ClasificacionSection() {
       {preview && (
         <div className="space-y-2">
           <div className="text-xs text-muted-foreground">
-            Total: {preview.total} · con match: <strong className="text-ink">{preview.matched}</strong> ·
-            sin match: <strong className="text-ink">{preview.unmatched}</strong>
-            {preview.applied > 0 && <> · aplicados: <strong className="text-ink">{preview.applied}</strong></>}
+            Total: {preview.total} · con match:{" "}
+            <strong className="text-ink">{preview.matched}</strong> · sin match:{" "}
+            <strong className="text-ink">{preview.unmatched}</strong>
+            {preview.applied > 0 && (
+              <>
+                {" "}
+                · aplicados: <strong className="text-ink">{preview.applied}</strong>
+              </>
+            )}
           </div>
           <div className="max-h-80 overflow-auto border hairline rounded-md text-xs">
             <table className="w-full">
@@ -91,7 +106,9 @@ export function ClasificacionSection() {
                   <tr key={it.id} className="border-t hairline">
                     <td className="px-2 py-1.5">
                       <div className="text-ink">{it.nombre}</div>
-                      {it.marca && <div className="text-muted-foreground text-[10px]">{it.marca}</div>}
+                      {it.marca && (
+                        <div className="text-muted-foreground text-[10px]">{it.marca}</div>
+                      )}
                     </td>
                     <td className="px-2 py-1.5 text-muted-foreground">
                       {it.actuales.length === 0 ? "—" : it.actuales.join(", ")}

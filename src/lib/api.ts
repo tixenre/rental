@@ -92,19 +92,22 @@ export type BackendEquipo = {
   specs_destacados?: { label: string; value: string }[];
   /** Specs estructuradas (Fase D): dict keyed por spec_key, fuente única
    *  post-migración. Reemplaza specs_json + columnas legacy de ficha. */
-  specs?: Record<string, {
-    label: string;
-    value: string;
-    /** Valor renderizado para display (mismo renderer que el nombre público).
-     *  `value` queda crudo para filtros. */
-    value_display?: string;
-    tipo: string;
-    unidad: string | null;
-    prioridad: number;
-    en_card: boolean;
-    en_filtros: boolean;
-    destacado: boolean;
-  }>;
+  specs?: Record<
+    string,
+    {
+      label: string;
+      value: string;
+      /** Valor renderizado para display (mismo renderer que el nombre público).
+       *  `value` queda crudo para filtros. */
+      value_display?: string;
+      tipo: string;
+      unidad: string | null;
+      prioridad: number;
+      en_card: boolean;
+      en_filtros: boolean;
+      destacado: boolean;
+    }
+  >;
   /** Unidades disponibles para el rango desde/hasta. Solo presente si se pasan fechas. */
   disponible?: number;
 };

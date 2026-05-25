@@ -2,8 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowDown, ArrowUp, Upload, Loader2, Image as ImageIcon,
-  TrendingUp, TrendingDown, Sparkles, Plus, Trash2,
+  ArrowDown,
+  ArrowUp,
+  Upload,
+  Loader2,
+  Image as ImageIcon,
+  TrendingUp,
+  TrendingDown,
+  Sparkles,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -11,8 +19,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, descuentosJornadaApi } from "@/lib/admin/api";
@@ -71,7 +85,11 @@ function DescuentosJornadaSection() {
 
   const crear = useMutation({
     mutationFn: () => descuentosJornadaApi.create({ jornadas: Number(dias), pct: Number(pct) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["descuentos-jornada"] }); setDias(""); setPct(""); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["descuentos-jornada"] });
+      setDias("");
+      setPct("");
+    },
     onError: () => toast.error("Error al guardar"),
   });
 
@@ -96,7 +114,9 @@ function DescuentosJornadaSection() {
       {isLoading ? (
         <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
       ) : sorted.length === 0 ? (
-        <p className="text-sm text-muted-foreground italic">Sin descuentos configurados. Todos los alquileres aplican 0%.</p>
+        <p className="text-sm text-muted-foreground italic">
+          Sin descuentos configurados. Todos los alquileres aplican 0%.
+        </p>
       ) : (
         <div className="border hairline rounded-md overflow-hidden">
           <table className="w-full text-sm">
@@ -104,21 +124,25 @@ function DescuentosJornadaSection() {
               <tr>
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">Jornadas</th>
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">Descuento</th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground text-xs">Ej. interpol.</th>
+                <th className="px-3 py-2 text-left font-medium text-muted-foreground text-xs">
+                  Ej. interpol.
+                </th>
                 <th className="px-3 py-2 w-10" />
               </tr>
             </thead>
             <tbody className="divide-y hairline">
               {sorted.map((p, i) => {
                 const siguiente = sorted[i + 1];
-                const medio = siguiente
-                  ? Math.round((p.jornadas + siguiente.jornadas) / 2)
-                  : null;
+                const medio = siguiente ? Math.round((p.jornadas + siguiente.jornadas) / 2) : null;
                 const pctMedio = medio ? interpolarDescuento(sorted, medio) : null;
                 return (
                   <tr key={p.id}>
-                    <td className="px-3 py-2 tabular-nums font-medium">{p.jornadas} {p.jornadas === 1 ? "día" : "días"}</td>
-                    <td className="px-3 py-2 tabular-nums text-emerald-600 font-medium">{p.pct}%</td>
+                    <td className="px-3 py-2 tabular-nums font-medium">
+                      {p.jornadas} {p.jornadas === 1 ? "día" : "días"}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-emerald-600 font-medium">
+                      {p.pct}%
+                    </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
                       {pctMedio !== null ? `${medio} días → ${pctMedio}%` : "—"}
                     </td>
@@ -144,30 +168,44 @@ function DescuentosJornadaSection() {
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">Jornadas</label>
           <Input
-            type="number" min="1" value={dias} onChange={(e) => setDias(e.target.value)}
-            placeholder="7" className="w-24 h-8 text-sm"
+            type="number"
+            min="1"
+            value={dias}
+            onChange={(e) => setDias(e.target.value)}
+            placeholder="7"
+            className="w-24 h-8 text-sm"
           />
         </div>
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">Descuento %</label>
           <Input
-            type="number" min="0" max="100" step="0.5" value={pct} onChange={(e) => setPct(e.target.value)}
-            placeholder="10" className="w-24 h-8 text-sm"
+            type="number"
+            min="0"
+            max="100"
+            step="0.5"
+            value={pct}
+            onChange={(e) => setPct(e.target.value)}
+            placeholder="10"
+            className="w-24 h-8 text-sm"
           />
         </div>
         <Button
-          size="sm" variant="outline"
+          size="sm"
+          variant="outline"
           onClick={() => crear.mutate()}
           disabled={!dias || !pct || crear.isPending}
         >
-          {crear.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+          {crear.isPending ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Plus className="w-3.5 h-3.5" />
+          )}
           Agregar
         </Button>
       </div>
     </section>
   );
 }
-
 
 // ── Buffer entre alquileres ─────────────────────────────────────────────────
 
@@ -202,15 +240,16 @@ function BufferSection() {
       <div>
         <h2 className="font-display text-lg text-ink">Buffer entre alquileres</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Horas de prep/revisión exigidas entre que un equipo vuelve y sale de nuevo.
-          Con buffer &gt; 0, dos alquileres del mismo equipo no pueden quedar pegados
-          (respeta la hora de retiro/devolución). Poné 0 para permitir alquileres
-          consecutivos. Ej: 24 = un día.
+          Horas de prep/revisión exigidas entre que un equipo vuelve y sale de nuevo. Con buffer
+          &gt; 0, dos alquileres del mismo equipo no pueden quedar pegados (respeta la hora de
+          retiro/devolución). Poné 0 para permitir alquileres consecutivos. Ej: 24 = un día.
         </p>
       </div>
       <div className="flex items-end gap-2 border-t hairline pt-3">
         <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Horas de buffer</div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Horas de buffer
+          </div>
           <Input
             type="number"
             min={0}
@@ -231,12 +270,16 @@ function BufferSection() {
   );
 }
 
-
 // ── Horarios habilitados de retiro/devolución ───────────────────────────────
 
 const DIAS_ORDEN: Array<[string, string]> = [
-  ["lun", "Lunes"], ["mar", "Martes"], ["mie", "Miércoles"], ["jue", "Jueves"],
-  ["vie", "Viernes"], ["sab", "Sábado"], ["dom", "Domingo"],
+  ["lun", "Lunes"],
+  ["mar", "Martes"],
+  ["mie", "Miércoles"],
+  ["jue", "Jueves"],
+  ["vie", "Viernes"],
+  ["sab", "Sábado"],
+  ["dom", "Domingo"],
 ];
 type DiaCfg = { abierto: boolean; desde: string; hasta: string };
 const DEFAULT_DIA: DiaCfg = { abierto: true, desde: "09:00", hasta: "18:00" };
@@ -268,10 +311,13 @@ function HorariosSection() {
     for (const [key] of DIAS_ORDEN) {
       const f = parsed[key];
       if (hasData) {
-        next[key] = f ? { abierto: true, desde: f.desde, hasta: f.hasta } : { ...DEFAULT_DIA, abierto: false };
+        next[key] = f
+          ? { abierto: true, desde: f.desde, hasta: f.hasta }
+          : { ...DEFAULT_DIA, abierto: false };
       } else {
         // Sin config previa: plantilla L-V abierto 09-18, finde cerrado.
-        next[key] = key === "sab" || key === "dom" ? { ...DEFAULT_DIA, abierto: false } : { ...DEFAULT_DIA };
+        next[key] =
+          key === "sab" || key === "dom" ? { ...DEFAULT_DIA, abierto: false } : { ...DEFAULT_DIA };
       }
     }
     setCfg(next);
@@ -295,7 +341,9 @@ function HorariosSection() {
     for (const [key] of DIAS_ORDEN) {
       const d = cfg[key];
       if (d.abierto && d.desde >= d.hasta) {
-        toast.error(`${DIAS_ORDEN.find(([k]) => k === key)?.[1]}: la apertura debe ser anterior al cierre`);
+        toast.error(
+          `${DIAS_ORDEN.find(([k]) => k === key)?.[1]}: la apertura debe ser anterior al cierre`,
+        );
         return;
       }
       payload[key] = d.abierto ? { desde: d.desde, hasta: d.hasta } : null;
@@ -308,48 +356,51 @@ function HorariosSection() {
       <div>
         <h2 className="font-display text-lg text-ink">Horarios de retiro y devolución</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Franja horaria habilitada por día para que el cliente elija retiro y devolución
-          (misma franja para ambos). Los días cerrados no se pueden seleccionar. Aplica al
-          checkout del cliente — los pedidos cargados a mano en el back-office no se restringen.
+          Franja horaria habilitada por día para que el cliente elija retiro y devolución (misma
+          franja para ambos). Los días cerrados no se pueden seleccionar. Aplica al checkout del
+          cliente — los pedidos cargados a mano en el back-office no se restringen.
         </p>
       </div>
       <div className="border-t hairline pt-3 space-y-2">
-        {cfg && DIAS_ORDEN.map(([key, label]) => {
-          const d = cfg[key];
-          return (
-            <div key={key} className="flex items-center gap-3">
-              <label className="flex items-center gap-2 w-40 shrink-0 text-sm">
-                <input
-                  type="checkbox"
-                  checked={d.abierto}
-                  onChange={(e) => setDia(key, { abierto: e.target.checked })}
-                />
-                <span className={d.abierto ? "text-ink" : "text-muted-foreground line-through"}>{label}</span>
-              </label>
-              {d.abierto ? (
-                <div className="flex items-center gap-1.5 text-sm">
-                  <Input
-                    type="time"
-                    step={1800}
-                    value={d.desde}
-                    onChange={(e) => setDia(key, { desde: e.target.value })}
-                    className="w-28"
+        {cfg &&
+          DIAS_ORDEN.map(([key, label]) => {
+            const d = cfg[key];
+            return (
+              <div key={key} className="flex items-center gap-3">
+                <label className="flex items-center gap-2 w-40 shrink-0 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={d.abierto}
+                    onChange={(e) => setDia(key, { abierto: e.target.checked })}
                   />
-                  <span className="text-muted-foreground">–</span>
-                  <Input
-                    type="time"
-                    step={1800}
-                    value={d.hasta}
-                    onChange={(e) => setDia(key, { hasta: e.target.value })}
-                    className="w-28"
-                  />
-                </div>
-              ) : (
-                <span className="text-xs text-muted-foreground italic">Cerrado</span>
-              )}
-            </div>
-          );
-        })}
+                  <span className={d.abierto ? "text-ink" : "text-muted-foreground line-through"}>
+                    {label}
+                  </span>
+                </label>
+                {d.abierto ? (
+                  <div className="flex items-center gap-1.5 text-sm">
+                    <Input
+                      type="time"
+                      step={1800}
+                      value={d.desde}
+                      onChange={(e) => setDia(key, { desde: e.target.value })}
+                      className="w-28"
+                    />
+                    <span className="text-muted-foreground">–</span>
+                    <Input
+                      type="time"
+                      step={1800}
+                      value={d.hasta}
+                      onChange={(e) => setDia(key, { hasta: e.target.value })}
+                      className="w-28"
+                    />
+                  </div>
+                ) : (
+                  <span className="text-xs text-muted-foreground italic">Cerrado</span>
+                )}
+              </div>
+            );
+          })}
         <div className="pt-2">
           <Button size="sm" onClick={save} disabled={!cfg || updateMut.isPending}>
             {updateMut.isPending ? "Guardando…" : "Guardar horarios"}
@@ -359,7 +410,6 @@ function HorariosSection() {
     </section>
   );
 }
-
 
 // ── Preguntas frecuentes (editables) ────────────────────────────────────────
 
@@ -379,7 +429,9 @@ function FaqSection() {
     if (groups !== null || !settingQ.isFetched) return;
     const parsed = parseFaq(settingQ.data?.value);
     // Clonamos para no mutar el default importado.
-    setGroups(parsed ?? FAQ_GROUPS.map((g) => ({ title: g.title, items: g.items.map((i) => ({ ...i })) })));
+    setGroups(
+      parsed ?? FAQ_GROUPS.map((g) => ({ title: g.title, items: g.items.map((i) => ({ ...i })) })),
+    );
   }, [settingQ.data, settingQ.isFetched, groups]);
 
   const updateMut = useMutation({
@@ -394,16 +446,29 @@ function FaqSection() {
   const setGroup = (gi: number, patch: Partial<FaqGroup>) =>
     setGroups((prev) => prev && prev.map((g, i) => (i === gi ? { ...g, ...patch } : g)));
   const setItem = (gi: number, ii: number, patch: Partial<{ q: string; a: string }>) =>
-    setGroups((prev) =>
-      prev && prev.map((g, i) =>
-        i === gi ? { ...g, items: g.items.map((it, j) => (j === ii ? { ...it, ...patch } : it)) } : g,
-      ),
+    setGroups(
+      (prev) =>
+        prev &&
+        prev.map((g, i) =>
+          i === gi
+            ? { ...g, items: g.items.map((it, j) => (j === ii ? { ...it, ...patch } : it)) }
+            : g,
+        ),
     );
   const addItem = (gi: number) =>
-    setGroups((prev) => prev && prev.map((g, i) => (i === gi ? { ...g, items: [...g.items, { q: "", a: "" }] } : g)));
+    setGroups(
+      (prev) =>
+        prev &&
+        prev.map((g, i) => (i === gi ? { ...g, items: [...g.items, { q: "", a: "" }] } : g)),
+    );
   const removeItem = (gi: number, ii: number) =>
-    setGroups((prev) => prev && prev.map((g, i) => (i === gi ? { ...g, items: g.items.filter((_, j) => j !== ii) } : g)));
-  const addGroup = () => setGroups((prev) => [...(prev ?? []), { title: "Nueva sección", items: [] }]);
+    setGroups(
+      (prev) =>
+        prev &&
+        prev.map((g, i) => (i === gi ? { ...g, items: g.items.filter((_, j) => j !== ii) } : g)),
+    );
+  const addGroup = () =>
+    setGroups((prev) => [...(prev ?? []), { title: "Nueva sección", items: [] }]);
   const removeGroup = (gi: number) => setGroups((prev) => prev && prev.filter((_, i) => i !== gi));
 
   const save = () => {
@@ -440,7 +505,9 @@ function FaqSection() {
                 className="font-medium"
               />
               <Button
-                type="button" size="icon" variant="ghost"
+                type="button"
+                size="icon"
+                variant="ghost"
                 onClick={() => removeGroup(gi)}
                 title="Eliminar sección"
               >
@@ -466,7 +533,9 @@ function FaqSection() {
                   />
                 </div>
                 <Button
-                  type="button" size="icon" variant="ghost"
+                  type="button"
+                  size="icon"
+                  variant="ghost"
                   onClick={() => removeItem(gi, ii)}
                   title="Eliminar pregunta"
                 >
@@ -493,7 +562,6 @@ function FaqSection() {
     </section>
   );
 }
-
 
 // ── Apariencia (logo del sitio) ─────────────────────────────────────────────
 
@@ -580,11 +648,12 @@ function AparienciaSection() {
 
 function RankingSection() {
   const qc = useQueryClient();
-  const [reporte, setReporte] = useState<Awaited<ReturnType<typeof adminApi.recalcularRanking>> | null>(null);
+  const [reporte, setReporte] = useState<Awaited<
+    ReturnType<typeof adminApi.recalcularRanking>
+  > | null>(null);
 
   const recalcMut = useMutation({
-    mutationFn: (dry_run: boolean) =>
-      adminApi.recalcularRanking({ dry_run, ventana_dias: 180 }),
+    mutationFn: (dry_run: boolean) => adminApi.recalcularRanking({ dry_run, ventana_dias: 180 }),
     onSuccess: (data) => {
       setReporte(data);
       if (!data.dry_run) {
@@ -605,10 +674,9 @@ function RankingSection() {
           <Sparkles className="h-4 w-4 text-amber" /> Ranking automático
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Calcula la prioridad de cada equipo en el catálogo basándose en
-          el histórico de pedidos e ingresos de los últimos 180 días.
-          Normalizado por categoría (los equipos compiten contra sus pares,
-          no contra todo el inventario).
+          Calcula la prioridad de cada equipo en el catálogo basándose en el histórico de pedidos e
+          ingresos de los últimos 180 días. Normalizado por categoría (los equipos compiten contra
+          sus pares, no contra todo el inventario).
         </p>
       </div>
 
@@ -623,10 +691,7 @@ function RankingSection() {
           ) : null}
           Ver preview (dry-run)
         </Button>
-        <Button
-          onClick={() => recalcMut.mutate(false)}
-          disabled={recalcMut.isPending}
-        >
+        <Button onClick={() => recalcMut.mutate(false)} disabled={recalcMut.isPending}>
           {recalcMut.isPending && !recalcMut.variables ? (
             <Loader2 className="h-4 w-4 mr-1 animate-spin" />
           ) : null}
@@ -641,27 +706,37 @@ function RankingSection() {
               {reporte.dry_run ? "Preview (dry-run): " : "Aplicado: "}
             </span>
             <span className="text-muted-foreground">
-              {reporte.cambios.length} equipos {reporte.dry_run ? "cambiarían" : "actualizados"},
-              {" "}{reporte.sin_cambios} sin cambios. Ventana: {reporte.ventana_dias} días.
+              {reporte.cambios.length} equipos {reporte.dry_run ? "cambiarían" : "actualizados"},{" "}
+              {reporte.sin_cambios} sin cambios. Ventana: {reporte.ventana_dias} días.
             </span>
           </div>
           {reporte.cambios.length > 0 && (
             <div className="space-y-1 max-h-80 overflow-y-auto">
               {reporte.cambios
                 .slice()
-                .sort((a, b) => (b.despues.score - b.antes.score) - (a.despues.score - a.antes.score))
+                .sort((a, b) => b.despues.score - b.antes.score - (a.despues.score - a.antes.score))
                 .slice(0, 20)
                 .map((c) => {
                   const delta = c.despues.score - c.antes.score;
                   return (
-                    <div key={c.id} className="flex items-center justify-between gap-2 text-xs py-1 border-b hairline last:border-0">
+                    <div
+                      key={c.id}
+                      className="flex items-center justify-between gap-2 text-xs py-1 border-b hairline last:border-0"
+                    >
                       <span className="text-ink truncate flex-1">{c.nombre}</span>
                       <span className="text-muted-foreground tabular shrink-0">
                         {c.antes.score} → {c.despues.score}
                       </span>
-                      <span className={`tabular shrink-0 inline-flex items-center gap-0.5 ${delta > 0 ? "text-green-600" : delta < 0 ? "text-destructive" : "text-muted-foreground"}`}>
-                        {delta > 0 ? <TrendingUp className="h-3 w-3" /> : delta < 0 ? <TrendingDown className="h-3 w-3" /> : null}
-                        {delta > 0 ? "+" : ""}{delta}
+                      <span
+                        className={`tabular shrink-0 inline-flex items-center gap-0.5 ${delta > 0 ? "text-green-600" : delta < 0 ? "text-destructive" : "text-muted-foreground"}`}
+                      >
+                        {delta > 0 ? (
+                          <TrendingUp className="h-3 w-3" />
+                        ) : delta < 0 ? (
+                          <TrendingDown className="h-3 w-3" />
+                        ) : null}
+                        {delta > 0 ? "+" : ""}
+                        {delta}
                       </span>
                     </div>
                   );
@@ -747,18 +822,20 @@ function CambioYPreciosSection() {
     if (!s) return "—";
     try {
       return new Date(s).toLocaleString("es-AR", {
-        dateStyle: "medium", timeStyle: "short",
+        dateStyle: "medium",
+        timeStyle: "short",
       });
     } catch {
       return s;
     }
   };
-  const modeLabel = (m: RecalcMode) => ({
-    missing: "Sólo equipos sin precio",
-    auto: "Sólo precios automáticos",
-    all: "Todos (incluye manuales)",
-    ids: "Selección personalizada",
-  }[m]);
+  const modeLabel = (m: RecalcMode) =>
+    ({
+      missing: "Sólo equipos sin precio",
+      auto: "Sólo precios automáticos",
+      all: "Todos (incluye manuales)",
+      ids: "Selección personalizada",
+    })[m];
 
   return (
     <>
@@ -766,8 +843,8 @@ function CambioYPreciosSection() {
         <header>
           <h2 className="font-display text-lg text-ink">Tipo de cambio &amp; precios</h2>
           <p className="text-sm text-muted-foreground">
-            Cotización del dólar usada para calcular el precio de jornada en pesos.
-            Actualizalo a fin de mes y después aplicá el recálculo masivo.
+            Cotización del dólar usada para calcular el precio de jornada en pesos. Actualizalo a
+            fin de mes y después aplicá el recálculo masivo.
           </p>
         </header>
 
@@ -804,25 +881,30 @@ function CambioYPreciosSection() {
             <p className="text-xs text-muted-foreground">
               <code className="font-mono text-[11px] bg-muted/50 px-1 py-0.5 rounded">
                 precio_jornada = precio_usd × usd_rate × (roi_pct / 100)
-              </code>
-              {" "}— redondeado al múltiplo de 100 más cercano.
+              </code>{" "}
+              — redondeado al múltiplo de 100 más cercano.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
-              variant="outline" size="sm"
+              variant="outline"
+              size="sm"
               onClick={() => dryRunMut.mutate({ mode: "auto" })}
               disabled={dryRunMut.isPending}
               title="Respeta los precios marcados como manuales"
             >
               {dryRunMut.isPending ? (
-                <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Calculando…</>
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Calculando…
+                </>
               ) : (
                 "Sólo automáticos (recomendado)"
               )}
             </Button>
             <Button
-              variant="ghost" size="sm"
+              variant="ghost"
+              size="sm"
               onClick={() => dryRunMut.mutate({ mode: "missing" })}
               disabled={dryRunMut.isPending}
               title="Sólo equipos que aún no tienen precio cargado"
@@ -830,7 +912,8 @@ function CambioYPreciosSection() {
               Sólo sin precio
             </Button>
             <Button
-              variant="ghost" size="sm"
+              variant="ghost"
+              size="sm"
               onClick={() => dryRunMut.mutate({ mode: "all" })}
               disabled={dryRunMut.isPending}
               title="Pisa los precios manuales también — usar con cuidado"
@@ -841,34 +924,38 @@ function CambioYPreciosSection() {
           </div>
         </div>
 
-        <PreciosManualesPanel
-          onRecalcSelected={(ids) => dryRunMut.mutate({ mode: "ids", ids })}
-        />
+        <PreciosManualesPanel onRecalcSelected={(ids) => dryRunMut.mutate({ mode: "ids", ids })} />
       </section>
 
-      <AlertDialog open={!!confirmRecalc} onOpenChange={(v) => { if (!v) setConfirmRecalc(null); }}>
+      <AlertDialog
+        open={!!confirmRecalc}
+        onOpenChange={(v) => {
+          if (!v) setConfirmRecalc(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
               ¿Aplicar recálculo a {confirmRecalc?.preview.total_cambios} equipos?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Modo: <strong>{confirmRecalc && modeLabel(confirmRecalc.mode)}</strong>.
-              {" "}De {confirmRecalc?.preview.total_evaluados} equipos evaluados,
-              {" "}{confirmRecalc?.preview.total_cambios} cambiarían su precio en pesos.
+              Modo: <strong>{confirmRecalc && modeLabel(confirmRecalc.mode)}</strong>. De{" "}
+              {confirmRecalc?.preview.total_evaluados} equipos evaluados,{" "}
+              {confirmRecalc?.preview.total_cambios} cambiarían su precio en pesos.
               {confirmRecalc?.mode === "all" && (
                 <span className="block mt-2 text-destructive">
                   ⚠️ Vas a pisar también los precios marcados como manuales.
                 </span>
-              )}
-              {" "}Esta acción no se puede deshacer automáticamente.
+              )}{" "}
+              Esta acción no se puede deshacer automáticamente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() =>
-                confirmRecalc && applyMut.mutate({
+                confirmRecalc &&
+                applyMut.mutate({
                   mode: confirmRecalc.mode,
                   ids: confirmRecalc.ids,
                 })
@@ -884,15 +971,10 @@ function CambioYPreciosSection() {
   );
 }
 
-
 /** Lista los equipos con precio_jornada_manual=TRUE y muestra qué precio
  *  daría la fórmula con el USD rate actual. Permite seleccionar manualmente
  *  cuáles recalcular (los demás conservan su precio fijado). */
-function PreciosManualesPanel({
-  onRecalcSelected,
-}: {
-  onRecalcSelected: (ids: number[]) => void;
-}) {
+function PreciosManualesPanel({ onRecalcSelected }: { onRecalcSelected: (ids: number[]) => void }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [expanded, setExpanded] = useState(false);
 
@@ -932,7 +1014,8 @@ function PreciosManualesPanel({
   const toggleOne = (id: number) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -955,7 +1038,8 @@ function PreciosManualesPanel({
           </p>
         </div>
         <Button
-          variant="ghost" size="sm"
+          variant="ghost"
+          size="sm"
           onClick={() => setExpanded((e) => !e)}
           className="shrink-0 h-7 text-xs"
         >
@@ -972,10 +1056,13 @@ function PreciosManualesPanel({
                 onClick={toggleAll}
                 className="text-[11px] underline hover:text-ink"
               >
-                {selected.size === conDelta.length ? "Deseleccionar todos" : "Seleccionar todos los que cambian"}
+                {selected.size === conDelta.length
+                  ? "Deseleccionar todos"
+                  : "Seleccionar todos los que cambian"}
               </button>
               <Button
-                size="sm" className="h-7 text-xs"
+                size="sm"
+                className="h-7 text-xs"
                 disabled={selected.size === 0}
                 onClick={() => onRecalcSelected([...selected])}
               >
@@ -1011,7 +1098,8 @@ function PreciosManualesPanel({
                       {it.nombre}
                       {(it.marca || it.modelo) && (
                         <span className="text-muted-foreground">
-                          {" "}— {[it.marca, it.modelo].filter(Boolean).join(" / ")}
+                          {" "}
+                          — {[it.marca, it.modelo].filter(Boolean).join(" / ")}
                         </span>
                       )}
                     </td>
@@ -1021,13 +1109,17 @@ function PreciosManualesPanel({
                     <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
                       {fmtPrecio(it.precio_calculado)}
                     </td>
-                    <td className={
-                      "px-3 py-1.5 text-right tabular-nums " +
-                      (cambia ? (it.delta! > 0 ? "text-emerald-600" : "text-destructive") : "text-muted-foreground")
-                    }>
-                      {cambia
-                        ? `${it.delta! > 0 ? "+" : ""}${fmtPrecio(it.delta).slice(1)}`
-                        : "—"}
+                    <td
+                      className={
+                        "px-3 py-1.5 text-right tabular-nums " +
+                        (cambia
+                          ? it.delta! > 0
+                            ? "text-emerald-600"
+                            : "text-destructive"
+                          : "text-muted-foreground")
+                      }
+                    >
+                      {cambia ? `${it.delta! > 0 ? "+" : ""}${fmtPrecio(it.delta).slice(1)}` : "—"}
                     </td>
                   </tr>
                 );
@@ -1039,4 +1131,3 @@ function PreciosManualesPanel({
     </div>
   );
 }
-

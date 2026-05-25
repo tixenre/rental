@@ -18,12 +18,15 @@ export function StatCard({
       <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </div>
-      <div className={cn("mt-1.5 font-display text-2xl font-black leading-none tabular-nums text-ink", valueClassName)}>
+      <div
+        className={cn(
+          "mt-1.5 font-display text-2xl font-black leading-none tabular-nums text-ink",
+          valueClassName,
+        )}
+      >
         {value}
       </div>
-      {meta && (
-        <div className="mt-1 font-mono text-[10px] text-muted-foreground">{meta}</div>
-      )}
+      {meta && <div className="mt-1 font-mono text-[10px] text-muted-foreground">{meta}</div>}
     </div>
   );
 }

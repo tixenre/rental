@@ -1,8 +1,4 @@
-import {
-  Drawer,
-  DrawerContent,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
 
 type Action = {
@@ -50,9 +46,7 @@ export function ActionMenu({ open, onOpenChange, title, actions }: Props) {
               onClick={() => handle(action)}
               className="flex h-14 w-full items-center gap-3 px-5 text-left transition hover:bg-muted active:bg-muted"
             >
-              {action.icon && (
-                <span className="shrink-0 text-muted-foreground">{action.icon}</span>
-              )}
+              {action.icon && <span className="shrink-0 text-muted-foreground">{action.icon}</span>}
               <span className="font-medium">{action.label}</span>
             </button>
           ))}
@@ -67,9 +61,7 @@ export function ActionMenu({ open, onOpenChange, title, actions }: Props) {
                   onClick={() => handle(action)}
                   className="flex h-14 w-full items-center gap-3 px-5 text-left transition hover:bg-destructive/5 active:bg-destructive/10"
                 >
-                  {action.icon && (
-                    <span className="shrink-0 text-destructive">{action.icon}</span>
-                  )}
+                  {action.icon && <span className="shrink-0 text-destructive">{action.icon}</span>}
                   <span className="font-medium text-destructive">{action.label}</span>
                 </button>
               ))}

@@ -9,8 +9,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { adminApi } from "@/lib/admin/api";
 
-const SETTINGS_STALE_MS = 5 * 60_000;   // 5 min — el USD lo cambia el admin manualmente
-const SETTINGS_CACHE_MS = 30 * 60_000;  // 30 min retain
+const SETTINGS_STALE_MS = 5 * 60_000; // 5 min — el USD lo cambia el admin manualmente
+const SETTINGS_CACHE_MS = 30 * 60_000; // 30 min retain
 
 /** Tipo de cambio ARS por 1 USD. Default 1000 si falla la red.
  *  El componente que lo use puede mostrar un fallback hasta que cargue. */

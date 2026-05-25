@@ -40,12 +40,7 @@ export function AddonPills({
   const extraCount = list.length - visible.length;
 
   return (
-    <div
-      className={cn(
-        "flex flex-nowrap items-center gap-1 overflow-hidden",
-        className,
-      )}
-    >
+    <div className={cn("flex flex-nowrap items-center gap-1 overflow-hidden", className)}>
       {visible.map((it, i) => (
         <AddonPill key={`${it.id ?? it.name}-${i}`} item={it} />
       ))}

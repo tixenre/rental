@@ -13,15 +13,32 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Trash2, ChevronRight, ChevronDown, GripVertical, Check, X } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  Trash2,
+  ChevronRight,
+  ChevronDown,
+  GripVertical,
+  Check,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
   useDroppable,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy,
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -30,21 +47,30 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 
 import { adminApi } from "@/lib/admin/api";
 import { AddEquiposToCategoriaDialog } from "./AddEquiposToCategoriaDialog";
 import { EquiposCountToggle, EquiposPanel } from "./EquiposEnCategoriaList";
 import { Users, Wrench } from "lucide-react";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SpecTemplatesSection } from "@/components/admin/specs/SpecTemplatesSection";
 import { NombreTemplateDialog } from "./NombreTemplateDialog";
 import { Type } from "lucide-react";
 
-type RowItem = { id: number; nombre: string; prioridad: number; parent_id: number | null; total: number; nombre_publico_template?: string | null };
+type RowItem = {
+  id: number;
+  nombre: string;
+  prioridad: number;
+  parent_id: number | null;
+  total: number;
+  nombre_publico_template?: string | null;
+};
 
 /** Tipos de elemento draggable. Va en `data` del useSortable / useDroppable. */
 type DragData =
@@ -66,9 +92,17 @@ export function CategoriasSection() {
   const [newChildName, setNewChildName] = useState("");
   const [newRoot, setNewRoot] = useState("");
   const [hideEmpty, setHideEmpty] = useState(false);
-  const [addingEquiposTo, setAddingEquiposTo] = useState<{ id: number; nombre: string } | null>(null);
-  const [editingSpecsFor, setEditingSpecsFor] = useState<{ id: number; nombre: string } | null>(null);
-  const [editingTemplateFor, setEditingTemplateFor] = useState<{ id: number; nombre: string; template: string | null } | null>(null);
+  const [addingEquiposTo, setAddingEquiposTo] = useState<{ id: number; nombre: string } | null>(
+    null,
+  );
+  const [editingSpecsFor, setEditingSpecsFor] = useState<{ id: number; nombre: string } | null>(
+    null,
+  );
+  const [editingTemplateFor, setEditingTemplateFor] = useState<{
+    id: number;
+    nombre: string;
+    template: string | null;
+  } | null>(null);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["admin", "categorias"] });
@@ -77,28 +111,46 @@ export function CategoriasSection() {
   };
 
   const updateMut = useMutation({
-    mutationFn: ({ id, ...patch }: { id: number; nombre?: string; prioridad?: number; parent_id?: number | null; set_parent_null?: boolean }) =>
-      adminApi.adminUpdateCategoria(id, patch),
-    onSuccess: () => { invalidate(); },
+    mutationFn: ({
+      id,
+      ...patch
+    }: {
+      id: number;
+      nombre?: string;
+      prioridad?: number;
+      parent_id?: number | null;
+      set_parent_null?: boolean;
+    }) => adminApi.adminUpdateCategoria(id, patch),
+    onSuccess: () => {
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const createMut = useMutation({
     mutationFn: (data: { nombre: string; prioridad?: number; parent_id?: number | null }) =>
       adminApi.adminCreateCategoria(data),
-    onSuccess: () => { invalidate(); toast.success("Categoría creada"); },
+    onSuccess: () => {
+      invalidate();
+      toast.success("Categoría creada");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => adminApi.adminDeleteCategoria(id),
-    onSuccess: () => { invalidate(); toast.success("Categoría eliminada"); },
+    onSuccess: () => {
+      invalidate();
+      toast.success("Categoría eliminada");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const reorderMut = useMutation({
     mutationFn: (ids: number[]) => adminApi.adminReorderCategorias(ids),
-    onSuccess: () => { invalidate(); },
+    onSuccess: () => {
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -130,7 +182,10 @@ export function CategoriasSection() {
   const childrenOfDisplay = (pid: number): RowItem[] =>
     localChildrenMap[pid] ?? tree.childrenOf(pid);
 
-  useEffect(() => { setLocalRoots(null); setLocalChildrenMap({}); }, [tree.roots, tree.all]);
+  useEffect(() => {
+    setLocalRoots(null);
+    setLocalChildrenMap({});
+  }, [tree.roots, tree.all]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -223,7 +278,10 @@ export function CategoriasSection() {
         updateMut.mutate(
           { id: activeChildId, parent_id: targetParentId },
           {
-            onSuccess: () => toast.success(`Movida a "${displayRoots.find((r) => r.id === targetParentId)?.nombre ?? "otra raíz"}"`),
+            onSuccess: () =>
+              toast.success(
+                `Movida a "${displayRoots.find((r) => r.id === targetParentId)?.nombre ?? "otra raíz"}"`,
+              ),
           },
         );
       }
@@ -283,7 +341,9 @@ export function CategoriasSection() {
         <div>
           <h2 className="font-display text-lg text-ink">Categorías</h2>
           <p className="text-sm text-muted-foreground">
-            Árbol de hasta 3 niveles. Arrastrá para reordenar las raíces y subcategorías. Una subcategoría se puede mover a otra raíz arrastrándola al área de hijas correspondiente. Los nietos (3er nivel) se crean con el botón + en cada subcategoría.
+            Árbol de hasta 3 niveles. Arrastrá para reordenar las raíces y subcategorías. Una
+            subcategoría se puede mover a otra raíz arrastrándola al área de hijas correspondiente.
+            Los nietos (3er nivel) se crean con el botón + en cada subcategoría.
           </p>
         </div>
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none cursor-pointer shrink-0">
@@ -308,7 +368,10 @@ export function CategoriasSection() {
 
       {displayRoots.length > 0 && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={displayRoots.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext
+            items={displayRoots.map((r) => r.id)}
+            strategy={verticalListSortingStrategy}
+          >
             <ul className="divide-y hairline border hairline rounded-md">
               {displayRoots.map((root) => {
                 const children = childrenOfDisplay(root.id);
@@ -327,10 +390,15 @@ export function CategoriasSection() {
                         deleteMut.mutate(root.id);
                       }
                     }}
-                    onAddChild={() => { setNewChildFor(root.id); setNewChildName(""); }}
+                    onAddChild={() => {
+                      setNewChildFor(root.id);
+                      setNewChildName("");
+                    }}
                     onAddEquipos={(id, nombre) => setAddingEquiposTo({ id, nombre })}
                     onEditSpecs={(id, nombre) => setEditingSpecsFor({ id, nombre })}
-                    onEditTemplate={(id, nombre, template) => setEditingTemplateFor({ id, nombre, template })}
+                    onEditTemplate={(id, nombre, template) =>
+                      setEditingTemplateFor({ id, nombre, template })
+                    }
                     newChildFor={newChildFor}
                     newChildName={newChildName}
                     setNewChildName={setNewChildName}
@@ -341,7 +409,9 @@ export function CategoriasSection() {
                     onCancelChild={() => setNewChildFor(null)}
                     onRenameChild={(id, n) => updateMut.mutate({ id, nombre: n })}
                     onChangeParent={(id, pid) =>
-                      updateMut.mutate(pid === null ? { id, set_parent_null: true } : { id, parent_id: pid })
+                      updateMut.mutate(
+                        pid === null ? { id, set_parent_null: true } : { id, parent_id: pid },
+                      )
                     }
                     onDeleteChild={(id, name) => {
                       if (confirm(`Eliminar subcategoría "${name}"?`)) deleteMut.mutate(id);
@@ -390,7 +460,9 @@ export function CategoriasSection() {
       {addingEquiposTo && (
         <AddEquiposToCategoriaDialog
           open={true}
-          onOpenChange={(v) => { if (!v) setAddingEquiposTo(null); }}
+          onOpenChange={(v) => {
+            if (!v) setAddingEquiposTo(null);
+          }}
           categoriaId={addingEquiposTo.id}
           categoriaNombre={addingEquiposTo.nombre}
         />
@@ -398,19 +470,16 @@ export function CategoriasSection() {
 
       <Dialog
         open={!!editingSpecsFor}
-        onOpenChange={(v) => { if (!v) setEditingSpecsFor(null); }}
+        onOpenChange={(v) => {
+          if (!v) setEditingSpecsFor(null);
+        }}
       >
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              Specs de "{editingSpecsFor?.nombre}"
-            </DialogTitle>
+            <DialogTitle>Specs de "{editingSpecsFor?.nombre}"</DialogTitle>
           </DialogHeader>
           {editingSpecsFor && (
-            <SpecTemplatesSection
-              fixedCategoriaId={editingSpecsFor.id}
-              showHeader={false}
-            />
+            <SpecTemplatesSection fixedCategoriaId={editingSpecsFor.id} showHeader={false} />
           )}
         </DialogContent>
       </Dialog>
@@ -418,7 +487,9 @@ export function CategoriasSection() {
       {editingTemplateFor && (
         <NombreTemplateDialog
           open={true}
-          onOpenChange={(v) => { if (!v) setEditingTemplateFor(null); }}
+          onOpenChange={(v) => {
+            if (!v) setEditingTemplateFor(null);
+          }}
           categoriaId={editingTemplateFor.id}
           categoriaNombre={editingTemplateFor.nombre}
           initialTemplate={editingTemplateFor.template}
@@ -431,13 +502,29 @@ export function CategoriasSection() {
 // ── Sortable root item ──────────────────────────────────────────────────────
 
 function SortableRootItem({
-  root, children, allRoots, isOpen,
-  onToggle, onRename, onDelete, onAddChild,
-  newChildFor, newChildName, setNewChildName,
-  onCreateChild, onCancelChild,
-  onRenameChild, onChangeParent, onDeleteChild,
-  grandchildrenOf, onCreateGrandchild, onRenameGrandchild, onDeleteGrandchild,
-  onAddEquipos, onEditSpecs, onEditTemplate,
+  root,
+  children,
+  allRoots,
+  isOpen,
+  onToggle,
+  onRename,
+  onDelete,
+  onAddChild,
+  newChildFor,
+  newChildName,
+  setNewChildName,
+  onCreateChild,
+  onCancelChild,
+  onRenameChild,
+  onChangeParent,
+  onDeleteChild,
+  grandchildrenOf,
+  onCreateGrandchild,
+  onRenameGrandchild,
+  onDeleteGrandchild,
+  onAddEquipos,
+  onEditSpecs,
+  onEditTemplate,
 }: {
   root: RowItem;
   children: RowItem[];
@@ -463,11 +550,10 @@ function SortableRootItem({
   onEditSpecs: (id: number, nombre: string) => void;
   onEditTemplate: (id: number, nombre: string, template: string | null) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({
-      id: root.id,
-      data: { type: "root", rootId: root.id } satisfies DragData,
-    });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: root.id,
+    data: { type: "root", rootId: root.id } satisfies DragData,
+  });
 
   // Droppable zone para recibir hijas de otros padres (cross-parent move).
   const dropZone = useDroppable({
@@ -506,8 +592,14 @@ function SortableRootItem({
           aria-label={isOpen ? "Colapsar" : "Expandir"}
         >
           {children.length > 0 ? (
-            isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
-          ) : <span className="h-4 w-4 inline-block" />}
+            isOpen ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )
+          ) : (
+            <span className="h-4 w-4 inline-block" />
+          )}
         </button>
 
         <EditableNameInput
@@ -548,10 +640,22 @@ function SortableRootItem({
         >
           <Type className="h-4 w-4" />
         </Button>
-        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onAddChild} title="Agregar subcategoría">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8"
+          onClick={onAddChild}
+          title="Agregar subcategoría"
+        >
           <Plus className="h-4 w-4" />
         </Button>
-        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={onDelete} title="Eliminar">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 text-destructive"
+          onClick={onDelete}
+          title="Eliminar"
+        >
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
@@ -607,14 +711,21 @@ function SortableRootItem({
                     onChange={(e) => setNewChildName(e.target.value)}
                     className="h-8 flex-1"
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && newChildName.trim()) onCreateChild(newChildName.trim());
+                      if (e.key === "Enter" && newChildName.trim())
+                        onCreateChild(newChildName.trim());
                       if (e.key === "Escape") onCancelChild();
                     }}
                   />
-                  <Button size="sm" disabled={!newChildName.trim()} onClick={() => onCreateChild(newChildName.trim())}>
+                  <Button
+                    size="sm"
+                    disabled={!newChildName.trim()}
+                    onClick={() => onCreateChild(newChildName.trim())}
+                  >
                     Agregar
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={onCancelChild}>Cancelar</Button>
+                  <Button size="sm" variant="ghost" onClick={onCancelChild}>
+                    Cancelar
+                  </Button>
                 </li>
               )}
             </ul>
@@ -626,10 +737,18 @@ function SortableRootItem({
 }
 
 function SortableChildItem({
-  child, parents, grandchildren = [],
-  onRename, onChangeParent, onDelete,
-  onCreateGrandchild, onRenameGrandchild, onDeleteGrandchild,
-  onAddEquipos, onEditSpecs, onEditTemplate,
+  child,
+  parents,
+  grandchildren = [],
+  onRename,
+  onChangeParent,
+  onDelete,
+  onCreateGrandchild,
+  onRenameGrandchild,
+  onDeleteGrandchild,
+  onAddEquipos,
+  onEditSpecs,
+  onEditTemplate,
 }: {
   child: RowItem;
   parents: RowItem[];
@@ -644,11 +763,10 @@ function SortableChildItem({
   onEditSpecs?: (id: number, nombre: string) => void;
   onEditTemplate?: (id: number, nombre: string, template: string | null) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({
-      id: child.id,
-      data: { type: "child", childId: child.id, parentId: child.parent_id ?? 0 } satisfies DragData,
-    });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: child.id,
+    data: { type: "child", childId: child.id, parentId: child.parent_id ?? 0 } satisfies DragData,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -672,11 +790,7 @@ function SortableChildItem({
         >
           <GripVertical className="h-4 w-4" />
         </button>
-        <EditableNameInput
-          value={child.nombre}
-          onSave={onRename}
-          className="h-8 flex-1"
-        />
+        <EditableNameInput value={child.nombre} onSave={onRename} className="h-8 flex-1" />
         <EquiposCountToggle
           count={child.total}
           isOpen={equiposOpen}
@@ -710,7 +824,9 @@ function SortableChildItem({
             size="icon"
             variant="ghost"
             className="h-8 w-8 text-muted-foreground hover:text-ink"
-            onClick={() => onEditTemplate(child.id, child.nombre, child.nombre_publico_template ?? null)}
+            onClick={() =>
+              onEditTemplate(child.id, child.nombre, child.nombre_publico_template ?? null)
+            }
             title="Plantilla de nombre público"
           >
             <Type className="h-4 w-4" />
@@ -721,13 +837,22 @@ function SortableChildItem({
             size="icon"
             variant="ghost"
             className="h-8 w-8 text-muted-foreground hover:text-ink"
-            onClick={() => { setAddingGrand(true); setNewGrandName(""); }}
+            onClick={() => {
+              setAddingGrand(true);
+              setNewGrandName("");
+            }}
             title="Agregar nieto"
           >
             <Plus className="h-4 w-4" />
           </Button>
         )}
-        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={onDelete} title="Eliminar">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8 text-destructive"
+          onClick={onDelete}
+          title="Eliminar"
+        >
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
@@ -765,38 +890,38 @@ function SortableChildItem({
                 />
               ))}
               {addingGrand && (
-            <li className="px-3 py-1.5 flex items-center gap-2">
-              <Input
-                autoFocus
-                placeholder="Nombre del nieto (3er nivel)"
-                value={newGrandName}
-                onChange={(e) => setNewGrandName(e.target.value)}
-                className="h-7 flex-1"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newGrandName.trim() && onCreateGrandchild) {
-                    onCreateGrandchild(child.id, newGrandName.trim());
-                    setAddingGrand(false);
-                  }
-                  if (e.key === "Escape") setAddingGrand(false);
-                }}
-              />
-              <Button
-                size="sm"
-                disabled={!newGrandName.trim()}
-                onClick={() => {
-                  if (onCreateGrandchild && newGrandName.trim()) {
-                    onCreateGrandchild(child.id, newGrandName.trim());
-                    setAddingGrand(false);
-                  }
-                }}
-              >
-                Agregar
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setAddingGrand(false)}>
-                Cancelar
-              </Button>
-            </li>
-          )}
+                <li className="px-3 py-1.5 flex items-center gap-2">
+                  <Input
+                    autoFocus
+                    placeholder="Nombre del nieto (3er nivel)"
+                    value={newGrandName}
+                    onChange={(e) => setNewGrandName(e.target.value)}
+                    className="h-7 flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newGrandName.trim() && onCreateGrandchild) {
+                        onCreateGrandchild(child.id, newGrandName.trim());
+                        setAddingGrand(false);
+                      }
+                      if (e.key === "Escape") setAddingGrand(false);
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={!newGrandName.trim()}
+                    onClick={() => {
+                      if (onCreateGrandchild && newGrandName.trim()) {
+                        onCreateGrandchild(child.id, newGrandName.trim());
+                        setAddingGrand(false);
+                      }
+                    }}
+                  >
+                    Agregar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setAddingGrand(false)}>
+                    Cancelar
+                  </Button>
+                </li>
+              )}
             </ul>
           </SortableContext>
         </ChildZone>
@@ -818,7 +943,13 @@ function ChildZone({ childId, children }: { childId: number; children: React.Rea
 }
 
 function SortableGrandchildItem({
-  grand, parentChildId, onRename, onDelete, onAddEquipos, onEditSpecs, onEditTemplate,
+  grand,
+  parentChildId,
+  onRename,
+  onDelete,
+  onAddEquipos,
+  onEditSpecs,
+  onEditTemplate,
 }: {
   grand: RowItem;
   parentChildId: number;
@@ -828,11 +959,10 @@ function SortableGrandchildItem({
   onEditSpecs?: (id: number, nombre: string) => void;
   onEditTemplate?: (id: number, nombre: string, template: string | null) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({
-      id: grand.id,
-      data: { type: "grandchild", grandchildId: grand.id, parentChildId } satisfies DragData,
-    });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: grand.id,
+    data: { type: "grandchild", grandchildId: grand.id, parentChildId } satisfies DragData,
+  });
 
   const [equiposOpen, setEquiposOpen] = useState(false);
 
@@ -845,68 +975,66 @@ function SortableGrandchildItem({
   return (
     <li ref={setNodeRef} style={style}>
       <div className="flex items-center gap-1.5 px-3 py-1">
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        className="h-5 w-5 grid place-items-center text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
-        aria-label="Arrastrar nieto"
-      >
-        <GripVertical className="h-3 w-3" />
-      </button>
-      <EditableNameInput
-        value={grand.nombre}
-        onSave={onRename}
-        className="h-7 flex-1"
-      />
-      <EquiposCountToggle
-        count={grand.total}
-        isOpen={equiposOpen}
-        onToggle={() => setEquiposOpen((v) => !v)}
-        onAddWhenEmpty={onAddEquipos ? () => onAddEquipos(grand.id, grand.nombre) : undefined}
-      />
-      {onAddEquipos && (
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="h-5 w-5 grid place-items-center text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
+          aria-label="Arrastrar nieto"
+        >
+          <GripVertical className="h-3 w-3" />
+        </button>
+        <EditableNameInput value={grand.nombre} onSave={onRename} className="h-7 flex-1" />
+        <EquiposCountToggle
+          count={grand.total}
+          isOpen={equiposOpen}
+          onToggle={() => setEquiposOpen((v) => !v)}
+          onAddWhenEmpty={onAddEquipos ? () => onAddEquipos(grand.id, grand.nombre) : undefined}
+        />
+        {onAddEquipos && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-muted-foreground hover:text-ink"
+            onClick={() => onAddEquipos(grand.id, grand.nombre)}
+            title="Asignar equipos a esta categoría"
+          >
+            <Users className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        {onEditSpecs && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-muted-foreground hover:text-ink"
+            onClick={() => onEditSpecs(grand.id, grand.nombre)}
+            title="Editar specs de esta categoría"
+          >
+            <Wrench className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        {onEditTemplate && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-muted-foreground hover:text-ink"
+            onClick={() =>
+              onEditTemplate(grand.id, grand.nombre, grand.nombre_publico_template ?? null)
+            }
+            title="Plantilla de nombre público"
+          >
+            <Type className="h-3.5 w-3.5" />
+          </Button>
+        )}
         <Button
           size="icon"
           variant="ghost"
-          className="h-7 w-7 text-muted-foreground hover:text-ink"
-          onClick={() => onAddEquipos(grand.id, grand.nombre)}
-          title="Asignar equipos a esta categoría"
+          className="h-7 w-7 text-destructive"
+          onClick={onDelete}
+          title="Eliminar"
         >
-          <Users className="h-3.5 w-3.5" />
+          <Trash2 className="h-3.5 w-3.5" />
         </Button>
-      )}
-      {onEditSpecs && (
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-7 w-7 text-muted-foreground hover:text-ink"
-          onClick={() => onEditSpecs(grand.id, grand.nombre)}
-          title="Editar specs de esta categoría"
-        >
-          <Wrench className="h-3.5 w-3.5" />
-        </Button>
-      )}
-      {onEditTemplate && (
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-7 w-7 text-muted-foreground hover:text-ink"
-          onClick={() => onEditTemplate(grand.id, grand.nombre, grand.nombre_publico_template ?? null)}
-          title="Plantilla de nombre público"
-        >
-          <Type className="h-3.5 w-3.5" />
-        </Button>
-      )}
-      <Button
-        size="icon"
-        variant="ghost"
-        className="h-7 w-7 text-destructive"
-        onClick={onDelete}
-        title="Eliminar"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </Button>
       </div>
       {equiposOpen && (
         <EquiposPanel
@@ -919,7 +1047,6 @@ function SortableGrandchildItem({
     </li>
   );
 }
-
 
 // ── Input editable con feedback visual ────────────────────────────────────────
 //

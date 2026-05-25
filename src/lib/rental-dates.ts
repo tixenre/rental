@@ -42,10 +42,7 @@ export function computeJornadas(
   endTime: string,
 ): number {
   if (!startDate || !endDate) return 1;
-  return jornadasBetween(
-    combineDateTime(startDate, startTime),
-    combineDateTime(endDate, endTime),
-  );
+  return jornadasBetween(combineDateTime(startDate, startTime), combineDateTime(endDate, endTime));
 }
 
 /** Parsea un string ISO (date-only o datetime) a Date local estable. */
@@ -91,8 +88,13 @@ export type HorariosSemana = Record<string, FranjaHoraria | null>;
 /** Índice por Date.getDay(): 0=domingo … 6=sábado. */
 export const DIAS_KEY = ["dom", "lun", "mar", "mie", "jue", "vie", "sab"] as const;
 export const DIAS_LABEL: Record<string, string> = {
-  lun: "Lunes", mar: "Martes", mie: "Miércoles", jue: "Jueves",
-  vie: "Viernes", sab: "Sábado", dom: "Domingo",
+  lun: "Lunes",
+  mar: "Martes",
+  mie: "Miércoles",
+  jue: "Jueves",
+  vie: "Viernes",
+  sab: "Sábado",
+  dom: "Domingo",
 };
 
 export function diaKey(date: Date): string {

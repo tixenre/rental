@@ -43,7 +43,10 @@ function fallbackLogoUrl(nombre: string): string | null {
 }
 
 function initials(nombre: string): string {
-  const words = nombre.trim().split(/\s+/).filter((w) => w.length > 0);
+  const words = nombre
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0);
   if (words.length === 0) return "?";
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
   return (words[0][0] + words[1][0]).toUpperCase();
@@ -99,25 +102,15 @@ export function BrandCard({
               url={logoUrl!}
               ariaLabel={brand.nombre}
               fallback={
-                <img
-                  src={logoUrl!}
-                  alt={brand.nombre}
-                  onError={() => setImgFailed(true)}
-                />
+                <img src={logoUrl!} alt={brand.nombre} onError={() => setImgFailed(true)} />
               }
             />
           ) : (
-            <img
-              src={logoUrl!}
-              alt={brand.nombre}
-              onError={() => setImgFailed(true)}
-            />
+            <img src={logoUrl!} alt={brand.nombre} onError={() => setImgFailed(true)} />
           )}
         </span>
       ) : (
-        <span className="font-display text-3xl leading-none">
-          {initials(brand.nombre)}
-        </span>
+        <span className="font-display text-3xl leading-none">{initials(brand.nombre)}</span>
       )}
     </button>
   );

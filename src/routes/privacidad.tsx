@@ -38,12 +38,8 @@ function PrivacidadPage() {
         <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
           Legal
         </div>
-        <h1 className="font-display text-3xl md:text-4xl text-ink mt-1">
-          Política de privacidad
-        </h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          Última actualización: {LAST_UPDATED}
-        </p>
+        <h1 className="font-display text-3xl md:text-4xl text-ink mt-1">Política de privacidad</h1>
+        <p className="text-sm text-muted-foreground mt-2">Última actualización: {LAST_UPDATED}</p>
 
         <article className="mt-8 space-y-6 text-[15px] leading-relaxed text-foreground/90">
           {PRIVACY_SECTIONS.map((s) => (
@@ -55,8 +51,8 @@ function PrivacidadPage() {
         </article>
 
         <div className="mt-12 pt-6 border-t hairline text-xs text-muted-foreground">
-          Si encontrás algo que querés revisar o consultar, escribinos por
-          WhatsApp o email — los datos están en la sección 10.
+          Si encontrás algo que querés revisar o consultar, escribinos por WhatsApp o email — los
+          datos están en la sección 10.
         </div>
       </div>
     </PublicLayout>

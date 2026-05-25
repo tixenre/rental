@@ -12,15 +12,29 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import {
-  AlertTriangle, Database, Download, FileArchive, FileJson,
-  FileSpreadsheet, Loader2, Trash2, Upload, Users,
+  AlertTriangle,
+  Database,
+  Download,
+  FileArchive,
+  FileJson,
+  FileSpreadsheet,
+  Loader2,
+  Trash2,
+  Upload,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
-  AlertDialogTitle, AlertDialogTrigger,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,16 +51,40 @@ const CATALOG_ENTITIES = [
   { key: "marcas", label: "Marcas", desc: "Sony, Canon, Aputure, …" },
   { key: "categorias", label: "Categorías", desc: "Árbol jerárquico (Cámaras > Foto, Video, …)" },
   { key: "etiquetas", label: "Etiquetas", desc: "Tags libres asignados a equipos" },
-  { key: "spec_definitions", label: "Specs (definiciones)", desc: "Plantilla de specs por categoría raíz" },
-  { key: "categoria_spec_templates", label: "Specs (asignaciones)", desc: "Qué specs aplican a cada categoría" },
-  { key: "equipos", label: "Equipos", desc: "Catálogo completo de equipos con M2M categorías/etiquetas" },
-  { key: "equipo_specs", label: "Equipo · valores de specs", desc: "Sensor, montura, formato, etc. por equipo" },
-  { key: "equipo_fichas", label: "Equipo · fichas extendidas", desc: "Descripción, peso, conectividad, etc." },
+  {
+    key: "spec_definitions",
+    label: "Specs (definiciones)",
+    desc: "Plantilla de specs por categoría raíz",
+  },
+  {
+    key: "categoria_spec_templates",
+    label: "Specs (asignaciones)",
+    desc: "Qué specs aplican a cada categoría",
+  },
+  {
+    key: "equipos",
+    label: "Equipos",
+    desc: "Catálogo completo de equipos con M2M categorías/etiquetas",
+  },
+  {
+    key: "equipo_specs",
+    label: "Equipo · valores de specs",
+    desc: "Sensor, montura, formato, etc. por equipo",
+  },
+  {
+    key: "equipo_fichas",
+    label: "Equipo · fichas extendidas",
+    desc: "Descripción, peso, conectividad, etc.",
+  },
 ] as const;
 
 const OPERATIONAL_ENTITIES = [
   { key: "clientes", label: "Clientes", desc: "Datos personales y fiscales. Clave: email." },
-  { key: "alquileres", label: "Alquileres", desc: "Pedidos con items y pagos embebidos. Clave: numero_pedido." },
+  {
+    key: "alquileres",
+    label: "Alquileres",
+    desc: "Pedidos con items y pagos embebidos. Clave: numero_pedido.",
+  },
 ] as const;
 
 async function downloadFile(path: string, fallbackName: string) {
@@ -92,7 +130,7 @@ function DataIoPage() {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.detail ?? `${res.status} ${res.statusText}`);
       toast.success(
-        `Borrado: ${json.deleted?.clientes ?? 0} clientes, ${json.deleted?.alquileres ?? 0} alquileres`
+        `Borrado: ${json.deleted?.clientes ?? 0} clientes, ${json.deleted?.alquileres ?? 0} alquileres`,
       );
       setLastImport(null);
       setResetOpen(false);
@@ -107,11 +145,12 @@ function DataIoPage() {
   const handleDownload = async (entity: string, label: string) => {
     setBusy(entity);
     try {
-      const fallback = entity.includes("-all") || entity === "full"
-        ? `${entity}.zip`
-        : entity.endsWith("-csv")
-          ? `${entity.slice(0, -4)}.csv`
-          : `${entity}.json`;
+      const fallback =
+        entity.includes("-all") || entity === "full"
+          ? `${entity}.zip`
+          : entity.endsWith("-csv")
+            ? `${entity.slice(0, -4)}.csv`
+            : `${entity}.json`;
       await downloadFile(`/api/admin/dataio/export?entity=${entity}`, fallback);
       toast.success(`Descargado: ${label}`);
     } catch (e) {
@@ -132,7 +171,7 @@ function DataIoPage() {
       if (!res.ok) throw new Error(json.detail ?? `${res.status} ${res.statusText}`);
       setLastImport(json as ImportResult);
       toast.success(
-        `Import ${dryRun ? "(simulado)" : "OK"}: +${json.total_inserted ?? 0} ins, ~${json.total_updated ?? 0} upd`
+        `Import ${dryRun ? "(simulado)" : "OK"}: +${json.total_inserted ?? 0} ins, ~${json.total_updated ?? 0} upd`,
       );
     } catch (e) {
       toast.error(`Import falló: ${(e as Error).message}`);
@@ -163,8 +202,8 @@ function DataIoPage() {
             </h2>
             <p className="text-sm text-muted-foreground">
               ZIP con los 8 JSONs del catálogo. Si los commiteás a{" "}
-              <code className="text-xs">data/catalog/</code>, pasan a ser la baseline oficial
-              que se importa al startup.
+              <code className="text-xs">data/catalog/</code>, pasan a ser la baseline oficial que se
+              importa al startup.
             </p>
           </div>
           <Button
@@ -186,12 +225,7 @@ function DataIoPage() {
         <h2 className="font-display text-lg">Catálogo · por entidad</h2>
         <div className="rounded-lg border bg-card divide-y">
           {CATALOG_ENTITIES.map((e) => (
-            <EntityRow
-              key={e.key}
-              entity={e}
-              busy={busy}
-              onDownload={handleDownload}
-            />
+            <EntityRow key={e.key} entity={e} busy={busy} onDownload={handleDownload} />
           ))}
         </div>
       </section>
@@ -204,10 +238,9 @@ function DataIoPage() {
             Exportar a planilla (CSV)
           </h2>
           <p className="text-sm text-muted-foreground">
-            Una sola hoja por entidad, lista para abrir en Excel/Sheets. Hace
-            los JOINs por vos (marca, categorías y specs ya vienen en columnas).
-            Alquileres y clientes incluyen datos privados —{" "}
-            <strong className="text-foreground">no commitear al repo.</strong>
+            Una sola hoja por entidad, lista para abrir en Excel/Sheets. Hace los JOINs por vos
+            (marca, categorías y specs ya vienen en columnas). Alquileres y clientes incluyen datos
+            privados — <strong className="text-foreground">no commitear al repo.</strong>
           </p>
         </div>
         <div className="flex flex-wrap gap-2 pt-1">
@@ -216,7 +249,11 @@ function DataIoPage() {
             onClick={() => handleDownload("equipos-csv", "Equipos (CSV)")}
             disabled={busy !== null}
           >
-            {busy === "equipos-csv" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            {busy === "equipos-csv" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
             Equipos
           </Button>
           <Button
@@ -224,7 +261,11 @@ function DataIoPage() {
             onClick={() => handleDownload("alquileres-csv", "Alquileres (CSV)")}
             disabled={busy !== null}
           >
-            {busy === "alquileres-csv" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            {busy === "alquileres-csv" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
             Alquileres
           </Button>
           <Button
@@ -232,14 +273,22 @@ function DataIoPage() {
             onClick={() => handleDownload("clientes-csv", "Clientes (CSV)")}
             disabled={busy !== null}
           >
-            {busy === "clientes-csv" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            {busy === "clientes-csv" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
             Clientes
           </Button>
           <Button
             onClick={() => handleDownload("csv-all", "Planillas (ZIP)")}
             disabled={busy !== null}
           >
-            {busy === "csv-all" ? <Loader2 className="size-4 animate-spin" /> : <FileArchive className="size-4" />}
+            {busy === "csv-all" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <FileArchive className="size-4" />
+            )}
             Todo (ZIP)
           </Button>
         </div>
@@ -256,8 +305,8 @@ function DataIoPage() {
             </h2>
             <p className="text-sm text-muted-foreground">
               Clientes y pedidos contienen datos personales (email, teléfono, CUIT, montos).
-              <strong className="text-foreground"> Nunca commitear al repo.</strong> Sirve
-              para backups o migrar entre ambientes.
+              <strong className="text-foreground"> Nunca commitear al repo.</strong> Sirve para
+              backups o migrar entre ambientes.
             </p>
           </div>
         </div>
@@ -290,12 +339,7 @@ function DataIoPage() {
 
         <div className="rounded-md border bg-card divide-y">
           {OPERATIONAL_ENTITIES.map((e) => (
-            <EntityRow
-              key={e.key}
-              entity={e}
-              busy={busy}
-              onDownload={handleDownload}
-            />
+            <EntityRow key={e.key} entity={e} busy={busy} onDownload={handleDownload} />
           ))}
         </div>
 
@@ -307,9 +351,9 @@ function DataIoPage() {
               Importar datos operacionales
             </h3>
             <p className="text-xs text-muted-foreground">
-              Subí un ZIP con <code>clientes.json</code> y/o <code>alquileres.json</code>.
-              Upsert por email (clientes) y numero_pedido (alquileres). Probá con{" "}
-              <strong>dry-run</strong> primero — no toca la DB pero reporta el delta esperado.
+              Subí un ZIP con <code>clientes.json</code> y/o <code>alquileres.json</code>. Upsert
+              por email (clientes) y numero_pedido (alquileres). Probá con <strong>dry-run</strong>{" "}
+              primero — no toca la DB pero reporta el delta esperado.
             </p>
           </div>
           <input
@@ -387,16 +431,19 @@ function DataIoPage() {
               Borrar todo (clientes + alquileres)
             </h3>
             <p className="text-xs text-muted-foreground">
-              Elimina <strong>todos los clientes y alquileres</strong> (incluyendo
-              items, pagos y solicitudes de modificación via cascade). Útil para hacer
-              un wipe-and-reimport limpio. <strong className="text-destructive">No es reversible</strong> —
-              hacé un backup antes (botón "Descargar ZIP" más arriba).
+              Elimina <strong>todos los clientes y alquileres</strong> (incluyendo items, pagos y
+              solicitudes de modificación via cascade). Útil para hacer un wipe-and-reimport limpio.{" "}
+              <strong className="text-destructive">No es reversible</strong> — hacé un backup antes
+              (botón "Descargar ZIP" más arriba).
             </p>
           </div>
-          <AlertDialog open={resetOpen} onOpenChange={(open) => {
-            setResetOpen(open);
-            if (!open) setResetConfirm("");
-          }}>
+          <AlertDialog
+            open={resetOpen}
+            onOpenChange={(open) => {
+              setResetOpen(open);
+              if (!open) setResetConfirm("");
+            }}
+          >
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="sm">
                 <Trash2 className="size-4" />
@@ -407,11 +454,13 @@ function DataIoPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>¿Borrar TODOS los datos operacionales?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Esta acción elimina permanentemente todos los clientes, alquileres,
-                  items, pagos y solicitudes de modificación de la base de datos. El
-                  catálogo (equipos, marcas, etc.) no se toca.
-                  <br /><br />
-                  Para confirmar, escribí <code className="font-mono font-bold">{RESET_CONFIRMATION}</code> abajo:
+                  Esta acción elimina permanentemente todos los clientes, alquileres, items, pagos y
+                  solicitudes de modificación de la base de datos. El catálogo (equipos, marcas,
+                  etc.) no se toca.
+                  <br />
+                  <br />
+                  Para confirmar, escribí{" "}
+                  <code className="font-mono font-bold">{RESET_CONFIRMATION}</code> abajo:
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <Input
@@ -448,7 +497,7 @@ function DataIoPage() {
       <section className="rounded-lg border border-dashed bg-muted/30 p-5 space-y-2">
         <h3 className="font-medium text-sm">CLI equivalente</h3>
         <pre className="text-xs bg-background border rounded px-3 py-2 overflow-x-auto">
-{`# Catálogo (default — JSONs versionados)
+          {`# Catálogo (default — JSONs versionados)
 python -m backend.dataio.cli export
 python -m backend.dataio.cli import --dry-run
 python -m backend.dataio.cli import

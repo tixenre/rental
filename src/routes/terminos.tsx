@@ -38,12 +38,8 @@ function TerminosPage() {
         <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
           Legal
         </div>
-        <h1 className="font-display text-3xl md:text-4xl text-ink mt-1">
-          Términos y condiciones
-        </h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          Última actualización: {LAST_UPDATED}
-        </p>
+        <h1 className="font-display text-3xl md:text-4xl text-ink mt-1">Términos y condiciones</h1>
+        <p className="text-sm text-muted-foreground mt-2">Última actualización: {LAST_UPDATED}</p>
 
         <article className="mt-8 space-y-6 text-[15px] leading-relaxed text-foreground/90">
           {TERMS_SECTIONS.map((s) => (
@@ -55,8 +51,8 @@ function TerminosPage() {
         </article>
 
         <div className="mt-12 pt-6 border-t hairline text-xs text-muted-foreground">
-          Si tenés dudas sobre algún punto, escribinos antes de reservar — los
-          datos de contacto están en la sección 14.
+          Si tenés dudas sobre algún punto, escribinos antes de reservar — los datos de contacto
+          están en la sección 14.
         </div>
       </div>
     </PublicLayout>

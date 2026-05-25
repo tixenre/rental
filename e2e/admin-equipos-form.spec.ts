@@ -18,7 +18,10 @@ import { test, expect } from "@playwright/test";
 const ADMIN_TESTS_ENABLED = process.env.PLAYWRIGHT_ADMIN === "1";
 
 test.describe("Admin equipos — form V2", () => {
-  test.skip(!ADMIN_TESTS_ENABLED, "Set PLAYWRIGHT_ADMIN=1 para correr tests admin (necesita ADMIN_BYPASS_AUTH=1 en backend)");
+  test.skip(
+    !ADMIN_TESTS_ENABLED,
+    "Set PLAYWRIGHT_ADMIN=1 para correr tests admin (necesita ADMIN_BYPASS_AUTH=1 en backend)",
+  );
 
   test("Lista admin carga con tabla + botones de header", async ({ page }) => {
     await page.goto("/admin/equipos");

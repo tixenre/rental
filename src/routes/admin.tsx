@@ -12,10 +12,7 @@ const AdminLayout = lazy(() =>
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
-    meta: [
-      { title: "Back Office · Rambla" },
-      { name: "robots", content: "noindex, nofollow" },
-    ],
+    meta: [{ title: "Back Office · Rambla" }, { name: "robots", content: "noindex, nofollow" }],
   }),
   component: () => (
     <Suspense

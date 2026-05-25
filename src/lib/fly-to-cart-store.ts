@@ -20,8 +20,7 @@ export const useFlyToCart = create<FlyToCartState>((set) => ({
   flyKey: 0,
   popKey: 0,
 
-  triggerFly: (origin) =>
-    set((s) => ({ origin, flyKey: s.flyKey + 1 })),
+  triggerFly: (origin) => set((s) => ({ origin, flyKey: s.flyKey + 1 })),
 
   popCart: () => set((s) => ({ popKey: s.popKey + 1 })),
 

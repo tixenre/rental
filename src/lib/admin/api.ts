@@ -82,20 +82,20 @@ export type EquipoAfuera = {
 // ── Equipos ──────────────────────────────────────────────────────────────
 
 export type Ficha = {
-  descripcion:   string | null;
-  notas:         string | null;
+  descripcion: string | null;
+  notas: string | null;
   keywords_json: string | null;
   nombre_publico_template?: string | null;
   // Listas / multimedia del enriquecimiento (no son specs estructuradas)
-  incluye_json?:        string | null;
-  conectividad_json?:   string | null;
+  incluye_json?: string | null;
+  conectividad_json?: string | null;
   compatible_con_json?: string | null;
-  video_url?:           string | null;
-  precio_bh_usd?:       number | null;
-  fuente_url?:          string | null;
-  fuente_titulo?:       string | null;
-  enriquecido_at?:      string | null;
-  enriquecido_fuente?:  string | null;
+  video_url?: string | null;
+  precio_bh_usd?: number | null;
+  fuente_url?: string | null;
+  fuente_titulo?: string | null;
+  enriquecido_at?: string | null;
+  enriquecido_fuente?: string | null;
   // Fase F: montura/formato/resolucion/peso/dimensiones/alimentacion
   // se droppearon de equipo_fichas. Las specs viven en equipo_specs.
 };
@@ -164,7 +164,9 @@ export type EquiposListResp = {
   items: Equipo[];
 };
 
-export type EquipoInput = Partial<Omit<Equipo, "id" | "etiquetas" | "kit" | "categorias" | "ficha">> & {
+export type EquipoInput = Partial<
+  Omit<Equipo, "id" | "etiquetas" | "kit" | "categorias" | "ficha">
+> & {
   nombre: string;
 };
 
@@ -260,7 +262,16 @@ export type MarcaAdmin = {
 
 // ── Templates de specs por categoría (CRUD admin) ────────────────────────
 
-export type SpecTipo = "string" | "number" | "enum" | "bool" | "rango" | "wxh" | "wxhxd" | "multi_enum" | "tabla";
+export type SpecTipo =
+  | "string"
+  | "number"
+  | "enum"
+  | "bool"
+  | "rango"
+  | "wxh"
+  | "wxhxd"
+  | "multi_enum"
+  | "tabla";
 
 /** Tipo de una columna individual cuando spec_definitions.tipo='tabla'.
  *  - `valor_unidad`: la celda tiene 2 sub-campos (número + unidad), permite
@@ -514,12 +525,7 @@ export type CompatibleOverall =
 
 export type CompatibleRazon = {
   spec: string;
-  status:
-    | "match"
-    | "match_con_crop"
-    | "mismatch"
-    | "partial_vignette"
-    | "partial";
+  status: "match" | "match_con_crop" | "mismatch" | "partial_vignette" | "partial";
   mensaje: string;
 };
 
@@ -567,17 +573,19 @@ export const adminApi = {
     authedJson<DashboardUso>(`/api/admin/dashboard/uso?dias_sin_uso=${dias_sin_uso}`),
 
   // equipos
-  listEquipos: (params: {
-    q?: string;
-    etiqueta?: string;
-    categoria?: string;
-    marca?: string;
-    per_page?: number;
-    solo_incompletos?: boolean;
-    solo_eliminados?: boolean;
-    incluir_eliminados?: boolean;
-    falta?: FaltaField;
-  } = {}) => {
+  listEquipos: (
+    params: {
+      q?: string;
+      etiqueta?: string;
+      categoria?: string;
+      marca?: string;
+      per_page?: number;
+      solo_incompletos?: boolean;
+      solo_eliminados?: boolean;
+      incluir_eliminados?: boolean;
+      falta?: FaltaField;
+    } = {},
+  ) => {
     const sp = new URLSearchParams();
     if (params.q) sp.set("q", params.q);
     if (params.etiqueta) sp.set("etiqueta", params.etiqueta);
@@ -592,28 +600,24 @@ export const adminApi = {
   },
   /** KPIs del inventario para el header de /admin/equipos. */
   equiposKpis: () =>
-    authedJson<{ total: number; en_uso_hoy: number; mantenimiento: number }>(
-      "/api/equipos/kpis",
-    ),
+    authedJson<{ total: number; en_uso_hoy: number; mantenimiento: number }>("/api/equipos/kpis"),
   restoreEquipo: (id: number) =>
     authedPostJson<{ ok: true; message?: string }>(`/api/equipos/${id}/restore`, {}),
   getEquipo: (id: number) => authedJson<Equipo>(`/api/equipos/${id}`),
   /** Calidad del inventario — métricas + breakdown por campo faltante. Issue #349. */
-  getCalidadInventario: () =>
-    authedJson<CalidadInventario>("/api/admin/inventario/calidad"),
+  getCalidadInventario: () => authedJson<CalidadInventario>("/api/admin/inventario/calidad"),
   /** Sugerencias automáticas para mejorar el inventario. Issue #352. */
-  getSugerenciasInventario: () =>
-    authedJson<SugerenciasResp>("/api/admin/inventario/sugerencias"),
+  getSugerenciasInventario: () => authedJson<SugerenciasResp>("/api/admin/inventario/sugerencias"),
   aplicarSugerencia: (tipo: Sugerencia["tipo"], ref: string) =>
-    authedPostJson<{ ok: true; message: string }>(
-      "/api/admin/inventario/sugerencias/aplicar",
-      { tipo, ref },
-    ),
+    authedPostJson<{ ok: true; message: string }>("/api/admin/inventario/sugerencias/aplicar", {
+      tipo,
+      ref,
+    }),
   ignorarSugerencia: (tipo: Sugerencia["tipo"], ref: string) =>
-    authedPostJson<{ ok: true; message: string }>(
-      "/api/admin/inventario/sugerencias/ignorar",
-      { tipo, ref },
-    ),
+    authedPostJson<{ ok: true; message: string }>("/api/admin/inventario/sugerencias/ignorar", {
+      tipo,
+      ref,
+    }),
   /** Equipos sin número de serie cargado (NULL o vacío). Issue #91. */
   getEquiposSinSerie: () =>
     authedJson<{
@@ -629,8 +633,7 @@ export const adminApi = {
         cantidad: number;
       }>;
     }>("/api/admin/equipos/sin-serie"),
-  createEquipo: (data: EquipoInput) =>
-    authedPostJson<Equipo>("/api/equipos", data),
+  createEquipo: (data: EquipoInput) => authedPostJson<Equipo>("/api/equipos", data),
   updateEquipo: (id: number, data: Partial<EquipoInput>) =>
     authedJson<Equipo>(`/api/equipos/${id}`, {
       method: "PATCH",
@@ -649,12 +652,18 @@ export const adminApi = {
   /** Bulk action sobre múltiples equipos. */
   bulkAction: (payload: {
     ids: number[];
-    action: "set_visible" | "set_ficha_completa" | "set_categoria" | "add_categoria" | "remove_categoria" | "delete" | "delete_permanent";
+    action:
+      | "set_visible"
+      | "set_ficha_completa"
+      | "set_categoria"
+      | "add_categoria"
+      | "remove_categoria"
+      | "delete"
+      | "delete_permanent";
     visible?: boolean;
     ficha_completa?: boolean;
     categoria_id?: number;
-  }) =>
-    authedPostJson<{ affected: number }>("/api/admin/equipos/bulk", payload),
+  }) => authedPostJson<{ affected: number }>("/api/admin/equipos/bulk", payload),
   /** Batch autocompletar: procesa hasta 3 equipos por call, guarda el scrape
    *  en cache (raw_json). El frontend re-batchea hasta terminar. */
   batchEnriquecer: (equipo_ids: number[]) =>
@@ -683,7 +692,9 @@ export const adminApi = {
       body: JSON.stringify(data),
     }),
   deleteMantenimiento: async (equipoId: number, logId: number) => {
-    const res = await authedFetch(`/api/equipos/${equipoId}/mantenimiento/${logId}`, { method: "DELETE" });
+    const res = await authedFetch(`/api/equipos/${equipoId}/mantenimiento/${logId}`, {
+      method: "DELETE",
+    });
     if (!res.ok && res.status !== 204) {
       const detail = await res.json().catch(() => ({}));
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
@@ -753,21 +764,18 @@ export const adminApi = {
           saltadas: Array<{ label: string; motivo: string }>;
         };
       };
-    }>(
-      `/api/admin/equipos/${id}/aplicar-autocompletado`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      },
-    ),
+    }>(`/api/admin/equipos/${id}/aplicar-autocompletado`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
 
   // kit / componentes
-  getKit: (id: number) =>
-    authedJson<KitComponente[]>(`/api/equipos/${id}/kit`),
+  getKit: (id: number) => authedJson<KitComponente[]>(`/api/equipos/${id}/kit`),
   addKitItem: (id: number, componente_id: number, cantidad = 1) =>
     authedPostJson<KitComponente[]>(`/api/equipos/${id}/kit`, {
-      componente_id, cantidad,
+      componente_id,
+      cantidad,
     }),
   removeKitItem: async (id: number, componente_id: number) => {
     const res = await authedFetch(`/api/equipos/${id}/kit/${componente_id}`, { method: "DELETE" });
@@ -820,7 +828,12 @@ export const adminApi = {
     authedPostJson<EtiquetaAdmin>("/api/admin/etiquetas", data),
   adminUpdateEtiqueta: (
     id: number,
-    patch: { nombre?: string; prioridad?: number; parent_id?: number | null; set_parent_null?: boolean },
+    patch: {
+      nombre?: string;
+      prioridad?: number;
+      parent_id?: number | null;
+      set_parent_null?: boolean;
+    },
   ) =>
     authedJson<{ ok: true }>(`/api/admin/etiquetas/${id}`, {
       method: "PATCH",
@@ -838,8 +851,7 @@ export const adminApi = {
     authedPostJson<{ ok: true; count: number }>("/api/admin/etiquetas/reorder", { ids }),
 
   // marcas (admin)
-  adminListMarcas: () =>
-    authedJson<{ items: MarcaAdmin[] }>("/api/admin/marcas"),
+  adminListMarcas: () => authedJson<{ items: MarcaAdmin[] }>("/api/admin/marcas"),
   adminUpdateMarca: (id: number, patch: Partial<MarcaAdmin>) =>
     authedJson<MarcaAdmin>(`/api/admin/marcas/${id}`, {
       method: "PATCH",
@@ -849,10 +861,10 @@ export const adminApi = {
   adminReorderMarcas: (reorder: { id: number; orden: number }[]) =>
     authedPostJson<{ ok: true }>("/api/admin/marcas/reorder", { marcas: reorder }),
   adminMergeMarcas: (sourceId: number, targetId: number) =>
-    authedPostJson<{ ok: boolean; merged_into: string }>(
-      "/api/admin/marcas/merge",
-      { source_id: sourceId, target_id: targetId },
-    ),
+    authedPostJson<{ ok: boolean; merged_into: string }>("/api/admin/marcas/merge", {
+      source_id: sourceId,
+      target_id: targetId,
+    }),
   adminDeleteMarca: (id: number) =>
     authedJson<void>(`/api/admin/marcas/${id}`, { method: "DELETE" }),
   adminUploadMarcaLogo: async (id: number, file: File): Promise<string> => {
@@ -877,13 +889,21 @@ export const adminApi = {
 
   // ── App settings (key/value globales) ─────────────────────────────────
   getSetting: (key: string) =>
-    authedJson<{ key: string; value: string; updated_at: string | null; updated_by: string | null }>(
-      `/api/settings/${encodeURIComponent(key)}`,
-    ),
+    authedJson<{
+      key: string;
+      value: string;
+      updated_at: string | null;
+      updated_by: string | null;
+    }>(`/api/settings/${encodeURIComponent(key)}`),
   listSettings: () =>
-    authedJson<{ items: Array<{ key: string; value: string; updated_at: string | null; updated_by: string | null }> }>(
-      "/api/settings",
-    ),
+    authedJson<{
+      items: Array<{
+        key: string;
+        value: string;
+        updated_at: string | null;
+        updated_by: string | null;
+      }>;
+    }>("/api/settings"),
   updateSetting: (key: string, value: string | number) =>
     authedJson<{ key: string; value: string; updated_by: string }>(
       `/api/admin/settings/${encodeURIComponent(key)}`,
@@ -895,16 +915,23 @@ export const adminApi = {
     ),
   /** Modos: "missing" (sin precio), "auto" (respeta manuales — default),
    *  "all" (todos), "ids" (solo los listados). */
-  recalcularPrecios: (
-    args: { dry_run: boolean; mode?: "missing" | "auto" | "all" | "ids"; ids?: number[] },
-  ) =>
+  recalcularPrecios: (args: {
+    dry_run: boolean;
+    mode?: "missing" | "auto" | "all" | "ids";
+    ids?: number[];
+  }) =>
     authedPostJson<{
-      usd_rate: number; mode: string;
-      total_evaluados: number; total_cambios: number;
+      usd_rate: number;
+      mode: string;
+      total_evaluados: number;
+      total_cambios: number;
       cambios: Array<{
-        id: number; nombre: string;
-        antes: number | null; despues: number;
-        delta: number; manual: boolean;
+        id: number;
+        nombre: string;
+        antes: number | null;
+        despues: number;
+        delta: number;
+        manual: boolean;
       }>;
       dry_run: boolean;
     }>("/api/admin/settings/recalcular-precios", args),
@@ -914,10 +941,15 @@ export const adminApi = {
     authedJson<{
       usd_rate: number;
       items: Array<{
-        id: number; nombre: string; marca: string | null; modelo: string | null;
+        id: number;
+        nombre: string;
+        marca: string | null;
+        modelo: string | null;
         foto_url: string | null;
-        precio_actual: number | null; precio_usd: number | null;
-        roi_pct: number | null; precio_calculado: number | null;
+        precio_actual: number | null;
+        precio_usd: number | null;
+        roi_pct: number | null;
+        precio_calculado: number | null;
         delta: number | null;
       }>;
     }>("/api/admin/equipos/precios-manuales"),
@@ -925,13 +957,23 @@ export const adminApi = {
   // ── Clasificación (PR C) ───────────────────────────────────────────
   clasificarBulk: (args: { solo_sin_categoria?: boolean; equipo_ids?: number[] } = {}) =>
     authedPostJson<{
-      total: number; alta_confianza: number; media_confianza: number;
-      baja_confianza: number; sin_clasificar: number;
+      total: number;
+      alta_confianza: number;
+      media_confianza: number;
+      baja_confianza: number;
+      sin_clasificar: number;
       items: Array<{
-        equipo_id: number; nombre: string; marca: string | null; modelo: string | null;
-        foto_url: string | null; raiz: string | null; sub: string | null;
-        raiz_id: number | null; sub_id: number | null;
-        confianza: number; razon: string;
+        equipo_id: number;
+        nombre: string;
+        marca: string | null;
+        modelo: string | null;
+        foto_url: string | null;
+        raiz: string | null;
+        sub: string | null;
+        raiz_id: number | null;
+        sub_id: number | null;
+        confianza: number;
+        razon: string;
       }>;
     }>("/api/admin/equipos/clasificar-bulk", args),
   aplicarClasificacion: (asignaciones: Array<{ equipo_id: number; categoria_ids: number[] }>) =>
@@ -955,10 +997,12 @@ export const adminApi = {
        *  WITH RECURSIVE en el backend). El shape extiende SpecTemplate
        *  con `template_id` (alias legacy de `id`) y `categoria_nombre`
        *  (para agrupar en UI). */
-      template: Array<SpecTemplate & {
-        template_id: number;
-        categoria_nombre: string;
-      }>;
+      template: Array<
+        SpecTemplate & {
+          template_id: number;
+          categoria_nombre: string;
+        }
+      >;
     }>(`/api/admin/equipos/${id}/specs`),
   /** Reemplaza TODAS las specs del equipo. Las keys son spec_def_id como
    *  strings (JSON no permite int keys). */
@@ -998,11 +1042,13 @@ export const adminApi = {
       ids: number[];
       items: Array<{ id: number; nombre: string; bh_url: string | null }>;
     }>("/api/admin/specs/observatorio/scrapeables-pendientes"),
-  observatorioAgregado: (params: {
-    categoria?: string | null;
-    solo_unmapped?: boolean;
-    top_values?: number;
-  } = {}) => {
+  observatorioAgregado: (
+    params: {
+      categoria?: string | null;
+      solo_unmapped?: boolean;
+      top_values?: number;
+    } = {},
+  ) => {
     const qs = new URLSearchParams();
     if (params.categoria) qs.set("categoria", params.categoria);
     if (params.solo_unmapped) qs.set("solo_unmapped", "true");
@@ -1022,8 +1068,7 @@ export const adminApi = {
   },
 
   // ── Catálogo global de spec_definitions ────────────────────────────
-  listSpecDefinitions: () =>
-    authedJson<{ items: SpecDefinition[] }>("/api/admin/spec-definitions"),
+  listSpecDefinitions: () => authedJson<{ items: SpecDefinition[] }>("/api/admin/spec-definitions"),
   createSpecDefinition: (input: SpecDefinitionInput) =>
     authedJson<SpecDefinition>("/api/admin/spec-definitions", {
       method: "POST",
@@ -1045,8 +1090,7 @@ export const adminApi = {
   },
 
   // ── Catálogo global de unidades (lm, K, V, etc.) ───────────────────
-  listUnidades: () =>
-    authedJson<{ items: Unidad[] }>("/api/admin/unidades"),
+  listUnidades: () => authedJson<{ items: Unidad[] }>("/api/admin/unidades"),
   createUnidad: (input: UnidadInput) =>
     authedJson<Unidad>("/api/admin/unidades", {
       method: "POST",
@@ -1076,9 +1120,7 @@ export const adminApi = {
    *  canónica para el selector "Categoría de specs" del form de equipos:
    *  cada una trae su id real para fetchear el spec-template. */
   listSpecCategorias: () =>
-    authedJson<{ categorias: { id: number; nombre: string }[] }>(
-      "/api/admin/specs/por-categoria",
-    ),
+    authedJson<{ categorias: { id: number; nombre: string }[] }>("/api/admin/specs/por-categoria"),
   listOrphanSpecs: (categoriaId: number) =>
     authedJson<OrphanSpec[]>(`/api/admin/categorias/${categoriaId}/spec-templates/orphans`),
   /** Asigna una spec_definition existente a una categoría. Para crear una
@@ -1105,10 +1147,7 @@ export const adminApi = {
       body: JSON.stringify(input),
     }),
   reorderSpecTemplates: (items: { id: number; prioridad: number }[]) =>
-    authedPostJson<{ ok: true; count: number }>(
-      "/api/admin/spec-templates/reorder",
-      { items },
-    ),
+    authedPostJson<{ ok: true; count: number }>("/api/admin/spec-templates/reorder", { items }),
   deleteSpecTemplate: async (templateId: number) => {
     const res = await authedFetch(`/api/admin/spec-templates/${templateId}`, { method: "DELETE" });
     if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
@@ -1118,10 +1157,14 @@ export const adminApi = {
   listarCompatibilidades: (id: number) =>
     authedJson<{
       items: Array<{
-        id: number; otro_id: number; otro_nombre: string; otro_foto: string | null;
+        id: number;
+        otro_id: number;
+        otro_nombre: string;
+        otro_foto: string | null;
         tipo: "compatible" | "incompatible" | "requiere_adaptador";
         nota: string | null;
-        adaptador_id: number | null; adaptador_nombre: string | null;
+        adaptador_id: number | null;
+        adaptador_nombre: string | null;
         auto_generado?: boolean;
         razon_ia?: string | null;
         confianza?: number | null;
@@ -1159,12 +1202,17 @@ export const adminApi = {
     );
   },
 
-
   // ── Nombres públicos / validación ──────────────────────────────────
   regenerarNombres: (dry_run = true) =>
     authedPostJson<{
       total: number;
-      cambios: Array<{ id: number; nombre_interno: string; actual: string | null; nuevo: string; largo: string }>;
+      cambios: Array<{
+        id: number;
+        nombre_interno: string;
+        actual: string | null;
+        nuevo: string;
+        largo: string;
+      }>;
       sin_cambios: number;
       errores: Array<{ id: number; error: string }>;
       dry_run: boolean;
@@ -1173,18 +1221,24 @@ export const adminApi = {
     }>("/api/admin/equipos/regenerar-nombres", { dry_run }),
   recalcularRanking: (args: { dry_run?: boolean; ventana_dias?: number } = {}) =>
     authedPostJson<{
-      total: number; ventana_dias: number;
+      total: number;
+      ventana_dias: number;
       cambios: Array<{
-        id: number; nombre: string;
+        id: number;
+        nombre: string;
         antes: { score: number; pedidos: number; ingreso: number };
         despues: { score: number; pedidos: number; ingreso: number };
       }>;
-      sin_cambios: number; dry_run: boolean;
+      sin_cambios: number;
+      dry_run: boolean;
     }>("/api/admin/equipos/recalcular-ranking", { dry_run: true, ventana_dias: 180, ...args }),
   listarParaValidacion: (filtro: "all" | "pendientes" | "aprobados" | "editados" = "all") =>
     authedJson<{
       items: Array<{
-        id: number; nombre: string; marca: string | null; modelo: string | null;
+        id: number;
+        nombre: string;
+        marca: string | null;
+        modelo: string | null;
         foto_url: string | null;
         nombre_publico: string | null;
         nombre_publico_largo: string | null;
@@ -1210,7 +1264,15 @@ export const adminApi = {
     }),
 
   // pedidos / alquileres
-  listPedidos: (params: { estado?: string; q?: string; con_saldo?: boolean; per_page?: number; page?: number } = {}) => {
+  listPedidos: (
+    params: {
+      estado?: string;
+      q?: string;
+      con_saldo?: boolean;
+      per_page?: number;
+      page?: number;
+    } = {},
+  ) => {
     const sp = new URLSearchParams();
     if (params.estado) sp.set("estado", params.estado);
     if (params.q) sp.set("q", params.q);
@@ -1260,11 +1322,7 @@ export const adminApi = {
   createCliente: (data: ClienteInput) => authedPostJson<Cliente>("/api/clientes", data),
 
   // disponibilidad por rango (mapa equipo_id → { cantidad, reservado })
-  getDisponibilidad: (
-    fechaDesde: string,
-    fechaHasta: string,
-    excludePedidoId?: number,
-  ) => {
+  getDisponibilidad: (fechaDesde: string, fechaHasta: string, excludePedidoId?: number) => {
     const sp = new URLSearchParams({ fecha_desde: fechaDesde, fecha_hasta: fechaHasta });
     if (excludePedidoId) sp.set("exclude_pedido_id", String(excludePedidoId));
     return authedJson<Record<string, { cantidad: number; reservado: number }>>(
@@ -1288,8 +1346,7 @@ export const adminApi = {
 
   // clientes — detalle / edición
   getCliente: (id: number) => authedJson<Cliente>(`/api/clientes/${id}`),
-  getClientePedidos: (id: number) =>
-    authedJson<ClientePedidoRow[]>(`/api/clientes/${id}/pedidos`),
+  getClientePedidos: (id: number) => authedJson<ClientePedidoRow[]>(`/api/clientes/${id}/pedidos`),
   updateCliente: (id: number, data: Partial<ClienteInput>) =>
     authedJson<Cliente>(`/api/clientes/${id}`, {
       method: "PATCH",
@@ -1426,8 +1483,10 @@ export type EstadisticasData = {
   top_clientes: { cliente: string; total_ars: number; pedidos: number }[];
   clientes_recurrentes: { cliente: string; veces_alquiladas: number; total_ars: number }[];
   mejor_peor_mes: {
-    mejor_mes: string | null; mejor_total: number | null;
-    peor_mes: string | null; peor_total: number | null;
+    mejor_mes: string | null;
+    mejor_total: number | null;
+    peor_mes: string | null;
+    peor_total: number | null;
   };
   por_dueno: { dueno: string; total_ars: number; items: number }[];
 };
@@ -1444,7 +1503,10 @@ export type Cliente = {
   perfil_impuestos: string | null;
 };
 export type ClientesListResp = {
-  total: number; page: number; per_page: number; items: Cliente[];
+  total: number;
+  page: number;
+  per_page: number;
+  items: Cliente[];
 };
 export type ClienteInput = {
   nombre: string;
@@ -1472,8 +1534,13 @@ export type PedidoCreateInput = {
 // ── Tipos pedidos ────────────────────────────────────────────────────────
 
 export type PedidoEstado =
-  | "borrador" | "presupuesto" | "confirmado" | "retirado"
-  | "devuelto" | "finalizado" | "cancelado";
+  | "borrador"
+  | "presupuesto"
+  | "confirmado"
+  | "retirado"
+  | "devuelto"
+  | "finalizado"
+  | "cancelado";
 
 export type PedidoItem = {
   id: number;
@@ -1587,7 +1654,5 @@ export const descuentosJornadaApi = {
   list: () => authedJson<DescuentoJornada[]>("/api/descuentos-jornada"),
   create: (data: { jornadas: number; pct: number }) =>
     authedPostJson<DescuentoJornada>("/api/admin/descuentos-jornada", data),
-  delete: (id: number) =>
-    authedFetch(`/api/admin/descuentos-jornada/${id}`, { method: "DELETE" }),
+  delete: (id: number) => authedFetch(`/api/admin/descuentos-jornada/${id}`, { method: "DELETE" }),
 };
-

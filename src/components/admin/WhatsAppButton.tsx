@@ -15,10 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { whatsappLink } from "@/lib/whatsapp";
-import {
-  templatesForPedido,
-  type PedidoMinimal,
-} from "@/lib/admin/whatsapp-templates";
+import { templatesForPedido, type PedidoMinimal } from "@/lib/admin/whatsapp-templates";
 import { cn } from "@/lib/utils";
 
 type Variant = "default" | "icon" | "compact";
@@ -62,11 +59,7 @@ export function WhatsAppButton({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           {templates.map((t) => (
-            <DropdownMenuItem
-              key={t.key}
-              onClick={() => open(t.message)}
-              disabled={disabled}
-            >
+            <DropdownMenuItem key={t.key} onClick={() => open(t.message)} disabled={disabled}>
               {t.label}
             </DropdownMenuItem>
           ))}
@@ -96,11 +89,7 @@ export function WhatsAppButton({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           {templates.map((t) => (
-            <DropdownMenuItem
-              key={t.key}
-              onClick={() => open(t.message)}
-              disabled={disabled}
-            >
+            <DropdownMenuItem key={t.key} onClick={() => open(t.message)} disabled={disabled}>
               {t.label}
             </DropdownMenuItem>
           ))}
@@ -115,10 +104,7 @@ export function WhatsAppButton({
       <DropdownMenuTrigger asChild>
         <Button
           disabled={disabled}
-          className={cn(
-            "gap-2 bg-green-600 text-white hover:bg-green-700",
-            className,
-          )}
+          className={cn("gap-2 bg-green-600 text-white hover:bg-green-700", className)}
         >
           <MessageCircle className="h-4 w-4" />
           Mandar WhatsApp

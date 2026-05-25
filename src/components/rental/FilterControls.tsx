@@ -46,15 +46,16 @@ export function FilterControls({
           onBrand={onBrand}
           className="shrink-0 px-3 py-1.5 text-xs"
         />
-        {showCategories && categories.map((c) => (
-          <CategoryChip
-            key={c}
-            label={c}
-            active={selectedCategories.has(c)}
-            onClick={() => onToggleCategory(c)}
-            size="sm"
-          />
-        ))}
+        {showCategories &&
+          categories.map((c) => (
+            <CategoryChip
+              key={c}
+              label={c}
+              active={selectedCategories.has(c)}
+              onClick={() => onToggleCategory(c)}
+              size="sm"
+            />
+          ))}
         {showClear && hasFilters && (
           <button
             onClick={onClear}

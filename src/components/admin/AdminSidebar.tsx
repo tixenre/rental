@@ -64,23 +64,23 @@ const items: NavItem[] = [
     url: "/admin/equipos",
     icon: Package,
     children: [
-      { title: "Equipos",             url: "/admin/equipos",            icon: List },
-      { title: "Calidad",             url: "/admin/equipos/calidad",    icon: ShieldCheck },
-      { title: "Categorías",          url: "/admin/equipos/categorias", icon: FolderTree },
-      { title: "Marcas",              url: "/admin/equipos/marcas",     icon: Building2 },
-      { title: "Specs",               url: "/admin/specs",              icon: Database },
-      { title: "Unidades",            url: "/admin/unidades",           icon: Ruler },
+      { title: "Equipos", url: "/admin/equipos", icon: List },
+      { title: "Calidad", url: "/admin/equipos/calidad", icon: ShieldCheck },
+      { title: "Categorías", url: "/admin/equipos/categorias", icon: FolderTree },
+      { title: "Marcas", url: "/admin/equipos/marcas", icon: Building2 },
+      { title: "Specs", url: "/admin/specs", icon: Database },
+      { title: "Unidades", url: "/admin/unidades", icon: Ruler },
     ],
   },
-  { title: "Pedidos",     url: "/admin/pedidos",     icon: ClipboardList },
+  { title: "Pedidos", url: "/admin/pedidos", icon: ClipboardList },
   { title: "Solicitudes", url: "/admin/solicitudes", icon: Inbox },
-  { title: "Clientes",    url: "/admin/clientes",    icon: Users },
+  { title: "Clientes", url: "/admin/clientes", icon: Users },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
-  { title: "Diseño",      url: "/admin/diseno",      icon: Palette },
-  { title: "Novedades",   url: "/admin/novedades",   icon: Sparkles },
-  { title: "Emails",      url: "/admin/email-templates", icon: Mail },
+  { title: "Diseño", url: "/admin/diseno", icon: Palette },
+  { title: "Novedades", url: "/admin/novedades", icon: Sparkles },
+  { title: "Emails", url: "/admin/email-templates", icon: Mail },
   { title: "Export catálogo", url: "/admin/dataio", icon: HardDriveDownload },
-  { title: "Settings",    url: "/admin/settings",    icon: Settings },
+  { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
 
 export function AdminSidebar({ email }: { email: string }) {
@@ -160,9 +160,7 @@ export function AdminSidebar({ email }: { email: string }) {
           </svg>
           {!collapsed && (
             <div className="min-w-0">
-              <div className="font-display text-base leading-tight text-ink truncate">
-                Rambla
-              </div>
+              <div className="font-display text-base leading-tight text-ink truncate">Rambla</div>
               <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
                 Back-office
               </div>
@@ -203,9 +201,10 @@ export function AdminSidebar({ email }: { email: string }) {
                       {isOpen && (
                         <SidebarMenuSub>
                           {item.children!.map((child) => {
-                            const childActive = child.url === item.url
-                              ? isActive(child.url, true)
-                              : isActive(child.url, false);
+                            const childActive =
+                              child.url === item.url
+                                ? isActive(child.url, true)
+                                : isActive(child.url, false);
                             return (
                               <SidebarMenuSubItem key={child.url}>
                                 <SidebarMenuSubButton asChild isActive={childActive}>

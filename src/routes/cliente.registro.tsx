@@ -13,15 +13,24 @@ function ClienteRegistroPage() {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [form, setForm] = useState({
-    nombre: "", apellido: "", telefono: "",
-    direccion: "", cuit: "", perfil_impuestos: "consumidor_final",
-    razon_social: "", domicilio_fiscal: "", email_facturacion: "",
+    nombre: "",
+    apellido: "",
+    telefono: "",
+    direccion: "",
+    cuit: "",
+    perfil_impuestos: "consumidor_final",
+    razon_social: "",
+    domicilio_fiscal: "",
+    email_facturacion: "",
   });
 
   const token = new URLSearchParams(window.location.search).get("t") ?? "";
 
   useEffect(() => {
-    if (!token) { navigate({ to: "/cliente/login" }); return; }
+    if (!token) {
+      navigate({ to: "/cliente/login" });
+      return;
+    }
     authedFetch(`/api/cliente/registro-info?t=${encodeURIComponent(token)}`)
       .then(async (r) => {
         if (r.ok) {
@@ -96,17 +105,33 @@ function ClienteRegistroPage() {
         {info && (
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field label="Nombre *" value={form.nombre}
-                onChange={(v) => setForm((f) => ({ ...f, nombre: v }))} />
-              <Field label="Apellido *" value={form.apellido}
-                onChange={(v) => setForm((f) => ({ ...f, apellido: v }))} />
+              <Field
+                label="Nombre *"
+                value={form.nombre}
+                onChange={(v) => setForm((f) => ({ ...f, nombre: v }))}
+              />
+              <Field
+                label="Apellido *"
+                value={form.apellido}
+                onChange={(v) => setForm((f) => ({ ...f, apellido: v }))}
+              />
             </div>
-            <Field label="Teléfono *" type="tel" value={form.telefono}
-              onChange={(v) => setForm((f) => ({ ...f, telefono: v }))} />
-            <Field label="Dirección" value={form.direccion}
-              onChange={(v) => setForm((f) => ({ ...f, direccion: v }))} />
-            <Field label="CUIT / DNI" value={form.cuit}
-              onChange={(v) => setForm((f) => ({ ...f, cuit: v }))} />
+            <Field
+              label="Teléfono *"
+              type="tel"
+              value={form.telefono}
+              onChange={(v) => setForm((f) => ({ ...f, telefono: v }))}
+            />
+            <Field
+              label="Dirección"
+              value={form.direccion}
+              onChange={(v) => setForm((f) => ({ ...f, direccion: v }))}
+            />
+            <Field
+              label="CUIT / DNI"
+              value={form.cuit}
+              onChange={(v) => setForm((f) => ({ ...f, cuit: v }))}
+            />
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">
                 Perfil impositivo
@@ -128,12 +153,21 @@ function ClienteRegistroPage() {
                 <div className="text-xs font-semibold text-ink uppercase tracking-wider">
                   Datos para Factura A
                 </div>
-                <Field label="Razón social" value={form.razon_social}
-                  onChange={(v) => setForm((f) => ({ ...f, razon_social: v }))} />
-                <Field label="Domicilio fiscal" value={form.domicilio_fiscal}
-                  onChange={(v) => setForm((f) => ({ ...f, domicilio_fiscal: v }))} />
-                <Field label="Email de facturación" value={form.email_facturacion}
-                  onChange={(v) => setForm((f) => ({ ...f, email_facturacion: v }))} />
+                <Field
+                  label="Razón social"
+                  value={form.razon_social}
+                  onChange={(v) => setForm((f) => ({ ...f, razon_social: v }))}
+                />
+                <Field
+                  label="Domicilio fiscal"
+                  value={form.domicilio_fiscal}
+                  onChange={(v) => setForm((f) => ({ ...f, domicilio_fiscal: v }))}
+                />
+                <Field
+                  label="Email de facturación"
+                  value={form.email_facturacion}
+                  onChange={(v) => setForm((f) => ({ ...f, email_facturacion: v }))}
+                />
               </div>
             )}
 
@@ -152,8 +186,16 @@ function ClienteRegistroPage() {
 }
 
 function Field({
-  label, value, onChange, type = "text",
-}: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+}) {
   return (
     <div>
       <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>

@@ -21,7 +21,11 @@ import { adminApi, type SpecTemplate } from "@/lib/admin/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 
@@ -94,9 +98,7 @@ export function NombreTemplateBuilder({
     staleTime: 30_000,
   });
 
-  const previewEquipo = previewEquipoId
-    ? equiposOpts.find((e) => e.id === previewEquipoId)
-    : null;
+  const previewEquipo = previewEquipoId ? equiposOpts.find((e) => e.id === previewEquipoId) : null;
 
   const previewSpecs = (() => {
     if (!previewSpecsQ.data) {
@@ -161,8 +163,12 @@ export function NombreTemplateBuilder({
             className="font-mono text-sm"
           />
           <p className="text-[10px] text-muted-foreground mt-1">
-            Sintaxis: <code className="font-mono">{"{marca}"}</code>, <code className="font-mono">{"{modelo}"}</code>, <code className="font-mono">{"{tipo}"}</code>, <code className="font-mono">{"{nombre}"}</code> y <code className="font-mono">{"{spec:Label}"}</code>.
-            Para specs tipo tabla: <code className="font-mono">{"{spec:Label.columna}"}</code> extrae una sola celda.
+            Sintaxis: <code className="font-mono">{"{marca}"}</code>,{" "}
+            <code className="font-mono">{"{modelo}"}</code>,{" "}
+            <code className="font-mono">{"{tipo}"}</code>,{" "}
+            <code className="font-mono">{"{nombre}"}</code> y{" "}
+            <code className="font-mono">{"{spec:Label}"}</code>. Para specs tipo tabla:{" "}
+            <code className="font-mono">{"{spec:Label.columna}"}</code> extrae una sola celda.
           </p>
         </div>
 
@@ -269,9 +275,7 @@ export function NombreTemplateBuilder({
             {saveMut.isPending ? "Guardando…" : "Guardar plantilla"}
           </Button>
           {isDirty && (
-            <span className="text-[10px] text-muted-foreground">
-              Cambios sin guardar
-            </span>
+            <span className="text-[10px] text-muted-foreground">Cambios sin guardar</span>
           )}
         </div>
       </div>

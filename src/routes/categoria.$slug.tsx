@@ -13,7 +13,12 @@ import { ArrowLeft, ShoppingBag } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
-import { apiGetCategorias, apiGetEquipos, type BackendCategoria, type BackendEquipo } from "@/lib/api";
+import {
+  apiGetCategorias,
+  apiGetEquipos,
+  type BackendCategoria,
+  type BackendEquipo,
+} from "@/lib/api";
 import { backendToEquipment } from "@/hooks/useEquipos";
 import { buildCategoriaSlug, findCategoriaBySlug } from "@/lib/categoria-slug";
 import { type Equipment } from "@/data/equipment";
@@ -196,7 +201,9 @@ function CategoriaPage() {
         <nav aria-label="Breadcrumb" className="mb-4">
           <ol className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <li>
-              <Link to="/" className="hover:text-ink transition">Inicio</Link>
+              <Link to="/" className="hover:text-ink transition">
+                Inicio
+              </Link>
             </li>
             <li aria-hidden>›</li>
             <li className="text-ink font-medium">{nombre}</li>
@@ -208,13 +215,17 @@ function CategoriaPage() {
             Alquiler de {nombre}
           </h1>
           <p className="text-sm text-muted-foreground mt-2">
-            {equiposOrdenados.length} equipo{equiposOrdenados.length !== 1 ? "s" : ""} disponible{equiposOrdenados.length !== 1 ? "s" : ""} para alquilar por jornada en Mar del Plata.
+            {equiposOrdenados.length} equipo{equiposOrdenados.length !== 1 ? "s" : ""} disponible
+            {equiposOrdenados.length !== 1 ? "s" : ""} para alquilar por jornada en Mar del Plata.
           </p>
         </header>
 
         {equiposOrdenados.length === 0 ? (
           <div className="rounded-xl border border-dashed hairline py-12 text-center">
-            <ShoppingBag className="h-10 w-10 mx-auto text-muted-foreground mb-3" strokeWidth={1.4} />
+            <ShoppingBag
+              className="h-10 w-10 mx-auto text-muted-foreground mb-3"
+              strokeWidth={1.4}
+            />
             <p className="text-sm text-muted-foreground">
               No hay equipos disponibles en esta categoría por ahora.
             </p>

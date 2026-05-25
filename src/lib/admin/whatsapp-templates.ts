@@ -114,8 +114,7 @@ export function templatesForPedido(p: PedidoMinimal): TemplateOption[] {
     {
       key: "recordatorio_devolucion",
       label: "Recordatorio devolución",
-      message:
-        `Hola${nombre ? " " + nombre : ""}! Recordatorio: la devolución de tu pedido ${num} es el ${hasta}.`,
+      message: `Hola${nombre ? " " + nombre : ""}! Recordatorio: la devolución de tu pedido ${num} es el ${hasta}.`,
     },
     {
       key: "pago",

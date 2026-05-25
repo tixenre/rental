@@ -35,8 +35,7 @@ export const useCart = create<CartState>()(
       endTime: "09:00",
       drawerOpen: false,
       drawerPlacement: "right" as DrawerPlacement,
-      add: (id) =>
-        set((s) => ({ items: { ...s.items, [id]: (s.items[id] ?? 0) + 1 } })),
+      add: (id) => set((s) => ({ items: { ...s.items, [id]: (s.items[id] ?? 0) + 1 } })),
       remove: (id) =>
         set((s) => {
           const next = { ...s.items };
@@ -61,8 +60,7 @@ export const useCart = create<CartState>()(
           drawerOpen: open,
           drawerPlacement: placement ?? s.drawerPlacement,
         })),
-      totalItems: () =>
-        Object.values(get().items).reduce((a, b) => a + b, 0),
+      totalItems: () => Object.values(get().items).reduce((a, b) => a + b, 0),
       days: () => {
         const { startDate, endDate, startTime, endTime } = get();
         return computeJornadas(startDate, endDate, startTime, endTime);
@@ -88,6 +86,6 @@ export const useCart = create<CartState>()(
         startTime: state.startTime,
         endTime: state.endTime,
       }),
-    }
-  )
+    },
+  ),
 );

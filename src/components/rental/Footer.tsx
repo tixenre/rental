@@ -32,12 +32,7 @@ function FooterMobile() {
       <div className="px-4 py-6 space-y-4">
         {/* Logo + WhatsApp CTA en una fila */}
         <div className="flex items-center justify-between gap-3">
-          <img
-            src={logoWordmark}
-            alt="Rambla Rental"
-            className="h-7 w-auto"
-            loading="lazy"
-          />
+          <img src={logoWordmark} alt="Rambla Rental" className="h-7 w-auto" loading="lazy" />
           <a
             href={whatsappUrl("Hola! Tengo una consulta.")}
             target="_blank"
@@ -123,15 +118,10 @@ function FooterDesktop() {
         <div className="grid gap-10 md:grid-cols-12">
           {/* Branding + tagline */}
           <div className="md:col-span-4">
-            <img
-              src={logoWordmark}
-              alt="Rambla Rental"
-              className="h-12 w-auto"
-              loading="lazy"
-            />
+            <img src={logoWordmark} alt="Rambla Rental" className="h-12 w-auto" loading="lazy" />
             <p className="mt-3 text-sm text-muted-foreground max-w-xs">
-              Equipos audiovisuales y estudio de foto/video en Mar del Plata.
-              Producciones de cualquier escala.
+              Equipos audiovisuales y estudio de foto/video en Mar del Plata. Producciones de
+              cualquier escala.
             </p>
 
             <a
@@ -222,10 +212,7 @@ function FooterDesktop() {
                 </Link>
               </li>
               <li>
-                <Link
-                  to="/preguntas-frecuentes"
-                  className="text-ink hover:text-amber transition"
-                >
+                <Link to="/preguntas-frecuentes" className="text-ink hover:text-amber transition">
                   Preguntas frecuentes
                 </Link>
               </li>
@@ -236,8 +223,7 @@ function FooterDesktop() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-ink hover:text-amber transition"
                 >
-                  <Instagram className="h-4 w-4" />
-                  @{CONTACT.social.instagram}
+                  <Instagram className="h-4 w-4" />@{CONTACT.social.instagram}
                 </a>
               </li>
             </ul>

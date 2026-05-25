@@ -28,13 +28,15 @@ export function FieldRow({
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-          {label}
-        </Label>
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>
         <label className="flex items-center gap-1.5 text-xs cursor-pointer">
           <Checkbox checked={checked} onCheckedChange={(v) => onCheckedChange(!!v)} />
           Aplicar
-          {changed && <Badge variant="secondary" className="text-[9px] px-1 py-0">cambia</Badge>}
+          {changed && (
+            <Badge variant="secondary" className="text-[9px] px-1 py-0">
+              cambia
+            </Badge>
+          )}
         </label>
       </div>
       <Input
@@ -43,9 +45,7 @@ export function FieldRow({
         className={mono ? "font-mono text-xs" : ""}
       />
       {current && current !== value && (
-        <div className="text-[11px] text-muted-foreground truncate">
-          Actual: {current}
-        </div>
+        <div className="text-[11px] text-muted-foreground truncate">Actual: {current}</div>
       )}
     </div>
   );
@@ -63,9 +63,7 @@ export function FichaCell({ label, value }: { label: string; value: string }) {
 export function FichaList({ label, items }: { label: string; items: string[] }) {
   return (
     <div className="mt-2">
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
-        {label}
-      </div>
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">{label}</div>
       <div className="flex flex-wrap gap-1">
         {items.map((item, i) => (
           <span

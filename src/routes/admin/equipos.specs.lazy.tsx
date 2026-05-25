@@ -16,7 +16,8 @@ function SpecsPage() {
         </div>
         <h1 className="font-display text-3xl text-ink">Specs por categoría</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Define qué campos técnicos pide cada categoría. Estos labels también guían la IA al importar.
+          Define qué campos técnicos pide cada categoría. Estos labels también guían la IA al
+          importar.
         </p>
       </header>
       <SpecTemplatesSection />

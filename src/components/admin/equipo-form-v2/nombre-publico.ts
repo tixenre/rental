@@ -43,11 +43,7 @@ const TEMPLATES: Record<string, TemplateFn> = {
 };
 
 function normalizeKey(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim();
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
 function monturaConPrefijo(montura: string): string {

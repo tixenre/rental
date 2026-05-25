@@ -15,7 +15,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import type { SpecTablaColumna } from "@/lib/admin/api";
 
@@ -139,8 +143,7 @@ export function TablaValueInput({
           if (m) {
             const valor = Number.isFinite(Number(m[1])) ? Number(m[1]) : m[1];
             const opts = c.unidades_opciones ?? [];
-            const unidad = m[2].trim()
-              || (opts.length === 1 ? opts[0] : "");
+            const unidad = m[2].trim() || (opts.length === 1 ? opts[0] : "");
             row[c.key] = { valor, unidad };
           } else {
             const opts = c.unidades_opciones ?? [];
@@ -185,12 +188,14 @@ export function TablaValueInput({
 
       {/* Header. Si valor_unidad tiene UNA sola unidad fija (definida en la
           spec), la pegamos al label como sufijo y la celda solo pide número. */}
-      <div className="grid gap-1.5 px-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground"
-           style={{ gridTemplateColumns: gridTemplate }}>
+      <div
+        className="grid gap-1.5 px-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground"
+        style={{ gridTemplateColumns: gridTemplate }}
+      >
         {columnas.map((c, i) => {
           const opts = c.unidades_opciones ?? [];
           const onlyOneUnit = c.tipo === "valor_unidad" && opts.length === 1;
-          const fixedUnit = onlyOneUnit ? opts[0] : (c.tipo !== "valor_unidad" ? c.unidad : null);
+          const fixedUnit = onlyOneUnit ? opts[0] : c.tipo !== "valor_unidad" ? c.unidad : null;
           const showSubHeaders = c.tipo === "valor_unidad" && !onlyOneUnit;
           return (
             <>
@@ -318,8 +323,8 @@ function PasteCsvSection({
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder={
-          "Pega filas separadas por línea, celdas por coma/tab.\n"
-          + "Ej: 10000, 5700\n     8000, 3200"
+          "Pega filas separadas por línea, celdas por coma/tab.\n" +
+          "Ej: 10000, 5700\n     8000, 3200"
         }
         rows={3}
         className="font-mono text-xs"
@@ -353,7 +358,6 @@ function PasteCsvSection({
   );
 }
 
-
 function CellInput({
   col,
   value,
@@ -376,7 +380,7 @@ function CellInput({
       : { valor: "", unidad: onlyOneUnit ? opciones[0] : "" };
 
     const updateValor = (raw: string) => {
-      const valor = raw === "" ? "" : (Number.isFinite(Number(raw)) ? Number(raw) : raw);
+      const valor = raw === "" ? "" : Number.isFinite(Number(raw)) ? Number(raw) : raw;
       const unidad = onlyOneUnit ? opciones[0] : baseUnidad;
       onChange({ valor, unidad });
     };
@@ -409,9 +413,7 @@ function CellInput({
         {hasOpts ? (
           <Select
             value={(vu.unidad ?? "") || "__empty"}
-            onValueChange={(next) =>
-              onChange({ ...vu, unidad: next === "__empty" ? "" : next })
-            }
+            onValueChange={(next) => onChange({ ...vu, unidad: next === "__empty" ? "" : next })}
             disabled={disabled}
           >
             <SelectTrigger className="h-8 text-xs">
@@ -420,7 +422,9 @@ function CellInput({
             <SelectContent>
               <SelectItem value="__empty">—</SelectItem>
               {opciones.map((opt) => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                <SelectItem key={opt} value={opt}>
+                  {opt}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -451,7 +455,9 @@ function CellInput({
         <SelectContent>
           <SelectItem value="__empty">—</SelectItem>
           {(col.options ?? []).map((opt) => (
-            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+            <SelectItem key={opt} value={opt}>
+              {opt}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -468,7 +474,9 @@ function CellInput({
           onClick={() => onChange(true)}
           disabled={disabled}
           className="h-8 flex-1 text-xs"
-        >Sí</Button>
+        >
+          Sí
+        </Button>
         <Button
           type="button"
           size="sm"
@@ -476,7 +484,9 @@ function CellInput({
           onClick={() => onChange(false)}
           disabled={disabled}
           className="h-8 flex-1 text-xs"
-        >No</Button>
+        >
+          No
+        </Button>
       </div>
     );
   }

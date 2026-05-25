@@ -9,11 +9,27 @@
  * para extraer mes/año.
  */
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const MESES_ES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
 ] as const;
 
 function parseValue(v: string | null | undefined): { year: string; month: string } {
@@ -46,11 +62,10 @@ export function MonthYearPicker({
 
   return (
     <div className="grid grid-cols-2 gap-1.5">
-      <Select
-        value={month}
-        onValueChange={(v) => update(year || String(CURRENT_YEAR), v)}
-      >
-        <SelectTrigger><SelectValue placeholder="Mes" /></SelectTrigger>
+      <Select value={month} onValueChange={(v) => update(year || String(CURRENT_YEAR), v)}>
+        <SelectTrigger>
+          <SelectValue placeholder="Mes" />
+        </SelectTrigger>
         <SelectContent>
           {MESES_ES.map((m, i) => {
             const monthValue = String(i + 1).padStart(2, "0");
@@ -62,14 +77,15 @@ export function MonthYearPicker({
           })}
         </SelectContent>
       </Select>
-      <Select
-        value={year}
-        onValueChange={(v) => update(v, month || "01")}
-      >
-        <SelectTrigger><SelectValue placeholder="Año" /></SelectTrigger>
+      <Select value={year} onValueChange={(v) => update(v, month || "01")}>
+        <SelectTrigger>
+          <SelectValue placeholder="Año" />
+        </SelectTrigger>
         <SelectContent>
           {YEARS.map((y) => (
-            <SelectItem key={y} value={y}>{y}</SelectItem>
+            <SelectItem key={y} value={y}>
+              {y}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
