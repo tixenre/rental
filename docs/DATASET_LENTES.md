@@ -1,7 +1,7 @@
 # Dataset de Lentes + Adaptadores + Filtros — Guía y Convenciones
 
 Mismo patrón que `DATASET_ILUMINACION.md` y `DATASET_CAMARAS.md`. Las convenciones
-cross-cutting (IDs, unidades, ausencia de datos) están en `MANIFIESTO.md` §6.
+cross-cutting (IDs, unidades, ausencia de datos) están en `docs/SISTEMA_SPECS.md` §2.
 
 **Particularidad de este dataset:** una sola carpeta de HTMLs
 (`~/Desktop/Paginas/Lentes/`) genera **TRES datasets** porque corresponden a

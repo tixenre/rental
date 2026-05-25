@@ -137,7 +137,7 @@ Producción corre en Railway. Detalle de variables, build, troubleshooting:
 - [MANIFIESTO.md](MANIFIESTO.md) — contexto del proyecto para sesiones con Claude (workflow, decisiones, estado actual)
 - [docs/PROTOCOLO.md](docs/PROTOCOLO.md) — protocolo de auditoría + PRs
 - [docs/DEPLOY_RAILWAY.md](docs/DEPLOY_RAILWAY.md) — setup de Railway
-- [docs/DISEÑO_SPECS.md](docs/DISEÑO_SPECS.md) — diseño del sistema de specs por categoría
+- [docs/SISTEMA_SPECS.md](docs/SISTEMA_SPECS.md) — manual técnico del sistema de specs / catálogo / datasets / compat
 - [docs/DATASET_ILUMINACION.md](docs/DATASET_ILUMINACION.md) — dataset curado de luces + workflow seed por categoría
 - [docs/MEMORIA.md](docs/MEMORIA.md) — memoria viva: decisiones de criterio + preferencias (curado)
 - [docs/archive/](docs/archive/) — histórico archivado (auditoría de bugs y backlog de mayo 2026)

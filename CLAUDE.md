@@ -35,8 +35,8 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 - **Trabajo pendiente** → GitHub Issues (la cola). Iniciativa multi-sesión → 1 issue de tracking
   por iniciativa, auto-mantenido por la sesión.
 - **Registro de cambios** → commit history.
-- **Contexto / arquitectura** → `MANIFIESTO.md` (§6 decisiones fundacionales, §7 sistema de specs).
-  Se lee on-demand.
+- **Contexto / arquitectura** → `MANIFIESTO.md` (§6 decisiones fundacionales). El manual técnico del
+  sistema de specs / catálogo → `docs/SISTEMA_SPECS.md`. Se lee on-demand.
 
 ## Punteros
 
