@@ -12,7 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Query, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 
-from database import get_db, row_to_dict, to_datetime, to_iso
+from database import get_db, row_to_dict, to_datetime, to_iso, now_ar
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin
 from services.email import send_email
@@ -627,7 +627,7 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
         if data.fecha_desde and data.fecha_hasta:
             d0 = to_datetime(data.fecha_desde)
             d1 = to_datetime(data.fecha_hasta)
-            hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
 
             if d0 >= d1:
                 raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
@@ -974,7 +974,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
                 try:
                     d0 = to_datetime(p_row["fecha_desde"])
                     d1 = to_datetime(p_row["fecha_hasta"])
-                    hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                    hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
 
                     if d0 >= d1:
                         errores.append("fecha_hasta debe ser posterior a fecha_desde")
@@ -1211,7 +1211,7 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
         if nueva_desde and nueva_hasta:
             d0 = to_datetime(nueva_desde)
             d1 = to_datetime(nueva_hasta)
-            hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
 
             if d0 >= d1:
                 raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")

@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
-from database import get_db, row_to_dict, to_datetime
+from database import get_db, row_to_dict, to_datetime, now_ar
 from routes.auth import get_session, signer, COOKIE_SECURE, SESSION_MAX_AGE
 from admin_guard import require_admin
 from itsdangerous import BadSignature, SignatureExpired
@@ -44,7 +44,7 @@ def _ventana_cumple(fecha_desde: Optional[str], ventana_horas: int) -> bool:
         return True
     if d0 is None:
         return True
-    return (d0 - datetime.datetime.now()).total_seconds() >= ventana_horas * 3600
+    return (d0 - now_ar()).total_seconds() >= ventana_horas * 3600
 
 
 # ── Documentos disponibles según estado del pedido ───────────────────────────
@@ -511,7 +511,7 @@ def _validar_fechas_propuestas(
         raise HTTPException(400, "Formato de fechas inválido")
     if d0 >= d1:
         raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
-    hoy = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
     if d0 < hoy:
         raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 

@@ -1165,6 +1165,16 @@ def to_datetime(v):
     return _dt.fromisoformat(str(v))
 
 
+def now_ar():
+    """Ahora en hora de Buenos Aires (UTC-3, sin horario de verano), como
+    `datetime` naive. Las fechas de los pedidos se guardan/comparan como
+    wall-clock de AR, así que el "ahora" para chequear pasado/ventanas debe
+    estar en la misma zona — independiente de la TZ del server (que en la nube
+    suele ser UTC)."""
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    return _dt.now(_tz(_td(hours=-3))).replace(tzinfo=None)
+
+
 def to_iso(v) -> str | None:
     """Coacciona a string ISO. None/'' → None. Acepta str, `date`, `datetime`."""
     if v is None or v == "":
