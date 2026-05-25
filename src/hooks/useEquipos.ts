@@ -271,7 +271,61 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     videoUrl:       ficha?.video_url     ?? null,
     precioBhUsd:    ficha?.precio_bh_usd ?? null,
     disponible:     e.disponible,
+    // Dict raw de specs estructuradas (Fase H: filtros públicos).
+    // Cada entry tiene {value, label, tipo, prioridad, en_filtros, ...}
+    // para que el catálogo arme filtros dinámicos.
+    specsRaw:       e.specs ?? {},
   };
+}
+
+
+/* ─── Filtros dinámicos por specs (Fase H) ──────────────────────────── */
+
+export type SpecFilterDef = {
+  /** spec_key del registry, ej. "lens_mount". */
+  key: string;
+  /** Label visible al usuario, ej. "Montura". */
+  label: string;
+  /** Valores únicos presentes en el dataset filtrado, ordenados alfa. */
+  values: string[];
+  /** prioridad del template (menor = más arriba en la UI). */
+  prioridad: number;
+};
+
+/** Descubre qué specs son filtrables para el conjunto de equipos dado.
+ *  Solo incluye specs con `en_filtros=true` en el template y al menos
+ *  2 valores únicos presentes (filtrar por 1 valor no aporta). */
+export function discoverFilterableSpecs(equipos: Equipment[]): SpecFilterDef[] {
+  // Acumulamos {spec_key: {label, prioridad, values: Set}}
+  const acc = new Map<string, {
+    label: string;
+    prioridad: number;
+    values: Set<string>;
+  }>();
+  for (const eq of equipos) {
+    const specsRaw = eq.specsRaw || {};
+    for (const [key, s] of Object.entries(specsRaw)) {
+      if (!s.en_filtros) continue;
+      // Solo enums/strings discretas para filtros (number/rango son
+      // siders, no chips). Por ahora limitamos a enum/string.
+      if (s.tipo !== "enum" && s.tipo !== "string") continue;
+      const val = String(s.value || "").trim();
+      if (!val) continue;
+      if (!acc.has(key)) {
+        acc.set(key, { label: s.label, prioridad: s.prioridad, values: new Set() });
+      }
+      acc.get(key)!.values.add(val);
+    }
+  }
+  return Array.from(acc.entries())
+    .filter(([, v]) => v.values.size >= 2)
+    .map(([key, v]) => ({
+      key,
+      label: v.label,
+      prioridad: v.prioridad,
+      values: Array.from(v.values).sort((a, b) => a.localeCompare(b, "es")),
+    }))
+    .sort((a, b) => a.prioridad - b.prioridad);
 }
 
 /* ─── Hooks ─────────────────────────────────────────────────────────── */

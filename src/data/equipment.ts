@@ -70,6 +70,20 @@ export type Equipment = {
   precioBhUsd?: number | null;
   /** Unidades disponibles para el rango de fechas pedido. Solo presente cuando se consulta con fechas. */
   disponible?: number;
+  /** Dict raw de specs estructuradas keyed por spec_key (Fase H: filtros
+   *  públicos dinámicos). Cada entry tiene la metadata del template
+   *  necesaria para construir UI de filtros: {value, label, tipo,
+   *  prioridad, en_filtros, en_card, destacado}. */
+  specsRaw?: Record<string, {
+    label: string;
+    value: string;
+    tipo: string;
+    unidad: string | null;
+    prioridad: number;
+    en_card: boolean;
+    en_filtros: boolean;
+    destacado: boolean;
+  }>;
 };
 
 const e = (

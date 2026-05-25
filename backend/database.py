@@ -1384,7 +1384,9 @@ def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
         SELECT DISTINCT ON (es.equipo_id, sd.id)
             es.equipo_id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
             es.value, t.prioridad,
-            t.visible_en_card AS en_card, t.destacado
+            t.visible_en_card AS en_card,
+            t.visible_en_filtros AS en_filtros,
+            t.destacado
         FROM equipo_specs es
         JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
         JOIN spec_definitions sd ON sd.id = es.spec_def_id
@@ -1410,6 +1412,7 @@ def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
             "unidad": r["unidad"],
             "prioridad": r["prioridad"],
             "en_card": bool(r["en_card"]),
+            "en_filtros": bool(r["en_filtros"]),
             "destacado": bool(r["destacado"]),
         }
     for e in equipos:
