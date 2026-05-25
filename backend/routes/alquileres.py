@@ -462,6 +462,139 @@ def _unidades_en_mantenimiento(conn, equipo_id: int, fecha_desde: str, fecha_has
     return int((row[0] if row else 0) or 0)
 
 
+def _dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> list[str]:
+    """Días (YYYY-MM-DD) en [desde, hasta] donde algún equipo de `items`
+    ({equipo_id: cantidad_requerida}) NO tiene unidades libres suficientes.
+
+    Refleja la MISMA semántica que `get_disponibilidad` (reservas directas +
+    vía kit + mantenimiento + buffer), evaluada día por día. Fuente para
+    bloquear días en el calendario del cliente sin divergir del chequeo real
+    que corre al confirmar el pedido.
+    """
+    if not items:
+        return []
+    ids = list(items.keys())
+    ph = ",".join("?" for _ in ids)
+
+    d_desde = to_datetime(desde)
+    d_hasta = to_datetime(hasta)
+    if d_desde is None or d_hasta is None or d_hasta < d_desde:
+        return []
+    buffer_horas = _get_buffer_horas(conn)
+    buf = datetime.timedelta(hours=buffer_horas)
+    # Ventana amplia para traer segmentos relevantes (incluye buffer).
+    win_lo = (d_desde - buf).isoformat()
+    win_hi = (d_hasta + datetime.timedelta(days=1) + buf).isoformat()
+
+    stock = {
+        r["id"]: r["cantidad"]
+        for r in conn.execute(
+            f"SELECT id, cantidad FROM equipos WHERE id IN ({ph})", ids
+        ).fetchall()
+    }
+
+    # Segmentos de reserva (directos + vía kit), con su cantidad por equipo.
+    segs: dict[int, list[tuple]] = {eid: [] for eid in ids}
+    directas = conn.execute(
+        f"""
+        SELECT pi.equipo_id AS eid, p.fecha_desde AS fd, p.fecha_hasta AS fh, pi.cantidad AS cant
+        FROM alquiler_items pi
+        JOIN alquileres p ON p.id = pi.pedido_id
+        WHERE p.estado IN {ESTADOS_RESERVADO}
+          AND pi.equipo_id IN ({ph})
+          AND p.fecha_hasta > ? AND p.fecha_desde < ?
+        """,
+        (*ids, win_lo, win_hi),
+    ).fetchall()
+    for r in directas:
+        segs[r["eid"]].append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
+
+    via_kit = conn.execute(
+        f"""
+        SELECT kc.componente_id AS eid, p.fecha_desde AS fd, p.fecha_hasta AS fh,
+               pi.cantidad * kc.cantidad AS cant
+        FROM kit_componentes kc
+        JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
+        JOIN alquileres p ON p.id = pi.pedido_id
+        WHERE p.estado IN {ESTADOS_RESERVADO}
+          AND kc.componente_id IN ({ph})
+          AND p.fecha_hasta > ? AND p.fecha_desde < ?
+        """,
+        (*ids, win_lo, win_hi),
+    ).fetchall()
+    for r in via_kit:
+        segs.setdefault(r["eid"], []).append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
+
+    # Mantenimiento (sin buffer).
+    mant: dict[int, list[tuple]] = {eid: [] for eid in ids}
+    mrows = conn.execute(
+        f"""
+        SELECT equipo_id AS eid, fecha AS fd, COALESCE(fecha_hasta, fecha) AS fh, cantidad AS cant
+        FROM equipo_mantenimiento
+        WHERE bloquea_stock = TRUE
+          AND equipo_id IN ({ph})
+          AND COALESCE(fecha_hasta, fecha) > ? AND fecha < ?
+        """,
+        (*ids, win_lo, win_hi),
+    ).fetchall()
+    for r in mrows:
+        mant.setdefault(r["eid"], []).append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
+
+    bloqueados: list[str] = []
+    dia = d_desde.replace(hour=0, minute=0, second=0, microsecond=0)
+    fin = d_hasta.replace(hour=0, minute=0, second=0, microsecond=0)
+    while dia <= fin:
+        dia_next = dia + datetime.timedelta(days=1)
+        # Buffer expande la ventana del día (mismo criterio que _rango_con_buffer).
+        lo = dia - buf
+        hi = dia_next + buf
+        for eid, qty in items.items():
+            reservado = sum(
+                c for (sd, sh, c) in segs.get(eid, [])
+                if sd is not None and sh is not None and sd < hi and sh > lo
+            )
+            en_mant = sum(
+                c for (sd, sh, c) in mant.get(eid, [])
+                if sd is not None and sh is not None and sd < dia_next and sh > dia
+            )
+            disp = stock.get(eid, 0) - reservado - en_mant
+            if disp < max(1, qty):
+                bloqueados.append(dia.date().isoformat())
+                break
+        dia = dia_next
+    return bloqueados
+
+
+@router.get("/disponibilidad-dias")
+def get_disponibilidad_dias(
+    items: str = Query(..., description="Lista 'equipo_id:cantidad' separada por coma"),
+    desde: str = Query(...),
+    hasta: str = Query(...),
+):
+    """Días sin disponibilidad para los equipos pedidos, en [desde, hasta].
+    Lo usa el calendario del cliente para bloquear días según las reservas
+    reales de los equipos que tiene en el carrito."""
+    parsed: dict[int, int] = {}
+    for tok in (items or "").split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        eid_str, _, qty_str = tok.partition(":")
+        try:
+            eid = int(eid_str)
+            qty = int(qty_str) if qty_str else 1
+        except ValueError:
+            raise HTTPException(400, f"Item inválido: '{tok}' (se espera 'id' o 'id:cantidad')")
+        parsed[eid] = max(parsed.get(eid, 0), max(1, qty))
+    if not parsed:
+        return {"dias_bloqueados": []}
+    conn = get_db()
+    try:
+        return {"dias_bloqueados": _dias_no_disponibles(conn, parsed, desde, hasta)}
+    finally:
+        conn.close()
+
+
 @router.get("/disponibilidad")
 def get_disponibilidad(
     fecha_desde: str = Query(...),

@@ -393,6 +393,94 @@ class TestValidarFechaIso:
                 _validar_fecha_iso(bad)
 
 
+# ── Disponibilidad por día (calendario del cliente) ─────────────────────────
+
+class DiasFakeConn:
+    """Fake conn para _dias_no_disponibles.
+
+    stock: {equipo_id: cantidad}
+    reservas: [(equipo_id, fd, fh, cant)]  (directas)
+    kit_reservas: [(componente_id, fd, fh, cant)]
+    mant: [(equipo_id, fd, fh, cant)]
+    buffer_horas: int
+    """
+    def __init__(self, stock, reservas=None, kit_reservas=None, mant=None, buffer_horas=0):
+        self.stock = stock
+        self.reservas = reservas or []
+        self.kit_reservas = kit_reservas or []
+        self.mant = mant or []
+        self.buffer_horas = buffer_horas
+
+    def execute(self, sql, params=()):
+        s = sql.lower()
+        if "app_settings" in s:
+            return FakeCursor([FakeRow(value=str(self.buffer_horas))])
+        if "from equipos where id in" in s:
+            return FakeCursor([FakeRow(id=i, cantidad=c) for i, c in self.stock.items()])
+        if "kit_componentes" in s:
+            return FakeCursor([FakeRow(eid=e, fd=fd, fh=fh, cant=c) for (e, fd, fh, c) in self.kit_reservas])
+        if "from alquiler_items" in s:
+            return FakeCursor([FakeRow(eid=e, fd=fd, fh=fh, cant=c) for (e, fd, fh, c) in self.reservas])
+        if "equipo_mantenimiento" in s:
+            return FakeCursor([FakeRow(eid=e, fd=fd, fh=fh, cant=c) for (e, fd, fh, c) in self.mant])
+        return FakeCursor([])
+
+
+class TestDiasNoDisponibles:
+    def test_sin_reservas_nada_bloqueado(self):
+        from routes.alquileres import _dias_no_disponibles
+        conn = DiasFakeConn(stock={1: 2})
+        assert _dias_no_disponibles(conn, {1: 1}, "2026-06-01", "2026-06-05") == []
+
+    def test_reserva_unica_bloquea_su_dia(self):
+        from routes.alquileres import _dias_no_disponibles
+        # Stock 1, reservado 1 el 03 (03→04) → el 03 queda sin stock.
+        conn = DiasFakeConn(
+            stock={1: 1},
+            reservas=[(1, "2026-06-03T09:00:00", "2026-06-04T09:00:00", 1)],
+        )
+        res = _dias_no_disponibles(conn, {1: 1}, "2026-06-01", "2026-06-05")
+        assert "2026-06-03" in res
+        assert "2026-06-01" not in res
+
+    def test_stock_suficiente_no_bloquea(self):
+        from routes.alquileres import _dias_no_disponibles
+        # Stock 2, reservado 1 → queda 1 libre, alcanza para qty 1.
+        conn = DiasFakeConn(
+            stock={1: 2},
+            reservas=[(1, "2026-06-03T09:00:00", "2026-06-04T09:00:00", 1)],
+        )
+        assert _dias_no_disponibles(conn, {1: 1}, "2026-06-01", "2026-06-05") == []
+
+    def test_cantidad_pedida_mayor_a_libre_bloquea(self):
+        from routes.alquileres import _dias_no_disponibles
+        # Stock 2, reservado 1, pido 2 → 1 libre < 2 → bloqueado el 03.
+        conn = DiasFakeConn(
+            stock={1: 2},
+            reservas=[(1, "2026-06-03T09:00:00", "2026-06-04T09:00:00", 1)],
+        )
+        assert "2026-06-03" in _dias_no_disponibles(conn, {1: 2}, "2026-06-01", "2026-06-05")
+
+    def test_buffer_expande_bloqueo_a_dias_adyacentes(self):
+        from routes.alquileres import _dias_no_disponibles
+        # Buffer 24h: una reserva el 03 bloquea también 02 y 04.
+        conn = DiasFakeConn(
+            stock={1: 1},
+            reservas=[(1, "2026-06-03T09:00:00", "2026-06-04T09:00:00", 1)],
+            buffer_horas=24,
+        )
+        res = _dias_no_disponibles(conn, {1: 1}, "2026-06-01", "2026-06-06")
+        assert "2026-06-02" in res and "2026-06-04" in res
+
+    def test_mantenimiento_bloquea(self):
+        from routes.alquileres import _dias_no_disponibles
+        conn = DiasFakeConn(
+            stock={1: 1},
+            mant=[(1, "2026-06-02T00:00:00", "2026-06-03T00:00:00", 1)],
+        )
+        assert "2026-06-02" in _dias_no_disponibles(conn, {1: 1}, "2026-06-01", "2026-06-05")
+
+
 # ── _crea_ciclo_kit — detección de ciclos ────────────────────────────────
 
 class CycleFakeConn:

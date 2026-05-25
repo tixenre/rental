@@ -1,5 +1,5 @@
 import { es } from "date-fns/locale";
-import { format, startOfDay } from "date-fns";
+import { addDays, format, startOfDay } from "date-fns";
 import { X, Calendar as CalendarIcon, Clock, Eraser, Minus, Plus, AlertTriangle } from "lucide-react";
 import {
   Dialog,
@@ -11,9 +11,15 @@ import { Calendar } from "@/components/ui/calendar";
 import { useCart } from "@/lib/cart-store";
 import { deriveEndDate, diaAbierto, franjaParaFecha } from "@/lib/rental-dates";
 import { useHorarios } from "@/lib/horarios";
+import { apiGetDiasBloqueados } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { TimeStepSelect } from "./TimeStepSelect";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+/** Fecha local → "YYYY-MM-DD" (sin corrimiento por TZ). */
+const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 type Props = {
   open: boolean;
@@ -42,6 +48,7 @@ function useIsMobile() {
  */
 export function RentalDateModal({ open, onOpenChange }: Props) {
   const {
+    items,
     startDate,
     endDate,
     startTime,
@@ -56,6 +63,42 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   const horarios = useHorarios();
 
   const today = startOfDay(new Date());
+
+  // ── Disponibilidad real por día ─────────────────────────────────────
+  // Bloqueamos en el calendario los días en que algún equipo del carrito
+  // está agotado (reservas reales + buffer + mantenimiento, calculado por el
+  // backend). Carrito vacío → no se bloquea nada. El key del carrito es el id
+  // del backend stringificado.
+  const itemsParam = useMemo(
+    () =>
+      Object.entries(items)
+        .filter(([id, qty]) => /^\d+$/.test(id) && qty > 0)
+        .map(([id, qty]) => `${id}:${qty}`)
+        .join(","),
+    [items],
+  );
+  const ventanaDesde = ymd(today);
+  const ventanaHasta = ymd(addDays(today, 120));
+  const diasBloqueadosQ = useQuery({
+    queryKey: ["dias-bloqueados", itemsParam, ventanaDesde, ventanaHasta],
+    queryFn: () => apiGetDiasBloqueados(itemsParam, ventanaDesde, ventanaHasta),
+    enabled: open && itemsParam !== "",
+    staleTime: 60_000,
+  });
+  const diasBloqueados = useMemo(
+    () => new Set(diasBloqueadosQ.data?.dias_bloqueados ?? []),
+    [diasBloqueadosQ.data],
+  );
+
+  // ¿El rango elegido cruza un día agotado? (no alcanza con bloquear el inicio:
+  // la devolución derivada puede cruzar un día sin stock).
+  const rangoCruzaBloqueado = useMemo(() => {
+    if (!startDate || !endDate || diasBloqueados.size === 0) return false;
+    for (let d = startOfDay(startDate); d <= startOfDay(endDate); d = addDays(d, 1)) {
+      if (diasBloqueados.has(ymd(d))) return true;
+    }
+    return false;
+  }, [startDate, endDate, diasBloqueados]);
 
   // Franja habilitada según el día de retiro/devolución (misma config para
   // ambos). null = sin restricción → TimeStepSelect muestra todo el rango.
@@ -236,6 +279,14 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
               cerrado. Ajustá las jornadas o la fecha de retiro.
             </p>
           )}
+
+          {!devolucionCerrada && rangoCruzaBloqueado && (
+            <p className="flex items-center gap-1.5 text-[11px] text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              El período elegido incluye días sin disponibilidad para algún equipo de tu
+              carrito. Probá con otras fechas o menos jornadas.
+            </p>
+          )}
         </div>
 
         {/* Calendario — elegís la fecha de retiro */}
@@ -246,7 +297,9 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
             onSelect={handleStartSelect}
             numberOfMonths={isMobile ? 1 : 2}
             locale={es}
-            disabled={(date: Date) => date < today || !diaAbierto(horarios, date)}
+            disabled={(date: Date) =>
+              date < today || !diaAbierto(horarios, date) || diasBloqueados.has(ymd(date))
+            }
             modifiers={startDate && endDate ? { rango: { from: startDate, to: endDate } } : {}}
             modifiersClassNames={{
               rango: "bg-amber-soft/70 text-ink",
@@ -279,7 +332,7 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
 
           <button
             onClick={apply}
-            disabled={devolucionCerrada}
+            disabled={devolucionCerrada || rangoCruzaBloqueado}
             className="rounded-full bg-amber px-6 py-2.5 sm:py-2 text-sm font-semibold text-ink hover:brightness-110 transition shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Aplicar
