@@ -248,6 +248,13 @@ def _specs_dict(specs_en_nombre: list[tuple[str, str]]) -> dict[str, str]:
 
 _TPL_SEP = r"[\s\-–—,/|·]"
 
+# Labels renombrados → labels viejos (normalizados) que deben seguir
+# resolviendo en placeholders `{spec:...}` de templates guardados.
+# Clave = label nuevo normalizado; valor = aliases viejos normalizados.
+_LABEL_ALIASES: dict[str, tuple[str, ...]] = {
+    "montura": ("lens mount",),
+}
+
 
 def _render_template(
     tpl: str,
@@ -270,13 +277,19 @@ def _render_template(
     spec_map: dict[str, dict] = {}
     if specs:
         for s in specs:
-            spec_map[norm_spec_label(s.get("label") or "")] = {
+            nlabel = norm_spec_label(s.get("label") or "")
+            info = {
                 "value": (s.get("value") or "").strip(),
                 "tipo": s.get("tipo"),
                 "unidad": s.get("unidad"),
                 "tabla_columnas": s.get("tabla_columnas"),
                 "output_config": s.get("output_config"),
             }
+            spec_map[nlabel] = info
+            # Aliases de labels renombrados: templates viejos que aún
+            # referencian el label en inglés deben seguir resolviendo.
+            for old in _LABEL_ALIASES.get(nlabel, ()):
+                spec_map.setdefault(old, info)
 
     def replace_token(m: re.Match) -> str:
         before, key, after = m.group(1), m.group(2), m.group(3)

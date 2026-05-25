@@ -6,7 +6,7 @@
  * un string editable.
  *
  * Sintaxis del template:
- *   Camara {marca} {modelo} ({spec:Lens mount}) {spec:Formato de sensor}
+ *   Camara {marca} {modelo} ({spec:Montura}) {spec:Formato de sensor}
  *
  * Placeholders soportados: {marca}, {modelo}, {tipo}, {nombre} + {spec:Label}
  * para cualquier spec del template de la categoría.
@@ -156,7 +156,7 @@ export function NombreTemplateBuilder({
             ref={textareaRef}
             value={template}
             onChange={(e) => setTemplate(e.target.value)}
-            placeholder="Ej: Camara {marca} {modelo} ({spec:Lens mount}) {spec:Formato de sensor}"
+            placeholder="Ej: Camara {marca} {modelo} ({spec:Montura}) {spec:Formato de sensor}"
             rows={2}
             className="font-mono text-sm"
           />

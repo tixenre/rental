@@ -594,7 +594,7 @@ function FlagDisplay({
  *
  * El template usa placeholders como `{spec:Label}` que se reemplazan por el
  * valor del spec del equipo cuando se genera el nombre público. Por ejemplo:
- *   "{Marca} {Modelo} {spec:Resolución máxima} {spec:Lens mount}"
+ *   "{Marca} {Modelo} {spec:Resolución máxima} {spec:Montura}"
  *   → "Sony FX3A 4K E-mount"
  *
  * El editor sólo permite insertar placeholders de specs marcados como
