@@ -2,7 +2,7 @@
 
 Mismo patrón que `DATASET_LENTES.md` / `DATASET_ILUMINACION.md` /
 `DATASET_CAMARAS.md`. Las convenciones cross-cutting (IDs, unidades,
-ausencia de datos) están en `MANIFIESTO.md` §6.
+ausencia de datos) están en `docs/SISTEMA_SPECS.md` §2.
 
 **Particularidad:** los modificadores son acoplados a una luz (no
 auto-iluminan). Categoría raíz **Modificadores** con 4 sub-cats fijas:

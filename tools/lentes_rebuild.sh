@@ -2,7 +2,8 @@
 # tools/lentes_rebuild.sh — Reconstruye los datasets de lentes + accesorios.
 #
 # Uso: bash tools/lentes_rebuild.sh
-# Pre: HTMLs guardados en ~/Desktop/Paginas/Lentes/
+# Pre: HTMLs guardados en $RAMBLA_HTMLS_DIR/Lentes/
+#      (default: ~/Desktop/Paginas/Lentes — override con RAMBLA_HTMLS_DIR)
 #
 # Salida (2 datasets desde una sola pasada):
 #   - docs/lentes.json      → categoría "Lentes"
@@ -12,7 +13,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-LENTES_DIR="$HOME/Desktop/Paginas/Lentes"
+LENTES_DIR="${RAMBLA_HTMLS_DIR:-$HOME/Desktop/Paginas}/Lentes"
 
 echo "▸ Limpiando outputs anteriores"
 rm -f docs/lentes_raw.json docs/lentes.json \

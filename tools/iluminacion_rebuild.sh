@@ -2,7 +2,8 @@
 # tools/iluminacion_rebuild.sh — Reconstruye el dataset completo de luces.
 #
 # Uso: bash tools/iluminacion_rebuild.sh
-# Pre: HTMLs guardados en ~/Desktop/Paginas/Luces/{Data Set,Inventario}/
+# Pre: HTMLs guardados en $RAMBLA_HTMLS_DIR/Luces/{Data Set,Inventario}/
+#      (default: ~/Desktop/Paginas/Luces — override con RAMBLA_HTMLS_DIR)
 #
 # Pasos:
 #   1. Limpia outputs
@@ -14,7 +15,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-PAGINAS="$HOME/Desktop/Paginas/Luces"
+PAGINAS="${RAMBLA_HTMLS_DIR:-$HOME/Desktop/Paginas}/Luces"
 DATASET="$PAGINAS/Data Set"
 INVENTARIO="$PAGINAS/Inventario"
 

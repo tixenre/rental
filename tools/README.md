@@ -27,7 +27,7 @@ match.json         import_preview.py    cli import         spec_definitions
 
 ## Pasos por categoría (ejemplo Cámaras)
 
-1. **Guardá los HTMLs** en `~/Desktop/Paginas/Camaras/`.
+1. **Guardá los HTMLs** en tu carpeta de capturas (default `~/Desktop/Paginas/Camaras/`; override con la variable de entorno `RAMBLA_HTMLS_DIR`).
 2. **Regenerá el dataset**:
    ```bash
    bash tools/camaras_rebuild.sh

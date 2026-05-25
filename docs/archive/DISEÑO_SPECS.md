@@ -1,6 +1,10 @@
 # Diseño — Sistema bulletproof de specs / categorías / relevancia / compatibilidad
 
-> **⚠ HISTÓRICO — 2026-05-17**
+> **⚠ HISTÓRICO — 2026-05-17** (archivado en `docs/archive/`)
+>
+> Reemplazado por el manual técnico vivo **[`docs/SISTEMA_SPECS.md`](../SISTEMA_SPECS.md)**.
+> Se conserva solo como registro del diseño original. Los links internos de abajo son relativos
+> a la ubicación vieja (`docs/`).
 >
 > Este documento fue el borrador del rediseño. **Ya implementado**, con cambios:
 >
@@ -14,10 +18,11 @@
 >    de pedidos intactas).
 >
 > **Fuente de verdad actual**:
-> - [`MANIFIESTO.md`](../MANIFIESTO.md) §6 (workflow) + §7 (sistema consolidado)
-> - [`docs/DATASET_*.md`](./) (detalle por categoría)
-> - [`backend/seeds/compat_config.py`](../backend/seeds/compat_config.py) (motor compat + helpers)
-> - [`backend/services/nombre_builder.py`](../backend/services/nombre_builder.py) (templates + keywords)
+> - [`docs/SISTEMA_SPECS.md`](../SISTEMA_SPECS.md) — manual técnico consolidado
+> - [`docs/DATASET_*.md`](../) (detalle por categoría)
+> - [`backend/specs/registry.py`](../../backend/specs/registry.py) (schema, fuente única)
+> - [`backend/seeds/compat_config.py`](../../backend/seeds/compat_config.py) (motor compat + helpers)
+> - [`backend/services/nombre_builder.py`](../../backend/services/nombre_builder.py) (templates + keywords)
 
 > **Estado original**: borrador para revisión. **Fecha**: 2026-05-10.
 > Este documento NO se implementa hasta que esté revisado y aprobado.

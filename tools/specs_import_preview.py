@@ -30,7 +30,7 @@ Reglas:
 NO toca DB. NO requiere conexión.
 
 Uso:
-  cd /Users/tincho/rental
+  cd <ruta-al-repo>
   python -m tools.specs_import_preview
   python -m tools.specs_import_preview --solo iluminacion
   python -m tools.specs_import_preview --out /tmp/otro_dir

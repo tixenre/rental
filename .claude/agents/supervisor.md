@@ -17,7 +17,8 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
 
 1. `CLAUDE.md` — el modus operandi esencial.
 2. `MANIFIESTO.md` — §3 (convenciones de trabajo), §6 (decisiones de arquitectura fundacionales),
-   §7 (sistema de specs) y el glosario/mapa de código según haga falta.
+   §7 (puntero al sistema de specs) y el glosario/mapa de código según haga falta. El manual técnico
+   del sistema de specs / catálogo vive en `docs/SISTEMA_SPECS.md`.
 3. `docs/MEMORIA.md` — **decisiones de criterio + preferencias vivas. Esto es lo que más tenés
    que hacer cumplir.**
 4. `docs/PROTOCOLO.md`, `docs/ISSUE_LABELS.md`, `docs/MOBILE_AUDIT.md` — según lo que toque el cambio.
