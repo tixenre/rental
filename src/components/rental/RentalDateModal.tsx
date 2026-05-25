@@ -1,6 +1,6 @@
 import { es } from "date-fns/locale";
-import { addDays, format, startOfDay } from "date-fns";
-import { X, Calendar as CalendarIcon, Clock, Eraser, Minus, Plus } from "lucide-react";
+import { format, startOfDay } from "date-fns";
+import { X, Calendar as CalendarIcon, Clock, Eraser, Minus, Plus, AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,11 +19,6 @@ type Props = {
   open: boolean;
   onOpenChange: (o: boolean) => void;
 };
-
-function buildBusyDays(): Date[] {
-  const today = startOfDay(new Date());
-  return [addDays(today, 5), addDays(today, 12), addDays(today, 13), addDays(today, 27)];
-}
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
@@ -61,12 +56,16 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   const horarios = useHorarios();
 
   const today = startOfDay(new Date());
-  const busy = buildBusyDays();
 
   // Franja habilitada según el día de retiro/devolución (misma config para
   // ambos). null = sin restricción → TimeStepSelect muestra todo el rango.
   const franjaRetiro = franjaParaFecha(horarios, startDate);
   const franjaDevolucion = franjaParaFecha(horarios, endDate);
+
+  // La devolución se deriva del stepper y puede caer en un día cerrado (ej.
+  // domingo). Lo detectamos para avisar y bloquear "Aplicar" — el backend lo
+  // rechazaría igual, pero acá damos feedback inmediato.
+  const devolucionCerrada = !!endDate && !diaAbierto(horarios, endDate);
 
   // Si al cambiar de día la hora queda fuera de la franja, la clampeamos al
   // inicio de la franja para no dejar una selección inválida.
@@ -229,6 +228,14 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
             Horarios cada 30 min — sujeto a confirmación. Devolver más tarde que la hora de
             retiro suma una jornada.
           </p>
+
+          {devolucionCerrada && (
+            <p className="flex items-center gap-1.5 text-[11px] text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              La devolución cae el {format(endDate!, "EEEE dd MMM", { locale: es })}, que está
+              cerrado. Ajustá las jornadas o la fecha de retiro.
+            </p>
+          )}
         </div>
 
         {/* Calendario — elegís la fecha de retiro */}
@@ -240,13 +247,8 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
             numberOfMonths={isMobile ? 1 : 2}
             locale={es}
             disabled={(date: Date) => date < today || !diaAbierto(horarios, date)}
-            modifiers={
-              startDate && endDate
-                ? { busy, rango: { from: startDate, to: endDate } }
-                : { busy }
-            }
+            modifiers={startDate && endDate ? { rango: { from: startDate, to: endDate } } : {}}
             modifiersClassNames={{
-              busy: "bg-amber/30 text-ink rounded-full",
               rango: "bg-amber-soft/70 text-ink",
             }}
             showOutsideDays={false}
@@ -277,7 +279,8 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
 
           <button
             onClick={apply}
-            className="rounded-full bg-amber px-6 py-2.5 sm:py-2 text-sm font-semibold text-ink hover:brightness-110 transition shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+            disabled={devolucionCerrada}
+            className="rounded-full bg-amber px-6 py-2.5 sm:py-2 text-sm font-semibold text-ink hover:brightness-110 transition shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Aplicar
           </button>

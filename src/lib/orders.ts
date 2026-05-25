@@ -174,6 +174,16 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     );
   }
 
+  // Las fechas son obligatorias y deben estar bien ordenadas. El backend lo
+  // valida también (fuente de verdad), pero acá damos un error claro antes de
+  // hacer el request.
+  if (!input.startDate || !input.endDate) {
+    throw new Error("Elegí la fecha de retiro y de devolución.");
+  }
+  if (isNaN(input.startDate.getTime()) || isNaN(input.endDate.getTime())) {
+    throw new Error("Las fechas seleccionadas no son válidas.");
+  }
+
   const body = {
     fecha_desde: input.startDate
       ? fmtIsoLocal(input.startDate, input.startTime)

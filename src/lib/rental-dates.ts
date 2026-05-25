@@ -113,7 +113,7 @@ export function parseHorarios(raw?: string | null): HorariosSemana | null {
 /** Franja del día de esa fecha. null = cerrado o sin restricción (ver diaAbierto). */
 export function franjaParaFecha(
   horarios: HorariosSemana | null,
-  date: Date | undefined,
+  date: Date | null | undefined,
 ): FranjaHoraria | null {
   if (!horarios || !date) return null;
   return horarios[diaKey(date)] ?? null;
@@ -122,7 +122,7 @@ export function franjaParaFecha(
 /** ¿El día está habilitado? Sin config global → siempre abierto. */
 export function diaAbierto(
   horarios: HorariosSemana | null,
-  date: Date | undefined,
+  date: Date | null | undefined,
 ): boolean {
   if (!horarios || !date) return true;
   return !!horarios[diaKey(date)];

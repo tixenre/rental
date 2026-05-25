@@ -19,7 +19,8 @@ import { authedFetch } from "@/lib/authedFetch";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
 import { apiGetDescuentosJornada, interpolarDescuento } from "@/lib/api";
-import { deriveEndDate } from "@/lib/rental-dates";
+import { deriveEndDate, franjaParaFecha, diaAbierto } from "@/lib/rental-dates";
+import { useHorarios } from "@/lib/horarios";
 
 function fmtDate(d: Date | null): string {
   if (!d) return "—";
@@ -199,6 +200,30 @@ function DateSheet({ onClose, onConfirm, initial }: DateSheetProps) {
     [fechaDesde, jornadas, horaDesde, horaHasta],
   );
 
+  // Horarios habilitados: filtramos las horas según la franja del día y
+  // bloqueamos confirmar si retiro o devolución caen en día cerrado. El
+  // backend valida igual; esto es el feedback en la UI.
+  const horarios = useHorarios();
+  const franjaDesde = franjaParaFecha(horarios, fechaDesde);
+  const franjaHasta = franjaParaFecha(horarios, fechaHasta);
+  const horasDesde = useMemo(
+    () => (franjaDesde ? HORAS.filter((h) => h >= franjaDesde.desde && h <= franjaDesde.hasta) : HORAS),
+    [franjaDesde],
+  );
+  const horasHasta = useMemo(
+    () => (franjaHasta ? HORAS.filter((h) => h >= franjaHasta.desde && h <= franjaHasta.hasta) : HORAS),
+    [franjaHasta],
+  );
+  const diaDesdeCerrado = !!fechaDesde && !diaAbierto(horarios, fechaDesde);
+  const diaHastaCerrado = !!fechaHasta && !diaAbierto(horarios, fechaHasta);
+  // Snap de la hora a una opción válida cuando cambia la franja del día.
+  useEffect(() => {
+    if (horasDesde.length && !horasDesde.includes(horaDesde)) setHoraDesde(horasDesde[0]);
+  }, [horasDesde, horaDesde]);
+  useEffect(() => {
+    if (horasHasta.length && !horasHasta.includes(horaHasta)) setHoraHasta(horasHasta[0]);
+  }, [horasHasta, horaHasta]);
+
   const selectStyle: React.CSSProperties = {
     cursor: "pointer",
     appearance: "none" as const,
@@ -261,7 +286,7 @@ function DateSheet({ onClose, onConfirm, initial }: DateSheetProps) {
                   value={horaDesde}
                   onChange={(e) => setHoraDesde(e.target.value)}
                 >
-                  {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+                  {horasDesde.map((h) => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
@@ -274,7 +299,7 @@ function DateSheet({ onClose, onConfirm, initial }: DateSheetProps) {
                   value={horaHasta}
                   onChange={(e) => setHoraHasta(e.target.value)}
                 >
-                  {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+                  {horasHasta.map((h) => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
             </div>
@@ -330,11 +355,20 @@ function DateSheet({ onClose, onConfirm, initial }: DateSheetProps) {
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-hairline shrink-0" style={{ paddingBottom: 20 }}>
+          {(diaDesdeCerrado || diaHastaCerrado) && (
+            <p className="mb-2 text-[12px] text-destructive text-center">
+              {diaDesdeCerrado
+                ? "El día de salida está cerrado — elegí otro."
+                : `La devolución (${fmtDate(fechaHasta)}) cae en un día cerrado — ajustá las jornadas.`}
+            </p>
+          )}
           <button
-            disabled={!fechaDesde}
+            disabled={!fechaDesde || diaDesdeCerrado || diaHastaCerrado}
             className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-[15px] font-bold text-center hover:bg-amber hover:text-ink transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-ink disabled:hover:text-amber"
             onClick={() =>
               fechaDesde &&
+              !diaDesdeCerrado &&
+              !diaHastaCerrado &&
               onConfirm({ fechaDesde, jornadas, horaDesde, horaHasta })
             }
           >
