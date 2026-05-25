@@ -302,6 +302,7 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
                   Hora de salida
                 </span>
                 <select
+                  aria-label="Hora de salida"
                   className="w-full px-3.5 py-[11px] rounded-[var(--radius-sm)] border-[1.5px] border-hairline bg-background text-ink text-sm outline-none focus:border-amber transition-colors"
                   style={{ ...selectStyle, fontFamily: "var(--font-sans)" }}
                   value={horaDesde}
@@ -315,6 +316,7 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
                   Hora de devolución
                 </span>
                 <select
+                  aria-label="Hora de devolución"
                   className="w-full px-3.5 py-[11px] rounded-[var(--radius-sm)] border-[1.5px] border-hairline bg-background text-ink text-sm outline-none focus:border-amber transition-colors"
                   style={{ ...selectStyle, fontFamily: "var(--font-sans)" }}
                   value={horaHasta}
@@ -340,6 +342,7 @@ function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetPro
                   −
                 </button>
                 <div
+                  data-testid="jornadas-count"
                   className="flex-1 text-center border-x border-hairline py-1.5 leading-none"
                   style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 900, color: "var(--ink)" }}
                 >
