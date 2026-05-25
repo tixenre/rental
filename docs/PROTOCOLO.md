@@ -22,7 +22,7 @@
 
 ```
 Sos un auditor de código. Stack: <stack del proyecto>.
-Working directory: /Users/tincho/<repo>.
+Working directory: el del repo (working dir de la sesión).
 
 Contexto: <2-3 líneas sobre features recientes / cambios grandes>.
 
@@ -174,22 +174,11 @@ Si el fix toca un componente React, **abrir el browser** y hacer la acción (typ
 
 ## Fase 3 — Commits atómicos (10-15 min)
 
-**Reglas**:
+**Convención de commits** (estilo `tipo(scope):`, tipos válidos, body explica el *por qué*):
+fuente única en [`MANIFIESTO.md`](../MANIFIESTO.md) §3 "Commits". No se repite acá.
 
-1. **Un commit = una unidad lógica** (ej: "untrack pycache", "fix typo + normalizar SQL", "feature X"). Si un commit necesita más de una bullet en el mensaje, está bien siempre que las bullets sean del mismo tema.
-2. **Estilo del repo**: `tipo(scope): descripción en español, lowercase, sin punto final`. Ver `git log --oneline -10` para confirmar.
-3. **Body** explica el _por qué_, no el _qué_ (el diff ya muestra el qué).
-4. **Co-Authored-By** al final si fue trabajo colaborativo con Claude.
-
-### Tipos válidos (Conventional Commits)
-
-- `feat(scope)`: feature nueva
-- `fix(scope)`: bug fix
-- `chore`: mantenimiento (untrack archivos, deps, etc.)
-- `docs`: solo documentación
-- `refactor`: cambios sin afectar comportamiento
-- `perf`: optimización
-- `test`: tests
+**Lo propio de la auditoría**: **un commit = una unidad lógica** — una tanda son 4-6 fixes
+relacionados, NUNCA 20 cambios sueltos en un commit.
 
 ### Plantilla
 
@@ -222,15 +211,13 @@ git ls-files | grep -E "(__pycache__|\.pyc$|\.env|secret)" # sin junk?
 
 ### 4.1 Branch con nombre descriptivo
 
-```bash
-git checkout -b chore/audit-and-fixes-YYYY-MM-DD
-git push -u origin chore/audit-and-fixes-YYYY-MM-DD
-```
+Convención de branches → fuente única en [`MANIFIESTO.md`](../MANIFIESTO.md) §3 "Branches"
+(`claude/<descripcion>`, una rama por iniciativa). Para una pasada de auditoría:
 
-Convenciones de nombre:
-- `chore/audit-and-fixes-<fecha>` — pasada de auditoría general
-- `feat/<feature-corta>` — feature nueva
-- `fix/<bug-corto>` — un bug específico
+```bash
+git checkout -b claude/audit-and-fixes-YYYY-MM-DD
+git push -u origin claude/audit-and-fixes-YYYY-MM-DD
+```
 
 ### 4.2 Crear el PR (con `gh` o web)
 
@@ -274,8 +261,8 @@ gh auth login
 
 ## Fase 5 — Después del merge
 
-- [ ] Actualizar `BUGS.md` y `MEJORAS.md` si quedaron items pendientes priorizados.
-- [ ] Si hubo un bug que indica una clase de error recurrente (ej. "secuencias desincronizadas"), agregarlo al `MEMORY.md` de la sesión: una memoria tipo `feedback` con **Why:** y **How to apply:** para no volver a caer.
+- [ ] Items pendientes priorizados → crear/actualizar GitHub Issues (el tracking activo vive ahí).
+- [ ] Si hubo un bug que indica una clase de error recurrente (ej. "secuencias desincronizadas"), registrarlo en [`docs/MEMORIA.md`](MEMORIA.md) como preferencia/decisión (formato **What / Why / How to apply**) para no volver a caer.
 - [ ] Si un bug requirió arreglo en runtime (database, infra) además del código, dejar nota en commit message + PR description.
 - [ ] Borrar la branch local: `git branch -d chore/audit-and-fixes-YYYY-MM-DD`.
 
