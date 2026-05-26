@@ -12,7 +12,7 @@ import json
 import re
 
 from fastapi import APIRouter, Request, HTTPException
-from database import get_db, row_to_dict
+from database import get_db, row_to_dict, MARCA_SUBQUERY
 from routes.auth import get_session
 
 router = APIRouter()
@@ -336,12 +336,12 @@ def listar_precios_manuales(request: Request):
         usd_rate = float(row["value"]) if row else 0.0
 
         rows = conn.execute(
-            """
-            SELECT id, nombre, marca, modelo, foto_url,
-                   precio_jornada, precio_usd, roi_pct
-            FROM equipos
-            WHERE precio_jornada_manual = TRUE
-            ORDER BY LOWER(nombre)
+            f"""
+            SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url,
+                   e.precio_jornada, e.precio_usd, e.roi_pct
+            FROM equipos e
+            WHERE e.precio_jornada_manual = TRUE
+            ORDER BY LOWER(e.nombre)
             """
         ).fetchall()
 

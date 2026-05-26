@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from database import (
     get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
     attach_ficha, attach_specs_destacados, attach_specs_estructuradas,
-    regenerate_auto_tags,
+    regenerate_auto_tags, MARCA_SUBQUERY,
 )
 from routes.auth import get_session
 from admin_guard import require_admin
@@ -2111,12 +2111,12 @@ def admin_equipos_sin_serie(request: Request):
     require_admin(request)
     conn = get_db()
     try:
-        rows = conn.execute("""
-            SELECT id, nombre, marca, modelo, foto_url,
-                   valor_reposicion, dueno, cantidad
-            FROM equipos
-            WHERE serie IS NULL OR TRIM(serie) = ''
-            ORDER BY COALESCE(valor_reposicion, 0) DESC, id ASC
+        rows = conn.execute(f"""
+            SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url,
+                   e.valor_reposicion, e.dueno, e.cantidad
+            FROM equipos e
+            WHERE e.serie IS NULL OR TRIM(e.serie) = ''
+            ORDER BY COALESCE(e.valor_reposicion, 0) DESC, e.id ASC
         """).fetchall()
         return {
             "total": len(rows),
@@ -2843,7 +2843,10 @@ def admin_batch_enriquecer(payload: BatchEnriquecerInput, request: Request):
     results = []
     try:
         for eid in ids:
-            eq = conn.execute("SELECT id, nombre, marca, modelo, foto_url, bh_url FROM equipos WHERE id=?", (eid,)).fetchone()
+            eq = conn.execute(
+                f"SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url, e.bh_url FROM equipos e WHERE e.id=?",
+                (eid,),
+            ).fetchone()
             if not eq:
                 results.append({"equipo_id": eid, "status": "error", "error": "no existe"})
                 continue

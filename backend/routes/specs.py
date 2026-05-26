@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from database import get_db, row_to_dict
+from database import get_db, row_to_dict, MARCA_SUBQUERY
 from routes.auth import get_session
 from services.clasificador_heuristico import clasificar_lote
 from services.nombre_service import (
@@ -2260,13 +2260,13 @@ def listar_para_validacion(request: Request, filtro: str = "all"):
     try:
         rows = conn.execute(
             f"""
-            SELECT id, nombre, marca, modelo, foto_url,
-                   nombre_publico, nombre_publico_largo,
-                   nombre_publico_override,
-                   COALESCE(nombre_publico_revisado, FALSE) AS revisado
-            FROM equipos
+            SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url,
+                   e.nombre_publico, e.nombre_publico_largo,
+                   e.nombre_publico_override,
+                   COALESCE(e.nombre_publico_revisado, FALSE) AS revisado
+            FROM equipos e
             {where}
-            ORDER BY LOWER(COALESCE(nombre_publico, nombre))
+            ORDER BY LOWER(COALESCE(e.nombre_publico, e.nombre))
             """
         ).fetchall()
         # Counts globales
@@ -2474,10 +2474,10 @@ def contexto_compat(equipo_id: int, request: Request):
     conn = get_db()
     try:
         eq = conn.execute(
-            """
-            SELECT id, nombre, marca, modelo, dueno
-            FROM equipos
-            WHERE id = ? AND eliminado_at IS NULL
+            f"""
+            SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.dueno
+            FROM equipos e
+            WHERE e.id = ? AND e.eliminado_at IS NULL
             """,
             (equipo_id,),
         ).fetchone()
@@ -2516,11 +2516,14 @@ def contexto_compat(equipo_id: int, request: Request):
             (equipo_id, equipo_id),
         ).fetchall()
 
-        # Ficha (descripcion + raw_json del autocompletar)
+        # Ficha del equipo. Tabla canónica: `equipo_fichas` (definida en
+        # database.py:397). Antes acá apuntaba a `fichas_tecnicas` (que
+        # nunca existió) y leía `raw_json` (dropeado en Fase E por la
+        # migración d7e9b3c5a8f2) → 500. Ver #504.
         ficha = conn.execute(
             """
-            SELECT descripcion, raw_json
-            FROM fichas_tecnicas
+            SELECT descripcion, notas
+            FROM equipo_fichas
             WHERE equipo_id = ?
             """,
             (equipo_id,),
@@ -2572,7 +2575,7 @@ def contexto_compat(equipo_id: int, request: Request):
             ],
             "ficha": {
                 "descripcion": ficha["descripcion"] if ficha else None,
-                "raw_json": ficha["raw_json"] if ficha else None,
+                "notas": ficha["notas"] if ficha else None,
             },
             "compat_manuales": [
                 {
