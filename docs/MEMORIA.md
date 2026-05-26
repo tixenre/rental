@@ -178,3 +178,20 @@
 - **How to apply:** quien toca un doc de gobernanza revisa el resto en la misma pasada; el
   **supervisor** lo verifica en su revisión. Extiende la decisión *2026-05-26 — Curación de la
   memoria* (que cura *dentro* de MEMORIA) a la **consistencia ENTRE docs**.
+
+### 2026-05-26 — Eficiencia de sesión: modelo según tarea + limpiar contexto
+- **What:**
+  - **Auditar / planificar / decidir / arquitectura** → Opus (effort alto).
+  - **Ejecutar** (implementar un prompt bien especificado, bug fixes con tests, trabajo mecánico) →
+    **Sonnet** (effort medio). No usar la variante de ventana **1M** salvo que la tarea necesite
+    contexto gigante (la ventana grande deja crecer el contexto → más cache-reads).
+  - **`/clear`** entre PRs/tareas independientes; **`/compact`** a mitad de una iniciativa larga
+    cuando el contexto ya está pesado.
+- **Why:** el consumo del plan lo domina la **re-lectura de contexto en caché**. Caso testigo: una
+  sesión local de ~8 PRs gastó **306M tokens, 99% cache-reads** (contexto grande releído en cada
+  turno). Opus-en-todo + maratones de muchos PRs en un solo contexto = quema rápido; baja mucho
+  usando Sonnet para ejecutar y reseteando el contexto entre tareas, sin perder calidad donde
+  importa (Opus para pensar).
+- **How to apply:** la sesión sugiere bajar a Sonnet cuando la tarea es de ejecución, y propone
+  `/compact`/`/clear` al cambiar de PR/tarea. El contexto durable vive en `CLAUDE.md` + `MEMORIA` +
+  issues + PRs, así que limpiar es de bajo riesgo (una sesión nueva retoma sola).
