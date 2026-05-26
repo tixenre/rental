@@ -8,7 +8,11 @@ es el "contenido").
 from __future__ import annotations
 
 from ..models import CategoriaRegistry, SpecDef, SubCategoria
-from ..shared import FORMATO_ENUM, LENS_MOUNT_ENUM, dimensions_mm, peso_g
+from ..shared import (
+    FORMATO_ENUM, LENS_MOUNT_ENUM,
+    autofocus, coating, diametro_filtro, estabilizacion,
+    dimensions_mm, peso_g,
+)
 
 
 CAT = CategoriaRegistry(
@@ -48,12 +52,10 @@ CAT = CategoriaRegistry(
             rol_compatibilidad="contenedor",
             aliases=["Image Circle", "Coverage", "Sensor Coverage"],
         ),
-        SpecDef(key="diametro_filtro", label="Diámetro de filtro", tipo="number", unidad="mm",
-                prioridad=55, en_filtros=True,
-                ayuda="Diámetro de la rosca del filtro frontal (ej. 67, 77, 82)",
-                es_compatibilidad=True, compatibilidad_modo="exacta",
-                aliases=["Filter Size", "Filter Thread", "Filter Diameter",
-                         "Front Filter Size", "Front Filter Diameter"]),
+        diametro_filtro(
+            prioridad=55,
+            ayuda="Diámetro de la rosca del filtro frontal (ej. 67, 77, 82)",
+        ),
         SpecDef(key="linea", label="Línea", tipo="string",
                 prioridad=60, en_filtros=True, en_nombre=True,
                 ayuda="Ej: Art, GM, L, Cinema, Master Prime"),
@@ -66,16 +68,13 @@ CAT = CategoriaRegistry(
                 prioridad=75, ayuda="Ej: 0.32x"),
         SpecDef(key="hojas_diafragma", label="Hojas de diafragma", tipo="number",
                 prioridad=78),
-        SpecDef(key="estabilizacion", label="Estabilización óptica", tipo="bool",
-                prioridad=80, en_filtros=True),
-        SpecDef(key="autofocus", label="Autofocus", tipo="bool",
-                prioridad=90, en_filtros=True),
+        estabilizacion(prioridad=80),
+        autofocus(prioridad=90),
         SpecDef(key="construccion_optica", label="Construcción óptica", tipo="string",
                 prioridad=95, ayuda="Ej: 20 elementos / 15 grupos"),
         peso_g(prioridad=100),
         dimensions_mm(prioridad=105, ayuda="Ej: Ø87.8 × 119.9 mm"),
-        SpecDef(key="coating", label="Coating", tipo="string",
-                prioridad=110, ayuda="Ej: Nano AR Coating II, ASC Coating, MRC Nano"),
+        coating(prioridad=110, ayuda="Ej: Nano AR Coating II, ASC Coating, MRC Nano"),
         SpecDef(key="tripod_mounting", label="Collar para trípode", tipo="bool",
                 prioridad=115, ayuda="Telefotos / cinema lenses pesados"),
     ],

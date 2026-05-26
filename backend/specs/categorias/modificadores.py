@@ -5,7 +5,7 @@ Iluminación.montura_luz)."""
 from __future__ import annotations
 
 from ..models import CategoriaRegistry, SpecDef, SubCategoria
-from ..shared import MONTURA_LUZ_ENUM, dimensions_mm, materials, peso_g
+from ..shared import beam_angle, dimensions_mm, materials, montura_luz, peso_g
 
 
 CAT = CategoriaRegistry(
@@ -52,14 +52,9 @@ CAT = CategoriaRegistry(
         ),
         # Misma key + enum que `montura_luz` en Iluminación → motor de
         # compat matchea automáticamente.
-        SpecDef(
-            key="montura_luz", label="Montura a la luz", tipo="enum",
-            enum_options=MONTURA_LUZ_ENUM,
-            prioridad=40, en_card=True, en_filtros=True, destacado=True,
+        montura_luz(
+            prioridad=40, en_card=True, destacado=True,
             ayuda="Lado-luz: cómo se acopla a la fuente. Compat con Iluminación.",
-            es_compatibilidad=True, compatibilidad_modo="exacta",
-            aliases=["Bowens Mount", "Light Mount", "Strobe Mount", "Mount Type",
-                     "Mounting Type"],
         ),
         # Semántica: viene CON grid en el kit. "Acepta grid pero se vende
         # aparte" → False (no lo tenemos disponible).
@@ -82,10 +77,10 @@ CAT = CategoriaRegistry(
                 aliases=["Light Loss", "Stop Loss", "F-Stop Loss"]),
         # Rango con unidad ° — mismo patrón que `angulo_vision` en Lentes.
         # [36] = ángulo fijo; [10, 45] = zoom Fresnel.
-        SpecDef(key="beam_angle", label="Ángulo del haz", tipo="rango", unidad="°",
-                prioridad=75, en_filtros=True,
-                ayuda="Solo Spotlight/Fresnel. [v] fijo, [min, max] variable",
-                aliases=["Beam Angle", "Spread Angle", "Field Angle", "Beam Spread"]),
+        beam_angle(
+            prioridad=75,
+            ayuda="Solo Spotlight/Fresnel. [v] fijo, [min, max] variable",
+        ),
         materials(prioridad=100, ayuda="Ej: Fabric, Steel, Glass"),
         peso_g(prioridad=110),
     ],

@@ -7,7 +7,7 @@ para conectar fixture ↔ softbox/spotlight/fresnel-lens.
 from __future__ import annotations
 
 from ..models import CategoriaRegistry, SpecDef, SubCategoria
-from ..shared import MONTURA_LUZ_ENUM, dimensions_mm, materials, peso_g
+from ..shared import beam_angle, dimensions_mm, materials, montura_luz, peso_g
 
 
 CAT = CategoriaRegistry(
@@ -91,14 +91,9 @@ CAT = CategoriaRegistry(
         # Lado-luz del acople con modificadores. MISMA key + enum que
         # `montura_luz` de Modificadores → motor de compat matchea
         # automáticamente luz↔softbox/spotlight/fresnel-lens.
-        SpecDef(
-            key="montura_luz", label="Montura a la luz", tipo="enum",
-            enum_options=MONTURA_LUZ_ENUM,
-            prioridad=100, en_filtros=True,
+        montura_luz(
+            prioridad=100,
             ayuda="Acople con modificadores. 'Sin montura' = no acepta modificadores estándar (fresnels tradicionales).",
-            es_compatibilidad=True, compatibilidad_modo="exacta",
-            aliases=["Bowens Mount", "Light Mount", "Mount Standard", "Strobe Mount Type",
-                     "Mounting System"],
         ),
         peso_g(prioridad=110, ayuda="Peso del fixture solo, sin accesorios"),
         # ─── Energía / consumo ────────────────────────────────────────
@@ -111,11 +106,10 @@ CAT = CategoriaRegistry(
         # tipo=rango: [v] fijo, [min, max] variable. Mismo patrón que
         # `angulo_vision` en Lentes y `beam_angle` en Modificadores.
         # beam_angle se usa también para derivar lúmenes desde lux (spec_coerce).
-        SpecDef(key="beam_angle", label="Ángulo del haz", tipo="rango", unidad="°",
-                prioridad=135, en_filtros=True,
-                ayuda="[v] fijo, [min, max] variable (zoom Fresnel/spotlight)",
-                aliases=["Beam Angle", "Spread Angle", "Field Angle", "Beam Spread",
-                         "Illumination Angle"]),
+        beam_angle(
+            prioridad=135,
+            ayuda="[v] fijo, [min, max] variable (zoom Fresnel/spotlight)",
+        ),
         # ─── Hardware / control físico ────────────────────────────────
         SpecDef(
             key="cooling_system", label="Sistema de enfriamiento", tipo="enum",
