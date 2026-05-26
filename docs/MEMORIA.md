@@ -84,3 +84,18 @@
 - **Why:** mantener la atención del dueño en lo que aporta valor (criterio), no en mecánica.
 - **How to apply:** el trabajo pesado de revisión va al subagente `supervisor` (contexto aislado);
   a la conversación llega el veredicto en claro + el plan de prueba.
+
+### 2026-05-26 — Sesión local para trabajo visual/testeable; la sesión avisa ⏰
+- **What:** cuando una tarea se hace mejor en **local** —porque hay que correr y *ver* la app
+  (trabajo visual/UX, template del PDF, mobile, o validar un flujo con la app andando y datos
+  reales)— la sesión lo **avisa** y se arranca local. Para lo demás (lógica de backend, refactors,
+  fixes con tests, planificación, gobernanza) se sigue en la nube, que es lo que el dueño usa desde
+  las apps Mac/iPhone.
+- **Why:** la sesión en la nube corre en un contenedor efímero y aislado: no puede mostrar la app
+  corriendo ni tiene la BD real. Local es el **preview** que hoy falta y reduce el "probar directo
+  en prod" (ver decisión 2026-05-25 — producción = ambiente de prueba).
+- **How to apply:** la sesión detecta cuándo el trabajo es visual o necesita testeo en vivo y lo
+  **señala explícitamente antes de arrancar**; el dueño inicia la sesión local (el stack se levanta
+  con el script de #467 — Postgres + backend). El costo es el setup una vez (node/python/postgres).
+- **⏰ Disparador (revisar):** cuando exista preview/staging (post-launch), reevaluar si esto sigue
+  valiendo o si el preview reemplaza la necesidad de la sesión local.
