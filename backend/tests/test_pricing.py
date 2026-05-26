@@ -3,7 +3,6 @@
 import pytest
 
 from routes.alquileres import (
-    _aplicar_descuento,
     _consolidar_items_por_equipo,
     _parse_precio,
 )
@@ -60,27 +59,8 @@ class TestConsolidarItemsPorEquipo:
         assert out[1]["cantidad"] == 6
 
 
-class TestAplicarDescuento:
-    def test_sin_descuento_devuelve_bruto(self):
-        assert _aplicar_descuento(1000, 0) == 1000
-
-    def test_descuento_10pct(self):
-        assert _aplicar_descuento(1000, 10) == 900
-
-    def test_descuento_15pct_redondea(self):
-        # 231300 * 0.85 = 196605
-        assert _aplicar_descuento(231300, 15) == 196605
-
-    def test_descuento_100pct_da_cero(self):
-        assert _aplicar_descuento(1000, 100) == 0
-
-    def test_pct_none_o_falsy_devuelve_bruto(self):
-        # Si pct es 0/None/False, devuelve int(bruto)
-        assert _aplicar_descuento(1234.7, 0) == 1234
-
-    def test_pct_negativo_aumenta(self):
-        # -10% = 110% del bruto. Es un caso raro pero la función no lo rechaza.
-        assert _aplicar_descuento(1000, -10) == 1100
+# Los tests de aplicar-descuento se movieron a `test_precios_service.py`
+# (cubierto por `TestCalcularTotal` que usa el helper canónico).
 
 
 class TestParsePrecio:
