@@ -219,7 +219,7 @@ def extract_from_html(html_content: str) -> dict:
                 val_str = json.dumps(value, ensure_ascii=False)
         elif isinstance(value, (int, float)):
             unit = ""
-            if key == "potencia_w": unit = " W"
+            if key == "consumo_w": unit = " W"
             elif "lumens" in key: unit = " lm"
             elif "lux" in key: unit = " lux"
             val_str = f"{value}{unit}"

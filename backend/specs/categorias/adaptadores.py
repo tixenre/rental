@@ -27,6 +27,7 @@ CAT = CategoriaRegistry(
             destacado=True, obligatorio=True,
             ayuda="Lado body (la rosca que se enchufa a la cámara)",
             es_compatibilidad=True, compatibilidad_modo="exacta",
+            aliases=["Camera Mount", "Body Mount", "Camera-Side Mount", "Rear Mount"],
         ),
         SpecDef(
             key="lens_mount_out", label="Montura — lado lente", tipo="enum",
@@ -34,6 +35,8 @@ CAT = CategoriaRegistry(
             prioridad=30, en_card=True, en_filtros=True, en_nombre=True, destacado=True,
             ayuda="Rosca que recibe el lente del otro sistema",
             es_compatibilidad=True, compatibilidad_modo="exacta",
+            aliases=["Lens Compatibility", "Lens Mount (Front)", "Front Mount",
+                     "Accepted Lens Mount"],
         ),
         SpecDef(key="electronica", label="Comunicación electrónica", tipo="bool",
                 prioridad=40, en_filtros=True,

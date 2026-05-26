@@ -4096,6 +4096,7 @@ def _matchear_y_persistir_specs(
              saltadas: [{label, motivo}]}.
     """
     import json as _json
+    from services.spec_coerce import coerce_and_serialize, derive_lumens_from_lux
 
     if not specs_entrantes:
         return {"aplicadas": [], "propuestas": [], "saltadas": []}
@@ -4110,7 +4111,8 @@ def _matchear_y_persistir_specs(
             UNION
             SELECT c2.id, c2.parent_id FROM categorias c2 JOIN chain ON c2.id = chain.parent_id
         )
-        SELECT DISTINCT sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad, sd.enum_options
+        SELECT DISTINCT sd.id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
+                        sd.enum_options, COALESCE(sd.aliases, '[]'::jsonb) AS aliases
         FROM categoria_spec_templates t
         JOIN spec_definitions sd ON sd.id = t.spec_def_id
         WHERE t.categoria_id IN (SELECT id FROM chain)
@@ -4118,22 +4120,33 @@ def _matchear_y_persistir_specs(
         (equipo_id,),
     ).fetchall()
 
-    # Index por label normalizado y spec_key
+    def _index_spec(index: dict, rd: dict) -> None:
+        index[_normalize_label(rd["label"])] = rd
+        index[_normalize_label(rd["spec_key"])] = rd
+        raw_aliases = rd.get("aliases") or []
+        if isinstance(raw_aliases, str):
+            try:
+                raw_aliases = _json.loads(raw_aliases)
+            except Exception:
+                raw_aliases = []
+        for alias in (raw_aliases if isinstance(raw_aliases, list) else []):
+            index[_normalize_label(str(alias))] = rd
+
+    # Index por label normalizado, spec_key y aliases
     index_asignadas: dict[str, dict] = {}
     for r in rows_asignadas:
         rd = row_to_dict(r) if not isinstance(r, dict) else r
-        index_asignadas[_normalize_label(rd["label"])] = rd
-        index_asignadas[_normalize_label(rd["spec_key"])] = rd
+        _index_spec(index_asignadas, rd)
 
     # 2. Cargar TODAS las specs globales para detectar candidatos a assign_spec.
     all_global = conn.execute(
-        "SELECT id, spec_key, label, tipo, unidad, enum_options FROM spec_definitions"
+        "SELECT id, spec_key, label, tipo, unidad, enum_options, "
+        "COALESCE(aliases, '[]'::jsonb) AS aliases FROM spec_definitions"
     ).fetchall()
     index_global: dict[str, dict] = {}
     for r in all_global:
         rd = row_to_dict(r) if not isinstance(r, dict) else r
-        index_global[_normalize_label(rd["label"])] = rd
-        index_global[_normalize_label(rd["spec_key"])] = rd
+        _index_spec(index_global, rd)
 
     # Categoría principal del equipo (para sugerir asignación a esa cat).
     cat_principal = conn.execute(
@@ -4145,6 +4158,7 @@ def _matchear_y_persistir_specs(
     aplicadas: list[dict] = []
     propuestas: list[dict] = []
     saltadas: list[dict] = []
+    applied_values: dict[str, str] = {}  # spec_key → stored value (para derivaciones post-loop)
 
     for raw_label, value in specs_entrantes.items():
         # Skip vacíos / nulls
@@ -4164,6 +4178,11 @@ def _matchear_y_persistir_specs(
         match = index_asignadas.get(norm)
         if match:
             try:
+                # Coercionar al tipo canónico antes de persistir
+                coerced = coerce_and_serialize(
+                    value_str, match["tipo"], match.get("unidad"), match.get("enum_options")
+                )
+                stored = coerced if coerced is not None else value_str
                 conn.execute(
                     """
                     INSERT INTO equipo_specs (equipo_id, spec_def_id, value)
@@ -4171,13 +4190,14 @@ def _matchear_y_persistir_specs(
                     ON CONFLICT (equipo_id, spec_def_id) DO UPDATE
                         SET value = EXCLUDED.value
                     """,
-                    (equipo_id, match["id"], value_str),
+                    (equipo_id, match["id"], stored),
                 )
                 aplicadas.append({
                     "label": match["label"],
                     "spec_def_id": match["id"],
-                    "value": value_str,
+                    "value": stored,
                 })
+                applied_values[match["spec_key"]] = stored
             except Exception as e:
                 saltadas.append({"label": raw_label, "motivo": f"error guardando: {e}"})
             continue
@@ -4227,6 +4247,51 @@ def _matchear_y_persistir_specs(
             propuestas.append({"tipo": "spec_nueva", "label": raw_label, "valor": value_str})
         else:
             saltadas.append({"label": raw_label, "motivo": "equipo sin categoría — no se puede sugerir asignación"})
+
+    # Post-proceso: derivar lúmenes desde lux + ángulo de haz cuando el fixture
+    # no reporta lúmenes directamente. Aplica solo si tenemos beam_angle + lux
+    # y el spec de lúmenes está asignado a esta categoría.
+    beam_raw = applied_values.get("beam_angle")
+    if beam_raw:
+        try:
+            ba_list = _json.loads(beam_raw)
+            beam_deg = float(ba_list[0]) if ba_list else None
+        except Exception:
+            beam_deg = None
+
+        if beam_deg and beam_deg > 0:
+            for lux_key, lumens_key in (
+                ("lux_at_1m_5600k", "lumens_at_5600k"),
+                ("lux_at_1m_3200k", "lumens_at_3200k"),
+            ):
+                lux_raw = applied_values.get(lux_key)
+                if not lux_raw or lumens_key in applied_values:
+                    continue
+                sd_lumens = index_asignadas.get(_normalize_label(lumens_key))
+                if not sd_lumens:
+                    continue
+                try:
+                    lux_val = float(lux_raw)
+                    derived = derive_lumens_from_lux(lux_val, beam_deg)
+                    if derived:
+                        conn.execute(
+                            """
+                            INSERT INTO equipo_specs (equipo_id, spec_def_id, value)
+                            VALUES (?, ?, ?)
+                            ON CONFLICT (equipo_id, spec_def_id) DO UPDATE
+                                SET value = EXCLUDED.value
+                            """,
+                            (equipo_id, sd_lumens["id"], str(derived)),
+                        )
+                        aplicadas.append({
+                            "label": sd_lumens["label"],
+                            "spec_def_id": sd_lumens["id"],
+                            "value": str(derived),
+                            "derived_from": f"{lux_key}+beam_angle",
+                        })
+                        applied_values[lumens_key] = str(derived)
+                except Exception:
+                    pass
 
     return {"aplicadas": aplicadas, "propuestas": propuestas, "saltadas": saltadas}
 

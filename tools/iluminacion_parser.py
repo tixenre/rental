@@ -732,7 +732,7 @@ def map_luz_specs(secciones: dict, title: str = "") -> dict:
 
     potencia = _parse_potencia(secciones)
     if potencia is not None:
-        result["potencia_w"] = potencia
+        result["consumo_w"] = potencia
 
     lumens = _parse_lumens(secciones)
     if lumens is not None:

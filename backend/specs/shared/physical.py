@@ -39,6 +39,7 @@ def peso_g(
         key="peso_g", label="Peso", tipo="number", unidad="g",
         prioridad=prioridad, en_filtros=en_filtros,
         ayuda=ayuda,
+        aliases=["Weight", "Net Weight", "Weight (Body Only)", "Product Weight"],
     )
 
 
