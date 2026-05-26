@@ -85,6 +85,51 @@
 - **How to apply:** el trabajo pesado de revisión va al subagente `supervisor` (contexto aislado);
   a la conversación llega el veredicto en claro + el plan de prueba.
 
+### 2026-05-25 — Barra de calidad de ingeniería (cómo construimos)
+- **What:** el estándar de calidad del código del proyecto. El supervisor lo hace cumplir en cada PR.
+  1. **Modularidad a prueba de balas.** Lógica que se repite (caso testigo: las fechas de reserva
+     estaban implementadas distinto en ~5 lugares) se extrae a un módulo/función único y robusto.
+     Nada de copiar-pegar variantes "parecidas pero distintas". Modularizar cuando sea coherente.
+  2. **Nada de hotfixes.** Implementaciones pensadas y a prueba de errores, no parches. Vale más
+     tardar y hacerlo robusto que parchar.
+  3. **Mobile-first + performance + sin bugs.** La UX (y especialmente la mobile) es prioridad:
+     que cargue rápido y funcione. (Refuerza el mobile gate de §3 del MANIFIESTO.)
+  4. **Consistencia visual / design system.** Estilos y componentes centralizados y reusables,
+     no estilo ad-hoc por pantalla. (La inconsistencia actual es en parte falta de modularización.)
+  5. **Código prolijo aunque el dueño no lo lea.** Legibilidad y orden son requisito, no opcional.
+  6. **El core de reservas es sagrado.** Cero overlap de pedidos; la disponibilidad tiene que ser
+     correcta siempre.
+- **Why:** el dueño está seteando las bases para un sistema robusto y de largo plazo, no un MVP
+  descartable. La deuda y la inconsistencia se pagan caro después.
+- **How to apply:** el supervisor marca como hallazgo (no bloqueante salvo que sea grave) cuando un
+  cambio viola estos principios — ej. duplica lógica en vez de reusar, mete un hotfix, agrega
+  estilo ad-hoc, o toca reservas sin cuidar el overlap.
+
+### 2026-05-25 — Protocolo de brain-dumps del dueño
+- **What:** el dueño tira ideas en lotes grandes y desordenados (varias cosas mezcladas, a mitad de
+  otra tarea, sin terminar el plan de la anterior). Eso está bien — la sesión lo ordena.
+- **Why:** que nada se pierda y que el desorden al pedir no se traduzca en desorden en el proyecto.
+- **How to apply:** la sesión **triagea cada ítem en el acto** y devuelve un mapa corto de dónde fue
+  cada cosa. Cada ítem cae en: **principio durable** → propuesta a esta memoria (con aprobación del
+  dueño); **trabajo** (bug/feature/iniciativa) → GitHub Issue (lo que no es para ahora queda
+  `priority:low`; la cola *es* el backlog); **pregunta** → respuesta; **idea cruda / "más adelante"**
+  → igual va a issue. **Nada se borra.** Si la sesión nota algo y no lo arregla en el momento, lo
+  deja como issue, no lo descarta.
+
+### 2026-05-25 — Minutos de GitHub Actions: cuota a cuidar SOLO si el repo vuelve a privado ⏰
+- **What:** en **público** (estado actual) Actions es **ilimitado** — no hay cuota que cuidar. Esta
+  regla aplica **solo si el repo vuelve a privado**: en plan Free, privado da **2.000 min/mes**, y
+  el CI corre 6 jobs por cada push a una PR, así que ahí sí hay que no quemar minutos al pedo.
+- **Why:** que el CI no se pause a fin de mes por consumir la cuota — pero eso es un riesgo solo en
+  privado.
+- **How to apply (vale siempre, buena higiene):** (1) **batch de commits** — pushear cuando el
+  cambio está listo, no por cada ajuste chico (cada push = una corrida completa). (2) Los cambios de
+  solo-docs/memoria **no deberían disparar los jobs pesados** (build, tests, mobile-smoke) — ver
+  issue #487 (path filters). (3) `concurrency: cancel-in-progress` ya cancela corridas viejas al
+  re-pushear.
+- **⏰ Disparador (activa la parte de cuota):** si el repo vuelve a privado, los 2.000 min/mes pasan
+  a valer; en público queda dormida.
+
 ### 2026-05-26 — Sesión local para trabajo visual/testeable; la sesión avisa ⏰
 - **What:** cuando una tarea se hace mejor en **local** —porque hay que correr y *ver* la app
   (trabajo visual/UX, template del PDF, mobile, o validar un flujo con la app andando y datos
