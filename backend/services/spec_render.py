@@ -153,6 +153,41 @@ def _apply_unit(text: str, unidad: Optional[str]) -> str:
     return f"{text} {u}"
 
 
+def _is_empty_value(value: Optional[str]) -> bool:
+    """True si el value es efectivamente vacío: None, "", "[]", "{}"."""
+    if not value:
+        return True
+    v = value.strip()
+    return v in ("", "[]", "{}")
+
+
+def _render_tabla_best_effort(value: str) -> str:
+    """Render best-effort de una spec tipo tabla sin columnas.
+
+    Parsea el JSON array de filas y concatena todas las celdas con " · "
+    (misma estrategia que `formatSpecValueForDisplay` del frontend).
+    Si el parse falla, devuelve el value original.
+    """
+    try:
+        rows = json.loads(value)
+    except Exception:
+        return value
+    if not isinstance(rows, list) or not rows:
+        return value
+    lines: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        cells: list[str] = []
+        for cell in row.values():
+            if cell is None or cell == "":
+                continue
+            cells.append(format_tabla_cell(cell))
+        if cells:
+            lines.append(" · ".join(c for c in cells if c))
+    return "\n".join(lines) if lines else value
+
+
 def _format_value_by_tipo(
     value: str, tipo: Optional[str], unidad: Optional[str] = None
 ) -> str:
@@ -164,6 +199,8 @@ def _format_value_by_tipo(
     - `rango`: parsea JSON array → `"min - max"` o solo `"v"` si es fijo. Si
       hay unidad, la agrega (prefijo para `f/`/monedas, sufijo para el resto).
     - `bool`: `"true"` → "Sí", `"false"` → "" (vacío para colapsar conectores).
+    - `tabla`: render best-effort uniendo celdas de cada fila con " · ".
+    - `wxh`/`wxhxd`: almacenados como "W×H unit" / "W×H×D unit" — pass-through.
     - resto (string, number, enum): devuelve value tal cual.
     """
     if not value:
@@ -206,6 +243,10 @@ def _format_value_by_tipo(
             return "Sí"
         return ""
 
+    if tipo == "tabla":
+        return _render_tabla_best_effort(v)
+
+    # wxh / wxhxd se almacenan como strings ya formateados ("6144×3240 px").
     return v
 
 
@@ -219,7 +260,10 @@ def render_spec_value(
 
     Diferencia con el nombre: acá un `number` con unidad la muestra inline
     (ej. "82 mm", "640 g") — en el nombre la unidad la pone el template.
+    Devuelve "" si el value es efectivamente vacío (None/"[]"/"{}").
     """
+    if _is_empty_value(value):
+        return ""
     base = _format_value_by_tipo(value, tipo, unidad)
     if tipo == "number" and unidad and base:
         return _apply_unit(base, unidad)
