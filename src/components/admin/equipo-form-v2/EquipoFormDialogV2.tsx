@@ -753,10 +753,10 @@ export function EquipoFormDialogV2({
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const r = await authedJson<{ html_source_url: string; specs?: { label: string; value: string; spec_key?: string }[] }>(
-        `/api/admin/equipos/${initial.id}/upload-html-source`,
-        { method: "POST", body: fd },
-      );
+      const r = await authedJson<{
+        html_source_url: string;
+        specs?: { label: string; value: string; spec_key?: string }[];
+      }>(`/api/admin/equipos/${initial.id}/upload-html-source`, { method: "POST", body: fd });
       setHtmlSourceUrl(r.html_source_url);
 
       const propuestos: Spec[] = withIds(r.specs ?? []);
@@ -789,7 +789,12 @@ export function EquipoFormDialogV2({
               if (idx >= 0) {
                 next[idx] = { ...next[idx], value: p.value };
               } else {
-                next.push({ id: targetId, label: tmpl.label, value: p.value, spec_key: p.spec_key });
+                next.push({
+                  id: targetId,
+                  label: tmpl.label,
+                  value: p.value,
+                  spec_key: p.spec_key,
+                });
               }
             }
             return next;
@@ -799,7 +804,8 @@ export function EquipoFormDialogV2({
 
         const parts: string[] = [];
         if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
-        if (requierenRevision.length) parts.push(`${requierenRevision.length} pendientes de revisar`);
+        if (requierenRevision.length)
+          parts.push(`${requierenRevision.length} pendientes de revisar`);
         toast.success("HTML procesado", { description: parts.join(" · ") || "specs extraídos" });
       } else {
         toast.success("HTML guardado", { description: "No se extrajeron specs del archivo" });
