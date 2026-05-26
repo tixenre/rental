@@ -846,9 +846,7 @@ function CartSheet({
 
               <div className="flex justify-between items-baseline pt-2 border-t border-hairline mt-1">
                 <span className="font-sans text-[15px] font-bold text-ink">
-                  {hayFechas
-                    ? `Total${conIva ? " · IVA incluído" : ""}`
-                    : "Estimado / jornada"}
+                  {hayFechas ? `Total${conIva ? " · IVA incluído" : ""}` : "Estimado / jornada"}
                 </span>
                 <span
                   style={{
