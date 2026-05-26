@@ -1572,6 +1572,7 @@ export type Pedido = {
   cliente_nombre: string | null;
   cliente_email: string | null;
   cliente_telefono: string | null;
+  cliente_perfil_impuestos: string | null;
   fecha_desde: string | null;
   fecha_hasta: string | null;
   estado: PedidoEstado;
@@ -1579,6 +1580,7 @@ export type Pedido = {
   monto_total: number;
   monto_pagado: number;
   descuento_pct: number | null;
+  descuento_jornadas_pct: number | null;
   notas: string | null;
   created_at?: string;
   items: PedidoItem[];
@@ -1589,6 +1591,17 @@ export type Pedido = {
   /** Solo presente en el detalle (`getPedido`). Timeline de cambios del
    * cliente desde el portal. */
   historial_modificaciones?: PedidoHistorialItem[];
+  // Desglose canónico del total — viene del backend
+  // (services/precios.calcular_total). El frontend lo lee directo sin
+  // reimplementar la fórmula (#496).
+  bruto?: number;
+  descuento_monto?: number;
+  monto_neto?: number;
+  iva_pct?: number;
+  iva_monto?: number;
+  total_con_iva?: number;
+  con_iva?: boolean;
+  cantidad_jornadas?: number;
 };
 
 export type PedidoCambiosSnapshot = {

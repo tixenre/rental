@@ -107,6 +107,16 @@ type Pedido = {
   pagos?: Pago[];
   solicitudes?: SolicitudPortal[];
   documentos_disponibles: { remito: boolean; contrato: boolean; albaran: boolean };
+  // Desglose canónico calculado por el backend (services/precios.calcular_total).
+  // Los lee el portal/admin sin reimplementar la fórmula — cierra #496.
+  bruto?: number;
+  descuento_monto?: number;
+  monto_neto?: number;
+  iva_pct?: number;
+  iva_monto?: number;
+  total_con_iva?: number;
+  con_iva?: boolean;
+  cantidad_jornadas?: number;
 };
 
 const ACTIVE_STATES = new Set(["borrador", "presupuesto", "confirmado", "retirado"]);
@@ -663,13 +673,18 @@ function PedidoCard({
     }
   }
 
-  const subtotalItems = pedido.items.reduce((acc, it) => acc + it.subtotal, 0);
+  // Desglose canónico desde el backend (services/precios.calcular_total).
+  // Antes este componente hardcodeaba `* 0.21` y comparaba el literal
+  // "responsable_inscripto" — el backend ya lo provee aplicando la misma
+  // regla que el carrito, el admin y el PDF (#496).
+  const subtotalItems = pedido.bruto ?? pedido.items.reduce((acc, it) => acc + it.subtotal, 0);
   const descuentoPct = pedido.descuento_pct ?? 0;
-  const descuentoMonto = Math.round(subtotalItems * (descuentoPct / 100));
-  const totalNeto = pedido.monto_total ?? subtotalItems - descuentoMonto;
-  const conIva = perfilImpuestos === "responsable_inscripto";
-  const ivaMonto = conIva ? Math.round(totalNeto * 0.21) : 0;
-  const total = totalNeto + ivaMonto;
+  const descuentoMonto = pedido.descuento_monto ?? Math.round(subtotalItems * (descuentoPct / 100));
+  const totalNeto = pedido.monto_neto ?? pedido.monto_total ?? subtotalItems - descuentoMonto;
+  const conIva = pedido.con_iva ?? false;
+  const ivaPct = pedido.iva_pct ?? 21;
+  const ivaMonto = pedido.iva_monto ?? 0;
+  const total = pedido.total_con_iva ?? totalNeto;
   const pagado = pedido.monto_pagado ?? 0;
   const balance = Math.max(0, total - pagado);
 
@@ -710,7 +725,11 @@ function PedidoCard({
           </span>
           {pedido.monto_total != null && (
             <span className="font-display text-lg font-extrabold text-ink tabular-nums shrink-0">
-              {fmt(pedido.monto_total)}
+              {/* Header colapsado: muestra el total que el cliente paga
+                  (con IVA si es RI) — alineado con el desglose expandido y
+                  el carrito/PDF. Fallback al neto si el backend no envió
+                  el desglose (pedidos cargados desde un endpoint viejo). */}
+              {fmt(pedido.total_con_iva ?? pedido.monto_total)}
             </span>
           )}
           <ChevronDown
@@ -1027,7 +1046,7 @@ function PedidoCard({
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline font-sans text-[13px]">
-                    <span className="text-muted-foreground">IVA 21%</span>
+                    <span className="text-muted-foreground">IVA {ivaPct}%</span>
                     <span className="font-mono font-semibold text-ink tabular-nums">
                       +{fmt(ivaMonto)}
                     </span>
