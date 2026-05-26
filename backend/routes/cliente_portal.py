@@ -268,6 +268,10 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
 class CartItemIn(BaseModel):
     equipo_id:      int
     cantidad:       int
+    # `precio_jornada` se acepta por compatibilidad con clientes ya
+    # cacheados, pero el server lo IGNORA y resuelve el precio desde
+    # `equipos.precio_jornada`. El cliente nunca decide el precio
+    # (ver `cliente_crear_pedido`).
     precio_jornada: int = 0
 
 
@@ -308,6 +312,28 @@ def cliente_crear_pedido(
     # Reusamos la lógica de creación del back-office para mantener una sola fuente.
     from routes.alquileres import create_pedido, PedidoCreate, PedidoItem
 
+    # SEGURIDAD: el cliente nunca decide el precio. Resolvemos cada
+    # `precio_jornada` desde `equipos.precio_jornada` y descartamos lo
+    # que vino en el body. Si un equipo no existe en el catálogo,
+    # devolvemos 404 (no creamos pedidos con equipos fantasma).
+    # (Mismo patrón que `cliente_modificar_pedido` —
+    # `_items_payload_to_pedido_items`.)
+    conn = get_db()
+    try:
+        precios: dict[int, int] = {}
+        for it in data.items:
+            if it.equipo_id in precios:
+                continue
+            row = conn.execute(
+                "SELECT precio_jornada FROM equipos WHERE id = ?",
+                (it.equipo_id,),
+            ).fetchone()
+            if not row:
+                raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado")
+            precios[it.equipo_id] = int(row["precio_jornada"] or 0)
+    finally:
+        conn.close()
+
     payload = PedidoCreate(
         cliente_id=cliente_id,
         fecha_desde=data.fecha_desde,
@@ -318,7 +344,7 @@ def cliente_crear_pedido(
             PedidoItem(
                 equipo_id=i.equipo_id,
                 cantidad=i.cantidad,
-                precio_jornada=i.precio_jornada,
+                precio_jornada=precios[i.equipo_id],
             )
             for i in data.items
         ],
