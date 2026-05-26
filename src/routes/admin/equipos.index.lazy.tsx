@@ -8,7 +8,6 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  Sparkles,
   AlertCircle,
   MoreHorizontal,
   Wrench,
@@ -52,8 +51,6 @@ import {
 
 import { adminApi, type Equipo, type EquipoInput, type FaltaField } from "@/lib/admin/api";
 import { ActionMenu } from "@/components/mobile";
-import { AutocompletarEquipoDialog } from "@/components/admin/autocompletar";
-import { BatchAutocompletarDialog } from "@/components/admin/BatchAutocompletarDialog";
 import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquipoDialog";
 import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
 import { DashboardUsoDialog } from "@/components/admin/DashboardUsoDialog";
@@ -122,9 +119,7 @@ function EquiposPage() {
     updateFilters({ vista_papelera: typeof v === "function" ? v(vistaPapelera) : v });
 
   const [deleting, setDeleting] = useState<Equipo | null>(null);
-  const [enriching, setEnriching] = useState<Equipo | null>(null);
   const [menuEquipo, setMenuEquipo] = useState<Equipo | null>(null);
-  const [openBatch, setOpenBatch] = useState(false);
   const [mantenimientoEquipo, setMantenimientoEquipo] = useState<Equipo | null>(null);
   const [historialEquipo, setHistorialEquipo] = useState<Equipo | null>(null);
   const [openDashboard, setOpenDashboard] = useState(false);
@@ -318,13 +313,6 @@ function EquiposPage() {
             title="Dashboard de uso (top alquilados, sin movimiento, revenue por categoría)"
           >
             <BarChart3 className="h-4 w-4 mr-1" /> Uso
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setOpenBatch(true)}
-            title="Buscar specs en bulk para los equipos con link de fuente"
-          >
-            <Sparkles className="h-4 w-4 mr-1" /> Batch specs
           </Button>
           <Button onClick={() => navigate({ to: "/admin/equipos/nuevo" })}>
             <Plus className="h-4 w-4 mr-1" /> Nuevo equipo
@@ -784,14 +772,6 @@ function EquiposPage() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      title="Auto-completar info (B&H/Adorama)"
-                      onClick={() => setEnriching(eq)}
-                    >
-                      <Sparkles className="h-4 w-4 text-amber" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
                       title="Historial de alquileres"
                       onClick={() => setHistorialEquipo(eq)}
                     >
@@ -864,11 +844,6 @@ function EquiposPage() {
             onClick: () => toggleVisibleMut.mutate(menuEquipo!),
           },
           {
-            label: "Auto-completar info",
-            icon: <Sparkles className="h-4 w-4" />,
-            onClick: () => setEnriching(menuEquipo!),
-          },
-          {
             label: "Historial de alquileres",
             icon: <History className="h-4 w-4" />,
             onClick: () => setHistorialEquipo(menuEquipo!),
@@ -899,10 +874,6 @@ function EquiposPage() {
         ]}
       />
 
-      {openBatch && (
-        <BatchAutocompletarDialog equipos={items} open={openBatch} onOpenChange={setOpenBatch} />
-      )}
-
       {mantenimientoEquipo && (
         <MantenimientoEquipoDialog
           equipo={mantenimientoEquipo}
@@ -924,17 +895,6 @@ function EquiposPage() {
       )}
 
       {openDashboard && <DashboardUsoDialog open={openDashboard} onOpenChange={setOpenDashboard} />}
-
-      {enriching && (
-        <AutocompletarEquipoDialog
-          equipo={enriching}
-          open={!!enriching}
-          onOpenChange={(v) => {
-            if (!v) setEnriching(null);
-          }}
-          onApplied={invalidate}
-        />
-      )}
 
       <AlertDialog
         open={!!deleting}

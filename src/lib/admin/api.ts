@@ -666,19 +666,6 @@ export const adminApi = {
     ficha_completa?: boolean;
     categoria_id?: number;
   }) => authedPostJson<{ affected: number }>("/api/admin/equipos/bulk", payload),
-  /** Batch autocompletar: procesa hasta 3 equipos por call, guarda el scrape
-   *  en cache (raw_json). El frontend re-batchea hasta terminar. */
-  batchEnriquecer: (equipo_ids: number[]) =>
-    authedPostJson<{
-      results: Array<{
-        equipo_id: number;
-        status: "ok" | "skipped" | "error";
-        reason?: string;
-        error?: string;
-        specs_count?: number;
-        filled?: string[];
-      }>;
-    }>("/api/admin/equipos/batch-enriquecer", { equipo_ids }),
   // Mantenimiento log por equipo
   listMantenimiento: (equipoId: number) =>
     authedJson<{
@@ -743,35 +730,6 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }),
-  /** Aplica el resultado de /admin/equipos/autocompletar en un único call.
-   *  Acepta cualquier subset de campos; los no enviados quedan como están.
-   *  `specs_matching` reporta el resultado del matching estructurado:
-   *    - aplicadas: cuántas specs entrantes se conectaron a un spec_def
-   *      asignado al equipo (cargadas en equipo_specs).
-   *    - propuestas_creadas: cuántas specs entrantes no encajaron y
-   *      generaron propuestas en spec_propuestas_pendientes (visibles en
-   *      /admin/gear-compatibility → Propuestas IA).
-   *    - saltadas: errores u otros casos no procesables. */
-  aplicarEnriquecimiento: (id: number, data: Record<string, unknown>) =>
-    authedJson<{
-      equipo: Equipo;
-      ficha: Ficha | null;
-      specs_matching?: {
-        aplicadas: number;
-        propuestas_creadas: number;
-        saltadas: number;
-        detalle: {
-          aplicadas: Array<{ label: string; spec_def_id: number; value: string }>;
-          propuestas: Array<{ tipo: "assign_spec" | "spec_nueva"; label: string; valor: string }>;
-          saltadas: Array<{ label: string; motivo: string }>;
-        };
-      };
-    }>(`/api/admin/equipos/${id}/aplicar-autocompletado`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    }),
-
   // kit / componentes
   getKit: (id: number) => authedJson<KitComponente[]>(`/api/equipos/${id}/kit`),
   addKitItem: (id: number, componente_id: number, cantidad = 1) =>
