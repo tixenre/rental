@@ -168,6 +168,25 @@ class TestResolveToPublicIp:
             _resolve_to_public_ip("noexiste.malo.com")
         assert exc.value.status_code == 403
 
+    def test_ipv6_publico_devuelve_ip(self, monkeypatch):
+        # getaddrinfo IPv6 → sockaddr es 4-tupla (host, port, flowinfo, scopeid).
+        pub6 = "2606:2800:220:1:248:1893:25c8:1946"
+        monkeypatch.setattr(
+            socket, "getaddrinfo",
+            lambda *a, **k: [(socket.AF_INET6, socket.SOCK_STREAM, 6, "", (pub6, 0, 0, 0))],
+        )
+        assert _resolve_to_public_ip("ejemplo6.com") == pub6
+
+    def test_ipv6_privado_rechaza(self, monkeypatch):
+        # fd00::/8 = ULA privada IPv6.
+        monkeypatch.setattr(
+            socket, "getaddrinfo",
+            lambda *a, **k: [(socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("fd00::1", 0, 0, 0))],
+        )
+        with pytest.raises(HTTPException) as exc:
+            _resolve_to_public_ip("interno6.malo.com")
+        assert exc.value.status_code == 403
+
 
 class TestValidateStaticNoDns:
     """`_validate_image_url_static` no resuelve DNS — solo scheme/host/puerto/allowlist."""

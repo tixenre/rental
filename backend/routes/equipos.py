@@ -4506,6 +4506,11 @@ def _validate_external_image_url(url: str) -> None:
         raise HTTPException(403, f"Host '{host}' resuelve a IP privada/interna")
 
 
+# Tope de tamaño de descarga: una imagen de equipo nunca pesa esto. Evita que un
+# host del allowlist comprometido agote la memoria del server con un body gigante.
+_MAX_IMAGE_BYTES = 20 * 1024 * 1024  # 20 MB
+
+
 def _http_get_pinned(
     url: str, pinned_ip: str, headers: dict, timeout: float = 20.0,
 ) -> tuple[int, dict, bytes]:
@@ -4543,7 +4548,10 @@ def _http_get_pinned(
         req_headers.setdefault("Host", host)
         conn.request("GET", path, headers=req_headers)
         resp = conn.getresponse()
-        body = resp.read()
+        # Leemos hasta el tope + 1 para detectar overflow sin tragarnos todo.
+        body = resp.read(_MAX_IMAGE_BYTES + 1)
+        if len(body) > _MAX_IMAGE_BYTES:
+            raise HTTPException(413, "La imagen supera el tamaño máximo permitido")
         resp_headers = {k.lower(): v for k, v in resp.getheaders()}
         return resp.status, resp_headers, body
     except (OSError, ssl.SSLError, http.client.HTTPException):
