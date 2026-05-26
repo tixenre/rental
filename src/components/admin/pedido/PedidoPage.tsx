@@ -68,6 +68,9 @@ import {
 } from "@/lib/admin/api";
 import { clienteApi } from "@/lib/cliente/api";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
+import { apiGetDescuentosJornada } from "@/lib/api";
+import { computeCartTotal } from "@/lib/cart-total";
+import { type PerfilImpuestos } from "@/lib/iva";
 import {
   usePedidoDraft,
   jornadasEntre,
@@ -324,6 +327,15 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
     enabled: isCliente && !!pedido && !!draft.datos?.fecha_desde && !!draft.datos?.fecha_hasta,
   });
 
+  // Puntos de descuento por jornadas — los usa `computeCartTotal` para
+  // recalcular el total cuando el admin edita en vivo (alineado bit a
+  // bit con el backend services/precios).
+  const descuentosJornadaQ = useQuery({
+    queryKey: ["descuentos-jornada"],
+    queryFn: apiGetDescuentosJornada,
+    staleTime: 60_000,
+  });
+
   if (pedidoQ.isLoading) {
     return (
       <div className="flex items-center justify-center h-[60vh] text-muted-foreground gap-2">
@@ -341,8 +353,27 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
   }
 
   const jornadas = jornadasEntre(draft.datos.fecha_desde, draft.datos.fecha_hasta);
-  const bruto = draft.items.reduce((s, it) => s + it.precio_jornada * it.cantidad * jornadas, 0);
-  const total = Math.round(bruto * (1 - (draft.datos.descuento_pct || 0) / 100));
+
+  // Desglose canónico vía lib/cart-total (alineado bit a bit con el
+  // backend services/precios.calcular_total). Cierra #496: total e IVA
+  // coinciden con admin, portal cliente, carrito y PDF.
+  //
+  // Mientras el admin edita en vivo (draft con cambios pendientes),
+  // recomputamos local. Cuando no hay cambios, el resultado coincide
+  // con `pedido.total_con_iva` que envió el backend.
+  const totales = computeCartTotal({
+    lines: draft.items.map((it) => ({ pricePerDay: it.precio_jornada, qty: it.cantidad })),
+    jornadas,
+    descuentosPuntos: descuentosJornadaQ.data ?? [],
+    perfilImpuestos: (pedido.cliente_perfil_impuestos ?? null) as PerfilImpuestos | null,
+    descuentoClientePct: draft.datos.descuento_pct ?? 0,
+  });
+  const bruto = totales.subtotal;
+  const totalNeto = totales.totalNeto;
+  const total = totales.total; // total con IVA si el cliente es RI, si no = neto
+  const ivaMonto = totales.iva;
+  const conIva = totales.conIva;
+  const ivaPct = 21;
   const pagado = pedido.monto_pagado ?? 0;
   const saldo = total - pagado;
   const numero = pedido.numero_pedido ? `#${pedido.numero_pedido}` : `(borrador #${pedido.id})`;
@@ -668,7 +699,11 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
           {/* Totales */}
           <TotalesCard
             bruto={bruto}
+            totalNeto={totalNeto}
             total={total}
+            conIva={conIva}
+            ivaPct={ivaPct}
+            ivaMonto={ivaMonto}
             jornadas={jornadas}
             descuentoPct={draft.datos.descuento_pct}
             setDescuentoPct={(v) => draft.setDatos({ ...draft.datos!, descuento_pct: v })}
@@ -1071,7 +1106,11 @@ function ItemsCard({
 
 function TotalesCard({
   bruto,
+  totalNeto,
   total,
+  conIva,
+  ivaPct,
+  ivaMonto,
   jornadas,
   descuentoPct,
   setDescuentoPct,
@@ -1080,7 +1119,11 @@ function TotalesCard({
   mode = "admin",
 }: {
   bruto: number;
+  totalNeto: number;
   total: number;
+  conIva: boolean;
+  ivaPct: number;
+  ivaMonto: number;
   jornadas: number;
   descuentoPct: number;
   setDescuentoPct: (v: number) => void;
@@ -1100,7 +1143,7 @@ function TotalesCard({
           descuentoPct > 0 && (
             <div className="flex items-center justify-between gap-3 text-muted-foreground">
               <span>Descuento {descuentoPct}%</span>
-              <span className="tabular-nums">−{fmtArs(bruto - total)}</span>
+              <span className="tabular-nums">−{fmtArs(bruto - totalNeto)}</span>
             </div>
           )
         ) : (
@@ -1125,11 +1168,23 @@ function TotalesCard({
         {!isCliente && descuentoPct > 0 && (
           <div className="flex justify-between text-muted-foreground">
             <span>−{descuentoPct}%</span>
-            <span className="tabular-nums">−{fmtArs(bruto - total)}</span>
+            <span className="tabular-nums">−{fmtArs(bruto - totalNeto)}</span>
           </div>
         )}
+        {conIva && (
+          <>
+            <div className="flex justify-between text-muted-foreground">
+              <span>Subtotal neto</span>
+              <span className="tabular-nums">{fmtArs(totalNeto)}</span>
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>IVA {ivaPct}%</span>
+              <span className="tabular-nums">+{fmtArs(ivaMonto)}</span>
+            </div>
+          </>
+        )}
         <div className="flex justify-between border-t hairline pt-2.5 font-semibold text-ink">
-          <span>Total con impuestos incluidos</span>
+          <span>Total{conIva ? " · IVA incluído" : ""}</span>
           <span className="tabular-nums">{fmtArs(total)}</span>
         </div>
         {jornadas > 0 && (

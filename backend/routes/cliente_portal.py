@@ -445,7 +445,8 @@ def cliente_pedido_detalle(id: int, request: Request):
     try:
         pedido = conn.execute("""
             SELECT id, numero_pedido, estado, fecha_desde, fecha_hasta,
-                   monto_total, monto_pagado, descuento_pct, notas, created_at
+                   monto_total, monto_pagado, descuento_pct,
+                   descuento_jornadas_pct, cliente_id, notas, created_at
             FROM alquileres
             WHERE id = ? AND cliente_id = ?
         """, (id, cliente_id)).fetchone()
@@ -480,6 +481,12 @@ def cliente_pedido_detalle(id: int, request: Request):
         d["solicitudes"] = [row_to_dict(s) for s in solicitudes]
 
         d["documentos_disponibles"] = _documentos_disponibles(d.get("estado", ""))
+
+        # Desglose canónico (neto/IVA/total con IVA) vía services/precios.
+        # Mismo helper que admin/PDF/carrito → totales coinciden en las 4
+        # superficies (#496). El frontend del portal lo lee directo.
+        from routes.alquileres import _enriquecer_pedido_con_total
+        _enriquecer_pedido_con_total(conn, d)
 
         return d
     finally:

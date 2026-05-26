@@ -202,6 +202,66 @@ def _get_alquiler_detail(conn, id: int) -> dict:
     pedido["items"] = _get_alquiler_items(conn, id)
     pedido["pagos"] = _get_alquiler_pagos(conn, id)
     pedido["historial_modificaciones"] = _get_historial_modificaciones(conn, id)
+    _enriquecer_pedido_con_total(conn, pedido)
+    return pedido
+
+
+def _enriquecer_pedido_con_total(conn, pedido: dict) -> dict:
+    """Agrega al pedido el desglose canónico del total + IVA derivado.
+
+    Fuente de verdad: `services/precios.calcular_total`. `monto_total`
+    persistido sigue siendo NETO (con descuento, sin IVA). Acá se computa
+    el desglose para que admin/portal/listados muestren EXACTAMENTE lo
+    mismo, sin reimplementar la fórmula en el frontend.
+
+    Cierra #496. Si el cliente del pedido es Responsable Inscripto, se
+    discrimina IVA 21%; el resto ve total = neto.
+    """
+    # Perfil tributario del cliente (lo usa calcular_total para decidir IVA).
+    perfil = pedido.get("cliente_perfil_impuestos")
+    if perfil is None and pedido.get("cliente_id"):
+        row = conn.execute(
+            "SELECT perfil_impuestos FROM clientes WHERE id = ?",
+            (pedido["cliente_id"],),
+        ).fetchone()
+        if row:
+            perfil = row_to_dict(row).get("perfil_impuestos")
+            pedido["cliente_perfil_impuestos"] = perfil
+
+    # Jornadas vía fórmula única (ceil/24h). Si falta alguna fecha → 1.
+    d0 = to_datetime(pedido["fecha_desde"]) if pedido.get("fecha_desde") else None
+    d1 = to_datetime(pedido["fecha_hasta"]) if pedido.get("fecha_hasta") else None
+    jornadas = jornadas_periodo(d0, d1)
+
+    # Items con la forma que espera el helper (precios netos).
+    items_para_total = [
+        {
+            "equipo_id": it["equipo_id"],
+            "cantidad": it["cantidad"],
+            "precio_jornada": it["precio_jornada"],
+        }
+        for it in pedido.get("items", [])
+    ]
+
+    desglose = calcular_total(
+        items=items_para_total,
+        jornadas=jornadas,
+        descuento_cliente_pct=pedido.get("descuento_pct") or 0,
+        descuento_jornadas_pct=pedido.get("descuento_jornadas_pct") or 0,
+        perfil_impuestos=perfil,
+    )
+
+    # Agregamos el desglose al pedido. El frontend lo lee directo, sin
+    # reimplementar la fórmula. NO sobreescribimos `monto_total` (que
+    # sigue siendo el neto persistido y la fuente de verdad de la BD).
+    pedido["bruto"] = desglose["bruto"]
+    pedido["descuento_monto"] = desglose["descuento_monto"]
+    pedido["monto_neto"] = desglose["neto"]
+    pedido["iva_pct"] = desglose["iva_pct"]
+    pedido["iva_monto"] = desglose["iva_monto"]
+    pedido["total_con_iva"] = desglose["total_final"]
+    pedido["con_iva"] = desglose["con_iva"]
+    pedido["cantidad_jornadas"] = jornadas
     return pedido
 
 
