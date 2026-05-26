@@ -1,7 +1,7 @@
 # Rambla Rental — guía de sesión
 
 > **Front door auto-cargado.** Liviano a propósito: el modus operandi esencial está acá; el
-> contexto profundo se lee on-demand. **No** se inlinea el `MANIFIESTO.md` completo (671 líneas)
+> contexto profundo se lee on-demand. **No** se inlinea el `MANIFIESTO.md` completo (~290 líneas)
 > para no inundar la sesión — se lee cuando hace falta, y el supervisor lo lee en su ventana.
 
 ## Qué es
