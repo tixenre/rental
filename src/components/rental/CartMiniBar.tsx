@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 import { motion, useAnimationControls } from "framer-motion";
 import { ShoppingBag } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useCart } from "@/lib/cart-store";
 import { useFlyToCart } from "@/lib/fly-to-cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
+import { apiGetDescuentosJornada } from "@/lib/api";
+import { useClienteSession } from "@/lib/iva";
+import { computeCartTotal } from "@/lib/cart-total";
 
 export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
   const items = useCart((s) => s.items);
@@ -28,13 +32,6 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
 
   const entries = Object.entries(items);
   const count = entries.reduce((a, [, q]) => a + q, 0);
-
-  const perDay = entries.reduce((acc, [id, qty]) => {
-    const item = allEquipos.find((e) => e.id === id);
-    if (!item) return acc;
-    return acc + item.pricePerDay * qty;
-  }, 0);
-  const total = perDay * days;
   const isEmpty = count === 0;
 
   // Pre-computar para el preview hover. Filtramos items que ya no estén
@@ -45,6 +42,24 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
       return equipo ? { equipo, qty } : null;
     })
     .filter((x): x is { equipo: Equipment; qty: number } => x !== null);
+
+  // Total unificado con drawer/sheet vía lib/cart-total. Sin fechas:
+  // estimado por jornada (J=1) sin descuento ni IVA.
+  const hayFechas = days > 0;
+  const { data: descuentosPuntos = [] } = useQuery({
+    queryKey: ["descuentos-jornada"],
+    queryFn: apiGetDescuentosJornada,
+    staleTime: 60_000,
+  });
+  const { data: clienteSession } = useClienteSession();
+  const totales = computeCartTotal({
+    lines: previewItems.map(({ equipo, qty }) => ({ pricePerDay: equipo.pricePerDay, qty })),
+    jornadas: hayFechas ? days : 1,
+    descuentosPuntos,
+    perfilImpuestos: hayFechas ? clienteSession?.perfil_impuestos : null,
+    descuentoClientePct: hayFechas ? clienteSession?.descuento : 0,
+  });
+  const total = totales.total;
 
   return (
     <div className="group/cart fixed inset-x-0 bottom-0 z-40 border-t-2 border-amber/60 bg-background/98 shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.15)] backdrop-blur-xl">
@@ -95,7 +110,7 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
 
         <div className="ml-auto text-right leading-tight">
           <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            Total
+            {hayFechas ? "Total" : "/ jornada"}
           </div>
           <div className="text-base font-semibold tabular sm:text-lg">{formatARS(total)}</div>
         </div>

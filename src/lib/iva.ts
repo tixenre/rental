@@ -25,25 +25,15 @@ export function aplicaIva(perfil: PerfilImpuestos | null | undefined): boolean {
   return perfil === "responsable_inscripto";
 }
 
-/** Descompone un precio neto en {neto, iva, total} según el perfil. Para
- * consumidor final / monotributo / exento, iva = 0 y total = neto. */
-export function desglosarIva(
-  neto: number,
-  perfil: PerfilImpuestos | null | undefined,
-): { neto: number; iva: number; total: number } {
-  if (!aplicaIva(perfil)) {
-    return { neto, iva: 0, total: neto };
-  }
-  const iva = Math.round(neto * IVA_RATE);
-  return { neto, iva, total: neto + iva };
-}
-
 // ── Hook de sesión cliente (lightweight, una sola llamada compartida) ────
 
 type ClienteSession = {
   id: number;
   email: string;
   perfil_impuestos: PerfilImpuestos | null;
+  /** Descuento personalizado del cliente (atención manual del admin a
+   * buenos clientes, 0..100). Lo lee el carrito; no es público. */
+  descuento: number | null;
 } | null;
 
 let cached: ClienteSession | undefined; // undefined = no fetched yet
@@ -59,6 +49,7 @@ async function fetchClienteSession(): Promise<ClienteSession> {
       id: data.id,
       email: data.email,
       perfil_impuestos: (data.perfil_impuestos ?? null) as PerfilImpuestos | null,
+      descuento: typeof data.descuento === "number" ? data.descuento : null,
     };
   } catch {
     return null;
