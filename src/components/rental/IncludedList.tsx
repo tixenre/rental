@@ -1,6 +1,5 @@
 import { type Equipment } from "@/data/equipment";
 import { KeywordChips } from "./KeywordChips";
-import { pickHighlightSpecs } from "@/lib/equipment/specs";
 
 /**
  * IncludedList — keywords + specs highlights de la ficha del equipo.
@@ -18,7 +17,9 @@ export function IncludedList({ item }: { item: Equipment }) {
     return null;
   }
 
-  const { highlights, rest } = pickHighlightSpecs(item.category, specs, 6);
+  const highlights = item.specsDestacados ?? [];
+  const highlightLabels = new Set(highlights.map((s) => s.label));
+  const rest = specs.filter((s) => !highlightLabels.has(s.label));
   const moreSpecs = rest.length;
 
   return (
