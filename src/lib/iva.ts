@@ -30,6 +30,9 @@ export function aplicaIva(perfil: PerfilImpuestos | null | undefined): boolean {
 type ClienteSession = {
   id: number;
   email: string;
+  /** Nombre de pila del cliente (para personalizar etiquetas en el UI:
+   * "Descuento para Tincho", avatar del TopBar, etc.). */
+  nombre: string | null;
   perfil_impuestos: PerfilImpuestos | null;
   /** Descuento personalizado del cliente (atención manual del admin a
    * buenos clientes, 0..100). Lo lee el carrito; no es público. */
@@ -48,6 +51,7 @@ async function fetchClienteSession(): Promise<ClienteSession> {
     return {
       id: data.id,
       email: data.email,
+      nombre: typeof data.nombre === "string" ? data.nombre : null,
       perfil_impuestos: (data.perfil_impuestos ?? null) as PerfilImpuestos | null,
       descuento: typeof data.descuento === "number" ? data.descuento : null,
     };

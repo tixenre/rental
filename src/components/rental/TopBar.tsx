@@ -7,6 +7,7 @@ import { Calendar as CalendarIcon, ShoppingBag, User, LogOut } from "lucide-reac
 import { RentalDateModal } from "./RentalDateModal";
 import { Logo } from "./Logo";
 import { cn } from "@/lib/utils";
+import { useClienteSession } from "@/lib/iva";
 
 export type TopBarProps = {
   /**
@@ -57,6 +58,15 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
   const hasDates = !!(startDate && endDate);
   const jornadas = days();
 
+  // Cuando hay sesión, el botón "Ingresar" se convierte en avatar y va
+  // al portal directo (#513). El nombre lo expone `useClienteSession`.
+  const { data: clienteSession } = useClienteSession();
+  const isLogged = !!clienteSession;
+  const initial = clienteSession?.nombre?.trim()[0]?.toUpperCase() ?? null;
+  const firstName = clienteSession?.nombre?.trim().split(" ")[0] ?? null;
+  const userLinkTo = isLogged ? "/cliente/portal" : "/cliente";
+  const userLinkLabel = isLogged ? `Mi cuenta · ${firstName ?? ""}`.trim() : "Ingresar";
+
   // Amber-on-scroll: lee --amber-pct del <html> (puesto por la página)
   // y aplica el gradiente al header + calcula el snap a 65%.
   useEffect(() => {
@@ -104,11 +114,21 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
               />
             </div>
             <Link
-              to="/cliente"
-              className="flex items-center justify-center w-10 h-10 rounded-full border hairline hover:border-foreground/40"
-              aria-label="Ingresar"
+              to={userLinkTo}
+              className={cn(
+                "flex items-center justify-center w-10 h-10 rounded-full border hairline transition",
+                isLogged
+                  ? "bg-amber text-ink border-amber hover:opacity-90"
+                  : "hover:border-foreground/40",
+              )}
+              aria-label={userLinkLabel}
+              title={userLinkLabel}
             >
-              <User className="h-5 w-5" />
+              {isLogged && initial ? (
+                <span className="font-display text-sm font-black">{initial}</span>
+              ) : (
+                <User className="h-5 w-5" />
+              )}
             </Link>
           </div>
 
@@ -177,16 +197,31 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
               <span>{count > 0 ? (count === 1 ? "ítem" : "ítems") : "Tu rental"}</span>
             </button>
             <Link
-              to="/cliente"
+              to={userLinkTo}
               className={cn(
-                "flex items-center justify-center w-9 h-9 rounded-full border transition",
+                "flex items-center gap-2 rounded-full border transition",
+                isLogged ? "px-2 py-1.5 pr-3" : "px-0 py-0 w-9 h-9 justify-center",
                 snapped
                   ? "border-background/80 bg-background text-ink hover:bg-background/90"
-                  : "hairline hover:border-foreground/40",
+                  : isLogged
+                    ? "border-amber/50 bg-amber/10 hover:bg-amber/20"
+                    : "hairline hover:border-foreground/40",
               )}
-              aria-label="Ingresar"
+              aria-label={userLinkLabel}
+              title={userLinkLabel}
             >
-              <User className="h-4 w-4" />
+              {isLogged && initial ? (
+                <>
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber text-ink font-display text-[11px] font-black">
+                    {initial}
+                  </span>
+                  {firstName && (
+                    <span className="text-sm font-semibold leading-none">{firstName}</span>
+                  )}
+                </>
+              ) : (
+                <User className="h-4 w-4" />
+              )}
             </Link>
           </div>
         </div>
