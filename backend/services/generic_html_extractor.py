@@ -19,7 +19,6 @@ import json
 import logging
 import re
 from html.parser import HTMLParser
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -206,13 +205,37 @@ def resolve_pairs(
 ) -> tuple[list[dict], list[dict]]:
     """Resuelve pares crudos {label, value} contra el registry de aliases.
 
+    Cuando se provee categoria_hint, filtra el índice a solo las specs de esa
+    categoría — evita colisiones cross-categoría (alias compartido entre
+    "Cámaras" y "Iluminación" que resolvería al primer ganador global).
+
     Retorna (matched, unmatched):
     - matched:   [{spec_key, label, value}] — resueltos y con valor coercionado
     - unmatched: [{label, value}]           — no resolvieron contra ningún alias
     """
     from services.spec_coerce import coerce_and_serialize
 
-    index = _get_alias_index()
+    if categoria_hint:
+        from specs import REGISTRY
+        cat_reg = REGISTRY.categorias.get(categoria_hint)
+        if cat_reg:
+            index: dict = {}
+            for spec in cat_reg.specs:
+                info = {
+                    "spec_key": spec.key,
+                    "label": spec.label,
+                    "tipo": spec.tipo,
+                    "unidad": spec.unidad,
+                    "enum_options": spec.enum_options,
+                }
+                for key in (_normalize_label(spec.label), _normalize_label(spec.key)):
+                    index.setdefault(key, info)
+                for alias in spec.aliases:
+                    index.setdefault(_normalize_label(alias), info)
+        else:
+            index = _get_alias_index()
+    else:
+        index = _get_alias_index()
     matched: list[dict] = []
     unmatched: list[dict] = []
     seen_keys: set[str] = set()

@@ -9,11 +9,8 @@
  *  - "Link de fuente" como primera cosa del form, con botones para abrir y
  *    copiar al clipboard.
  *  - "Buscar foto" + "Autocompletar todo" como dos botones del mismo widget.
- *  - Diff visual al traer specs del autocompletar.
+ *  - HTML upload para extraer specs (determinístico, sin LLM).
  *  - Kit con drag-drop (igual que el viejo).
- *
- * El backend no cambia: usa los mismos endpoints (adminApi.createEquipo,
- * setFicha, setCategorias, aplicarEnriquecimiento, etc.).
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -26,7 +23,6 @@ import {
   Upload,
   Plus,
   Trash2,
-  Sparkles,
   Search,
   Link as LinkIcon,
   Image as ImageIcon,
@@ -79,7 +75,6 @@ import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/use
 import { KitEditor } from "./KitEditor";
 import { SpecsDiffEditor } from "./SpecsDiffEditor";
 import { type Spec, newSpec, withIds, sameLabel, findSpecValue, uniq } from "./spec-helpers";
-import type { AutocompletarResult } from "../autocompletar";
 import { generarNombrePublico, categoriaSoportaAutoGen } from "./nombre-publico";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 
@@ -209,15 +204,7 @@ export function EquipoFormDialogV2({
   const [nombrePublico, setNombrePublico] = useState("");
   const [nombrePublicoAuto, setNombrePublicoAuto] = useState(true);
 
-  // ── Autocompletar (URL importer) ───────────────────────────────────
-  // El URL del autocompletar es el mismo bh_url del form — un único link
-  // para todo (autocompletar, buscar fotos, referencia, copiar/abrir).
-  const [autocompletando, setAutocompletando] = useState(false);
-  const [importedFichaExt, setImportedFichaExt] = useState<Partial<AutocompletarResult> | null>(
-    null,
-  );
-
-  // Specs traídos del autocompletar: se guardan en una lista separada para
+  // Specs traídos del HTML upload: se guardan en una lista separada para
   // que el usuario los apruebe uno por uno (vs los specs actuales).
   const [specsPropuestos, setSpecsPropuestos] = useState<Spec[]>([]);
 
@@ -537,118 +524,6 @@ export function EquipoFormDialogV2({
   const autoGenDisponible = !!categoriaTemplate || categoriaSoportaAutoGen(categoriaRoot);
 
   // ════════════════════════════════════════════════════════════════════
-  // Autocompletar — llama al backend con la URL y rellena el form.
-  // Specs van a una lista de "propuestos" para que el usuario los apruebe.
-  // ════════════════════════════════════════════════════════════════════
-  const autocompletar = async () => {
-    const u = (form.getValues("bh_url") ?? "").trim();
-    if (!u) {
-      toast.error("Pegá un link primero");
-      return;
-    }
-    try {
-      const parsed = new URL(u);
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        throw new Error("URL debe empezar con http:// o https://");
-      }
-    } catch (e) {
-      toast.error(`URL inválida: ${e instanceof Error ? e.message : ""}`);
-      return;
-    }
-    setAutocompletando(true);
-    try {
-      const r = await authedJson<AutocompletarResult>("/api/admin/equipos/autocompletar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Pasamos las categorías ya seleccionadas para que el LLM use los
-        // labels canónicos del template de esa categoría. Si todavía no
-        // se eligió ninguna, el backend cae a guía general.
-        body: JSON.stringify({
-          url: u,
-          categoria_ids: selectedCats.size > 0 ? [...selectedCats] : undefined,
-        }),
-      });
-      const sets = (k: keyof FormValues, v: string | number | null | undefined) => {
-        if (v !== null && v !== undefined && v !== "") {
-          form.setValue(k, v as never, { shouldDirty: true });
-        }
-      };
-      if (!form.getValues("nombre")?.trim() && r.nombre_normalizado) {
-        sets("nombre", r.nombre_normalizado);
-      }
-      sets("marca", r.marca ?? "");
-      sets("modelo", r.modelo ?? "");
-      // Foto NO se toca acá — para fotos está el botón "Buscar foto" aparte.
-      // Mantenemos el bh_url (fuente) para que se pueda re-usar.
-      sets("bh_url", r.fuente_url);
-      if (typeof r.precio_bh_usd === "number") sets("precio_usd", r.precio_bh_usd);
-
-      if (r.descripcion) setDescripcion(r.descripcion);
-      if (r.keywords?.length) setTags((prev) => uniq([...prev, ...r.keywords!]));
-
-      // Specs propuestos = los que vienen del autocompletar + montura/formato/resolucion
-      // (que en V2 ya no son inputs dedicados — viven como specs).
-      const propuestos: Spec[] = withIds(r.specs ?? []);
-      if (r.montura) propuestos.unshift(newSpec("Montura", r.montura));
-      if (r.formato) propuestos.unshift(newSpec("Formato", r.formato));
-      if (r.resolucion) propuestos.unshift(newSpec("Resolución", r.resolucion));
-
-      // Auto-aplicar los propuestos que matchean con el template del equipo.
-      // Matcheo por spec_key primero (exacto, sin ambigüedad), label como
-      // fallback para propuestos sin spec_key (ej. montura/formato/resolucion
-      // agregados arriba). Specs sin template match van a "propuestos pendientes"
-      // — nunca se descartan silenciosamente.
-      const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-      const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-      for (const t of templateItems ?? []) {
-        if (t.spec_key) tmplByKey.set(t.spec_key, t);
-        if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
-      }
-      const findTmpl = (p: Spec) =>
-        (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
-        tmplByLabel.get(p.label.trim().toLowerCase());
-
-      const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
-      const requierenRevision = propuestos.filter((p) => !findTmpl(p));
-      if (autoAplicables.length > 0) {
-        setSpecs((prev) => {
-          const next = [...prev];
-          for (const p of autoAplicables) {
-            const tmpl = findTmpl(p)!;
-            const targetId = `spec-${tmpl.spec_def_id}`;
-            const idx = next.findIndex(
-              (x) =>
-                x.id === targetId ||
-                x.id === `tmpl-${tmpl.spec_def_id}` ||
-                sameLabel(x.label, tmpl.label),
-            );
-            if (idx >= 0) {
-              next[idx] = { ...next[idx], value: p.value };
-            } else {
-              next.push({ id: targetId, label: tmpl.label, value: p.value, spec_key: p.spec_key });
-            }
-          }
-          return next;
-        });
-      }
-      if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
-
-      setImportedFichaExt(r);
-
-      const parts: string[] = [];
-      if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
-      if (requierenRevision.length) parts.push(`${requierenRevision.length} pendientes de revisar`);
-      if (r.keywords?.length) parts.push(`${r.keywords.length} etiquetas`);
-      if (r.descripcion) parts.push("descripción");
-      toast.success("Specs importados", { description: parts.join(" · ") || "datos básicos" });
-    } catch (e) {
-      toast.error(`No se pudo importar: ${e instanceof Error ? e.message : ""}`);
-    } finally {
-      setAutocompletando(false);
-    }
-  };
-
-  // ════════════════════════════════════════════════════════════════════
   // Buscar fotos (solo foto, ~5s)
   // ════════════════════════════════════════════════════════════════════
   const buscarFotos = async () => {
@@ -956,12 +831,7 @@ export function EquipoFormDialogV2({
         // Las specs estructuradas ya NO van acá — viven en equipo_specs y
         // se persisten vía putEquipoSpecs (más abajo).
         const tieneFicha =
-          isEdit ||
-          !!descripcion ||
-          !!notas ||
-          tags.length > 0 ||
-          !!nombrePublico.trim() ||
-          !!importedFichaExt;
+          isEdit || !!descripcion || !!notas || tags.length > 0 || !!nombrePublico.trim();
         if (tieneFicha) {
           try {
             await adminApi.setFicha(equipoId, {
@@ -1002,39 +872,6 @@ export function EquipoFormDialogV2({
             await adminApi.putEquipoSpecs(equipoId, specsDict);
           } catch (e) {
             fallidos.push(`specs (${e instanceof Error ? e.message : "error"})`);
-          }
-        }
-
-        // Ficha extendida (peso, dimensiones, etc.) si vino del autocompletar
-        if (importedFichaExt) {
-          try {
-            const r = importedFichaExt;
-            // Specs físicas (peso/dimensiones/montura/formato/resolucion/
-            // alimentacion) las consolida el backend en equipo_specs vía
-            // _matchear_y_persistir_specs (post-Fase F). Mandamos los
-            // campos planos del scrape — el backend hace el mapping a
-            // spec_key correspondiente.
-            const ext: Record<string, unknown> = {};
-            if (r.peso) ext.peso = r.peso;
-            if (r.dimensiones) ext.dimensiones = r.dimensiones;
-            if (r.alimentacion) ext.alimentacion = r.alimentacion;
-            if (r.montura) ext.montura = r.montura;
-            if (r.formato) ext.formato = r.formato;
-            if (r.resolucion) ext.resolucion = r.resolucion;
-            // Listas y multimedia (no son specs estructuradas)
-            if (r.video_url) ext.video_url = r.video_url;
-            if (typeof r.precio_bh_usd === "number") ext.precio_bh_usd = r.precio_bh_usd;
-            if (r.incluye?.length) ext.incluye = r.incluye;
-            if (r.conectividad?.length) ext.conectividad = r.conectividad;
-            if (r.compatible_con?.length) ext.compatible_con = r.compatible_con;
-            if (r.fuente_url) ext.fuente_url = r.fuente_url;
-            if (r.fuente_titulo) ext.fuente_titulo = r.fuente_titulo;
-            if (r.enriquecido_fuente) ext.enriquecido_fuente = r.enriquecido_fuente;
-            if (Object.keys(ext).length > 0) {
-              await adminApi.aplicarEnriquecimiento(equipoId, ext);
-            }
-          } catch (e) {
-            fallidos.push(`ficha extendida (${e instanceof Error ? e.message : "error"})`);
           }
         }
 
@@ -1142,10 +979,7 @@ export function EquipoFormDialogV2({
   // descripcion/notas/tags/specs manuales sin tocar form fields.
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const hasUnsavedChanges =
-    form.formState.isDirty ||
-    specsPropuestos.length > 0 ||
-    importedFichaExt !== null ||
-    pendingFile !== null;
+    form.formState.isDirty || specsPropuestos.length > 0 || pendingFile !== null;
 
   const handleCloseRequest = (next: boolean) => {
     if (!next && hasUnsavedChanges) {
@@ -1209,17 +1043,6 @@ export function EquipoFormDialogV2({
             ) : (
               <>
                 <ImageIcon className="h-3.5 w-3.5 mr-1" /> Buscar foto (~5s)
-              </>
-            )}
-          </Button>
-          <Button type="button" size="sm" onClick={autocompletar} disabled={autocompletando}>
-            {autocompletando ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Buscando…
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-3.5 w-3.5 mr-1" /> Buscar specs (~15s)
               </>
             )}
           </Button>
@@ -1635,12 +1458,6 @@ export function EquipoFormDialogV2({
           <Label className="text-xs uppercase tracking-wide text-muted-foreground">
             Categorías del catálogo
           </Label>
-          <CategoriaSugeridaChip
-            categoriaSugerida={importedFichaExt?.categoria_sugerida ?? null}
-            categorias={catsQ.data ?? []}
-            selected={selectedCats}
-            onApply={(id) => setSelectedCats(new Set([...selectedCats, id]))}
-          />
           <CategoriasPicker
             categorias={catsQ.data ?? []}
             selected={selectedCats}
@@ -2093,49 +1910,6 @@ function PhotoCard({
         )}
       </div>
     </div>
-  );
-}
-
-/**
- * Chip de "Categoría sugerida" que aparece arriba del CategoriasPicker
- * cuando el scrape devolvió un `categoria_sugerida`. Match case-insensitive
- * (sin acentos) contra la lista de categorías de DB. Click → aplica.
- *
- * El backend se encarga de auto-asignar la madre si la sugerencia es hija
- * (ver `_expand_to_ancestors` en backend/routes/equipos.py).
- */
-function CategoriaSugeridaChip({
-  categoriaSugerida,
-  categorias,
-  selected,
-  onApply,
-}: {
-  categoriaSugerida: string | null | undefined;
-  categorias: CategoriaAdmin[];
-  selected: Set<number>;
-  onApply: (id: number) => void;
-}) {
-  if (!categoriaSugerida) return null;
-
-  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-  const target = norm(categoriaSugerida);
-
-  const match = categorias.find((c) => norm(c.nombre) === target);
-  if (!match) return null;
-  if (selected.has(match.id)) return null;
-
-  return (
-    <button
-      type="button"
-      onClick={() => onApply(match.id)}
-      className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-soft px-3 py-1 text-xs text-ink hover:bg-amber transition active:scale-95"
-      title="Aplicar la categoría sugerida por el scrape"
-    >
-      <Sparkles className="h-3 w-3 text-amber-700" />
-      <span className="text-muted-foreground">Sugerida:</span>
-      <strong>{match.nombre}</strong>
-      <span className="text-muted-foreground">· Aplicar</span>
-    </button>
   );
 }
 

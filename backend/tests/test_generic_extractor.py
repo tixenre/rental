@@ -282,3 +282,41 @@ def test_dispatcher_desconocido_usa_extractor_generico():
     assert "peso_g" in by_key, (
         "Extractor genérico debe resolver 'Weight' → peso_g incluso para categoría desconocida"
     )
+
+
+# ── Cobertura inversa: toda key del registry es alcanzable ───────────────────
+
+
+def test_todas_las_keys_modificadores_son_emitibles():
+    """Cobertura inversa: para cada spec en el registry de Modificadores, el
+    extractor genérico puede producir su spec_key dado un HTML con el label
+    canónico. Complementa test_extract_generic_matched_no_emite_keys_huerfanas
+    que solo verifica la dirección opuesta (emitidas ⊆ registry).
+    """
+    from services.generic_html_extractor import extract_from_html_generic
+    from specs import REGISTRY
+
+    cat_reg = REGISTRY.categorias.get("Modificadores")
+    if cat_reg is None:
+        pytest.skip("No hay registry para Modificadores")
+
+    faltantes = []
+    for spec in cat_reg.specs:
+        unit = spec.unidad or "W"
+        html = f"""
+        <html><head><title>Test Modificador</title>
+        <script type="application/ld+json">
+        {{"@type":"Product","additionalProperty":[
+          {{"@type":"PropertyValue","name":"{spec.label}","value":"123 {unit}"}}
+        ]}}
+        </script>
+        </head><body></body></html>
+        """
+        r = extract_from_html_generic(html, categoria_hint="Modificadores")
+        by_key = {s["spec_key"]: s for s in r["specs"]}
+        if spec.key not in by_key:
+            faltantes.append(spec.key)
+
+    assert not faltantes, (
+        f"Specs del registry de Modificadores no emitibles desde HTML con label canónico: {faltantes}"
+    )
