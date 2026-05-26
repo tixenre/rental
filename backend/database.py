@@ -1403,7 +1403,7 @@ def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
     """
     if not equipos:
         return equipos
-    from services.spec_render import render_spec_value
+    from services.spec_render import render_spec_value, _is_empty_value
     ids = [e["id"] for e in equipos]
     placeholders = ",".join(["%s"] * len(ids))
     cur = conn.cursor()
@@ -1427,19 +1427,30 @@ def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
     rows = cur.fetchall()
     cur.close()
 
+    _BOOL_FALSE = frozenset({"false", "no", "0", "n", "falso", "off", "disabled"})
+
     specs_map: dict[int, dict[str, dict]] = {e["id"]: {} for e in equipos}
     for r in rows:
         eid = r["equipo_id"]
         key = r["spec_key"]
         if key in specs_map[eid]:
             continue  # dedup: mantenemos el de mayor prioridad (DISTINCT ON)
+        raw_val: str | None = r["value"]
+        # Omitir specs efectivamente vacías o bool-false: no aportan en la ficha.
+        if _is_empty_value(raw_val):
+            continue
+        if r["tipo"] == "bool" and str(raw_val).lower().strip() in _BOOL_FALSE:
+            continue
+        value_display = render_spec_value(raw_val, r["tipo"], r["unidad"])
+        if not value_display:
+            continue
         specs_map[eid][key] = {
             "label": r["label"],
             # `value` queda CRUDO (lo usan los filtros públicos por specsRaw).
             # `value_display` es el render canónico (mismo que el nombre
             # público) para mostrar en la ficha — "[24,70]" mm → "24-70 mm".
-            "value": r["value"],
-            "value_display": render_spec_value(r["value"], r["tipo"], r["unidad"]),
+            "value": raw_val,
+            "value_display": value_display,
             "tipo": r["tipo"],
             "unidad": r["unidad"],
             "prioridad": r["prioridad"],
