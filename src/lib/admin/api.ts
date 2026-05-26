@@ -132,6 +132,8 @@ export type Equipo = {
    *  y el nombre público. Independiente del árbol de categorías de catálogo
    *  (`categorias`), que es solo agrupación para el front-office. */
   categoria_specs?: string | null;
+  /** URL pública del HTML de producto guardado en R2 (para re-extracción futura). */
+  html_source_url?: string | null;
   /** Timestamp ISO si el equipo está soft-deleted. null = activo (#206). */
   eliminado_at?: string | null;
   etiquetas?: string[];
