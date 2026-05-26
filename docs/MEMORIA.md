@@ -165,3 +165,16 @@
   con el script de #467 — Postgres + backend). El costo es el setup una vez (node/python/postgres).
 - **⏰ Disparador (revisar):** cuando exista preview/staging (post-launch), reevaluar si esto sigue
   valiendo o si el preview reemplaza la necesidad de la sesión local.
+
+### 2026-05-26 — Al actualizar gobernanza, barrer todo el sistema de supervisión
+- **What:** cada vez que se edita un doc de gobernanza (`MEMORIA.md`, `CLAUDE.md`, `MANIFIESTO.md`,
+  `PROTOCOLO.md`, el agente `supervisor`, demás docs de `docs/`), hacer una **lectura comprensiva
+  del sistema de supervisión completo** en la misma pasada, para mantenerlo consistente — cazar
+  referencias cruzadas viejas: conteos, punteros a archivos/secciones que ya no existen, o
+  decisiones que una nueva contradice.
+- **Why:** los docs se cruzan entre sí y se desincronizan en silencio. Casos testigo: `CLAUDE.md`
+  decía "MANIFIESTO 671 líneas" cuando tiene 287 (#516); `SISTEMA_SPECS.md` citaba `registry.py`
+  que ya no existe. Una edición aislada deja mentiras escritas como ciertas.
+- **How to apply:** quien toca un doc de gobernanza revisa el resto en la misma pasada; el
+  **supervisor** lo verifica en su revisión. Extiende la decisión *2026-05-26 — Curación de la
+  memoria* (que cura *dentro* de MEMORIA) a la **consistencia ENTRE docs**.
