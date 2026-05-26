@@ -32,7 +32,9 @@ import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
-import { apiGetDescuentosJornada, interpolarDescuento, apiGetDiasBloqueados } from "@/lib/api";
+import { apiGetDescuentosJornada, apiGetDiasBloqueados } from "@/lib/api";
+import { useClienteSession, IVA_PCT } from "@/lib/iva";
+import { computeCartTotal, descuentoLabel } from "@/lib/cart-total";
 import { deriveEndDate, franjaParaFecha, diaAbierto, timeToMinutes } from "@/lib/rental-dates";
 import { useHorarios } from "@/lib/horarios";
 
@@ -574,28 +576,34 @@ function CartSheet({
     .map(([id, qty]) => ({ eq: equipos.find((e) => e.id === id)!, qty }))
     .filter((x) => x.eq);
 
-  const jornadasEfectivas = fechaDesde ? jornadas : 1;
-  const subtotal = entries.reduce(
-    (s, { eq, qty }) => s + eq.pricePerDay * qty * jornadasEfectivas,
-    0,
-  );
   const fechaHasta = fechaDesde ? deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta) : null;
 
-  // Descuento por jornadas desde el backend
+  // Total unificado con drawer desktop y minibar vía lib/cart-total.
+  // Sin fechas: estimado por jornada (J=1) sin descuento ni IVA.
+  const hayFechas = !!fechaDesde;
   const { data: descuentosPuntos = [] } = useQuery({
     queryKey: ["descuentos-jornada"],
     queryFn: apiGetDescuentosJornada,
     staleTime: 60_000,
   });
-  const descuentoPct = fechaDesde ? interpolarDescuento(descuentosPuntos, jornadas) : 0;
-  const descJornadas =
-    descuentoPct > 0 ? { pct: descuentoPct, label: `${jornadas} jornadas` } : null;
-
-  // Descuento cliente — placeholder según spec del design (conectar con perfil real)
-  const descCliente = { pct: 5, label: "cliente registrado" };
-  const montoDescJornadas = Math.round((subtotal * (descJornadas?.pct ?? 0)) / 100);
-  const montoDescCliente = Math.round((subtotal * descCliente.pct) / 100);
-  const totalFinal = subtotal - montoDescJornadas - montoDescCliente;
+  const { data: clienteSession } = useClienteSession();
+  const totales = computeCartTotal({
+    lines: entries.map(({ eq, qty }) => ({ pricePerDay: eq.pricePerDay, qty })),
+    jornadas: hayFechas ? jornadas : 1,
+    descuentosPuntos,
+    perfilImpuestos: hayFechas ? clienteSession?.perfil_impuestos : null,
+    descuentoClientePct: hayFechas ? clienteSession?.descuento : 0,
+  });
+  const {
+    subtotal,
+    descuentoPct,
+    descuentoOrigen,
+    descuentoMonto,
+    totalNeto,
+    iva,
+    conIva,
+    total: totalFinal,
+  } = totales;
 
   async function handleSubmit() {
     if (entries.length === 0) return;
@@ -769,7 +777,7 @@ function CartSheet({
               qty={qty}
               fechaDesde={fechaDesde}
               jornadas={jornadas}
-              jornadasEfectivas={jornadasEfectivas}
+              jornadasEfectivas={totales.jornadas}
             />
           ))}
 
@@ -778,38 +786,56 @@ function CartSheet({
             <div className="flex flex-col gap-2 px-5 py-3.5">
               <div className="flex justify-between items-baseline">
                 <span className="font-sans text-[13px] text-muted-foreground">
-                  Subtotal equipos
+                  {hayFechas
+                    ? `Subtotal · ${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"}`
+                    : "Subtotal · por jornada"}
                 </span>
                 <span className="font-mono text-[13px] font-semibold text-ink tabular-nums">
                   {formatARS(subtotal)}
                 </span>
               </div>
 
-              {descJornadas && (
+              {descuentoPct > 0 && (
                 <div className="flex items-center justify-between py-1">
                   <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                    Descuento jornadas
-                    <span className="inline-flex items-center px-1.5 py-px rounded-full font-mono text-[9px] font-bold bg-blue-100 text-blue-700">
-                      −{descJornadas.pct}% · {descJornadas.label}
+                    {descuentoLabel(descuentoOrigen, jornadas)}
+                    <span
+                      className={cn(
+                        "inline-flex items-center px-1.5 py-px rounded-full font-mono text-[9px] font-bold",
+                        descuentoOrigen === "cliente"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-blue-100 text-blue-700",
+                      )}
+                    >
+                      −{descuentoPct}%
                     </span>
                   </div>
                   <span className="font-mono text-[13px] font-semibold text-green-700 tabular-nums">
-                    −{formatARS(montoDescJornadas)}
+                    −{formatARS(descuentoMonto)}
                   </span>
                 </div>
               )}
 
-              <div className="flex items-center justify-between py-1">
-                <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                  Descuento cliente
-                  <span className="inline-flex items-center px-1.5 py-px rounded-full font-mono text-[9px] font-bold bg-green-100 text-green-700">
-                    −{descCliente.pct}% · {descCliente.label}
-                  </span>
-                </div>
-                <span className="font-mono text-[13px] font-semibold text-green-700 tabular-nums">
-                  −{formatARS(montoDescCliente)}
-                </span>
-              </div>
+              {conIva && (
+                <>
+                  <div className="flex justify-between items-baseline">
+                    <span className="font-sans text-[13px] text-muted-foreground">
+                      Subtotal neto
+                    </span>
+                    <span className="font-mono text-[13px] text-muted-foreground tabular-nums">
+                      {formatARS(totalNeto)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
+                    <span className="font-sans text-[13px] text-muted-foreground">
+                      IVA {IVA_PCT}%
+                    </span>
+                    <span className="font-mono text-[13px] text-muted-foreground tabular-nums">
+                      +{formatARS(iva)}
+                    </span>
+                  </div>
+                </>
+              )}
 
               <div className="flex justify-between items-baseline opacity-45">
                 <span className="font-sans text-[13px] text-muted-foreground">
@@ -820,7 +846,7 @@ function CartSheet({
 
               <div className="flex justify-between items-baseline pt-2 border-t border-hairline mt-1">
                 <span className="font-sans text-[15px] font-bold text-ink">
-                  {fechaDesde ? "Total estimado" : "Estimado / jornada"}
+                  {hayFechas ? `Total${conIva ? " · IVA incluído" : ""}` : "Estimado / jornada"}
                 </span>
                 <span
                   style={{
