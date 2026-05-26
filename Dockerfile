@@ -51,6 +51,11 @@ RUN mkdir -p /app/backend/data
 
 # Código del backend y dist del frontend al final — lo que cambia más seguido.
 COPY backend/ ./backend/
+# Los parsers determinísticos (lentes_parser, camaras_parser, iluminacion_parser,
+# iluminacion_normalizar) viven en tools/ y son importados en runtime por los
+# extractores del backend via sys.path. Sin esta línea, el upload de HTML falla
+# con "No module named 'lentes_parser'" en producción.
+COPY tools/ ./tools/
 COPY --from=frontend /app/dist ./dist
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
