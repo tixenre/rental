@@ -3,8 +3,19 @@ name: Mobile smoke tests
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+
+# Cancela runs viejos del mismo branch al re-pushear (igual que ci.yml).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   mobile-smoke:
@@ -20,6 +31,15 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Cachea los browsers de Playwright (~100 MB) para no redescargarlos en
+      # cada corrida. Se invalida cuando cambia el lockfile (puede cambiar la
+      # versión de Playwright). Las OS deps de --with-deps no se cachean (apt).
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps

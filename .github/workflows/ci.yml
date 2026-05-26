@@ -3,8 +3,17 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # Cambios solo-docs no disparan el CI (ahorro de minutos de Actions).
+    # Si un PR toca código + docs, igual corre (paths-ignore solo saltea
+    # cuando TODOS los archivos cambiados matchean estos globs).
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
 
 # Cancela runs viejos del mismo branch al pushear de nuevo
 concurrency:
