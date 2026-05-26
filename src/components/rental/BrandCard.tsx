@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { type Brand } from "@/types/brand";
 import { cn } from "@/lib/utils";
-import { InlineSvg, isSvgUrl } from "@/components/ui/InlineSvg";
+import { InlineSvg } from "@/components/ui/InlineSvg";
+import { isSvgUrl } from "@/components/ui/inline-svg-utils";
 
 /**
  * Mapeo de marcas a slugs de simple-icons.org (CDN gratuito de logos SVG, MIT).

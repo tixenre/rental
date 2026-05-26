@@ -1292,7 +1292,7 @@ export function CatalogoMovil() {
   // Marcas: misma source que BrandCarousel del desktop + admin/marcas.
   // Trae logo_url, destacada, orden, popularidad_score, etc.
   const { data: marcasData } = useMarcas();
-  const marcasCanonicas = marcasData?.items ?? [];
+  const marcasCanonicas = useMemo(() => marcasData?.items ?? [], [marcasData?.items]);
   // Categorías canónicas (con parent_id) — usamos solo las root para los
   // cat-tabs, así no se mezclan sub-cats como "82mm" o "Montura E" que
   // aparecían cuando derivábamos del e.category del equipo.
@@ -1441,11 +1441,17 @@ export function CatalogoMovil() {
 
   // Filtered equipment
   // Helper: matchea el activeTab contra el root del equipo o su M2M.
-  const matchesActiveTab = (e: Equipment): boolean => {
-    if (activeTab === "Todo") return true;
-    if (e.category === activeTab) return true;
-    return (e.categorias ?? []).some((c) => c.nombre === activeTab);
-  };
+  // useCallback keyed en activeTab → identidad estable salvo cambio de tab,
+  // así puede entrar en las deps del useMemo de filteredEquipos sin invalidarlo
+  // en cada render (conducta idéntica: el filtrado ya dependía de activeTab).
+  const matchesActiveTab = useCallback(
+    (e: Equipment): boolean => {
+      if (activeTab === "Todo") return true;
+      if (e.category === activeTab) return true;
+      return (e.categorias ?? []).some((c) => c.nombre === activeTab);
+    },
+    [activeTab],
+  );
 
   const filteredEquipos = useMemo(() => {
     const norm = (s: string) =>
@@ -1462,7 +1468,7 @@ export function CatalogoMovil() {
       const matchBrand = !selectedBrand || e.brand === selectedBrand;
       return matchCat && matchQ && matchStock && matchBrand;
     });
-  }, [allEquipos, activeTab, query, stockOnly, selectedBrand]);
+  }, [allEquipos, matchesActiveTab, query, stockOnly, selectedBrand]);
 
   // Filtros activos (para el badge del botón "Filtros"). Excluye categoría
   // (esa la elige el tab) y búsqueda (esa tiene su propio input visible).

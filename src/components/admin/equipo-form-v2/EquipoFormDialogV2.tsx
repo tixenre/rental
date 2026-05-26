@@ -521,6 +521,7 @@ export function EquipoFormDialogV2({
     watchedModelo,
     specs,
     initial?.nombre,
+    templateItems,
   ]);
 
   /** Hay alguna fuente de auto-gen disponible? Template DB o hardcoded. */

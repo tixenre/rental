@@ -139,4 +139,5 @@ export function CategoryIllustration({
   return <Component className={className} {...rest} />;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- objeto de componentes (no constante simple); conviven con CategoryIllustration en este archivo
 export const Illustrations = { Camara, Lente, Iluminacion, Audio, Silla, Claqueta, Cable };
