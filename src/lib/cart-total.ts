@@ -101,11 +101,21 @@ export function computeCartTotal(args: {
   };
 }
 
-/** Etiqueta de la fila de descuento en el UI. */
-export function descuentoLabel(origen: DescuentoOrigen, jornadas: number): string {
+/** Etiqueta de la fila de descuento en el UI. Cuando el descuento es
+ *  por cliente, se personaliza con su nombre ("Descuento para Tincho")
+ *  si está disponible — es una atención manual del dueño, comunica mejor
+ *  que un genérico. */
+export function descuentoLabel(
+  origen: DescuentoOrigen,
+  jornadas: number,
+  nombreCliente?: string | null,
+): string {
   if (origen === "jornadas") {
     return `Descuento jornadas (${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"})`;
   }
-  if (origen === "cliente") return "Descuento cliente";
+  if (origen === "cliente") {
+    const nombre = nombreCliente?.trim();
+    return nombre ? `Descuento para ${nombre}` : "Descuento cliente";
+  }
   return "";
 }

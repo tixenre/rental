@@ -512,7 +512,8 @@ export function CartDrawer({
                   {descuentoPct > 0 && (
                     <div className="flex items-center justify-between text-sm text-emerald-600">
                       <span>
-                        {descuentoLabel(descuentoOrigen, d)} · {descuentoPct}%
+                        {descuentoLabel(descuentoOrigen, d, clienteSession?.nombre)} ·{" "}
+                        {descuentoPct}%
                       </span>
                       <span className="tabular">−{formatARS(descuentoMonto)}</span>
                     </div>
