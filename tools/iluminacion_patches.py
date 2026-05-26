@@ -89,7 +89,7 @@ def apply_patches():
         "url_source": "https://www.arri.com/en/lighting/daylight-tungsten/tungsten/arri-junior/arri-650-plus",
         "specs": {
             "iluminacion_subtipo": "Fresnel",
-            "potencia_w": 650, "cri": 100, "temperatura_k": "3200K",
+            "consumo_w": 650, "cri": 100, "temperatura_k": "3200K",
             "bicolor": False, "rgb": False, "dimming": True,
             "alimentacion": ["AC"], "montura_luz": "Sin montura", "peso_g": 3000,
             "beam_angle": [12, 52],
@@ -131,7 +131,7 @@ def apply_patches():
         "url_source": "https://www.mole.com/407-baby-solarspot",
         "specs": {
             "iluminacion_subtipo": "Fresnel",
-            "potencia_w": 2000, "cri": 100, "temperatura_k": "3200K",
+            "consumo_w": 2000, "cri": 100, "temperatura_k": "3200K",
             "bicolor": False, "rgb": False, "dimming": True,
             "alimentacion": ["AC"], "montura_luz": "Sin montura", "peso_g": 6240,
             "beam_angle": [15, 58],

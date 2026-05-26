@@ -248,3 +248,56 @@ def test_extract_camara_lens_mount_label_canonico():
         assert by_key["lens_mount"]["label"] == "Montura", (
             f"label esperado 'Montura', obtenido '{by_key['lens_mount']['label']}'"
         )
+
+
+# ── Wattage alias → consumo_w (no potencia_w ni orphan) ────────────────────
+
+
+def test_extract_luz_wattage_cae_en_consumo_w():
+    """'Wattage: 200 W' en el fixture HTML → spec_key 'consumo_w', nunca 'potencia_w'."""
+    from services.equipo_html_extractor import extract_from_html
+    html = _load_fixture("luz_minimal.html")
+    r = extract_from_html(html)
+    by_key = {item["spec_key"]: item for item in r["specs"]}
+    assert "consumo_w" in by_key, (
+        f"'consumo_w' no aparece en specs; keys presentes: {list(by_key)}"
+    )
+    assert "potencia_w" not in by_key, "'potencia_w' (key vieja) no debe aparecer"
+
+
+# ── Parser output vs registry: el parser no puede emitir keys huérfanas ─────
+
+
+def test_parser_luz_no_emite_keys_huerfanas():
+    """Las spec_keys que emite el parser de luces existen en el registry.
+
+    Cierra el gap de cobertura: test_cobertura_iluminacion alimenta el registry
+    contra sí mismo; éste ejercita la SALIDA REAL del parser contra el fixture.
+    Un rename en el registry sin actualizar el parser lo rompe aquí, no en prod.
+
+    Gaps pre-existentes excluidos de la aserción (fuera del scope de este fix):
+      - bicolor, rgb: emitidos siempre como bool por el parser pero aún no
+        formalizados como SpecDef en el registry (issue pendiente).
+    """
+    import sys
+    from pathlib import Path
+    _tools = Path(__file__).parent.parent.parent / "tools"
+    sys.path.insert(0, str(_tools))
+    from iluminacion_parser import map_luz_specs, BHSpecsParser
+
+    from specs import REGISTRY
+    cat = REGISTRY.get("Iluminación")
+    registry_keys = {s.key for s in cat.specs}
+
+    _KNOWN_ORPHANS = {"bicolor", "rgb"}  # pre-existentes, triagear en issue
+
+    html = _load_fixture("luz_minimal.html")
+    parser = BHSpecsParser()
+    parser.feed(html)
+    specs_dict = map_luz_specs(dict(parser.secciones))
+
+    huerfanas = {k for k in specs_dict if k not in registry_keys} - _KNOWN_ORPHANS
+    assert not huerfanas, (
+        f"El parser emitió spec_keys no declaradas en el registry: {huerfanas}\n"
+        "Actualizá el parser o el registry para que estén alineados."
+    )

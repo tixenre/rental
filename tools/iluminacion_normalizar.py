@@ -168,7 +168,7 @@ def clean_extras(extras: dict) -> dict:
 
 SPECS_ORDER = [
     "iluminacion_subtipo",
-    "potencia_w",
+    "consumo_w",
     "color_modes",
     "lumens_at_5600k", "lumens_at_3200k",
     "lux_at_1m_5600k", "lux_at_1m_3200k",
@@ -177,7 +177,7 @@ SPECS_ORDER = [
     "dimming",
     "control_inalambrico", "alimentacion", "montura_luz",
     "peso_g",
-    "power_consumption_w", "battery", "power_pass_thru",
+    "battery", "power_pass_thru",
     "beam_angle", "cooling_system", "display",
     "mobile_app_compatible",
     "umbrella_mount", "effects",
