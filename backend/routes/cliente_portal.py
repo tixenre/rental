@@ -15,6 +15,7 @@ from routes.auth import get_session, signer, COOKIE_SECURE, SESSION_MAX_AGE
 from admin_guard import require_admin
 from itsdangerous import BadSignature, SignatureExpired
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
+from services.precios import es_responsable_inscripto
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -130,7 +131,7 @@ def cliente_registro(data: RegistroCreate):
             # Sólo guardamos datos de Factura A si el perfil es responsable
             # inscripto — el resto los puede tener vacíos en DB.
             perfil = data.perfil_impuestos or "consumidor_final"
-            es_ri = perfil == "responsable_inscripto"
+            es_ri = es_responsable_inscripto(perfil)
             conn.execute("""
                 INSERT INTO clientes (
                     nombre, apellido, email, telefono, direccion, cuit,

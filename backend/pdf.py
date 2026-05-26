@@ -9,6 +9,12 @@ import os
 import re
 from datetime import datetime
 
+from services.precios import (
+    jornadas_periodo,
+    es_responsable_inscripto,
+    IVA_PCT,
+)
+
 # ── Datos del locador (configurar en variables de entorno) ────────────────────
 OWNER_NOMBRE   = os.getenv("OWNER_NOMBRE",   "Marín Javier Santini Calarco")
 OWNER_CUIL     = os.getenv("OWNER_CUIL",     "23-37389102-9")
@@ -221,7 +227,7 @@ def _pedido_html(pedido: dict) -> str:
     try:
         d1 = _as_dt(pedido["fecha_desde"])
         d2 = _as_dt(pedido["fecha_hasta"])
-        jornadas = max(1, (d2 - d1).days or 1)
+        jornadas = jornadas_periodo(d1, d2)
     except Exception:
         jornadas = 1
 
@@ -275,16 +281,17 @@ def _pedido_html(pedido: dict) -> str:
           <td class="right">{fmt_ars(comp_subtotal)}</td>
         </tr>"""
 
-    total_neto = sum(
-        (it.get("precio_jornada") or 0) * it.get("cantidad",1) * jornadas
-        for it in items
-    ) or pedido.get("monto_total") or 0
+    # Fuente de verdad: `monto_total` (neto, con descuento aplicado, sin IVA),
+    # calculado por `services/precios.calcular_total` en alquileres.py. Antes
+    # este PDF recomputaba la suma cruda sin descuento → mostraba más caro
+    # de lo facturado, y para RI calculaba IVA sobre la base inflada (#502).
+    total_neto = int(pedido.get("monto_total") or 0)
     # IVA discriminado: sólo para Responsable Inscripto (Factura A).
     # El resto ve el total como veían siempre (sin IVA agregado).
-    es_ri = (pedido.get("cliente_perfil_impuestos") or "") == "responsable_inscripto"
-    iva_pct = 21
+    es_ri = es_responsable_inscripto(pedido.get("cliente_perfil_impuestos"))
+    iva_pct = int(IVA_PCT)
     if es_ri:
-        iva_monto = int(round(total_neto * iva_pct / 100))
+        iva_monto = int(round(total_neto * IVA_PCT / 100))
         total_final = total_neto + iva_monto
         totales_html = f"""
       <div class="total-row" style="opacity:0.85">
@@ -873,7 +880,7 @@ def _contrato_html(pedido: dict) -> str:
         try:
             d1 = datetime.fromisoformat(pedido["fecha_desde"])
             d2 = datetime.fromisoformat(pedido["fecha_hasta"])
-            jornadas = max(1, (d2 - d1).days or 1)
+            jornadas = jornadas_periodo(d1, d2)
         except Exception:
             jornadas = 1
 
@@ -947,7 +954,7 @@ def _contrato_html(pedido: dict) -> str:
     cliente_direccion = html.escape(pedido.get("cliente_direccion") or "—")
     cliente_cuit      = html.escape(pedido.get("cliente_cuit") or "—")
     # Datos fiscales si el cliente es Responsable Inscripto (Factura A).
-    es_ri = (pedido.get("cliente_perfil_impuestos") or "") == "responsable_inscripto"
+    es_ri = es_responsable_inscripto(pedido.get("cliente_perfil_impuestos"))
     razon_social     = html.escape(pedido.get("cliente_razon_social") or "")
     domicilio_fiscal = html.escape(pedido.get("cliente_domicilio_fiscal") or "")
     fiscal_extra_html = ""

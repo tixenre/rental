@@ -5,7 +5,6 @@ routes/pedidos.py — CRUD de pedidos, disponibilidad y generación de PDFs.
 import datetime
 import json
 import logging
-from math import ceil
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Query, HTTPException, Request
@@ -17,6 +16,7 @@ from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedid
 from admin_guard import require_admin
 from services.email import send_email
 from services.email.service import get_admin_to
+from services.precios import calcular_total, jornadas_periodo
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -92,13 +92,6 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
 def _next_numero_pedido(conn) -> int:
     """Devuelve el próximo número de pedido usando una SEQUENCE de PostgreSQL (race-free)."""
     return conn.execute("SELECT nextval('numero_pedido_seq')").fetchone()[0]
-
-
-def _aplicar_descuento(bruto: float, pct: float) -> int:
-    """Aplica un descuento porcentual y devuelve el monto neto redondeado."""
-    if not pct:
-        return int(bruto)
-    return int(round(bruto * (1 - pct / 100)))
 
 
 def _get_descuento_jornadas(conn, jornadas: int) -> float:
@@ -767,22 +760,32 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
             if d0 < hoy:
                 raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 
-            jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
+            jornadas = jornadas_periodo(d0, d1)
         else:
             jornadas = 1
 
-        bruto = 0
-        items_rows  = []
+        items_rows = []
         for it in data.items:
             if not conn.execute("SELECT id FROM equipos WHERE id=?", (it.equipo_id,)).fetchone():
                 raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado")
             subtotal = it.precio_jornada * it.cantidad * jornadas
-            bruto += subtotal
             items_rows.append((it.equipo_id, it.cantidad, it.precio_jornada, subtotal))
 
         descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
-        descuento_total = max(descuento_pct, descuento_jornadas_pct)
-        monto_total = _aplicar_descuento(bruto, descuento_total)
+        total_desglose = calcular_total(
+            items=[
+                {"equipo_id": it.equipo_id, "cantidad": it.cantidad,
+                 "precio_jornada": it.precio_jornada}
+                for it in data.items
+            ],
+            jornadas=jornadas,
+            descuento_cliente_pct=descuento_pct,
+            descuento_jornadas_pct=descuento_jornadas_pct,
+            # monto_total se persiste NETO (sin IVA). IVA es derivado al
+            # mostrar, no se persiste.
+            perfil_impuestos=None,
+        )
+        monto_total = total_desglose["neto"]
 
         estado_inicial = data.estado if data.estado in {"borrador", "presupuesto"} else "presupuesto"
         next_num = _next_numero_pedido(conn)
@@ -1362,23 +1365,30 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
 
     if "fecha_desde" in payload or "fecha_hasta" in payload or cliente_cambio:
         p2 = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
-        if p2["fecha_desde"] and p2["fecha_hasta"]:
-            d0 = to_datetime(p2["fecha_desde"])
-            d1 = to_datetime(p2["fecha_hasta"])
-            jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
-        else:
-            jornadas = 1
+        d0 = to_datetime(p2["fecha_desde"]) if p2["fecha_desde"] else None
+        d1 = to_datetime(p2["fecha_hasta"]) if p2["fecha_hasta"] else None
+        jornadas = jornadas_periodo(d0, d1)
         items = conn.execute(
-            "SELECT id, cantidad, precio_jornada FROM alquiler_items WHERE pedido_id=?", (id,)
+            "SELECT id, equipo_id, cantidad, precio_jornada FROM alquiler_items WHERE pedido_id=?",
+            (id,),
         ).fetchall()
-        bruto = 0
+        # Actualizar subtotales persistidos por línea (los usan los visores).
         for it in items:
             sub = it["precio_jornada"] * it["cantidad"] * jornadas
             conn.execute("UPDATE alquiler_items SET subtotal=? WHERE id=?", (sub, it["id"]))
-            bruto += sub
         descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
-        descuento_total = max(p2["descuento_pct"] or 0, descuento_jornadas_pct)
-        monto_total = _aplicar_descuento(bruto, descuento_total)
+        total_desglose = calcular_total(
+            items=[
+                {"equipo_id": it["equipo_id"], "cantidad": it["cantidad"],
+                 "precio_jornada": it["precio_jornada"]}
+                for it in items
+            ],
+            jornadas=jornadas,
+            descuento_cliente_pct=p2["descuento_pct"] or 0,
+            descuento_jornadas_pct=descuento_jornadas_pct,
+            perfil_impuestos=None,  # persiste NETO; IVA es derivado al mostrar.
+        )
+        monto_total = total_desglose["neto"]
         conn.execute(
             "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
             (monto_total, descuento_jornadas_pct, id)
@@ -1399,12 +1409,9 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
     if not items:
         raise HTTPException(400, "Debe tener al menos un ítem")
 
-    if p["fecha_desde"] and p["fecha_hasta"]:
-        d0 = to_datetime(p["fecha_desde"])
-        d1 = to_datetime(p["fecha_hasta"])
-        jornadas = max(1, ceil((d1 - d0).total_seconds() / 3600 / 24))
-    else:
-        jornadas = 1
+    d0 = to_datetime(p["fecha_desde"]) if p["fecha_desde"] else None
+    d1 = to_datetime(p["fecha_hasta"]) if p["fecha_hasta"] else None
+    jornadas = jornadas_periodo(d0, d1)
 
     # Consolidar duplicados del mismo equipo (sumar cantidades) antes de
     # insertar. Sino dos rows con cantidad=2 cada una pasan el check de
@@ -1426,22 +1433,35 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
                 "precio_jornada": it.precio_jornada,
             }
 
-    bruto = 0
     rows = []
     for it in consolidado.values():
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (it["equipo_id"],)).fetchone():
             raise HTTPException(404, f"Equipo {it['equipo_id']} no encontrado")
         subtotal = it["precio_jornada"] * it["cantidad"] * jornadas
-        bruto += subtotal
         rows.append((id, it["equipo_id"], it["cantidad"], it["precio_jornada"], subtotal))
-    monto_total = _aplicar_descuento(bruto, p["descuento_pct"] or 0)
+
+    # Re-aplicar AMBOS descuentos (cliente + jornadas), como hacen las
+    # otras 2 sedes. Antes solo se aplicaba el del cliente → editar ítems
+    # perdía el descuento por jornadas (#500).
+    descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+    total_desglose = calcular_total(
+        items=list(consolidado.values()),
+        jornadas=jornadas,
+        descuento_cliente_pct=p["descuento_pct"] or 0,
+        descuento_jornadas_pct=descuento_jornadas_pct,
+        perfil_impuestos=None,  # persiste NETO; IVA derivado al mostrar.
+    )
+    monto_total = total_desglose["neto"]
 
     conn.execute("DELETE FROM alquiler_items WHERE pedido_id=?", (id,))
     conn.executemany("""
         INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
         VALUES (?,?,?,?,?)
     """, rows)
-    conn.execute("UPDATE alquileres SET monto_total=? WHERE id=?", (monto_total, id))
+    conn.execute(
+        "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
+        (monto_total, descuento_jornadas_pct, id),
+    )
 
     return _get_alquiler_detail(conn, id)
 
