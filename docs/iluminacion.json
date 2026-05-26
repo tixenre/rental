@@ -9,7 +9,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1698321-REG/amaran_ap20232a14_f21x_2x1_bi_color_led.html/specs",
       "specs": {
         "iluminacion_subtipo": "Flexible Mat",
-        "potencia_w": 120,
+        "consumo_w": 120,
         "color_modes": [
           "Bicolor"
         ],
@@ -279,7 +279,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1552705-REG/godox_rgb_mini_creative_m1.html",
       "specs": {
         "iluminacion_subtipo": "Panel",
-        "potencia_w": 13,
+        "consumo_w": 13,
         "color_modes": [
           "Bicolor",
           "RGB"
@@ -491,7 +491,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1779322-REG/nanlite_fc500b_fc_500_led_spotlight.html",
       "specs": {
         "iluminacion_subtipo": "Foco",
-        "potencia_w": 520,
+        "consumo_w": 520,
         "color_modes": [
           "Bicolor"
         ],
@@ -702,7 +702,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1930190-REG/amaran_mp00000191_ray_360c_rgb_led.html/specs",
       "specs": {
         "iluminacion_subtipo": "Foco",
-        "potencia_w": 410,
+        "consumo_w": 410,
         "color_modes": [
           "Bicolor",
           "RGB"
@@ -951,7 +951,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1920544-REG/aputure_ap0400040j_nova_ii_2x1_rgb.html",
       "specs": {
         "iluminacion_subtipo": "Panel",
-        "potencia_w": 1000,
+        "consumo_w": 1000,
         "color_modes": [
           "Bicolor",
           "RGB"
@@ -1196,7 +1196,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/979830-REG/mole_richardson_8941_50rev_junior_200w_8_junior.html",
       "specs": {
         "iluminacion_subtipo": "Fresnel",
-        "potencia_w": 200,
+        "consumo_w": 200,
         "color_modes": [
           "Tungsten"
         ],
@@ -1406,7 +1406,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1611957-REG/godox_tl60_tube_light_2700_6500k.html",
       "specs": {
         "iluminacion_subtipo": "Tube Light",
-        "potencia_w": 18,
+        "consumo_w": 18,
         "color_modes": [
           "Bicolor",
           "RGB"
@@ -1651,7 +1651,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1595337-REG/aputure_aacbc7_accent_b7c_led_light.html",
       "specs": {
         "iluminacion_subtipo": "Foco",
-        "potencia_w": 7,
+        "consumo_w": 7,
         "color_modes": [
           "Bicolor",
           "RGB"
@@ -1730,7 +1730,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1513246-REG/godox_vl150_video_led_light.html?fromDisList=y",
       "specs": {
         "iluminacion_subtipo": "Foco",
-        "potencia_w": 150,
+        "consumo_w": 150,
         "color_modes": [
           "Daylight"
         ],
@@ -1900,7 +1900,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1721572-REG/godox_vl300ii_series_300w_led.html/specs?fromDisList=y",
       "specs": {
         "iluminacion_subtipo": "Foco",
-        "potencia_w": 320,
+        "consumo_w": 320,
         "color_modes": [
           "Daylight"
         ],
@@ -2130,7 +2130,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1476382-REG/nanlite_12_2026_forza_500_led_monolight.html?fromDisList=y",
       "specs": {
         "iluminacion_subtipo": "Foco",
-        "potencia_w": 500,
+        "consumo_w": 500,
         "color_modes": [
           "Daylight"
         ],
@@ -2318,7 +2318,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1476380-REG/nanlite_12_2022_forza_60_led_monolight.html",
       "specs": {
         "iluminacion_subtipo": "Foco",
-        "potencia_w": 60,
+        "consumo_w": 60,
         "color_modes": [
           "Daylight"
         ],
@@ -2524,7 +2524,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1762211-REG/amaran_ap30011a10_300c_rgb_led_monolight.html?fromDisList=y",
       "specs": {
         "iluminacion_subtipo": "Foco",
-        "potencia_w": 360,
+        "consumo_w": 360,
         "color_modes": [
           "Bicolor",
           "RGB"
@@ -2764,7 +2764,7 @@
       "url_source": "https://www.bhphotovideo.com/c/product/1753990-REG/amaran_apm022xa10_amaran_cob_200x_s.html?fromDisList=y",
       "specs": {
         "iluminacion_subtipo": "Foco",
-        "potencia_w": 229,
+        "consumo_w": 229,
         "color_modes": [
           "Bicolor"
         ],
@@ -3168,7 +3168,7 @@
       "url_source": "https://www.arri.com/en/lighting/daylight-tungsten/tungsten/arri-junior/arri-650-plus",
       "specs": {
         "iluminacion_subtipo": "Fresnel",
-        "potencia_w": 650,
+        "consumo_w": 650,
         "color_modes": [
           "Tungsten"
         ],
@@ -3335,7 +3335,7 @@
       "url_source": "https://www.mole.com/407-baby-solarspot",
       "specs": {
         "iluminacion_subtipo": "Fresnel",
-        "potencia_w": 2000,
+        "consumo_w": 2000,
         "color_modes": [
           "Tungsten"
         ],
