@@ -9,7 +9,7 @@ incorporado serio, se agregan acá de vuelta.
 from __future__ import annotations
 
 from ..models import CategoriaRegistry, SpecDef, SubCategoria
-from ..shared import LENS_MOUNT_ENUM, FORMATO_ENUM, dimensions_mm, materials, peso_g
+from ..shared import LENS_MOUNT_ENUM, FORMATO_ENUM, autofocus, dimensions_mm, estabilizacion, materials, peso_g
 
 
 CAT = CategoriaRegistry(
@@ -76,12 +76,8 @@ CAT = CategoriaRegistry(
         SpecDef(key="rango_dinamico_stops", label="Rango dinámico", tipo="number",
                 unidad="stops", prioridad=70, en_filtros=True),
         # ─── Features ─────────────────────────────────────────────────
-        SpecDef(key="estabilizacion", label="Estabilización óptica", tipo="bool",
-                prioridad=75, en_filtros=True,
-                aliases=["Image Stabilization", "In-Body Image Stabilization", "IBIS"]),
-        SpecDef(key="autofocus", label="Autofocus", tipo="bool",
-                prioridad=80, en_filtros=True,
-                aliases=["Auto Focus", "Autofocus System", "Focus System"]),
+        estabilizacion(prioridad=75),
+        autofocus(prioridad=80),
         SpecDef(key="fast_slow_motion", label="Cámara lenta/rápida", tipo="bool",
                 prioridad=85, ayuda="Soporta variable frame rate / S&Q"),
         SpecDef(key="lens_communication", label="Comunicación electrónica lente", tipo="bool",

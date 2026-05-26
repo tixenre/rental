@@ -8,7 +8,7 @@ también participa de la generación de sub-cats (rosca on-the-fly según stock:
 from __future__ import annotations
 
 from ..models import CategoriaRegistry, SpecDef
-from ..shared import peso_g
+from ..shared import coating, diametro_filtro, peso_g
 
 
 CAT = CategoriaRegistry(
@@ -26,14 +26,9 @@ CAT = CategoriaRegistry(
             prioridad=10, en_card=True, en_filtros=True, en_nombre=True,
             destacado=True, obligatorio=True, ayuda="Form factor",
         ),
-        SpecDef(
-            key="diametro_filtro", label="Diámetro de filtro", tipo="number", unidad="mm",
-            prioridad=20, en_card=True, en_filtros=True, en_nombre=True,
-            destacado=True, obligatorio=True,
+        diametro_filtro(
+            prioridad=20, en_card=True, en_nombre=True, destacado=True, obligatorio=True,
             ayuda="Rosca del filter thread (67, 77, 82, etc.). Compartido con Lentes.",
-            es_compatibilidad=True, compatibilidad_modo="exacta",
-            aliases=["Filter Size", "Filter Diameter", "Thread Size",
-                     "Filter Thread Size", "Filter Thread"],
         ),
         SpecDef(key="front_thread", label="Rosca frontal", tipo="string",
                 prioridad=25, en_filtros=True,
@@ -50,8 +45,7 @@ CAT = CategoriaRegistry(
         ),
         SpecDef(key="ring_material", label="Material del aro", tipo="string",
                 prioridad=45, ayuda="Ej: Aluminum, Brass"),
-        SpecDef(key="coating", label="Coating", tipo="string",
-                prioridad=48, ayuda="Ej: Multi-coated, Nano-X, IRND"),
+        coating(prioridad=48, ayuda="Ej: Multi-coated, Nano-X, IRND"),
         SpecDef(key="grade", label="Grado", tipo="string",
                 prioridad=50, en_filtros=True, en_nombre=True,
                 ayuda="Solo difusión: 1/8, 1/4, 1/2, 1, 2"),
