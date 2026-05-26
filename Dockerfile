@@ -1,7 +1,10 @@
 # ── Stage 1: build del frontend (Vite SPA) ───────────────────────────────
 # Imagen oficial de Bun (más chica y rápida que instalar bun via curl).
 # Esta etapa se descarta — solo se copia /app/dist al runtime.
-FROM oven/bun:1 AS frontend
+# Versión PINEADA a propósito: `oven/bun:1` flota a la última 1.x y una bun
+# nueva puede recalcular el lockfile distinto y romper `--frozen-lockfile`.
+# Debe coincidir con la bun que generó bun.lock; bumpear = regenerar el lock.
+FROM oven/bun:1.3.11 AS frontend
 WORKDIR /app
 
 # Variables públicas que Vite inlinea en el bundle.
