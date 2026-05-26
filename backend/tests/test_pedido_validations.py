@@ -13,6 +13,7 @@ import datetime
 import pytest
 from fastapi import HTTPException
 
+from database import now_ar
 from routes.alquileres import create_pedido, PedidoCreate, PedidoItem
 
 
@@ -121,8 +122,13 @@ class TestValidacionFechas:
         assert exc.value.status_code == 400
 
     def test_fecha_desde_en_el_pasado_400(self, fake_db):
-        ayer = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
-        manana = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+        # "Ayer" se ancla a la hora de Argentina (now_ar), la misma que usa la
+        # validación. Con date.today() (TZ del server, UTC en CI) el test era
+        # flaky entre las 00:00 y 03:00 UTC: ahí "ayer en UTC" == "hoy en AR" y
+        # el guard de fecha-pasada no disparaba (404 en vez de 400).
+        hoy_ar = now_ar().date()
+        ayer = (hoy_ar - datetime.timedelta(days=1)).isoformat()
+        manana = (hoy_ar + datetime.timedelta(days=1)).isoformat()
 
         data = PedidoCreate(
             items=[PedidoItem(equipo_id=1, cantidad=1, precio_jornada=1000)],
