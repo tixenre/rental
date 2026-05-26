@@ -340,10 +340,43 @@ def purge_stale_specs(conn, categoria_raiz: str, dry_run: bool = True) -> dict:
 
 
 def seed_all_categorias(conn, dry_run: bool = False) -> dict:
-    """Pasada completa: siembra todas las categorías del registry."""
+    """Pasada completa: siembra todas las categorías del registry.
+
+    Cada categoría corre en su propio SAVEPOINT para que un fallo en una no
+    revierta las demás. Si una categoría falla, loguea el traceback completo
+    (exc_info=True) y continúa con las siguientes.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
     result: dict = {"categorias": {}}
     for nombre in REGISTRY.categorias:
-        result["categorias"][nombre] = seed_categoria_from_registry(conn, nombre, dry_run)
+        sp = "cat_" + nombre.replace(" ", "_").replace("/", "_")
+        try:
+            if not dry_run:
+                conn.execute(f"SAVEPOINT {sp}")
+            cat_result = seed_categoria_from_registry(conn, nombre, dry_run)
+            if not dry_run:
+                conn.execute(f"RELEASE SAVEPOINT {sp}")
+            stats = cat_result["stats"]
+            logger.info(
+                "Seeder [%s]: specs_creadas=%d specs_purgadas=%d",
+                nombre,
+                stats.get("specs_creadas", 0),
+                stats.get("specs_purgadas", 0),
+            )
+            result["categorias"][nombre] = cat_result
+        except Exception:
+            logger.error(
+                "Seeder falló en categoría '%s' — resto continúa",
+                nombre,
+                exc_info=True,
+            )
+            if not dry_run:
+                try:
+                    conn.execute(f"ROLLBACK TO SAVEPOINT {sp}")
+                except Exception:
+                    pass
     return result
 
 

@@ -23,7 +23,8 @@ import re
 from typing import Any
 
 
-_TRUE_VALS = frozenset({"yes", "si", "sí", "true", "1", "y", "verdadero", "on", "enabled"})
+_TRUE_VALS = frozenset({"yes", "si", "sí", "true", "1", "y", "verdadero", "on", "enabled",
+                        "foldable", "collapsible"})
 _FALSE_VALS = frozenset({"no", "false", "0", "n", "falso", "off", "disabled"})
 
 
@@ -108,6 +109,15 @@ def _coerce_bool(s: str) -> str | None:
     if low in _TRUE_VALS:
         return "true"
     if low in _FALSE_VALS:
+        return "false"
+    # Handle B&H-style qualifiers: "Yes (Not Included)" → false, "Yes (Included)" → true,
+    # "Yes, Removable" → true.
+    if low.startswith("yes"):
+        parens = re.search(r"\(([^)]*)\)", low)
+        if parens and "not" in parens.group(1):
+            return "false"
+        return "true"
+    if low.startswith("no"):
         return "false"
     return None
 
