@@ -117,13 +117,10 @@ def _coerce_enum(s: str, opts: list[str]) -> str | None:
     for opt in opts:
         if opt.lower() == low:
             return opt
-    # Substring containment: opt is inside input, or input is inside opt.
-    # Handles "Wi-Fi 6 (802.11ax)" → "Wi-Fi" when opts=["Wi-Fi", ...].
-    # First match in list order wins; caller should order opts specific→generic
-    # if overlapping options exist.
+    # Substring: opt is inside input ("Wi-Fi" in "Wi-Fi 6 (802.11ax)").
+    # First match in list order wins.
     for opt in opts:
-        opt_low = opt.lower()
-        if opt_low in low or low in opt_low:
+        if opt.lower() in low:
             return opt
     return None
 

@@ -59,12 +59,6 @@ def test_coerce_enum_fuzzy_case_insensitive():
     assert _coerce_enum("wi-fi 6 (802.11ax)", opts) == "Wi-Fi"
 
 
-def test_coerce_enum_fuzzy_input_in_opt():
-    from services.spec_coerce import _coerce_enum
-    # input es substring del opt ("SDI" in "SDI 12G")
-    opts = ["SDI 12G", "HDMI 2.0"]
-    assert _coerce_enum("SDI", opts) == "SDI 12G"
-
 
 def test_coerce_enum_fuzzy_no_match_es_none():
     from services.spec_coerce import _coerce_enum

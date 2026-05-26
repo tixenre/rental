@@ -1211,52 +1211,6 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
         conn.close()
 
 
-def _validate_multi_enum_value(value: str, enum_options: list[str], spec_label: str) -> str:
-    """Normaliza `value` a JSON array y valida que cada item esté en
-    `enum_options`. Acepta dos shapes de entrada (CSV legacy o JSON array)
-    pero siempre devuelve JSON array compactado.
-
-    El endpoint PUT usa esto para enforce el storage canónico definido en
-    la migration `f3a5c7d9e1b6_multi_enum_json_canonical.py`."""
-    v = (value or "").strip()
-    if not v:
-        return "[]"
-    items: list[str]
-    if v.startswith("["):
-        try:
-            parsed = json.loads(v)
-        except Exception:
-            raise HTTPException(
-                400, f"Spec '{spec_label}' tipo multi_enum: JSON inválido."
-            )
-        if not isinstance(parsed, list):
-            raise HTTPException(
-                400, f"Spec '{spec_label}': multi_enum debe ser array."
-            )
-        items = [str(x).strip() for x in parsed if str(x).strip()]
-    else:
-        items = [p.strip() for p in v.split(",") if p.strip()]
-    # Validar contra enum_options si están declaradas. Si la spec no tiene
-    # enum_options (caso raro), aceptamos cualquier valor pero canonizado.
-    if enum_options:
-        opts_set = set(enum_options)
-        invalid = [x for x in items if x not in opts_set]
-        if invalid:
-            raise HTTPException(
-                400,
-                f"Spec '{spec_label}' multi_enum: valores no permitidos {invalid}. "
-                f"Opciones: {enum_options}.",
-            )
-    # Dedup preservando orden de aparición.
-    seen: set[str] = set()
-    deduped: list[str] = []
-    for x in items:
-        if x not in seen:
-            seen.add(x)
-            deduped.append(x)
-    return json.dumps(deduped, ensure_ascii=False)
-
-
 @router.put("/admin/equipos/{equipo_id}/specs")
 def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: Request):
     """Reemplaza TODAS las specs del equipo. Body shape:
