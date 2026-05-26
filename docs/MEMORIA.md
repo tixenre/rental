@@ -116,14 +116,31 @@
   → igual va a issue. **Nada se borra.** Si la sesión nota algo y no lo arregla en el momento, lo
   deja como issue, no lo descarta.
 
-### 2026-05-25 — Cuidar los minutos de GitHub Actions (repo privado)
-- **What:** el repo pasa a privado; en plan Free eso da **2.000 min/mes** de Actions (en público
-  era ilimitado). El CI corre 6 jobs por cada push a una PR. Hay que ser cuidadoso para no quemar
-  minutos al pedo.
-- **Why:** que el CI no se pause a fin de mes por consumir la cuota con corridas innecesarias.
-- **How to apply:** (1) **batch de commits** — pushear cuando el cambio está listo, no por cada
-  ajuste chico (cada push = una corrida completa). (2) Los cambios que no tocan código (docs,
-  memoria) **no deberían disparar los jobs pesados** (build, tests, mobile-smoke) — ver issue #487
-  (optimización del CI con path filters). (3) `concurrency: cancel-in-progress` ya cancela corridas
-  viejas al re-pushear.
+### 2026-05-25 — Minutos de GitHub Actions: cuota a cuidar SOLO si el repo vuelve a privado ⏰
+- **What:** en **público** (estado actual) Actions es **ilimitado** — no hay cuota que cuidar. Esta
+  regla aplica **solo si el repo vuelve a privado**: en plan Free, privado da **2.000 min/mes**, y
+  el CI corre 6 jobs por cada push a una PR, así que ahí sí hay que no quemar minutos al pedo.
+- **Why:** que el CI no se pause a fin de mes por consumir la cuota — pero eso es un riesgo solo en
+  privado.
+- **How to apply (vale siempre, buena higiene):** (1) **batch de commits** — pushear cuando el
+  cambio está listo, no por cada ajuste chico (cada push = una corrida completa). (2) Los cambios de
+  solo-docs/memoria **no deberían disparar los jobs pesados** (build, tests, mobile-smoke) — ver
+  issue #487 (path filters). (3) `concurrency: cancel-in-progress` ya cancela corridas viejas al
+  re-pushear.
+- **⏰ Disparador (activa la parte de cuota):** si el repo vuelve a privado, los 2.000 min/mes pasan
+  a valer; en público queda dormida.
 
+### 2026-05-26 — Sesión local para trabajo visual/testeable; la sesión avisa ⏰
+- **What:** cuando una tarea se hace mejor en **local** —porque hay que correr y *ver* la app
+  (trabajo visual/UX, template del PDF, mobile, o validar un flujo con la app andando y datos
+  reales)— la sesión lo **avisa** y se arranca local. Para lo demás (lógica de backend, refactors,
+  fixes con tests, planificación, gobernanza) se sigue en la nube, que es lo que el dueño usa desde
+  las apps Mac/iPhone.
+- **Why:** la sesión en la nube corre en un contenedor efímero y aislado: no puede mostrar la app
+  corriendo ni tiene la BD real. Local es el **preview** que hoy falta y reduce el "probar directo
+  en prod" (ver decisión 2026-05-25 — producción = ambiente de prueba).
+- **How to apply:** la sesión detecta cuándo el trabajo es visual o necesita testeo en vivo y lo
+  **señala explícitamente antes de arrancar**; el dueño inicia la sesión local (el stack se levanta
+  con el script de #467 — Postgres + backend). El costo es el setup una vez (node/python/postgres).
+- **⏰ Disparador (revisar):** cuando exista preview/staging (post-launch), reevaluar si esto sigue
+  valiendo o si el preview reemplaza la necesidad de la sesión local.
