@@ -159,6 +159,37 @@ def test_cobertura_real_iluminacion():
     assert emitted, "El extractor debe emitir al menos una spec del fixture"
 
 
+def test_cobertura_real_modificadores():
+    """Extractor genérico de Modificadores resuelve labels B&H en inglés.
+
+    Verifica que los aliases nuevos (Type→modificador_subtipo, Shape→forma,
+    Diameter→diametro_cm, Grid Included→incluye_grid, Internal Baffle→incluye_difusor,
+    Foldable→plegable, Light Loss→light_loss_stops) funcionan sobre un fixture
+    con labels en inglés tal como los trae B&H. Antes de esta fase quedaban vacíos.
+    """
+    from services.equipo_html_extractor import extract_from_html
+    html = _load_fixture("softbox_bh.html")
+    r = extract_from_html(html, categoria_hint="Modificadores")
+    by_key = {s["spec_key"]: s for s in r["specs"] if s.get("spec_key")}
+    all_registry_keys = _registry_all_keys()
+
+    # No emite keys huérfanas (las keys resueltas existen en el registry)
+    matched_registry_keys = set(by_key) & all_registry_keys
+    orphans = matched_registry_keys - all_registry_keys
+    assert not orphans, f"Extractor Modificadores emitió keys huérfanas: {orphans}"
+
+    # Las specs clave del fixture deben haberse poblado desde labels en inglés
+    expected = {
+        "modificador_subtipo", "forma", "diametro_cm",
+        "incluye_grid", "incluye_difusor", "plegable", "light_loss_stops",
+    }
+    faltantes = expected - set(by_key)
+    assert not faltantes, (
+        f"Specs de modificador no resueltas desde labels B&H: {faltantes}. "
+        f"Keys presentes: {sorted(by_key)}"
+    )
+
+
 # ── _normalize_label del companion (unifica _ ↔ espacio) ───────────────────
 
 
