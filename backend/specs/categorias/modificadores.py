@@ -30,7 +30,7 @@ CAT = CategoriaRegistry(
             ],
             prioridad=10, en_card=True, en_filtros=True, en_nombre=True,
             destacado=True, ayuda="Función del modificador",
-            aliases=["Type", "Modifier Type", "Light Shaping Tool"],
+            aliases=["Item Type", "Type", "Modifier Type", "Light Shaping Tool"],
         ),
         SpecDef(
             key="forma", label="Forma", tipo="enum",
@@ -61,20 +61,20 @@ CAT = CategoriaRegistry(
         SpecDef(key="incluye_grid", label="Incluye grid", tipo="bool",
                 prioridad=50, en_filtros=True,
                 ayuda="Grid de panal incluido en el kit (no 'acepta pero se vende aparte')",
-                aliases=["Grid", "Grid Included", "Includes Grid", "Honeycomb Grid"]),
+                aliases=["Accepts Grids", "Grid", "Grid Included", "Includes Grid", "Honeycomb Grid"]),
         SpecDef(key="incluye_difusor", label="Difusor interno", tipo="bool",
                 prioridad=55,
                 ayuda="Interior baffle (capa difusora removible)",
-                aliases=["Diffuser", "Internal Baffle", "Diffusion", "Front Diffuser"]),
+                aliases=["Interior Baffle", "Diffuser", "Internal Baffle", "Diffusion", "Front Diffuser"]),
         SpecDef(key="plegable", label="Plegable", tipo="bool",
                 prioridad=60, en_filtros=True,
                 ayuda="Quick-Open / Foldable / Click-Lock",
-                aliases=["Foldable", "Collapsible", "Quick-Open", "Quick Release"]),
+                aliases=["Quick Open Type", "Foldable", "Collapsible", "Quick-Open", "Quick Release"]),
         # Number en stops. 0 = sin pérdida; None = no medido por el fabricante.
         SpecDef(key="light_loss_stops", label="Pérdida de luz", tipo="number",
                 unidad="stops", prioridad=65,
                 ayuda="Pérdida con difusor (1-stop loss → 1.0). 0 = sin pérdida",
-                aliases=["Light Loss", "Stop Loss", "F-Stop Loss"]),
+                aliases=["Light Loss/Gain", "Light Loss", "Stop Loss", "F-Stop Loss"]),
         # Rango con unidad ° — mismo patrón que `angulo_vision` en Lentes.
         # [36] = ángulo fijo; [10, 45] = zoom Fresnel.
         beam_angle(

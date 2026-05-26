@@ -237,9 +237,14 @@ def _seed_registry() -> None:
                 r["stats"].get("specs_creadas", 0)
                 for r in result["categorias"].values()
             )
-            if total_specs > 0:
-                logger.info("Registry seedeado: %d specs en %d categorías",
-                            total_specs, len(result["categorias"]))
+            total_purgadas = sum(
+                r["stats"].get("specs_purgadas", 0)
+                for r in result["categorias"].values()
+            )
+            logger.info(
+                "Registry seedeado: %d specs en %d categorías (purgadas=%d)",
+                total_specs, len(result["categorias"]), total_purgadas,
+            )
         except Exception:
             try:
                 conn.rollback()

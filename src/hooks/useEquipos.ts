@@ -348,7 +348,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
         // `value_display` viene renderizado del backend (mismo renderer que el
         // nombre público: rango/unidad/prefijo). Fallback al formateo local
         // (que cubre tablas) para entries sin value_display.
-        value: formatSpecValueForDisplay(s.value_display ?? s.value),
+        value: s.value_display ?? formatSpecValueForDisplay(s.value),
       }));
   }
 

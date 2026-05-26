@@ -30,6 +30,7 @@ def montura_luz(
         ayuda=ayuda,
         es_compatibilidad=True, compatibilidad_modo="exacta",
         aliases=[
+            "Light Compatibility",
             "Bowens Mount", "Light Mount",
             "Mount Standard", "Strobe Mount Type", "Mounting System",
             "Strobe Mount", "Mount Type", "Mounting Type",
