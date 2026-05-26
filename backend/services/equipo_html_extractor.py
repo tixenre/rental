@@ -18,10 +18,13 @@ Entrada principal:
 
 import html as html_lib
 import json
+import logging
 import re
 import sys
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # Importar parsers core desde tools/ (mismo código que el seed)
 _TOOLS_DIR = Path(__file__).parent.parent.parent / "tools"
@@ -408,8 +411,8 @@ def _build_result(*, marca: str, modelo: str, specs: dict, extras: dict,
             for k, v in (extras or {}).items():
                 if k in registry_keys and k not in specs_para_persistir:
                     specs_para_persistir[k] = v
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("extras wiring: no se pudo promover extras para '%s': %s", categoria_sugerida, exc)
     specs_array = _specs_dict_to_array(specs_para_persistir)
     keywords = compute_keywords(specs)
 
