@@ -25,6 +25,7 @@ from services.nombre_service import (
     regenerar_nombres_todos,
 )
 from services.ranking_service import recalcular_ranking_todos
+from services.spec_persist import persistir_specs, _validate_tabla_value
 
 
 router = APIRouter()
@@ -1210,119 +1211,6 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
         conn.close()
 
 
-def _validate_multi_enum_value(value: str, enum_options: list[str], spec_label: str) -> str:
-    """Normaliza `value` a JSON array y valida que cada item esté en
-    `enum_options`. Acepta dos shapes de entrada (CSV legacy o JSON array)
-    pero siempre devuelve JSON array compactado.
-
-    El endpoint PUT usa esto para enforce el storage canónico definido en
-    la migration `f3a5c7d9e1b6_multi_enum_json_canonical.py`."""
-    v = (value or "").strip()
-    if not v:
-        return "[]"
-    items: list[str]
-    if v.startswith("["):
-        try:
-            parsed = json.loads(v)
-        except Exception:
-            raise HTTPException(
-                400, f"Spec '{spec_label}' tipo multi_enum: JSON inválido."
-            )
-        if not isinstance(parsed, list):
-            raise HTTPException(
-                400, f"Spec '{spec_label}': multi_enum debe ser array."
-            )
-        items = [str(x).strip() for x in parsed if str(x).strip()]
-    else:
-        items = [p.strip() for p in v.split(",") if p.strip()]
-    # Validar contra enum_options si están declaradas. Si la spec no tiene
-    # enum_options (caso raro), aceptamos cualquier valor pero canonizado.
-    if enum_options:
-        opts_set = set(enum_options)
-        invalid = [x for x in items if x not in opts_set]
-        if invalid:
-            raise HTTPException(
-                400,
-                f"Spec '{spec_label}' multi_enum: valores no permitidos {invalid}. "
-                f"Opciones: {enum_options}.",
-            )
-    # Dedup preservando orden de aparición.
-    seen: set[str] = set()
-    deduped: list[str] = []
-    for x in items:
-        if x not in seen:
-            seen.add(x)
-            deduped.append(x)
-    return json.dumps(deduped, ensure_ascii=False)
-
-
-def _validate_tabla_value(value: str, columnas: list[dict], spec_label: str) -> str:
-    """Valida que `value` sea JSON array donde cada row tiene las keys de
-    `columnas` con los tipos correctos. Devuelve el JSON re-serializado
-    (compactado) para garantizar storage normalizado."""
-    try:
-        data = json.loads(value)
-    except Exception:
-        raise HTTPException(400, f"Spec '{spec_label}' tipo tabla: value debe ser JSON válido.")
-    if not isinstance(data, list):
-        raise HTTPException(400, f"Spec '{spec_label}': tabla debe ser un array de filas.")
-    cleaned: list[dict] = []
-    col_by_key = {c["key"]: c for c in columnas}
-    for i, row in enumerate(data):
-        if not isinstance(row, dict):
-            raise HTTPException(400, f"Spec '{spec_label}' fila {i}: debe ser objeto.")
-        clean_row: dict = {}
-        for key, col in col_by_key.items():
-            v = row.get(key)
-            if v is None or v == "":
-                continue  # campo vacío permitido en cualquier columna
-            ctipo = col["tipo"]
-            if ctipo == "number":
-                try:
-                    clean_row[key] = float(v) if "." in str(v) else int(v)
-                except (TypeError, ValueError):
-                    raise HTTPException(
-                        400,
-                        f"Spec '{spec_label}' fila {i} columna '{key}': debe ser número, vino {v!r}.",
-                    )
-            elif ctipo == "valor_unidad":
-                # Objeto {valor, unidad}. Permite que la unidad varíe por fila.
-                if not isinstance(v, dict):
-                    raise HTTPException(
-                        400,
-                        f"Spec '{spec_label}' fila {i} columna '{key}': debe ser objeto {{valor, unidad}}.",
-                    )
-                valor_raw = v.get("valor")
-                unidad_raw = v.get("unidad", "")
-                has_valor = valor_raw not in (None, "")
-                has_unidad = bool(str(unidad_raw or "").strip())
-                if not has_valor and not has_unidad:
-                    continue
-                cell: dict = {}
-                if has_valor:
-                    try:
-                        cell["valor"] = float(valor_raw) if "." in str(valor_raw) else int(valor_raw)
-                    except (TypeError, ValueError):
-                        cell["valor"] = str(valor_raw).strip()
-                if has_unidad:
-                    cell["unidad"] = str(unidad_raw).strip()
-                clean_row[key] = cell
-            elif ctipo == "bool":
-                clean_row[key] = bool(v) if isinstance(v, bool) else str(v).lower() in ("true", "1", "yes", "sí", "si")
-            elif ctipo == "enum":
-                if str(v) not in (col.get("options") or []):
-                    raise HTTPException(
-                        400,
-                        f"Spec '{spec_label}' fila {i} columna '{key}': '{v}' no está en opciones {col.get('options')}.",
-                    )
-                clean_row[key] = str(v)
-            else:  # string
-                clean_row[key] = str(v).strip()
-        if clean_row:  # solo persistir filas con al menos un valor
-            cleaned.append(clean_row)
-    return json.dumps(cleaned, ensure_ascii=False)
-
-
 @router.put("/admin/equipos/{equipo_id}/specs")
 def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: Request):
     """Reemplaza TODAS las specs del equipo. Body shape:
@@ -1336,8 +1224,6 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
         if not eq:
             raise HTTPException(404, "Equipo no existe")
 
-        # Pre-cargar las defs referenciadas (tipo + tabla_columnas) para
-        # validar el value de specs tipo 'tabla' antes de persistir.
         keys_int: list[int] = []
         for key in payload.specs.keys():
             try:
@@ -1347,56 +1233,18 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
                     400,
                     f"spec_def_id inválido en payload.specs: '{key}'. Las keys deben ser IDs numéricos.",
                 )
+
         defs_by_id: dict[int, dict] = {}
         if keys_int:
             placeholders = ",".join(["?"] * len(keys_int))
             def_rows = conn.execute(
-                f"SELECT id, label, tipo, tabla_columnas, enum_options "
+                f"SELECT id, label, tipo, tabla_columnas, enum_options, unidad "
                 f"FROM spec_definitions WHERE id IN ({placeholders})",
                 tuple(keys_int),
             ).fetchall()
             defs_by_id = {r["id"]: row_to_dict(r) for r in def_rows}
 
-        conn.execute("DELETE FROM equipo_specs WHERE equipo_id = ?", (equipo_id,))
-        for key, value in payload.specs.items():
-            if value is None or value == "":
-                continue
-            spec_def_id = int(key)
-            sd = defs_by_id.get(spec_def_id)
-            persist_value = str(value)
-            if sd and sd.get("tipo") == "tabla":
-                cols = sd.get("tabla_columnas")
-                if isinstance(cols, str):
-                    cols = json.loads(cols)
-                if not cols:
-                    raise HTTPException(
-                        500,
-                        f"Spec '{sd.get('label')}' tipo tabla sin tabla_columnas definidas.",
-                    )
-                persist_value = _validate_tabla_value(persist_value, cols, sd.get("label") or "")
-                if persist_value == "[]":
-                    continue  # tabla totalmente vacía → no persistir nada
-            elif sd and sd.get("tipo") == "multi_enum":
-                opts = sd.get("enum_options")
-                if isinstance(opts, str):
-                    try:
-                        opts = json.loads(opts)
-                    except Exception:
-                        opts = []
-                persist_value = _validate_multi_enum_value(
-                    persist_value, opts or [], sd.get("label") or "",
-                )
-                if persist_value == "[]":
-                    continue  # multi_enum vacío → no persistir
-            conn.execute(
-                """
-                INSERT INTO equipo_specs (equipo_id, spec_def_id, value)
-                VALUES (?, ?, ?)
-                ON CONFLICT (equipo_id, spec_def_id) DO UPDATE
-                    SET value = EXCLUDED.value
-                """,
-                (equipo_id, spec_def_id, persist_value),
-            )
+        result = persistir_specs(conn, equipo_id, payload.specs, defs_by_id, coerce=True)
 
         try:
             actualizar_nombres_de(conn, equipo_id, commit=False)
@@ -1404,7 +1252,12 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
             pass
 
         conn.commit()
-        return {"ok": True, "equipo_id": equipo_id, "specs_count": len(payload.specs)}
+        return {
+            "ok": True,
+            "equipo_id": equipo_id,
+            "specs_count": result["persisted"],
+            "discarded": result["discarded"],
+        }
     except HTTPException:
         conn.rollback()
         raise
