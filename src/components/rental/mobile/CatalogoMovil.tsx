@@ -798,7 +798,7 @@ function CartSheet({
               {descuentoPct > 0 && (
                 <div className="flex items-center justify-between py-1">
                   <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                    {descuentoLabel(descuentoOrigen, jornadas)}
+                    {descuentoLabel(descuentoOrigen, jornadas, clienteSession?.nombre)}
                     <span
                       className={cn(
                         "inline-flex items-center px-1.5 py-px rounded-full font-mono text-[9px] font-bold",
