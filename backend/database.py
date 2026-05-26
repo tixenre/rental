@@ -285,6 +285,11 @@ def init_db():
     # front-office. NULL = sin specs asignadas.
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS categoria_specs TEXT")
 
+    # Migration: URL pública del HTML de producto guardado (B&H Webpage Complete).
+    # Permite re-extraer specs en el futuro sin volver a pedir el HTML al dueño.
+    # Mismo patrón que foto_url — almacena URL pública R2, blob en equipos/{id}/source.html.
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS html_source_url TEXT")
+
     # Tabla de marcas (brands)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS marcas (

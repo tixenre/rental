@@ -30,6 +30,7 @@ import {
   Search,
   Link as LinkIcon,
   Image as ImageIcon,
+  FileCode,
   X,
   Copy,
   ExternalLink,
@@ -220,6 +221,13 @@ export function EquipoFormDialogV2({
   // que el usuario los apruebe uno por uno (vs los specs actuales).
   const [specsPropuestos, setSpecsPropuestos] = useState<Spec[]>([]);
 
+  // ── HTML source ────────────────────────────────────────────────────
+  const [uploadingHtml, setUploadingHtml] = useState(false);
+  const [htmlSourceUrl, setHtmlSourceUrl] = useState(initial?.html_source_url ?? null);
+  useEffect(() => {
+    setHtmlSourceUrl(initial?.html_source_url ?? null);
+  }, [initial?.html_source_url]);
+
   // ── Buscar fotos ───────────────────────────────────────────────────
   const [photoSearching, setPhotoSearching] = useState(false);
   const [photoCands, setPhotoCands] = useState<string[]>([]);
@@ -376,6 +384,7 @@ export function EquipoFormDialogV2({
   // el catálogo. Así no peleamos contra una elección explícita de "Sin
   // categoría de specs".
   const specsTouchedRef = useRef(false);
+  const htmlInputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     setCategoriaSpecs(initial?.categoria_specs ?? "");
     specsTouchedRef.current = false;
@@ -732,6 +741,73 @@ export function EquipoFormDialogV2({
       toast.error(`Error al subir: ${e instanceof Error ? e.message : ""}`);
     } finally {
       setUploading(false);
+    }
+  };
+
+  // ════════════════════════════════════════════════════════════════════
+  // HTML source — sube el archivo, persiste en R2 y extrae specs
+  // ════════════════════════════════════════════════════════════════════
+  const handleHtmlUpload = async (file: File) => {
+    if (!initial?.id) return;
+    setUploadingHtml(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await authedJson<{ html_source_url: string; specs?: { label: string; value: string; spec_key?: string }[] }>(
+        `/api/admin/equipos/${initial.id}/upload-html-source`,
+        { method: "POST", body: fd },
+      );
+      setHtmlSourceUrl(r.html_source_url);
+
+      const propuestos: Spec[] = withIds(r.specs ?? []);
+      if (propuestos.length > 0) {
+        const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+        const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+        for (const t of templateItems ?? []) {
+          if (t.spec_key) tmplByKey.set(t.spec_key, t);
+          if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
+        }
+        const findTmpl = (p: Spec) =>
+          (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
+          tmplByLabel.get(p.label.trim().toLowerCase());
+
+        const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
+        const requierenRevision = propuestos.filter((p) => !findTmpl(p));
+
+        if (autoAplicables.length > 0) {
+          setSpecs((prev) => {
+            const next = [...prev];
+            for (const p of autoAplicables) {
+              const tmpl = findTmpl(p)!;
+              const targetId = `spec-${tmpl.spec_def_id}`;
+              const idx = next.findIndex(
+                (x) =>
+                  x.id === targetId ||
+                  x.id === `tmpl-${tmpl.spec_def_id}` ||
+                  sameLabel(x.label, tmpl.label),
+              );
+              if (idx >= 0) {
+                next[idx] = { ...next[idx], value: p.value };
+              } else {
+                next.push({ id: targetId, label: tmpl.label, value: p.value, spec_key: p.spec_key });
+              }
+            }
+            return next;
+          });
+        }
+        if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
+
+        const parts: string[] = [];
+        if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
+        if (requierenRevision.length) parts.push(`${requierenRevision.length} pendientes de revisar`);
+        toast.success("HTML procesado", { description: parts.join(" · ") || "specs extraídos" });
+      } else {
+        toast.success("HTML guardado", { description: "No se extrajeron specs del archivo" });
+      }
+    } catch (e) {
+      toast.error(`Error al subir HTML: ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setUploadingHtml(false);
     }
   };
 
@@ -1141,6 +1217,44 @@ export function EquipoFormDialogV2({
               </>
             )}
           </Button>
+          {isEdit && (
+            <>
+              <input
+                ref={htmlInputRef}
+                type="file"
+                accept=".html,.htm"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleHtmlUpload(f);
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => htmlInputRef.current?.click()}
+                disabled={uploadingHtml}
+              >
+                {uploadingHtml ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Subiendo…
+                  </>
+                ) : (
+                  <>
+                    <FileCode className="h-3.5 w-3.5 mr-1" />
+                    {htmlSourceUrl ? "Reemplazar HTML" : "Subir HTML"}
+                  </>
+                )}
+              </Button>
+              {htmlSourceUrl && (
+                <span className="flex items-center gap-1 text-xs text-emerald-700 font-medium">
+                  <FileCode className="h-3 w-3" /> HTML guardado
+                </span>
+              )}
+            </>
+          )}
         </div>
       </section>
 

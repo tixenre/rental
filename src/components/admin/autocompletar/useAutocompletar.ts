@@ -402,7 +402,9 @@ export function useAutocompletar({
   const setAll = (v: boolean) => {
     setAplicarMarca(v);
     setAplicarModelo(v);
-    setAplicarFoto(v);
+    // Foto excluida del "select all": tiene su propio flujo de subida.
+    // Deseleccionar todo sí la apaga; seleccionar todo respeta el estado actual.
+    if (!v) setAplicarFoto(false);
     setAplicarBh(v);
     setAplicarDescripcion(v);
     setAplicarSpecs(v);

@@ -1311,8 +1311,12 @@ def delete_equipo(id: int):
     alquileres del equipo dado de baja. Restaurable vía POST /restore (#206)."""
     conn = get_db()
     try:
-        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+        row = conn.execute(
+            "SELECT id, html_source_url FROM equipos WHERE id=?", (id,)
+        ).fetchone()
+        if not row:
             raise HTTPException(404, "Equipo no encontrado")
+        html_source_url = row["html_source_url"]
         conn.execute(
             "UPDATE equipos SET eliminado_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id=?",
             (id,),
@@ -1323,6 +1327,16 @@ def delete_equipo(id: int):
         raise
     finally:
         conn.close()
+
+    # Cleanup R2 blob after successful soft-delete (best-effort, no rollback if fails).
+    if html_source_url:
+        try:
+            cfg = _r2_config()
+            client = _get_r2_client(cfg)
+            key = html_source_url.removeprefix(f"{cfg['public_base']}/")
+            client.delete_object(Bucket=cfg["bucket"], Key=key)
+        except Exception as _e:
+            logger.warning("delete_equipo: no se pudo borrar HTML blob de R2: %s", _e)
 
 
 # ── Ficha por equipo ─────────────────────────────────────────────────────────
@@ -3018,6 +3032,72 @@ async def admin_autocompletar_from_html(
         raise HTTPException(500, f"Error parseando HTML: {e}")
 
     return result
+
+
+@router.post("/admin/equipos/{id}/upload-html-source")
+async def admin_upload_html_source(
+    id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    categoria_hint: Optional[str] = None,
+) -> dict:
+    """Sube y persiste el HTML guardado de B&H, extrae specs y los devuelve.
+
+    Guarda el blob en R2 (equipos/{id}/source.html), actualiza html_source_url
+    en la BD y devuelve AutocompletarResult con los specs extraídos. Una segunda
+    llamada sobreescribe el blob anterior (path determinístico sin timestamp).
+
+    Args:
+        id: ID del equipo al que se asocia el HTML.
+        file: HTML guardado (Cmd+S → Webpage Complete).
+        categoria_hint: categoría opcional para saltear auto-detección.
+
+    Returns: {html_source_url, ...AutocompletarResult}
+    """
+    require_admin(request)
+
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+    finally:
+        conn.close()
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "Archivo vacío")
+    if len(content) > 5_000_000:
+        raise HTTPException(400, "HTML demasiado grande (máx 5MB)")
+
+    try:
+        html_content = content.decode("utf-8", errors="replace")
+    except Exception:
+        raise HTTPException(400, "HTML inválido (no es UTF-8)")
+
+    path = f"equipos/{id}/source.html"
+    html_source_url = _upload_to_r2(path, content, "text/html; charset=utf-8")
+
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE equipos SET html_source_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id=?",
+            (html_source_url, id),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    try:
+        from services.equipo_html_extractor import extract_from_html
+        result = extract_from_html(html_content, categoria_hint=categoria_hint)
+    except Exception as e:
+        logger.exception("Error extrayendo specs del HTML (equipo %d)", id)
+        raise HTTPException(500, f"Error parseando HTML: {e}")
+
+    return {"html_source_url": html_source_url, **result}
 
 
 @router.post("/admin/equipos/enriquecer", deprecated=True)
