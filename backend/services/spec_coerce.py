@@ -93,6 +93,9 @@ def _parse_opts(raw: Any) -> list[str]:
 
 def _coerce_number(s: str) -> str | None:
     """Extrae el primer número del string; descarta prefijo/sufijo de unidad."""
+    # Limpiar separadores de miles (\d,\d{3}) antes de parsear, para que
+    # "11,600 Lux" → 11600 y no 11.6.
+    s = re.sub(r"(\d),(\d{3})(?!\d)", r"\1\2", s)
     m = re.search(r"-?\d+(?:[.,]\d+)?", s)
     if not m:
         return None
@@ -131,6 +134,9 @@ def _coerce_rango(s: str) -> str | None:
     s = re.sub(r"^f/", "", s.strip(), flags=re.IGNORECASE)
     # Eliminar sufijo de unidad al final (letras, °, etc.)
     s = re.sub(r"[a-zA-Z°/]+\s*$", "", s.strip()).strip()
+    # Limpiar separadores de miles (\d,\d{3}) antes de parsear, para que
+    # "2,500-7,500" → "2500-7500" y no interprete la coma como decimal.
+    s = re.sub(r"(\d),(\d{3})(?!\d)", r"\1\2", s)
 
     # Formato "min-max" (guion ascii o dash unicode)
     m = re.match(r"^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)$", s)
