@@ -55,6 +55,8 @@ CAT = CategoriaRegistry(
             prioridad=40, en_card=True, en_filtros=True, destacado=True,
             ayuda="Lado-luz: cómo se acopla a la fuente. Compat con Iluminación.",
             es_compatibilidad=True, compatibilidad_modo="exacta",
+            aliases=["Bowens Mount", "Light Mount", "Strobe Mount", "Mount Type",
+                     "Mounting Type"],
         ),
         # Semántica: viene CON grid en el kit. "Acepta grid pero se vende
         # aparte" → False (no lo tenemos disponible).
@@ -75,7 +77,8 @@ CAT = CategoriaRegistry(
         # [36] = ángulo fijo; [10, 45] = zoom Fresnel.
         SpecDef(key="beam_angle", label="Ángulo del haz", tipo="rango", unidad="°",
                 prioridad=75, en_filtros=True,
-                ayuda="Solo Spotlight/Fresnel. [v] fijo, [min, max] variable"),
+                ayuda="Solo Spotlight/Fresnel. [v] fijo, [min, max] variable",
+                aliases=["Beam Angle", "Spread Angle", "Field Angle", "Beam Spread"]),
         materials(prioridad=100, ayuda="Ej: Fabric, Steel, Glass"),
         peso_g(prioridad=110),
     ],

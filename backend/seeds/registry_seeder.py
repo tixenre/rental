@@ -115,6 +115,7 @@ def _upsert_spec_definition(
     El flag `validado=true` lo respeta — el admin lo marca a mano.
     """
     enum_json = json.dumps(spec.enum_options) if spec.enum_options else None
+    aliases_json = json.dumps(spec.aliases) if spec.aliases else "[]"
 
     if dry_run:
         # Buscar si existe para devolver id real, sino placeholder
@@ -134,8 +135,8 @@ def _upsert_spec_definition(
         INSERT INTO spec_definitions
           (categoria_raiz_id, spec_key, label, tipo, unidad, enum_options,
            ayuda, es_compatibilidad, compatibilidad_modo, rol_compatibilidad,
-           favorito, en_nombre, en_filtros, prioridad)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           favorito, en_nombre, en_filtros, prioridad, aliases)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (categoria_raiz_id, spec_key) DO UPDATE SET
             label               = EXCLUDED.label,
             tipo                = EXCLUDED.tipo,
@@ -145,6 +146,7 @@ def _upsert_spec_definition(
             es_compatibilidad   = EXCLUDED.es_compatibilidad,
             compatibilidad_modo = EXCLUDED.compatibilidad_modo,
             rol_compatibilidad  = EXCLUDED.rol_compatibilidad,
+            aliases             = EXCLUDED.aliases,
             updated_at          = CURRENT_TIMESTAMP
         RETURNING id
         """,
@@ -154,7 +156,7 @@ def _upsert_spec_definition(
             spec.compatibilidad_modo or "exacta",
             spec.rol_compatibilidad,
             favorito_inicial, bool(spec.en_nombre), bool(spec.en_filtros),
-            int(spec.prioridad),
+            int(spec.prioridad), aliases_json,
         ),
     )
     new = cur.fetchone()

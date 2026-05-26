@@ -178,7 +178,7 @@ def _specs_dict_to_array(specs_dict: dict, registry_labels: dict | None = None) 
                 val_str = json.dumps(value, ensure_ascii=False)
         elif isinstance(value, (int, float)):
             unit = ""
-            if key == "potencia_w": unit = " W"
+            if key == "consumo_w": unit = " W"
             elif "lumens" in key:  unit = " lm"
             elif key == "peso_g":  unit = " g"
             elif key == "fps_max": unit = " fps"

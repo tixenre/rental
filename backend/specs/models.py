@@ -43,6 +43,11 @@ class SpecDef(BaseModel):
     destacado: bool = False
     obligatorio: bool = False
 
+    # Labels alternativos (inglés B&H, variantes) → se usan en el matcheo
+    # para resolver crudos como "Weight" → peso_g, "Focal Length" → distancia_focal.
+    # Se seedean a spec_definitions.aliases (JSONB). Single source: vive acá.
+    aliases: list[str] = Field(default_factory=list)
+
     # Compatibilidad (qué role juega esta spec en el motor de matching)
     es_compatibilidad: bool = False
     compatibilidad_modo: CompatMode | None = None

@@ -149,6 +149,39 @@ def test_cobertura_iluminacion():
     )
 
 
+def test_cobertura_modificadores():
+    from specs import REGISTRY
+    cat = REGISTRY.get("Modificadores")
+    all_keys = {s.key for s in cat.specs}
+    specs_dict = {k: "test_value" for k in all_keys}
+    cob = _cobertura("Modificadores", specs_dict)
+    assert cob["cubiertas"] == all_keys, (
+        f"Faltantes en cobertura Modificadores: {cob['faltantes']}"
+    )
+
+
+def test_cobertura_adaptadores():
+    from specs import REGISTRY
+    cat = REGISTRY.get("Adaptadores")
+    all_keys = {s.key for s in cat.specs}
+    specs_dict = {k: "test_value" for k in all_keys}
+    cob = _cobertura("Adaptadores", specs_dict)
+    assert cob["cubiertas"] == all_keys, (
+        f"Faltantes en cobertura Adaptadores: {cob['faltantes']}"
+    )
+
+
+def test_cobertura_filtros():
+    from specs import REGISTRY
+    cat = REGISTRY.get("Filtros")
+    all_keys = {s.key for s in cat.specs}
+    specs_dict = {k: "test_value" for k in all_keys}
+    cob = _cobertura("Filtros", specs_dict)
+    assert cob["cubiertas"] == all_keys, (
+        f"Faltantes en cobertura Filtros: {cob['faltantes']}"
+    )
+
+
 # ── _normalize_label del companion (unifica _ ↔ espacio) ───────────────────
 
 
@@ -162,7 +195,7 @@ def _get_normalize_label():
 def test_normalize_label_unifica_guion_y_espacio():
     _normalize_label = _get_normalize_label()
     assert _normalize_label("lens_mount") == _normalize_label("lens mount")
-    assert _normalize_label("potencia_w") == _normalize_label("potencia w")
+    assert _normalize_label("consumo_w") == _normalize_label("consumo w")
 
 
 def test_normalize_label_sin_parentesis():

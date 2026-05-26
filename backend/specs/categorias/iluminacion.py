@@ -31,8 +31,11 @@ CAT = CategoriaRegistry(
             prioridad=10, en_card=True, en_filtros=True, en_nombre=True,
             destacado=True, ayuda="Form factor del fixture",
         ),
-        SpecDef(key="potencia_w", label="Potencia", tipo="number", unidad="W",
-                prioridad=20, en_card=True, en_filtros=True, en_nombre=True, destacado=True),
+        # Watts = consumo eléctrico del fixture (no potencia óptica — esa son lúmenes).
+        SpecDef(key="consumo_w", label="Consumo eléctrico", tipo="number", unidad="W",
+                prioridad=20, en_card=True, en_filtros=True, en_nombre=True, destacado=True,
+                aliases=["Power", "Wattage", "Power Consumption", "Power Draw",
+                         "Power Input", "Rated Power"]),
         SpecDef(
             key="color_modes", label="Modos de color", tipo="multi_enum",
             enum_options=["RGB", "Bicolor", "Daylight", "Tungsten"],
@@ -41,22 +44,35 @@ CAT = CategoriaRegistry(
         ),
         SpecDef(key="temperatura_k", label="Temperatura color", tipo="rango", unidad="K",
                 prioridad=40, en_card=True, en_filtros=True,
-                ayuda="Rango Kelvin. Si fijo: usar [v]; si variable: [min, max]"),
+                ayuda="Rango Kelvin. Si fijo: usar [v]; si variable: [min, max]",
+                aliases=["Color Temperature", "Color Temperature Range", "Color Temp",
+                         "Color Temp Range"]),
         # ─── Fotométrico ──────────────────────────────────────────────
         SpecDef(key="cri", label="CRI", tipo="number",
-                prioridad=50, en_filtros=True, ayuda="Color Rendering Index 0-100"),
+                prioridad=50, en_filtros=True, ayuda="Color Rendering Index 0-100",
+                aliases=["Color Rendering Index", "CRI Value", "Ra", "CRI (Ra)"]),
         SpecDef(key="tlci", label="TLCI", tipo="number",
                 prioridad=55, ayuda="Broadcast color rendering 0-100"),
         SpecDef(key="lumens_at_5600k", label="Lúmenes (5600K)", tipo="number", unidad="lm",
                 prioridad=58, en_card=True, en_filtros=True,
-                ayuda="Lúmenes totales a daylight — estándar de medición en cine/video"),
+                ayuda="Lúmenes totales a daylight sin modificador — estándar de medición en cine/video",
+                aliases=["Luminous Flux", "Lumen Output", "Brightness", "Total Lumens"]),
         SpecDef(key="lumens_at_3200k", label="Lúmenes (3200K)", tipo="number", unidad="lm",
                 prioridad=60, en_filtros=True,
-                ayuda="Lúmenes totales a tungsten. Las luces bicolor rinden menos a 3200K que a 5600K"),
+                ayuda="Lúmenes totales a tungsten sin modificador. Las luces bicolor rinden menos a 3200K que a 5600K"),
+        # Lux: fuente para derivar lúmenes cuando el fabricante no los reporta.
+        # Convención: siempre sin modificador/difusor (fixture desnudo).
+        # Los lúmenes se derivan automáticamente al persistir si se tiene beam_angle.
         SpecDef(key="lux_at_1m_5600k", label="Lux a 1m (5600K)", tipo="number", unidad="lx",
-                prioridad=62, ayuda="Estándar cine — Lux a 1m daylight"),
+                prioridad=62,
+                ayuda="Iluminancia a 1m sin modificador, daylight. Se usa para derivar lúmenes.",
+                aliases=["Illuminance (at 1 Meter, Daylight)", "Lux at 1m (Daylight)",
+                         "Illuminance (5600K)", "Lux (Daylight)", "Illuminance at 1m"]),
         SpecDef(key="lux_at_1m_3200k", label="Lux a 1m (3200K)", tipo="number", unidad="lx",
-                prioridad=63, ayuda="Lux a 1m tungsten"),
+                prioridad=63,
+                ayuda="Iluminancia a 1m sin modificador, tungsten.",
+                aliases=["Illuminance (at 1 Meter, Tungsten)", "Lux at 1m (Tungsten)",
+                         "Illuminance (3200K)", "Lux (Tungsten)"]),
         SpecDef(key="r9", label="R9", tipo="number", prioridad=65,
                 ayuda="Deep red rendering 0-100"),
         # ─── Control ──────────────────────────────────────────────────
@@ -81,11 +97,11 @@ CAT = CategoriaRegistry(
             prioridad=100, en_filtros=True,
             ayuda="Acople con modificadores. 'Sin montura' = no acepta modificadores estándar (fresnels tradicionales).",
             es_compatibilidad=True, compatibilidad_modo="exacta",
+            aliases=["Bowens Mount", "Light Mount", "Mount Standard", "Strobe Mount Type",
+                     "Mounting System"],
         ),
         peso_g(prioridad=110, ayuda="Peso del fixture solo, sin accesorios"),
         # ─── Energía / consumo ────────────────────────────────────────
-        SpecDef(key="power_consumption_w", label="Consumo", tipo="number", unidad="W",
-                prioridad=120, en_filtros=True),
         SpecDef(key="battery", label="Batería", tipo="string",
                 prioridad=125, ayuda="Modelo de batería compatible (V-mount, NP-F970, etc.)"),
         SpecDef(key="power_pass_thru", label="Power pass-thru", tipo="bool",
@@ -94,9 +110,12 @@ CAT = CategoriaRegistry(
         # ─── Performance fotométrico ──────────────────────────────────
         # tipo=rango: [v] fijo, [min, max] variable. Mismo patrón que
         # `angulo_vision` en Lentes y `beam_angle` en Modificadores.
+        # beam_angle se usa también para derivar lúmenes desde lux (spec_coerce).
         SpecDef(key="beam_angle", label="Ángulo del haz", tipo="rango", unidad="°",
                 prioridad=135, en_filtros=True,
-                ayuda="[v] fijo, [min, max] variable (zoom Fresnel/spotlight)"),
+                ayuda="[v] fijo, [min, max] variable (zoom Fresnel/spotlight)",
+                aliases=["Beam Angle", "Spread Angle", "Field Angle", "Beam Spread",
+                         "Illumination Angle"]),
         # ─── Hardware / control físico ────────────────────────────────
         SpecDef(
             key="cooling_system", label="Sistema de enfriamiento", tipo="enum",
