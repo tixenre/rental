@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { snapTo30 } from "./time-utils";
 
 const SLOTS: string[] = (() => {
   const out: string[] = [];
@@ -8,17 +9,6 @@ const SLOTS: string[] = (() => {
   }
   return out;
 })();
-
-export function snapTo30(value: string): string {
-  const [hRaw, mRaw] = (value ?? "").split(":");
-  const h = Math.min(23, Math.max(0, parseInt(hRaw ?? "0", 10) || 0));
-  const m = Math.min(59, Math.max(0, parseInt(mRaw ?? "0", 10) || 0));
-  const total = h * 60 + Math.round(m / 30) * 30;
-  const clamped = Math.min(23 * 60 + 30, total);
-  const hh = Math.floor(clamped / 60);
-  const mm = clamped % 60;
-  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
-}
 
 const toMin = (t: string) => {
   const [h = 0, m = 0] = (t ?? "").split(":").map(Number);

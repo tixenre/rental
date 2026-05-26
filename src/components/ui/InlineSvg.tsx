@@ -57,17 +57,6 @@ export function InlineSvg({
   );
 }
 
-/** ¿La URL es probablemente un SVG? Heurística por extensión. */
-export function isSvgUrl(url: string | null | undefined): boolean {
-  if (!url) return false;
-  try {
-    const path = new URL(url).pathname.toLowerCase();
-    return path.endsWith(".svg");
-  } catch {
-    return url.toLowerCase().endsWith(".svg");
-  }
-}
-
 function sanitizeSvg(text: string): string {
   return text
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")

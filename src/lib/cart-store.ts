@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { snapTo30 } from "@/components/rental/TimeStepSelect";
+import { snapTo30 } from "@/components/rental/time-utils";
 import { computeJornadas } from "@/lib/rental-dates";
 
 type DrawerPlacement = "right" | "bottom";

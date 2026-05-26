@@ -740,5 +740,6 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  // eslint-disable-next-line react-refresh/only-export-components -- hook acoplado a SidebarContext del archivo (patrón shadcn); separarlo arrastraría el context que SidebarProvider setea
   useSidebar,
 };
