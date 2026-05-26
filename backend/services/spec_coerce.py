@@ -110,9 +110,20 @@ def _coerce_bool(s: str) -> str | None:
 
 
 def _coerce_enum(s: str, opts: list[str]) -> str | None:
+    if not opts:
+        return None
     low = s.lower().strip()
+    # Exact match (case-insensitive)
     for opt in opts:
         if opt.lower() == low:
+            return opt
+    # Substring containment: opt is inside input, or input is inside opt.
+    # Handles "Wi-Fi 6 (802.11ax)" → "Wi-Fi" when opts=["Wi-Fi", ...].
+    # First match in list order wins; caller should order opts specific→generic
+    # if overlapping options exist.
+    for opt in opts:
+        opt_low = opt.lower()
+        if opt_low in low or low in opt_low:
             return opt
     return None
 
@@ -141,23 +152,32 @@ def _coerce_rango(s: str) -> str | None:
 
 
 def _coerce_multi_enum(s: str, opts: list[str]) -> str | None:
-    # Ya es JSON array
+    # Parse input to a flat list of parts (JSON array or CSV/slash separated)
     if s.startswith("["):
         try:
             vals = json.loads(s)
-            cleaned = [str(v).strip() for v in vals if str(v).strip()]
-            return json.dumps(cleaned) if cleaned else None
+            parts = [str(v).strip() for v in vals if str(v).strip()]
         except Exception:
-            pass
-    # CSV o separado por /
-    parts = [p.strip() for p in re.split(r"[,/]", s) if p.strip()]
+            parts = [p.strip() for p in re.split(r"[,/]", s) if p.strip()]
+    else:
+        parts = [p.strip() for p in re.split(r"[,/]", s) if p.strip()]
+
     if not parts:
         return None
+
     if opts:
-        opts_map = {o.lower(): o for o in opts}
-        canonical = [opts_map[p.lower()] for p in parts if p.lower() in opts_map]
-        if canonical:
-            return json.dumps(canonical)
+        # Fuzzy-match each part via _coerce_enum (exact first, then substring).
+        # Parts that don't map to any option are silently discarded — never 400.
+        matched: list[str] = []
+        seen: set[str] = set()
+        for p in parts:
+            m = _coerce_enum(p, opts)
+            if m is not None and m not in seen:
+                seen.add(m)
+                matched.append(m)
+        return json.dumps(matched) if matched else None
+
+    # No opts declared → passthrough raw parts (unchanged behaviour)
     return json.dumps(parts)
 
 
