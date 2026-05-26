@@ -12,6 +12,8 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
+from net_utils import get_client_ip
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -187,7 +189,7 @@ def auth_google(request: Request):
 @router.get("/auth/callback")
 def auth_callback(request: Request):
     """Google redirige acá con el código de autorización."""
-    ip = request.client.host if request.client else "unknown"
+    ip = get_client_ip(request)
     _check_rate(ip)
 
     error = request.query_params.get("error")
@@ -298,7 +300,7 @@ def cliente_auth_callback(request: Request):
     """Google redirige acá. Si el cliente existe → sesión. Si no → registro."""
     from database import get_db
 
-    ip = request.client.host if request.client else "unknown"
+    ip = get_client_ip(request)
     _check_rate(ip)
 
     error = request.query_params.get("error")

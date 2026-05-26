@@ -16,6 +16,7 @@ from admin_guard import require_admin
 from itsdangerous import BadSignature, SignatureExpired
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 from services.precios import es_responsable_inscripto
+from rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -89,7 +90,8 @@ class RegistroCreate(BaseModel):
 
 
 @router.get("/api/cliente/registro-info")
-def cliente_registro_info(t: str):
+@limiter.limit("5/minute")
+def cliente_registro_info(request: Request, t: str):
     """Valida el token de registro y devuelve email/nombre. Solo lectura."""
     try:
         payload = signer.loads(t, max_age=1800)
@@ -101,7 +103,8 @@ def cliente_registro_info(t: str):
 
 
 @router.post("/api/cliente/registro")
-def cliente_registro(data: RegistroCreate):
+@limiter.limit("5/minute")
+def cliente_registro(request: Request, data: RegistroCreate):
     # Validar token de registro (firmado por Google callback, max 30 min)
     try:
         payload = signer.loads(data.token, max_age=1800)

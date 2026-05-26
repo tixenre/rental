@@ -4412,27 +4412,47 @@ def _is_photo_host_allowed(host: str) -> bool:
     return any(host == h or host.endswith("." + h) for h in _ALLOWED_PHOTO_HOSTS)
 
 
-def _host_resolves_to_private(host: str) -> bool:
-    """True si el host resuelve a alguna IP privada/loopback/link-local/
-    multicast/reserved. Defense-in-depth: bloquea el caso (improbable pero
-    posible) de un dominio del allowlist apuntando a IPs internas.
+def _resolve_to_public_ip(host: str) -> str:
+    """Resuelve `host` UNA vez y devuelve una IP pública para pinearla en la
+    conexión (mata DNS rebinding: validación y request usan la MISMA IP).
+
+    Valida que TODAS las IPs resueltas sean públicas — si alguna es
+    privada/loopback/link-local/multicast/reserved, rechaza (un host del
+    allowlist podría apuntar a IPs internas). Eleva HTTPException si no resuelve
+    o si resuelve a algo interno.
     """
     import ipaddress as _ip
     import socket as _socket
     try:
         infos = _socket.getaddrinfo(host, None)
     except (_socket.gaierror, OSError):
-        return True   # No resolver → no descargar
+        raise HTTPException(403, f"No se pudo resolver el host '{host}'")
+    public_ip: str | None = None
     for info in infos:
         addr = info[4][0]
         try:
             ip = _ip.ip_address(addr)
-            if (ip.is_private or ip.is_loopback or ip.is_link_local
-                    or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
-                return True
         except ValueError:
             continue
-    return False
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+            raise HTTPException(403, f"Host '{host}' resuelve a IP privada/interna")
+        if public_ip is None:
+            public_ip = addr
+    if public_ip is None:
+        raise HTTPException(403, f"Host '{host}' no resolvió a ninguna IP válida")
+    return public_ip
+
+
+def _host_resolves_to_private(host: str) -> bool:
+    """True si el host no resuelve o resuelve a alguna IP privada/interna.
+    Wrapper booleano sobre `_resolve_to_public_ip` (fuente única de la lógica).
+    """
+    try:
+        _resolve_to_public_ip(host)
+        return False
+    except HTTPException:
+        return True
 
 
 def _validate_ssrf_only(url: str) -> None:
@@ -4453,8 +4473,10 @@ def _validate_ssrf_only(url: str) -> None:
         raise HTTPException(403, f"Host '{host}' resuelve a IP privada/interna")
 
 
-def _validate_external_image_url(url: str) -> None:
-    """Anti-SSRF con whitelist de dominios. Eleva HTTPException si la URL no es segura."""
+def _validate_image_url_static(url: str) -> None:
+    """Checks estáticos anti-SSRF (scheme + host + puerto + allowlist), SIN
+    resolver DNS. Separado de la resolución para que el path de descarga
+    resuelva una sola vez y pinee esa IP (ver `_download_with_redirects`)."""
     from urllib.parse import urlparse as _urlparse
     if not url.lower().startswith(("http://", "https://")):
         raise HTTPException(400, "URL inválida — sólo http/https")
@@ -4471,20 +4493,104 @@ def _validate_external_image_url(url: str) -> None:
             f"Host no permitido para descarga: {host}. Si es un sitio "
             "legítimo, agregar a _ALLOWED_PHOTO_HOSTS.",
         )
+
+
+def _validate_external_image_url(url: str) -> None:
+    """Anti-SSRF con whitelist de dominios (checks estáticos + resolución DNS).
+    Eleva HTTPException si la URL no es segura. Para el path de descarga real
+    usar `_download_with_redirects`, que pinea la IP resuelta."""
+    _validate_image_url_static(url)
+    from urllib.parse import urlparse as _urlparse
+    host = (_urlparse(url).hostname or "").lower()
     if _host_resolves_to_private(host):
         raise HTTPException(403, f"Host '{host}' resuelve a IP privada/interna")
 
 
+def _http_get_pinned(
+    url: str, pinned_ip: str, headers: dict, timeout: float = 20.0,
+) -> tuple[int, dict, bytes]:
+    """GET de bajo nivel con la IP pineada: el TCP va a `pinned_ip`, pero el TLS
+    usa el hostname original como SNI (cert válido). NO sigue redirects.
+    Devuelve (status, headers_lower, body). Eleva HTTPException(502) en error de red.
+
+    Pinear la IP mata el DNS rebinding: la IP que se validó es exactamente la que
+    se conecta (no hay segunda resolución entre validar y conectar).
+    """
+    import http.client
+    import socket
+    import ssl
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    is_https = parsed.scheme == "https"
+    port = parsed.port or (443 if is_https else 80)
+    path = parsed.path or "/"
+    if parsed.query:
+        path += "?" + parsed.query
+
+    sock = None
+    try:
+        sock = socket.create_connection((pinned_ip, port), timeout=timeout)
+        if is_https:
+            ctx = ssl.create_default_context()
+            sock = ctx.wrap_socket(sock, server_hostname=host)  # SNI = hostname real
+        conn = http.client.HTTPConnection(host, port, timeout=timeout)
+        conn.sock = sock  # socket ya conectado (y con TLS) → no re-resuelve DNS
+        req_headers = dict(headers)
+        # http.client no descomprime; pedimos identity para leer el body crudo.
+        req_headers["Accept-Encoding"] = "identity"
+        req_headers.setdefault("Host", host)
+        conn.request("GET", path, headers=req_headers)
+        resp = conn.getresponse()
+        body = resp.read()
+        resp_headers = {k.lower(): v for k, v in resp.getheaders()}
+        return resp.status, resp_headers, body
+    except (OSError, ssl.SSLError, http.client.HTTPException):
+        raise HTTPException(502, "No se pudo descargar la imagen")
+    finally:
+        if sock is not None:
+            try:
+                sock.close()
+            except OSError:
+                pass
+
+
+def _download_with_redirects(
+    url: str, headers: dict, max_redirects: int = 3,
+) -> tuple[int, dict, bytes]:
+    """Descarga siguiendo hasta `max_redirects` saltos, RE-VALIDANDO cada salto
+    contra el guard (allowlist + IP pública) y pineando el DNS en cada uno.
+    Así un 302 → http://169.254.169.254/... o a la red interna queda bloqueado.
+    Devuelve (status, headers, body) del primer response no-redirect.
+    """
+    from urllib.parse import urlparse, urljoin
+
+    current = url
+    for _ in range(max_redirects + 1):
+        _validate_image_url_static(current)               # scheme + allowlist + puerto
+        host = (urlparse(current).hostname or "").lower()
+        pinned_ip = _resolve_to_public_ip(host)            # resuelve UNA vez → IP pineada
+        status, resp_headers, body = _http_get_pinned(current, pinned_ip, headers)
+        if status in (301, 302, 303, 307, 308):
+            location = resp_headers.get("location")
+            if not location:
+                raise HTTPException(502, "Redirect sin destino")
+            current = urljoin(current, location)           # resolver Location relativo
+            continue
+        return status, resp_headers, body
+    raise HTTPException(502, "Demasiados redirects")
+
+
 def _download_image_bytes(url: str) -> tuple[bytes, str]:
-    """Descarga una imagen externa con todos los fallbacks del proxy
-    (Referer del host, sin Referer, Referer=google, weserv).
+    """Descarga una imagen externa con DNS pineado + redirects re-validados.
+    Reintenta con distintos Referer si el origen responde 403 (anti-hotlink).
     Devuelve (bytes, content_type). Eleva HTTPException si no se pudo.
 
-    NOTA: el caller debe haber pasado `url` por `_validate_external_image_url`
-    antes (SSRF guard). Acá hacemos una validación final por las dudas.
+    Seguridad: TCP a la IP resuelta y validada (pin), TLS con SNI al hostname,
+    cada redirect re-validado contra el allowlist. Sin proxies de terceros.
     """
-    import httpx
-    from urllib.parse import urlparse, quote
+    from urllib.parse import urlparse
 
     _validate_external_image_url(url)
     host = (urlparse(url).hostname or "").lower()
@@ -4497,7 +4603,6 @@ def _download_image_bytes(url: str) -> tuple[bytes, str]:
             ),
             "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
-            "Accept-Encoding": "gzip, deflate, br",
             "Sec-Fetch-Dest": "image",
             "Sec-Fetch-Mode": "no-cors",
             "Sec-Fetch-Site": "cross-site",
@@ -4518,58 +4623,24 @@ def _download_image_bytes(url: str) -> tuple[bytes, str]:
         f"https://{host}/",
     )
 
+    # Reintentos de Referer ante 403 (hotlink protection). Los redirects y el
+    # pin de DNS los maneja `_download_with_redirects`. Un 403 del guard (IP
+    # privada / host no permitido) se eleva como excepción y corta el loop.
     last_status = None
-    last_body = b""
-    r = None
-    try:
-        with httpx.Client(timeout=20.0, follow_redirects=True, http2=False, max_redirects=3) as client:
-            r = client.get(url, headers=_headers(primary_referer))
-            last_status, last_body = r.status_code, r.content
-            if r.status_code == 403:
-                r2 = client.get(url, headers=_headers(None))
-                if r2.status_code == 200:
-                    r = r2
-                else:
-                    last_status, last_body = r2.status_code, r2.content
-            if r.status_code == 403:
-                r3 = client.get(url, headers=_headers("https://www.google.com/"))
-                if r3.status_code == 200:
-                    r = r3
-                else:
-                    last_status, last_body = r3.status_code, r3.content
-            if r.status_code in (401, 403, 404, 429) or r.status_code >= 500:
-                stripped = url.split("://", 1)[1] if "://" in url else url
-                weserv_url = f"https://images.weserv.nl/?url={quote(stripped, safe='')}"
-                r4 = client.get(weserv_url, headers={
-                    "User-Agent": "Mozilla/5.0",
-                    "Accept": "image/*,*/*;q=0.8",
-                })
-                if r4.status_code == 200 and r4.headers.get("content-type", "").startswith("image/"):
-                    r = r4
-                else:
-                    last_status, last_body = r4.status_code, r4.content
-    except httpx.HTTPError as e:
-        raise HTTPException(502, f"No se pudo descargar la imagen: {e}")
+    for referer in (primary_referer, None, "https://www.google.com/"):
+        status, resp_headers, body = _download_with_redirects(url, _headers(referer))
+        last_status = status
+        if status == 200:
+            ctype = resp_headers.get("content-type", "image/jpeg")
+            if not ctype.lower().startswith("image/"):
+                raise HTTPException(415, f"La URL no devolvió una imagen ({ctype})")
+            if len(body) < 1024:
+                raise HTTPException(415, f"Imagen muy chica ({len(body)} bytes)")
+            return body, ctype
+        if status != 403:
+            break  # solo reintentamos Referer ante 403
 
-    if r is None or r.status_code != 200:
-        snippet = ""
-        try:
-            snippet = last_body[:200].decode("utf-8", errors="ignore")
-        except Exception:
-            pass
-        raise HTTPException(
-            502,
-            f"Origen devolvió {last_status} para host {host}. {snippet}".strip(),
-        )
-
-    ctype = r.headers.get("content-type", "image/jpeg")
-    if not ctype.startswith("image/"):
-        raise HTTPException(415, f"La URL no devolvió una imagen ({ctype})")
-
-    if len(r.content) < 1024:
-        raise HTTPException(415, f"Imagen muy chica ({len(r.content)} bytes)")
-
-    return r.content, ctype
+    raise HTTPException(502, f"No se pudo descargar la imagen (error {last_status})")
 
 
 def _ext_from_ctype(ct: str) -> str:
@@ -4821,7 +4892,6 @@ def _upload_to_supabase_storage(path: str, content: bytes, content_type: str) ->
 
 class UploadFotoFromUrlInput(BaseModel):
     url: str
-    bypass_whitelist: bool = False
 
 
 @router.post("/admin/equipos/{equipo_id}/upload-foto-from-url")
@@ -4846,11 +4916,10 @@ def admin_upload_foto_from_url(
     if cfg_pub and url.startswith(cfg_pub + "/"):
         return {"public_url": url, "path": None, "skipped": True}
 
-    # SSRF guard: validar host antes de descargar.
-    if payload.bypass_whitelist:
-        _validate_ssrf_only(url)
-    else:
-        _validate_external_image_url(url)
+    # SSRF guard: el host debe estar en el allowlist y resolver a IP pública.
+    # (No hay bypass: para un dominio legítimo nuevo, agregarlo a
+    # _ALLOWED_PHOTO_HOSTS — la foto siempre termina sirviéndose desde R2.)
+    _validate_external_image_url(url)
 
     raw_content, raw_ctype = _download_image_bytes(url)
     # Optimización: resize a max 1600px + WebP q=85

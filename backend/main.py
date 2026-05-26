@@ -15,8 +15,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 # Configurar logging ANTES de importar cualquier módulo del proyecto
@@ -64,16 +63,9 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Rambla Rental API", version="2.0")
 
 # ── Rate limiting (#58) ──────────────────────────────────────────────────────
-# In-memory: sirve para 1 instancia de Railway. Si se escala a multi-instancia
-# o se agrega Redis, cambiar storage_uri a "redis://..." (slowapi lo soporta).
-#
-# Defaults: 200 requests/minuto por IP. Endpoints sensibles (auth, cotización)
-# tienen rate más estricto via @limiter.limit("...") en cada handler.
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["200/minute"],
-    headers_enabled=True,  # devuelve X-RateLimit-* en cada response
-)
+# El limiter vive en `rate_limit.py` (compartido con los routers que usan
+# @limiter.limit en handlers sensibles, sin ciclos de import).
+from rate_limit import limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

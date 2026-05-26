@@ -309,7 +309,7 @@ export function useAutocompletar({
       const response = await authedFetch(`/api/admin/equipos/${equipoId}/upload-foto-from-url`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: externalUrl, bypass_whitelist: true }),
+        body: JSON.stringify({ url: externalUrl }),
       });
       if (!response.ok) {
         const detail = await response.json().catch(() => ({}));
