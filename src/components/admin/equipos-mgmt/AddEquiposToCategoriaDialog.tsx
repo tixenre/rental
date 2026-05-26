@@ -46,7 +46,7 @@ export function AddEquiposToCategoriaDialog({
     enabled: open,
   });
 
-  const items = equiposQ.data?.items ?? [];
+  const items = useMemo(() => equiposQ.data?.items ?? [], [equiposQ.data?.items]);
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return items;

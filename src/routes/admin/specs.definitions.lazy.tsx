@@ -78,6 +78,20 @@ const TIPO_LABEL: Record<SpecTipo, string> = {
   tabla: "Tabla (columnas configurables)",
 };
 
+// Agrupación por dominio (primer segmento del spec_key antes del primer "_").
+// Constante de módulo (estable) → no necesita entrar en deps de useMemo.
+const DOMAIN_LABELS: Record<string, string> = {
+  camara: "Cámara",
+  lente: "Lente",
+  video: "Video",
+  audio: "Audio",
+  bateria: "Batería",
+  modificador: "Modificador / Iluminación",
+  stand: "Stand / Trípode",
+  filtro: "Filtro",
+  signal: "Routing de señal",
+};
+
 function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) {
   useDocumentTitle("Specs · Back Office");
   const qc = useQueryClient();
@@ -152,7 +166,7 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
     },
   });
 
-  const allItems = listQ.data?.items ?? [];
+  const allItems = useMemo(() => listQ.data?.items ?? [], [listQ.data?.items]);
 
   // Universo base sobre el que se calculan chips y filtros: si solo validadas
   // está activo, los chips también muestran counts de validadas solamente.
@@ -193,21 +207,9 @@ function SpecDefinitionsPage({ embedded = false }: { embedded?: boolean } = {}) 
 
   const validadasTotal = allItems.filter((d) => d.validado).length;
 
-  // Agrupar por dominio (primer segmento del spec_key antes del primer "_").
-  // Specs sin "_" o con segmento muy genérico van a "General". Esto encaja con
-  // la convención de naming <dominio>_<atributo> (camara_montura, lente_apertura,
-  // video_out, bateria_capacidad, etc.).
-  const DOMAIN_LABELS: Record<string, string> = {
-    camara: "Cámara",
-    lente: "Lente",
-    video: "Video",
-    audio: "Audio",
-    bateria: "Batería",
-    modificador: "Modificador / Iluminación",
-    stand: "Stand / Trípode",
-    filtro: "Filtro",
-    signal: "Routing de señal",
-  };
+  // Agrupar por dominio: ver DOMAIN_LABELS (constante de módulo). Specs sin "_"
+  // o con segmento genérico van a "General"; encaja con el naming
+  // <dominio>_<atributo> (camara_montura, lente_apertura, video_out, etc.).
   const grupos = useMemo(() => {
     const map = new Map<string, typeof items>();
     for (const def of items) {
@@ -1355,7 +1357,7 @@ function UnidadesPicker({
     queryFn: () => adminApi.listUnidades(),
     staleTime: 60_000,
   });
-  const unidades: Unidad[] = unidadesQ.data?.items ?? [];
+  const unidades: Unidad[] = useMemo(() => unidadesQ.data?.items ?? [], [unidadesQ.data?.items]);
   const selectedSet = new Set(selected);
 
   // Agrupar por dimensión para que el dueño encuentre rápido.

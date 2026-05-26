@@ -73,7 +73,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { adminApi, type MarcaAdmin } from "@/lib/admin/api";
-import { InlineSvg, isSvgUrl } from "@/components/ui/InlineSvg";
+import { InlineSvg } from "@/components/ui/InlineSvg";
+import { isSvgUrl } from "@/components/ui/inline-svg-utils";
 
 export function MarcasSection() {
   const qc = useQueryClient();
@@ -139,7 +140,7 @@ export function MarcasSection() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const allMarcas = listQ.data?.items ?? [];
+  const allMarcas = useMemo(() => listQ.data?.items ?? [], [listQ.data?.items]);
 
   // ── Detección de duplicadas (intacta vs versión anterior) ──────────────
   const duplicateGroups = useMemo(() => {

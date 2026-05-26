@@ -56,7 +56,7 @@ function UnidadesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const items = listQ.data?.items ?? [];
+  const items = useMemo(() => listQ.data?.items ?? [], [listQ.data?.items]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
