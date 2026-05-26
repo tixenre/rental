@@ -163,9 +163,7 @@ def test_cobertura_real_iluminacion():
 
 
 def _get_normalize_label():
-    """Importa _normalize_label desde routes/equipos si las deps están disponibles."""
-    fastapi = pytest.importorskip("fastapi", reason="fastapi no instalado en este entorno")
-    from routes.equipos import _normalize_label
+    from services.generic_html_extractor import _normalize_label
     return _normalize_label
 
 
