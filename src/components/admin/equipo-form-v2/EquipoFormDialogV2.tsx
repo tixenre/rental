@@ -584,25 +584,40 @@ export function EquipoFormDialogV2({
       if (r.formato) propuestos.unshift(newSpec("Formato", r.formato));
       if (r.resolucion) propuestos.unshift(newSpec("Resolución", r.resolucion));
 
-      // Auto-aplicar los propuestos que matchean con el template del equipo
-      // (label normalizado): el usuario no debería tener que clickear ✓ uno
-      // por uno cuando ya hay un campo definido para ese spec. Solo quedan
-      // como "propuestos pendientes" los que NO matchean — esos sí necesitan
-      // decisión (¿agregar al catálogo? ¿ignorar?). El backend obliga al
-      // LLM a usar el label canónico del template via enum en el JSON
-      // schema, así el match acá es por igualdad simple.
-      const tmplLabels = new Set((templateItems ?? []).map((t) => t.label.trim().toLowerCase()));
-      const autoAplicables = propuestos.filter((p) => tmplLabels.has(p.label.trim().toLowerCase()));
-      const requierenRevision = propuestos.filter(
-        (p) => !tmplLabels.has(p.label.trim().toLowerCase()),
-      );
+      // Auto-aplicar los propuestos que matchean con el template del equipo.
+      // Matcheo por spec_key primero (exacto, sin ambigüedad), label como
+      // fallback para propuestos sin spec_key (ej. montura/formato/resolucion
+      // agregados arriba). Specs sin template match van a "propuestos pendientes"
+      // — nunca se descartan silenciosamente.
+      const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+      const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+      for (const t of templateItems ?? []) {
+        if (t.spec_key) tmplByKey.set(t.spec_key, t);
+        if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
+      }
+      const findTmpl = (p: Spec) =>
+        (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
+        tmplByLabel.get(p.label.trim().toLowerCase());
+
+      const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
+      const requierenRevision = propuestos.filter((p) => !findTmpl(p));
       if (autoAplicables.length > 0) {
         setSpecs((prev) => {
           const next = [...prev];
           for (const p of autoAplicables) {
-            const idx = next.findIndex((x) => sameLabel(x.label, p.label));
-            if (idx >= 0) next[idx] = { ...next[idx], value: p.value };
-            else next.push(newSpec(p.label, p.value));
+            const tmpl = findTmpl(p)!;
+            const targetId = `spec-${tmpl.spec_def_id}`;
+            const idx = next.findIndex(
+              (x) =>
+                x.id === targetId ||
+                x.id === `tmpl-${tmpl.spec_def_id}` ||
+                sameLabel(x.label, tmpl.label),
+            );
+            if (idx >= 0) {
+              next[idx] = { ...next[idx], value: p.value };
+            } else {
+              next.push({ id: targetId, label: tmpl.label, value: p.value, spec_key: p.spec_key });
+            }
           }
           return next;
         });
@@ -1403,13 +1418,47 @@ export function EquipoFormDialogV2({
             onChange={setSpecs}
             onAceptarPropuesto={(s) => {
               setSpecs((prev) => {
+                // Buscar template por spec_key primero, label como fallback.
+                const byKey = new Map<string, import("@/lib/admin/api").SpecTemplate>(
+                  (templateItems ?? []).filter((t) => t.spec_key).map((t) => [t.spec_key, t]),
+                );
+                const byLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>(
+                  (templateItems ?? [])
+                    .filter((t) => t.label?.trim())
+                    .map((t) => [t.label.trim().toLowerCase(), t]),
+                );
+                const tmpl =
+                  (s.spec_key ? byKey.get(s.spec_key) : undefined) ??
+                  byLabel.get(s.label.trim().toLowerCase());
+                if (tmpl) {
+                  const targetId = `spec-${tmpl.spec_def_id}`;
+                  const next = [...prev];
+                  const idx = next.findIndex(
+                    (x) =>
+                      x.id === targetId ||
+                      x.id === `tmpl-${tmpl.spec_def_id}` ||
+                      sameLabel(x.label, tmpl.label),
+                  );
+                  if (idx >= 0) {
+                    next[idx] = { ...next[idx], value: s.value };
+                  } else {
+                    next.push({
+                      id: targetId,
+                      label: tmpl.label,
+                      value: s.value,
+                      spec_key: s.spec_key,
+                    });
+                  }
+                  return next;
+                }
+                // Sin template match: spec custom con UUID id.
                 const idx = prev.findIndex((x) => sameLabel(x.label, s.label));
                 if (idx >= 0) {
                   const next = [...prev];
                   next[idx] = { ...next[idx], value: s.value };
                   return next;
                 }
-                return [...prev, newSpec(s.label, s.value)];
+                return [...prev, newSpec(s.label, s.value, s.spec_key)];
               });
               setSpecsPropuestos((prev) => prev.filter((x) => x.id !== s.id));
             }}

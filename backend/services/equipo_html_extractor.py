@@ -146,81 +146,18 @@ def _jsonld_url(html_content: str) -> str | None:
     return None
 
 
-# ── Adapter común: convierte specs dict → array [{label, value}] ────────
+# ── Adapter común: convierte specs dict → array [{spec_key, label, value}] ──
 
-# Labels canónicos por spec_key (en español, lo que se muestra en el form).
-# Las claves son las que emiten los parsers de tools/. Si una clave no figura
-# acá, se usa el spec_key tal cual (capitalizado) en la UI. Para metadata
-# canónica completa (tipo, enum, unidad), `backend/specs/registry.py`.
-_SPEC_LABELS: dict[str, str] = {
-    # Cámaras
-    "camera_subtipo": "Tipo",
-    "lens_mount": "Lens mount",
-    "formato": "Formato",
-    "resolucion_max": "Resolución máxima",
-    "fps_max": "FPS máx",
-    "megapixels": "Megapixels",
-    "codecs": "Codecs",
-    "iso_nativo": "ISO nativo",
-    "iso_extendido": "ISO extendido",
-    "rango_dinamico_stops": "Rango dinámico",
-    "estabilizacion": "Estabilización óptica",
-    "autofocus": "Autofocus",
-    "fast_slow_motion": "Fast/Slow motion",
-    "lens_communication": "Comunicación electrónica lente",
-    "gps": "GPS",
-    "ip_streaming": "IP Streaming",
-    "netflix_approved": "Netflix approved",
-    "continuous_shooting_fps": "Ráfaga (stills)",
-    "max_aperture": "Apertura máxima (fixed-lens)",
-    "sensor_crop": "Sensor crop (35mm eq.)",
-    "recording_limit_min": "Límite de grabación",
-    "peso_g": "Peso",
-    # Lentes
-    "distancia_focal": "Distancia focal",
-    "apertura": "Apertura",
-    "diametro_filtro": "Diámetro de filtro",
-    "linea": "Línea",
-    "angulo_vision": "Ángulo de visión",
-    "distancia_minima_m": "Distancia mínima de foco",
-    "magnificacion": "Magnificación",
-    "hojas_diafragma": "Hojas de diafragma",
-    "construccion_optica": "Construcción óptica",
-    "dimensiones": "Dimensiones",
-    # Adaptadores
-    "adaptador_subtipo": "Tipo",
-    "lens_mount_out": "Lens mount — lado lente",
-    "electronica": "Comunicación electrónica",
-    "incluye_iris": "Iris incluido",
-    # Filtros
-    "filtro_subtipo": "Tipo",
-    "densidad": "Densidad ND",
-    "material": "Material",
-    "grade": "Grado",
-    # Iluminación
-    "iluminacion_subtipo": "Tipo",
-    "potencia_w": "Potencia",
-    "lumens_at_5600k": "Lúmenes (5600K)",
-    "lumens_at_3200k": "Lúmenes (3200K)",
-    "cri": "CRI",
-    "tlci": "TLCI",
-    "r9": "R9",
-    "temperatura_k": "Temperatura color",
-    "color_modes": "Modos de color",
-    "bicolor": "Bicolor",
-    "rgb": "RGB",
-    "dimming": "Dimmer",
-    "control_inalambrico": "Control inalámbrico",
-    "alimentacion": "Alimentación",
-    "montaje": "Montaje",
-}
+def _specs_dict_to_array(specs_dict: dict, registry_labels: dict | None = None) -> list[dict]:
+    """Convierte {spec_key: value} → [{spec_key, label, value}] para el form admin.
 
-
-def _specs_dict_to_array(specs_dict: dict) -> list[dict]:
-    """Convierte {spec_key: value} → [{label, value}] para el form admin."""
+    El label viene del registry (fuente única de verdad). Si la key no tiene
+    entry en registry_labels, se usa la key limpia como fallback — nunca se
+    descarta un item.
+    """
     out = []
     for key, value in specs_dict.items():
-        label = _SPEC_LABELS.get(key, key)
+        label = (registry_labels or {}).get(key) or key.replace("_", " ").title()
         if isinstance(value, bool):
             val_str = "Sí" if value else "No"
         elif isinstance(value, list):
@@ -248,7 +185,7 @@ def _specs_dict_to_array(specs_dict: dict) -> list[dict]:
             val_str = f"{value}{unit}"
         else:
             val_str = str(value)
-        out.append({"label": label, "value": val_str})
+        out.append({"spec_key": key, "label": label, "value": val_str})
     return out
 
 
@@ -403,17 +340,19 @@ def _build_result(*, marca: str, modelo: str, specs: dict, extras: dict,
     # generan propuestas-basura por datos sin spec. El bucket curado gana en
     # caso de colisión de key.
     specs_para_persistir = dict(specs)
+    registry_labels: dict[str, str] = {}
     try:
         from specs import REGISTRY  # import local: evita ciclos al boot
         cat_reg = REGISTRY.get(categoria_sugerida)
         if cat_reg:
-            registry_keys = {s.key for s in cat_reg.specs}
+            registry_labels = {s.key: s.label for s in cat_reg.specs}
+            registry_keys = set(registry_labels)
             for k, v in (extras or {}).items():
                 if k in registry_keys and k not in specs_para_persistir:
                     specs_para_persistir[k] = v
     except Exception as exc:
         logger.warning("extras wiring: no se pudo promover extras para '%s': %s", categoria_sugerida, exc)
-    specs_array = _specs_dict_to_array(specs_para_persistir)
+    specs_array = _specs_dict_to_array(specs_para_persistir, registry_labels=registry_labels)
     keywords = compute_keywords(specs)
 
     # Campos derivados para AutocompletarResult (ficha extendida)

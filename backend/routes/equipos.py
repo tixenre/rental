@@ -4072,9 +4072,10 @@ class AplicarEnriquecimientoInput(BaseModel):
 #      existe, spec_nueva si no).
 
 def _normalize_label(s: str) -> str:
-    """Para matching: lowercase, sin espacios extra, sin paréntesis finales."""
+    """Para matching: lowercase, _ ↔ espacio, sin espacios extra, sin paréntesis finales."""
     import re
     s = s.lower().strip()
+    s = s.replace("_", " ")                   # "lens_mount" ≡ "lens mount"
     s = re.sub(r"\s*\([^)]*\)\s*$", "", s)   # "Peso (g)" → "peso"
     s = re.sub(r"\s+", " ", s)
     return s

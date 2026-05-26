@@ -3,16 +3,17 @@
  * Compartidos entre EquipoFormDialogV2 y SpecsDiffEditor (#207).
  */
 
-export type Spec = { id: string; label: string; value: string };
+export type Spec = { id: string; label: string; value: string; spec_key?: string };
 
-export const newSpec = (label = "", value = ""): Spec => ({
+export const newSpec = (label = "", value = "", spec_key?: string): Spec => ({
   id: crypto.randomUUID(),
   label,
   value,
+  ...(spec_key ? { spec_key } : {}),
 });
 
-export const withIds = (raw: Array<{ label: string; value: string }>): Spec[] =>
-  raw.map((s) => newSpec(s.label, s.value));
+export const withIds = (raw: Array<{ label: string; value: string; spec_key?: string }>): Spec[] =>
+  raw.map((s) => newSpec(s.label, s.value, s.spec_key));
 
 export const sameLabel = (a: string, b: string) =>
   a.trim().toLowerCase() === b.trim().toLowerCase();

@@ -1,0 +1,217 @@
+"""Tests de Fase 1: spec_key end-to-end en el pipeline de normalización.
+
+Verifica:
+- _specs_dict_to_array produce {spec_key, label, value} por item.
+- Label viene del registry (fuente única) — no de _SPEC_LABELS borrado.
+- lens_mount → label "Montura" para Cámaras (antes era "Lens mount" divergente).
+- Specs sin registry_labels reciben fallback label (nunca se descartan).
+- Cobertura: qué spec_keys del registry emite _build_result por categoría.
+- _normalize_label del companion unifica _ ↔ espacio.
+"""
+
+import pytest
+from pathlib import Path
+
+pytestmark = pytest.mark.unit
+
+from services.equipo_html_extractor import _specs_dict_to_array, _build_result
+
+
+FIXTURES = Path(__file__).parent / "fixtures" / "html"
+
+
+# ── _specs_dict_to_array ────────────────────────────────────────────────────
+
+
+def test_specs_dict_incluye_spec_key():
+    result = _specs_dict_to_array({"lens_mount": "E", "fps_max": 120})
+    keys = {item["spec_key"] for item in result}
+    assert "lens_mount" in keys
+    assert "fps_max" in keys
+
+
+def test_specs_dict_item_tiene_tres_campos():
+    result = _specs_dict_to_array({"lens_mount": "E"})
+    item = result[0]
+    assert "spec_key" in item
+    assert "label" in item
+    assert "value" in item
+
+
+def test_specs_dict_fallback_label_sin_registry():
+    # Sin registry_labels, el label es la key limpia (title-case) — no se descarta.
+    result = _specs_dict_to_array({"lens_mount": "E"})
+    item = next(x for x in result if x["spec_key"] == "lens_mount")
+    assert item["label"]  # no vacío
+    assert item["value"] == "E"
+
+
+def test_specs_dict_label_de_registry_labels():
+    registry_labels = {"lens_mount": "Montura", "fps_max": "FPS máx"}
+    result = _specs_dict_to_array({"lens_mount": "E", "fps_max": 120}, registry_labels=registry_labels)
+    by_key = {item["spec_key"]: item for item in result}
+    assert by_key["lens_mount"]["label"] == "Montura"
+    assert by_key["fps_max"]["label"] == "FPS máx"
+
+
+def test_zero_descartes_spec_key_desconocido():
+    # Una key que no existe en registry_labels igual aparece en la salida.
+    registry_labels = {"lens_mount": "Montura"}
+    result = _specs_dict_to_array(
+        {"lens_mount": "E", "unknown_future_key": "valor"}, registry_labels=registry_labels
+    )
+    keys = {item["spec_key"] for item in result}
+    assert "unknown_future_key" in keys, "spec desconocida no debe descartarse"
+
+
+# ── _build_result — label sale del registry ─────────────────────────────────
+
+
+def test_lens_mount_label_montura_para_camaras():
+    """Caso testigo principal: lens_mount → label "Montura" (del registry), no "Lens mount"."""
+    r = _build_result(
+        marca="Sony", modelo="FX6",
+        specs={"lens_mount": "E", "camera_subtipo": "Cinema Camera"},
+        extras={},
+        image=None, url="http://x", title="Sony FX6 Cinema Camera",
+        secciones={}, categoria_sugerida="Cámaras",
+    )
+    by_key = {item["spec_key"]: item for item in r["specs"]}
+    assert "lens_mount" in by_key, "lens_mount debe aparecer en specs"
+    assert by_key["lens_mount"]["label"] == "Montura", (
+        f"label esperado 'Montura', obtenido '{by_key['lens_mount']['label']}'"
+    )
+
+
+def test_todos_los_items_tienen_spec_key():
+    """Invariante: ningún item de specs puede carecer de spec_key."""
+    r = _build_result(
+        marca="Sony", modelo="FX6",
+        specs={"lens_mount": "E", "fps_max": 120, "resolucion_max": "4K"},
+        extras={"white_balance": "Auto"},
+        image=None, url="http://x", title="Sony FX6",
+        secciones={}, categoria_sugerida="Cámaras",
+    )
+    for item in r["specs"]:
+        assert "spec_key" in item and item["spec_key"], (
+            f"item sin spec_key: {item}"
+        )
+
+
+# ── Cobertura por categoría ─────────────────────────────────────────────────
+
+
+def _cobertura(categoria: str, specs_dict: dict) -> dict:
+    """Retorna {cubiertas: set, faltantes: set} contra el registry."""
+    from specs import REGISTRY
+    cat = REGISTRY.get(categoria)
+    registry_keys = {s.key for s in cat.specs} if cat else set()
+    r = _build_result(
+        marca="X", modelo="Y", specs=specs_dict, extras={},
+        image=None, url="http://x", title="X Y",
+        secciones={}, categoria_sugerida=categoria,
+    )
+    emitidas = {item["spec_key"] for item in r["specs"]}
+    return {"cubiertas": emitidas & registry_keys, "faltantes": registry_keys - emitidas}
+
+
+def test_cobertura_camaras():
+    from specs import REGISTRY
+    cat = REGISTRY.get("Cámaras")
+    all_keys = {s.key for s in cat.specs}
+    # Alimentamos TODOS los keys del registry para verificar cobertura máxima.
+    specs_dict = {k: "test_value" for k in all_keys}
+    cob = _cobertura("Cámaras", specs_dict)
+    assert cob["cubiertas"] == all_keys, (
+        f"Faltantes en cobertura Cámaras: {cob['faltantes']}"
+    )
+
+
+def test_cobertura_lentes():
+    from specs import REGISTRY
+    cat = REGISTRY.get("Lentes")
+    all_keys = {s.key for s in cat.specs}
+    specs_dict = {k: "test_value" for k in all_keys}
+    cob = _cobertura("Lentes", specs_dict)
+    assert cob["cubiertas"] == all_keys, (
+        f"Faltantes en cobertura Lentes: {cob['faltantes']}"
+    )
+
+
+def test_cobertura_iluminacion():
+    from specs import REGISTRY
+    cat = REGISTRY.get("Iluminación")
+    all_keys = {s.key for s in cat.specs}
+    specs_dict = {k: "test_value" for k in all_keys}
+    cob = _cobertura("Iluminación", specs_dict)
+    assert cob["cubiertas"] == all_keys, (
+        f"Faltantes en cobertura Iluminación: {cob['faltantes']}"
+    )
+
+
+# ── _normalize_label del companion (unifica _ ↔ espacio) ───────────────────
+
+
+def _get_normalize_label():
+    """Importa _normalize_label desde routes/equipos si las deps están disponibles."""
+    fastapi = pytest.importorskip("fastapi", reason="fastapi no instalado en este entorno")
+    from routes.equipos import _normalize_label
+    return _normalize_label
+
+
+def test_normalize_label_unifica_guion_y_espacio():
+    _normalize_label = _get_normalize_label()
+    assert _normalize_label("lens_mount") == _normalize_label("lens mount")
+    assert _normalize_label("potencia_w") == _normalize_label("potencia w")
+
+
+def test_normalize_label_sin_parentesis():
+    _normalize_label = _get_normalize_label()
+    assert _normalize_label("Peso (g)") == "peso"
+    assert _normalize_label("Peso_g") == "peso g"
+
+
+# ── Tests de integración con HTML mínimo ───────────────────────────────────
+
+
+def _load_fixture(name: str) -> str:
+    return (FIXTURES / name).read_text(encoding="utf-8")
+
+
+def test_extract_camara_specs_tienen_spec_key():
+    from services.equipo_html_extractor import extract_from_html
+    html = _load_fixture("camara_minimal.html")
+    r = extract_from_html(html)
+    assert r["specs"], "debe extraer al menos un spec"
+    for item in r["specs"]:
+        assert "spec_key" in item and item["spec_key"], f"item sin spec_key: {item}"
+
+
+def test_extract_lente_specs_tienen_spec_key():
+    from services.equipo_html_extractor import extract_from_html
+    html = _load_fixture("lente_minimal.html")
+    r = extract_from_html(html)
+    assert r["specs"], "debe extraer al menos un spec"
+    for item in r["specs"]:
+        assert "spec_key" in item and item["spec_key"], f"item sin spec_key: {item}"
+
+
+def test_extract_luz_specs_tienen_spec_key():
+    from services.equipo_html_extractor import extract_from_html
+    html = _load_fixture("luz_minimal.html")
+    r = extract_from_html(html)
+    assert r["specs"], "debe extraer al menos un spec"
+    for item in r["specs"]:
+        assert "spec_key" in item and item["spec_key"], f"item sin spec_key: {item}"
+
+
+def test_extract_camara_lens_mount_label_canonico():
+    """lens_mount extraído de fixture HTML → label canónico del registry, no "Lens mount"."""
+    from services.equipo_html_extractor import extract_from_html
+    html = _load_fixture("camara_minimal.html")
+    r = extract_from_html(html)
+    by_key = {item["spec_key"]: item for item in r["specs"]}
+    if "lens_mount" in by_key:
+        assert by_key["lens_mount"]["label"] == "Montura", (
+            f"label esperado 'Montura', obtenido '{by_key['lens_mount']['label']}'"
+        )

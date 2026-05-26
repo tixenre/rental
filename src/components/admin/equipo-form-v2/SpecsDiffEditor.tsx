@@ -77,11 +77,15 @@ export function SpecsDiffEditor({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // Lookup case-insensitive del template por label.
+  // Lookup del template por spec_key (exacto) y por label (fallback).
+  const tmplByKey = new Map<string, SpecTemplate>();
   const tmplByLabel = new Map<string, SpecTemplate>();
   for (const t of templateItems ?? []) {
+    if (t.spec_key) tmplByKey.set(t.spec_key, t);
     if (t.label?.trim()) tmplByLabel.set(lower(t.label), t);
   }
+  const findTmplForPropuesto = (s: Spec): SpecTemplate | undefined =>
+    (s.spec_key ? tmplByKey.get(s.spec_key) : undefined) ?? tmplByLabel.get(lower(s.label));
 
   // Particionar specs en "del template" y "custom".
   // El orden del template-bound viene de templateItems (prioridad ASC).
@@ -174,14 +178,23 @@ export function SpecsDiffEditor({
             del autocompletar
           </p>
           {propuestos.map((s) => {
-            const existing = specs.find((x) => sameLabel(x.label, s.label));
+            const tmpl = findTmplForPropuesto(s);
+            const displayLabel = tmpl?.label ?? s.label;
+            const existing = specs.find(
+              (x) => (s.spec_key && x.spec_key === s.spec_key) || sameLabel(x.label, displayLabel),
+            );
             return (
               <div key={s.id} className="flex items-center gap-1.5 text-xs">
                 <div className="flex-1 min-w-0">
-                  <span className="font-medium">{s.label}:</span> <span>{s.value}</span>
+                  <span className="font-medium">{displayLabel}:</span> <span>{s.value}</span>
                   {existing && existing.value !== s.value && (
                     <span className="ml-1 text-muted-foreground line-through">
                       {existing.value}
+                    </span>
+                  )}
+                  {!tmpl && (
+                    <span className="ml-1.5 text-[10px] text-muted-foreground italic">
+                      sin template
                     </span>
                   )}
                 </div>
