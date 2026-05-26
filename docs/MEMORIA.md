@@ -1,16 +1,22 @@
 # Memoria viva — Rambla Rental
 
 > **Decisiones de criterio + preferencias.** Curado (no exhaustivo): solo lo que tiene
-> consecuencia duradera o se repite. Append-only, fechado. **El supervisor lo lee y lo hace
-> cumplir** (caza contradicciones = drift).
+> consecuencia duradera o se repite. Fechado. **El supervisor lo lee y lo hace cumplir** (caza
+> contradicciones = drift) **y lo cura** (propone podar lo viejo/redundante).
+>
+> **Este doc = la verdad curada del presente, NO un log.** Se **edita y poda** para que quede
+> chico y vigente. El "append-only / nada se pierde" lo cumple el **historial de git** (inmutable);
+> acá vive solo lo que sigue valiendo hoy. Una decisión que se reemplaza se **actualiza o retira en
+> el lugar** (no se apilan contradicciones); su versión vieja queda en git. Ver decisión
+> *2026-05-26 — Curación de la memoria*.
 >
 > Las **decisiones de arquitectura fundacionales** viven en [`MANIFIESTO.md`](../MANIFIESTO.md) §6
 > (baseline congelado). Acá van las **nuevas**. El **trabajo pendiente** vive en GitHub Issues;
 > el **registro de cambios**, en el commit history.
 >
-> **Cómo se escribe acá:** la sesión agrega entradas **solo con aprobación explícita del dueño**.
-> El supervisor **propone** entradas pero no escribe. Cuando una decisión tiene fecha de
-> vencimiento, anotar el **disparador** que obliga a revisarla.
+> **Cómo se escribe acá:** la sesión agrega, **edita o poda** entradas **solo con aprobación
+> explícita del dueño**. El supervisor **propone** (agregar, retirar, fusionar) pero no escribe.
+> Cuando una decisión tiene fecha de vencimiento, anotar el **disparador** que obliga a revisarla.
 
 ---
 
@@ -66,6 +72,21 @@
 - **Pendiente (para que el aviso no se vuelva ruido permanente):** triagear los ~22 avisos, arreglar
   los bugs reales (sobre todo `exhaustive-deps`) y promover a bloqueante las reglas que valgan →
   issue de tracking **#476**.
+
+### 2026-05-26 — Curación de la memoria (no es append-only puro)
+- **Contexto:** el doc era "append-only", pero eso lo hace crecer indefinidamente y deja entradas
+  obsoletas escritas como si fueran ciertas. Caso testigo: la entrada de "minutos de Actions" quedó
+  falsa en horas (el repo volvió a público) y hubo que editarla en el lugar para no mentirle a una
+  sesión futura.
+- **Decisión:** `MEMORIA.md` es la **verdad curada del presente**, no un log. Se **edita y poda**
+  para que quede chico y vigente. El "nada se pierde" lo garantiza el **historial de git**
+  (inmutable) — ahí queda toda versión vieja. Una decisión reemplazada se **actualiza o retira en el
+  lugar** (con nota "reemplazada por X" si ayuda), en vez de apilar contradicciones.
+- **Quién cura:** el **supervisor** — además de cazar drift, en cada PR **propone** retirar entradas
+  cuyo disparador ⏰ ya se cumplió, fusionar redundantes, o podar lo que perdió consecuencia. El
+  supervisor **propone**; el dueño aprueba (la regla de "solo el dueño aprueba escrituras en
+  MEMORIA" no cambia, ahora cubre también editar y podar).
+- **Consecuencias:** la memoria se mantiene chica y verdadera; el log completo vive en git.
 
 ---
 
