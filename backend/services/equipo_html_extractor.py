@@ -18,10 +18,13 @@ Entrada principal:
 
 import html as html_lib
 import json
+import logging
 import re
 import sys
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # Importar parsers core desde tools/ (mismo código que el seed)
 _TOOLS_DIR = Path(__file__).parent.parent.parent / "tools"
@@ -394,7 +397,23 @@ def _build_result(*, marca: str, modelo: str, specs: dict, extras: dict,
                   image: str | None, url: str, title: str,
                   secciones: dict, categoria_sugerida: str) -> dict:
     """Estructura común AutocompletarResult con keywords canónicas."""
-    specs_array = _specs_dict_to_array(specs)
+    # La ficha técnica se nutre de specs (bucket curado) + extras (cola larga
+    # del parser). Sólo se promueven las keys de extras que correspondan a un
+    # spec del registry de la categoría — así nada parseado se pierde y no se
+    # generan propuestas-basura por datos sin spec. El bucket curado gana en
+    # caso de colisión de key.
+    specs_para_persistir = dict(specs)
+    try:
+        from specs import REGISTRY  # import local: evita ciclos al boot
+        cat_reg = REGISTRY.get(categoria_sugerida)
+        if cat_reg:
+            registry_keys = {s.key for s in cat_reg.specs}
+            for k, v in (extras or {}).items():
+                if k in registry_keys and k not in specs_para_persistir:
+                    specs_para_persistir[k] = v
+    except Exception as exc:
+        logger.warning("extras wiring: no se pudo promover extras para '%s': %s", categoria_sugerida, exc)
+    specs_array = _specs_dict_to_array(specs_para_persistir)
     keywords = compute_keywords(specs)
 
     # Campos derivados para AutocompletarResult (ficha extendida)
