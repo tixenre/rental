@@ -201,7 +201,7 @@ SPECS_ORDER = [
     "max_aperture", "sensor_crop",
     "built_in_nd", "built_in_cc", "internal_filter_holder",
     # Exposure / shutter
-    "shutter_type", "shutter_speed", "white_balance", "gamma_curve",
+    "shutter_type", "shutter_scan", "shutter_speed", "white_balance", "gamma_curve",
     # Display / audio
     "display_type", "built_in_microphone",
     "audio_io", "audio_recording",
@@ -219,23 +219,31 @@ SPECS_ORDER = [
 
 # ── Rescate de extras → specs (canonicalización) ────────────────────────
 
-def _parse_shutter_type(value) -> str | None:
-    """Mechanical+Electronic → 'Hybrid'; Global → 'Global Shutter'; etc."""
+def _parse_shutter_mechanism(value) -> str | None:
+    """Raw B&H shutter string → mecanismo: Mechanical / Electronic / Hybrid."""
     if not isinstance(value, str):
         return None
     s = value.lower()
     has_mech = "mechanical" in s
-    has_elec = "electronic" in s or "rolling" in s
+    has_elec = "electronic" in s
     if has_mech and has_elec:
         return "Hybrid"
-    if "global" in s:
-        return "Global Shutter"
     if has_mech:
         return "Mechanical"
-    if "rolling" in s:
-        return "Rolling Shutter"
     if has_elec:
         return "Electronic"
+    return None
+
+
+def _parse_shutter_scan(value) -> str | None:
+    """Raw B&H shutter/readout string → lectura del sensor: Global / Rolling Shutter."""
+    if not isinstance(value, str):
+        return None
+    s = value.lower()
+    if "global" in s:
+        return "Global Shutter"
+    if "rolling" in s:
+        return "Rolling Shutter"
     return None
 
 
@@ -366,11 +374,20 @@ def canonicalizar_specs(specs: dict, extras: dict) -> dict:
         if b is not None:
             out[dst] = b
 
-    # shutter_type → enum
-    if "shutter_type" not in out:
-        parsed = _parse_shutter_type(extras.get("shutter_type"))
-        if parsed:
-            out["shutter_type"] = parsed
+    # shutter_type / shutter_scan: mecanismo y readout son ortogonales.
+    # Un raw "Electronic/Rolling Shutter" puede poblar ambos.
+    for raw_key in ("shutter_type", "sensor_readout_raw"):
+        raw = extras.get(raw_key)
+        if not raw:
+            continue
+        if "shutter_type" not in out:
+            mech = _parse_shutter_mechanism(raw)
+            if mech:
+                out["shutter_type"] = mech
+        if "shutter_scan" not in out:
+            scan = _parse_shutter_scan(raw)
+            if scan:
+                out["shutter_scan"] = scan
 
     # focus_points: af_puntos → number
     if "focus_points" not in out:
@@ -431,7 +448,7 @@ EXTRAS_ORDER = [
     "time_code", "scanning_system", "signal_system", "system_frequency",
     "bit_depth", "aspect_ratio",
     # Exposure
-    "shutter_type", "shutter_speed", "shutter_modes",
+    "shutter_type", "shutter_scan", "sensor_readout_raw", "shutter_speed", "shutter_modes",
     "exposure_modes", "exposure_compensation",
     "metering_method", "metering_range",
     "bulb_mode", "self_timer",

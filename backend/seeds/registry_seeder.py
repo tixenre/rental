@@ -269,11 +269,73 @@ def seed_categoria_from_registry(
                 if _upsert_template(conn, raiz_id, sdid, spec, dry_run):
                     stats["asignaciones_creadas"] += 1
 
+    # 5) Purgar specs que ya no están en el registry (CASCADE limpia equipo_specs).
+    purge = purge_stale_specs(conn, categoria_raiz, dry_run=dry_run)
+    stats["specs_purgadas"] = purge["deleted"]
+
     return {
         "raiz_id": raiz_id,
         "subcat_ids": subcat_ids,
         "spec_def_ids": spec_def_ids,
         "stats": stats,
+        "purge": purge,
+    }
+
+
+def purge_stale_specs(conn, categoria_raiz: str, dry_run: bool = True) -> dict:
+    """Borra spec_definitions cuya (categoria_raiz_id, spec_key) ya no está en
+    el registry de esa categoría.
+
+    CASCADE en la DB limpia equipo_specs + categoria_spec_templates automáticamente.
+    dry_run=True (default): solo reporta las filas que borraría, sin borrar.
+
+    Returns:
+        {"to_delete": [spec_keys], "kept": N, "deleted": N, "dry_run": bool}
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    cat_reg: CategoriaRegistry | None = REGISTRY.get(categoria_raiz)
+    if cat_reg is None:
+        raise ValueError(f"Categoría '{categoria_raiz}' no está en el registry")
+
+    raiz_row = conn.execute(
+        "SELECT id FROM categorias WHERE nombre = %s", (categoria_raiz,)
+    ).fetchone()
+    if raiz_row is None:
+        return {"to_delete": [], "kept": 0, "deleted": 0, "dry_run": dry_run}
+
+    raiz_id = raiz_row["id"] if isinstance(raiz_row, dict) else raiz_row[0]
+
+    registry_keys = {s.key for s in cat_reg.specs}
+
+    db_rows = conn.execute(
+        "SELECT id, spec_key FROM spec_definitions WHERE categoria_raiz_id = %s",
+        (raiz_id,),
+    ).fetchall()
+
+    stale = [
+        (r["id"] if isinstance(r, dict) else r[0],
+         r["spec_key"] if isinstance(r, dict) else r[1])
+        for r in db_rows
+        if (r["spec_key"] if isinstance(r, dict) else r[1]) not in registry_keys
+    ]
+    kept = len(db_rows) - len(stale)
+
+    for sid, key in stale:
+        logger.info("purge_stale_specs [%s] %s '%s' (id=%s)", "DRY-RUN" if dry_run else "DELETE", categoria_raiz, key, sid)
+
+    if not dry_run and stale:
+        ids = [sid for sid, _ in stale]
+        conn.execute(
+            "DELETE FROM spec_definitions WHERE id = ANY(%s)", (ids,)
+        )
+
+    return {
+        "to_delete": [key for _, key in stale],
+        "kept": kept,
+        "deleted": 0 if dry_run else len(stale),
+        "dry_run": dry_run,
     }
 
 

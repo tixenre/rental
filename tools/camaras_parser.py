@@ -758,6 +758,7 @@ def map_camara_extras(secciones: dict, title: str = "") -> dict:
 
         # Exposure
         ("Shutter Type",          "shutter_type"),
+        ("Sensor Readout",        "sensor_readout_raw"),
         ("Shutter Speed",         "shutter_speed"),
         ("Shutter Modes",         "shutter_modes"),
         ("Exposure Modes",        "exposure_modes"),
