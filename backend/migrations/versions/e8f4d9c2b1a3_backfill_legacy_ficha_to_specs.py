@@ -90,6 +90,19 @@ def _convert_value(raw: str, conversor: str | None) -> str | None:
 
 def upgrade() -> None:
     conn = op.get_bind()
+
+    # Guard: en una DB limpia, init_db() ya crea equipo_fichas sin las columnas
+    # legacy (montura/formato/resolucion/peso/dimensiones/alimentacion) — fueron
+    # dropeadas en la migration siguiente (a1b3c5e7f9d2). Si no existen, no hay
+    # nada que backfillear (la DB está vacía) y saltamos la migración.
+    col_exists = conn.execute(sa.text("""
+        SELECT COUNT(*) FROM information_schema.columns
+        WHERE table_name = 'equipo_fichas' AND column_name = 'montura'
+    """)).scalar()
+    if not col_exists:
+        print("  backfill e8f4d9c2b1a3: columnas legacy ausentes — no-op")
+        return
+
     total_inserted = 0
 
     for legacy_col, spec_key, conversor in _MAPPINGS:
