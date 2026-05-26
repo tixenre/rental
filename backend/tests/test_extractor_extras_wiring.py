@@ -14,7 +14,8 @@ from services.equipo_html_extractor import _build_result
 
 
 def _labels(result: dict) -> set[str]:
-    return {s["label"] for s in result["specs"]}
+    # Después de Fase 1, los items llevan spec_key como campo canónico.
+    return {s["spec_key"] for s in result["specs"]}
 
 
 def test_extras_que_matchean_registry_se_promueven():
@@ -57,5 +58,5 @@ def test_bucket_curado_gana_en_colision():
         image=None, url="http://x", title="X Y",
         secciones={}, categoria_sugerida="Cámaras",
     )
-    vals = {s["label"]: s["value"] for s in r["specs"]}
+    vals = {s["spec_key"]: s["value"] for s in r["specs"]}
     assert vals["video_io"] == "curado"

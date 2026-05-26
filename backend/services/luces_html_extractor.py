@@ -193,30 +193,20 @@ def extract_from_html(html_content: str) -> dict:
     specs_dict = map_luz_specs(secciones, title=modelo)
     extras_dict = clean_extras(map_luz_extras(secciones, title=modelo))
 
-    # 6) Formato AutocompletarResult: specs como array [{label, value}]
-    # Los labels son los canónicos en español del proyecto
-    SPEC_LABELS = {
-        "tipo": "Tipo",
-        "potencia_w": "Potencia",
-        "lumens_at_5600k": "Lúmenes (5600K)",
-        "lumens_at_3200k": "Lúmenes (3200K)",
-        "cri": "CRI",
-        "tlci": "TLCI",
-        "r9": "R9",
-        "temperatura_k": "Temperatura color",
-        "color_modes": "Modos de color",
-        "bicolor": "Bicolor",
-        "rgb": "RGB",
-        "dimming": "Dimmer",
-        "control_inalambrico": "Control inalámbrico",
-        "alimentacion": "Alimentación",
-        "montaje": "Montaje",
-        "peso": "Peso",
-    }
+    # 6) Formato AutocompletarResult: specs como array [{spec_key, label, value}]
+    # Label sale del registry (fuente única). Fallback: key.replace("_"," ").title().
+    registry_labels: dict[str, str] = {}
+    try:
+        from specs import REGISTRY  # import local: evita ciclos
+        cat_reg = REGISTRY.get("Iluminación")
+        if cat_reg:
+            registry_labels = {s.key: s.label for s in cat_reg.specs}
+    except Exception:
+        pass
 
     specs_array = []
     for key, value in specs_dict.items():
-        label = SPEC_LABELS.get(key, key)
+        label = registry_labels.get(key) or key.replace("_", " ").title()
         # Serializar valor: bools y listas → string compacto
         if isinstance(value, bool):
             val_str = "Sí" if value else "No"
@@ -235,7 +225,7 @@ def extract_from_html(html_content: str) -> dict:
             val_str = f"{value}{unit}"
         else:
             val_str = str(value)
-        specs_array.append({"label": label, "value": val_str})
+        specs_array.append({"spec_key": key, "label": label, "value": val_str})
 
     # Peso lo agregamos como "390 g" (más legible) si está
     if "peso" in specs_dict and isinstance(specs_dict["peso"], (int, float)):

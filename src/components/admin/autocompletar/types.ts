@@ -9,7 +9,7 @@ export type AutocompletarResult = {
   modelo: string | null;
   nombre_normalizado: string;
   descripcion: string;
-  specs: { label: string; value: string }[];
+  specs: { label: string; value: string; spec_key?: string }[];
   keywords: string[];
   foto_url: string | null;
   /** Todas las URLs de foto que pasaron la validación. La primera es la elegida por defecto. */
