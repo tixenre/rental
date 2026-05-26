@@ -34,7 +34,7 @@
 > equipo, on-demand desde el form). Coexisten: el seed pone la base, autocompletar agrega ad-hoc o
 > re-enriquece.
 
-**Por qué un archivo por categoría (no unificado):** cada categoría tiene specs muy distintas (cámaras: `lens_mount`, `fps_max`; lentes: `distancia_focal`, `apertura`; luces: `potencia_w`, `color_modes`). Forzar un schema unificado pierde tipado fuerte. Per-categoría: cada archivo enfocado, pequeño, con su propio parser/seed/doc. Git history limpio. Escala bien (categoría nueva = archivo nuevo, no riesgo de romper las existentes).
+**Por qué un archivo por categoría (no unificado):** cada categoría tiene specs muy distintas (cámaras: `lens_mount`, `fps_max`; lentes: `distancia_focal`, `apertura`; luces: `consumo_w`, `color_modes`). Forzar un schema unificado pierde tipado fuerte. Per-categoría: cada archivo enfocado, pequeño, con su propio parser/seed/doc. Git history limpio. Escala bien (categoría nueva = archivo nuevo, no riesgo de romper las existentes).
 
 **Por qué el naming dropea `bh_`:** B&H es la fuente primaria pero no la única. ARRI y Mole vienen de sus sitios fabricante (vía WebFetch). Futuras categorías van a usar Adorama, screenshots manuales, PDFs, etc. El dataset es **agnóstico de fuente** — la fuente queda registrada en `url_source` y `_meta.fuentes` de cada producto.
 
@@ -48,7 +48,7 @@
 
 **Convenciones del dataset curado** (los 3 niveles por producto):
 
-- **`specs`**: campos canónicos para filtros/comparación. Todos numéricos o enum estrictos. Ej: `potencia_w: 410`, `temperatura_k: {min: 1800, max: 20000}`, `color_modes: ["RGB","Daylight","Tungsten"]`. Unidades en field name (`_w`, `_g`, `_k`).
+- **`specs`**: campos canónicos para filtros/comparación. Todos numéricos o enum estrictos. Ej: `consumo_w: 410`, `temperatura_k: {min: 1800, max: 20000}`, `color_modes: ["RGB","Daylight","Tungsten"]`. Unidades en field name (`_w`, `_g`, `_k`).
 - **`extras`**: ficha técnica detallada. Strings descriptivos + algunos numéricos estructurados (ej. `dimensiones_cm: {largo_cm, ancho_cm, alto_cm}`, `noise_db: {silent, medium, high}`).
 - **`ficha`**: raw del scrape (todas las secciones B&H tal cual). Para renderizar ficha técnica completa sin perder data.
 
@@ -78,7 +78,7 @@
 
 - **Equipos** (`/admin/equipos`) — lista admin, form `EquipoFormDialogV2`. Edita precio_jornada, foto_url, marca, modelo, nombre_publico, etc.
 - **Specs values por equipo** — en la sección Specs del form admin del equipo.
-- **Spec definitions globales** (`/admin/equipos/specs`) — catálogo de specs (potencia_w, cri, etc.). Edita label, enum_options, ayuda.
+- **Spec definitions globales** (`/admin/equipos/specs`) — catálogo de specs (consumo_w, cri, etc.). Edita label, enum_options, ayuda.
 - **Categorías** — admin las gestiona en la UI existente de categorías.
 
 **Quién edita qué (operativa diaria):**
@@ -178,7 +178,7 @@ DB value:           lumens_at_5600k = 19389 (int)
 
 ```python
 # a) String con {value} → interpolación directa
-"potencia_w":  "{value}W"               # 1000 → "1000W"
+"consumo_w":  "{value}W"               # 1000 → "1000W"
 
 # b) Dict short/long → variantes distintas
 "lumens_at_5600k": {
@@ -200,7 +200,7 @@ DB value:           lumens_at_5600k = 19389 (int)
 
 | Spec | short | long |
 |---|---|---|
-| `potencia_w` | `"1000W"` | idem |
+| `consumo_w` | `"1000W"` | idem |
 | `lumens_at_5600k` | `"19389 lumen"` | `"19389 lm a 5600K"` |
 | `lumens_at_3200k` | `"17000 lumen (tungsten)"` | `"17000 lm a 3200K"` |
 | `lux_at_1m_5600k` | `"11600 lux"` | `"11600 lux a 1m (5600K)"` |
@@ -339,7 +339,7 @@ DB Postgres
 | Lentes | 15 | — | lens_mount, distancia_focal (rango), apertura (rango), formato, linea, diametro_filtro |
 | Adaptadores | 7 | `adaptador_subtipo` | lens_mount, lens_mount_out, electronica, magnificacion |
 | Filtros | 6 | `filtro_subtipo` | diametro_filtro, densidad, material, grade |
-| Iluminación | 17 | `iluminacion_subtipo` | potencia_w, color_modes (multi_enum), temperatura_k (rango), cri, alimentacion (multi_enum) |
+| Iluminación | 17 | `iluminacion_subtipo` | consumo_w, color_modes (multi_enum), temperatura_k (rango), cri, alimentacion (multi_enum) |
 | Modificadores | 12 | `modificador_subtipo` | forma, diametro_cm, dimensions_mm, montura_luz, light_loss_stops, beam_angle, peso_g |
 
 **Specs compartidas semánticamente** (mismo `spec_key` declarado en varias cats con metadata idéntica):

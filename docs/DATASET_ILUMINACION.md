@@ -31,7 +31,7 @@ Archivos:
 | Campo | Tipo | Cobertura | Notas |
 |---|---|---|---|
 | `tipo` | enum | 100% | Flash / Bulb-Lamp / Panel / Tube Light / Flexible Mat / Monolight / COB Monolight / Fresnel |
-| `potencia_w` | int (W) | 94% | Falta solo en flash (usa Guide Number) |
+| `consumo_w` | int (W) | 94% | Falta solo en flash (usa Guide Number) |
 | `lumens_at_5600k` / `lumens_at_3200k` | int (lm) | 25% | Pocos fabricantes publican lúmenes totales |
 | `lux_at_1m_5600k` / `lux_at_1m_3200k` | int (lx) | 50% | Estándar cine. Más común que lumens en B&H |
 | `cri` | int (0-100) | 94% | Color Rendering Index |
@@ -170,7 +170,7 @@ todas las luces con un parser actualizado:
 INSERT INTO spec_definitions (spec_key, label, tipo, unidad, enum_options)
 VALUES
   ('tipo',           'Tipo',                'enum',       NULL, '["Flash","Panel","Monolight",...]'),
-  ('potencia_w',     'Potencia',            'number',     'W',  NULL),
+  ('consumo_w',      'Consumo eléctrico',   'number',     'W',  NULL),
   ('lumens_at_5600k','Lúmenes a 5600K',     'number',     'lm', NULL),
   ('cri',            'CRI',                 'number',     NULL, NULL),
   ('tlci',           'TLCI',                'number',     NULL, NULL),
@@ -184,7 +184,7 @@ VALUES
 INSERT INTO categoria_spec_templates (categoria_id, spec_def_id, prioridad, visible_en_card, visible_en_filtros, visible_en_nombre)
 VALUES
   (Iluminación, tipo,          10,  true, true, true),
-  (Iluminación, potencia_w,    20,  true, true, true),
+  (Iluminación, consumo_w,     20,  true, true, true),
   (Iluminación, cri,           30,  true, true, false),
   (Iluminación, temperatura_k, 40,  true, true, false),
   (Iluminación, color_modes,   50,  true, true, false),
@@ -193,7 +193,7 @@ VALUES
 -- equipo_specs (valores por equipo)
 INSERT INTO equipo_specs (equipo_id, spec_def_id, value) VALUES
   (NOVA_II_id, tipo_id,            'Panel'),
-  (NOVA_II_id, potencia_w_id,      '1000'),
+  (NOVA_II_id, consumo_w_id,       '1000'),
   (NOVA_II_id, cri_id,             '95'),
   (NOVA_II_id, temperatura_k_id,   '1800-20000'),  -- formato rango
   (NOVA_II_id, color_modes_id,     '["RGB","Daylight","Tungsten"]'),  -- JSON array
