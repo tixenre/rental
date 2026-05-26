@@ -106,7 +106,7 @@ def test_todos_los_items_tienen_spec_key():
 # (tautología que no cazaba desajustes entre parser y registry).
 
 
-_KNOWN_ORPHANS_GLOBAL: set[str] = {"bicolor", "rgb"}  # pre-existentes, triagear aparte
+_KNOWN_ORPHANS_GLOBAL: set[str] = set()  # 6b-i: bicolor/rgb removidos → color_modes
 
 
 def _registry_all_keys() -> set[str]:
@@ -264,7 +264,7 @@ def test_parser_luz_no_emite_keys_huerfanas():
     cat = REGISTRY.get("Iluminación")
     registry_keys = {s.key for s in cat.specs}
 
-    _KNOWN_ORPHANS = {"bicolor", "rgb"}  # pre-existentes, triagear en issue
+    _KNOWN_ORPHANS: set[str] = set()  # 6b-i: bicolor/rgb removidos → color_modes
 
     html = _load_fixture("luz_minimal.html")
     parser = BHSpecsParser()

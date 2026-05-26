@@ -250,6 +250,8 @@ def _parse_potencia(secciones: dict) -> int | None:
         secciones,
         "Power Consumption", "Wattage", "Max Power",
         "Max Bulb Wattage", "Bulb Wattage", "Lamp Wattage",
+        # Aliases del registry (consumo_w) — sincronizado para no volver a desincronizar:
+        "Power Draw", "Power Input", "Rated Power",
     )
     if not val:
         return None
@@ -257,18 +259,73 @@ def _parse_potencia(secciones: dict) -> int | None:
     return int(float(m.group(1))) if m else None
 
 
-def _parse_lumens(secciones: dict) -> int | None:
-    val = _find_value(secciones, "Lumens", "Maximum Luminous Flux")
+def _parse_lumens(secciones: dict) -> dict[str, int]:
+    """Devuelve {lumens_at_5600k: n} y/o {lumens_at_3200k: n}.
+
+    Si el valor contiene anotación "3200K" se asigna a tungsten; si no, al
+    estándar daylight 5600K. B&H a veces tiene filas separadas por temperatura
+    (bicolor), por lo que se recorren todas las ocurrencias del label.
+    """
+    labels = (
+        "Lumens", "Maximum Luminous Flux", "Lumen Output",
+        "Luminous Flux", "Total Lumens",
+    )
+    targets = {l.lower() for l in labels}
+    all_vals: list[str] = []
+    for section_items in secciones.values():
+        for item in section_items:
+            if item["label"].lower() in targets:
+                all_vals.append(item["value"])
+
+    out: dict[str, int] = {}
+    for val in all_vals:
+        for line in val.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            m = re.search(r"([\d,]+)", line)
+            if not m:
+                continue
+            try:
+                num = int(m.group(1).replace(",", ""))
+            except ValueError:
+                continue
+            if num <= 0:
+                continue
+            if "3200" in line:
+                out.setdefault("lumens_at_3200k", num)
+            else:
+                out.setdefault("lumens_at_5600k", num)
+    return out
+
+
+def _parse_lux_at_1m(secciones: dict) -> dict[str, int]:
+    """Parsea la línea de Fotometría → {lux_at_1m_5600k: n} y/o {lux_at_1m_3200k: n}.
+
+    B&H format: "5600K: 1077 fc / 11,600 Lux" o "3200K: 800 fc / 8,600 Lux".
+    """
+    val = _find_value(secciones, "Photometrics at 3.3' / 1 m", "Photometrics")
     if not val:
-        return None
-    # "19,389 (at 5600K)" → 19389
-    m = re.search(r"([\d,]+)", val)
-    if m:
+        return {}
+    out: dict[str, int] = {}
+    for line in val.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        m_lux = re.search(r"([\d,]+)\s*[Ll]ux", line)
+        if not m_lux:
+            continue
         try:
-            return int(m.group(1).replace(",", ""))
+            lux = int(m_lux.group(1).replace(",", ""))
         except ValueError:
-            pass
-    return None
+            continue
+        if lux <= 0:
+            continue
+        if "3200" in line:
+            out.setdefault("lux_at_1m_3200k", lux)
+        else:
+            out.setdefault("lux_at_1m_5600k", lux)
+    return out
 
 
 def _parse_cri(secciones: dict) -> int | None:
@@ -734,9 +791,11 @@ def map_luz_specs(secciones: dict, title: str = "") -> dict:
     if potencia is not None:
         result["consumo_w"] = potencia
 
-    lumens = _parse_lumens(secciones)
-    if lumens is not None:
-        result["lumens"] = lumens
+    for k, v in _parse_lumens(secciones).items():
+        result[k] = v
+
+    for k, v in _parse_lux_at_1m(secciones).items():
+        result[k] = v
 
     cri = _parse_cri(secciones)
     if cri is not None:
@@ -746,8 +805,27 @@ def map_luz_specs(secciones: dict, title: str = "") -> dict:
     if temperatura:
         result["temperatura_k"] = temperatura
 
-    result["bicolor"] = _parse_bicolor(secciones)
-    result["rgb"] = _parse_rgb(secciones, title)
+    _is_bicolor = _parse_bicolor(secciones)
+    _is_rgb = _parse_rgb(secciones, title)
+
+    # Sintetizar color_modes (multi_enum del registry) desde las detecciones.
+    # Las keys huérfanas "bicolor"/"rgb" se descartan — color_modes es la única
+    # key del registry para este concepto.
+    _modes: list[str] = []
+    if _is_rgb:
+        _modes.append("RGB")
+    if _is_bicolor:
+        _modes.append("Bicolor")
+    if not _modes:
+        _temp = result.get("temperatura_k", "")
+        if isinstance(_temp, str) and _temp:
+            if "3200" in _temp and "5600" not in _temp:
+                _modes.append("Tungsten")
+            else:
+                _modes.append("Daylight")
+    if _modes:
+        result["color_modes"] = _modes
+
     result["dimming"] = _parse_dimming(secciones)
 
     control = _parse_control_inalambrico(secciones)
