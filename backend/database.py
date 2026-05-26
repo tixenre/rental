@@ -30,6 +30,23 @@ FRONT = BASE.parent / "frontend" / "public"
 # Nuevo frontend (rental-refine, Vite SPA) — compilado en la raíz
 FRONT_NEW = BASE.parent / "dist"
 
+# ── Fragmentos SQL canónicos ─────────────────────────────────────────────────
+#
+# Fase 0 de #501: la migración d5a8f2c4b6e9 dropeó `equipos.marca` (TEXT). El
+# nombre de la marca se resuelve por subquery contra `marcas.nombre` vía
+# `e.brand_id`. Esta subquery aparecía copiada literal en >15 lugares y algunos
+# quedaron sin migrar → 500s (#499). El helper único acá garantiza que cualquier
+# query nueva use la forma correcta y que "que no se repita el olvido".
+#
+# Uso (todas las queries asumen `equipos` aliasado como `e`):
+#     conn.execute(f"SELECT e.id, e.nombre, {MARCA_SUBQUERY} FROM equipos e ...")
+# Para predicados en WHERE/COALESCE sin alias:
+#     conn.execute(f"... WHERE LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(?) ...")
+
+MARCA_NOMBRE_EXPR = "(SELECT nombre FROM marcas WHERE id = e.brand_id)"
+MARCA_SUBQUERY = f"{MARCA_NOMBRE_EXPR} AS marca"
+
+
 # ── Config BD desde variables de entorno ─────────────────────────────────────
 
 DATABASE_URL = os.getenv("DATABASE_URL")

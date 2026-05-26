@@ -22,7 +22,7 @@ from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Response
 
-from database import get_db
+from database import get_db, MARCA_SUBQUERY
 
 router = APIRouter()
 
@@ -79,12 +79,12 @@ def sitemap():
     try:
         conn = get_db()
         try:
-            equipos = conn.execute("""
-                SELECT id, marca, nombre,
-                       COALESCE(updated_at, created_at) AS lastmod
-                FROM equipos
-                WHERE COALESCE(visible_catalogo, true) = true
-                ORDER BY id
+            equipos = conn.execute(f"""
+                SELECT e.id, {MARCA_SUBQUERY}, e.nombre,
+                       COALESCE(e.updated_at, e.created_at) AS lastmod
+                FROM equipos e
+                WHERE COALESCE(e.visible_catalogo, true) = true
+                ORDER BY e.id
             """).fetchall()
             # Categorías visibles. Filtramos las que no tienen equipos para no
             # listar URLs con resultado vacío.

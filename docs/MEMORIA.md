@@ -73,6 +73,20 @@
   los bugs reales (sobre todo `exhaustive-deps`) y promover a bloqueante las reglas que valgan →
   issue de tracking **#476**.
 
+### 2026-05-26 — Convención de alias `e` para `equipos` en queries SQL
+- **Contexto:** la migración `d5a8f2c4b6e9` dropeó `equipos.marca` (TEXT). El nombre se resuelve
+  por subquery contra `marcas.nombre` vía `e.brand_id`. La subquery estaba copiada literal en >15
+  lugares; algunas quedaron sin migrar → 500s en producción (#499). Se extrajo a un helper único
+  (`database.MARCA_SUBQUERY`) que usa el alias `e`.
+- **Decisión:** **todas las queries SQL nuevas que toquen `equipos` usan el alias `e`**
+  (`FROM equipos e ...`, `e.brand_id`, etc.). Eso permite usar el helper canónico
+  `MARCA_SUBQUERY` (que ya está escrito con `e.brand_id`) sin reescribir la subquery a mano.
+- **Consecuencias:** una sola forma de resolver `marca` en queries de equipos → modularidad a
+  prueba de balas (no se repite el olvido). Las queries viejas sin alias siguen funcionando (no
+  son bug), pero al reescribirse migran a la convención.
+- **Quién hace cumplir:** el supervisor lo marca como hallazgo en PRs nuevas que escriban queries
+  sin alias.
+
 ### 2026-05-26 — Curación de la memoria (no es append-only puro)
 - **Contexto:** el doc era "append-only", pero eso lo hace crecer indefinidamente y deja entradas
   obsoletas escritas como si fueran ciertas. Caso testigo: la entrada de "minutos de Actions" quedó

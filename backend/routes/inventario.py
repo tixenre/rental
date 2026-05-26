@@ -11,7 +11,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from database import get_db
+from database import get_db, MARCA_SUBQUERY
 from admin_guard import require_admin
 
 router = APIRouter()
@@ -269,14 +269,14 @@ def _detect_categoria_sospechosa(conn) -> list[dict]:
 def _detect_precio_sin_usd(conn) -> list[dict]:
     """Detecta equipos con precio_jornada cargado pero precio_usd vacío.
     Apply = computar precio_usd usando usd_rate de app_settings."""
-    rows = conn.execute("""
-        SELECT id, nombre, marca, precio_jornada
-        FROM equipos
-        WHERE eliminado_at IS NULL
-          AND precio_jornada IS NOT NULL
-          AND precio_jornada > 0
-          AND (precio_usd IS NULL OR precio_usd = 0)
-        ORDER BY precio_jornada DESC
+    rows = conn.execute(f"""
+        SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.precio_jornada
+        FROM equipos e
+        WHERE e.eliminado_at IS NULL
+          AND e.precio_jornada IS NOT NULL
+          AND e.precio_jornada > 0
+          AND (e.precio_usd IS NULL OR e.precio_usd = 0)
+        ORDER BY e.precio_jornada DESC
         LIMIT 50
     """).fetchall()
     if not rows:
@@ -380,10 +380,14 @@ def _apply_fusionar_marcas(conn, clave: str) -> dict:
     canonical_nombre = rows[0]["nombre"]
     duplicados_ids = [r["id"] for r in rows[1:]]
     placeholders = ",".join(["%s"] * len(duplicados_ids))
-    # Repuntar equipos: brand_id + marca TEXT (que está cacheado).
+    # Repuntar equipos: solo brand_id. La columna `equipos.marca` (TEXT)
+    # fue dropeada por la migración d5a8f2c4b6e9 — el nombre se resuelve
+    # ahora siempre por subquery contra `marcas.nombre`. Ver MARCA_SUBQUERY
+    # en database.py.
+    _ = canonical_nombre  # se mantiene en el response, no se persiste en equipos
     conn.execute(
-        f"UPDATE equipos SET brand_id = ?, marca = ? WHERE brand_id IN ({placeholders})",
-        (canonical_id, canonical_nombre, *duplicados_ids),
+        f"UPDATE equipos SET brand_id = ? WHERE brand_id IN ({placeholders})",
+        (canonical_id, *duplicados_ids),
     )
     conn.execute(
         f"DELETE FROM marcas WHERE id IN ({placeholders})",

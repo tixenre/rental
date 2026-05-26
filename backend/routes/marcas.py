@@ -193,15 +193,13 @@ def admin_merge_marcas(req: MarcaMergeRequest, request: Request):
 
         target_nombre = existing[req.target_id]
 
-        # Reasignar brand_id (FK)
+        # Reasignar brand_id (FK) — único campo necesario. La columna
+        # legacy `equipos.marca` (TEXT) fue dropeada por la migración
+        # d5a8f2c4b6e9; el nombre se resuelve por subquery contra
+        # `marcas.nombre` (ver MARCA_SUBQUERY en database.py).
         conn.execute(
             "UPDATE equipos SET brand_id = %s WHERE brand_id = %s",
             (req.target_id, req.source_id),
-        )
-        # Sincronizar el TEXT marca por si quedó desincronizado
-        conn.execute(
-            "UPDATE equipos SET marca = %s WHERE brand_id = %s",
-            (target_nombre, req.target_id),
         )
         # Borrar la source
         conn.execute("DELETE FROM marcas WHERE id = %s", (req.source_id,))
