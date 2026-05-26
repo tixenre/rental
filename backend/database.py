@@ -718,6 +718,13 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
         "ON spec_definitions(es_compatibilidad) WHERE es_compatibilidad"
     )
+    # aliases: lista de strings usados para match de columnas B&H/CSV.
+    # Agregado por migración b3d5e7f9a1c2; lo replicamos en init_db para
+    # garantizar la columna pase lo que pase con la cadena de Alembic.
+    conn.execute(
+        "ALTER TABLE spec_definitions "
+        "ADD COLUMN IF NOT EXISTS aliases JSONB NOT NULL DEFAULT '[]'::jsonb"
+    )
 
     # Familias jerárquicas para specs multi_enum (HDMI 1.4 < 2.0 < 2.1, SDI
     # 3G < 6G < 12G, sensor formats, etc.). Editable desde UI admin —
