@@ -67,8 +67,13 @@ def _detect_categoria(html_content: str, title: str = "") -> str:
     if re.search(r"\b(lens|lente)\b", t) and not re.search(r"\b(adapter|filter|hood|cap)\b", t):
         return "Lentes"
 
+    # Modificadores: accesorios que se acoplan a una luz (antes que Iluminación
+    # para evitar que "fresnel attachment" / "softbox" caigan en el parser de luces)
+    if re.search(r"\b(fresnel\s+attachment|softbox|octobox|diffusion\s+frame|beauty\s+dish|reflector\s+dish|parabolic)\b", t):
+        return "Modificadores"
+
     # Iluminación: amplio (LED, light, monolight, flash, tube, panel, fresnel)
-    if re.search(r"\b(led|light|monolight|spotlight|flash|tube\s+light|fresnel|softbox|panel)\b", t):
+    if re.search(r"\b(led|light|monolight|spotlight|flash|tube\s+light|fresnel|panel)\b", t):
         return "Iluminación"
 
     return "Desconocido"
@@ -420,16 +425,8 @@ def extract_from_html(html_content: str, categoria_hint: str | None = None) -> d
     if categoria in ("Lentes", "Adaptadores", "Filtros"):
         return _extract_via_lentes_parser(html_content)
 
-    # Desconocido — intentar todos, el primero que funcione gana
-    for fn in (_extract_via_lentes_parser, _extract_via_camaras_parser, _extract_iluminacion):
-        try:
-            r = fn(html_content)
-            if r and r.get("specs"):
-                return r
-        except Exception:
-            continue
-
-    # Último recurso: resultado vacío con título
-    image = _jsonld_image(html_content)
-    url = _jsonld_url(html_content) or ""
-    return _generic_result(title, "", "", image, url, html_content)
+    # Categorías sin parser bespoke (Modificadores, Desconocido, futuras) →
+    # extractor genérico: saca TODOS los pares crudos y resuelve por aliases.
+    # Cero descartes silenciosos: lo que no resuelve queda visible como "sin template".
+    from services.generic_html_extractor import extract_from_html_generic
+    return extract_from_html_generic(html_content, categoria_hint=categoria if categoria != "Desconocido" else None)

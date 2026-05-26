@@ -98,88 +98,65 @@ def test_todos_los_items_tienen_spec_key():
         )
 
 
-# ── Cobertura por categoría ─────────────────────────────────────────────────
+# ── Cobertura real por categoría (ejercita salida del extractor sobre fixtures) ─
+#
+# Invariante: las spec_keys emitidas por el extractor deben existir en el registry.
+# Si el registry renombra una key sin actualizar el parser, este test lo caza.
+# Reemplaza los tests anteriores que alimentaban el registry contra sí mismo
+# (tautología que no cazaba desajustes entre parser y registry).
 
 
-def _cobertura(categoria: str, specs_dict: dict) -> dict:
-    """Retorna {cubiertas: set, faltantes: set} contra el registry."""
+_KNOWN_ORPHANS_GLOBAL: set[str] = {"bicolor", "rgb"}  # pre-existentes, triagear aparte
+
+
+def _registry_all_keys() -> set[str]:
     from specs import REGISTRY
-    cat = REGISTRY.get(categoria)
-    registry_keys = {s.key for s in cat.specs} if cat else set()
-    r = _build_result(
-        marca="X", modelo="Y", specs=specs_dict, extras={},
-        image=None, url="http://x", title="X Y",
-        secciones={}, categoria_sugerida=categoria,
+    keys: set[str] = set()
+    for cat_reg in REGISTRY.categorias.values():
+        keys.update(s.key for s in cat_reg.specs)
+    return keys
+
+
+def test_cobertura_real_camaras():
+    """Parser de Cámaras no emite keys huérfanas (emitidas pero no en el registry)."""
+    from services.equipo_html_extractor import extract_from_html
+    html = _load_fixture("camara_minimal.html")
+    r = extract_from_html(html, categoria_hint="Cámaras")
+    emitted = {s["spec_key"] for s in r["specs"] if s.get("spec_key")}
+    all_registry_keys = _registry_all_keys()
+    orphans = emitted - all_registry_keys - _KNOWN_ORPHANS_GLOBAL
+    assert not orphans, (
+        f"Parser Cámaras emitió spec_keys no declaradas en el registry: {orphans}"
     )
-    emitidas = {item["spec_key"] for item in r["specs"]}
-    return {"cubiertas": emitidas & registry_keys, "faltantes": registry_keys - emitidas}
+    assert emitted, "El extractor debe emitir al menos una spec del fixture"
 
 
-def test_cobertura_camaras():
-    from specs import REGISTRY
-    cat = REGISTRY.get("Cámaras")
-    all_keys = {s.key for s in cat.specs}
-    # Alimentamos TODOS los keys del registry para verificar cobertura máxima.
-    specs_dict = {k: "test_value" for k in all_keys}
-    cob = _cobertura("Cámaras", specs_dict)
-    assert cob["cubiertas"] == all_keys, (
-        f"Faltantes en cobertura Cámaras: {cob['faltantes']}"
+def test_cobertura_real_lentes():
+    """Parser de Lentes no emite keys huérfanas."""
+    from services.equipo_html_extractor import extract_from_html
+    html = _load_fixture("lente_minimal.html")
+    r = extract_from_html(html, categoria_hint="Lentes")
+    emitted = {s["spec_key"] for s in r["specs"] if s.get("spec_key")}
+    all_registry_keys = _registry_all_keys()
+    orphans = emitted - all_registry_keys - _KNOWN_ORPHANS_GLOBAL
+    assert not orphans, (
+        f"Parser Lentes emitió spec_keys no declaradas en el registry: {orphans}"
     )
+    assert emitted, "El extractor debe emitir al menos una spec del fixture"
 
 
-def test_cobertura_lentes():
-    from specs import REGISTRY
-    cat = REGISTRY.get("Lentes")
-    all_keys = {s.key for s in cat.specs}
-    specs_dict = {k: "test_value" for k in all_keys}
-    cob = _cobertura("Lentes", specs_dict)
-    assert cob["cubiertas"] == all_keys, (
-        f"Faltantes en cobertura Lentes: {cob['faltantes']}"
+def test_cobertura_real_iluminacion():
+    """Parser de Iluminación no emite keys huérfanas."""
+    from services.equipo_html_extractor import extract_from_html
+    html = _load_fixture("luz_minimal.html")
+    r = extract_from_html(html, categoria_hint="Iluminación")
+    emitted = {s["spec_key"] for s in r["specs"] if s.get("spec_key")}
+    all_registry_keys = _registry_all_keys()
+    orphans = emitted - all_registry_keys - _KNOWN_ORPHANS_GLOBAL
+    assert not orphans, (
+        f"Parser Iluminación emitió spec_keys no declaradas en el registry: {orphans}"
     )
-
-
-def test_cobertura_iluminacion():
-    from specs import REGISTRY
-    cat = REGISTRY.get("Iluminación")
-    all_keys = {s.key for s in cat.specs}
-    specs_dict = {k: "test_value" for k in all_keys}
-    cob = _cobertura("Iluminación", specs_dict)
-    assert cob["cubiertas"] == all_keys, (
-        f"Faltantes en cobertura Iluminación: {cob['faltantes']}"
-    )
-
-
-def test_cobertura_modificadores():
-    from specs import REGISTRY
-    cat = REGISTRY.get("Modificadores")
-    all_keys = {s.key for s in cat.specs}
-    specs_dict = {k: "test_value" for k in all_keys}
-    cob = _cobertura("Modificadores", specs_dict)
-    assert cob["cubiertas"] == all_keys, (
-        f"Faltantes en cobertura Modificadores: {cob['faltantes']}"
-    )
-
-
-def test_cobertura_adaptadores():
-    from specs import REGISTRY
-    cat = REGISTRY.get("Adaptadores")
-    all_keys = {s.key for s in cat.specs}
-    specs_dict = {k: "test_value" for k in all_keys}
-    cob = _cobertura("Adaptadores", specs_dict)
-    assert cob["cubiertas"] == all_keys, (
-        f"Faltantes en cobertura Adaptadores: {cob['faltantes']}"
-    )
-
-
-def test_cobertura_filtros():
-    from specs import REGISTRY
-    cat = REGISTRY.get("Filtros")
-    all_keys = {s.key for s in cat.specs}
-    specs_dict = {k: "test_value" for k in all_keys}
-    cob = _cobertura("Filtros", specs_dict)
-    assert cob["cubiertas"] == all_keys, (
-        f"Faltantes en cobertura Filtros: {cob['faltantes']}"
-    )
+    assert emitted, "El extractor debe emitir al menos una spec del fixture"
 
 
 # ── _normalize_label del companion (unifica _ ↔ espacio) ───────────────────
