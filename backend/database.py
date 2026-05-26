@@ -1338,7 +1338,7 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
 
 def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
     """Agrega `specs_destacados` a cada equipo: lista [{label, value}] de las
-    specs marcadas como destacado=true en el template de su categoría."""
+    specs con sd.favorito=true en spec_definitions."""
     if not equipos:
         return equipos
     from services.spec_render import render_spec_value
@@ -1348,24 +1348,22 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
     # Para destacadas de tipo bool, solo emitir cuando el valor es "Sí"/true.
     # Una spec "Macro: No" no aporta como quick fact en la card — destacar
     # solo cuando el lente ES macro, no cuando no lo es.
-    # Para destacadas de tipo bool, solo emitir cuando el valor es "Sí"/true.
-    # Una spec "Macro: No" no aporta como quick fact en la card — destacar
-    # solo cuando el lente ES macro, no cuando no lo es.
     cur.execute(f"""
-        SELECT es.equipo_id, sd.label, sd.tipo, sd.unidad, es.value, t.prioridad
+        SELECT es.equipo_id, sd.label, sd.tipo, sd.unidad, es.value,
+               COALESCE(sd.prioridad, 100) AS prioridad
         FROM equipo_specs es
         JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
         JOIN spec_definitions sd ON sd.id = es.spec_def_id
         JOIN categoria_spec_templates t
             ON t.spec_def_id = es.spec_def_id
            AND t.categoria_id = ec.categoria_id
-        WHERE t.destacado = TRUE
+        WHERE COALESCE(sd.favorito, FALSE) = TRUE
           AND es.equipo_id IN ({placeholders})
           AND (
             sd.tipo != 'bool'
             OR LOWER(TRIM(es.value)) IN ('sí', 'si', 'yes', 'true', '1')
           )
-        ORDER BY es.equipo_id, t.prioridad, sd.label
+        ORDER BY es.equipo_id, COALESCE(sd.prioridad, 100), sd.label
     """, ids)
     rows = cur.fetchall()
     cur.close()
@@ -1401,6 +1399,7 @@ def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
 
     Solo incluye specs cuyo `spec_def` esté asignado al template de
     alguna categoría del equipo (descartando orfanos cross-cat).
+    Flags y prioridad vienen de spec_definitions (sd), no de categoria_spec_templates.
     """
     if not equipos:
         return equipos
@@ -1411,10 +1410,11 @@ def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
     cur.execute(f"""
         SELECT DISTINCT ON (es.equipo_id, sd.id)
             es.equipo_id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
-            es.value, t.prioridad,
-            t.visible_en_card AS en_card,
-            t.visible_en_filtros AS en_filtros,
-            t.destacado
+            es.value,
+            COALESCE(sd.prioridad, 100) AS prioridad,
+            COALESCE(sd.favorito, FALSE) AS en_card,
+            COALESCE(sd.en_filtros, FALSE) AS en_filtros,
+            COALESCE(sd.favorito, FALSE) AS destacado
         FROM equipo_specs es
         JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
         JOIN spec_definitions sd ON sd.id = es.spec_def_id
@@ -1422,7 +1422,7 @@ def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
             ON t.spec_def_id = es.spec_def_id
            AND t.categoria_id = ec.categoria_id
         WHERE es.equipo_id IN ({placeholders})
-        ORDER BY es.equipo_id, sd.id, t.prioridad
+        ORDER BY es.equipo_id, sd.id, COALESCE(sd.prioridad, 100)
     """, ids)
     rows = cur.fetchall()
     cur.close()

@@ -1005,6 +1005,9 @@ def asignar_spec_a_categoria(categoria_id: int, payload: SpecAssignmentInput, re
         if payload.rol_compatibilidad and payload.rol_compatibilidad not in ("contenedor", "contenido"):
             raise HTTPException(400, "rol_compatibilidad debe ser 'contenedor' o 'contenido' (o null).")
         try:
+            # legacy: los flags visible_en_card/visible_en_filtros/destacado de
+            # categoria_spec_templates ya no controlan el catálogo público (se leen
+            # de spec_definitions desde Fase 6d). Se elimina en 6f junto al CRUD de templates.
             cur = conn.execute(
                 """
                 INSERT INTO categoria_spec_templates
@@ -1044,9 +1047,10 @@ def asignar_spec_a_categoria(categoria_id: int, payload: SpecAssignmentInput, re
 
 @router.patch("/admin/spec-templates/{template_id}")
 def actualizar_asignacion(template_id: int, payload: SpecAssignmentUpdate, request: Request):
-    """Actualiza los flags de una asignación (prioridad, destacado, visible_*,
-    obligatorio, ayuda). Para cambiar tipo/unidad/options usar PATCH
-    /admin/spec-definitions/{id} (afecta a todas las categorías)."""
+    """Actualiza los flags de una asignación en categoria_spec_templates.
+    NOTA legacy (Fase 6d): estos flags ya no controlan el catálogo público;
+    la fuente canónica es spec_definitions. Se elimina en 6f.
+    Para cambiar tipo/unidad/options usar PATCH /admin/spec-definitions/{id}."""
     _require_admin(request)
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
@@ -1092,9 +1096,11 @@ def borrar_asignacion(template_id: int, request: Request):
 
 @router.post("/admin/spec-templates/reorder")
 def reordenar_templates(payload: dict, request: Request):
-    """Actualiza la prioridad de múltiples templates en un solo request.
+    """Actualiza la prioridad de categoria_spec_templates en un solo request.
     Body: {"items": [{"id": 1, "prioridad": 10}, {"id": 2, "prioridad": 20}, …]}.
-    Menor prioridad = aparece antes (el listado y el form ordenan ASC).
+    NOTA legacy (Fase 6d): el catálogo público usa sd.prioridad de spec_definitions.
+    Este endpoint escribe en categoria_spec_templates (solo afecta la UI admin de
+    asignación por categoría). Se elimina en 6f.
     """
     _require_admin(request)
     items = payload.get("items") if isinstance(payload, dict) else None
