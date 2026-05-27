@@ -721,28 +721,82 @@ def get_disponibilidad(
 
 # ── Rutas de pedidos ─────────────────────────────────────────────────────────
 
+def _fmt_ars(monto) -> str:
+    """Formatea un monto en pesos estilo es-AR: $ 12.500."""
+    try:
+        n = int(round(float(monto or 0)))
+    except (TypeError, ValueError):
+        n = 0
+    return "$ " + f"{n:,}".replace(",", ".")
+
+
+def _fmt_fecha_amable(v) -> str:
+    """ISO → '15 jun · 10:00' (sin año). Cae al ISO si no parsea."""
+    iso = to_iso(v)
+    if not iso:
+        return ""
+    try:
+        dt = datetime.datetime.fromisoformat(str(iso).replace("Z", ""))
+    except (ValueError, TypeError):
+        return str(iso)
+    meses = ["ene", "feb", "mar", "abr", "may", "jun",
+             "jul", "ago", "sep", "oct", "nov", "dic"]
+    fecha = f"{dt.day} {meses[dt.month - 1]}"
+    if dt.hour or dt.minute:
+        return f"{fecha} · {dt.hour:02d}:{dt.minute:02d}"
+    return fecha
+
+
 def _pedido_email_context(pedido: dict) -> dict:
     """Arma el dict de variables disponibles a todos los templates de
     pedido. Mantener en sincronía con la lista de variables que se muestra
     en el editor del frontend (`/admin/email-templates`).
     """
+    from markupsafe import escape
+
     items = pedido.get("items") or []
+
+    def _nombre(it) -> str:
+        return it.get("nombre_publico") or it.get("nombre") or it.get("equipo_nombre") or ""
+
     items_text = "\n".join(
-        f"- {it.get('equipo_nombre') or ''} × {it.get('cantidad', 1)}"
-        for it in items
+        f"- {_nombre(it)} × {it.get('cantidad', 1)}" for it in items
     )
-    items_html = "<ul>" + "".join(
-        f"<li>{it.get('equipo_nombre') or ''} × {it.get('cantidad', 1)}</li>"
-        for it in items
-    ) + "</ul>"
+
+    # Tabla estilizada (inline) para el mail. Los nombres (datos dinámicos) se
+    # escapan; la estructura HTML es segura → la plantilla la inyecta con |safe.
+    filas = ""
+    for it in items:
+        nombre = escape(_nombre(it))
+        cant = escape(str(it.get("cantidad", 1)))
+        sub = it.get("subtotal")
+        sub_cell = (
+            f'<td style="padding:8px 0;text-align:right;white-space:nowrap;color:#2a251e;">{escape(_fmt_ars(sub))}</td>'
+            if sub is not None
+            else '<td style="padding:8px 0;"></td>'
+        )
+        filas += (
+            '<tr style="border-bottom:1px solid #ececec;">'
+            f'<td style="padding:8px 8px 8px 0;color:#2a251e;">{nombre}</td>'
+            f'<td style="padding:8px 12px;text-align:center;color:#8a8378;white-space:nowrap;">× {cant}</td>'
+            f"{sub_cell}</tr>"
+        )
+    items_html = (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="border-collapse:collapse;font-size:14px;margin:4px 0 8px;">'
+        f"{filas}</table>"
+        if items
+        else ""
+    )
+
     return {
         "cliente_nombre": pedido.get("cliente_nombre") or "",
         "cliente_email": pedido.get("cliente_email") or "",
         "cliente_telefono": pedido.get("cliente_telefono") or "",
         "numero_pedido": pedido.get("numero_pedido") or pedido.get("id"),
-        "fecha_desde": to_iso(pedido.get("fecha_desde")) or "",
-        "fecha_hasta": to_iso(pedido.get("fecha_hasta")) or "",
-        "total": pedido.get("monto_total") or 0,
+        "fecha_desde": _fmt_fecha_amable(pedido.get("fecha_desde")),
+        "fecha_hasta": _fmt_fecha_amable(pedido.get("fecha_hasta")),
+        "total": _fmt_ars(pedido.get("monto_total")),
         "notas": pedido.get("notas") or "",
         "items_html": items_html,
         "items_text": items_text,
