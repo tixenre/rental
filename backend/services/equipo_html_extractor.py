@@ -270,6 +270,45 @@ def _extract_via_lentes_parser(html_content: str) -> dict:
     )
 
 
+def _extract_via_modificadores_parser(html_content: str) -> dict:
+    """Usa tools/modificadores_parser.py — softbox / spotlight / fresnel / difusor."""
+    from modificadores_parser import map_modificador_specs  # type: ignore
+    from iluminacion_parser import (  # type: ignore
+        BHSpecsParser, _clean_title, _extract_brand, _extract_modelo,
+    )
+
+    parser = BHSpecsParser()
+    parser.feed(html_content)
+    secciones = dict(parser.secciones)
+    title = _clean_title(parser.title or "")
+    image = _jsonld_image(html_content)
+    url = _jsonld_url(html_content) or ""
+
+    # Mergear JSON-LD (autoritativo sobre el DOM)
+    jsonld = _jsonld_props(html_content)
+    if jsonld:
+        items = []
+        for name, value in jsonld.items():
+            if isinstance(value, list):
+                clean = [str(v) for v in value if str(v).strip() and str(v) not in ("1 x", "—", "n/a")]
+                if clean:
+                    items.append({"label": name, "value": "\n".join(clean)})
+            elif value and str(value).strip() and str(value) not in ("1 x", "—", "n/a"):
+                items.append({"label": name, "value": str(value)})
+        if items:
+            secciones = {"Specs (JSON-LD)": items, **secciones}
+
+    marca = _extract_brand(title)
+    modelo = _extract_modelo(title)
+    specs = map_modificador_specs(secciones, title=title)
+
+    return _build_result(
+        marca=marca, modelo=modelo, specs=specs, extras={},
+        image=image, url=url, title=title, secciones=secciones,
+        categoria_sugerida="Modificadores",
+    )
+
+
 def _extract_via_camaras_parser(html_content: str) -> dict:
     """Usa tools/camaras_parser.py — cámaras."""
     from camaras_parser import (  # type: ignore
@@ -424,8 +463,10 @@ def extract_from_html(html_content: str, categoria_hint: str | None = None) -> d
         return _extract_via_camaras_parser(html_content)
     if categoria in ("Lentes", "Adaptadores", "Filtros"):
         return _extract_via_lentes_parser(html_content)
+    if categoria == "Modificadores":
+        return _extract_via_modificadores_parser(html_content)
 
-    # Categorías sin parser bespoke (Modificadores, Desconocido, futuras) →
+    # Categorías sin parser bespoke (Desconocido, futuras) →
     # extractor genérico: saca TODOS los pares crudos y resuelve por aliases.
     # Cero descartes silenciosos: lo que no resuelve queda visible como "sin template".
     from services.generic_html_extractor import extract_from_html_generic
