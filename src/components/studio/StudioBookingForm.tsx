@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { authedFetch } from "@/lib/authedFetch";
+import { StudioPackKit } from "@/components/studio/StudioPackKit";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import {
   apiGetEstudioDisponibilidad,
@@ -376,20 +377,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
                   </div>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{packDescripcion}</p>
-                {withPack && (
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    {packEquipos.length > 0 ? (
-                      <>
-                        <span className="font-medium text-ink">Incluye en esta franja:</span>{" "}
-                        {packEquipos
-                          .map((e) => `${e.nombre}${e.cantidad > 1 ? ` ×${e.cantidad}` : ""}`)
-                          .join(", ")}
-                      </>
-                    ) : (
-                      "No hay equipos del pack disponibles en esta franja."
-                    )}
-                  </div>
-                )}
+                {withPack && <StudioPackKit equipos={packEquipos} />}
               </div>
             </label>
           )}

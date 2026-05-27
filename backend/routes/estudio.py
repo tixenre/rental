@@ -412,45 +412,39 @@ def _centinela_libre(conn, equipo_id: int, fecha_desde, fecha_hasta,
     return (row["cnt"] or 0) == 0
 
 
-# ── Pack dinámico (E3) ─────────────────────────────────────────────────────────
+# ── Pack curado (v2-C) ──────────────────────────────────────────────────────────
 #
-# El pack incluye TODA la gripería/luces/modificadores DISPONIBLES en la franja.
-# Son equipos reales → se rigen por el motor sagrado (get_disponibilidad / _check_stock
-# con el buffer GLOBAL de equipos, que es el prep correcto de equipos). Esto es
-# distinto del espacio (centinela), que usa su propio buffer vía _centinela_libre.
-# NO mezclar: espacio = query dedicada; pack = motor.
-
-PACK_CATEGORIAS = ("Grip", "Iluminación", "Modificadores")
+# El pack es una lista CURADA de equipos elegidos a mano por el admin (tabla
+# `estudio_pack_equipos`), no "todo lo de unas categorías". De esos equipos, en
+# cada franja se ofrecen SOLO los DISPONIBLES (best-effort: un ocupado no se
+# ofrece, pero tampoco bloquea la reserva). Son equipos reales → se rigen por el
+# motor sagrado (get_disponibilidad / _check_stock con el buffer GLOBAL de
+# equipos). Esto es distinto del espacio (centinela), que usa su propio buffer vía
+# _centinela_libre. NO mezclar: espacio = query dedicada; pack = motor.
 
 
 def _pack_equipo_ids(conn) -> list[int]:
-    """IDs de equipos que pertenecen a las categorías raíz del pack (o sus
-    descendientes). Excluye el centinela y los eliminados."""
+    """IDs de los equipos curados del pack (tabla `estudio_pack_equipos`), en su
+    orden. Excluye el centinela y los eliminados (por si quedó alguno colgado)."""
     rows = conn.execute(
         """
-        SELECT DISTINCT e.id
-        FROM equipos e
-        JOIN equipo_categorias ec ON ec.equipo_id = e.id
-        WHERE e.es_recurso_interno = FALSE
+        SELECT e.id
+        FROM estudio_pack_equipos pe
+        JOIN equipos e ON e.id = pe.equipo_id
+        WHERE pe.estudio_id = 1
+          AND e.es_recurso_interno = FALSE
           AND e.eliminado_at IS NULL
-          AND ec.categoria_id IN (
-            WITH RECURSIVE sub AS (
-                SELECT id FROM categorias WHERE nombre = ANY(?) AND parent_id IS NULL
-                UNION ALL
-                SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
-            )
-            SELECT id FROM sub
-          )
+        ORDER BY pe.orden, pe.id
         """,
-        (list(PACK_CATEGORIAS),),
     ).fetchall()
     return [r["id"] for r in rows]
 
 
 def _pack_disponible(conn, fecha_desde, fecha_hasta, exclude_pedido_id: int | None = None) -> list[dict]:
-    """Equipos del pack con >= 1 unidad disponible en la franja. La disponibilidad
-    sale del motor sagrado (get_disponibilidad aplica el buffer global de equipos),
-    así que lo ya reservado no aparece. Devuelve [{id, nombre, marca, cantidad}]."""
+    """Equipos curados del pack con >= 1 unidad disponible en la franja. La
+    disponibilidad sale del motor sagrado (get_disponibilidad aplica el buffer
+    global de equipos), así que lo ya reservado no aparece. Devuelve
+    [{id, nombre, marca, foto_url, cantidad}]."""
     pack_ids = _pack_equipo_ids(conn)
     if not pack_ids:
         return []
@@ -462,7 +456,7 @@ def _pack_disponible(conn, fecha_desde, fecha_hasta, exclude_pedido_id: int | No
         return []
     rows = conn.execute(
         """
-        SELECT e.id, e.nombre,
+        SELECT e.id, e.nombre, e.foto_url,
                (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca
         FROM equipos e
         WHERE e.id = ANY(?)
@@ -471,9 +465,105 @@ def _pack_disponible(conn, fecha_desde, fecha_hasta, exclude_pedido_id: int | No
         (list(libres.keys()),),
     ).fetchall()
     return [
-        {"id": r["id"], "nombre": r["nombre"], "marca": r["marca"], "cantidad": libres[r["id"]]}
+        {
+            "id": r["id"],
+            "nombre": r["nombre"],
+            "marca": r["marca"],
+            "foto_url": r["foto_url"],
+            "cantidad": libres[r["id"]],
+        }
         for r in rows
     ]
+
+
+def _pack_curado(conn) -> list[dict]:
+    """Lista curada del pack para el admin: todos los equipos elegidos (en orden),
+    con nombre/marca/foto — sin filtrar por disponibilidad (eso es del público)."""
+    rows = conn.execute(
+        """
+        SELECT pe.equipo_id AS id, pe.orden, e.nombre, e.foto_url,
+               (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca
+        FROM estudio_pack_equipos pe
+        JOIN equipos e ON e.id = pe.equipo_id
+        WHERE pe.estudio_id = 1
+          AND e.eliminado_at IS NULL
+        ORDER BY pe.orden, pe.id
+        """,
+    ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "nombre": r["nombre"],
+            "marca": r["marca"],
+            "foto_url": r["foto_url"],
+            "orden": r["orden"],
+        }
+        for r in rows
+    ]
+
+
+# ── Admin: CRUD del pack curado (v2-C) ──────────────────────────────────────────
+
+@router.get("/admin/estudio/pack")
+def listar_pack(request: Request):
+    require_admin(request)
+    conn = get_db()
+    try:
+        return {"pack": _pack_curado(conn)}
+    finally:
+        conn.close()
+
+
+class PackEquipoCreate(BaseModel):
+    equipo_id: int
+
+
+@router.post("/admin/estudio/pack", status_code=201)
+def agregar_pack_equipo(body: PackEquipoCreate, request: Request):
+    require_admin(request)
+    conn = get_db()
+    try:
+        eq = conn.execute(
+            "SELECT id, es_recurso_interno, eliminado_at FROM equipos WHERE id = ?",
+            (body.equipo_id,),
+        ).fetchone()
+        if not eq or eq["eliminado_at"] is not None:
+            raise HTTPException(404, "Equipo no encontrado")
+        if eq["es_recurso_interno"]:
+            raise HTTPException(400, "No se puede agregar un recurso interno al pack")
+        orden = conn.execute(
+            "SELECT COALESCE(MAX(orden), -1) + 1 AS next FROM estudio_pack_equipos WHERE estudio_id = 1"
+        ).fetchone()["next"]
+        conn.execute(
+            "INSERT INTO estudio_pack_equipos (estudio_id, equipo_id, orden) "
+            "VALUES (1, ?, ?) ON CONFLICT (estudio_id, equipo_id) DO NOTHING",
+            (body.equipo_id, orden),
+        )
+        conn.commit()
+        return {"pack": _pack_curado(conn)}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.delete("/admin/estudio/pack/{equipo_id}")
+def quitar_pack_equipo(equipo_id: int, request: Request):
+    require_admin(request)
+    conn = get_db()
+    try:
+        conn.execute(
+            "DELETE FROM estudio_pack_equipos WHERE estudio_id = 1 AND equipo_id = ?",
+            (equipo_id,),
+        )
+        conn.commit()
+        return {"pack": _pack_curado(conn)}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 # ── Slots fijos recurrentes mensuales (E4) ─────────────────────────────────────

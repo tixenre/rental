@@ -169,6 +169,33 @@ class TestEstudioAdminGuards:
             upload_foto_from_url(UploadFromUrlBody(url="https://example.com/img.jpg"), FakeRequest())
         assert exc.value.status_code == 401
 
+    def test_listar_pack_requiere_admin(self, monkeypatch):
+        monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
+        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        from routes.estudio import listar_pack
+
+        with pytest.raises(HTTPException) as exc:
+            listar_pack(FakeRequest())
+        assert exc.value.status_code == 401
+
+    def test_agregar_pack_requiere_admin(self, monkeypatch):
+        monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
+        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        from routes.estudio import agregar_pack_equipo, PackEquipoCreate
+
+        with pytest.raises(HTTPException) as exc:
+            agregar_pack_equipo(PackEquipoCreate(equipo_id=1), FakeRequest())
+        assert exc.value.status_code == 401
+
+    def test_quitar_pack_requiere_admin(self, monkeypatch):
+        monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
+        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        from routes.estudio import quitar_pack_equipo
+
+        with pytest.raises(HTTPException) as exc:
+            quitar_pack_equipo(1, FakeRequest())
+        assert exc.value.status_code == 401
+
 
 # ── E2 / E2.1: reserva por horas ──────────────────────────────────────────────
 #
@@ -500,7 +527,8 @@ class _NamesConn:
         if "FROM EQUIPOS E WHERE E.ID = ANY(?)" in su:
             ids = params[0]
             return _Cur(
-                [{"id": i, "nombre": self.names[i][0], "marca": self.names[i][1]}
+                [{"id": i, "nombre": self.names[i][0], "marca": self.names[i][1],
+                  "foto_url": self.names[i][2] if len(self.names[i]) > 2 else None}
                  for i in ids if i in self.names]
             )
         return _Cur([])
@@ -531,6 +559,124 @@ class TestPackDisponible:
             _NamesConn({}), datetime(2026, 6, 1, 14), datetime(2026, 6, 1, 16)
         )
         assert out == []
+
+    def test_incluye_foto_url(self, monkeypatch):
+        from datetime import datetime
+        monkeypatch.setattr(estudio_mod, "_pack_equipo_ids", lambda conn: [10])
+        monkeypatch.setattr(
+            estudio_mod, "get_disponibilidad", lambda fd, fh, excl=None: {"10": 1}
+        )
+        conn = _NamesConn({10: ("HMI", "Arri", "https://cdn/hmi.webp")})
+        out = estudio_mod._pack_disponible(
+            conn, datetime(2026, 6, 1, 14), datetime(2026, 6, 1, 16)
+        )
+        assert out[0]["foto_url"] == "https://cdn/hmi.webp"
+
+
+class _PackTablaConn:
+    """Responde la query de _pack_equipo_ids (tabla curada estudio_pack_equipos)."""
+
+    def __init__(self, ids):
+        self.ids = ids
+
+    def execute(self, sql, params=()):
+        su = " ".join(sql.split()).upper()
+        assert "ESTUDIO_PACK_EQUIPOS" in su, "debe leer de la tabla curada, no de categorías"
+        assert "EQUIPO_CATEGORIAS" not in su, "ya no se filtra por categorías"
+        return _Cur([{"id": i} for i in self.ids])
+
+
+class TestPackEquipoIds:
+    """_pack_equipo_ids lee de la tabla curada estudio_pack_equipos (v2-C)."""
+
+    def test_lee_de_tabla_curada(self):
+        conn = _PackTablaConn([7, 3, 9])
+        assert estudio_mod._pack_equipo_ids(conn) == [7, 3, 9]
+
+    def test_pack_vacio(self):
+        assert estudio_mod._pack_equipo_ids(_PackTablaConn([])) == []
+
+
+class _PackCrudConn:
+    """Fake conn para el CRUD del pack: graba INSERT/DELETE y responde el equipo."""
+
+    def __init__(self, equipo=None):
+        self.equipo = equipo  # dict o None
+        self.inserted = None
+        self.deleted = None
+        self.committed = False
+
+    def execute(self, sql, params=()):
+        su = " ".join(sql.split()).upper()
+        if su.startswith("SELECT ID, ES_RECURSO_INTERNO, ELIMINADO_AT FROM EQUIPOS"):
+            return _Cur([self.equipo] if self.equipo else [])
+        if "MAX(ORDEN)" in su:
+            return _Cur([{"next": 0}])
+        if su.startswith("INSERT INTO ESTUDIO_PACK_EQUIPOS"):
+            self.inserted = params
+            return _Cur([])
+        if su.startswith("DELETE FROM ESTUDIO_PACK_EQUIPOS"):
+            self.deleted = params
+            return _Cur([])
+        return _Cur([])
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
+
+
+class TestPackCrud:
+    """CRUD del pack curado (con ADMIN_BYPASS_AUTH)."""
+
+    def test_agregar_inserta(self, monkeypatch):
+        monkeypatch.setenv("ADMIN_BYPASS_AUTH", "1")
+        conn = _PackCrudConn(equipo={"id": 5, "es_recurso_interno": False, "eliminado_at": None})
+        monkeypatch.setattr(estudio_mod, "get_db", lambda: conn)
+        monkeypatch.setattr(estudio_mod, "_pack_curado", lambda c: [{"id": 5}])
+        from routes.estudio import agregar_pack_equipo, PackEquipoCreate
+
+        out = agregar_pack_equipo(PackEquipoCreate(equipo_id=5), FakeRequest())
+        assert conn.inserted is not None and conn.inserted[0] == 5
+        assert conn.committed
+        assert out == {"pack": [{"id": 5}]}
+
+    def test_agregar_recurso_interno_falla(self, monkeypatch):
+        monkeypatch.setenv("ADMIN_BYPASS_AUTH", "1")
+        conn = _PackCrudConn(equipo={"id": 9, "es_recurso_interno": True, "eliminado_at": None})
+        monkeypatch.setattr(estudio_mod, "get_db", lambda: conn)
+        from routes.estudio import agregar_pack_equipo, PackEquipoCreate
+
+        with pytest.raises(HTTPException) as exc:
+            agregar_pack_equipo(PackEquipoCreate(equipo_id=9), FakeRequest())
+        assert exc.value.status_code == 400
+        assert conn.inserted is None
+
+    def test_agregar_inexistente_404(self, monkeypatch):
+        monkeypatch.setenv("ADMIN_BYPASS_AUTH", "1")
+        conn = _PackCrudConn(equipo=None)
+        monkeypatch.setattr(estudio_mod, "get_db", lambda: conn)
+        from routes.estudio import agregar_pack_equipo, PackEquipoCreate
+
+        with pytest.raises(HTTPException) as exc:
+            agregar_pack_equipo(PackEquipoCreate(equipo_id=123), FakeRequest())
+        assert exc.value.status_code == 404
+
+    def test_quitar_borra(self, monkeypatch):
+        monkeypatch.setenv("ADMIN_BYPASS_AUTH", "1")
+        conn = _PackCrudConn()
+        monkeypatch.setattr(estudio_mod, "get_db", lambda: conn)
+        monkeypatch.setattr(estudio_mod, "_pack_curado", lambda c: [])
+        from routes.estudio import quitar_pack_equipo
+
+        out = quitar_pack_equipo(5, FakeRequest())
+        assert conn.deleted == (5,)
+        assert conn.committed
+        assert out == {"pack": []}
 
 
 class _RecordingConn:

@@ -5,8 +5,8 @@ export const STUDIO = {
   name: "El Estudio",
   tagline: "Foto y video en Mar del Plata",
   description:
-    "Un espacio pensado para producciones audiovisuales. Iluminación natural, " +
-    "ciclorama infinito, climatización y todo el equipo de Rambla a mano. " +
+    "Un espacio pensado para producciones audiovisuales. Ciclorama " +
+    "infinito, climatización y todo el equipo de Rambla a mano. " +
     "Ideal para producto, retrato, video corporativo, redes sociales y " +
     "shoots editoriales.",
   pricePerHour: 0, // TODO: precio real $/hora
