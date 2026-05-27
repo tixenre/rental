@@ -14,7 +14,6 @@ from admin_guard import require_admin
 from database import get_db
 from routes.equipos import (
     _download_image_bytes,
-    _ext_from_ctype,
     _optimize_image,
     _upload_to_r2,
     _validate_ssrf_only,
@@ -200,7 +199,6 @@ async def upload_foto(request: Request):
         raise HTTPException(413, "Archivo muy grande (máx 20 MB)")
 
     content, ctype, w, h = _optimize_image(raw)
-    ext = _ext_from_ctype(ctype)
     path = _foto_path_estudio()
     url = _upload_to_r2(path, content, ctype)
 
@@ -239,7 +237,6 @@ def upload_foto_from_url(body: UploadFromUrlBody, request: Request):
 
     raw, raw_ctype = _download_image_bytes(url)
     content, ctype, w, h = _optimize_image(raw)
-    ext = _ext_from_ctype(ctype)
     path = _foto_path_estudio()
     public_url = _upload_to_r2(path, content, ctype)
 

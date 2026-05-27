@@ -2,6 +2,7 @@
 database.py — Conexión PostgreSQL con pool de conexiones, migraciones y helpers.
 """
 
+import json
 import logging
 import os
 import pathlib
@@ -1169,14 +1170,13 @@ def init_db():
     """)
     # Seed idempotente: inserta la fila singleton si no existe, con los valores
     # del copy original de src/data/studio.ts. Precios en 0 (el dueño los setea).
-    import json as _json
-    _features_seed = _json.dumps([
+    _features_seed = json.dumps([
         {"label": "Superficie", "value": "— m²"},
         {"label": "Ciclorama", "value": "Infinito"},
         {"label": "Altura", "value": "— m"},
         {"label": "Climatización", "value": "Sí"},
     ])
-    _faq_seed = _json.dumps([
+    _faq_seed = json.dumps([
         {"q": "¿Cuál es el mínimo de reserva?",
          "a": "El mínimo es de 2 horas. Para producciones más cortas, escribínos por WhatsApp y vemos."},
         {"q": "¿Cómo se abona?",
