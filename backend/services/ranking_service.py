@@ -115,6 +115,7 @@ def recalcular_ranking_todos(
         """
         SELECT id, nombre, popularidad_score, cant_pedidos, ingreso_total_ars
         FROM equipos
+        WHERE es_recurso_interno = FALSE
         ORDER BY id
         """
     ).fetchall()

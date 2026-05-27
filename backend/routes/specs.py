@@ -1361,7 +1361,8 @@ def clasificar_bulk(request: Request, payload: dict = None):
 
     conn = get_db()
     try:
-        where = []
+        # El centinela del Estudio no es un producto: nunca entra al flujo de specs.
+        where = ["e.es_recurso_interno = FALSE"]
         params: list = []
         if equipo_ids:
             placeholders = ",".join(["?"] * len(equipo_ids))
@@ -1372,7 +1373,7 @@ def clasificar_bulk(request: Request, payload: dict = None):
                 "NOT EXISTS (SELECT 1 FROM equipo_categorias ec WHERE ec.equipo_id = e.id)"
             )
 
-        clause = ("WHERE " + " AND ".join(where)) if where else ""
+        clause = "WHERE " + " AND ".join(where)
         rows = conn.execute(
             f"SELECT e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url "
             f"FROM equipos e {clause} ORDER BY e.nombre",
@@ -1482,7 +1483,8 @@ def listar_sin_categoria(request: Request):
     try:
         row = conn.execute(
             "SELECT COUNT(*) AS cnt FROM equipos e "
-            "WHERE NOT EXISTS (SELECT 1 FROM equipo_categorias ec WHERE ec.equipo_id = e.id)"
+            "WHERE e.es_recurso_interno = FALSE "
+            "AND NOT EXISTS (SELECT 1 FROM equipo_categorias ec WHERE ec.equipo_id = e.id)"
         ).fetchone()
         return {"total": row["cnt"]}
     finally:
@@ -2107,13 +2109,15 @@ def listar_para_validacion(request: Request, filtro: str = "all"):
       - "all"        → todos
     """
     _require_admin(request)
-    where = ""
+    # El centinela del Estudio no es un producto: queda fuera del nombre público.
+    conds = ["es_recurso_interno = FALSE"]
     if filtro == "pendientes":
-        where = "WHERE COALESCE(nombre_publico_revisado, FALSE) = FALSE"
+        conds.append("COALESCE(nombre_publico_revisado, FALSE) = FALSE")
     elif filtro == "aprobados":
-        where = "WHERE nombre_publico_revisado = TRUE AND nombre_publico_override IS NULL"
+        conds.append("nombre_publico_revisado = TRUE AND nombre_publico_override IS NULL")
     elif filtro == "editados":
-        where = "WHERE nombre_publico_revisado = TRUE AND nombre_publico_override IS NOT NULL"
+        conds.append("nombre_publico_revisado = TRUE AND nombre_publico_override IS NOT NULL")
+    where = "WHERE " + " AND ".join(conds)
 
     conn = get_db()
     try:
@@ -2137,6 +2141,7 @@ def listar_para_validacion(request: Request, filtro: str = "all"):
                 COUNT(*) FILTER (WHERE nombre_publico_revisado = TRUE AND nombre_publico_override IS NOT NULL) AS editados,
                 COUNT(*) AS total
             FROM equipos
+            WHERE es_recurso_interno = FALSE
             """
         ).fetchone()
         return {

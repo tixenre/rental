@@ -502,7 +502,7 @@ def equipos_kpis(request: Request):
     conn = get_db()
     try:
         total = conn.execute(
-            "SELECT COUNT(*) FROM equipos WHERE eliminado_at IS NULL"
+            "SELECT COUNT(*) FROM equipos WHERE eliminado_at IS NULL AND es_recurso_interno = FALSE"
         ).fetchone()[0]
         en_uso_hoy = conn.execute("""
             SELECT COALESCE(SUM(pi.cantidad), 0)
@@ -607,6 +607,10 @@ def list_equipos(
     offset = (page - 1) * per_page
     base_sql = "FROM equipos e WHERE 1=1"
     params: list = []
+
+    # El centinela del Estudio (es_recurso_interno) no es un producto del
+    # catálogo: se excluye SIEMPRE (público y admin), filtros incluidos.
+    base_sql += " AND e.es_recurso_interno = FALSE"
 
     is_admin = bool(get_session(request))
     if solo_visibles or not is_admin:

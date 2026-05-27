@@ -29,7 +29,7 @@ def get_calidad_inventario(_admin: dict = Depends(require_admin)):
     try:
         # Total de equipos activos.
         total = conn.execute(
-            "SELECT COUNT(*) FROM equipos WHERE eliminado_at IS NULL"
+            "SELECT COUNT(*) FROM equipos WHERE eliminado_at IS NULL AND es_recurso_interno = FALSE"
         ).fetchone()[0]
 
         # Campos faltantes — una query con COUNT FILTER por cada campo.
@@ -43,7 +43,7 @@ def get_calidad_inventario(_admin: dict = Depends(require_admin)):
               COUNT(*) FILTER (WHERE NULLIF(TRIM(COALESCE(e.nombre_publico, '')), '') IS NULL) AS sin_nombre_publico
             FROM equipos e
             LEFT JOIN equipo_fichas f ON f.equipo_id = e.id
-            WHERE e.eliminado_at IS NULL
+            WHERE e.eliminado_at IS NULL AND e.es_recurso_interno = FALSE
         """).fetchone()
 
         # Equipos sin categoría: no aparecen en equipo_categorias.
@@ -51,6 +51,7 @@ def get_calidad_inventario(_admin: dict = Depends(require_admin)):
             SELECT COUNT(*)
             FROM equipos e
             WHERE e.eliminado_at IS NULL
+              AND e.es_recurso_interno = FALSE
               AND NOT EXISTS (
                 SELECT 1 FROM equipo_categorias ec WHERE ec.equipo_id = e.id
               )
@@ -221,6 +222,7 @@ def _detect_categoria_sospechosa(conn) -> list[dict]:
              WHERE ec.equipo_id = e.id) AS categorias_actuales
         FROM equipos e
         WHERE e.eliminado_at IS NULL
+          AND e.es_recurso_interno = FALSE
         ORDER BY e.id
     """).fetchall()
 
