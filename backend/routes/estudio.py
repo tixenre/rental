@@ -14,9 +14,11 @@ from admin_guard import require_admin
 from database import get_db, now_ar
 from routes.alquileres import (
     ESTADOS_RESERVADO,
+    _check_stock,
     _dispatch_pedido_creado_emails,
     _get_alquiler_detail,
     _next_numero_pedido,
+    get_disponibilidad,
 )
 from routes.equipos import (
     _download_image_bytes,
@@ -402,6 +404,70 @@ def _centinela_libre(conn, equipo_id: int, fecha_desde, fecha_hasta,
     return (row["cnt"] or 0) == 0
 
 
+# ── Pack dinámico (E3) ─────────────────────────────────────────────────────────
+#
+# El pack incluye TODA la gripería/luces/modificadores DISPONIBLES en la franja.
+# Son equipos reales → se rigen por el motor sagrado (get_disponibilidad / _check_stock
+# con el buffer GLOBAL de equipos, que es el prep correcto de equipos). Esto es
+# distinto del espacio (centinela), que usa su propio buffer vía _centinela_libre.
+# NO mezclar: espacio = query dedicada; pack = motor.
+
+PACK_CATEGORIAS = ("Grip", "Iluminación", "Modificadores")
+
+
+def _pack_equipo_ids(conn) -> list[int]:
+    """IDs de equipos que pertenecen a las categorías raíz del pack (o sus
+    descendientes). Excluye el centinela y los eliminados."""
+    rows = conn.execute(
+        """
+        SELECT DISTINCT e.id
+        FROM equipos e
+        JOIN equipo_categorias ec ON ec.equipo_id = e.id
+        WHERE e.es_recurso_interno = FALSE
+          AND e.eliminado_at IS NULL
+          AND ec.categoria_id IN (
+            WITH RECURSIVE sub AS (
+                SELECT id FROM categorias WHERE nombre = ANY(?) AND parent_id IS NULL
+                UNION ALL
+                SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
+            )
+            SELECT id FROM sub
+          )
+        """,
+        (list(PACK_CATEGORIAS),),
+    ).fetchall()
+    return [r["id"] for r in rows]
+
+
+def _pack_disponible(conn, fecha_desde, fecha_hasta, exclude_pedido_id: int | None = None) -> list[dict]:
+    """Equipos del pack con >= 1 unidad disponible en la franja. La disponibilidad
+    sale del motor sagrado (get_disponibilidad aplica el buffer global de equipos),
+    así que lo ya reservado no aparece. Devuelve [{id, nombre, marca, cantidad}]."""
+    pack_ids = _pack_equipo_ids(conn)
+    if not pack_ids:
+        return []
+    disp = get_disponibilidad(
+        fecha_desde.isoformat(), fecha_hasta.isoformat(), exclude_pedido_id
+    )
+    libres = {eid: disp.get(str(eid), 0) for eid in pack_ids if disp.get(str(eid), 0) >= 1}
+    if not libres:
+        return []
+    rows = conn.execute(
+        """
+        SELECT e.id, e.nombre,
+               (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca
+        FROM equipos e
+        WHERE e.id = ANY(?)
+        ORDER BY e.nombre
+        """,
+        (list(libres.keys()),),
+    ).fetchall()
+    return [
+        {"id": r["id"], "nombre": r["nombre"], "marca": r["marca"], "cantidad": libres[r["id"]]}
+        for r in rows
+    ]
+
+
 @router.get("/estudio/disponibilidad")
 def estudio_disponibilidad(
     fecha: str = Query(..., description="YYYY-MM-DD"),
@@ -427,9 +493,15 @@ def estudio_disponibilidad(
 
         if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
                                 estudio["buffer_horas"]):
-            return {"libre": False, "motivo": "Ocupado en esa franja"}
+            return {"libre": False, "motivo": "Ocupado en esa franja", "pack": []}
 
-        return {"libre": True, "motivo": None}
+        # Pack: equipos disponibles en la franja (solo si el pack está activo).
+        pack = (
+            _pack_disponible(conn, fecha_desde, fecha_hasta)
+            if estudio["pack_activo"]
+            else []
+        )
+        return {"libre": True, "motivo": None, "pack": pack}
     finally:
         conn.close()
 
@@ -441,13 +513,35 @@ class EstudioReservaCreate(BaseModel):
     cliente_nombre: str
     cliente_email: Optional[str] = None
     cliente_telefono: Optional[str] = None
+    con_pack: bool = False
+
+
+def _agregar_items_pack(conn, pedido_id: int, fecha_desde, fecha_hasta, pack_ids: list[int]) -> None:
+    """Inserta un alquiler_item por cada equipo del pack con stock disponible en
+    la franja (cantidad = lo disponible, precio 0 — el pack es valor fijo). Asume
+    que las filas de `pack_ids` ya están lockeadas (FOR UPDATE) por el caller."""
+    disp = get_disponibilidad(fecha_desde.isoformat(), fecha_hasta.isoformat(), pedido_id)
+    for eid in pack_ids:
+        qty = disp.get(str(eid), 0)
+        if qty >= 1:
+            conn.execute(
+                """
+                INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
+                VALUES (?,?,?,?,?)
+                """,
+                (pedido_id, eid, qty, 0, 0),
+            )
 
 
 @router.post("/estudio/reservas", status_code=201)
 def crear_reserva_estudio(body: EstudioReservaCreate, background: BackgroundTasks):
     """Reserva real del estudio por horas. Entra como solicitud
-    (estado='presupuesto'). Espejo de create_pedido, en UNA transacción, reusando
-    el motor de stock/overlap SAGRADO."""
+    (estado='presupuesto'), en UNA transacción.
+
+    El ESPACIO (centinela) es requisito duro: se valida con _centinela_libre +
+    FOR UPDATE (su buffer propio), no con el motor. Los EQUIPOS del pack son
+    equipos reales: se validan con el motor sagrado (_check_stock, buffer global).
+    Criterio ante race del pack: best-effort — todo lo disponible al confirmar."""
     conn = get_db()
     try:
         estudio = _get_estudio_row(conn)
@@ -466,7 +560,11 @@ def crear_reserva_estudio(body: EstudioReservaCreate, background: BackgroundTask
                 f"Necesitás reservar con al menos {estudio['anticipacion_min_horas']} h de anticipación",
             )
 
+        con_pack = bool(body.con_pack) and bool(estudio["pack_activo"])
         monto_total = (estudio["precio_hora"] or 0) * body.horas
+        if con_pack:
+            monto_total += estudio["pack_precio"] or 0
+
         next_num = _next_numero_pedido(conn)
         cur = conn.execute(
             """
@@ -478,11 +576,34 @@ def crear_reserva_estudio(body: EstudioReservaCreate, background: BackgroundTask
             (
                 body.cliente_nombre, body.cliente_email, body.cliente_telefono,
                 fecha_desde, fecha_hasta, monto_total, "presupuesto",
-                "estudio", "estudio", False, next_num,
+                "estudio", "estudio", con_pack, next_num,
             ),
         )
         pedido_id = cur.lastrowid
 
+        # ── Pack PRIMERO (antes del ítem centinela) ─────────────────────────────
+        # Así _check_stock solo ve los equipos reales del pack y nunca el
+        # centinela → no se mezcla el buffer global con el propio del espacio.
+        if con_pack:
+            pack_ids = _pack_equipo_ids(conn)
+            if pack_ids:
+                # Lock de las filas del pack: serializa contra otras reservas que
+                # toquen estos equipos (su _check_stock también las lockea).
+                conn.execute("SELECT id FROM equipos WHERE id = ANY(?) FOR UPDATE", (pack_ids,))
+                _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
+                # Gate del motor (FOR UPDATE). Best-effort: si algo se lo llevó
+                # otro entre el snapshot y el lock, re-snapshoteamos bajo el lock
+                # (ya refleja a los competidores commiteados) en vez de fallar
+                # toda la reserva. El espacio sí es requisito duro (abajo).
+                fd_iso, fh_iso = fecha_desde.isoformat(), fecha_hasta.isoformat()
+                if _check_stock(conn, pedido_id, fd_iso, fh_iso):
+                    conn.execute(
+                        "DELETE FROM alquiler_items WHERE pedido_id = ? AND equipo_id = ANY(?)",
+                        (pedido_id, pack_ids),
+                    )
+                    _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
+
+        # ── Espacio (centinela): requisito DURO ─────────────────────────────────
         conn.execute(
             """
             INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
@@ -490,11 +611,8 @@ def crear_reserva_estudio(body: EstudioReservaCreate, background: BackgroundTask
             """,
             (pedido_id, estudio["equipo_id"], 1, 0, 0),
         )
-
-        # Chequeo final bajo FOR UPDATE para cerrar la race de doble-booking:
-        # lockeamos la fila del centinela (recurso único) y recién ahí contamos
-        # overlaps. Una 2da reserva concurrente espera el lock y ve la 1ra ya
-        # commiteada. Usa SOLO el buffer propio del estudio.
+        # Lock del centinela (recurso único) + chequeo con SU buffer propio. Una
+        # 2da reserva concurrente espera el lock y ve la 1ra commiteada.
         conn.execute("SELECT id FROM equipos WHERE id = ? FOR UPDATE", (estudio["equipo_id"],))
         if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
                                 estudio["buffer_horas"], exclude_pedido_id=pedido_id):
