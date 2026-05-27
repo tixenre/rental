@@ -212,5 +212,29 @@ export function apiGetEstudio() {
   return get<EstudioConfig>("/api/estudio");
 }
 
+/** ¿El estudio está libre en [fecha start, +horas]? El backend aplica el
+ *  buffer propio del estudio. */
+export function apiGetEstudioDisponibilidad(fecha: string, start: string, horas: number) {
+  return get<{ libre: boolean }>("/api/estudio/disponibilidad", {
+    fecha,
+    start,
+    horas: String(horas),
+  });
+}
+
+export type EstudioReservaBody = {
+  fecha: string;
+  start: string;
+  horas: number;
+  cliente_nombre: string;
+  cliente_email?: string;
+  cliente_telefono?: string;
+};
+
+/** Crea una reserva real del estudio (entra como solicitud, estado='presupuesto'). */
+export function apiCrearReservaEstudio(body: EstudioReservaBody) {
+  return post<{ id: number; numero_pedido: number | null }>("/api/estudio/reservas", body);
+}
+
 // NOTA: la creación de pedidos se movió a `src/lib/orders.ts → createOrder()`
 // usando el endpoint autenticado /api/cliente/pedidos del backend FastAPI.

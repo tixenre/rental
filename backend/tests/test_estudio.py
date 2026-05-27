@@ -167,3 +167,224 @@ class TestEstudioAdminGuards:
         with pytest.raises(HTTPException) as exc:
             upload_foto_from_url(UploadFromUrlBody(url="https://example.com/img.jpg"), FakeRequest())
         assert exc.value.status_code == 401
+
+
+# ── E2: reserva por horas ─────────────────────────────────────────────────────
+#
+# La reserva del estudio reusa el motor SAGRADO (_check_stock / _rango_con_buffer)
+# sin tocarlo. El centinela es un equipo de cantidad=1; cualquier reserva del
+# estudio que se pise (dentro del buffer propio) con otra deja disponible=0 → choca.
+
+
+def _estudio_row(**overrides):
+    """Fila de estudio simulada (dict-accessible) para los helpers."""
+    defaults = {
+        "min_horas": 2,
+        "open_hour": 8,
+        "close_hour": 22,
+        "buffer_horas": 0,
+        "precio_hora": 10000,
+        "equipo_id": 99,  # id del centinela
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+class _Cur:
+    def __init__(self, rows):
+        self._rows = list(rows)
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
+
+    def fetchall(self):
+        return self._rows
+
+
+class EstudioConflictoFakeConn:
+    """Fake conn que evalúa el overlap REAL contra reservas del centinela.
+
+    A diferencia de un stub fijo, parsea los parámetros de fecha que le pasa
+    `_check_stock` (que son el rango ya expandido por el buffer propio del
+    estudio) y suma las reservas existentes que efectivamente se pisan
+    (`fd_existente < fh_consulta AND fh_existente > fd_consulta`, half-open).
+    Así el test ejercita de verdad `_rango_con_buffer` + el overlap del motor.
+
+    reservas: lista de (fecha_desde_iso, fecha_hasta_iso) del centinela.
+    """
+
+    def __init__(self, centinela_id, stock, reservas, buffer_global=0):
+        self.centinela_id = centinela_id
+        self.stock = stock
+        self.reservas = reservas
+        self.buffer_global = buffer_global
+
+    @staticmethod
+    def _parse(v):
+        from database import to_datetime
+        return to_datetime(v)
+
+    def execute(self, sql, params=()):
+        s = " ".join(sql.split()).upper()
+
+        # Buffer global (setting app_settings) — separado del buffer del estudio.
+        if "FROM APP_SETTINGS WHERE KEY = ?" in s:
+            return _Cur([{"value": str(self.buffer_global)}])
+
+        # Mantenimiento — ninguno.
+        if "FROM EQUIPO_MANTENIMIENTO" in s:
+            return _Cur([{0: 0}])
+
+        # Items del pedido (1ra query de _check_stock): el centinela.
+        if s.startswith("SELECT PI.EQUIPO_ID, PI.CANTIDAD, E.NOMBRE, E.CANTIDAD AS STOCK_TOTAL"):
+            return _Cur([{
+                "equipo_id": self.centinela_id,
+                "cantidad": 1,
+                "nombre": "Estudio (espacio)",
+                "stock_total": self.stock,
+            }])
+
+        # Componentes del centinela — ninguno (no es kit).
+        if s.startswith("SELECT KC.COMPONENTE_ID, KC.CANTIDAD AS KC_CANT"):
+            return _Cur([])
+
+        # Lock + stock del centinela.
+        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s:
+            return _Cur([{"cantidad": self.stock}])
+
+        # Reservas directas: sumamos las que se pisan con el rango consultado.
+        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s:
+            _eq, _excl, fh_consulta, fd_consulta = params
+            fh_c = self._parse(fh_consulta)
+            fd_c = self._parse(fd_consulta)
+            total = 0
+            for (fd_e, fh_e) in self.reservas:
+                if self._parse(fd_e) < fh_c and self._parse(fh_e) > fd_c:
+                    total += 1
+            return _Cur([{0: total}])
+
+        # Reservas vía kit — ninguna.
+        if "JOIN KIT_COMPONENTES KC ON KC.EQUIPO_ID = PI2.EQUIPO_ID WHERE KC.COMPONENTE_ID = ?" in s:
+            return _Cur([{0: 0}])
+
+        return _Cur([])
+
+
+class TestFranjaEstudio:
+    def test_minimo_de_horas_falla(self):
+        from routes.estudio import _franja_estudio
+        with pytest.raises(HTTPException) as exc:
+            _franja_estudio(_estudio_row(min_horas=2), "2026-06-01", "14:00", 1)
+        assert exc.value.status_code == 400
+
+    def test_fuera_de_horario_falla(self):
+        from routes.estudio import _franja_estudio
+        # close_hour=22 → terminar a las 23 cae afuera.
+        with pytest.raises(HTTPException) as exc:
+            _franja_estudio(_estudio_row(), "2026-06-01", "21:00", 2)
+        assert exc.value.status_code == 400
+        # Antes de abrir (open_hour=8) también.
+        with pytest.raises(HTTPException):
+            _franja_estudio(_estudio_row(), "2026-06-01", "07:00", 2)
+
+    def test_franja_valida_devuelve_datetimes(self):
+        from routes.estudio import _franja_estudio
+        fd, fh = _franja_estudio(_estudio_row(), "2026-06-01", "14:00", 2)
+        assert (fd.hour, fd.minute) == (14, 0)
+        assert (fh.hour, fh.minute) == (16, 0)
+        assert fd.date().isoformat() == "2026-06-01"
+
+
+class TestEstudioOverlap:
+    """Overlap estudio-vs-estudio por hora, reusando _check_stock."""
+
+    def _check(self, conn, fd, fh, buffer_horas):
+        from datetime import datetime
+        from routes.estudio import _estudio_check_conflicto
+        fdt = datetime.fromisoformat(fd)
+        fht = datetime.fromisoformat(fh)
+        return _estudio_check_conflicto(conn, 2, fdt, fht, buffer_horas)
+
+    def test_dos_reservas_que_se_pisan_choca(self):
+        # Existe 14:00–16:00. Una nueva 15:00–17:00 se pisa → conflicto (409).
+        conn = EstudioConflictoFakeConn(
+            centinela_id=99, stock=1,
+            reservas=[("2026-06-01T14:00:00", "2026-06-01T16:00:00")],
+        )
+        problemas = self._check(conn, "2026-06-01T15:00:00", "2026-06-01T17:00:00", 0)
+        assert len(problemas) == 1
+
+    def test_franjas_disjuntas_mismo_dia_ok(self):
+        # 14:00–16:00 existente; nueva 16:00–18:00 (half-open) NO se pisa → OK.
+        conn = EstudioConflictoFakeConn(
+            centinela_id=99, stock=1,
+            reservas=[("2026-06-01T14:00:00", "2026-06-01T16:00:00")],
+        )
+        assert self._check(conn, "2026-06-01T16:00:00", "2026-06-01T18:00:00", 0) == []
+
+
+class TestEstudioBufferPropio:
+    """El buffer propio del estudio expande el rango ANTES de chequear."""
+
+    def _check(self, conn, fd, fh, buffer_horas):
+        from datetime import datetime
+        from routes.estudio import _estudio_check_conflicto
+        return _estudio_check_conflicto(
+            conn, 2, datetime.fromisoformat(fd), datetime.fromisoformat(fh), buffer_horas
+        )
+
+    def test_buffer_1h_bloquea_franja_adyacente(self):
+        # Existe 14:00–16:00. Sin buffer, 16:30–18:00 estaría OK. Con buffer 1h
+        # del estudio, el rango se expande a 15:30–19:00 → se pisa → choca.
+        conn = EstudioConflictoFakeConn(
+            centinela_id=99, stock=1,
+            reservas=[("2026-06-01T14:00:00", "2026-06-01T16:00:00")],
+        )
+        # Sin buffer: libre.
+        assert self._check(conn, "2026-06-01T16:30:00", "2026-06-01T18:00:00", 0) == []
+        # Con buffer 1h: choca.
+        problemas = self._check(conn, "2026-06-01T16:30:00", "2026-06-01T18:00:00", 1)
+        assert len(problemas) == 1
+
+
+class TestNoRegresionTipo:
+    """SAGRADO: el DEFAULT tipo='diaria' no cambia el overlap (las queries no
+    filtran por tipo). Replicamos un caso de test_stock_validation.py y
+    verificamos el mismo resultado: una reserva existente sigue contando."""
+
+    def test_overlap_diaria_sigue_contando(self):
+        # Equipo normal (no centinela): stock=1 con una reserva que se pisa →
+        # debe seguir bloqueando, idéntico a antes de existir la columna tipo.
+        conn = EstudioConflictoFakeConn(
+            centinela_id=20, stock=1,
+            reservas=[("2026-06-01T00:00:00", "2026-06-05T00:00:00")],
+        )
+        from routes.alquileres import _check_stock
+        problemas = _check_stock(conn, 2, "2026-06-02T00:00:00", "2026-06-03T00:00:00")
+        assert len(problemas) == 1
+        assert "disponible: 0" in problemas[0]
+
+
+class TestCentinelaNoLeak:
+    """El centinela (es_recurso_interno) no debe filtrarse en las vistas admin
+    de equipos. Verificamos que cada query que enumera/conteo equipos lleve el
+    filtro `es_recurso_interno = FALSE` (no hay BD en CI; inspeccionamos el SQL
+    embebido en cada handler, que es estático)."""
+
+    def _src(self, fn):
+        import inspect
+        return inspect.getsource(fn)
+
+    def test_dashboard_uso_excluye_centinela(self):
+        from routes.equipos import admin_dashboard_uso
+        src = self._src(admin_dashboard_uso)
+        # top_alquilados, sin_uso y stats globales (total_equipos).
+        assert src.count("es_recurso_interno = FALSE") >= 3
+
+    def test_sin_serie_excluye_centinela(self):
+        from routes.equipos import admin_equipos_sin_serie
+        assert "es_recurso_interno = FALSE" in self._src(admin_equipos_sin_serie)
+
+    def test_clasificar_excluye_centinela(self):
+        from routes.equipos import admin_clasificar
+        assert "es_recurso_interno = FALSE" in self._src(admin_clasificar)

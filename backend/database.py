@@ -290,6 +290,14 @@ def init_db():
     # Mismo patrón que foto_url — almacena URL pública R2, blob en equipos/{id}/source.html.
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS html_source_url TEXT")
 
+    # Migration: recurso interno (no es un producto del catálogo). Lo usa el
+    # centinela del Estudio (E2): un equipo de cantidad=1 que representa el
+    # espacio físico para que las reservas por hora pasen por el mismo motor de
+    # stock/overlap. Se excluye SIEMPRE de catálogo público, filtros, listado
+    # admin, ranking y specs — no es un producto alquilable suelto. Es distinto
+    # de visible_catalogo=0 (un producto real oculto sigue siendo producto).
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS es_recurso_interno BOOLEAN NOT NULL DEFAULT FALSE")
+
     # Tabla de marcas (brands)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS marcas (
@@ -365,6 +373,13 @@ def init_db():
             updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Estudio E2: tipo de alquiler ('diaria' = pedido normal por jornada;
+    # 'estudio' = reserva del espacio por horas). El DEFAULT 'diaria' es clave:
+    # las reservas existentes y las queries de overlap (que NO filtran por tipo)
+    # quedan idénticas. `estudio_con_pack` se reserva para E3 (pack Grip/Luz).
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'diaria'")
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS estudio_con_pack BOOLEAN NOT NULL DEFAULT FALSE")
 
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_pedidos_estado ON alquileres(estado)
@@ -1214,6 +1229,21 @@ def init_db():
             %s
         WHERE NOT EXISTS (SELECT 1 FROM estudio WHERE id = 1)
     """, (_features_seed, _faq_seed))
+
+    # Centinela del Estudio (E2): el espacio físico modelado como un equipo de
+    # cantidad=1, para que las reservas por hora reusen el motor de stock/overlap
+    # SAGRADO sin lógica nueva. Es un recurso interno: invisible al catálogo,
+    # filtros, listado admin, ranking y specs (es_recurso_interno=TRUE). Idempotente:
+    # solo se crea si el estudio todavía no tiene un equipo asociado.
+    est_row = conn.execute("SELECT equipo_id FROM estudio WHERE id = 1").fetchone()
+    if est_row is not None and est_row["equipo_id"] is None:
+        cur_cent = conn.execute("""
+            INSERT INTO equipos (nombre, cantidad, visible_catalogo, dueno, es_recurso_interno)
+            VALUES ('Estudio (espacio)', 1, 0, 'Rambla', TRUE)
+            RETURNING id
+        """)
+        centinela_id = cur_cent.fetchone()["id"]
+        conn.execute("UPDATE estudio SET equipo_id = ? WHERE id = 1", (centinela_id,))
 
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
 

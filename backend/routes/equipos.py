@@ -502,7 +502,7 @@ def equipos_kpis(request: Request):
     conn = get_db()
     try:
         total = conn.execute(
-            "SELECT COUNT(*) FROM equipos WHERE eliminado_at IS NULL"
+            "SELECT COUNT(*) FROM equipos WHERE eliminado_at IS NULL AND es_recurso_interno = FALSE"
         ).fetchone()[0]
         en_uso_hoy = conn.execute("""
             SELECT COALESCE(SUM(pi.cantidad), 0)
@@ -607,6 +607,10 @@ def list_equipos(
     offset = (page - 1) * per_page
     base_sql = "FROM equipos e WHERE 1=1"
     params: list = []
+
+    # El centinela del Estudio (es_recurso_interno) no es un producto del
+    # catálogo: se excluye SIEMPRE (público y admin), filtros incluidos.
+    base_sql += " AND e.es_recurso_interno = FALSE"
 
     is_admin = bool(get_session(request))
     if solo_visibles or not is_admin:
@@ -2024,7 +2028,7 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
             FROM equipos e
             JOIN alquiler_items pi ON pi.equipo_id = e.id
             JOIN alquileres p ON p.id = pi.pedido_id
-            WHERE e.eliminado_at IS NULL
+            WHERE e.eliminado_at IS NULL AND e.es_recurso_interno = FALSE
             GROUP BY e.id, e.nombre, e.modelo, e.foto_url
             ORDER BY cant_pedidos DESC, revenue_total DESC
             LIMIT 10
@@ -2039,7 +2043,7 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
             FROM equipos e
             LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
             LEFT JOIN alquileres p ON p.id = pi.pedido_id
-            WHERE e.eliminado_at IS NULL
+            WHERE e.eliminado_at IS NULL AND e.es_recurso_interno = FALSE
             GROUP BY e.id, e.nombre, e.modelo, e.foto_url, e.valor_reposicion
             HAVING (MAX(p.fecha_desde) IS NULL OR MAX(p.fecha_desde) < (CURRENT_DATE - (? || ' days')::INTERVAL))
             ORDER BY ultimo_alquiler ASC NULLS FIRST
@@ -2079,7 +2083,7 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
             FROM equipos e
             LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
             LEFT JOIN alquileres p ON p.id = pi.pedido_id
-            WHERE e.eliminado_at IS NULL
+            WHERE e.eliminado_at IS NULL AND e.es_recurso_interno = FALSE
         """).fetchone()
 
         # ── Cuentas por cobrar ───────────────────────────────────────────
@@ -2146,7 +2150,8 @@ def admin_equipos_sin_serie(request: Request):
             SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url,
                    e.valor_reposicion, e.dueno, e.cantidad
             FROM equipos e
-            WHERE e.serie IS NULL OR TRIM(e.serie) = ''
+            WHERE e.es_recurso_interno = FALSE
+              AND (e.serie IS NULL OR TRIM(e.serie) = '')
             ORDER BY COALESCE(e.valor_reposicion, 0) DESC, e.id ASC
         """).fetchall()
         return {
@@ -2692,6 +2697,7 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
         equipos = conn.execute("""
             SELECT e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo
             FROM equipos e
+            WHERE e.es_recurso_interno = FALSE
             ORDER BY e.nombre
         """).fetchall()
 

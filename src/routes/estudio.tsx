@@ -97,10 +97,6 @@ function EstudioPage() {
         minHours: data.min_horas,
         openHour: data.open_hour,
         closeHour: data.close_hour,
-        packActivo: data.pack_activo,
-        packNombre: data.pack_nombre,
-        packDescripcion: data.pack_descripcion,
-        packPrecio: data.pack_precio,
       }
     : undefined;
 
@@ -265,7 +261,8 @@ function EstudioPage() {
       >
         <h2 className="font-display text-2xl sm:text-3xl">Reservar</h2>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Mínimo {minHours} horas. Te confirmamos disponibilidad por WhatsApp.
+          Mínimo {minHours} horas. Elegí día y horario y reservá online — te contactamos para
+          confirmar.
         </p>
         <div className="mt-6">
           <StudioBookingForm config={bookingConfig} />
