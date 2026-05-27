@@ -110,7 +110,7 @@ async function downloadFile(path: string, fallbackName: string) {
 }
 
 function DataIoPage() {
-  useDocumentTitle("Export catálogo · Back Office");
+  useDocumentTitle("Datos y backups · Back Office");
   const [busy, setBusy] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [lastImport, setLastImport] = useState<ImportResult | null>(null);
@@ -146,11 +146,13 @@ function DataIoPage() {
     setBusy(entity);
     try {
       const fallback =
-        entity.includes("-all") || entity === "full"
-          ? `${entity}.zip`
-          : entity.endsWith("-csv")
-            ? `${entity.slice(0, -4)}.csv`
-            : `${entity}.json`;
+        entity === "operacional-all"
+          ? "backup.zip"
+          : entity.includes("-all") || entity === "full"
+            ? `${entity}.zip`
+            : entity.endsWith("-csv")
+              ? `${entity.slice(0, -4)}.csv`
+              : `${entity}.json`;
       await downloadFile(`/api/admin/dataio/export?entity=${entity}`, fallback);
       toast.success(`Descargado: ${label}`);
     } catch (e) {
@@ -186,9 +188,10 @@ function DataIoPage() {
         <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
           Back-office
         </div>
-        <h1 className="font-display text-3xl text-ink">Export / Import de datos</h1>
+        <h1 className="font-display text-3xl text-ink">Datos y backups</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Catálogo (versionado en el repo) y datos operacionales (clientes/pedidos, ad-hoc).
+          Catálogo (versionado en el repo) y datos operacionales (clientes/pedidos): backup,
+          restaurar y borrar todo para arrancar de cero.
         </p>
       </header>
 
@@ -311,9 +314,32 @@ function DataIoPage() {
           </div>
         </div>
 
+        {/* Guía para probar antes del lanzamiento (lenguaje claro para el dueño) */}
+        <div className="rounded-md border border-amber-500/30 bg-card p-4 text-sm space-y-1.5">
+          <div className="font-medium text-ink">
+            Flujo recomendado para probar antes del lanzamiento
+          </div>
+          <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
+            <li>
+              <strong className="text-foreground">Descargá el backup</strong> (botón de abajo) y
+              guardalo en tu compu. Es un solo archivo <code>backup-fecha.zip</code>.
+            </li>
+            <li>Probá libremente: hacé pedidos como si fueras un cliente.</li>
+            <li>
+              Cuando quieras <strong className="text-foreground">arrancar de cero</strong>: botón
+              rojo “Borrar clientes y alquileres” → escribí <code>{RESET_CONFIRMATION}</code>.
+              Vuelve todo a cero, incluida la numeración de pedidos (el próximo vuelve a ser #1).
+            </li>
+            <li>
+              Si querés <strong className="text-foreground">recuperar lo que guardaste</strong>:
+              “Subir ZIP · dry-run” (te muestra qué va a pasar) y después “Subir ZIP · aplicar”.
+            </li>
+          </ol>
+        </div>
+
         <div className="flex flex-wrap gap-2 pt-2">
           <Button
-            onClick={() => handleDownload("operacional-all", "Operacional (clientes + alquileres)")}
+            onClick={() => handleDownload("operacional-all", "Backup (clientes + pedidos)")}
             disabled={busy !== null}
           >
             {busy === "operacional-all" ? (
@@ -321,7 +347,7 @@ function DataIoPage() {
             ) : (
               <Download className="size-4" />
             )}
-            Descargar ZIP (operacional)
+            Descargar backup
           </Button>
           <Button
             variant="outline"
