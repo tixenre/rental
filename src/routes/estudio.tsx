@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Camera, Check, MessageCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, MessageCircle } from "lucide-react";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { CartDrawer } from "@/components/rental/CartDrawer";
 import { StudioBookingForm } from "@/components/studio/StudioBookingForm";
@@ -297,7 +297,25 @@ function EstudioPage() {
   const minHours = data?.min_horas ?? STUDIO.minHours;
   const direccion = data?.direccion ?? "";
   const comoLlegar = data?.como_llegar ?? "";
+  const mapaUrl = data?.mapa_url ?? "";
+  const mapaEmbedUrl = data?.mapa_embed_url ?? "";
   const testimonios = data?.testimonios ?? [];
+  // Mostramos el bloque "Dónde estamos" si hay mapa configurado o dirección.
+  // El mapa puede venir solo (sin dirección) y al revés.
+  const tieneUbicacion = !!(mapaEmbedUrl || direccion);
+  // Link para "Ver en Google Maps": prioridad al link original del dueño (más
+  // corto, abre la app móvil); si no, generamos uno desde la dirección.
+  const verMapaHref =
+    mapaUrl ||
+    (direccion
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`
+      : "");
+  // src del iframe: el embed_url resuelto por el backend, o fallback con direccion.
+  const iframeSrc =
+    mapaEmbedUrl ||
+    (direccion
+      ? `https://www.google.com/maps?q=${encodeURIComponent(direccion)}&output=embed`
+      : "");
 
   // Foto principal para el hero: la marcada como principal o la primera.
   // El resto va a la galería (sin repetir la del hero).
@@ -436,21 +454,13 @@ function EstudioPage() {
               {packEquipos.length > 0 ? (
                 <StudioPackKit equipos={packEquipos} title="Equipos incluidos" />
               ) : (
-                <ul className="mt-4 space-y-2">
-                  {STUDIO.addon.includes.map((it) => (
-                    <li
-                      key={it}
-                      className="flex items-start gap-2 rounded-lg bg-ink/5 px-3 py-2 text-sm"
-                    >
-                      <Check className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>{it}</span>
-                    </li>
-                  ))}
-                </ul>
+                <p className="mt-4 rounded-lg bg-ink/5 px-3 py-2 text-sm text-muted-foreground">
+                  Llegá con la cámara — el día de la reserva te confirmamos qué luces y griperías
+                  están libres en tu franja.
+                </p>
               )}
               <p className="mt-3 text-xs text-muted-foreground">
-                Activá el pack al reservar (en el formulario) — se incluye lo que esté disponible en
-                tu franja.
+                Activá el pack al reservar — se incluye lo que esté disponible en tu franja.
               </p>
             </aside>
           )}
@@ -477,35 +487,44 @@ function EstudioPage() {
       </section>
 
       {/* ─── Ubicación ───────────────────────────────────────────────── */}
-      {direccion && (
+      {tieneUbicacion && (
         <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
           <h2 className="font-display text-2xl sm:text-3xl">Dónde estamos</h2>
           <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:items-start">
             <div>
-              <p className="text-base text-ink">{direccion}</p>
+              {direccion && <p className="text-base text-ink">{direccion}</p>}
               {comoLlegar && (
-                <p className="mt-3 whitespace-pre-line text-sm text-muted-foreground">
+                <p
+                  className={cn(
+                    direccion ? "mt-3" : "",
+                    "whitespace-pre-line text-sm text-muted-foreground",
+                  )}
+                >
                   {comoLlegar}
                 </p>
               )}
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 inline-flex items-center gap-2 rounded-full border hairline bg-surface px-4 py-2 text-sm text-ink transition hover:border-ink"
-              >
-                Ver en Google Maps
-              </a>
+              {verMapaHref && (
+                <a
+                  href={verMapaHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex items-center gap-2 rounded-full border hairline bg-surface px-4 py-2 text-sm text-ink transition hover:border-ink"
+                >
+                  Ver en Google Maps
+                </a>
+              )}
             </div>
-            <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border hairline bg-ink/5">
-              <iframe
-                title="Mapa del estudio"
-                src={`https://www.google.com/maps?q=${encodeURIComponent(direccion)}&output=embed`}
-                className="h-full w-full border-0"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
+            {iframeSrc && (
+              <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border hairline bg-ink/5">
+                <iframe
+                  title="Mapa del estudio"
+                  src={iframeSrc}
+                  className="h-full w-full border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+            )}
           </div>
         </section>
       )}
