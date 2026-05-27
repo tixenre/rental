@@ -285,7 +285,7 @@ def _safe_next_path(raw: str | None) -> str | None:
     s = raw.strip()
     if not s.startswith("/"):
         return None
-    if s.startswith("//"):  # protocol-relative → otro host
+    if s.startswith("//") or s.startswith("/\\"):  # protocol-relative → otro host
         return None
     if ":" in s.split("/", 2)[1] if "/" in s[1:] else False:  # noqa: E501
         # Defensivo: si algún componente trae ':' antes de un '/' adicional,

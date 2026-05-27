@@ -69,7 +69,8 @@ def _host_of(url: str) -> str:
     try:
         # urlparse es overkill; basta con cortar por '/' después del esquema.
         m = re.match(r"^https?://([^/?#]+)", url, re.IGNORECASE)
-        return (m.group(1) if m else "").lower().lstrip("www.")
+        host = (m.group(1) if m else "").lower()
+        return host.removeprefix("www.")
     except Exception:
         return ""
 

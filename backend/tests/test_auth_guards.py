@@ -169,6 +169,8 @@ class TestSafeNextPath:
     def test_protocol_relative_rechaza(self):
         # `//evil.com/x` se interpreta como `https://evil.com/x` → open redirect
         assert self._safe("//evil.com/path") is None
+        # Backslash al inicio: algunos navegadores lo tratan como `//` (open redirect).
+        assert self._safe("/\\evil.com/path") is None
 
     def test_url_absoluta_rechaza(self):
         assert self._safe("https://evil.com/path") is None
