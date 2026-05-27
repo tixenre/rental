@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -7,7 +6,6 @@ import {
   Check,
   Clock,
   Loader2,
-  LogIn,
   MessageCircle,
   Minus,
   Plus,
@@ -15,6 +13,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
@@ -139,6 +144,45 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Round-trip de login: dejamos en la URL la franja elegida (d/h/dur/pack)
+ * antes de mandar al OAuth. Al volver, la restoramos y limpiamos la URL. */
+const QUERY_KEYS = { d: "d", h: "h", dur: "dur", pack: "pack" } as const;
+
+function readBookingFromQuery() {
+  if (typeof window === "undefined") return null;
+  const sp = new URLSearchParams(window.location.search);
+  const d = sp.get(QUERY_KEYS.d);
+  const h = sp.get(QUERY_KEYS.h);
+  const dur = sp.get(QUERY_KEYS.dur);
+  const pack = sp.get(QUERY_KEYS.pack);
+  if (!d && !h && !dur && !pack) return null;
+  // Validación liviana: si fecha está, tiene que parsear a Date razonable.
+  let parsedDate: Date | undefined;
+  if (d) {
+    const [y, mo, da] = d.split("-").map((n) => parseInt(n, 10));
+    if (y && mo && da) {
+      const dt = new Date(y, mo - 1, da);
+      if (!isNaN(dt.getTime())) parsedDate = dt;
+    }
+  }
+  return {
+    date: parsedDate,
+    start: h && /^\d{2}:\d{2}$/.test(h) ? h : null,
+    hours: dur && /^\d+$/.test(dur) ? parseInt(dur, 10) : null,
+    withPack: pack === "1",
+  };
+}
+
+function clearBookingQuery() {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  Object.values(QUERY_KEYS).forEach((k) => url.searchParams.delete(k));
+  // Solo reemplazamos si quedó algo distinto — evita un history entry innecesario.
+  if (url.toString() !== window.location.href) {
+    window.history.replaceState({}, "", url.toString());
+  }
+}
+
 export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) {
   const pricePerHour = config?.pricePerHour ?? STUDIO.pricePerHour;
   const minHours = config?.minHours ?? STUDIO.minHours;
@@ -149,27 +193,35 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
   const packDescripcion = config?.packDescripcion ?? STUDIO.addon.description;
   const packPrecio = config?.packPrecio ?? 0;
 
-  const [date, setDate] = useState<Date | undefined>(undefined);
-  const [startSlot, setStartSlot] = useState<string>(`${pad(openHour)}:00`);
-  const [hours, setHours] = useState<number>(minHours);
+  // Estado inicial: si volvimos del OAuth con la franja en la URL, la restoramos
+  // y limpiamos los query params (evita refrescar = re-disparar el flujo).
+  const initial = useMemo(() => readBookingFromQuery(), []);
+  const [date, setDate] = useState<Date | undefined>(initial?.date);
+  const [startSlot, setStartSlot] = useState<string>(initial?.start ?? `${pad(openHour)}:00`);
+  const [hours, setHours] = useState<number>(initial?.hours ?? minHours);
+  const [withPack, setWithPack] = useState<boolean>(initial?.withPack ?? false);
+  // Banner de "sesión iniciada" si volvimos del OAuth — se muestra una vez,
+  // hasta que el usuario apriete Reservar o cierre el flag (auto-clear en 12s).
+  const [returnedFromLogin, setReturnedFromLogin] = useState<boolean>(!!initial);
 
-  // Login obligatorio: los datos del cliente salen de la sesión (no se piden acá).
-  // Pre-chequeo con authedFetch (mismo patrón que CartDrawer / v2-B).
+  useEffect(() => {
+    if (initial) {
+      clearBookingQuery();
+      const t = setTimeout(() => setReturnedFromLogin(false), 12_000);
+      return () => clearTimeout(t);
+    }
+  }, [initial]);
+
+  // Pre-chequeo de sesión: silencioso. No bloquea ni renderiza paso. Lo usamos
+  // para decidir, al apretar Reservar, si abrimos el modal de login o mandamos.
   const [auth, setAuth] = useState<"checking" | "in" | "out">("checking");
-  const [clienteNombre, setClienteNombre] = useState<string>("");
 
   useEffect(() => {
     let cancelado = false;
     authedFetch("/api/cliente/me")
-      .then(async (r) => {
+      .then((r) => {
         if (cancelado) return;
-        if (r.ok) {
-          const me = await r.json().catch(() => ({}));
-          setClienteNombre(me?.nombre ?? "");
-          setAuth("in");
-        } else {
-          setAuth("out");
-        }
+        setAuth(r.ok ? "in" : "out");
       })
       .catch(() => {
         if (!cancelado) setAuth("out");
@@ -179,7 +231,6 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
     };
   }, []);
 
-  const [withPack, setWithPack] = useState(false);
   const [packEquipos, setPackEquipos] = useState<EstudioPackEquipo[]>([]);
 
   const [disponibilidad, setDisponibilidad] = useState<Disponibilidad>("idle");
@@ -188,6 +239,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
   const [confirmada, setConfirmada] = useState<{ numero: number | null } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   const slots = useMemo(
     () => buildTimeSlots(openHour, closeHour, minHours),
@@ -283,7 +335,18 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
     };
   }, [fechaISO, startSlot, hours]);
 
-  const canReserve = !!fechaISO && disponibilidad === "libre" && auth === "in" && !submitting;
+  // El botón Reservar se habilita con fecha + disponibilidad libre. El login
+  // ya no es un paso visible — si falta sesión, abrimos el modal al apretar.
+  const canSubmit = !!fechaISO && disponibilidad === "libre" && !submitting;
+
+  const handleReservarClick = () => {
+    if (!canSubmit) return;
+    if (auth !== "in") {
+      setLoginModalOpen(true);
+      return;
+    }
+    void handleReservar();
+  };
 
   const handleReservar = async () => {
     if (!fechaISO) return;
@@ -297,16 +360,35 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
         con_pack: withPack,
       });
       setConfirmada({ numero: res.numero_pedido ?? null });
+      setReturnedFromLogin(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "No se pudo crear la reserva";
       // Sesión vencida entre el pre-chequeo y el submit → pedir login de nuevo.
-      if (/401|sesión/i.test(msg)) setAuth("out");
+      if (/401|sesión/i.test(msg)) {
+        setAuth("out");
+        setLoginModalOpen(true);
+      }
       // Si chocó con otra reserva, refrescamos el estado a ocupado.
       if (/disponible|409/.test(msg)) setDisponibilidad("ocupado");
       setErrorMsg(msg);
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleContinuarConGoogle = () => {
+    if (!fechaISO) return;
+    // Codificamos la franja para volver acá tras el OAuth. El backend valida
+    // que `next` sea un path interno (no open-redirect).
+    const inner = new URLSearchParams({
+      [QUERY_KEYS.d]: fechaISO,
+      [QUERY_KEYS.h]: startSlot,
+      [QUERY_KEYS.dur]: String(hours),
+      [QUERY_KEYS.pack]: withPack ? "1" : "0",
+    });
+    const nextPath = `/estudio?${inner.toString()}`;
+    const outer = new URLSearchParams({ next: nextPath });
+    window.location.href = `/cliente/auth/google?${outer.toString()}`;
   };
 
   const handleWhatsapp = () => {
@@ -358,8 +440,18 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
     );
   }
 
+  const ctaLabel =
+    auth === "out" ? "Iniciar sesión y reservar" : auth === "checking" ? "Reservar" : "Reservar";
+
   return (
     <div className="space-y-4">
+      {returnedFromLogin && auth === "in" && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">
+          <span className="font-medium">Sesión iniciada.</span> Revisá los datos y apretá Reservar
+          para confirmar tu sesión en el estudio.
+        </div>
+      )}
+
       {/* ── 1. Cuándo ─────────────────────────────────────────────────── */}
       <Section
         step={1}
@@ -445,8 +537,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
           </div>
         </div>
 
-        {/* Readout: hora de fin + hint según estado. Es el modelo mental real
-            del usuario ("estoy de tal hora a tal hora"). */}
+        {/* Readout: hora de fin + hint según estado. */}
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           {date ? (
             <span className="inline-flex items-center gap-1.5 text-ink">
@@ -467,45 +558,8 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
         </div>
       </Section>
 
-      {/* ── 2. Tu cuenta ──────────────────────────────────────────────── */}
-      {/* Login obligatorio (v2-B): si está logueado, mostramos la cuenta y
-          listo; si no, redirigimos a /cliente/login. No pedimos datos acá. */}
-      <Section step={2} title="Tu cuenta">
-        {auth === "checking" && (
-          <div className="flex items-center gap-2 rounded-md border hairline bg-background px-3 py-2.5 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Verificando tu sesión…
-          </div>
-        )}
-        {auth === "out" && (
-          <div>
-            <p className="text-sm text-ink">
-              Iniciá sesión para reservar — usamos los datos de tu cuenta.
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Si todavía no tenés cuenta, creá una en 1 minuto.
-            </p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <Button asChild className="bg-amber text-ink hover:bg-amber/90">
-                <Link to="/cliente/login">
-                  <LogIn className="mr-2 h-4 w-4" /> Iniciar sesión
-                </Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link to="/cliente/registro">Crear cuenta</Link>
-              </Button>
-            </div>
-          </div>
-        )}
-        {auth === "in" && (
-          <div className="flex items-center justify-between gap-3 rounded-md border hairline bg-background px-3 py-2.5 text-sm">
-            <span className="text-muted-foreground">Reservás como</span>
-            <span className="font-semibold text-ink truncate">{clienteNombre || "tu cuenta"}</span>
-          </div>
-        )}
-      </Section>
-
-      {/* ── 3. Confirmar (pack + total + CTAs) ────────────────────────── */}
-      <Section step={3} title="Confirmar y reservar">
+      {/* ── 2. Confirmar (pack + total + CTAs) ────────────────────────── */}
+      <Section step={2} title="Confirmar y reservar">
         {/* Pack toggle inline — el detalle de qué incluye vive en el aside
             de la página (no duplicar acá). */}
         {packActivo && (
@@ -566,8 +620,8 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
         )}
 
         <Button
-          onClick={handleReservar}
-          disabled={!canReserve}
+          onClick={handleReservarClick}
+          disabled={!canSubmit}
           className="mt-4 w-full bg-amber text-ink hover:bg-amber/90"
           size="lg"
         >
@@ -576,7 +630,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Reservando…
             </>
           ) : (
-            "Reservar"
+            ctaLabel
           )}
         </Button>
 
@@ -601,17 +655,83 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
             Elegí una fecha para continuar.
           </p>
         )}
-        {date && disponibilidad === "libre" && auth === "out" && (
-          <p className="mt-3 text-center text-xs text-muted-foreground">
-            Sólo falta iniciar sesión para reservar.
-          </p>
-        )}
         {date && disponibilidad === "ocupado" && (
           <p className="mt-3 text-center text-xs text-red-700">
             Probá otro horario o fecha — esa franja está ocupada.
           </p>
         )}
       </Section>
+
+      {/* ── Modal de login (se abre al apretar Reservar sin sesión) ───── */}
+      <Dialog open={loginModalOpen} onOpenChange={setLoginModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Iniciá sesión para reservar</DialogTitle>
+            <DialogDescription>
+              Usamos los datos de tu cuenta — no te pedimos formularios.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Recap de lo que está por reservar — para que confirme antes de irse */}
+          <div className="rounded-xl border hairline bg-surface px-4 py-3 text-sm">
+            <div className="font-medium text-ink">{dateLabelFull}</div>
+            <div className="mt-1 text-muted-foreground">
+              <span className="font-medium text-ink tabular">
+                {startSlot} a {endTime}
+              </span>{" "}
+              · {hours} h
+            </div>
+            {withPack && (
+              <div className="mt-1 text-muted-foreground">
+                + <span className="text-ink">{packNombre}</span>
+              </div>
+            )}
+            <div className="mt-2 flex items-baseline justify-between border-t hairline pt-2">
+              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                Total estimado
+              </span>
+              <span className="font-semibold tabular">
+                {total > 0 ? formatARS(total) : "A consultar"}
+              </span>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleContinuarConGoogle}
+            className="w-full bg-amber text-ink hover:bg-amber/90"
+            size="lg"
+          >
+            <GoogleIcon /> <span className="ml-2">Continuar con Google</span>
+          </Button>
+
+          <p className="text-center text-xs text-muted-foreground">
+            Te llevamos a Google a iniciar sesión y volvés acá automáticamente para confirmar.
+          </p>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.7 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13 17.8 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.1z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.5 28.7A14.6 14.6 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.7 10.7l7.8-6z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.6-5.9c-2 1.4-4.6 2.2-7.6 2.2-6.2 0-11.5-4.2-13.4-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z"
+      />
+    </svg>
   );
 }

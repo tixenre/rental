@@ -138,3 +138,45 @@ class TestRequireCliente:
         result = require_cliente(FakeRequest())
         assert result["email"] == "cliente@gmail.com"
         assert result["cliente_id"] == 42
+
+
+# ── _safe_next_path (open-redirect guard del OAuth flow) ──────────────────────
+
+
+class TestSafeNextPath:
+    """Valida que solo aceptamos paths internos, no open-redirect.
+
+    Cubre la cookie `oauth_next_cliente` que setea /cliente/auth/google con
+    `?next=` y que el callback usa para redirigir post-login.
+    """
+
+    def _safe(self, raw):
+        from routes.auth import _safe_next_path
+        return _safe_next_path(raw)
+
+    def test_none_y_vacio_devuelven_none(self):
+        assert self._safe(None) is None
+        assert self._safe("") is None
+        assert self._safe("   ") is None
+
+    def test_path_simple_es_aceptado(self):
+        assert self._safe("/estudio") == "/estudio"
+        assert self._safe("/cliente/portal") == "/cliente/portal"
+
+    def test_path_con_query_es_aceptado(self):
+        assert self._safe("/estudio?d=2026-06-01&h=10:00") == "/estudio?d=2026-06-01&h=10:00"
+
+    def test_protocol_relative_rechaza(self):
+        # `//evil.com/x` se interpreta como `https://evil.com/x` → open redirect
+        assert self._safe("//evil.com/path") is None
+
+    def test_url_absoluta_rechaza(self):
+        assert self._safe("https://evil.com/path") is None
+        assert self._safe("http://evil.com/path") is None
+
+    def test_path_sin_slash_inicial_rechaza(self):
+        assert self._safe("estudio") is None
+        assert self._safe("../estudio") is None
+
+    def test_longitud_excesiva_rechaza(self):
+        assert self._safe("/" + ("a" * 3000)) is None

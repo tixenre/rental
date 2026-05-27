@@ -273,9 +273,38 @@ def public_maps_key():
 
 # ── OAuth para clientes ───────────────────────────────────────────────────────
 
+def _safe_next_path(raw: str | None) -> str | None:
+    """Valida que `next` sea una ruta interna segura (no open-redirect).
+
+    Acepta solo paths que empiezan con un único `/` (no `//`, que sería
+    protocol-relative y abriría a otro dominio). Rechaza esquemas explícitos.
+    Devuelve la ruta validada o None.
+    """
+    if not raw:
+        return None
+    s = raw.strip()
+    if not s.startswith("/"):
+        return None
+    if s.startswith("//"):  # protocol-relative → otro host
+        return None
+    if ":" in s.split("/", 2)[1] if "/" in s[1:] else False:  # noqa: E501
+        # Defensivo: si algún componente trae ':' antes de un '/' adicional,
+        # podría intentarse `/\\example.com:443/x` u otros tricks. Rechazamos.
+        return None
+    # Tope de longitud razonable (URL-encoded params se inflan).
+    if len(s) > 2048:
+        return None
+    return s
+
+
 @router.get("/cliente/auth/google")
 def cliente_auth_google(request: Request):
-    """Inicia el flujo OAuth de Google para clientes."""
+    """Inicia el flujo OAuth de Google para clientes.
+
+    Si llega `?next=<path>`, la guardamos en cookie para volver ahí después del
+    login en vez de mandar siempre a /cliente/portal. Solo aceptamos paths
+    internos (validación en `_safe_next_path` — no open-redirect).
+    """
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         raise HTTPException(503, "Google OAuth no configurado en el servidor.")
     client = OAuth2Client(
@@ -292,6 +321,12 @@ def cliente_auth_google(request: Request):
     res = RedirectResponse(uri, status_code=302)
     res.set_cookie("oauth_state_cliente", state, httponly=True, samesite="lax",
                    secure=COOKIE_SECURE, max_age=600)
+    next_path = _safe_next_path(request.query_params.get("next"))
+    if next_path:
+        res.set_cookie(
+            "oauth_next_cliente", next_path, httponly=True, samesite="lax",
+            secure=COOKIE_SECURE, max_age=600,
+        )
     return res
 
 
@@ -357,10 +392,14 @@ def cliente_auth_callback(request: Request):
         conn.close()
 
     if row:
-        # Cliente conocido → crear sesión directamente
+        # Cliente conocido → crear sesión directamente. Si llegó `next` válido
+        # (cookie seteada por /cliente/auth/google), volvemos ahí en vez de al
+        # portal — habilita el flujo de "iniciar sesión y volver a /estudio".
         session_data = {"email": email, "name": name, "role": "cliente", "cliente_id": row["id"]}
         token = signer.dumps(session_data)
-        safe_url = f"{FRONTEND_BASE}/cliente/portal".replace('"', "%22")
+        next_path = _safe_next_path(request.cookies.get("oauth_next_cliente"))
+        target = f"{FRONTEND_BASE}{next_path}" if next_path else f"{FRONTEND_BASE}/cliente/portal"
+        safe_url = target.replace('"', "%22")
         res = HTMLResponse(
             f'<!DOCTYPE html><html><head>'
             f'<script>window.location.replace("{safe_url}")</script>'
@@ -369,11 +408,15 @@ def cliente_auth_callback(request: Request):
         res.set_cookie("session", token, httponly=True, samesite="lax",
                        secure=COOKIE_SECURE, max_age=SESSION_MAX_AGE)
         res.delete_cookie("oauth_state_cliente")
+        res.delete_cookie("oauth_next_cliente")
         return res
     else:
-        # Cliente nuevo → token de registro (válido 30 min)
+        # Cliente nuevo → token de registro (válido 30 min). El `next` lo
+        # descartamos: el flujo de registro lleva su propio camino y el cliente
+        # podrá navegar al destino después de completar el alta.
         reg_token = signer.dumps({"tipo": "registro", "email": email, "name": name})
         redirect_url = f"{FRONTEND_BASE}/cliente/registro?t={reg_token}"
         res = RedirectResponse(redirect_url, status_code=303)
         res.delete_cookie("oauth_state_cliente")
+        res.delete_cookie("oauth_next_cliente")
         return res
