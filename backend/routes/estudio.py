@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from admin_guard import require_admin
-from database import get_db, now_ar, to_datetime
+from database import MARCA_SUBQUERY, get_db, now_ar, to_datetime
 from routes.alquileres import (
     ESTADOS_RESERVADO,
     _check_stock,
@@ -455,9 +455,8 @@ def _pack_disponible(conn, fecha_desde, fecha_hasta, exclude_pedido_id: int | No
     if not libres:
         return []
     rows = conn.execute(
-        """
-        SELECT e.id, e.nombre, e.foto_url,
-               (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca
+        f"""
+        SELECT e.id, e.nombre, e.foto_url, {MARCA_SUBQUERY}
         FROM equipos e
         WHERE e.id = ANY(?)
         ORDER BY e.nombre
@@ -480,9 +479,8 @@ def _pack_curado(conn) -> list[dict]:
     """Lista curada del pack para el admin: todos los equipos elegidos (en orden),
     con nombre/marca/foto — sin filtrar por disponibilidad (eso es del público)."""
     rows = conn.execute(
-        """
-        SELECT pe.equipo_id AS id, pe.orden, e.nombre, e.foto_url,
-               (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca
+        f"""
+        SELECT pe.equipo_id AS id, pe.orden, e.nombre, e.foto_url, {MARCA_SUBQUERY}
         FROM estudio_pack_equipos pe
         JOIN equipos e ON e.id = pe.equipo_id
         WHERE pe.estudio_id = 1
