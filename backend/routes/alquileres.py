@@ -17,6 +17,7 @@ from admin_guard import require_admin
 from services.email import send_email
 from services.email.service import get_admin_to
 from services.precios import calcular_total, jornadas_periodo
+from routes.seo import SITE_URL
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -746,6 +747,7 @@ def _pedido_email_context(pedido: dict) -> dict:
         "items_html": items_html,
         "items_text": items_text,
         "admin_url": f"/admin/pedidos/{pedido.get('id')}",
+        "portal_url": f"{SITE_URL}/cliente/portal",
     }
 
 
