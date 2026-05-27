@@ -39,6 +39,11 @@ const faqSchema = z.object({
   a: z.string().min(1, "Requerido"),
 });
 
+const testimonioSchema = z.object({
+  autor: z.string().min(1, "Requerido"),
+  texto: z.string().min(1, "Requerido"),
+});
+
 const schema = z.object({
   nombre: z.string().min(1, "Requerido"),
   tagline: z.string(),
@@ -55,6 +60,9 @@ const schema = z.object({
   pack_precio: z.coerce.number().int().min(0),
   features: z.array(featureSchema),
   faq: z.array(faqSchema),
+  direccion: z.string(),
+  como_llegar: z.string(),
+  testimonios: z.array(testimonioSchema),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -76,6 +84,9 @@ function configToForm(c: EstudioConfig): FormValues {
     pack_precio: c.pack_precio,
     features: c.features ?? [],
     faq: c.faq ?? [],
+    direccion: c.direccion,
+    como_llegar: c.como_llegar,
+    testimonios: c.testimonios ?? [],
   };
 }
 
@@ -534,6 +545,7 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
 
   const featuresArr = useFieldArray({ control, name: "features" });
   const faqArr = useFieldArray({ control, name: "faq" });
+  const testimoniosArr = useFieldArray({ control, name: "testimonios" });
 
   const packActivo = watch("pack_activo");
 
@@ -543,6 +555,7 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
         ...values,
         features_json: JSON.stringify(values.features),
         faq_json: JSON.stringify(values.faq),
+        testimonios_json: JSON.stringify(values.testimonios),
       }),
     onSuccess: () => {
       toast.success("Estudio guardado");
@@ -563,6 +576,24 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
         </Field>
         <Field label="Descripción" error={errors.descripcion?.message}>
           <Textarea {...register("descripcion")} rows={3} />
+        </Field>
+      </Section>
+
+      {/* ── Ubicación ── */}
+      <Section title="Ubicación">
+        <p className="-mt-1 text-xs text-muted-foreground">
+          La dirección alimenta el mapa de la página pública. Si está vacía, no se muestra el
+          bloque.
+        </p>
+        <Field label="Dirección" error={errors.direccion?.message}>
+          <Input {...register("direccion")} placeholder="Av. Colón 1234, Mar del Plata" />
+        </Field>
+        <Field label="Cómo llegar / estacionamiento" error={errors.como_llegar?.message}>
+          <Textarea
+            {...register("como_llegar")}
+            rows={2}
+            placeholder="Entrada de autos por el frente, estacionamiento sobre la calle…"
+          />
         </Field>
       </Section>
 
@@ -673,6 +704,47 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
           onClick={() => faqArr.append({ q: "", a: "" })}
         >
           <Plus className="h-3.5 w-3.5 mr-1" /> Añadir pregunta
+        </Button>
+      </Section>
+
+      {/* ── Testimonios / prueba social ── */}
+      <Section title="Testimonios (prueba social)">
+        <p className="text-xs text-muted-foreground mb-3">
+          Aparecen en la página pública. Si no hay ninguno, la sección no se muestra.
+        </p>
+        <div className="space-y-3">
+          {testimoniosArr.fields.map((f, i) => (
+            <div key={f.id} className="rounded-xl border hairline p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <Input
+                  {...register(`testimonios.${i}.autor`)}
+                  placeholder="Autor (ej. Productora X)"
+                  className="flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => testimoniosArr.remove(i)}
+                  className="mt-2 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+              <Textarea
+                {...register(`testimonios.${i}.texto`)}
+                placeholder="Lo que dijeron del estudio"
+                rows={2}
+              />
+            </div>
+          ))}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-2"
+          onClick={() => testimoniosArr.append({ autor: "", texto: "" })}
+        >
+          <Plus className="h-3.5 w-3.5 mr-1" /> Añadir testimonio
         </Button>
       </Section>
 

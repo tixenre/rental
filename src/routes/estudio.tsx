@@ -1,19 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Camera,
-  Check,
-  MessageCircle,
-  Lightbulb,
-  Snowflake,
-  Users,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, Check, MessageCircle } from "lucide-react";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { CartDrawer } from "@/components/rental/CartDrawer";
 import { StudioBookingForm } from "@/components/studio/StudioBookingForm";
+import { StudioPackKit } from "@/components/studio/StudioPackKit";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import { apiGetEstudio, type EstudioFoto } from "@/lib/api";
 import { formatARS } from "@/lib/format";
@@ -300,8 +292,12 @@ function EstudioPage() {
   const packNombre = data?.pack_nombre ?? STUDIO.addon.name;
   const packDescripcion = data?.pack_descripcion ?? STUDIO.addon.description;
   const packPrecio = data?.pack_precio ?? STUDIO.addon.pricePerDay;
+  const packEquipos = useMemo(() => data?.pack_equipos ?? [], [data?.pack_equipos]);
   const precioHora = data?.precio_hora ?? STUDIO.pricePerHour;
   const minHours = data?.min_horas ?? STUDIO.minHours;
+  const direccion = data?.direccion ?? "";
+  const comoLlegar = data?.como_llegar ?? "";
+  const testimonios = data?.testimonios ?? [];
 
   // Foto principal para el hero: la marcada como principal o la primera.
   // El resto va a la galería (sin repetir la del hero).
@@ -366,10 +362,11 @@ function EstudioPage() {
             </div>
           </div>
 
-          {/* Foto hero — grande, ratio cinematográfico en mobile, 4/3 en desktop */}
-          <div className="order-1 lg:order-2">
+          {/* Foto hero — full-bleed en mobile (cancela el px-4 del section con
+              -mx-4 y saca el redondeo); en desktop vuelve a la celda del grid. */}
+          <div className="order-1 lg:order-2 -mx-4 lg:mx-0">
             {fotoHero ? (
-              <div className="aspect-[16/10] sm:aspect-[4/3] w-full overflow-hidden rounded-2xl bg-ink/5">
+              <div className="aspect-[16/10] sm:aspect-[4/3] w-full overflow-hidden rounded-none lg:rounded-2xl bg-ink/5">
                 <img
                   src={fotoHero.url}
                   alt={nombre}
@@ -379,7 +376,7 @@ function EstudioPage() {
               </div>
             ) : (
               <PhotoPlaceholder
-                className="aspect-[16/10] sm:aspect-[4/3] w-full"
+                className="aspect-[16/10] sm:aspect-[4/3] w-full rounded-none lg:rounded-xl"
                 label="FOTO PRINCIPAL"
               />
             )}
@@ -436,17 +433,21 @@ function EstudioPage() {
               <div className="mt-3 text-2xl font-semibold tabular">
                 {packPrecio > 0 ? formatARS(packPrecio) : "Consultar"}
               </div>
-              <ul className="mt-4 space-y-2">
-                {STUDIO.addon.includes.map((it) => (
-                  <li
-                    key={it}
-                    className="flex items-start gap-2 rounded-lg bg-ink/5 px-3 py-2 text-sm"
-                  >
-                    <Check className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>{it}</span>
-                  </li>
-                ))}
-              </ul>
+              {packEquipos.length > 0 ? (
+                <StudioPackKit equipos={packEquipos} title="Equipos incluidos" />
+              ) : (
+                <ul className="mt-4 space-y-2">
+                  {STUDIO.addon.includes.map((it) => (
+                    <li
+                      key={it}
+                      className="flex items-start gap-2 rounded-lg bg-ink/5 px-3 py-2 text-sm"
+                    >
+                      <Check className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{it}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <p className="mt-3 text-xs text-muted-foreground">
                 Activá el pack al reservar (en el formulario) — se incluye lo que esté disponible en
                 tu franja.
@@ -456,11 +457,12 @@ function EstudioPage() {
         </div>
       </section>
 
-      {/* ─── Qué incluye / características ───────────────────────────── */}
+      {/* ─── Características del espacio ─────────────────────────────── */}
       <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-        <h2 className="font-display text-2xl sm:text-3xl">Qué incluye</h2>
+        <h2 className="font-display text-2xl sm:text-3xl">Características del espacio</h2>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Todo lo que necesitás para producir sin sobresaltos.
+          Lo que vas a encontrar en el lugar. No incluye equipos ni staff — el equipamiento es el
+          pack opcional de arriba.
         </p>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {features.map((f) => (
@@ -472,25 +474,41 @@ function EstudioPage() {
             </div>
           ))}
         </div>
-
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Feature
-            icon={<Lightbulb className="h-5 w-5" />}
-            title="Catálogo a mano"
-            desc="Sumás cámaras, lentes o luces extra al pedido del estudio en un mismo flujo."
-          />
-          <Feature
-            icon={<Snowflake className="h-5 w-5" />}
-            title="Espacio confortable"
-            desc="Climatización, baño privado y zona de descanso para staff y modelos."
-          />
-          <Feature
-            icon={<Users className="h-5 w-5" />}
-            title="Atendido por nosotros"
-            desc="No es un coworking automatizado. Te recibimos y te resolvemos dudas técnicas."
-          />
-        </div>
       </section>
+
+      {/* ─── Ubicación ───────────────────────────────────────────────── */}
+      {direccion && (
+        <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
+          <h2 className="font-display text-2xl sm:text-3xl">Dónde estamos</h2>
+          <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:items-start">
+            <div>
+              <p className="text-base text-ink">{direccion}</p>
+              {comoLlegar && (
+                <p className="mt-3 whitespace-pre-line text-sm text-muted-foreground">
+                  {comoLlegar}
+                </p>
+              )}
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-flex items-center gap-2 rounded-full border hairline bg-surface px-4 py-2 text-sm text-ink transition hover:border-ink"
+              >
+                Ver en Google Maps
+              </a>
+            </div>
+            <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border hairline bg-ink/5">
+              <iframe
+                title="Mapa del estudio"
+                src={`https://www.google.com/maps?q=${encodeURIComponent(direccion)}&output=embed`}
+                className="h-full w-full border-0"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ─── FAQ ─────────────────────────────────────────────────────── */}
       {faq.length > 0 && (
@@ -502,6 +520,23 @@ function EstudioPage() {
                 <summary className="cursor-pointer list-none font-medium">{f.q}</summary>
                 <p className="mt-2 text-sm text-muted-foreground">{f.a}</p>
               </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ─── Prueba social ───────────────────────────────────────────── */}
+      {testimonios.length > 0 && (
+        <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
+          <h2 className="font-display text-2xl sm:text-3xl">Trabajaron acá</h2>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {testimonios.map((t, i) => (
+              <figure key={i} className="rounded-xl border hairline bg-surface p-5">
+                <blockquote className="text-sm leading-relaxed text-ink">“{t.texto}”</blockquote>
+                <figcaption className="mt-3 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                  {t.autor}
+                </figcaption>
+              </figure>
             ))}
           </div>
         </section>
@@ -539,17 +574,5 @@ function EstudioPage() {
 
       <CartDrawer allEquipos={[]} />
     </PublicLayout>
-  );
-}
-
-function Feature({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
-  return (
-    <div className="rounded-xl border hairline bg-surface p-5 hover:border-ink/20 transition">
-      <div className="grid h-10 w-10 place-items-center rounded-md bg-amber-soft text-ink">
-        {icon}
-      </div>
-      <h3 className="mt-3 font-display text-lg text-ink">{title}</h3>
-      <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
-    </div>
   );
 }

@@ -207,8 +207,13 @@ export type EstudioConfig = {
   pack_precio: number;
   features: Array<{ label: string; value: string }> | null;
   faq: Array<{ q: string; a: string }> | null;
+  direccion: string;
+  como_llegar: string;
+  testimonios: Array<{ autor: string; texto: string }> | null;
   updated_at: string | null;
   fotos: EstudioFoto[];
+  // Lista curada del pack con cantidades (stock total) para la ficha pública.
+  pack_equipos?: EstudioPackEquipo[];
 };
 
 export function apiGetEstudio() {

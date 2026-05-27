@@ -6,19 +6,23 @@ import type { EstudioPackEquipo } from "@/lib/api";
  * reusando el patrón visual de rental/KitSection. Se alimenta de la disponibilidad
  * de la franja: lo que llega ya está filtrado (best-effort) a lo disponible.
  */
-export function StudioPackKit({ equipos }: { equipos: EstudioPackEquipo[] }) {
+export function StudioPackKit({
+  equipos,
+  title = "Incluye en esta franja",
+  emptyText = "No hay equipos del pack disponibles en esta franja.",
+}: {
+  equipos: EstudioPackEquipo[];
+  title?: string;
+  emptyText?: string;
+}) {
   if (equipos.length === 0) {
-    return (
-      <p className="mt-2 text-xs text-muted-foreground">
-        No hay equipos del pack disponibles en esta franja.
-      </p>
-    );
+    return <p className="mt-2 text-xs text-muted-foreground">{emptyText}</p>;
   }
 
   return (
     <div className="mt-3 space-y-2">
       <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-ink">
-        <Package className="h-3 w-3" /> Incluye en esta franja
+        <Package className="h-3 w-3" /> {title}
         <span className="ml-1 text-muted-foreground">({equipos.length})</span>
       </div>
       <ul className="grid gap-1.5 sm:grid-cols-2">

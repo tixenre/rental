@@ -1648,6 +1648,9 @@ export type EstudioConfig = {
   pack_precio: number;
   features: Array<{ label: string; value: string }> | null;
   faq: Array<{ q: string; a: string }> | null;
+  direccion: string;
+  como_llegar: string;
+  testimonios: Array<{ autor: string; texto: string }> | null;
   updated_at: string | null;
   fotos: EstudioFoto[];
 };
@@ -1668,6 +1671,9 @@ export type EstudioInput = {
   pack_precio?: number;
   features_json?: string;
   faq_json?: string;
+  direccion?: string;
+  como_llegar?: string;
+  testimonios_json?: string;
 };
 
 export type FotoOrdenItem = { id: number; orden: number; es_principal: boolean };
