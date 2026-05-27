@@ -213,14 +213,20 @@ export function apiGetEstudio() {
   return get<EstudioConfig>("/api/estudio");
 }
 
-/** ¿El estudio está libre en [fecha start, +horas]? El backend aplica el
- *  buffer propio del estudio. */
+export type EstudioPackEquipo = {
+  id: number;
+  nombre: string;
+  marca: string | null;
+  cantidad: number;
+};
+
+/** ¿El estudio está libre en [fecha start, +horas]? El backend aplica el buffer
+ *  propio del estudio. `pack` = equipos disponibles en la franja (Grip/Luz/Mod). */
 export function apiGetEstudioDisponibilidad(fecha: string, start: string, horas: number) {
-  return get<{ libre: boolean; motivo?: string | null }>("/api/estudio/disponibilidad", {
-    fecha,
-    start,
-    horas: String(horas),
-  });
+  return get<{ libre: boolean; motivo?: string | null; pack?: EstudioPackEquipo[] }>(
+    "/api/estudio/disponibilidad",
+    { fecha, start, horas: String(horas) },
+  );
 }
 
 export type EstudioReservaBody = {
@@ -230,6 +236,7 @@ export type EstudioReservaBody = {
   cliente_nombre: string;
   cliente_email?: string;
   cliente_telefono?: string;
+  con_pack?: boolean;
 };
 
 /** Crea una reserva real del estudio (entra como solicitud, estado='presupuesto'). */

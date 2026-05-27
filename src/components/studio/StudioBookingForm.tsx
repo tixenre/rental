@@ -4,17 +4,26 @@ import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, Minus, Plus, MessageCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
-import { apiGetEstudioDisponibilidad, apiCrearReservaEstudio } from "@/lib/api";
+import {
+  apiGetEstudioDisponibilidad,
+  apiCrearReservaEstudio,
+  type EstudioPackEquipo,
+} from "@/lib/api";
 
 export type StudioBookingConfig = {
   pricePerHour: number;
   minHours: number;
   openHour: number;
   closeHour: number;
+  packActivo: boolean;
+  packNombre: string;
+  packDescripcion: string;
+  packPrecio: number;
 };
 
 function pad(n: number) {
@@ -43,6 +52,10 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
   const minHours = config?.minHours ?? STUDIO.minHours;
   const openHour = config?.openHour ?? STUDIO.openHour;
   const closeHour = config?.closeHour ?? STUDIO.closeHour;
+  const packActivo = config?.packActivo ?? false;
+  const packNombre = config?.packNombre ?? STUDIO.addon.name;
+  const packDescripcion = config?.packDescripcion ?? STUDIO.addon.description;
+  const packPrecio = config?.packPrecio ?? 0;
 
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [startSlot, setStartSlot] = useState<string>(`${pad(openHour)}:00`);
@@ -51,6 +64,9 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
+
+  const [withPack, setWithPack] = useState(false);
+  const [packEquipos, setPackEquipos] = useState<EstudioPackEquipo[]>([]);
 
   const [disponibilidad, setDisponibilidad] = useState<Disponibilidad>("idle");
   const [motivo, setMotivo] = useState<string | null>(null);
@@ -66,7 +82,8 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
   }, []);
 
   const subtotal = pricePerHour * hours;
-  const total = subtotal;
+  const packTotal = withPack ? packPrecio : 0;
+  const total = subtotal + packTotal;
   const slot = slots.find((s) => s.value === startSlot) ?? slots[0];
 
   const fechaISO = date ? format(date, "yyyy-MM-dd") : null;
@@ -89,6 +106,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
         if (cancelado) return;
         setDisponibilidad(res.libre ? "libre" : "ocupado");
         setMotivo(res.motivo ?? null);
+        setPackEquipos(res.pack ?? []);
       })
       .catch(() => {
         if (!cancelado) setDisponibilidad("error");
@@ -118,6 +136,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
         cliente_nombre: nombre.trim(),
         cliente_email: email.trim() || undefined,
         cliente_telefono: telefono.trim() || undefined,
+        con_pack: withPack,
       });
       setConfirmada({ numero: res.numero_pedido ?? null });
     } catch (err) {
@@ -142,6 +161,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
       `Hola! Quiero consultar por el estudio.`,
       `📅 ${format(date, "EEEE d 'de' MMMM, yyyy", { locale: es })}`,
       `🕒 ${start} – ${end} (${hours} h)`,
+      withPack ? `➕ ${packNombre}` : null,
       total > 0 ? `💵 Total estimado: ${formatARS(total)}` : null,
     ].filter(Boolean);
 
@@ -330,11 +350,56 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
             </div>
           </div>
 
+          {/* Pack opcional */}
+          {packActivo && (
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition",
+                withPack ? "border-amber bg-amber/10" : "hairline hover:border-ink",
+              )}
+            >
+              <Checkbox
+                checked={withPack}
+                onCheckedChange={(v) => setWithPack(v === true)}
+                className="mt-0.5"
+              />
+              <div className="flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <div className="font-semibold">{packNombre}</div>
+                  <div className="font-mono text-sm tabular">
+                    {packPrecio > 0 ? `+${formatARS(packPrecio)}` : "Consultar"}
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{packDescripcion}</p>
+                {withPack && (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    {packEquipos.length > 0 ? (
+                      <>
+                        <span className="font-medium text-ink">Incluye en esta franja:</span>{" "}
+                        {packEquipos
+                          .map((e) => `${e.nombre}${e.cantidad > 1 ? ` ×${e.cantidad}` : ""}`)
+                          .join(", ")}
+                      </>
+                    ) : (
+                      "No hay equipos del pack disponibles en esta franja."
+                    )}
+                  </div>
+                )}
+              </div>
+            </label>
+          )}
+
           <div className="rounded-xl bg-foreground p-4 text-background">
             <div className="flex items-center justify-between text-xs text-background/70">
               <span>Estudio · {hours} h</span>
               <span className="tabular">{subtotal > 0 ? formatARS(subtotal) : "—"}</span>
             </div>
+            {withPack && (
+              <div className="mt-1 flex items-center justify-between text-xs text-background/70">
+                <span>{packNombre}</span>
+                <span className="tabular">{packPrecio > 0 ? formatARS(packPrecio) : "—"}</span>
+              </div>
+            )}
             <div className="mt-3 flex items-end justify-between border-t border-background/15 pt-3">
               <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-background/60">
                 Total estimado

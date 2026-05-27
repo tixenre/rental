@@ -97,6 +97,10 @@ function EstudioPage() {
         minHours: data.min_horas,
         openHour: data.open_hour,
         closeHour: data.close_hour,
+        packActivo: data.pack_activo,
+        packNombre: data.pack_nombre,
+        packDescripcion: data.pack_descripcion,
+        packPrecio: data.pack_precio,
       }
     : undefined;
 
