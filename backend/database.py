@@ -1130,6 +1130,91 @@ def init_db():
             END $$;
         """)
 
+    # ── Estudio (singleton E1) ──────────────────────────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS estudio (
+            id             SERIAL PRIMARY KEY,
+            equipo_id      INTEGER,
+            nombre         TEXT NOT NULL DEFAULT 'El Estudio',
+            tagline        TEXT NOT NULL DEFAULT '',
+            descripcion    TEXT NOT NULL DEFAULT '',
+            precio_hora    INTEGER NOT NULL DEFAULT 0,
+            min_horas      INTEGER NOT NULL DEFAULT 2,
+            open_hour      INTEGER NOT NULL DEFAULT 8,
+            close_hour     INTEGER NOT NULL DEFAULT 22,
+            buffer_horas   INTEGER NOT NULL DEFAULT 0,
+            pack_activo    BOOLEAN NOT NULL DEFAULT TRUE,
+            pack_nombre    TEXT NOT NULL DEFAULT '',
+            pack_descripcion TEXT NOT NULL DEFAULT '',
+            pack_precio    INTEGER NOT NULL DEFAULT 0,
+            features_json  TEXT,
+            faq_json       TEXT,
+            updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS estudio_fotos (
+            id           SERIAL PRIMARY KEY,
+            estudio_id   INTEGER NOT NULL REFERENCES estudio(id) ON DELETE CASCADE,
+            url          TEXT NOT NULL,
+            path         TEXT,
+            orden        INTEGER NOT NULL DEFAULT 0,
+            es_principal BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_estudio_fotos_estudio_orden
+        ON estudio_fotos(estudio_id, orden)
+    """)
+    # Seed idempotente: inserta la fila singleton si no existe, con los valores
+    # del copy original de src/data/studio.ts. Precios en 0 (el dueño los setea).
+    import json as _json
+    _features_seed = _json.dumps([
+        {"label": "Superficie", "value": "— m²"},
+        {"label": "Ciclorama", "value": "Infinito"},
+        {"label": "Altura", "value": "— m"},
+        {"label": "Climatización", "value": "Sí"},
+    ])
+    _faq_seed = _json.dumps([
+        {"q": "¿Cuál es el mínimo de reserva?",
+         "a": "El mínimo es de 2 horas. Para producciones más cortas, escribínos por WhatsApp y vemos."},
+        {"q": "¿Cómo se abona?",
+         "a": "Aceptamos transferencia bancaria, MercadoPago y efectivo. Se reserva con un 50% del total al confirmar la fecha."},
+        {"q": "¿Puedo llevar equipo extra?",
+         "a": "Sí, podés traer cualquier equipo propio. Si necesás algo puntual también podés alquilarlo en Rambla y armar todo en un único pedido."},
+        {"q": "¿Tienen estacionamiento?",
+         "a": "Estacionamiento sobre la calle (zona azul gratuita los fines de semana). Para descarga rápida de equipos hay acceso directo."},
+        {"q": "¿Incluye asistente / iluminador?",
+         "a": "Por defecto el estudio se reserva sin staff. Si necesás un asistente o iluminador, lo coordinamos aparte — escribínos antes."},
+        {"q": "¿Puedo cancelar o reagendar?",
+         "a": "Hasta 48 hs antes del shoot podés reagendar sin costo. Cancelaciones con menos aviso pierden la seña."},
+    ])
+    conn.execute("""
+        INSERT INTO estudio (
+            id, nombre, tagline, descripcion,
+            precio_hora, min_horas, open_hour, close_hour, buffer_horas,
+            pack_activo, pack_nombre, pack_descripcion, pack_precio,
+            features_json, faq_json
+        )
+        SELECT
+            1,
+            'El Estudio',
+            'Foto y video en Mar del Plata',
+            'Un espacio pensado para producciones audiovisuales. Iluminación natural, '
+            'ciclorama infinito, climatización y todo el equipo de Rambla a mano. '
+            'Ideal para producto, retrato, video corporativo, redes sociales y shoots editoriales.',
+            0, 2, 8, 22, 0,
+            TRUE,
+            'Pack Todo Incluido',
+            'Todas las luces y griperías del estudio sin pensar en sumar ítem por ítem. '
+            'Llegás con la cámara y filmás.',
+            0,
+            %s,
+            %s
+        WHERE NOT EXISTS (SELECT 1 FROM estudio WHERE id = 1)
+    """, (_features_seed, _faq_seed))
+
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
 
     # Seed the sequence to the current max so nextval never collides with existing data.

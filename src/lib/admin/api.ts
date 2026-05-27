@@ -1619,6 +1619,93 @@ export const ESTADO_LABEL: Record<PedidoEstado, string> = {
   cancelado: "Cancelado",
 };
 
+// ── Estudio (singleton E1) ───────────────────────────────────────────────────
+
+export type EstudioFoto = {
+  id: number;
+  url: string;
+  path: string | null;
+  orden: number;
+  es_principal: boolean;
+  created_at: string | null;
+};
+
+export type EstudioConfig = {
+  id: number;
+  equipo_id: number | null;
+  nombre: string;
+  tagline: string;
+  descripcion: string;
+  precio_hora: number;
+  min_horas: number;
+  open_hour: number;
+  close_hour: number;
+  buffer_horas: number;
+  pack_activo: boolean;
+  pack_nombre: string;
+  pack_descripcion: string;
+  pack_precio: number;
+  features: Array<{ label: string; value: string }> | null;
+  faq: Array<{ q: string; a: string }> | null;
+  updated_at: string | null;
+  fotos: EstudioFoto[];
+};
+
+export type EstudioInput = {
+  nombre?: string;
+  tagline?: string;
+  descripcion?: string;
+  precio_hora?: number;
+  min_horas?: number;
+  open_hour?: number;
+  close_hour?: number;
+  buffer_horas?: number;
+  pack_activo?: boolean;
+  pack_nombre?: string;
+  pack_descripcion?: string;
+  pack_precio?: number;
+  features_json?: string;
+  faq_json?: string;
+};
+
+export type FotoOrdenItem = { id: number; orden: number; es_principal: boolean };
+
+export const estudioAdminApi = {
+  get: () => authedJson<EstudioConfig>("/api/estudio"),
+  update: (data: EstudioInput) =>
+    authedFetch("/api/admin/estudio", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(async (r) => {
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d?.detail ?? `PATCH estudio → ${r.status}`);
+      }
+      return r.json() as Promise<EstudioConfig>;
+    }),
+  deleteFoto: (fotoId: number) =>
+    authedFetch(`/api/admin/estudio/fotos/${fotoId}`, { method: "DELETE" }).then(async (r) => {
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d?.detail ?? `DELETE foto → ${r.status}`);
+      }
+      return r.json() as Promise<{ ok: boolean }>;
+    }),
+  reorderFotos: (fotos: FotoOrdenItem[]) =>
+    authedFetch("/api/admin/estudio/fotos/orden", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fotos }),
+    }).then(async (r) => {
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d?.detail ?? `PATCH fotos/orden → ${r.status}`);
+      }
+      return r.json() as Promise<{ fotos: EstudioFoto[] }>;
+    }),
+};
+
 // ── Descuentos por jornadas ──────────────────────────────────────────────────
 
 export type DescuentoJornada = { id: number; jornadas: number; pct: number };

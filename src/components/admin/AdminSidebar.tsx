@@ -23,6 +23,7 @@ import {
   Mail,
   Inbox,
   HardDriveDownload,
+  Clapperboard,
 } from "lucide-react";
 
 import {
@@ -72,6 +73,7 @@ const items: NavItem[] = [
       { title: "Unidades", url: "/admin/unidades", icon: Ruler },
     ],
   },
+  { title: "Estudio", url: "/admin/estudio", icon: Clapperboard },
   { title: "Pedidos", url: "/admin/pedidos", icon: ClipboardList },
   { title: "Solicitudes", url: "/admin/solicitudes", icon: Inbox },
   { title: "Clientes", url: "/admin/clientes", icon: Users },
