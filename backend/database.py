@@ -1182,6 +1182,9 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_estudio_fotos_estudio_orden
         ON estudio_fotos(estudio_id, orden)
     """)
+    # E2.1: anticipación mínima de reserva del estudio (en horas). Solo aplica
+    # al espacio (no a equipos). 0 = sin tope.
+    conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS anticipacion_min_horas INTEGER NOT NULL DEFAULT 0")
     # Seed idempotente: inserta la fila singleton si no existe, con los valores
     # del copy original de src/data/studio.ts. Precios en 0 (el dueño los setea).
     import json as _json

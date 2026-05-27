@@ -13,12 +13,10 @@ from pydantic import BaseModel
 from admin_guard import require_admin
 from database import get_db, now_ar
 from routes.alquileres import (
-    _check_stock,
+    ESTADOS_RESERVADO,
     _dispatch_pedido_creado_emails,
     _get_alquiler_detail,
     _next_numero_pedido,
-    _rango_con_buffer,
-    get_disponibilidad,
 )
 from routes.equipos import (
     _download_image_bytes,
@@ -89,6 +87,7 @@ def _build_response(row, fotos: list) -> dict:
         "open_hour": row["open_hour"],
         "close_hour": row["close_hour"],
         "buffer_horas": row["buffer_horas"],
+        "anticipacion_min_horas": row["anticipacion_min_horas"],
         "pack_activo": bool(row["pack_activo"]),
         "pack_nombre": row["pack_nombre"],
         "pack_descripcion": row["pack_descripcion"],
@@ -158,6 +157,7 @@ class EstudioUpdate(BaseModel):
     open_hour: Optional[int] = None
     close_hour: Optional[int] = None
     buffer_horas: Optional[int] = None
+    anticipacion_min_horas: Optional[int] = None
     pack_activo: Optional[bool] = None
     pack_nombre: Optional[str] = None
     pack_descripcion: Optional[str] = None
@@ -319,14 +319,17 @@ def reorder_fotos(body: ReorderBody, request: Request):
     return {"fotos": fotos}
 
 
-# ── Reserva del estudio por horas (E2) ────────────────────────────────────────
+# ── Reserva del estudio por horas (E2 / E2.1) ─────────────────────────────────
 #
 # REGLA SAGRADA: el motor de reservas (_check_stock / get_disponibilidad /
-# _rango_con_buffer) NO se modifica — se reusa tal cual. La reserva del estudio
-# es un pedido normal (tipo='estudio') con UN ítem: el equipo centinela
-# (estudio.equipo_id, cantidad=1). El buffer propio del estudio se aplica
-# expandiendo el rango ANTES de chequear el centinela, nunca metiendo lógica
-# nueva adentro del motor.
+# _rango_con_buffer) NO se modifica ni se reusa para el espacio. La reserva del
+# estudio es un pedido normal (tipo='estudio') con UN ítem: el equipo centinela
+# (estudio.equipo_id, cantidad=1, recurso único).
+#
+# E2.1 — el solapamiento del centinela se chequea con una query DEDICADA (no vía
+# _check_stock), para que el espacio use SOLO su buffer propio (estudio.buffer_horas)
+# y nunca el buffer global de equipos (buffer_horas_alquiler, que es el prep de
+# equipos del pack — eso es E3). Al ser stock=1, un overlap directo alcanza.
 
 
 def _franja_estudio(estudio, fecha: str, start: str, horas: int) -> tuple[datetime, datetime]:
@@ -361,15 +364,42 @@ def _franja_estudio(estudio, fecha: str, start: str, horas: int) -> tuple[dateti
     return fecha_desde, fecha_hasta
 
 
-def _estudio_check_conflicto(conn, pedido_id: int, fecha_desde, fecha_hasta, buffer_horas: int) -> list[str]:
-    """Chequea que el centinela esté libre en la franja, aplicando el buffer
-    PROPIO del estudio. Expande el rango con `_rango_con_buffer` y delega en
-    `_check_stock` (que ya hace el lock FOR UPDATE y cuenta overlaps). Devuelve
-    la lista de problemas (vacía = libre)."""
-    fd_buf, fh_buf = _rango_con_buffer(
-        fecha_desde.isoformat(), fecha_hasta.isoformat(), buffer_horas
-    )
-    return _check_stock(conn, pedido_id, fd_buf, fh_buf)
+def _viola_anticipacion(estudio, fecha_desde) -> bool:
+    """¿La franja arranca antes de la anticipación mínima exigida por el estudio?
+    Solo aplica al estudio (no a equipos). anticipacion_min_horas <= 0 → sin tope."""
+    horas = estudio["anticipacion_min_horas"] or 0
+    if horas <= 0:
+        return False
+    return fecha_desde < now_ar() + timedelta(hours=horas)
+
+
+def _centinela_libre(conn, equipo_id: int, fecha_desde, fecha_hasta,
+                     buffer_horas: int, exclude_pedido_id: int | None = None) -> bool:
+    """True si el centinela del estudio está libre en [fecha_desde, fecha_hasta],
+    aplicando SOLO el buffer propio del estudio (expande el rango por
+    `buffer_horas` a cada lado). Query dedicada — NO usa el motor sagrado, así
+    el buffer global de equipos no interviene.
+
+    El centinela es un recurso único (stock=1): cualquier reserva activa que se
+    pise con la franja expandida (half-open: fecha_desde < hi AND fecha_hasta > lo)
+    significa ocupado. `exclude_pedido_id` excluye el propio pedido en el POST.
+    """
+    lo = fecha_desde - timedelta(hours=max(0, buffer_horas or 0))
+    hi = fecha_hasta + timedelta(hours=max(0, buffer_horas or 0))
+    row = conn.execute(
+        f"""
+        SELECT COUNT(*) AS cnt
+        FROM alquiler_items pi
+        JOIN alquileres p ON p.id = pi.pedido_id
+        WHERE pi.equipo_id = ?
+          AND p.estado IN {ESTADOS_RESERVADO}
+          AND (? IS NULL OR p.id != ?)
+          AND p.fecha_desde < ?
+          AND p.fecha_hasta > ?
+        """,
+        (equipo_id, exclude_pedido_id, exclude_pedido_id, hi, lo),
+    ).fetchone()
+    return (row["cnt"] or 0) == 0
 
 
 @router.get("/estudio/disponibilidad")
@@ -379,23 +409,29 @@ def estudio_disponibilidad(
     horas: int = Query(..., description="Duración en horas (>= min_horas)"),
 ):
     """¿El estudio está libre en [fecha start, +horas]? Aplica el buffer propio
-    del estudio y reusa el motor de disponibilidad (get_disponibilidad)."""
+    del estudio (no el global) y la anticipación mínima. Devuelve {libre, motivo}."""
     conn = get_db()
     try:
         estudio = _get_estudio_row(conn)
+
+        if not estudio["equipo_id"]:
+            raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
+
+        fecha_desde, fecha_hasta = _franja_estudio(estudio, fecha, start, horas)
+
+        if _viola_anticipacion(estudio, fecha_desde):
+            return {
+                "libre": False,
+                "motivo": f"Necesitás reservar con al menos {estudio['anticipacion_min_horas']} h de anticipación",
+            }
+
+        if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
+                                estudio["buffer_horas"]):
+            return {"libre": False, "motivo": "Ocupado en esa franja"}
+
+        return {"libre": True, "motivo": None}
     finally:
         conn.close()
-
-    if not estudio["equipo_id"]:
-        raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
-
-    fecha_desde, fecha_hasta = _franja_estudio(estudio, fecha, start, horas)
-    fd_buf, fh_buf = _rango_con_buffer(
-        fecha_desde.isoformat(), fecha_hasta.isoformat(), estudio["buffer_horas"]
-    )
-    disponibles = get_disponibilidad(fd_buf, fh_buf)
-    libre = disponibles.get(str(estudio["equipo_id"]), 0) >= 1
-    return {"libre": libre}
 
 
 class EstudioReservaCreate(BaseModel):
@@ -424,6 +460,11 @@ def crear_reserva_estudio(body: EstudioReservaCreate, background: BackgroundTask
         hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
         if fecha_desde < hoy:
             raise HTTPException(400, "La fecha no puede ser en el pasado")
+        if _viola_anticipacion(estudio, fecha_desde):
+            raise HTTPException(
+                400,
+                f"Necesitás reservar con al menos {estudio['anticipacion_min_horas']} h de anticipación",
+            )
 
         monto_total = (estudio["precio_hora"] or 0) * body.horas
         next_num = _next_numero_pedido(conn)
@@ -450,11 +491,13 @@ def crear_reserva_estudio(body: EstudioReservaCreate, background: BackgroundTask
             (pedido_id, estudio["equipo_id"], 1, 0, 0),
         )
 
-        # Chequeo final bajo FOR UPDATE para cerrar la race de doble-booking.
-        problemas = _estudio_check_conflicto(
-            conn, pedido_id, fecha_desde, fecha_hasta, estudio["buffer_horas"]
-        )
-        if problemas:
+        # Chequeo final bajo FOR UPDATE para cerrar la race de doble-booking:
+        # lockeamos la fila del centinela (recurso único) y recién ahí contamos
+        # overlaps. Una 2da reserva concurrente espera el lock y ve la 1ra ya
+        # commiteada. Usa SOLO el buffer propio del estudio.
+        conn.execute("SELECT id FROM equipos WHERE id = ? FOR UPDATE", (estudio["equipo_id"],))
+        if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
+                                estudio["buffer_horas"], exclude_pedido_id=pedido_id):
             raise HTTPException(409, "El estudio no está disponible en esa franja")
 
         conn.commit()
