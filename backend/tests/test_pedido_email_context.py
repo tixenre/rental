@@ -8,6 +8,7 @@
   coincidir EXACTAMENTE con ese seed, o la guarda haría un no-op silencioso (y la
   garantía de "no pisar ediciones del admin" sería falsa).
 """
+import datetime
 import importlib.util
 from pathlib import Path
 
@@ -27,6 +28,41 @@ def _load_migration(filename: str):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+# ── formato lindo del contexto ──────────────────────────────────────────────
+
+class TestContextoFormato:
+    def test_total_formateado_ars(self):
+        ctx = _pedido_email_context({"id": 1, "monto_total": 12500, "items": []})
+        assert ctx["total"] == "$ 12.500"
+
+    def test_fecha_amable(self):
+        ctx = _pedido_email_context(
+            {"id": 1, "fecha_desde": datetime.datetime(2026, 6, 15, 10, 0), "items": []}
+        )
+        assert ctx["fecha_desde"] == "15 jun · 10:00"
+
+    def test_items_html_es_tabla_con_nombre_escapado(self):
+        # Nombre con HTML malicioso → debe quedar escapado (XSS-safe) aunque el
+        # blob se inyecte con |safe en la plantilla.
+        ctx = _pedido_email_context(
+            {
+                "id": 1,
+                "items": [{"nombre": "<b>Cam</b>", "cantidad": 2, "subtotal": 9000}],
+            }
+        )
+        html = ctx["items_html"]
+        assert "<table" in html
+        assert "&lt;b&gt;Cam&lt;/b&gt;" in html
+        assert "<b>Cam</b>" not in html
+        assert "× 2" in html
+        assert "$ 9.000" in html
+
+    def test_items_vacio_no_rompe(self):
+        ctx = _pedido_email_context({"id": 1, "items": []})
+        assert ctx["items_html"] == ""
+        assert ctx["items_text"] == ""
 
 
 # ── _pedido_email_context ───────────────────────────────────────────────────
