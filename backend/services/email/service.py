@@ -64,12 +64,72 @@ def get_admin_to() -> Optional[str]:
         conn.close()
 
 
+def _setting(conn, key: str) -> str:
+    """Lee un app_setting como string (vacío si no existe)."""
+    row = conn.execute(
+        "SELECT value FROM app_settings WHERE key = ?", (key,)
+    ).fetchone()
+    return (row["value"].strip() if row and row["value"] else "")
+
+
+def _wrap_email_html(body_html: str, conn) -> str:
+    """Envuelve el cuerpo renderizado en un layout branded común (header con
+    logo + barra de acento + footer con contacto). Table-based + estilos
+    inline para máxima compatibilidad con clientes de mail.
+
+    Las plantillas editables guardan solo el CONTENIDO; el chrome vive acá,
+    en un único lugar. El body ya viene renderizado y escapado por Jinja.
+    """
+    from routes.seo import SITE_URL
+
+    logo = _setting(conn, "logo_url") or f"{SITE_URL}/email-logo.png"
+    whatsapp = _setting(conn, "whatsapp_phone")
+
+    wa_html = ""
+    if whatsapp:
+        digits = "".join(ch for ch in whatsapp if ch.isdigit())
+        wa_html = (
+            f' · <a href="https://wa.me/{digits}" '
+            f'style="color:#6b6457;text-decoration:underline;">WhatsApp</a>'
+        )
+
+    return f"""<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light only">
+<title>Rambla Rental</title>
+</head>
+<body style="margin:0;padding:0;background:#f1efe9;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1efe9;padding:24px 12px;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e1d8;">
+<tr><td style="padding:22px 28px 18px;text-align:center;">
+<img src="{logo}" alt="Rambla Rental" height="40" style="height:40px;width:auto;display:inline-block;border:0;">
+</td></tr>
+<tr><td style="height:4px;background:#FAB428;font-size:0;line-height:0;">&nbsp;</td></tr>
+<tr><td style="padding:28px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#2a251e;">
+{body_html}
+</td></tr>
+<tr><td style="padding:20px 28px;background:#faf8f3;border-top:1px solid #e5e1d8;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#8a8378;text-align:center;">
+<strong style="color:#2a251e;">Rambla Rental</strong> · alquiler de equipos audiovisuales<br>
+<a href="{SITE_URL}" style="color:#6b6457;text-decoration:underline;">{SITE_URL.replace("https://", "").replace("http://", "")}</a>{wa_html}
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>"""
+
+
 def render_template(
     template_key: str,
     context: dict[str, Any],
 ) -> dict[str, str]:
     """Renderiza una plantilla del catálogo con el contexto dado.
-    Devuelve {subject, html, text}. Útil para preview sin enviar."""
+    Devuelve {subject, html, text}. Útil para preview sin enviar.
+
+    El html se envuelve en el layout branded común (`_wrap_email_html`) — las
+    plantillas guardan solo el contenido."""
     conn = get_db()
     try:
         row = conn.execute(
@@ -83,7 +143,8 @@ def render_template(
         text = _jinja_text.from_string(row["body_text"]).render(**context)
         # html: con autoescape — variables de usuario quedan escapadas, pero
         # las que vienen con .html() o {{ x|safe }} pasan literales.
-        html = _jinja_html.from_string(row["body_html"]).render(**context)
+        body_html = _jinja_html.from_string(row["body_html"]).render(**context)
+        html = _wrap_email_html(body_html, conn)
         return {"subject": subject, "html": html, "text": text}
     finally:
         conn.close()
