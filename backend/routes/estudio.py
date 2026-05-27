@@ -617,8 +617,12 @@ def _slot_bloqueante(conn, fecha_desde, fecha_hasta) -> Optional[str]:
     del slot — NO usa el motor de reservas."""
     dia = fecha_desde.weekday()
     mes = f"{fecha_desde.year:04d}-{fecha_desde.month:02d}"
-    ini = fecha_desde.hour * 60 + fecha_desde.minute
-    fin = fecha_hasta.hour * 60 + fecha_hasta.minute
+    # Minutos relativos al día de inicio (no `.hour`): una franja que cierra a
+    # medianoche tiene fecha_hasta = 00:00 del día siguiente, y `.hour` daría 0,
+    # rompiendo el solape. La resta sí da 1440.
+    dia_base = fecha_desde.replace(hour=0, minute=0, second=0, microsecond=0)
+    ini = int((fecha_desde - dia_base).total_seconds() // 60)
+    fin = int((fecha_hasta - dia_base).total_seconds() // 60)
     rows = conn.execute(
         """
         SELECT cliente, hora_desde, hora_hasta
@@ -663,8 +667,12 @@ def _regenerar_pedidos_slot(conn, slot: dict) -> None:
         if mes < mes_actual or mes in conservados:
             continue
         rep = _primer_dia_semana(y, m, slot["dia_semana"])
-        fd = rep.replace(hour=slot["hora_desde"], minute=0, second=0, microsecond=0)
-        fh = rep.replace(hour=slot["hora_hasta"], minute=0, second=0, microsecond=0)
+        # `timedelta` desde medianoche (no `.replace(hour=...)`): hora_hasta=24
+        # (cierre a medianoche, válido) caería en las 00:00 del día siguiente sin
+        # romper, mientras que replace(hour=24) lanza ValueError.
+        base = rep.replace(hour=0, minute=0, second=0, microsecond=0)
+        fd = base + timedelta(hours=slot["hora_desde"])
+        fh = base + timedelta(hours=slot["hora_hasta"])
         num = _next_numero_pedido(conn)
         conn.execute(
             """
