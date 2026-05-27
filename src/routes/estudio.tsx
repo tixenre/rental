@@ -332,8 +332,6 @@ function EstudioPage() {
         openHour: data.open_hour,
         closeHour: data.close_hour,
         packActivo: data.pack_activo,
-        packNombre: data.pack_nombre,
-        packDescripcion: data.pack_descripcion,
         packPrecio: data.pack_precio,
       }
     : undefined;
@@ -445,12 +443,19 @@ function EstudioPage() {
           {packActivo && (
             <aside className="rounded-2xl border hairline bg-amber/10 p-5 lg:sticky lg:top-20 lg:self-start">
               <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/60">
-                Pack · add-on opcional
+                Espacio + equipos · precio fijo
               </div>
               <h3 className="mt-1 font-display text-xl">{packNombre}</h3>
               <p className="mt-2 text-sm text-muted-foreground">{packDescripcion}</p>
-              <div className="mt-3 text-2xl font-semibold tabular">
-                {packPrecio > 0 ? formatARS(packPrecio) : "Consultar"}
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-2xl font-semibold tabular">
+                  {packPrecio > 0 ? formatARS(packPrecio) : "Consultar"}
+                </span>
+                {packPrecio > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    fijo · independiente de las horas
+                  </span>
+                )}
               </div>
               {packEquipos.length > 0 ? (
                 <StudioPackKit equipos={packEquipos} title="Equipos incluidos" />
@@ -461,7 +466,8 @@ function EstudioPage() {
                 </p>
               )}
               <p className="mt-3 text-xs text-muted-foreground">
-                Activá el pack al reservar — se incluye lo que esté disponible en tu franja.
+                Elegí "Espacio + equipos" al reservar para sumar luces, griperías y modificadores
+                durante toda tu sesión.
               </p>
             </aside>
           )}

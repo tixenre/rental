@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -38,8 +37,6 @@ export type StudioBookingConfig = {
   openHour: number;
   closeHour: number;
   packActivo: boolean;
-  packNombre: string;
-  packDescripcion: string;
   packPrecio: number;
 };
 
@@ -189,8 +186,6 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
   const openHour = config?.openHour ?? STUDIO.openHour;
   const closeHour = config?.closeHour ?? STUDIO.closeHour;
   const packActivo = config?.packActivo ?? false;
-  const packNombre = config?.packNombre ?? STUDIO.addon.name;
-  const packDescripcion = config?.packDescripcion ?? STUDIO.addon.description;
   const packPrecio = config?.packPrecio ?? 0;
 
   // Estado inicial: si volvimos del OAuth con la franja en la URL, la restoramos
@@ -398,7 +393,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
       `Hola! Quiero consultar por el estudio.`,
       `📅 ${format(date, "EEEE d 'de' MMMM, yyyy", { locale: es })}`,
       `🕒 ${start} – ${endTime} (${hours} h)`,
-      withPack ? `➕ ${packNombre}` : null,
+      withPack ? `➕ Con equipos (luces, griperías y modificadores)` : null,
       total > 0 ? `💵 Total estimado: ${formatARS(total)}` : null,
     ].filter(Boolean);
     const text = encodeURIComponent(lines.join("\n"));
@@ -556,37 +551,78 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
             </span>
           )}
         </div>
+
+        {/* Selector de modalidad — solo el espacio vs espacio + equipos. Vive
+            en el paso 01 porque es una decisión de producto primaria, no un
+            add-on de confirmación. Cuando el admin apaga `pack_activo`,
+            ocultamos el bloque entero (queda "solo el espacio" implícito). */}
+        {packActivo && (
+          <fieldset
+            className="mt-5 grid gap-2.5 sm:grid-cols-2"
+            role="radiogroup"
+            aria-label="¿Qué reservás?"
+          >
+            <legend className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2 sm:col-span-2">
+              ¿Qué reservás?
+            </legend>
+
+            {/* Card A — solo espacio */}
+            <label
+              className={cn(
+                "flex cursor-pointer flex-col gap-1 rounded-xl border p-4 transition",
+                !withPack ? "border-amber bg-amber/10" : "hairline hover:border-ink/40",
+              )}
+            >
+              <input
+                type="radio"
+                name="studio-modalidad"
+                checked={!withPack}
+                onChange={() => setWithPack(false)}
+                className="sr-only"
+              />
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-semibold">Solo el espacio</span>
+                <span className="font-mono text-xs tabular shrink-0 text-muted-foreground">
+                  {pricePerHour > 0 ? `${formatARS(pricePerHour)}/h` : "Consultar"}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Reservás el estudio por las horas elegidas. Traés tu equipamiento.
+              </p>
+            </label>
+
+            {/* Card B — espacio + equipos */}
+            <label
+              className={cn(
+                "flex cursor-pointer flex-col gap-1 rounded-xl border p-4 transition",
+                withPack ? "border-amber bg-amber/10" : "hairline hover:border-ink/40",
+              )}
+            >
+              <input
+                type="radio"
+                name="studio-modalidad"
+                checked={withPack}
+                onChange={() => setWithPack(true)}
+                className="sr-only"
+              />
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-semibold">Espacio + equipos</span>
+                <span className="font-mono text-xs tabular shrink-0">
+                  {packPrecio > 0 ? `+${formatARS(packPrecio)} fijo` : "Consultar"}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Sumás <span className="text-ink font-medium">luces, griperías y modificadores</span>{" "}
+                durante toda la reserva. Llegás con la cámara y filmás.
+              </p>
+              {withPack && packEquipos.length > 0 && <StudioPackKit equipos={packEquipos} />}
+            </label>
+          </fieldset>
+        )}
       </Section>
 
-      {/* ── 2. Confirmar (pack + total + CTAs) ────────────────────────── */}
+      {/* ── 2. Confirmar (total + CTAs) ────────────────────────────────── */}
       <Section step={2} title="Confirmar y reservar">
-        {/* Pack toggle inline — el detalle de qué incluye vive en el aside
-            de la página (no duplicar acá). */}
-        {packActivo && (
-          <label
-            className={cn(
-              "mb-4 flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition",
-              withPack ? "border-amber bg-amber/10" : "hairline hover:border-ink/40",
-            )}
-          >
-            <Checkbox
-              checked={withPack}
-              onCheckedChange={(v) => setWithPack(v === true)}
-              className="mt-0.5"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline justify-between gap-3">
-                <div className="font-semibold">{packNombre}</div>
-                <div className="font-mono text-sm tabular shrink-0">
-                  {packPrecio > 0 ? `+${formatARS(packPrecio)}` : "Consultar"}
-                </div>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">{packDescripcion}</p>
-              {withPack && <StudioPackKit equipos={packEquipos} />}
-            </div>
-          </label>
-        )}
-
         {/* Total breakdown */}
         <div className="rounded-xl bg-foreground p-4 text-background">
           <div className="space-y-1.5">
@@ -598,7 +634,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
             </div>
             {withPack && (
               <div className="flex items-center justify-between text-sm text-background/75">
-                <span>{packNombre}</span>
+                <span>Equipos (luces, griperías, modificadores)</span>
                 <span className="tabular">{packPrecio > 0 ? formatARS(packPrecio) : "—"}</span>
               </div>
             )}
@@ -683,7 +719,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
             </div>
             {withPack && (
               <div className="mt-1 text-muted-foreground">
-                + <span className="text-ink">{packNombre}</span>
+                + <span className="text-ink">Con equipos</span> (luces, griperías y modificadores)
               </div>
             )}
             <div className="mt-2 flex items-baseline justify-between border-t hairline pt-2">
