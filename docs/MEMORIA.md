@@ -102,6 +102,23 @@
   MEMORIA" no cambia, ahora cubre también editar y podar).
 - **Consecuencias:** la memoria se mantiene chica y verdadera; el log completo vive en git.
 
+### 2026-05-27 — El Estudio: producto aparte que reusa el motor de reservas
+- **Contexto:** el **Estudio** es un espacio físico que se alquila — parte del inventario pero **fuera
+  de categorías/specs**. Se reserva **por horas** (no por día, mín 2h, tarifa plana), con un **pack
+  opcional dinámico** (gripería/luces/modificadores disponibles esas horas) y **slots fijos
+  recurrentes mensuales** (ej. "miércoles 8-20 Filmar"). No es un equipo más.
+- **Decisión:** modelarlo **reusando el motor de reservas existente, sin tocarlo ni duplicarlo**. La
+  reserva vive en `alquileres`/`alquiler_items` con una columna `tipo` (`DEFAULT 'diaria'` → cero
+  impacto en lo existente); un **equipo "centinela"** invisible (stock=1, sin categorías/specs)
+  representa el espacio para que el overlap + buffer salgan de `_check_stock` (que ya es
+  hora-granular). El pack se materializa como `alquiler_items`; los slots fijos generan **pedidos
+  mensuales** que fluyen por estadísticas/pagos como cualquier alquiler. **El core de reservas es
+  sagrado → no se modifica** (el buffer propio del estudio se aplica expandiendo el rango antes de
+  llamar, nunca adentro del motor).
+- **Consecuencias:** no se abre un segundo sistema de reservas paralelo. Plan + etapas (E1-E4,
+  multi-foto, slots) viven en GitHub **#548**. Follow-ups habilitados: multi-foto en equipos (el
+  componente `PhotoGallery` se construyó genérico), pago online, distribución proporcional del pack.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
@@ -197,7 +214,10 @@
 - **What:**
   - **Auditar / planificar / decidir / arquitectura** → Opus (effort alto).
   - **Ejecutar** (implementar un prompt bien especificado, bug fixes con tests, trabajo mecánico) →
-    **Sonnet** (effort medio). No usar la variante de ventana **1M** salvo que la tarea necesite
+    **Sonnet** (effort medio). **Excepción — Opus aunque sea ejecución:** cuando el cambio es
+    **delicado / de alto radio de explosión** (ej. tocar el **core de reservas**, que es sagrado),
+    conviene Opus, porque un bug sutil ahí es caro y el costo extra se justifica. La barra es el
+    riesgo del cambio, no la etapa. No usar la variante de ventana **1M** salvo que la tarea necesite
     contexto gigante (la ventana grande deja crecer el contexto → más cache-reads).
   - **`/clear`** entre PRs/tareas independientes; **`/compact`** a mitad de una iniciativa larga
     cuando el contexto ya está pesado.
