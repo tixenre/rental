@@ -210,10 +210,12 @@ function EstudioPage() {
                     </CarouselItem>
                   ))}
             </CarouselContent>
-            <CarouselPrevious className="hidden sm:flex" />
-            <CarouselNext className="hidden sm:flex" />
+            {/* Flechas solo en lg: ahí la sección tiene px-12 (48px) y entran sin
+                cortarse. En <lg el carrusel se maneja con swipe (hint abajo). */}
+            <CarouselPrevious className="hidden lg:flex" />
+            <CarouselNext className="hidden lg:flex" />
           </Carousel>
-          <p className="mt-3 text-center text-[10px] uppercase tracking-[0.25em] text-muted-foreground sm:hidden">
+          <p className="mt-3 text-center text-[10px] uppercase tracking-[0.25em] text-muted-foreground lg:hidden">
             Deslizá para ver más
           </p>
         </section>
