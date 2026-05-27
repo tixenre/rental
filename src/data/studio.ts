@@ -6,17 +6,22 @@ export const STUDIO = {
   tagline: "Foto y video en Mar del Plata",
   description:
     "Un espacio para producciones audiovisuales con todos los equipos de " +
-    "Rambla Rental a mano. Ciclorama de 6×6 m, living, áreas de trabajo y " +
-    "entrada para autos. Ideal para rodajes grandes — flexible para los chicos.",
+    "Rambla Rental a mano. Ideal para rodajes grandes — flexible para los chicos.",
   pricePerHour: 0, // TODO: precio real $/hora
   minHours: 3,
   openHour: 8, // 08:00
   closeHour: 22, // 22:00 (último inicio razonable)
+  // Las medidas concretas (superficie, altura) y atributos del espacio viven
+  // acá — la descripción se mantiene corta y narrativa, sin duplicar specs.
   features: [
     { label: "Superficie", value: "— m²" },
-    { label: "Ciclorama", value: "Infinito" },
     { label: "Altura", value: "— m" },
+    { label: "Ciclorama", value: "6×6 m" },
     { label: "Climatización", value: "Sí" },
+    { label: "Living", value: "Sí" },
+    { label: "Área de trabajo", value: "Sí" },
+    { label: "Entrada para autos", value: "Sí" },
+    { label: "Cocina", value: "Sí" },
   ],
   gallery: 6, // cantidad de placeholders hasta que haya fotos reales
   faq: [
