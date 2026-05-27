@@ -28,6 +28,11 @@ PUBLIC_API = (
     "/api/disponibilidad",
     "/api/public/",
     "/api/cliente/registro",  # registro-info y registro (sin sesión)
+    # /api/estudio expone la config del espacio (incluyendo pack curado) y la
+    # disponibilidad por franja — son lecturas públicas. La creación de reservas
+    # vive bajo /api/estudio/reservas y tiene su propio `_require_cliente` en el
+    # handler, así que el guard de cliente se sigue aplicando ahí.
+    "/api/estudio",
 )
 
 
