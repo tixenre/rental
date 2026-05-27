@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from admin_guard import require_admin
-from database import get_db, now_ar
+from database import get_db, now_ar, to_datetime
 from routes.alquileres import (
     ESTADOS_RESERVADO,
     _check_stock,
@@ -468,6 +468,135 @@ def _pack_disponible(conn, fecha_desde, fecha_hasta, exclude_pedido_id: int | No
     ]
 
 
+# ── Slots fijos recurrentes mensuales (E4) ─────────────────────────────────────
+#
+# Un slot fijo (ej. "miércoles 8-20 Filmar $X jun-dic") cumple DOS roles:
+#   (a) bloquea su franja para el público mientras el rango de meses esté activo
+#       → regla propia (`_slot_bloqueante`), NO usa el motor ni el centinela.
+#   (b) genera un pedido por mes (tipo='estudio_fijo') para estadísticas + pagos
+#       → registro de facturación, SIN ítem del centinela para no doble-bloquear
+#       (el bloqueo ya lo hace (a)).
+
+
+def _slot_to_dict(row) -> dict:
+    return {
+        "id": row["id"],
+        "cliente": row["cliente"],
+        "dia_semana": row["dia_semana"],
+        "hora_desde": row["hora_desde"],
+        "hora_hasta": row["hora_hasta"],
+        "valor_mensual": row["valor_mensual"],
+        "mes_desde": row["mes_desde"],
+        "mes_hasta": row["mes_hasta"],
+        "activo": bool(row["activo"]),
+    }
+
+
+def _mes_actual_ar() -> str:
+    n = now_ar()
+    return f"{n.year:04d}-{n.month:02d}"
+
+
+def _iter_meses(mes_desde: str, mes_hasta: str):
+    """Itera (year, month) inclusive entre dos 'YYYY-MM'."""
+    y0, m0 = int(mes_desde[:4]), int(mes_desde[5:7])
+    y1, m1 = int(mes_hasta[:4]), int(mes_hasta[5:7])
+    cur = (y0, m0)
+    while cur <= (y1, m1):
+        yield cur
+        y, m = cur
+        cur = (y + 1, 1) if m == 12 else (y, m + 1)
+
+
+def _primer_dia_semana(year: int, month: int, dia_semana: int) -> datetime:
+    """Primera fecha del mes cuyo weekday() == dia_semana (0=Lun..6=Dom)."""
+    base = datetime(year, month, 1)
+    offset = (dia_semana - base.weekday()) % 7
+    return base + timedelta(days=offset)
+
+
+def _slot_bloqueante(conn, fecha_desde, fecha_hasta) -> Optional[str]:
+    """Si la franja cae en un slot fijo activo (mismo día de semana, dentro del
+    rango de meses y con solape horario), devuelve el `cliente` del slot. Regla
+    del slot — NO usa el motor de reservas."""
+    dia = fecha_desde.weekday()
+    mes = f"{fecha_desde.year:04d}-{fecha_desde.month:02d}"
+    ini = fecha_desde.hour * 60 + fecha_desde.minute
+    fin = fecha_hasta.hour * 60 + fecha_hasta.minute
+    rows = conn.execute(
+        """
+        SELECT cliente, hora_desde, hora_hasta
+        FROM estudio_slots_fijos
+        WHERE activo = TRUE AND dia_semana = ?
+          AND mes_desde <= ? AND mes_hasta >= ?
+        """,
+        (dia, mes, mes),
+    ).fetchall()
+    for r in rows:
+        if ini < r["hora_hasta"] * 60 and fin > r["hora_desde"] * 60:
+            return r["cliente"]
+    return None
+
+
+def _regenerar_pedidos_slot(conn, slot: dict) -> None:
+    """(Re)genera un pedido `estudio_fijo` por mes del rango del slot. Preserva
+    los pasados y los que ya tienen pagos; borra y recrea los futuros impagos.
+    Fecha representativa = primer `dia_semana` del mes a [hora_desde, hora_hasta].
+    SIN ítem del centinela (el bloqueo lo hace `_slot_bloqueante`)."""
+    slot_id = slot["id"]
+    mes_actual = _mes_actual_ar()
+    existentes = conn.execute(
+        "SELECT id, fecha_desde, monto_pagado FROM alquileres WHERE estudio_slot_id = ?",
+        (slot_id,),
+    ).fetchall()
+
+    conservados: set[str] = set()
+    for e in existentes:
+        fd = to_datetime(e["fecha_desde"])
+        mes_e = f"{fd.year:04d}-{fd.month:02d}"
+        if mes_e < mes_actual or (e["monto_pagado"] or 0) > 0:
+            conservados.add(mes_e)  # pasado o con pagos → intocable
+        else:
+            conn.execute("DELETE FROM alquileres WHERE id = ?", (e["id"],))
+
+    if not slot["activo"]:
+        return
+
+    for (y, m) in _iter_meses(slot["mes_desde"], slot["mes_hasta"]):
+        mes = f"{y:04d}-{m:02d}"
+        if mes < mes_actual or mes in conservados:
+            continue
+        rep = _primer_dia_semana(y, m, slot["dia_semana"])
+        fd = rep.replace(hour=slot["hora_desde"], minute=0, second=0, microsecond=0)
+        fh = rep.replace(hour=slot["hora_hasta"], minute=0, second=0, microsecond=0)
+        num = _next_numero_pedido(conn)
+        conn.execute(
+            """
+            INSERT INTO alquileres (cliente_nombre, fecha_desde, fecha_hasta, monto_total,
+                                    estado, fuente, tipo, numero_pedido, estudio_slot_id)
+            VALUES (?,?,?,?,?,?,?,?,?)
+            """,
+            (slot["cliente"], fd, fh, slot["valor_mensual"], "confirmado",
+             "estudio", "estudio_fijo", num, slot_id),
+        )
+
+
+def _borrar_pedidos_futuros_impagos(conn, slot_id: int) -> None:
+    """Borra los pedidos del slot que son de un mes actual-o-futuro y no tienen
+    pagos. Los pasados/pagados quedan (su estudio_slot_id se va a NULL al borrar
+    el slot, vía FK ON DELETE SET NULL)."""
+    mes_actual = _mes_actual_ar()
+    rows = conn.execute(
+        "SELECT id, fecha_desde, monto_pagado FROM alquileres WHERE estudio_slot_id = ?",
+        (slot_id,),
+    ).fetchall()
+    for e in rows:
+        fd = to_datetime(e["fecha_desde"])
+        mes_e = f"{fd.year:04d}-{fd.month:02d}"
+        if mes_e >= mes_actual and (e["monto_pagado"] or 0) == 0:
+            conn.execute("DELETE FROM alquileres WHERE id = ?", (e["id"],))
+
+
 @router.get("/estudio/disponibilidad")
 def estudio_disponibilidad(
     fecha: str = Query(..., description="YYYY-MM-DD"),
@@ -489,7 +618,12 @@ def estudio_disponibilidad(
             return {
                 "libre": False,
                 "motivo": f"Necesitás reservar con al menos {estudio['anticipacion_min_horas']} h de anticipación",
+                "pack": [],
             }
+
+        slot_cliente = _slot_bloqueante(conn, fecha_desde, fecha_hasta)
+        if slot_cliente:
+            return {"libre": False, "motivo": f"Reservado: {slot_cliente}", "pack": []}
 
         if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
                                 estudio["buffer_horas"]):
@@ -560,6 +694,10 @@ def crear_reserva_estudio(body: EstudioReservaCreate, background: BackgroundTask
                 f"Necesitás reservar con al menos {estudio['anticipacion_min_horas']} h de anticipación",
             )
 
+        slot_cliente = _slot_bloqueante(conn, fecha_desde, fecha_hasta)
+        if slot_cliente:
+            raise HTTPException(409, f"Esa franja está reservada de forma fija ({slot_cliente})")
+
         con_pack = bool(body.con_pack) and bool(estudio["pack_activo"])
         monto_total = (estudio["precio_hora"] or 0) * body.horas
         if con_pack:
@@ -628,3 +766,140 @@ def crear_reserva_estudio(body: EstudioReservaCreate, background: BackgroundTask
 
     _dispatch_pedido_creado_emails(background, pedido)
     return pedido
+
+
+# ── Admin: CRUD de slots fijos (E4) ────────────────────────────────────────────
+
+class SlotFijoCreate(BaseModel):
+    cliente: str
+    dia_semana: int
+    hora_desde: int
+    hora_hasta: int
+    valor_mensual: int = 0
+    mes_desde: str
+    mes_hasta: str
+    activo: bool = True
+
+
+class SlotFijoUpdate(BaseModel):
+    cliente: Optional[str] = None
+    dia_semana: Optional[int] = None
+    hora_desde: Optional[int] = None
+    hora_hasta: Optional[int] = None
+    valor_mensual: Optional[int] = None
+    mes_desde: Optional[str] = None
+    mes_hasta: Optional[str] = None
+    activo: Optional[bool] = None
+
+
+_MES_RE = __import__("re").compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+
+
+def _validar_slot(d: dict) -> None:
+    """Valida los campos de un slot (los que estén presentes). Lanza 400."""
+    if "dia_semana" in d and not (0 <= d["dia_semana"] <= 6):
+        raise HTTPException(400, "dia_semana debe estar entre 0 (Lun) y 6 (Dom)")
+    for k in ("hora_desde", "hora_hasta"):
+        if k in d and not (0 <= d[k] <= 24):
+            raise HTTPException(400, f"{k} debe estar entre 0 y 24")
+    if "hora_desde" in d and "hora_hasta" in d and d["hora_desde"] >= d["hora_hasta"]:
+        raise HTTPException(400, "hora_hasta debe ser posterior a hora_desde")
+    for k in ("mes_desde", "mes_hasta"):
+        if k in d and not _MES_RE.match(d[k] or ""):
+            raise HTTPException(400, f"{k} debe tener formato YYYY-MM")
+    if "mes_desde" in d and "mes_hasta" in d and d["mes_desde"] > d["mes_hasta"]:
+        raise HTTPException(400, "mes_hasta no puede ser anterior a mes_desde")
+
+
+def _get_slot(conn, slot_id: int) -> dict:
+    row = conn.execute("SELECT * FROM estudio_slots_fijos WHERE id = ?", (slot_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "Slot no encontrado")
+    return _slot_to_dict(row)
+
+
+@router.get("/admin/estudio/slots")
+def listar_slots(request: Request):
+    require_admin(request)
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM estudio_slots_fijos ORDER BY activo DESC, dia_semana, hora_desde"
+        ).fetchall()
+        return {"slots": [_slot_to_dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.post("/admin/estudio/slots", status_code=201)
+def crear_slot(body: SlotFijoCreate, request: Request):
+    require_admin(request)
+    data = body.dict()
+    _validar_slot(data)
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            """
+            INSERT INTO estudio_slots_fijos
+                (cliente, dia_semana, hora_desde, hora_hasta, valor_mensual,
+                 mes_desde, mes_hasta, activo)
+            VALUES (?,?,?,?,?,?,?,?)
+            """,
+            (data["cliente"], data["dia_semana"], data["hora_desde"], data["hora_hasta"],
+             data["valor_mensual"], data["mes_desde"], data["mes_hasta"], data["activo"]),
+        )
+        slot = _get_slot(conn, cur.lastrowid)
+        _regenerar_pedidos_slot(conn, slot)
+        conn.commit()
+        return slot
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.patch("/admin/estudio/slots/{slot_id}")
+def actualizar_slot(slot_id: int, body: SlotFijoUpdate, request: Request):
+    require_admin(request)
+    updates = {k: v for k, v in body.dict().items() if v is not None}
+    conn = get_db()
+    try:
+        actual = _get_slot(conn, slot_id)
+        merged = {**actual, **updates}
+        _validar_slot(merged)
+        if updates:
+            updates["updated_at"] = now_ar()
+            set_parts = ", ".join(f"{k} = ?" for k in updates)
+            conn.execute(
+                f"UPDATE estudio_slots_fijos SET {set_parts} WHERE id = ?",
+                (*updates.values(), slot_id),
+            )
+        slot = _get_slot(conn, slot_id)
+        _regenerar_pedidos_slot(conn, slot)
+        conn.commit()
+        return slot
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@router.delete("/admin/estudio/slots/{slot_id}")
+def borrar_slot(slot_id: int, request: Request):
+    require_admin(request)
+    conn = get_db()
+    try:
+        _get_slot(conn, slot_id)  # 404 si no existe
+        # Borra los pedidos futuros impagos; los pasados/pagados quedan (su
+        # estudio_slot_id pasa a NULL por la FK ON DELETE SET NULL).
+        _borrar_pedidos_futuros_impagos(conn, slot_id)
+        conn.execute("DELETE FROM estudio_slots_fijos WHERE id = ?", (slot_id,))
+        conn.commit()
+        return {"ok": True}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
