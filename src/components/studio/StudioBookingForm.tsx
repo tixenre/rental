@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, Minus, Plus, MessageCircle, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, Minus, Plus, MessageCircle, Loader2, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
+import { authedFetch } from "@/lib/authedFetch";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import {
   apiGetEstudioDisponibilidad,
@@ -61,9 +63,9 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
   const [startSlot, setStartSlot] = useState<string>(`${pad(openHour)}:00`);
   const [hours, setHours] = useState<number>(minHours);
 
-  const [nombre, setNombre] = useState("");
-  const [email, setEmail] = useState("");
-  const [telefono, setTelefono] = useState("");
+  // Login obligatorio: los datos del cliente salen de la sesión (no se piden acá).
+  const [auth, setAuth] = useState<"checking" | "in" | "out">("checking");
+  const [clienteNombre, setClienteNombre] = useState<string>("");
 
   const [withPack, setWithPack] = useState(false);
   const [packEquipos, setPackEquipos] = useState<EstudioPackEquipo[]>([]);
@@ -79,6 +81,28 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
+  }, []);
+
+  // Pre-chequeo de sesión de cliente (mismo patrón que CartDrawer).
+  useEffect(() => {
+    let cancelado = false;
+    authedFetch("/api/cliente/me")
+      .then(async (r) => {
+        if (cancelado) return;
+        if (r.ok) {
+          const me = await r.json().catch(() => ({}));
+          setClienteNombre(me?.nombre ?? "");
+          setAuth("in");
+        } else {
+          setAuth("out");
+        }
+      })
+      .catch(() => {
+        if (!cancelado) setAuth("out");
+      });
+    return () => {
+      cancelado = true;
+    };
   }, []);
 
   const subtotal = pricePerHour * hours;
@@ -116,13 +140,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
     };
   }, [fechaISO, startSlot, hours]);
 
-  const emailValido = !email || /.+@.+\..+/.test(email);
-  const canReserve =
-    !!fechaISO &&
-    disponibilidad === "libre" &&
-    nombre.trim().length > 0 &&
-    emailValido &&
-    !submitting;
+  const canReserve = !!fechaISO && disponibilidad === "libre" && auth === "in" && !submitting;
 
   const handleReservar = async () => {
     if (!fechaISO) return;
@@ -133,14 +151,13 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
         fecha: fechaISO,
         start: startSlot,
         horas: hours,
-        cliente_nombre: nombre.trim(),
-        cliente_email: email.trim() || undefined,
-        cliente_telefono: telefono.trim() || undefined,
         con_pack: withPack,
       });
       setConfirmada({ numero: res.numero_pedido ?? null });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "No se pudo crear la reserva";
+      // Sesión vencida entre el pre-chequeo y el submit → pedir login de nuevo.
+      if (/401|sesión/i.test(msg)) setAuth("out");
       // Si chocó con otra reserva, refrescamos el estado a ocupado.
       if (/disponible|409/.test(msg)) setDisponibilidad("ocupado");
       setErrorMsg(msg);
@@ -185,9 +202,6 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
           onClick={() => {
             setConfirmada(null);
             setDate(undefined);
-            setNombre("");
-            setEmail("");
-            setTelefono("");
           }}
         >
           Reservar otra fecha
@@ -308,47 +322,38 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
         {/* Divider */}
         <div className="hidden lg:block w-px bg-border" />
 
-        {/* Datos del cliente + resumen */}
+        {/* Cuenta del cliente + resumen */}
         <div className="space-y-4">
-          <div className="space-y-3">
-            <div>
-              <label className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                Nombre
-              </label>
-              <input
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Tu nombre"
-                className="mt-1.5 h-10 w-full rounded-md border hairline bg-background px-3 text-base sm:text-sm focus:border-amber/60 focus:outline-none"
-              />
+          {/* Estado de sesión: login obligatorio, los datos salen de la cuenta. */}
+          {auth === "checking" && (
+            <div className="flex items-center gap-2 rounded-md border hairline bg-background px-3 py-2.5 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Verificando tu sesión…
             </div>
-            <div>
-              <label className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@email.com"
-                className={cn(
-                  "mt-1.5 h-10 w-full rounded-md border bg-background px-3 text-base sm:text-sm focus:outline-none",
-                  emailValido ? "hairline focus:border-amber/60" : "border-red-400",
-                )}
-              />
+          )}
+          {auth === "out" && (
+            <div className="rounded-xl border hairline bg-surface p-4">
+              <p className="text-sm font-medium text-ink">Iniciá sesión para reservar el estudio</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Usamos los datos de tu cuenta — no hace falta volver a cargarlos.
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <Button asChild className="w-full bg-amber text-ink hover:bg-amber/90 sm:w-auto">
+                  <Link to="/cliente/login">
+                    <LogIn className="mr-2 h-4 w-4" /> Iniciar sesión
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full sm:w-auto">
+                  <Link to="/cliente/registro">Crear cuenta</Link>
+                </Button>
+              </div>
             </div>
-            <div>
-              <label className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                Teléfono
-              </label>
-              <input
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-                placeholder="Tu teléfono"
-                className="mt-1.5 h-10 w-full rounded-md border hairline bg-background px-3 text-base sm:text-sm focus:border-amber/60 focus:outline-none"
-              />
+          )}
+          {auth === "in" && (
+            <div className="rounded-md border hairline bg-background px-3 py-2.5 text-sm">
+              Reservás como{" "}
+              <span className="font-semibold text-ink">{clienteNombre || "tu cuenta"}</span>
             </div>
-          </div>
+          )}
 
           {/* Pack opcional */}
           {packActivo && (
