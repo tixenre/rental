@@ -1,19 +1,23 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Camera, Check, MessageCircle, Lightbulb, Snowflake, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Camera,
+  Check,
+  MessageCircle,
+  Lightbulb,
+  Snowflake,
+  Users,
+} from "lucide-react";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { CartDrawer } from "@/components/rental/CartDrawer";
 import { StudioBookingForm } from "@/components/studio/StudioBookingForm";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
-import { apiGetEstudio, type EstudioConfig } from "@/lib/api";
+import { apiGetEstudio, type EstudioFoto } from "@/lib/api";
 import { formatARS } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/estudio")({
   head: () => ({
@@ -53,15 +57,227 @@ function PhotoPlaceholder({
 }) {
   return (
     <div
-      className={
-        "relative flex items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-amber-soft via-surface to-amber-soft/40 border hairline " +
-        (className ?? "")
-      }
+      className={cn(
+        "relative flex items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-amber-soft via-surface to-amber-soft/40 border hairline",
+        className,
+      )}
     >
       <div className="absolute inset-0 grain opacity-20" />
       <div className="relative flex flex-col items-center gap-2 text-ink/40">
         <Camera className="h-7 w-7" />
         <span className="font-mono text-[9px] uppercase tracking-[0.3em]">{label}</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Galería con scroll-snap nativo (touch/swipe) + mouse-drag para desktop +
+ * flechas. Sigue el patrón de CarouselRow (overflow-x-auto + snap-x), no
+ * Embla, para que el feel sea idéntico al resto del sitio.
+ */
+function DragGallery({
+  fotos,
+  placeholders,
+  alt,
+}: {
+  fotos: EstudioFoto[];
+  placeholders: number;
+  alt: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(true);
+  const drag = useRef<{ active: boolean; moved: boolean; startX: number; startScroll: number }>({
+    active: false,
+    moved: false,
+    startX: 0,
+    startScroll: 0,
+  });
+
+  const update = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setCanPrev(el.scrollLeft > 4);
+    setCanNext(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    update();
+    const el = ref.current;
+    if (!el) return;
+    el.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      el.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [update]);
+
+  const scrollBy = (dir: 1 | -1) => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.round(el.clientWidth * 0.85), behavior: "smooth" });
+  };
+
+  // Mouse-drag para desktop. En touch, el navegador maneja el swipe nativo.
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "mouse") return;
+    const el = ref.current;
+    if (!el) return;
+    drag.current = {
+      active: true,
+      moved: false,
+      startX: e.clientX,
+      startScroll: el.scrollLeft,
+    };
+    el.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.current.active) return;
+    const el = ref.current;
+    if (!el) return;
+    const dx = e.clientX - drag.current.startX;
+    if (Math.abs(dx) > 5) drag.current.moved = true;
+    el.scrollLeft = drag.current.startScroll - dx;
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (el && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    // pequeña pausa para que un click justo después del drag no dispare onClick.
+    setTimeout(() => {
+      drag.current.active = false;
+      drag.current.moved = false;
+    }, 0);
+  };
+
+  const items: Array<{ key: string | number; node: React.ReactNode }> =
+    fotos.length > 0
+      ? fotos.map((f, i) => ({
+          key: f.id,
+          node: (
+            <img
+              src={f.url}
+              alt={`${alt} — foto ${i + 1}`}
+              className="h-full w-full object-cover select-none"
+              draggable={false}
+              loading={i < 2 ? "eager" : "lazy"}
+            />
+          ),
+        }))
+      : Array.from({ length: placeholders }).map((_, i) => ({
+          key: i,
+          node: <PhotoPlaceholder className="h-full w-full" label={`FOTO ${i + 1}`} />,
+        }));
+
+  return (
+    <div className="relative">
+      <div
+        ref={ref}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        className={cn(
+          "flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 lg:gap-4 lg:px-12",
+          "scroll-pl-4 lg:scroll-pl-12",
+          "[&::-webkit-scrollbar]:hidden [scrollbar-width:none]",
+          // mouse-drag affordance en desktop
+          "cursor-grab active:cursor-grabbing select-none",
+          // touch nativo: dejar que el navegador haga el pan-x
+          "touch-pan-x",
+        )}
+      >
+        {items.map((it) => (
+          <div
+            key={it.key}
+            className={cn(
+              "snap-start shrink-0",
+              // mobile casi full-bleed (deja un asomo del próximo);
+              // sm: 2 por viewport; lg: ~2.6 por viewport
+              "basis-[88%] sm:basis-[58%] lg:basis-[38%]",
+              "aspect-[4/3] overflow-hidden rounded-xl bg-ink/5",
+            )}
+          >
+            {it.node}
+          </div>
+        ))}
+      </div>
+
+      {/* Flechas: solo desktop, sobre la franja con padding suficiente. */}
+      <button
+        type="button"
+        onClick={() => scrollBy(-1)}
+        disabled={!canPrev}
+        aria-label="Foto anterior"
+        className={cn(
+          "absolute left-3 top-1/2 hidden -translate-y-1/2 lg:grid h-10 w-10 place-items-center rounded-full bg-background/90 border hairline shadow-sm backdrop-blur transition",
+          canPrev
+            ? "hover:border-ink hover:bg-ink hover:text-amber"
+            : "opacity-0 pointer-events-none",
+        )}
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => scrollBy(1)}
+        disabled={!canNext}
+        aria-label="Foto siguiente"
+        className={cn(
+          "absolute right-3 top-1/2 hidden -translate-y-1/2 lg:grid h-10 w-10 place-items-center rounded-full bg-background/90 border hairline shadow-sm backdrop-blur transition",
+          canNext
+            ? "hover:border-ink hover:bg-ink hover:text-amber"
+            : "opacity-0 pointer-events-none",
+        )}
+      >
+        <ArrowRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+/** Sticky CTA "Reservar" sólo en mobile. Se oculta cuando #reservar entra en viewport. */
+function MobileBookCta({ priceLabel }: { priceLabel: string | null }) {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    const target = document.getElementById("reservar");
+    if (!target) return;
+    // Ocultar el sticky en cuanto cualquier parte del bloque de reserva
+    // entra en viewport — ya no aporta y taparía el formulario.
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0];
+        setHidden(e.isIntersecting);
+      },
+      { threshold: 0 },
+    );
+    obs.observe(target);
+    return () => obs.disconnect();
+  }, []);
+
+  return (
+    <div
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-30 lg:hidden",
+        "transition-transform duration-200",
+        hidden ? "translate-y-full" : "translate-y-0",
+      )}
+      aria-hidden={hidden}
+    >
+      <div className="pointer-events-auto flex items-center gap-3 border-t hairline bg-background/95 backdrop-blur px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="min-w-0 flex-1">
+          <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
+            Reservar el estudio
+          </div>
+          <div className="truncate text-sm font-medium text-ink">{priceLabel ?? "A consultar"}</div>
+        </div>
+        <a
+          href="#reservar"
+          className="inline-flex items-center justify-center rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-amber hover:brightness-110 transition"
+        >
+          Reservar
+        </a>
       </div>
     </div>
   );
@@ -79,15 +295,21 @@ function EstudioPage() {
   const descripcion = data?.descripcion ?? STUDIO.description;
   const features = data?.features ?? STUDIO.features;
   const faq = data?.faq ?? STUDIO.faq;
-  const fotos = data?.fotos ?? [];
+  const fotos = useMemo(() => data?.fotos ?? [], [data?.fotos]);
   const packActivo = data?.pack_activo ?? true;
   const packNombre = data?.pack_nombre ?? STUDIO.addon.name;
   const packDescripcion = data?.pack_descripcion ?? STUDIO.addon.description;
   const packPrecio = data?.pack_precio ?? STUDIO.addon.pricePerDay;
+  const precioHora = data?.precio_hora ?? STUDIO.pricePerHour;
   const minHours = data?.min_horas ?? STUDIO.minHours;
 
-  // foto principal para el hero (primera marcada como principal, o primera)
-  const fotoPrincipal = fotos.find((f) => f.es_principal) ?? fotos[0];
+  // Foto principal para el hero: la marcada como principal o la primera.
+  // El resto va a la galería (sin repetir la del hero).
+  const fotoHero = fotos.find((f) => f.es_principal) ?? fotos[0];
+  const fotosGaleria = useMemo(() => {
+    if (!fotoHero) return fotos;
+    return fotos.filter((f) => f.id !== fotoHero.id);
+  }, [fotos, fotoHero]);
 
   const bookingConfig = data
     ? {
@@ -102,6 +324,9 @@ function EstudioPage() {
       }
     : undefined;
 
+  const priceLabel = precioHora > 0 ? `${formatARS(precioHora)}/hora · mín ${minHours}h` : null;
+  const priceAnchor = precioHora > 0 ? `Desde ${formatARS(precioHora)}/h · mín ${minHours}h` : null;
+
   return (
     <PublicLayout>
       {/* Back link */}
@@ -114,43 +339,97 @@ function EstudioPage() {
         </Link>
       </div>
 
-      {/* Hero compacto */}
-      <section className="px-4 pt-4 pb-7 lg:px-12 lg:pb-10">
-        <div className="grid gap-6 lg:grid-cols-2 lg:items-center">
-          <div>
-            <h1 className="wordmark text-[12vw] leading-[0.95] md:text-[4.5rem] lg:text-[5.5rem] text-balance">
-              {nombre}
-            </h1>
-            <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
+      {/* ─── Hero ──────────────────────────────────────────────────────── */}
+      <section className="px-4 pt-3 pb-8 lg:px-12 lg:pt-6 lg:pb-12">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-10">
+          <div className="order-2 lg:order-1">
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
               {tagline}
             </p>
-            <p className="mt-4 max-w-lg text-sm sm:text-base text-muted-foreground">
-              {descripcion}
-            </p>
-          </div>
-          {fotoPrincipal ? (
-            <div className="aspect-[4/3] w-full overflow-hidden rounded-xl">
-              <img src={fotoPrincipal.url} alt={nombre} className="h-full w-full object-cover" />
+            <h1 className="mt-2 wordmark text-[14vw] leading-[0.92] sm:text-[10vw] md:text-[5.5rem] lg:text-[6.25rem] text-balance">
+              {nombre}
+            </h1>
+            <p className="mt-4 max-w-lg text-base text-muted-foreground">{descripcion}</p>
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <a
+                href="#reservar"
+                className="inline-flex items-center justify-center rounded-full bg-ink px-6 py-3 text-sm font-semibold text-amber hover:brightness-110 transition"
+              >
+                Reservar
+              </a>
+              {priceAnchor && (
+                <span className="inline-flex items-center rounded-full border hairline bg-surface px-4 py-2 text-xs sm:text-sm tabular text-ink">
+                  {priceAnchor}
+                </span>
+              )}
             </div>
-          ) : (
-            <PhotoPlaceholder className="aspect-[4/3] w-full" label="FOTO PRINCIPAL" />
-          )}
+          </div>
+
+          {/* Foto hero — grande, ratio cinematográfico en mobile, 4/3 en desktop */}
+          <div className="order-1 lg:order-2">
+            {fotoHero ? (
+              <div className="aspect-[16/10] sm:aspect-[4/3] w-full overflow-hidden rounded-2xl bg-ink/5">
+                <img
+                  src={fotoHero.url}
+                  alt={nombre}
+                  className="h-full w-full object-cover"
+                  loading="eager"
+                />
+              </div>
+            ) : (
+              <PhotoPlaceholder
+                className="aspect-[16/10] sm:aspect-[4/3] w-full"
+                label="FOTO PRINCIPAL"
+              />
+            )}
+          </div>
         </div>
       </section>
 
-      {/* Reservar + Pack (acción principal, arriba) */}
-      <section id="reservar" className="border-t hairline px-4 py-8 lg:px-12 lg:py-10 scroll-mt-24">
-        <h2 className="font-display text-2xl sm:text-3xl">Reservá el estudio</h2>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Mínimo {minHours} horas. Elegí día y horario y reservá online — te contactamos para
-          confirmar.
-        </p>
+      {/* ─── Galería ─────────────────────────────────────────────────── */}
+      {(fotosGaleria.length > 0 || !data) && (
+        <section className="border-t hairline pt-8 pb-10 lg:pt-12 lg:pb-14">
+          <div className="mb-5 flex items-end justify-between gap-3 px-4 lg:px-12">
+            <div>
+              <h2 className="font-display text-2xl sm:text-3xl">El espacio</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Deslizá para ver más.</p>
+            </div>
+            {fotosGaleria.length > 0 && (
+              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
+                {fotosGaleria.length + (fotoHero ? 1 : 0)} fotos
+              </span>
+            )}
+          </div>
+          <DragGallery fotos={fotosGaleria} placeholders={STUDIO.gallery} alt={nombre} />
+        </section>
+      )}
+
+      {/* ─── Reservar + Pack ─────────────────────────────────────────── */}
+      <section
+        id="reservar"
+        className="border-t hairline px-4 py-10 lg:px-12 lg:py-14 scroll-mt-20 lg:scroll-mt-24"
+      >
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-display text-2xl sm:text-3xl">Reservá tu sesión</h2>
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+              Mínimo {minHours} horas. Elegí día y horario y reservá online — te contactamos para
+              confirmar.
+            </p>
+          </div>
+          {priceAnchor && (
+            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
+              {priceAnchor}
+            </span>
+          )}
+        </div>
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start">
           <StudioBookingForm config={bookingConfig} />
           {packActivo && (
             <aside className="rounded-2xl border hairline bg-amber/10 p-5">
               <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/60">
-                Pack · monto fijo
+                Pack · add-on opcional
               </div>
               <h3 className="mt-1 font-display text-xl">{packNombre}</h3>
               <p className="mt-2 text-sm text-muted-foreground">{packDescripcion}</p>
@@ -177,53 +456,9 @@ function EstudioPage() {
         </div>
       </section>
 
-      {/* Galería — carrusel */}
-      {(fotos.length > 0 || !data) && (
-        <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-          <div className="mb-6 flex items-end justify-between gap-3">
-            <h2 className="font-display text-2xl sm:text-3xl">Galería</h2>
-            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-              {fotos.length > 0 ? `${fotos.length} fotos` : `${STUDIO.gallery} fotos`}
-            </span>
-          </div>
-          <Carousel opts={{ align: "start" }} className="w-full">
-            <CarouselContent className="-ml-3">
-              {fotos.length > 0
-                ? fotos.map((foto) => (
-                    <CarouselItem
-                      key={foto.id}
-                      className="basis-4/5 pl-3 sm:basis-1/2 lg:basis-1/3"
-                    >
-                      <div className="aspect-[4/3] w-full overflow-hidden rounded-xl">
-                        <img
-                          src={foto.url}
-                          alt=""
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      </div>
-                    </CarouselItem>
-                  ))
-                : Array.from({ length: STUDIO.gallery }).map((_, i) => (
-                    <CarouselItem key={i} className="basis-4/5 pl-3 sm:basis-1/2 lg:basis-1/3">
-                      <PhotoPlaceholder className="aspect-[4/3] w-full" label={`FOTO ${i + 1}`} />
-                    </CarouselItem>
-                  ))}
-            </CarouselContent>
-            {/* Flechas solo en lg: ahí la sección tiene px-12 (48px) y entran sin
-                cortarse. En <lg el carrusel se maneja con swipe (hint abajo). */}
-            <CarouselPrevious className="hidden lg:flex" />
-            <CarouselNext className="hidden lg:flex" />
-          </Carousel>
-          <p className="mt-3 text-center text-[10px] uppercase tracking-[0.25em] text-muted-foreground lg:hidden">
-            Deslizá para ver más
-          </p>
-        </section>
-      )}
-
-      {/* Características */}
+      {/* ─── Qué incluye / características ───────────────────────────── */}
       <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-        <h2 className="font-display text-2xl sm:text-3xl">Características</h2>
+        <h2 className="font-display text-2xl sm:text-3xl">Qué incluye</h2>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
           Todo lo que necesitás para producir sin sobresaltos.
         </p>
@@ -237,16 +472,12 @@ function EstudioPage() {
             </div>
           ))}
         </div>
-      </section>
 
-      {/* Por qué elegirnos */}
-      <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-        <h2 className="font-display text-2xl sm:text-3xl">Por qué Rambla</h2>
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Feature
             icon={<Lightbulb className="h-5 w-5" />}
-            title="Todo a mano"
-            desc="Acceso directo al catálogo de Rambla — sumás cámara, lentes o luces extra al pedido del estudio."
+            title="Catálogo a mano"
+            desc="Sumás cámaras, lentes o luces extra al pedido del estudio en un mismo flujo."
           />
           <Feature
             icon={<Snowflake className="h-5 w-5" />}
@@ -256,12 +487,12 @@ function EstudioPage() {
           <Feature
             icon={<Users className="h-5 w-5" />}
             title="Atendido por nosotros"
-            desc="No es un coworking automatizado. Te recibimos, te resolvemos dudas técnicas y te asistimos si lo necesitás."
+            desc="No es un coworking automatizado. Te recibimos y te resolvemos dudas técnicas."
           />
         </div>
       </section>
 
-      {/* FAQ */}
+      {/* ─── FAQ ─────────────────────────────────────────────────────── */}
       {faq.length > 0 && (
         <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
           <h2 className="font-display text-2xl sm:text-3xl">Preguntas frecuentes</h2>
@@ -276,7 +507,7 @@ function EstudioPage() {
         </section>
       )}
 
-      {/* CTA WhatsApp final */}
+      {/* ─── CTA WhatsApp ────────────────────────────────────────────── */}
       <section className="border-t hairline bg-ink text-amber px-4 py-12 lg:px-12 lg:py-16">
         <div className="max-w-2xl">
           <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber/70">
@@ -300,6 +531,11 @@ function EstudioPage() {
           </a>
         </div>
       </section>
+
+      {/* Padding extra al final para que el sticky CTA mobile no tape contenido */}
+      <div className="h-20 lg:hidden" aria-hidden />
+
+      <MobileBookCta priceLabel={priceLabel} />
 
       <CartDrawer allEquipos={[]} />
     </PublicLayout>
