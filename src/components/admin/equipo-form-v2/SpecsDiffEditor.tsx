@@ -170,57 +170,10 @@ export function SpecsDiffEditor({
         </span>
       </div>
 
-      {/* Propuestos (del autocompletar) */}
-      {propuestos.length > 0 && (
-        <div className="rounded-md border hairline bg-amber-soft/30 p-2 space-y-1.5">
-          <p className="text-[11px] text-ink/70 font-medium">
-            ✨ {propuestos.length} {propuestos.length === 1 ? "ítem propuesto" : "ítems propuestos"}{" "}
-            del autocompletar
-          </p>
-          {propuestos.map((s) => {
-            const tmpl = findTmplForPropuesto(s);
-            const displayLabel = tmpl?.label ?? s.label;
-            const existing = specs.find(
-              (x) => (s.spec_key && x.spec_key === s.spec_key) || sameLabel(x.label, displayLabel),
-            );
-            return (
-              <div key={s.id} className="flex items-center gap-1.5 text-xs">
-                <div className="flex-1 min-w-0">
-                  <span className="font-medium">{displayLabel}:</span> <span>{s.value}</span>
-                  {existing && existing.value !== s.value && (
-                    <span className="ml-1 text-muted-foreground line-through">
-                      {existing.value}
-                    </span>
-                  )}
-                  {!tmpl && (
-                    <span className="ml-1.5 text-[10px] text-muted-foreground italic">
-                      sin template
-                    </span>
-                  )}
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="default"
-                  className="h-6 px-1.5 text-[10px]"
-                  onClick={() => onAceptarPropuesto(s)}
-                >
-                  ✓
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-6 px-1.5 text-[10px]"
-                  onClick={() => onDescartarPropuesto(s)}
-                >
-                  ✗
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* Propuestos (del autocompletar) — sección oculta.
+          Los parsers bespoke llenan el template directamente; lo que no
+          matchea no aporta valor visible al admin. El estado y la lógica
+          de auto-apply siguen activos en EquipoFormDialogV2. */}
 
       {/* Sección template-bound */}
       {templateBound.length > 0 && (
