@@ -122,6 +122,21 @@
   componente `PhotoGallery` se construyó genérico), pago online, **revenue separado estudio≠rental**
   (distribución proporcional del pack → rental; espacio/slot → estudio — es contabilidad, iniciativa aparte).
 
+### 2026-05-27 — Notificaciones canal-agnósticas; mail construido-no-activado; confirmación = redirect al portal
+- **Contexto:** al solicitar un pedido (carrito o estudio) el feedback era pobre; y la infra de mails
+  ya estaba **construida pero apagada** (caía al backend `test`), no inexistente.
+- **Decisión:** (1) el feedback de "pedido solicitado" es un **redirect al portal del cliente** con la
+  card nueva resaltada (no un cartel en el lugar) — mismo flujo para carrito y estudio. (2) Las
+  **notificaciones son canal-agnósticas**: hoy el canal es mail; **WhatsApp es follow-up** que se
+  enchufa al mismo punto de despacho (generalizándolo a un notificador multi-canal), no un segundo
+  sistema. (3) El envío de mails se **activa por configuración, no por código** (setear
+  `RESEND_API_KEY`/`SMTP_*` + `EMAIL_FROM`/`EMAIL_ADMIN_TO` en prod) → es tarea de ops, iniciativa
+  aparte. (4) Regla de **documentos**: el remito/contrato no existen en `presupuesto`, recién desde
+  `confirmado` → el mail de creación no los promete, el de confirmación sí.
+- **Consecuencias:** el recorrido del pedido queda documentado en `docs/FLUJO_PEDIDOS.md` (enlazado
+  desde CLAUDE.md + MANIFIESTO). WhatsApp requiere proveedor (Meta/Twilio), verificación y plantillas
+  pre-aprobadas → cuando se encare, va como iniciativa propia.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
