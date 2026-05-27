@@ -380,9 +380,10 @@ function EstudioPage() {
             </div>
           </div>
 
-          {/* Foto hero — full-bleed en mobile (cancela el px-4 del section con
-              -mx-4 y saca el redondeo); en desktop vuelve a la celda del grid. */}
-          <div className="order-1 lg:order-2 -mx-4 lg:mx-0">
+          {/* Foto hero — full-bleed real en mobile/tablet (margen negativo basado
+              en el viewport, no en el padding del padre, así no depende del
+              contexto). En lg vuelve a la celda del grid con redondeo. */}
+          <div className="order-1 lg:order-2 mx-[calc(50%-50vw)] w-screen lg:mx-0 lg:w-auto">
             {fotoHero ? (
               <div className="aspect-[16/10] sm:aspect-[4/3] w-full overflow-hidden rounded-none lg:rounded-2xl bg-ink/5">
                 <img
