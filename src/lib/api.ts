@@ -6,6 +6,8 @@
  *   - Producción:  "" (el backend Python sirve el frontend en el mismo origen)
  */
 
+import { authedPostJson } from "@/lib/authedFetch";
+
 const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
 async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
@@ -233,15 +235,17 @@ export type EstudioReservaBody = {
   fecha: string;
   start: string;
   horas: number;
-  cliente_nombre: string;
-  cliente_email?: string;
-  cliente_telefono?: string;
   con_pack?: boolean;
+  // Datos del cliente: NO van en el body, salen de la sesión (login obligatorio).
 };
 
-/** Crea una reserva real del estudio (entra como solicitud, estado='presupuesto'). */
+/** Crea una reserva real del estudio (entra como solicitud, estado='presupuesto').
+ *  Requiere cliente logueado: usa authedPostJson (manda la cookie de sesión). */
 export function apiCrearReservaEstudio(body: EstudioReservaBody) {
-  return post<{ id: number; numero_pedido: number | null }>("/api/estudio/reservas", body);
+  return authedPostJson<{ id: number; numero_pedido: number | null }>(
+    "/api/estudio/reservas",
+    body,
+  );
 }
 
 // NOTA: la creación de pedidos se movió a `src/lib/orders.ts → createOrder()`
