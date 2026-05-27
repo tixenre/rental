@@ -1,18 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowLeft,
-  Camera,
-  Check,
-  Sparkles,
-  MessageCircle,
-  Lightbulb,
-  Snowflake,
-  Users,
-} from "lucide-react";
+import { ArrowLeft, Camera, Check, MessageCircle, Lightbulb, Snowflake, Users } from "lucide-react";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { CartDrawer } from "@/components/rental/CartDrawer";
 import { StudioBookingForm } from "@/components/studio/StudioBookingForm";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import { apiGetEstudio, type EstudioConfig } from "@/lib/api";
 import { formatARS } from "@/lib/format";
@@ -116,33 +114,19 @@ function EstudioPage() {
         </Link>
       </div>
 
-      {/* Hero estudio */}
-      <section className="px-4 py-8 lg:px-12 lg:py-12">
-        <div className="grid gap-8 lg:grid-cols-2 lg:items-end">
+      {/* Hero compacto */}
+      <section className="px-4 pt-4 pb-7 lg:px-12 lg:pb-10">
+        <div className="grid gap-6 lg:grid-cols-2 lg:items-center">
           <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-amber px-3 py-1 font-mono text-[10px] uppercase tracking-[0.25em] text-ink">
-              <Sparkles className="h-3 w-3" /> Producto estrella
-            </div>
-            <h1 className="mt-4 wordmark text-[14vw] leading-[0.9] md:text-[6rem] lg:text-[7rem] text-balance">
+            <h1 className="wordmark text-[12vw] leading-[0.95] md:text-[4.5rem] lg:text-[5.5rem] text-balance">
               {nombre}
             </h1>
-            <p className="mt-4 max-w-lg text-base text-muted-foreground">{descripcion}</p>
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <a
-                href="#reservar"
-                className="rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background hover:bg-amber hover:text-ink"
-              >
-                Reservar
-              </a>
-              {packActivo && (
-                <a
-                  href="#pack"
-                  className="rounded-full border hairline px-5 py-2.5 text-sm hover:border-ink"
-                >
-                  Ver pack todo incluido
-                </a>
-              )}
-            </div>
+            <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">
+              {tagline}
+            </p>
+            <p className="mt-4 max-w-lg text-sm sm:text-base text-muted-foreground">
+              {descripcion}
+            </p>
           </div>
           {fotoPrincipal ? (
             <div className="aspect-[4/3] w-full overflow-hidden rounded-xl">
@@ -154,7 +138,46 @@ function EstudioPage() {
         </div>
       </section>
 
-      {/* Galería */}
+      {/* Reservar + Pack (acción principal, arriba) */}
+      <section id="reservar" className="border-t hairline px-4 py-8 lg:px-12 lg:py-10 scroll-mt-24">
+        <h2 className="font-display text-2xl sm:text-3xl">Reservá el estudio</h2>
+        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+          Mínimo {minHours} horas. Elegí día y horario y reservá online — te contactamos para
+          confirmar.
+        </p>
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start">
+          <StudioBookingForm config={bookingConfig} />
+          {packActivo && (
+            <aside className="rounded-2xl border hairline bg-amber/10 p-5">
+              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/60">
+                Pack · monto fijo
+              </div>
+              <h3 className="mt-1 font-display text-xl">{packNombre}</h3>
+              <p className="mt-2 text-sm text-muted-foreground">{packDescripcion}</p>
+              <div className="mt-3 text-2xl font-semibold tabular">
+                {packPrecio > 0 ? formatARS(packPrecio) : "Consultar"}
+              </div>
+              <ul className="mt-4 space-y-2">
+                {STUDIO.addon.includes.map((it) => (
+                  <li
+                    key={it}
+                    className="flex items-start gap-2 rounded-lg bg-ink/5 px-3 py-2 text-sm"
+                  >
+                    <Check className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{it}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Activá el pack al reservar (en el formulario) — se incluye lo que esté disponible en
+                tu franja.
+              </p>
+            </aside>
+          )}
+        </div>
+      </section>
+
+      {/* Galería — carrusel */}
       {(fotos.length > 0 || !data) && (
         <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
           <div className="mb-6 flex items-end justify-between gap-3">
@@ -163,26 +186,38 @@ function EstudioPage() {
               {fotos.length > 0 ? `${fotos.length} fotos` : `${STUDIO.gallery} fotos`}
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-            {fotos.length > 0
-              ? fotos.map((foto) => (
-                  <div key={foto.id} className="aspect-square w-full overflow-hidden rounded-xl">
-                    <img
-                      src={foto.url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  </div>
-                ))
-              : Array.from({ length: STUDIO.gallery }).map((_, i) => (
-                  <PhotoPlaceholder
-                    key={i}
-                    className="aspect-square w-full"
-                    label={`FOTO ${i + 1}`}
-                  />
-                ))}
-          </div>
+          <Carousel opts={{ align: "start" }} className="w-full">
+            <CarouselContent className="-ml-3">
+              {fotos.length > 0
+                ? fotos.map((foto) => (
+                    <CarouselItem
+                      key={foto.id}
+                      className="basis-4/5 pl-3 sm:basis-1/2 lg:basis-1/3"
+                    >
+                      <div className="aspect-[4/3] w-full overflow-hidden rounded-xl">
+                        <img
+                          src={foto.url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      </div>
+                    </CarouselItem>
+                  ))
+                : Array.from({ length: STUDIO.gallery }).map((_, i) => (
+                    <CarouselItem key={i} className="basis-4/5 pl-3 sm:basis-1/2 lg:basis-1/3">
+                      <PhotoPlaceholder className="aspect-[4/3] w-full" label={`FOTO ${i + 1}`} />
+                    </CarouselItem>
+                  ))}
+            </CarouselContent>
+            {/* Flechas solo en lg: ahí la sección tiene px-12 (48px) y entran sin
+                cortarse. En <lg el carrusel se maneja con swipe (hint abajo). */}
+            <CarouselPrevious className="hidden lg:flex" />
+            <CarouselNext className="hidden lg:flex" />
+          </Carousel>
+          <p className="mt-3 text-center text-[10px] uppercase tracking-[0.25em] text-muted-foreground lg:hidden">
+            Deslizá para ver más
+          </p>
         </section>
       )}
 
@@ -223,53 +258,6 @@ function EstudioPage() {
             title="Atendido por nosotros"
             desc="No es un coworking automatizado. Te recibimos, te resolvemos dudas técnicas y te asistimos si lo necesitás."
           />
-        </div>
-      </section>
-
-      {/* Pack todo incluido */}
-      {packActivo && (
-        <section
-          id="pack"
-          className="border-t hairline bg-amber text-ink px-4 py-10 lg:px-12 lg:py-14"
-        >
-          <div className="grid gap-6 lg:grid-cols-2 lg:gap-12">
-            <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/70">
-                Addon · monto fijo / día
-              </div>
-              <h2 className="mt-2 font-display text-3xl sm:text-4xl">{packNombre}</h2>
-              <p className="mt-3 max-w-md text-ink/80">{packDescripcion}</p>
-              <div className="mt-5 text-4xl font-semibold tabular">
-                {packPrecio > 0 ? `${formatARS(packPrecio)} / día` : "Consultar precio"}
-              </div>
-            </div>
-            <ul className="space-y-2">
-              {STUDIO.addon.includes.map((it) => (
-                <li
-                  key={it}
-                  className="flex items-start gap-2 rounded-lg bg-ink/5 px-3 py-2 text-sm"
-                >
-                  <Check className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{it}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-      )}
-
-      {/* Reservar */}
-      <section
-        id="reservar"
-        className="border-t hairline px-4 py-10 lg:px-12 lg:py-14 scroll-mt-32"
-      >
-        <h2 className="font-display text-2xl sm:text-3xl">Reservar</h2>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Mínimo {minHours} horas. Elegí día y horario y reservá online — te contactamos para
-          confirmar.
-        </p>
-        <div className="mt-6">
-          <StudioBookingForm config={bookingConfig} />
         </div>
       </section>
 
