@@ -544,6 +544,11 @@ class _RecordingConn:
 
     def execute(self, sql, params=()):
         su = " ".join(sql.split()).upper()
+        if su.startswith("SELECT NOMBRE, APELLIDO, EMAIL, TELEFONO FROM CLIENTES"):
+            return _Cur([{
+                "nombre": "Tester", "apellido": "Estudio",
+                "email": "tester@example.com", "telefono": "1122334455",
+            }])
         if su.startswith("INSERT INTO ALQUILERES"):
             self.alquiler_params = params
             return _CurLastrowid([], lastrowid=self.pedido_id)
@@ -580,6 +585,8 @@ def _patch_post_collaborators(monkeypatch, conn, estudio_row, disp, pack_ids):
     )
     monkeypatch.setattr(estudio_mod, "_get_alquiler_detail", lambda c, pid: {"id": pid})
     monkeypatch.setattr(estudio_mod, "_dispatch_pedido_creado_emails", lambda bg, p: None)
+    # v2-B: login obligatorio — cliente_id sale de la sesión.
+    monkeypatch.setattr(estudio_mod, "_require_cliente", lambda req: {"cliente_id": 7, "role": "cliente"})
 
 
 def _estudio_row_full(**overrides):
@@ -604,11 +611,8 @@ class TestCrearReservaPack:
 
         # Fecha futura válida dentro del horario [open, close].
         manana = (now_ar() + timedelta(days=2)).strftime("%Y-%m-%d")
-        body = EstudioReservaCreate(
-            fecha=manana, start="14:00", horas=2,
-            cliente_nombre="Tester", con_pack=con_pack,
-        )
-        crear_reserva_estudio(body, BackgroundTasks())
+        body = EstudioReservaCreate(fecha=manana, start="14:00", horas=2, con_pack=con_pack)
+        crear_reserva_estudio(body, FakeRequest(), BackgroundTasks())
         return conn
 
     def test_con_pack_suma_precio_y_crea_items(self, monkeypatch):
@@ -805,3 +809,46 @@ class TestRegenerarPedidosSlot:
         conn = _SlotRegenConn(existing=[])
         _regenerar_pedidos_slot(conn, _slot_full(activo=False))
         assert conn.inserted == []
+
+
+# ── v2-B: reserva con login obligatorio ────────────────────────────────────────
+
+
+class TestReservaLoginObligatorio:
+    def test_sin_sesion_devuelve_401(self, monkeypatch):
+        from fastapi import BackgroundTasks, HTTPException
+        from routes.estudio import crear_reserva_estudio, EstudioReservaCreate
+
+        def _raise(_req):
+            raise HTTPException(401, "Sesión de cliente requerida")
+
+        monkeypatch.setattr(estudio_mod, "_require_cliente", _raise)
+        body = EstudioReservaCreate(fecha="2026-12-02", start="14:00", horas=2)
+        with pytest.raises(HTTPException) as exc:
+            crear_reserva_estudio(body, FakeRequest(), BackgroundTasks())
+        assert exc.value.status_code == 401
+
+    def test_usa_cliente_de_la_sesion_no_del_body(self, monkeypatch):
+        from datetime import timedelta
+        from fastapi import BackgroundTasks
+        from database import now_ar
+        from routes.estudio import crear_reserva_estudio, EstudioReservaCreate
+
+        conn = _RecordingConn()
+        _patch_post_collaborators(monkeypatch, conn, _estudio_row_full(), {}, [])
+        manana = (now_ar() + timedelta(days=2)).strftime("%Y-%m-%d")
+        crear_reserva_estudio(
+            EstudioReservaCreate(fecha=manana, start="14:00", horas=2),
+            FakeRequest(),
+            BackgroundTasks(),
+        )
+        # cliente_id (7, de la sesión) es el primer parámetro del INSERT.
+        assert conn.alquiler_params[0] == 7
+        # nombre/email salen de la tabla clientes, no del body.
+        assert "Estudio, Tester" in conn.alquiler_params
+        assert "tester@example.com" in conn.alquiler_params
+
+    def test_body_no_acepta_datos_de_cliente(self):
+        from routes.estudio import EstudioReservaCreate
+        assert "cliente_nombre" not in EstudioReservaCreate.model_fields
+        assert "cliente_email" not in EstudioReservaCreate.model_fields
