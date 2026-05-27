@@ -40,6 +40,7 @@ const schema = z.object({
   open_hour: z.coerce.number().int().min(0).max(23),
   close_hour: z.coerce.number().int().min(1).max(24),
   buffer_horas: z.coerce.number().int().min(0),
+  anticipacion_min_horas: z.coerce.number().int().min(0),
   pack_activo: z.boolean(),
   pack_nombre: z.string(),
   pack_descripcion: z.string(),
@@ -60,6 +61,7 @@ function configToForm(c: EstudioConfig): FormValues {
     open_hour: c.open_hour,
     close_hour: c.close_hour,
     buffer_horas: c.buffer_horas,
+    anticipacion_min_horas: c.anticipacion_min_horas,
     pack_activo: c.pack_activo,
     pack_nombre: c.pack_nombre,
     pack_descripcion: c.pack_descripcion,
@@ -180,6 +182,9 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
           </Field>
           <Field label="Buffer entre reservas (h)" error={errors.buffer_horas?.message}>
             <Input type="number" min={0} {...register("buffer_horas")} />
+          </Field>
+          <Field label="Anticipación mínima (h)" error={errors.anticipacion_min_horas?.message}>
+            <Input type="number" min={0} {...register("anticipacion_min_horas")} />
           </Field>
           <Field label="Apertura (hora)" error={errors.open_hour?.message}>
             <Input type="number" min={0} max={23} {...register("open_hour")} />

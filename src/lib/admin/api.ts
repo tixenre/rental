@@ -1641,6 +1641,7 @@ export type EstudioConfig = {
   open_hour: number;
   close_hour: number;
   buffer_horas: number;
+  anticipacion_min_horas: number;
   pack_activo: boolean;
   pack_nombre: string;
   pack_descripcion: string;
@@ -1660,6 +1661,7 @@ export type EstudioInput = {
   open_hour?: number;
   close_hour?: number;
   buffer_horas?: number;
+  anticipacion_min_horas?: number;
   pack_activo?: boolean;
   pack_nombre?: string;
   pack_descripcion?: string;
