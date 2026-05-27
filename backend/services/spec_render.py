@@ -234,7 +234,16 @@ def _format_value_by_tipo(
                     return _apply_unit(out, unidad)
             except Exception:
                 pass
-        # value no es JSON — devolver tal cual
+        # value no-canónico (data legacy: "24-70", "2.8", "f/2.8", "34.3-84.1mm").
+        # Lo parseamos a número(s) y le aplicamos la unidad igual que al JSON.
+        s2 = re.sub(r"^f/", "", v, flags=re.IGNORECASE)
+        s2 = re.sub(r"[a-zA-Z°/]+\s*$", "", s2).strip()
+        m = re.match(r"^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)$", s2)
+        if m:
+            return _apply_unit(f"{m.group(1)}-{m.group(2)}", unidad)
+        m1 = re.match(r"^(\d+(?:[.,]\d+)?)$", s2)
+        if m1:
+            return _apply_unit(m1.group(1), unidad)
         return v
 
     if tipo == "bool":
@@ -266,7 +275,12 @@ def render_spec_value(
         return ""
     base = _format_value_by_tipo(value, tipo, unidad)
     if tipo == "number" and unidad and base:
-        return _apply_unit(base, unidad)
+        # `base` puede traer la unidad pegada en data legacy ("1020 g") →
+        # extraer solo el número para no duplicarla ("1020 g g").
+        m = re.match(r"^\s*(-?\d+(?:[.,]\d+)?)", base)
+        if m:
+            return _apply_unit(m.group(1), unidad)
+        return base
     return base
 
 

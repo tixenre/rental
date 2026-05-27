@@ -479,9 +479,11 @@ export function discoverFilterableSpecs(equipos: Equipment[]): SpecFilterDef[] {
     const specsRaw = eq.specsRaw || {};
     for (const [key, s] of Object.entries(specsRaw)) {
       if (!s.en_filtros) continue;
-      // Solo enums/strings discretas para filtros (number/rango son
-      // siders, no chips). Por ahora limitamos a enum/string.
-      if (s.tipo !== "enum" && s.tipo !== "string") continue;
+      // Solo `enum` (opciones cerradas) → chips limpios y acotados. Los
+      // `string` son texto libre (codecs, conexiones, grabación) y generaban
+      // facetas basura con valores únicos larguísimos. number/rango/multi_enum
+      // (sliders/facetas) quedan para el sistema de filtros completo (pendiente).
+      if (s.tipo !== "enum") continue;
       const val = String(s.value || "").trim();
       if (!val) continue;
       if (!acc.has(key)) {
