@@ -880,6 +880,17 @@ class TestSlotBloqueante:
         fd, fh = self._franja(2026, 6, 2, 10, 12)
         assert _slot_bloqueante(conn, fd, fh) is None
 
+    def test_bloquea_franja_que_cierra_a_medianoche(self):
+        # Reserva 22-24: fecha_hasta = 00:00 del día siguiente. Con `.hour` daría
+        # fin=0 y no detectaría el solape; con minutos relativos al día da 1440.
+        from datetime import timedelta
+        from routes.estudio import _primer_dia_semana, _slot_bloqueante
+        conn = _SlotBloqueoConn([{**self.SLOT, "hora_hasta": 24}])  # slot 8-24
+        rep = _primer_dia_semana(2026, 6, 2)  # miércoles (dia_semana=2)
+        fd = rep.replace(hour=22)
+        fh = rep.replace(hour=0) + timedelta(hours=24)  # 00:00 del día siguiente
+        assert _slot_bloqueante(conn, fd, fh) == "Filmar"
+
 
 class _SlotRegenConn:
     """Fake conn para _regenerar_pedidos_slot: graba INSERT/DELETE de alquileres."""
@@ -955,6 +966,18 @@ class TestRegenerarPedidosSlot:
         conn = _SlotRegenConn(existing=[])
         _regenerar_pedidos_slot(conn, _slot_full(activo=False))
         assert conn.inserted == []
+
+    def test_slot_que_cierra_a_medianoche_no_crashea(self):
+        # hora_hasta=24 (cierre a medianoche, válido) rompía con
+        # rep.replace(hour=24); ahora se arma con timedelta → 00:00 del día sig.
+        from routes.estudio import _regenerar_pedidos_slot
+        conn = _SlotRegenConn(existing=[])
+        _regenerar_pedidos_slot(conn, _slot_full(hora_desde=20, hora_hasta=24))
+        assert len(conn.inserted) == 3  # jun, jul, ago
+        for p in conn.inserted:
+            fd, fh = p[1], p[2]
+            assert fd.hour == 20
+            assert fh.hour == 0 and fh.day == fd.day + 1  # medianoche del día siguiente
 
 
 # ── v2-B: reserva con login obligatorio ────────────────────────────────────────

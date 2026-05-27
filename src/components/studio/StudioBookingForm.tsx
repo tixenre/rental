@@ -42,10 +42,15 @@ function pad(n: number) {
   return n.toString().padStart(2, "0");
 }
 
-function buildTimeSlots(openHour: number, closeHour: number) {
+function buildTimeSlots(openHour: number, closeHour: number, minHours: number) {
   const slots: { value: string; label: string; hour: number; minute: 0 | 30 }[] = [];
+  // Último inicio que todavía permite el mínimo de horas antes del cierre. Sin
+  // este tope se ofrecían horarios (ej. 21:30 con cierre 22 y mín 2h) que el
+  // backend rechazaba con 400 → el chip mostraba "error" en vez de algo útil.
+  const lastStartMin = closeHour * 60 - minHours * 60;
   for (let h = openHour; h < closeHour; h++) {
     for (const m of [0, 30] as const) {
+      if (h * 60 + m > lastStartMin) continue;
       slots.push({
         value: `${pad(h)}:${pad(m)}`,
         label: `${pad(h)}:${pad(m)}`,
@@ -184,14 +189,31 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  const slots = useMemo(() => buildTimeSlots(openHour, closeHour), [openHour, closeHour]);
+  const slots = useMemo(
+    () => buildTimeSlots(openHour, closeHour, minHours),
+    [openHour, closeHour, minHours],
+  );
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
   }, []);
 
-  const slot = slots.find((s) => s.value === startSlot) ?? slots[0];
+  // Fallback sintético si la config no deja ningún inicio válido (ventana <
+  // mínimo) — evita un crash en `slot.hour` aunque el estudio no sea reservable.
+  // Memoizado para no cambiar de identidad en cada render (rompería los useMemo
+  // que dependen de `slot`).
+  const slot = useMemo(
+    () =>
+      slots.find((s) => s.value === startSlot) ??
+      slots[0] ?? {
+        value: `${pad(openHour)}:00`,
+        label: `${pad(openHour)}:00`,
+        hour: openHour,
+        minute: 0 as const,
+      },
+    [slots, startSlot, openHour],
+  );
 
   // Máxima duración válida: hasta close (en horas), capeado en 12.
   // Cuando cambia el slot de inicio, recortamos si quedaría fuera de horario.
@@ -204,6 +226,14 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
   useEffect(() => {
     if (hours > maxHours) setHours(maxHours);
   }, [hours, maxHours]);
+
+  // Si el inicio elegido dejó de ser válido (cambió la config del estudio), lo
+  // reseteamos al primero disponible para que el <select> no quede desfasado.
+  useEffect(() => {
+    if (slots.length > 0 && !slots.some((s) => s.value === startSlot)) {
+      setStartSlot(slots[0].value);
+    }
+  }, [slots, startSlot]);
 
   const subtotal = pricePerHour * hours;
   const packTotal = withPack ? packPrecio : 0;
