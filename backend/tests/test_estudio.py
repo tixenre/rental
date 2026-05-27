@@ -73,6 +73,7 @@ class TestBuildResponse:
             "open_hour": 8,
             "close_hour": 22,
             "buffer_horas": 0,
+            "anticipacion_min_horas": 0,
             "pack_activo": True,
             "pack_nombre": "Pack Todo Incluido",
             "pack_descripcion": "Todo incluido.",
@@ -169,11 +170,12 @@ class TestEstudioAdminGuards:
         assert exc.value.status_code == 401
 
 
-# ── E2: reserva por horas ─────────────────────────────────────────────────────
+# ── E2 / E2.1: reserva por horas ──────────────────────────────────────────────
 #
-# La reserva del estudio reusa el motor SAGRADO (_check_stock / _rango_con_buffer)
-# sin tocarlo. El centinela es un equipo de cantidad=1; cualquier reserva del
-# estudio que se pise (dentro del buffer propio) con otra deja disponible=0 → choca.
+# El motor SAGRADO (_check_stock / get_disponibilidad / _rango_con_buffer) NO se
+# toca. E2.1 — el solapamiento del centinela (recurso único, stock=1) se chequea
+# con una query DEDICADA (_centinela_libre) que usa SOLO el buffer propio del
+# estudio, nunca el global de equipos.
 
 
 def _estudio_row(**overrides):
@@ -183,6 +185,7 @@ def _estudio_row(**overrides):
         "open_hour": 8,
         "close_hour": 22,
         "buffer_horas": 0,
+        "anticipacion_min_horas": 0,
         "precio_hora": 10000,
         "equipo_id": 99,  # id del centinela
     }
@@ -295,56 +298,127 @@ class TestFranjaEstudio:
         assert fd.date().isoformat() == "2026-06-01"
 
 
-class TestEstudioOverlap:
-    """Overlap estudio-vs-estudio por hora, reusando _check_stock."""
+class CentinelaFakeConn:
+    """Fake conn para la query DEDICADA de E2.1 (`_centinela_libre`).
 
-    def _check(self, conn, fd, fh, buffer_horas):
+    Evalúa el overlap real contra las reservas del centinela. CRÍTICO: si el
+    código tocara el buffer global (app_settings), esta conn EXPLOTA — así el
+    test prueba que el estudio usa SOLO su buffer propio.
+
+    reservas: lista de (fecha_desde_iso, fecha_hasta_iso).
+    """
+
+    def __init__(self, reservas):
+        self.reservas = reservas
+
+    @staticmethod
+    def _parse(v):
+        from database import to_datetime
+        return to_datetime(v)
+
+    def execute(self, sql, params=()):
+        s = " ".join(sql.split()).upper()
+
+        if "APP_SETTINGS" in s:
+            raise AssertionError(
+                "El estudio NO debe leer el buffer global (app_settings) — E2.1"
+            )
+
+        # Lock del centinela (FOR UPDATE) en el POST.
+        if s.startswith("SELECT ID FROM EQUIPOS WHERE ID = ? FOR UPDATE"):
+            return _Cur([{"id": params[0]}])
+
+        # Query dedicada de overlap del centinela.
+        if "SELECT COUNT(*) AS CNT FROM ALQUILER_ITEMS PI JOIN ALQUILERES P" in s:
+            _eq, _excl, _excl2, hi, lo = params
+            hi_d, lo_d = self._parse(hi), self._parse(lo)
+            cnt = sum(
+                1 for (fd, fh) in self.reservas
+                if self._parse(fd) < hi_d and self._parse(fh) > lo_d
+            )
+            return _Cur([{"cnt": cnt}])
+
+        return _Cur([])
+
+
+class TestEstudioOverlap:
+    """Overlap estudio-vs-estudio por hora, vía la query dedicada (_centinela_libre)."""
+
+    def _libre(self, conn, fd, fh, buffer_horas):
         from datetime import datetime
-        from routes.estudio import _estudio_check_conflicto
-        fdt = datetime.fromisoformat(fd)
-        fht = datetime.fromisoformat(fh)
-        return _estudio_check_conflicto(conn, 2, fdt, fht, buffer_horas)
+        from routes.estudio import _centinela_libre
+        return _centinela_libre(
+            conn, 99, datetime.fromisoformat(fd), datetime.fromisoformat(fh), buffer_horas
+        )
 
     def test_dos_reservas_que_se_pisan_choca(self):
-        # Existe 14:00–16:00. Una nueva 15:00–17:00 se pisa → conflicto (409).
-        conn = EstudioConflictoFakeConn(
-            centinela_id=99, stock=1,
-            reservas=[("2026-06-01T14:00:00", "2026-06-01T16:00:00")],
-        )
-        problemas = self._check(conn, "2026-06-01T15:00:00", "2026-06-01T17:00:00", 0)
-        assert len(problemas) == 1
+        # Existe 14:00–16:00. Una nueva 15:00–17:00 se pisa → ocupado.
+        conn = CentinelaFakeConn([("2026-06-01T14:00:00", "2026-06-01T16:00:00")])
+        assert self._libre(conn, "2026-06-01T15:00:00", "2026-06-01T17:00:00", 0) is False
 
     def test_franjas_disjuntas_mismo_dia_ok(self):
-        # 14:00–16:00 existente; nueva 16:00–18:00 (half-open) NO se pisa → OK.
-        conn = EstudioConflictoFakeConn(
-            centinela_id=99, stock=1,
-            reservas=[("2026-06-01T14:00:00", "2026-06-01T16:00:00")],
-        )
-        assert self._check(conn, "2026-06-01T16:00:00", "2026-06-01T18:00:00", 0) == []
+        # 14:00–16:00 existente; nueva 16:00–18:00 (half-open) NO se pisa → libre.
+        conn = CentinelaFakeConn([("2026-06-01T14:00:00", "2026-06-01T16:00:00")])
+        assert self._libre(conn, "2026-06-01T16:00:00", "2026-06-01T18:00:00", 0) is True
 
 
 class TestEstudioBufferPropio:
-    """El buffer propio del estudio expande el rango ANTES de chequear."""
+    """El buffer propio del estudio expande el rango — y SOLO ese buffer (no el
+    global). La CentinelaFakeConn explota si se lee app_settings."""
 
-    def _check(self, conn, fd, fh, buffer_horas):
+    def _libre(self, conn, fd, fh, buffer_horas):
         from datetime import datetime
-        from routes.estudio import _estudio_check_conflicto
-        return _estudio_check_conflicto(
-            conn, 2, datetime.fromisoformat(fd), datetime.fromisoformat(fh), buffer_horas
+        from routes.estudio import _centinela_libre
+        return _centinela_libre(
+            conn, 99, datetime.fromisoformat(fd), datetime.fromisoformat(fh), buffer_horas
         )
 
-    def test_buffer_1h_bloquea_franja_adyacente(self):
-        # Existe 14:00–16:00. Sin buffer, 16:30–18:00 estaría OK. Con buffer 1h
-        # del estudio, el rango se expande a 15:30–19:00 → se pisa → choca.
-        conn = EstudioConflictoFakeConn(
-            centinela_id=99, stock=1,
-            reservas=[("2026-06-01T14:00:00", "2026-06-01T16:00:00")],
+    def test_buffer_propio_bloquea_franja_adyacente(self):
+        # Existe 14:00–16:00. Sin buffer, 16:30–18:00 está libre; con buffer 1h
+        # el rango se expande a 15:30–19:00 → se pisa → ocupado.
+        conn = CentinelaFakeConn([("2026-06-01T14:00:00", "2026-06-01T16:00:00")])
+        assert self._libre(conn, "2026-06-01T16:30:00", "2026-06-01T18:00:00", 0) is True
+        assert self._libre(conn, "2026-06-01T16:30:00", "2026-06-01T18:00:00", 1) is False
+
+    def test_buffer_2h_bloquea_ventana_completa(self):
+        # Reserva 12:00–16:00 con buffer 2h bloquea cualquier cosa en [10:00, 18:00].
+        conn = CentinelaFakeConn([("2026-06-01T12:00:00", "2026-06-01T16:00:00")])
+        # 10:00–12:00 (justo antes) y 16:00–18:00 (justo después) → ocupados con buffer 2.
+        assert self._libre(conn, "2026-06-01T10:00:00", "2026-06-01T12:00:00", 2) is False
+        assert self._libre(conn, "2026-06-01T16:00:00", "2026-06-01T18:00:00", 2) is False
+        # Sin buffer, esas franjas adyacentes están libres (half-open).
+        assert self._libre(conn, "2026-06-01T16:00:00", "2026-06-01T18:00:00", 0) is True
+
+    def test_global_buffer_no_interviene(self):
+        # Si el código intentara leer el buffer global, la conn explotaría.
+        # Que esto pase prueba que el estudio usa exclusivamente su buffer propio.
+        conn = CentinelaFakeConn([("2026-06-01T14:00:00", "2026-06-01T16:00:00")])
+        assert self._libre(conn, "2026-06-01T18:00:00", "2026-06-01T20:00:00", 1) is True
+
+
+class TestAnticipacionMinima:
+    """anticipacion_min_horas (E2.1) — solo estudio. Rechaza franjas demasiado
+    próximas a `now_ar()`."""
+
+    def _viola(self, horas_anticipacion, horas_hasta_franja):
+        from datetime import timedelta
+        from database import now_ar
+        from routes.estudio import _viola_anticipacion
+        fecha_desde = now_ar() + timedelta(hours=horas_hasta_franja)
+        return _viola_anticipacion(
+            _estudio_row(anticipacion_min_horas=horas_anticipacion), fecha_desde
         )
-        # Sin buffer: libre.
-        assert self._check(conn, "2026-06-01T16:30:00", "2026-06-01T18:00:00", 0) == []
-        # Con buffer 1h: choca.
-        problemas = self._check(conn, "2026-06-01T16:30:00", "2026-06-01T18:00:00", 1)
-        assert len(problemas) == 1
+
+    def test_rechaza_antes_de_la_anticipacion(self):
+        # Anticipación 12h, franja dentro de 6h → viola.
+        assert self._viola(12, 6) is True
+
+    def test_permite_a_partir_de_la_anticipacion(self):
+        # Anticipación 12h, franja dentro de 24h → OK.
+        assert self._viola(12, 24) is False
+
+    def test_anticipacion_cero_nunca_viola(self):
+        assert self._viola(0, 0) is False
 
 
 class TestNoRegresionTipo:

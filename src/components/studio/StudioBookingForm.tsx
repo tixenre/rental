@@ -53,6 +53,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
   const [telefono, setTelefono] = useState("");
 
   const [disponibilidad, setDisponibilidad] = useState<Disponibilidad>("idle");
+  const [motivo, setMotivo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirmada, setConfirmada] = useState<{ numero: number | null } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -82,10 +83,12 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
     }
     let cancelado = false;
     setDisponibilidad("checking");
+    setMotivo(null);
     apiGetEstudioDisponibilidad(fechaISO, startSlot, hours)
       .then((res) => {
         if (cancelado) return;
         setDisponibilidad(res.libre ? "libre" : "ocupado");
+        setMotivo(res.motivo ?? null);
       })
       .catch(() => {
         if (!cancelado) setDisponibilidad("error");
@@ -270,7 +273,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
               )}
               {disponibilidad === "ocupado" && (
                 <span className="font-medium text-red-600">
-                  Ocupado en esa franja — probá otro horario o fecha.
+                  {motivo ?? "Ocupado en esa franja"} — probá otro horario o fecha.
                 </span>
               )}
               {disponibilidad === "error" && (

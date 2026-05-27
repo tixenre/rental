@@ -198,6 +198,7 @@ export type EstudioConfig = {
   open_hour: number;
   close_hour: number;
   buffer_horas: number;
+  anticipacion_min_horas: number;
   pack_activo: boolean;
   pack_nombre: string;
   pack_descripcion: string;
@@ -215,7 +216,7 @@ export function apiGetEstudio() {
 /** ¿El estudio está libre en [fecha start, +horas]? El backend aplica el
  *  buffer propio del estudio. */
 export function apiGetEstudioDisponibilidad(fecha: string, start: string, horas: number) {
-  return get<{ libre: boolean }>("/api/estudio/disponibilidad", {
+  return get<{ libre: boolean; motivo?: string | null }>("/api/estudio/disponibilidad", {
     fecha,
     start,
     horas: String(horas),
