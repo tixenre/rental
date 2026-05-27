@@ -80,6 +80,9 @@ class TestBuildResponse:
             "pack_precio": 10000,
             "features_json": json.dumps([{"label": "Superficie", "value": "50 m²"}]),
             "faq_json": json.dumps([{"q": "¿Mínimo?", "a": "2 h"}]),
+            "direccion": "",
+            "como_llegar": "",
+            "testimonios_json": None,
             "updated_at": None,
         }
         defaults.update(overrides)

@@ -104,6 +104,9 @@ def _build_response(row, fotos: list) -> dict:
         "pack_precio": row["pack_precio"],
         "features": _parse_json_field(row["features_json"]),
         "faq": _parse_json_field(row["faq_json"]),
+        "direccion": row["direccion"],
+        "como_llegar": row["como_llegar"],
+        "testimonios": _parse_json_field(row["testimonios_json"]),
         "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
         "fotos": fotos,
     }
@@ -180,6 +183,9 @@ class EstudioUpdate(BaseModel):
     pack_precio: Optional[int] = None
     features_json: Optional[str] = None
     faq_json: Optional[str] = None
+    direccion: Optional[str] = None
+    como_llegar: Optional[str] = None
+    testimonios_json: Optional[str] = None
 
 
 @router.patch("/admin/estudio")

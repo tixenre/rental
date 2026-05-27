@@ -295,6 +295,9 @@ function EstudioPage() {
   const packEquipos = useMemo(() => data?.pack_equipos ?? [], [data?.pack_equipos]);
   const precioHora = data?.precio_hora ?? STUDIO.pricePerHour;
   const minHours = data?.min_horas ?? STUDIO.minHours;
+  const direccion = data?.direccion ?? "";
+  const comoLlegar = data?.como_llegar ?? "";
+  const testimonios = data?.testimonios ?? [];
 
   // Foto principal para el hero: la marcada como principal o la primera.
   // El resto va a la galería (sin repetir la del hero).
@@ -473,6 +476,40 @@ function EstudioPage() {
         </div>
       </section>
 
+      {/* ─── Ubicación ───────────────────────────────────────────────── */}
+      {direccion && (
+        <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
+          <h2 className="font-display text-2xl sm:text-3xl">Dónde estamos</h2>
+          <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:items-start">
+            <div>
+              <p className="text-base text-ink">{direccion}</p>
+              {comoLlegar && (
+                <p className="mt-3 whitespace-pre-line text-sm text-muted-foreground">
+                  {comoLlegar}
+                </p>
+              )}
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-flex items-center gap-2 rounded-full border hairline bg-surface px-4 py-2 text-sm text-ink transition hover:border-ink"
+              >
+                Ver en Google Maps
+              </a>
+            </div>
+            <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border hairline bg-ink/5">
+              <iframe
+                title="Mapa del estudio"
+                src={`https://www.google.com/maps?q=${encodeURIComponent(direccion)}&output=embed`}
+                className="h-full w-full border-0"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ─── FAQ ─────────────────────────────────────────────────────── */}
       {faq.length > 0 && (
         <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
@@ -483,6 +520,23 @@ function EstudioPage() {
                 <summary className="cursor-pointer list-none font-medium">{f.q}</summary>
                 <p className="mt-2 text-sm text-muted-foreground">{f.a}</p>
               </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ─── Prueba social ───────────────────────────────────────────── */}
+      {testimonios.length > 0 && (
+        <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
+          <h2 className="font-display text-2xl sm:text-3xl">Trabajaron acá</h2>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {testimonios.map((t, i) => (
+              <figure key={i} className="rounded-xl border hairline bg-surface p-5">
+                <blockquote className="text-sm leading-relaxed text-ink">“{t.texto}”</blockquote>
+                <figcaption className="mt-3 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                  {t.autor}
+                </figcaption>
+              </figure>
             ))}
           </div>
         </section>

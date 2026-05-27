@@ -1185,6 +1185,10 @@ def init_db():
     # E2.1: anticipación mínima de reserva del estudio (en horas). Solo aplica
     # al espacio (no a equipos). 0 = sin tope.
     conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS anticipacion_min_horas INTEGER NOT NULL DEFAULT 0")
+    # Ficha pública: ubicación + prueba social (editables desde el back-office).
+    conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS direccion TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS como_llegar TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS testimonios_json TEXT")
     # E4: slots fijos recurrentes mensuales (ej. "miércoles 8-20 Filmar $X jun-dic").
     # Bloquean su franja para el público mientras el rango de meses esté activo y
     # generan un pedido por mes (tipo='estudio_fijo') para estadísticas + pagos.
