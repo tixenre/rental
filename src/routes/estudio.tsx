@@ -458,23 +458,37 @@ function EstudioPage() {
       </section>
 
       {/* ─── Características del espacio ─────────────────────────────── */}
-      <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-        <h2 className="font-display text-2xl sm:text-3xl">Características del espacio</h2>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Lo que vas a encontrar en el lugar. No incluye equipos ni staff — el equipamiento es el
-          pack opcional de arriba.
-        </p>
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {features.map((f) => (
-            <div key={f.label} className="rounded-xl border hairline bg-surface p-4">
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                {f.label}
-              </div>
-              <div className="mt-1 text-lg font-semibold">{f.value}</div>
+      {/* Solo features con valor real — las que viven en el admin con value
+          vacío o placeholder "—" se ocultan en público hasta que el dueño las
+          complete. Permite tener una lista canónica en admin sin "—" feos en
+          la web. */}
+      {(() => {
+        const isFilled = (v: string) => {
+          const t = (v ?? "").trim();
+          return t.length > 0 && t !== "—" && !/^—\s*(m|m²|m\^2)?$/i.test(t);
+        };
+        const visibles = features.filter((f) => isFilled(f.value));
+        if (visibles.length === 0) return null;
+        return (
+          <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
+            <h2 className="font-display text-2xl sm:text-3xl">Características del espacio</h2>
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+              Lo que vas a encontrar en el lugar. No incluye equipos ni staff — el equipamiento es
+              el pack opcional de arriba.
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {visibles.map((f) => (
+                <div key={f.label} className="rounded-xl border hairline bg-surface p-4">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                    {f.label}
+                  </div>
+                  <div className="mt-1 text-lg font-semibold">{f.value}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
+          </section>
+        );
+      })()}
 
       {/* ─── Ubicación ───────────────────────────────────────────────── */}
       {tieneUbicacion && (
