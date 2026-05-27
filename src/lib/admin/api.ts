@@ -1672,8 +1672,45 @@ export type EstudioInput = {
 
 export type FotoOrdenItem = { id: number; orden: number; es_principal: boolean };
 
+export type EstudioSlotFijo = {
+  id: number;
+  cliente: string;
+  dia_semana: number; // 0=Lun .. 6=Dom
+  hora_desde: number;
+  hora_hasta: number;
+  valor_mensual: number;
+  mes_desde: string; // YYYY-MM
+  mes_hasta: string; // YYYY-MM
+  activo: boolean;
+};
+
+export type EstudioSlotInput = Omit<EstudioSlotFijo, "id">;
+
 export const estudioAdminApi = {
   get: () => authedJson<EstudioConfig>("/api/estudio"),
+  listSlots: () => authedJson<{ slots: EstudioSlotFijo[] }>("/api/admin/estudio/slots"),
+  createSlot: (data: EstudioSlotInput) =>
+    authedPostJson<EstudioSlotFijo>("/api/admin/estudio/slots", data),
+  updateSlot: (id: number, data: Partial<EstudioSlotInput>) =>
+    authedFetch(`/api/admin/estudio/slots/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(async (r) => {
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d?.detail ?? `PATCH slot → ${r.status}`);
+      }
+      return r.json() as Promise<EstudioSlotFijo>;
+    }),
+  deleteSlot: (id: number) =>
+    authedFetch(`/api/admin/estudio/slots/${id}`, { method: "DELETE" }).then(async (r) => {
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d?.detail ?? `DELETE slot → ${r.status}`);
+      }
+      return r.json() as Promise<{ ok: boolean }>;
+    }),
   update: (data: EstudioInput) =>
     authedFetch("/api/admin/estudio", {
       method: "PATCH",

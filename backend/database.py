@@ -1185,6 +1185,27 @@ def init_db():
     # E2.1: anticipación mínima de reserva del estudio (en horas). Solo aplica
     # al espacio (no a equipos). 0 = sin tope.
     conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS anticipacion_min_horas INTEGER NOT NULL DEFAULT 0")
+    # E4: slots fijos recurrentes mensuales (ej. "miércoles 8-20 Filmar $X jun-dic").
+    # Bloquean su franja para el público mientras el rango de meses esté activo y
+    # generan un pedido por mes (tipo='estudio_fijo') para estadísticas + pagos.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS estudio_slots_fijos (
+            id            SERIAL PRIMARY KEY,
+            cliente       TEXT NOT NULL,
+            dia_semana    INTEGER NOT NULL,        -- 0=Lunes .. 6=Domingo (date.weekday())
+            hora_desde    INTEGER NOT NULL,        -- hora entera 0-24
+            hora_hasta    INTEGER NOT NULL,
+            valor_mensual INTEGER NOT NULL DEFAULT 0,
+            mes_desde     TEXT NOT NULL,           -- 'YYYY-MM'
+            mes_hasta     TEXT NOT NULL,           -- 'YYYY-MM'
+            activo        BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # Vincula cada pedido mensual generado con su slot, para regenerar futuros sin
+    # tocar pasados/pagados. NULL en todo pedido normal → cero impacto.
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS estudio_slot_id INTEGER REFERENCES estudio_slots_fijos(id) ON DELETE SET NULL")
     # Seed idempotente: inserta la fila singleton si no existe, con los valores
     # del copy original de src/data/studio.ts. Precios en 0 (el dueño los setea).
     import json as _json

@@ -648,3 +648,160 @@ class TestCrearReservaPack:
         assert 20000 in conn.alquiler_params
         by_eq = {it["equipo_id"]: it["cantidad"] for it in conn.items}
         assert by_eq == {99: 1}
+
+
+# ── E4: slots fijos recurrentes mensuales ──────────────────────────────────────
+
+
+class TestIterMesesYPrimerDia:
+    def test_iter_meses_inclusive_cruza_anio(self):
+        from routes.estudio import _iter_meses
+        out = list(_iter_meses("2026-11", "2027-02"))
+        assert out == [(2026, 11), (2026, 12), (2027, 1), (2027, 2)]
+
+    def test_primer_dia_semana(self):
+        from routes.estudio import _primer_dia_semana
+        # Primer miércoles (weekday 2) de junio 2026.
+        d = _primer_dia_semana(2026, 6, 2)
+        assert d.weekday() == 2
+        assert d.month == 6 and d.day <= 7
+
+
+class _SlotBloqueoConn:
+    """Fake conn para _slot_bloqueante: filtra los slots como la query real."""
+
+    def __init__(self, slots):
+        self.slots = slots  # dicts con cliente/dia_semana/hora_desde/hora_hasta/mes_desde/mes_hasta/activo
+
+    def execute(self, sql, params=()):
+        su = " ".join(sql.split()).upper()
+        if "FROM ESTUDIO_SLOTS_FIJOS" in su and "WHERE ACTIVO" in su:
+            dia, mes, _mes2 = params
+            res = [
+                s for s in self.slots
+                if s["activo"] and s["dia_semana"] == dia
+                and s["mes_desde"] <= mes and s["mes_hasta"] >= mes
+            ]
+            return _Cur([
+                {"cliente": s["cliente"], "hora_desde": s["hora_desde"], "hora_hasta": s["hora_hasta"]}
+                for s in res
+            ])
+        return _Cur([])
+
+
+class TestSlotBloqueante:
+    SLOT = {
+        "cliente": "Filmar", "dia_semana": 2, "hora_desde": 8, "hora_hasta": 20,
+        "mes_desde": "2026-06", "mes_hasta": "2026-12", "activo": True,
+    }
+
+    def _franja(self, year, month, weekday, h_desde, h_hasta):
+        from routes.estudio import _primer_dia_semana
+        rep = _primer_dia_semana(year, month, weekday)
+        return (rep.replace(hour=h_desde), rep.replace(hour=h_hasta))
+
+    def test_bloquea_su_dia_y_horario_en_rango(self):
+        from routes.estudio import _slot_bloqueante
+        conn = _SlotBloqueoConn([self.SLOT])
+        fd, fh = self._franja(2026, 6, 2, 10, 12)  # miércoles de junio 10-12
+        assert _slot_bloqueante(conn, fd, fh) == "Filmar"
+
+    def test_no_bloquea_otro_dia(self):
+        from routes.estudio import _slot_bloqueante
+        conn = _SlotBloqueoConn([self.SLOT])
+        fd, fh = self._franja(2026, 6, 1, 10, 12)  # martes
+        assert _slot_bloqueante(conn, fd, fh) is None
+
+    def test_no_bloquea_fuera_del_rango_de_meses(self):
+        from routes.estudio import _slot_bloqueante
+        conn = _SlotBloqueoConn([self.SLOT])
+        fd, fh = self._franja(2027, 1, 2, 10, 12)  # miércoles de enero 2027 (> mes_hasta)
+        assert _slot_bloqueante(conn, fd, fh) is None
+
+    def test_no_bloquea_horario_disjunto(self):
+        from routes.estudio import _slot_bloqueante
+        conn = _SlotBloqueoConn([self.SLOT])
+        fd, fh = self._franja(2026, 6, 2, 20, 22)  # arranca cuando el slot termina (half-open)
+        assert _slot_bloqueante(conn, fd, fh) is None
+
+    def test_slot_inactivo_no_bloquea(self):
+        from routes.estudio import _slot_bloqueante
+        conn = _SlotBloqueoConn([{**self.SLOT, "activo": False}])
+        fd, fh = self._franja(2026, 6, 2, 10, 12)
+        assert _slot_bloqueante(conn, fd, fh) is None
+
+
+class _SlotRegenConn:
+    """Fake conn para _regenerar_pedidos_slot: graba INSERT/DELETE de alquileres."""
+
+    def __init__(self, existing=None):
+        self.existing = existing or []  # [{id, fecha_desde, monto_pagado}]
+        self.inserted = []              # params de cada INSERT alquileres
+        self.deleted = []               # ids borrados
+        self.item_inserts = 0           # NO debe haber items (no doble-bloqueo)
+        self._num = 1000
+
+    def execute(self, sql, params=()):
+        su = " ".join(sql.split()).upper()
+        if "FROM ALQUILERES WHERE ESTUDIO_SLOT_ID = ?" in su:
+            return _Cur(self.existing)
+        if "NEXTVAL" in su:
+            self._num += 1
+            return _Cur([{0: self._num}])
+        if su.startswith("INSERT INTO ALQUILERES"):
+            self.inserted.append(params)
+            return _CurLastrowid([], lastrowid=self._num)
+        if su.startswith("INSERT INTO ALQUILER_ITEMS"):
+            self.item_inserts += 1
+            return _Cur([])
+        if su.startswith("DELETE FROM ALQUILERES WHERE ID = ?"):
+            self.deleted.append(params[0])
+            return _Cur([])
+        return _Cur([])
+
+
+def _slot_full(**ov):
+    s = {
+        "id": 1, "cliente": "Filmar", "dia_semana": 2, "hora_desde": 8, "hora_hasta": 20,
+        "valor_mensual": 50000, "mes_desde": "2026-06", "mes_hasta": "2026-08", "activo": True,
+    }
+    s.update(ov)
+    return s
+
+
+class TestRegenerarPedidosSlot:
+    def test_genera_un_pedido_por_mes_con_el_valor(self):
+        from routes.estudio import _regenerar_pedidos_slot
+        conn = _SlotRegenConn(existing=[])
+        _regenerar_pedidos_slot(conn, _slot_full())  # jun, jul, ago 2026 (todos futuros)
+        assert len(conn.inserted) == 3
+        for p in conn.inserted:
+            # (cliente, fd, fh, monto, estado, fuente, tipo, num, slot_id)
+            assert p[0] == "Filmar"
+            assert p[3] == 50000
+            assert p[4] == "confirmado"
+            assert p[5] == "estudio"
+            assert p[6] == "estudio_fijo"
+            assert p[8] == 1
+        # NO se crean items → el slot no doble-bloquea el centinela.
+        assert conn.item_inserts == 0
+
+    def test_editar_regenera_futuros_sin_tocar_pagados(self):
+        from datetime import datetime
+        from routes.estudio import _regenerar_pedidos_slot
+        existing = [
+            {"id": 90, "fecha_desde": datetime(2026, 7, 1, 8), "monto_pagado": 10000},  # pagado → conservar
+            {"id": 91, "fecha_desde": datetime(2026, 6, 3, 8), "monto_pagado": 0},       # futuro impago → borrar+recrear
+        ]
+        conn = _SlotRegenConn(existing=existing)
+        _regenerar_pedidos_slot(conn, _slot_full())  # rango jun-ago
+        assert 91 in conn.deleted       # impago borrado
+        assert 90 not in conn.deleted   # pagado intocable
+        # Recrea jun (borrado) + ago (nuevo); jul queda conservado.
+        assert len(conn.inserted) == 2
+
+    def test_slot_inactivo_no_genera(self):
+        from routes.estudio import _regenerar_pedidos_slot
+        conn = _SlotRegenConn(existing=[])
+        _regenerar_pedidos_slot(conn, _slot_full(activo=False))
+        assert conn.inserted == []
