@@ -944,7 +944,7 @@ def create_equipo(data: EquipoCreate):
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (data.nombre, brand_id, data.modelo, data.cantidad,
               data.precio_jornada, data.precio_usd, data.roi_pct,
-              data.valor_reposicion, data.foto_url, data.fecha_compra or None,
+              data.valor_reposicion, data.foto_url, _normalize_fecha_compra(data.fecha_compra),
               data.serie, data.bh_url, data.dueno, data.visible_catalogo, data.estado,
               bool(data.ficha_completa), data.categoria_specs))
         new_id = cur.lastrowid
@@ -965,6 +965,21 @@ def create_equipo(data: EquipoCreate):
         conn.close()
 
 
+def _normalize_fecha_compra(value):
+    """`equipos.fecha_compra` es DATE, pero el front (MonthYearPicker) manda
+    "YYYY-MM" (mes/año — issue #109). Postgres no castea "YYYY-MM" a DATE
+    ('2024-01'::date es inválido → 500), así que completamos al día 1.
+    Vacío → None. "YYYY-MM-DD" se deja igual."""
+    if not value:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    if re.fullmatch(r"\d{4}-\d{2}", s):
+        return f"{s}-01"
+    return s
+
+
 @router.patch("/equipos/{id}")
 def update_equipo(id: int, data: EquipoUpdate):
     conn     = get_db()
@@ -980,9 +995,10 @@ def update_equipo(id: int, data: EquipoUpdate):
         marca_cambio = "marca" in updates
         if marca_cambio:
             updates["brand_id"] = _resolve_brand_id(conn, updates.pop("marca"))
-        # fecha_compra es DATE: '' rompe el cast → normalizar a NULL.
-        if "fecha_compra" in updates and not updates["fecha_compra"]:
-            updates["fecha_compra"] = None
+        # fecha_compra es DATE; el front (MonthYearPicker) manda "YYYY-MM" →
+        # completar a "YYYY-MM-01"; vacío → NULL (ver _normalize_fecha_compra).
+        if "fecha_compra" in updates:
+            updates["fecha_compra"] = _normalize_fecha_compra(updates["fecha_compra"])
         # Validar serie única si se está cambiando (excluyendo este equipo).
         # Rechaza si otra fila activa tiene la misma serie.
         if "serie" in updates:
@@ -1059,7 +1075,7 @@ def duplicate_equipo(id: int):
             f"{src_d['nombre']} (copia)",
             src_d.get("brand_id"), src_d.get("modelo"), 1,
             src_d.get("precio_jornada"), src_d.get("precio_usd"), src_d.get("roi_pct"),
-            src_d.get("valor_reposicion"), src_d.get("foto_url"), src_d.get("fecha_compra") or None,
+            src_d.get("valor_reposicion"), src_d.get("foto_url"), _normalize_fecha_compra(src_d.get("fecha_compra")),
             None,  # serie vacía
             src_d.get("bh_url"), src_d.get("dueno"), src_d.get("visible_catalogo", 1), src_d.get("estado", "operativo"),
             False,  # ficha_completa false para que el admin la revise
