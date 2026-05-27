@@ -44,6 +44,7 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 |---|---|
 | [`MANIFIESTO.md`](MANIFIESTO.md) | Qué es, stack, glosario, mapa de código, decisiones de arquitectura |
 | [`docs/MEMORIA.md`](docs/MEMORIA.md) | Decisiones + preferencias vivas (importado abajo) |
+| [`docs/FLUJO_PEDIDOS.md`](docs/FLUJO_PEDIDOS.md) | Recorrido del pedido: estados, confirmación visible, mails, `id` vs `numero_pedido` |
 | [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Playbook de auditoría + PRs + mobile gate |
 | [`docs/ISSUE_LABELS.md`](docs/ISSUE_LABELS.md) | Labels (3 dimensiones obligatorias) |
 | [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md) | Criterio mobile + status por ruta |
