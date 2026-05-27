@@ -552,10 +552,10 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
           )}
         </div>
 
-        {/* Selector de modalidad — solo el espacio vs espacio + equipos. Vive
+        {/* Selector de modalidad — solo el estudio vs estudio + equipos. Vive
             en el paso 01 porque es una decisión de producto primaria, no un
             add-on de confirmación. Cuando el admin apaga `pack_activo`,
-            ocultamos el bloque entero (queda "solo el espacio" implícito). */}
+            ocultamos el bloque entero (queda "solo el estudio" implícito). */}
         {packActivo && (
           <fieldset
             className="mt-5 grid gap-2.5 sm:grid-cols-2"
@@ -566,7 +566,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
               ¿Qué reservás?
             </legend>
 
-            {/* Card A — solo espacio */}
+            {/* Card A — solo estudio */}
             <label
               className={cn(
                 "flex cursor-pointer flex-col gap-1 rounded-xl border p-4 transition",
@@ -581,7 +581,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
                 className="sr-only"
               />
               <div className="flex items-baseline justify-between gap-3">
-                <span className="font-semibold">Solo el espacio</span>
+                <span className="font-semibold">Solo el estudio</span>
                 <span className="font-mono text-xs tabular shrink-0 text-muted-foreground">
                   {pricePerHour > 0 ? `${formatARS(pricePerHour)}/h` : "Consultar"}
                 </span>
@@ -591,7 +591,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
               </p>
             </label>
 
-            {/* Card B — espacio + equipos */}
+            {/* Card B — estudio + equipos */}
             <label
               className={cn(
                 "flex cursor-pointer flex-col gap-1 rounded-xl border p-4 transition",
@@ -606,7 +606,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
                 className="sr-only"
               />
               <div className="flex items-baseline justify-between gap-3">
-                <span className="font-semibold">Espacio + equipos</span>
+                <span className="font-semibold">Estudio + equipos</span>
                 <span className="font-mono text-xs tabular shrink-0">
                   {packPrecio > 0 ? `+${formatARS(packPrecio)} fijo` : "Consultar"}
                 </span>

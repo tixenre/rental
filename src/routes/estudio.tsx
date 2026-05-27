@@ -289,9 +289,6 @@ function EstudioPage() {
   const faq = data?.faq ?? STUDIO.faq;
   const fotos = useMemo(() => data?.fotos ?? [], [data?.fotos]);
   const packActivo = data?.pack_activo ?? true;
-  const packNombre = data?.pack_nombre ?? STUDIO.addon.name;
-  const packDescripcion = data?.pack_descripcion ?? STUDIO.addon.description;
-  const packPrecio = data?.pack_precio ?? STUDIO.addon.pricePerDay;
   const packEquipos = useMemo(() => data?.pack_equipos ?? [], [data?.pack_equipos]);
   const precioHora = data?.precio_hora ?? STUDIO.pricePerHour;
   const minHours = data?.min_horas ?? STUDIO.minHours;
@@ -443,20 +440,10 @@ function EstudioPage() {
           {packActivo && (
             <aside className="rounded-2xl border hairline bg-amber/10 p-5 lg:sticky lg:top-20 lg:self-start">
               <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/60">
-                Espacio + equipos · precio fijo
+                Estudio + equipos · qué incluye
               </div>
-              <h3 className="mt-1 font-display text-xl">{packNombre}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{packDescripcion}</p>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-2xl font-semibold tabular">
-                  {packPrecio > 0 ? formatARS(packPrecio) : "Consultar"}
-                </span>
-                {packPrecio > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    fijo · independiente de las horas
-                  </span>
-                )}
-              </div>
+              {/* Mostramos solo la grilla de equipos curados (sin duplicar
+                  precio/descripción/título — eso ya vive en el card del paso 01). */}
               {packEquipos.length > 0 ? (
                 <StudioPackKit equipos={packEquipos} title="Equipos incluidos" />
               ) : (
@@ -465,10 +452,6 @@ function EstudioPage() {
                   están libres en tu franja.
                 </p>
               )}
-              <p className="mt-3 text-xs text-muted-foreground">
-                Elegí "Espacio + equipos" al reservar para sumar luces, griperías y modificadores
-                durante toda tu sesión.
-              </p>
             </aside>
           )}
         </div>
