@@ -462,3 +462,189 @@ class TestCentinelaNoLeak:
     def test_clasificar_excluye_centinela(self):
         from routes.equipos import admin_clasificar
         assert "es_recurso_interno = FALSE" in self._src(admin_clasificar)
+
+
+# ── E3: pack dinámico (Grip / Iluminación / Modificadores) ────────────────────
+#
+# El espacio (centinela) sigue con _centinela_libre (buffer propio). Los equipos
+# del pack son reales → motor sagrado (get_disponibilidad / _check_stock, buffer
+# global). Estos tests patchean el motor para aislar la orquestación del pack.
+
+import routes.estudio as estudio_mod
+
+
+class _CurLastrowid:
+    def __init__(self, rows, lastrowid=None):
+        self._rows = list(rows)
+        self._lastrowid = lastrowid
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
+
+    def fetchall(self):
+        return self._rows
+
+    @property
+    def lastrowid(self):
+        return self._lastrowid
+
+
+class _NamesConn:
+    """Responde solo la query de nombres de _pack_disponible."""
+
+    def __init__(self, names):
+        self.names = names  # {id: (nombre, marca)}
+
+    def execute(self, sql, params=()):
+        su = " ".join(sql.split()).upper()
+        if "FROM EQUIPOS E WHERE E.ID = ANY(?)" in su:
+            ids = params[0]
+            return _Cur(
+                [{"id": i, "nombre": self.names[i][0], "marca": self.names[i][1]}
+                 for i in ids if i in self.names]
+            )
+        return _Cur([])
+
+
+class TestPackDisponible:
+    """_pack_disponible: solo equipos con >= 1 disponible; lo reservado no entra."""
+
+    def test_filtra_por_disponibilidad(self, monkeypatch):
+        from datetime import datetime
+        # Pack candidatos: 10, 11, 12. El 11 está ocupado (disp 0) → no entra.
+        monkeypatch.setattr(estudio_mod, "_pack_equipo_ids", lambda conn: [10, 11, 12])
+        monkeypatch.setattr(
+            estudio_mod, "get_disponibilidad",
+            lambda fd, fh, excl=None: {"10": 2, "11": 0, "12": 1},
+        )
+        conn = _NamesConn({10: ("Trípode", "Manfrotto"), 12: ("HMI", "Arri")})
+        out = estudio_mod._pack_disponible(
+            conn, datetime(2026, 6, 1, 14), datetime(2026, 6, 1, 16)
+        )
+        ids = {e["id"]: e["cantidad"] for e in out}
+        assert ids == {10: 2, 12: 1}  # el 11 (reservado) quedó afuera
+
+    def test_sin_candidatos_lista_vacia(self, monkeypatch):
+        from datetime import datetime
+        monkeypatch.setattr(estudio_mod, "_pack_equipo_ids", lambda conn: [])
+        out = estudio_mod._pack_disponible(
+            _NamesConn({}), datetime(2026, 6, 1, 14), datetime(2026, 6, 1, 16)
+        )
+        assert out == []
+
+
+class _RecordingConn:
+    """Graba INSERTs de alquileres/items para verificar la orquestación del POST."""
+
+    def __init__(self, pedido_id=555):
+        self.pedido_id = pedido_id
+        self.alquiler_params = None
+        self.items = []  # {equipo_id, cantidad, precio}
+        self.committed = False
+
+    def execute(self, sql, params=()):
+        su = " ".join(sql.split()).upper()
+        if su.startswith("INSERT INTO ALQUILERES"):
+            self.alquiler_params = params
+            return _CurLastrowid([], lastrowid=self.pedido_id)
+        if su.startswith("INSERT INTO ALQUILER_ITEMS"):
+            self.items.append(
+                {"equipo_id": params[1], "cantidad": params[2], "precio": params[3]}
+            )
+            return _Cur([])
+        if su.startswith("DELETE FROM ALQUILER_ITEMS"):
+            return _Cur([])
+        return _Cur([])
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
+
+
+def _patch_post_collaborators(monkeypatch, conn, estudio_row, disp, pack_ids):
+    """Patchea los colaboradores pesados del POST para aislar la orquestación."""
+    monkeypatch.setattr(estudio_mod, "get_db", lambda: conn)
+    monkeypatch.setattr(estudio_mod, "_get_estudio_row", lambda c: estudio_row)
+    monkeypatch.setattr(estudio_mod, "_next_numero_pedido", lambda c: 999)
+    monkeypatch.setattr(estudio_mod, "_pack_equipo_ids", lambda c: pack_ids)
+    monkeypatch.setattr(estudio_mod, "get_disponibilidad", lambda fd, fh, excl=None: disp)
+    monkeypatch.setattr(estudio_mod, "_check_stock", lambda c, pid, fd, fh: [])
+    monkeypatch.setattr(
+        estudio_mod, "_centinela_libre",
+        lambda c, eid, fd, fh, buf, exclude_pedido_id=None: True,
+    )
+    monkeypatch.setattr(estudio_mod, "_get_alquiler_detail", lambda c, pid: {"id": pid})
+    monkeypatch.setattr(estudio_mod, "_dispatch_pedido_creado_emails", lambda bg, p: None)
+
+
+def _estudio_row_full(**overrides):
+    row = _estudio_row()
+    row.update({"pack_activo": True, "pack_precio": 30000})
+    row.update(overrides)
+    return row
+
+
+class TestCrearReservaPack:
+    """POST /estudio/reservas con/ sin pack — orquestación y monto."""
+
+    def _post(self, monkeypatch, con_pack, disp, pack_ids, estudio_row=None):
+        from datetime import timedelta
+        from fastapi import BackgroundTasks
+        from database import now_ar
+        from routes.estudio import crear_reserva_estudio, EstudioReservaCreate
+
+        conn = _RecordingConn()
+        est = estudio_row or _estudio_row_full()
+        _patch_post_collaborators(monkeypatch, conn, est, disp, pack_ids)
+
+        # Fecha futura válida dentro del horario [open, close].
+        manana = (now_ar() + timedelta(days=2)).strftime("%Y-%m-%d")
+        body = EstudioReservaCreate(
+            fecha=manana, start="14:00", horas=2,
+            cliente_nombre="Tester", con_pack=con_pack,
+        )
+        crear_reserva_estudio(body, BackgroundTasks())
+        return conn
+
+    def test_con_pack_suma_precio_y_crea_items(self, monkeypatch):
+        conn = self._post(
+            monkeypatch, con_pack=True,
+            disp={"10": 2, "11": 1}, pack_ids=[10, 11],
+        )
+        # monto_total = precio_hora(10000)*2 + pack_precio(30000) = 50000
+        # INSERT alquileres params: (... , monto_total, estado, fuente, tipo, estudio_con_pack, numero)
+        params = conn.alquiler_params
+        assert 50000 in params           # monto_total
+        assert True in params            # estudio_con_pack = TRUE
+        # Items: centinela (equipo_id=99, cant 1) + pack 10 (×2) + 11 (×1)
+        by_eq = {it["equipo_id"]: it["cantidad"] for it in conn.items}
+        assert by_eq == {99: 1, 10: 2, 11: 1}
+        assert conn.committed is True
+
+    def test_sin_pack_no_crea_items_de_equipos(self, monkeypatch):
+        conn = self._post(
+            monkeypatch, con_pack=False,
+            disp={"10": 2, "11": 1}, pack_ids=[10, 11],
+        )
+        # monto_total = 10000*2 = 20000 (sin pack_precio)
+        assert 20000 in conn.alquiler_params
+        assert False in conn.alquiler_params  # estudio_con_pack = FALSE
+        # Solo el centinela; ningún equipo del pack.
+        by_eq = {it["equipo_id"]: it["cantidad"] for it in conn.items}
+        assert by_eq == {99: 1}
+
+    def test_pack_inactivo_ignora_con_pack(self, monkeypatch):
+        # pack_activo=False → aunque el cliente mande con_pack, no se cobra ni agrega.
+        est = _estudio_row_full(pack_activo=False)
+        conn = self._post(
+            monkeypatch, con_pack=True,
+            disp={"10": 2}, pack_ids=[10], estudio_row=est,
+        )
+        assert 20000 in conn.alquiler_params
+        by_eq = {it["equipo_id"]: it["cantidad"] for it in conn.items}
+        assert by_eq == {99: 1}
