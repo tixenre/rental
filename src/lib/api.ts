@@ -176,5 +176,41 @@ export function apiGetMarcs() {
   return get<{ items: BackendMarca[] }>("/api/marcas");
 }
 
+/* ─── Estudio ────────────────────────────────────────────────────────── */
+
+export type EstudioFoto = {
+  id: number;
+  url: string;
+  path: string | null;
+  orden: number;
+  es_principal: boolean;
+  created_at: string | null;
+};
+
+export type EstudioConfig = {
+  id: number;
+  equipo_id: number | null;
+  nombre: string;
+  tagline: string;
+  descripcion: string;
+  precio_hora: number;
+  min_horas: number;
+  open_hour: number;
+  close_hour: number;
+  buffer_horas: number;
+  pack_activo: boolean;
+  pack_nombre: string;
+  pack_descripcion: string;
+  pack_precio: number;
+  features: Array<{ label: string; value: string }> | null;
+  faq: Array<{ q: string; a: string }> | null;
+  updated_at: string | null;
+  fotos: EstudioFoto[];
+};
+
+export function apiGetEstudio() {
+  return get<EstudioConfig>("/api/estudio");
+}
+
 // NOTA: la creación de pedidos se movió a `src/lib/orders.ts → createOrder()`
 // usando el endpoint autenticado /api/cliente/pedidos del backend FastAPI.

@@ -8,15 +8,26 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
-import { STUDIO, STUDIO_PHONE, studioTotal } from "@/data/studio";
+import { STUDIO, STUDIO_PHONE } from "@/data/studio";
+
+export type StudioBookingConfig = {
+  pricePerHour: number;
+  minHours: number;
+  openHour: number;
+  closeHour: number;
+  packActivo: boolean;
+  packNombre: string;
+  packDescripcion: string;
+  packPrecio: number;
+};
 
 function pad(n: number) {
   return n.toString().padStart(2, "0");
 }
 
-function buildTimeSlots() {
+function buildTimeSlots(openHour: number, closeHour: number) {
   const slots: { value: string; label: string; hour: number; minute: 0 | 30 }[] = [];
-  for (let h = STUDIO.openHour; h < STUDIO.closeHour; h++) {
+  for (let h = openHour; h < closeHour; h++) {
     for (const m of [0, 30] as const) {
       slots.push({
         value: `${pad(h)}:${pad(m)}`,
@@ -29,21 +40,31 @@ function buildTimeSlots() {
   return slots;
 }
 
-export function StudioBookingForm() {
+export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) {
+  const pricePerHour = config?.pricePerHour ?? STUDIO.pricePerHour;
+  const minHours = config?.minHours ?? STUDIO.minHours;
+  const openHour = config?.openHour ?? STUDIO.openHour;
+  const closeHour = config?.closeHour ?? STUDIO.closeHour;
+  const packActivo = config?.packActivo ?? true;
+  const packNombre = config?.packNombre ?? STUDIO.addon.name;
+  const packDescripcion = config?.packDescripcion ?? STUDIO.addon.description;
+  const packPrecio = config?.packPrecio ?? STUDIO.addon.pricePerDay;
+
   const [date, setDate] = useState<Date | undefined>(undefined);
-  const [startSlot, setStartSlot] = useState<string>(`${pad(STUDIO.openHour)}:00`);
-  const [hours, setHours] = useState<number>(STUDIO.minHours);
+  const [startSlot, setStartSlot] = useState<string>(`${pad(openHour)}:00`);
+  const [hours, setHours] = useState<number>(minHours);
   const [withAddon, setWithAddon] = useState<boolean>(false);
 
-  const slots = useMemo(buildTimeSlots, []);
+  const slots = useMemo(() => buildTimeSlots(openHour, closeHour), [openHour, closeHour]);
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
   }, []);
 
-  const total = studioTotal({ durationHours: hours, withAddon });
-  const subtotal = STUDIO.pricePerHour * hours;
+  const subtotal = pricePerHour * hours;
+  const addonTotal = withAddon ? packPrecio : 0;
+  const total = subtotal + addonTotal;
   const slot = slots.find((s) => s.value === startSlot)!;
 
   const dateLabel = date ? format(date, "EEEE d 'de' MMMM, yyyy", { locale: es }) : "Elegir fecha";
@@ -62,7 +83,7 @@ export function StudioBookingForm() {
       `Hola! Quiero reservar el estudio.`,
       `📅 ${format(date, "EEEE d 'de' MMMM, yyyy", { locale: es })}`,
       `🕒 ${start} – ${end} (${hours} h)`,
-      withAddon ? `➕ ${STUDIO.addon.name}` : null,
+      withAddon ? `➕ ${packNombre}` : null,
       total > 0 ? `💵 Total estimado: ${formatARS(total)}` : null,
     ].filter(Boolean);
 
@@ -128,14 +149,14 @@ export function StudioBookingForm() {
           {/* Duración */}
           <div>
             <label className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-              Duración (mín. {STUDIO.minHours} h)
+              Duración (mín. {minHours} h)
             </label>
             <div className="mt-1.5 flex items-center gap-3 rounded-md border hairline bg-background px-2 py-1.5">
               <button
                 type="button"
-                onClick={() => setHours((h) => Math.max(STUDIO.minHours, h - 1))}
+                onClick={() => setHours((h) => Math.max(minHours, h - 1))}
                 className="flex h-10 w-10 items-center justify-center rounded-md border hairline text-muted-foreground hover:border-ink hover:text-ink disabled:opacity-40"
-                disabled={hours <= STUDIO.minHours}
+                disabled={hours <= minHours}
                 aria-label="Restar hora"
               >
                 <Minus className="h-4 w-4" />
@@ -160,29 +181,29 @@ export function StudioBookingForm() {
 
         {/* Addon + resumen */}
         <div className="space-y-4">
-          <label
-            className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition",
-              withAddon ? "border-amber bg-amber/10" : "hairline hover:border-ink",
-            )}
-          >
-            <Checkbox
-              checked={withAddon}
-              onCheckedChange={(v) => setWithAddon(v === true)}
-              className="mt-0.5"
-            />
-            <div className="flex-1">
-              <div className="flex items-baseline justify-between gap-2">
-                <div className="font-semibold">{STUDIO.addon.name}</div>
-                <div className="font-mono text-sm tabular">
-                  {STUDIO.addon.pricePerDay > 0
-                    ? `+${formatARS(STUDIO.addon.pricePerDay)}/día`
-                    : "Consultar"}
+          {packActivo && (
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition",
+                withAddon ? "border-amber bg-amber/10" : "hairline hover:border-ink",
+              )}
+            >
+              <Checkbox
+                checked={withAddon}
+                onCheckedChange={(v) => setWithAddon(v === true)}
+                className="mt-0.5"
+              />
+              <div className="flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <div className="font-semibold">{packNombre}</div>
+                  <div className="font-mono text-sm tabular">
+                    {packPrecio > 0 ? `+${formatARS(packPrecio)}/día` : "Consultar"}
+                  </div>
                 </div>
+                <p className="mt-1 text-xs text-muted-foreground">{packDescripcion}</p>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">{STUDIO.addon.description}</p>
-            </div>
-          </label>
+            </label>
+          )}
 
           <div className="rounded-xl bg-foreground p-4 text-background">
             <div className="flex items-center justify-between text-xs text-background/70">
@@ -191,10 +212,8 @@ export function StudioBookingForm() {
             </div>
             {withAddon && (
               <div className="mt-1 flex items-center justify-between text-xs text-background/70">
-                <span>{STUDIO.addon.name}</span>
-                <span className="tabular">
-                  {STUDIO.addon.pricePerDay > 0 ? formatARS(STUDIO.addon.pricePerDay) : "—"}
-                </span>
+                <span>{packNombre}</span>
+                <span className="tabular">{packPrecio > 0 ? formatARS(packPrecio) : "—"}</span>
               </div>
             )}
             <div className="mt-3 flex items-end justify-between border-t border-background/15 pt-3">

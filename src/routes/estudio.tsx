@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Camera,
@@ -13,6 +14,7 @@ import { PublicLayout } from "@/components/rental/PublicLayout";
 import { CartDrawer } from "@/components/rental/CartDrawer";
 import { StudioBookingForm } from "@/components/studio/StudioBookingForm";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
+import { apiGetEstudio, type EstudioConfig } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 
 export const Route = createFileRoute("/estudio")({
@@ -68,6 +70,40 @@ function PhotoPlaceholder({
 }
 
 function EstudioPage() {
+  const { data } = useQuery({
+    queryKey: ["estudio"],
+    queryFn: apiGetEstudio,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const nombre = data?.nombre ?? STUDIO.name;
+  const tagline = data?.tagline ?? STUDIO.tagline;
+  const descripcion = data?.descripcion ?? STUDIO.description;
+  const features = data?.features ?? STUDIO.features;
+  const faq = data?.faq ?? STUDIO.faq;
+  const fotos = data?.fotos ?? [];
+  const packActivo = data?.pack_activo ?? true;
+  const packNombre = data?.pack_nombre ?? STUDIO.addon.name;
+  const packDescripcion = data?.pack_descripcion ?? STUDIO.addon.description;
+  const packPrecio = data?.pack_precio ?? STUDIO.addon.pricePerDay;
+  const minHours = data?.min_horas ?? STUDIO.minHours;
+
+  // foto principal para el hero (primera marcada como principal, o primera)
+  const fotoPrincipal = fotos.find((f) => f.es_principal) ?? fotos[0];
+
+  const bookingConfig = data
+    ? {
+        pricePerHour: data.precio_hora,
+        minHours: data.min_horas,
+        openHour: data.open_hour,
+        closeHour: data.close_hour,
+        packActivo: data.pack_activo,
+        packNombre: data.pack_nombre,
+        packDescripcion: data.pack_descripcion,
+        packPrecio: data.pack_precio,
+      }
+    : undefined;
+
   return (
     <PublicLayout>
       {/* Back link */}
@@ -88,9 +124,9 @@ function EstudioPage() {
               <Sparkles className="h-3 w-3" /> Producto estrella
             </div>
             <h1 className="mt-4 wordmark text-[14vw] leading-[0.9] md:text-[6rem] lg:text-[7rem] text-balance">
-              {STUDIO.name}
+              {nombre}
             </h1>
-            <p className="mt-4 max-w-lg text-base text-muted-foreground">{STUDIO.description}</p>
+            <p className="mt-4 max-w-lg text-base text-muted-foreground">{descripcion}</p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <a
                 href="#reservar"
@@ -98,32 +134,57 @@ function EstudioPage() {
               >
                 Reservar
               </a>
-              <a
-                href="#pack"
-                className="rounded-full border hairline px-5 py-2.5 text-sm hover:border-ink"
-              >
-                Ver pack todo incluido
-              </a>
+              {packActivo && (
+                <a
+                  href="#pack"
+                  className="rounded-full border hairline px-5 py-2.5 text-sm hover:border-ink"
+                >
+                  Ver pack todo incluido
+                </a>
+              )}
             </div>
           </div>
-          <PhotoPlaceholder className="aspect-[4/3] w-full" label="FOTO PRINCIPAL" />
+          {fotoPrincipal ? (
+            <div className="aspect-[4/3] w-full overflow-hidden rounded-xl">
+              <img src={fotoPrincipal.url} alt={nombre} className="h-full w-full object-cover" />
+            </div>
+          ) : (
+            <PhotoPlaceholder className="aspect-[4/3] w-full" label="FOTO PRINCIPAL" />
+          )}
         </div>
       </section>
 
       {/* Galería */}
-      <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-        <div className="mb-6 flex items-end justify-between gap-3">
-          <h2 className="font-display text-2xl sm:text-3xl">Galería</h2>
-          <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            {STUDIO.gallery} fotos
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-          {Array.from({ length: STUDIO.gallery }).map((_, i) => (
-            <PhotoPlaceholder key={i} className="aspect-square w-full" label={`FOTO ${i + 1}`} />
-          ))}
-        </div>
-      </section>
+      {(fotos.length > 0 || !data) && (
+        <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
+          <div className="mb-6 flex items-end justify-between gap-3">
+            <h2 className="font-display text-2xl sm:text-3xl">Galería</h2>
+            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              {fotos.length > 0 ? `${fotos.length} fotos` : `${STUDIO.gallery} fotos`}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+            {fotos.length > 0
+              ? fotos.map((foto) => (
+                  <div key={foto.id} className="aspect-square w-full overflow-hidden rounded-xl">
+                    <img
+                      src={foto.url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                ))
+              : Array.from({ length: STUDIO.gallery }).map((_, i) => (
+                  <PhotoPlaceholder
+                    key={i}
+                    className="aspect-square w-full"
+                    label={`FOTO ${i + 1}`}
+                  />
+                ))}
+          </div>
+        </section>
+      )}
 
       {/* Características */}
       <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
@@ -132,7 +193,7 @@ function EstudioPage() {
           Todo lo que necesitás para producir sin sobresaltos.
         </p>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {STUDIO.features.map((f) => (
+          {features.map((f) => (
             <div key={f.label} className="rounded-xl border hairline bg-surface p-4">
               <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
                 {f.label}
@@ -166,33 +227,36 @@ function EstudioPage() {
       </section>
 
       {/* Pack todo incluido */}
-      <section
-        id="pack"
-        className="border-t hairline bg-amber text-ink px-4 py-10 lg:px-12 lg:py-14"
-      >
-        <div className="grid gap-6 lg:grid-cols-2 lg:gap-12">
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/70">
-              Addon · monto fijo / día
+      {packActivo && (
+        <section
+          id="pack"
+          className="border-t hairline bg-amber text-ink px-4 py-10 lg:px-12 lg:py-14"
+        >
+          <div className="grid gap-6 lg:grid-cols-2 lg:gap-12">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/70">
+                Addon · monto fijo / día
+              </div>
+              <h2 className="mt-2 font-display text-3xl sm:text-4xl">{packNombre}</h2>
+              <p className="mt-3 max-w-md text-ink/80">{packDescripcion}</p>
+              <div className="mt-5 text-4xl font-semibold tabular">
+                {packPrecio > 0 ? `${formatARS(packPrecio)} / día` : "Consultar precio"}
+              </div>
             </div>
-            <h2 className="mt-2 font-display text-3xl sm:text-4xl">{STUDIO.addon.name}</h2>
-            <p className="mt-3 max-w-md text-ink/80">{STUDIO.addon.description}</p>
-            <div className="mt-5 text-4xl font-semibold tabular">
-              {STUDIO.addon.pricePerDay > 0
-                ? `${formatARS(STUDIO.addon.pricePerDay)} / día`
-                : "Consultar precio"}
-            </div>
+            <ul className="space-y-2">
+              {STUDIO.addon.includes.map((it) => (
+                <li
+                  key={it}
+                  className="flex items-start gap-2 rounded-lg bg-ink/5 px-3 py-2 text-sm"
+                >
+                  <Check className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{it}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className="space-y-2">
-            {STUDIO.addon.includes.map((it) => (
-              <li key={it} className="flex items-start gap-2 rounded-lg bg-ink/5 px-3 py-2 text-sm">
-                <Check className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{it}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Reservar */}
       <section
@@ -201,25 +265,27 @@ function EstudioPage() {
       >
         <h2 className="font-display text-2xl sm:text-3xl">Reservar</h2>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Mínimo {STUDIO.minHours} horas. Te confirmamos disponibilidad por WhatsApp.
+          Mínimo {minHours} horas. Te confirmamos disponibilidad por WhatsApp.
         </p>
         <div className="mt-6">
-          <StudioBookingForm />
+          <StudioBookingForm config={bookingConfig} />
         </div>
       </section>
 
       {/* FAQ */}
-      <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-        <h2 className="font-display text-2xl sm:text-3xl">Preguntas frecuentes</h2>
-        <div className="mt-6 space-y-3">
-          {STUDIO.faq.map((f) => (
-            <details key={f.q} className="group rounded-xl border hairline bg-surface px-4 py-3">
-              <summary className="cursor-pointer list-none font-medium">{f.q}</summary>
-              <p className="mt-2 text-sm text-muted-foreground">{f.a}</p>
-            </details>
-          ))}
-        </div>
-      </section>
+      {faq.length > 0 && (
+        <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
+          <h2 className="font-display text-2xl sm:text-3xl">Preguntas frecuentes</h2>
+          <div className="mt-6 space-y-3">
+            {faq.map((f) => (
+              <details key={f.q} className="group rounded-xl border hairline bg-surface px-4 py-3">
+                <summary className="cursor-pointer list-none font-medium">{f.q}</summary>
+                <p className="mt-2 text-sm text-muted-foreground">{f.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* CTA WhatsApp final */}
       <section className="border-t hairline bg-ink text-amber px-4 py-12 lg:px-12 lg:py-16">
