@@ -746,7 +746,8 @@ def _pedido_email_context(pedido: dict) -> dict:
         "notas": pedido.get("notas") or "",
         "items_html": items_html,
         "items_text": items_text,
-        "admin_url": f"/admin/pedidos/{pedido.get('id')}",
+        # URLs absolutas: en un cliente de mail un link relativo no resuelve.
+        "admin_url": f"{SITE_URL}/admin/pedidos/{pedido.get('id')}",
         "portal_url": f"{SITE_URL}/cliente/portal",
     }
 
