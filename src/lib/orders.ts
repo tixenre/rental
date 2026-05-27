@@ -62,6 +62,7 @@ export type CreateOrderInput = {
 
 export type Order = {
   id: string;
+  numero_pedido: string;
   status: OrderStatus;
   start_date: string | null;
   end_date: string | null;
@@ -120,6 +121,7 @@ function adaptOrder(b: Record<string, unknown>): Order {
   const days = fd && fh ? Math.max(1, Math.ceil((fh.getTime() - fd.getTime()) / 86_400_000)) : 1;
   return {
     id: String(b.id),
+    numero_pedido: String(b.numero_pedido ?? b.id),
     status: ESTADO_MAP[String(b.estado)] ?? "solicitado",
     start_date: fd ? fd.toISOString() : null,
     end_date: fh ? fh.toISOString() : null,

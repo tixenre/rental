@@ -57,7 +57,6 @@ export function CartDrawer({
 
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [needsLogin, setNeedsLogin] = useState(false);
   const [notas, setNotas] = useState("");
@@ -204,7 +203,7 @@ export function CartDrawer({
     }
 
     try {
-      await createOrder({
+      const order = await createOrder({
         status: "solicitado",
         startDate,
         endDate,
@@ -222,8 +221,15 @@ export function CartDrawer({
           backendId: it._backendId,
         })),
       });
-      setSubmitted(true);
       clear();
+      setShowNotas(false);
+      setNotas("");
+      setDrawerOpen(false);
+      toast.success(`Pedido #${order.numero_pedido} enviado`, {
+        description: "Te llevamos a tu portal para seguir el estado y los próximos pasos.",
+        duration: 6000,
+      });
+      navigate({ to: "/cliente/portal", search: { nuevo: Number(order.id) } });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error al enviar el pedido";
       setSubmitError(msg);
@@ -241,14 +247,6 @@ export function CartDrawer({
   function goToRegister() {
     setDrawerOpen(false);
     navigate({ to: "/cliente/registro" });
-  }
-
-  function reset() {
-    setSubmitted(false);
-    setSubmitError(null);
-    setShowNotas(false);
-    setNotas("");
-    setDrawerOpen(false);
   }
 
   return (
@@ -332,284 +330,262 @@ export function CartDrawer({
             </div>
 
             {/* Contenido */}
-            {submitted ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-                <div className="text-4xl" aria-hidden="true">
-                  ✓
-                </div>
-                <div className="font-display text-2xl">¡Pedido enviado!</div>
-                <p className="text-sm text-muted-foreground">
-                  Recibimos tu solicitud. Te contactaremos a la brevedad para confirmar
-                  disponibilidad y coordinar el retiro.
-                </p>
-                <button
-                  onClick={reset}
-                  className="mt-4 rounded-md border hairline px-6 py-2 text-sm hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
-                >
-                  Cerrar
-                </button>
-              </div>
-            ) : (
-              <>
-                {/* Lista de items — área scrolleable */}
-                <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
-                  {list.length === 0 ? (
-                    <EmptyState
-                      icon={<ShoppingBag className="h-6 w-6" />}
-                      title="Tu rental está vacío"
-                      sub="Elegí equipos del catálogo y se sumarán acá."
-                    >
-                      <button
-                        onClick={() => setDrawerOpen(false, "bottom")}
-                        className="rounded-full bg-ink px-5 py-2 text-sm font-semibold text-amber transition hover:opacity-90"
-                      >
-                        Explorar catálogo
-                      </button>
-                    </EmptyState>
-                  ) : (
-                    <>
-                      <ul className="space-y-2.5">
-                        {list.map(({ it, qty }) => {
-                          const cap = getDisponible?.(it) ?? it.cantidad ?? Infinity;
-                          const reachedMax = qty >= cap;
-                          const lineaBruta = it.pricePerDay * qty * (d || 1);
-                          const lineaDto =
-                            descuentoPct > 0 ? Math.round((lineaBruta * descuentoPct) / 100) : 0;
-                          const lineaNeta = lineaBruta - lineaDto;
-                          return (
-                            <li
-                              key={it.id}
-                              className="flex gap-3 rounded-lg border hairline bg-surface p-3"
-                            >
-                              <div className="h-16 w-20 shrink-0 overflow-hidden rounded">
-                                {it.fotoUrl ? (
-                                  <img
-                                    src={it.fotoUrl}
-                                    alt=""
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <EmptyImage category={it.category} brand={it.brand} />
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-                                  {it.brand}
-                                </div>
-                                <div className="line-clamp-2 font-display text-sm leading-tight">
-                                  {it.name}
-                                </div>
-                                <div className="mt-2 flex items-center justify-between gap-2">
-                                  <div
-                                    role="group"
-                                    aria-label={`Cantidad de ${it.name}`}
-                                    className="flex items-center gap-0.5 rounded-full border hairline"
-                                  >
-                                    <button
-                                      onClick={() => remove(it.id)}
-                                      aria-label="Quitar uno"
-                                      className="grid h-10 w-10 place-items-center rounded-full hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
-                                    >
-                                      <Minus className="h-3.5 w-3.5" />
-                                    </button>
-                                    <span
-                                      className="w-6 text-center text-sm tabular"
-                                      aria-live="polite"
-                                    >
-                                      {qty}
-                                    </span>
-                                    <button
-                                      onClick={() => {
-                                        if (!reachedMax) add(it.id);
-                                      }}
-                                      disabled={reachedMax}
-                                      aria-label="Sumar uno"
-                                      className="grid h-10 w-10 place-items-center rounded-full hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
-                                    >
-                                      <Plus className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-xs tabular text-ink">
-                                      {formatARS(it.pricePerDay * qty)}
-                                      <span className="text-muted-foreground"> /día</span>
-                                    </div>
-                                    {d > 0 && (
-                                      <div className="hidden sm:flex items-center justify-end gap-1 mt-0.5 text-[11px] tabular">
-                                        {lineaDto > 0 && (
-                                          <span className="line-through text-muted-foreground/60">
-                                            {formatARS(lineaBruta)}
-                                          </span>
-                                        )}
-                                        <span
-                                          className={
-                                            lineaDto > 0
-                                              ? "text-emerald-600 font-medium"
-                                              : "text-muted-foreground"
-                                          }
-                                        >
-                                          {formatARS(lineaNeta)}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => setQty(it.id, 0)}
-                                aria-label={`Quitar ${it.name} del carrito`}
-                                className="grid h-8 w-8 shrink-0 place-items-center self-start rounded-full text-muted-foreground hover:bg-surface hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-
-                      {/* Notas opcionales */}
-                      {showNotas && (
-                        <div className="mt-4 space-y-2 rounded-lg border hairline bg-surface p-4">
-                          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
-                            Notas para nosotros (opcional)
-                          </div>
-                          <textarea
-                            value={notas}
-                            onChange={(e) => setNotas(e.target.value)}
-                            rows={3}
-                            maxLength={500}
-                            placeholder="Ej: necesito dolly extra, retiro fuera de horario, etc."
-                            className="w-full resize-none rounded-md border hairline bg-background px-3 py-2 text-sm focus:border-amber/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
-                          />
-                        </div>
-                      )}
-                      {submitError && (
-                        <div
-                          role="alert"
-                          className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
-                        >
-                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <span>{submitError}</span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {/* Footer sticky con totales */}
-                <div
-                  className="border-t hairline bg-background px-5 py-4 space-y-3 sm:px-6"
-                  style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
-                >
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {hayFechas
-                        ? `Subtotal · ${d} ${d === 1 ? "jornada" : "jornadas"}`
-                        : "Subtotal · por jornada"}
-                    </span>
-                    <span className="tabular">{formatARS(subtotalTotal)}</span>
-                  </div>
-                  {descuentoPct > 0 && (
-                    <div className="flex items-center justify-between text-sm text-emerald-600">
-                      <span>
-                        {descuentoLabel(descuentoOrigen, d, clienteSession?.nombre)} ·{" "}
-                        {descuentoPct}%
-                      </span>
-                      <span className="tabular">−{formatARS(descuentoMonto)}</span>
-                    </div>
-                  )}
-                  {conIva && (
-                    <>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Subtotal neto</span>
-                        <span className="tabular">{formatARS(totalNeto)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>IVA {IVA_PCT}%</span>
-                        <span className="tabular">+{formatARS(iva)}</span>
-                      </div>
-                    </>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                      {hayFechas
-                        ? `Total${conIva ? " · IVA incluído" : ""}`
-                        : "Estimado · por jornada"}
-                    </span>
-                    <span className="font-display text-3xl tabular text-ink">
-                      {formatARS(total)}
-                    </span>
-                  </div>
-
-                  {!showNotas && list.length > 0 && (
-                    <button
-                      onClick={() => setShowNotas(true)}
-                      className="w-full text-xs text-muted-foreground hover:text-ink focus:outline-none focus-visible:underline"
-                    >
-                      Agregar una nota
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={submitting || list.length === 0}
-                    onClick={handleSubmit}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+            <>
+              {/* Lista de items — área scrolleable */}
+              <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
+                {list.length === 0 ? (
+                  <EmptyState
+                    icon={<ShoppingBag className="h-6 w-6" />}
+                    title="Tu rental está vacío"
+                    sub="Elegí equipos del catálogo y se sumarán acá."
                   >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" /> Enviando…
-                      </>
-                    ) : (
-                      "Confirmar solicitud"
-                    )}
-                  </button>
-
-                  {!startDate || !endDate ? (
-                    <p className="flex items-center justify-center gap-1.5 text-center text-xs text-amber-700">
-                      <AlertCircle className="h-3.5 w-3.5" />
-                      Elegí fechas para confirmar
-                    </p>
-                  ) : null}
-
-                  {/* #27 — Panel "necesitás cuenta" cuando el pre-check falla */}
-                  {needsLogin && (
-                    <div className="rounded-md border border-amber/40 bg-amber-soft p-3 space-y-2">
-                      <p className="text-sm text-ink font-medium">
-                        Necesitás una cuenta para confirmar
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Iniciá sesión o creá una cuenta para mandarnos tu solicitud.
-                      </p>
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={goToLogin}
-                          className="flex-1 rounded-md bg-ink px-3 py-2 text-xs font-medium uppercase tracking-wider text-amber transition hover:brightness-110"
-                        >
-                          Iniciar sesión
-                        </button>
-                        <button
-                          type="button"
-                          onClick={goToRegister}
-                          className="flex-1 rounded-md border hairline px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink transition hover:bg-background"
-                        >
-                          Crear cuenta
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {list.length > 0 && (
                     <button
-                      onClick={clear}
-                      className="w-full text-xs text-muted-foreground hover:text-destructive focus:outline-none focus-visible:underline"
+                      onClick={() => setDrawerOpen(false, "bottom")}
+                      className="rounded-full bg-ink px-5 py-2 text-sm font-semibold text-amber transition hover:opacity-90"
                     >
-                      Vaciar pedido
+                      Explorar catálogo
                     </button>
-                  )}
+                  </EmptyState>
+                ) : (
+                  <>
+                    <ul className="space-y-2.5">
+                      {list.map(({ it, qty }) => {
+                        const cap = getDisponible?.(it) ?? it.cantidad ?? Infinity;
+                        const reachedMax = qty >= cap;
+                        const lineaBruta = it.pricePerDay * qty * (d || 1);
+                        const lineaDto =
+                          descuentoPct > 0 ? Math.round((lineaBruta * descuentoPct) / 100) : 0;
+                        const lineaNeta = lineaBruta - lineaDto;
+                        return (
+                          <li
+                            key={it.id}
+                            className="flex gap-3 rounded-lg border hairline bg-surface p-3"
+                          >
+                            <div className="h-16 w-20 shrink-0 overflow-hidden rounded">
+                              {it.fotoUrl ? (
+                                <img
+                                  src={it.fotoUrl}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <EmptyImage category={it.category} brand={it.brand} />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                                {it.brand}
+                              </div>
+                              <div className="line-clamp-2 font-display text-sm leading-tight">
+                                {it.name}
+                              </div>
+                              <div className="mt-2 flex items-center justify-between gap-2">
+                                <div
+                                  role="group"
+                                  aria-label={`Cantidad de ${it.name}`}
+                                  className="flex items-center gap-0.5 rounded-full border hairline"
+                                >
+                                  <button
+                                    onClick={() => remove(it.id)}
+                                    aria-label="Quitar uno"
+                                    className="grid h-10 w-10 place-items-center rounded-full hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+                                  >
+                                    <Minus className="h-3.5 w-3.5" />
+                                  </button>
+                                  <span
+                                    className="w-6 text-center text-sm tabular"
+                                    aria-live="polite"
+                                  >
+                                    {qty}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      if (!reachedMax) add(it.id);
+                                    }}
+                                    disabled={reachedMax}
+                                    aria-label="Sumar uno"
+                                    className="grid h-10 w-10 place-items-center rounded-full hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+                                  >
+                                    <Plus className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-xs tabular text-ink">
+                                    {formatARS(it.pricePerDay * qty)}
+                                    <span className="text-muted-foreground"> /día</span>
+                                  </div>
+                                  {d > 0 && (
+                                    <div className="hidden sm:flex items-center justify-end gap-1 mt-0.5 text-[11px] tabular">
+                                      {lineaDto > 0 && (
+                                        <span className="line-through text-muted-foreground/60">
+                                          {formatARS(lineaBruta)}
+                                        </span>
+                                      )}
+                                      <span
+                                        className={
+                                          lineaDto > 0
+                                            ? "text-emerald-600 font-medium"
+                                            : "text-muted-foreground"
+                                        }
+                                      >
+                                        {formatARS(lineaNeta)}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => setQty(it.id, 0)}
+                              aria-label={`Quitar ${it.name} del carrito`}
+                              className="grid h-8 w-8 shrink-0 place-items-center self-start rounded-full text-muted-foreground hover:bg-surface hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+
+                    {/* Notas opcionales */}
+                    {showNotas && (
+                      <div className="mt-4 space-y-2 rounded-lg border hairline bg-surface p-4">
+                        <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                          Notas para nosotros (opcional)
+                        </div>
+                        <textarea
+                          value={notas}
+                          onChange={(e) => setNotas(e.target.value)}
+                          rows={3}
+                          maxLength={500}
+                          placeholder="Ej: necesito dolly extra, retiro fuera de horario, etc."
+                          className="w-full resize-none rounded-md border hairline bg-background px-3 py-2 text-sm focus:border-amber/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+                        />
+                      </div>
+                    )}
+                    {submitError && (
+                      <div
+                        role="alert"
+                        className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+                      >
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{submitError}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Footer sticky con totales */}
+              <div
+                className="border-t hairline bg-background px-5 py-4 space-y-3 sm:px-6"
+                style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+              >
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {hayFechas
+                      ? `Subtotal · ${d} ${d === 1 ? "jornada" : "jornadas"}`
+                      : "Subtotal · por jornada"}
+                  </span>
+                  <span className="tabular">{formatARS(subtotalTotal)}</span>
                 </div>
-              </>
-            )}
+                {descuentoPct > 0 && (
+                  <div className="flex items-center justify-between text-sm text-emerald-600">
+                    <span>
+                      {descuentoLabel(descuentoOrigen, d, clienteSession?.nombre)} · {descuentoPct}%
+                    </span>
+                    <span className="tabular">−{formatARS(descuentoMonto)}</span>
+                  </div>
+                )}
+                {conIva && (
+                  <>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Subtotal neto</span>
+                      <span className="tabular">{formatARS(totalNeto)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>IVA {IVA_PCT}%</span>
+                      <span className="tabular">+{formatARS(iva)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+                    {hayFechas
+                      ? `Total${conIva ? " · IVA incluído" : ""}`
+                      : "Estimado · por jornada"}
+                  </span>
+                  <span className="font-display text-3xl tabular text-ink">{formatARS(total)}</span>
+                </div>
+
+                {!showNotas && list.length > 0 && (
+                  <button
+                    onClick={() => setShowNotas(true)}
+                    className="w-full text-xs text-muted-foreground hover:text-ink focus:outline-none focus-visible:underline"
+                  >
+                    Agregar una nota
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={submitting || list.length === 0}
+                  onClick={handleSubmit}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Enviando…
+                    </>
+                  ) : (
+                    "Confirmar solicitud"
+                  )}
+                </button>
+
+                {!startDate || !endDate ? (
+                  <p className="flex items-center justify-center gap-1.5 text-center text-xs text-amber-700">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    Elegí fechas para confirmar
+                  </p>
+                ) : null}
+
+                {/* #27 — Panel "necesitás cuenta" cuando el pre-check falla */}
+                {needsLogin && (
+                  <div className="rounded-md border border-amber/40 bg-amber-soft p-3 space-y-2">
+                    <p className="text-sm text-ink font-medium">
+                      Necesitás una cuenta para confirmar
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Iniciá sesión o creá una cuenta para mandarnos tu solicitud.
+                    </p>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={goToLogin}
+                        className="flex-1 rounded-md bg-ink px-3 py-2 text-xs font-medium uppercase tracking-wider text-amber transition hover:brightness-110"
+                      >
+                        Iniciar sesión
+                      </button>
+                      <button
+                        type="button"
+                        onClick={goToRegister}
+                        className="flex-1 rounded-md border hairline px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink transition hover:bg-background"
+                      >
+                        Crear cuenta
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {list.length > 0 && (
+                  <button
+                    onClick={clear}
+                    className="w-full text-xs text-muted-foreground hover:text-destructive focus:outline-none focus-visible:underline"
+                  >
+                    Vaciar pedido
+                  </button>
+                )}
+              </div>
+            </>
           </motion.aside>
 
           {/* Modal de fechas — montado fuera del drawer para que se vea encima */}

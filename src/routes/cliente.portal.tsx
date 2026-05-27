@@ -55,6 +55,10 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mis pedidos — Rambla Rental" }] }),
+  validateSearch: (search: Record<string, unknown>): { nuevo?: number } => {
+    const n = Number(search.nuevo);
+    return Number.isFinite(n) && n > 0 ? { nuevo: n } : {};
+  },
   component: ClientePortal,
 });
 
@@ -205,10 +209,13 @@ function fmtTime(s?: string) {
 
 export default function ClientePortal() {
   const navigate = useNavigate();
+  const { nuevo } = Route.useSearch();
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
+  const nuevoHandledRef = useRef(false);
   const [tab, setTab] = useState<Filtro>("todos");
   const [query, setQuery] = useState<string>("");
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -282,6 +289,28 @@ export default function ClientePortal() {
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
   }
+
+  // Llegada desde "pedido recién creado" (?nuevo=<id>): expandir + scrollear +
+  // resaltar la card una sola vez, y limpiar la URL para que un refresh no la
+  // vuelva a disparar. Esperamos a que los pedidos estén cargados.
+  useEffect(() => {
+    if (loading || nuevo == null || nuevoHandledRef.current) return;
+    if (!pedidos.some((p) => p.id === nuevo)) return;
+    nuevoHandledRef.current = true;
+    verPedido(nuevo);
+    setHighlightId(nuevo);
+    navigate({ to: "/cliente/portal", search: {}, replace: true });
+    // verPedido es estable a efectos prácticos; no lo incluimos para no re-disparar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, nuevo, pedidos, navigate]);
+
+  // El resaltado es transitorio (~3.5s). Effect propio para que un reload de
+  // pedidos no corte el timeout antes de tiempo.
+  useEffect(() => {
+    if (highlightId == null) return;
+    const t = setTimeout(() => setHighlightId(null), 3500);
+    return () => clearTimeout(t);
+  }, [highlightId]);
 
   async function handleLogout() {
     await authedFetch("/auth/logout", { method: "POST" }).catch(() => {});
@@ -524,6 +553,7 @@ export default function ClientePortal() {
                 key={p.id}
                 pedido={p}
                 expanded={expanded === p.id}
+                highlight={highlightId === p.id}
                 onToggle={() => setExpanded(expanded === p.id ? null : p.id)}
                 ventanaHoras={ventanaHoras}
                 onChanged={reloadPedidos}
@@ -598,6 +628,7 @@ function PedidoEmpty({
 function PedidoCard({
   pedido,
   expanded,
+  highlight = false,
   onToggle,
   ventanaHoras,
   onChanged,
@@ -605,6 +636,7 @@ function PedidoCard({
 }: {
   pedido: Pedido;
   expanded: boolean;
+  highlight?: boolean;
   onToggle: () => void;
   ventanaHoras: number;
   onChanged: () => void;
@@ -614,6 +646,8 @@ function PedidoCard({
   const businessPhone = useBusinessPhone();
   const { documentos_disponibles: docs } = pedido;
   const numero = pedido.numero_pedido ?? pedido.id;
+  // Pedido recién enviado: banner de bienvenida con los próximos pasos.
+  const showWelcome = highlight && pedido.estado === "presupuesto";
   const jornadas = jornadasEntre(pedido.fecha_desde, pedido.fecha_hasta);
   const tlCurrent = buildTimelineSteps(pedido).find((s) => s.state === "current");
   const cardRef = useRef<HTMLDivElement>(null);
@@ -700,6 +734,7 @@ function PedidoCard({
         expanded
           ? "border-amber shadow-[0_0_0_1px_var(--amber)]"
           : "border-[var(--hairline)] hover:border-ink/30",
+        highlight && "ring-2 ring-amber ring-offset-2 ring-offset-background animate-pulse",
       )}
     >
       <div className="flex items-stretch">
@@ -760,9 +795,24 @@ function PedidoCard({
 
       {expanded && (
         <div className="border-t border-dashed border-[var(--hairline)] px-4 sm:px-[18px] pt-[18px] pb-[22px] grid gap-y-5 gap-x-7 animate-[expand-in_.22s_ease-out] [grid-template-areas:'banner''timeline''main''side'] lg:[grid-template-columns:minmax(0,1fr)_clamp(20rem,26%,25rem)] lg:[grid-template-areas:'banner_banner''timeline_timeline''main_side']">
-          {/* ── Banner: solicitud pendiente / resuelta (full width) ── */}
-          {(pendiente || ultimaResuelta) && (
+          {/* ── Banner: solicitud pendiente / resuelta / bienvenida (full width) ── */}
+          {(pendiente || ultimaResuelta || showWelcome) && (
             <div className="[grid-area:banner] flex flex-col gap-3">
+              {showWelcome && (
+                <section className="rounded-md border border-amber bg-amber-soft px-3.5 py-3 flex items-start gap-2.5">
+                  <CircleCheckBig className="h-4 w-4 text-amber mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-sans text-[13px] font-semibold text-ink">
+                      ¡Recibimos tu solicitud!
+                    </div>
+                    <div className="font-sans text-xs text-ink/70 mt-0.5">
+                      La estamos revisando. Cuando confirmemos la disponibilidad vas a poder
+                      descargar el remito y el contrato desde acá. Seguí el estado en la línea de
+                      tiempo de abajo.
+                    </div>
+                  </div>
+                </section>
+              )}
               {pendiente && (
                 <section className="rounded-md border border-amber bg-amber-soft px-3.5 py-3 flex items-start gap-2.5">
                   <Clock className="h-4 w-4 text-amber mt-0.5 shrink-0" />
