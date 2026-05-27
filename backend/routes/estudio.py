@@ -46,6 +46,14 @@ def _get_estudio_row(conn):
     return row
 
 
+def _require_cliente(request):
+    """Guard de cliente logueado (mismo que /api/cliente/pedidos). Import diferido
+    para no acoplar el módulo a toda la cadena del portal; envuelto en helper para
+    ser patcheable en tests."""
+    from routes.cliente_portal import require_cliente
+    return require_cliente(request)
+
+
 def _get_fotos(conn) -> list:
     cur = conn.execute(
         "SELECT id, url, path, orden, es_principal, created_at "
@@ -644,10 +652,9 @@ class EstudioReservaCreate(BaseModel):
     fecha: str
     start: str
     horas: int
-    cliente_nombre: str
-    cliente_email: Optional[str] = None
-    cliente_telefono: Optional[str] = None
     con_pack: bool = False
+    # Los datos del cliente NO vienen del body: salen de la sesión + tabla clientes
+    # (reserva con login obligatorio, igual que el portal /api/cliente/pedidos).
 
 
 def _agregar_items_pack(conn, pedido_id: int, fecha_desde, fecha_hasta, pack_ids: list[int]) -> None:
@@ -668,19 +675,36 @@ def _agregar_items_pack(conn, pedido_id: int, fecha_desde, fecha_hasta, pack_ids
 
 
 @router.post("/estudio/reservas", status_code=201)
-def crear_reserva_estudio(body: EstudioReservaCreate, background: BackgroundTasks):
+def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, background: BackgroundTasks):
     """Reserva real del estudio por horas. Entra como solicitud
     (estado='presupuesto'), en UNA transacción.
+
+    Requiere CLIENTE LOGUEADO (igual que /api/cliente/pedidos): el cliente_id sale
+    de la sesión y nombre/email/teléfono del registro de `clientes` — nunca del body.
 
     El ESPACIO (centinela) es requisito duro: se valida con _centinela_libre +
     FOR UPDATE (su buffer propio), no con el motor. Los EQUIPOS del pack son
     equipos reales: se validan con el motor sagrado (_check_stock, buffer global).
     Criterio ante race del pack: best-effort — todo lo disponible al confirmar."""
+    session = _require_cliente(request)
+    cliente_id = session["cliente_id"]
+
     conn = get_db()
     try:
         estudio = _get_estudio_row(conn)
         if not estudio["equipo_id"]:
             raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
+
+        # Datos del cliente desde la cuenta (no del body), mismo formato que create_pedido.
+        cli = conn.execute(
+            "SELECT nombre, apellido, email, telefono FROM clientes WHERE id = ?",
+            (cliente_id,),
+        ).fetchone()
+        if not cli:
+            raise HTTPException(401, "Sesión de cliente inválida")
+        cliente_nombre = f"{cli['apellido']}, {cli['nombre']}"
+        cliente_email = cli["email"]
+        cliente_telefono = cli["telefono"]
 
         fecha_desde, fecha_hasta = _franja_estudio(
             estudio, body.fecha, body.start, body.horas
@@ -706,13 +730,13 @@ def crear_reserva_estudio(body: EstudioReservaCreate, background: BackgroundTask
         next_num = _next_numero_pedido(conn)
         cur = conn.execute(
             """
-            INSERT INTO alquileres (cliente_nombre, cliente_email, cliente_telefono,
+            INSERT INTO alquileres (cliente_id, cliente_nombre, cliente_email, cliente_telefono,
                                     fecha_desde, fecha_hasta, monto_total, estado,
                                     fuente, tipo, estudio_con_pack, numero_pedido)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
-                body.cliente_nombre, body.cliente_email, body.cliente_telefono,
+                cliente_id, cliente_nombre, cliente_email, cliente_telefono,
                 fecha_desde, fecha_hasta, monto_total, "presupuesto",
                 "estudio", "estudio", con_pack, next_num,
             ),
