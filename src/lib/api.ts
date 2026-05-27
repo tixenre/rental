@@ -219,6 +219,7 @@ export type EstudioPackEquipo = {
   id: number;
   nombre: string;
   marca: string | null;
+  foto_url: string | null;
   cantidad: number;
 };
 

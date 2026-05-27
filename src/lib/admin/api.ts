@@ -1686,8 +1686,27 @@ export type EstudioSlotFijo = {
 
 export type EstudioSlotInput = Omit<EstudioSlotFijo, "id">;
 
+export type EstudioPackEquipoCurado = {
+  id: number;
+  nombre: string;
+  marca: string | null;
+  foto_url: string | null;
+  orden: number;
+};
+
 export const estudioAdminApi = {
   get: () => authedJson<EstudioConfig>("/api/estudio"),
+  listPack: () => authedJson<{ pack: EstudioPackEquipoCurado[] }>("/api/admin/estudio/pack"),
+  addPackEquipo: (equipo_id: number) =>
+    authedPostJson<{ pack: EstudioPackEquipoCurado[] }>("/api/admin/estudio/pack", { equipo_id }),
+  removePackEquipo: (equipo_id: number) =>
+    authedFetch(`/api/admin/estudio/pack/${equipo_id}`, { method: "DELETE" }).then(async (r) => {
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d?.detail ?? `DELETE pack → ${r.status}`);
+      }
+      return r.json() as Promise<{ pack: EstudioPackEquipoCurado[] }>;
+    }),
   listSlots: () => authedJson<{ slots: EstudioSlotFijo[] }>("/api/admin/estudio/slots"),
   createSlot: (data: EstudioSlotInput) =>
     authedPostJson<EstudioSlotFijo>("/api/admin/estudio/slots", data),

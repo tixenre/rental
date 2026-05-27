@@ -1206,6 +1206,18 @@ def init_db():
     # Vincula cada pedido mensual generado con su slot, para regenerar futuros sin
     # tocar pasados/pagados. NULL en todo pedido normal → cero impacto.
     conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS estudio_slot_id INTEGER REFERENCES estudio_slots_fijos(id) ON DELETE SET NULL")
+    # v2-C: pack curado. El admin elige a mano qué equipos integran el pack
+    # (reemplaza "todo lo de las categorías Grip/Iluminación/Modificadores"). La
+    # disponibilidad de la franja sigue saliendo del motor sagrado.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS estudio_pack_equipos (
+            id          SERIAL PRIMARY KEY,
+            estudio_id  INTEGER NOT NULL REFERENCES estudio(id) ON DELETE CASCADE,
+            equipo_id   INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            orden       INTEGER NOT NULL DEFAULT 0,
+            UNIQUE (estudio_id, equipo_id)
+        )
+    """)
     # Seed idempotente: inserta la fila singleton si no existe, con los valores
     # del copy original de src/data/studio.ts. Precios en 0 (el dueño los setea).
     import json as _json
@@ -1240,8 +1252,8 @@ def init_db():
             1,
             'El Estudio',
             'Foto y video en Mar del Plata',
-            'Un espacio pensado para producciones audiovisuales. Iluminación natural, '
-            'ciclorama infinito, climatización y todo el equipo de Rambla a mano. '
+            'Un espacio pensado para producciones audiovisuales. Ciclorama '
+            'infinito, climatización y todo el equipo de Rambla a mano. '
             'Ideal para producto, retrato, video corporativo, redes sociales y shoots editoriales.',
             0, 2, 8, 22, 0,
             TRUE,
