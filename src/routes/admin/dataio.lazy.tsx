@@ -1,12 +1,10 @@
 /**
- * Página de export del catálogo.
+ * Página de datos y backups del back-office.
  *
- * Permite descargar JSONs versionables del catálogo (marcas, categorías,
- * equipos, specs, etc.) para commitear al repo. La importación se hace
- * vía CLI (`python -m backend.dataio.cli import`) — no por UI.
- *
- * El catálogo "oficial" vive en /data/catalog/ del repo. Si descargás
- * un JSON desde acá y lo commiteás, esa pasa a ser la nueva baseline.
+ * Modelo simple para el dueño: 3 grupos (Configuración, Clientes, Pedidos),
+ * cada uno con Backup (descarga un ZIP) y Restaurar (sube ese ZIP, con
+ * dry-run que simula antes de aplicar). Más abajo: borrar todo (arrancar de
+ * cero) y un bloque "Avanzado" con las exportaciones por entidad / CSV.
  */
 
 import { createLazyFileRoute } from "@tanstack/react-router";
@@ -19,6 +17,8 @@ import {
   FileJson,
   FileSpreadsheet,
   Loader2,
+  Package,
+  Settings,
   Trash2,
   Upload,
   Users,
@@ -47,44 +47,45 @@ export const Route = createLazyFileRoute("/admin/dataio")({
   component: DataIoPage,
 });
 
-const CATALOG_ENTITIES = [
-  { key: "marcas", label: "Marcas", desc: "Sony, Canon, Aputure, …" },
-  { key: "categorias", label: "Categorías", desc: "Árbol jerárquico (Cámaras > Foto, Video, …)" },
-  { key: "etiquetas", label: "Etiquetas", desc: "Tags libres asignados a equipos" },
+type ImportResult = {
+  ok: boolean;
+  dry_run: boolean;
+  stats: Record<string, { inserted?: number; updated?: number; skipped?: number }>;
+  total_inserted: number;
+  total_updated: number;
+};
+
+// Los 3 grupos que ve el dueño. Cada uno mapea a un scope del backend.
+const GROUPS = [
   {
-    key: "spec_definitions",
-    label: "Specs (definiciones)",
-    desc: "Plantilla de specs por categoría raíz",
+    scope: "configuracion",
+    label: "Configuración",
+    Icon: Settings,
+    desc: "Catálogo, specs, ajustes (cotización, WhatsApp, horarios, FAQ), plantillas de mail y descuentos.",
   },
   {
-    key: "categoria_spec_templates",
-    label: "Specs (asignaciones)",
-    desc: "Qué specs aplican a cada categoría",
+    scope: "clientes",
+    label: "Clientes",
+    Icon: Users,
+    desc: "La base de clientes (datos personales y fiscales).",
   },
   {
-    key: "equipos",
-    label: "Equipos",
-    desc: "Catálogo completo de equipos con M2M categorías/etiquetas",
-  },
-  {
-    key: "equipo_specs",
-    label: "Equipo · valores de specs",
-    desc: "Sensor, montura, formato, etc. por equipo",
-  },
-  {
-    key: "equipo_fichas",
-    label: "Equipo · fichas extendidas",
-    desc: "Descripción, peso, conectividad, etc.",
+    scope: "pedidos",
+    label: "Pedidos",
+    Icon: Package,
+    desc: "Los alquileres con sus items y pagos.",
   },
 ] as const;
 
-const OPERATIONAL_ENTITIES = [
-  { key: "clientes", label: "Clientes", desc: "Datos personales y fiscales. Clave: email." },
-  {
-    key: "alquileres",
-    label: "Alquileres",
-    desc: "Pedidos con items y pagos embebidos. Clave: numero_pedido.",
-  },
+const CATALOG_ENTITIES = [
+  { key: "marcas", label: "Marcas" },
+  { key: "categorias", label: "Categorías" },
+  { key: "etiquetas", label: "Etiquetas" },
+  { key: "spec_definitions", label: "Specs (definiciones)" },
+  { key: "categoria_spec_templates", label: "Specs (asignaciones)" },
+  { key: "equipos", label: "Equipos" },
+  { key: "equipo_specs", label: "Equipo · valores de specs" },
+  { key: "equipo_fichas", label: "Equipo · fichas extendidas" },
 ] as const;
 
 async function downloadFile(path: string, fallbackName: string) {
@@ -94,7 +95,6 @@ async function downloadFile(path: string, fallbackName: string) {
     throw new Error(text || `${res.status} ${res.statusText}`);
   }
   const blob = await res.blob();
-  // Extraer filename del Content-Disposition si está
   const cd = res.headers.get("Content-Disposition") || "";
   const match = cd.match(/filename="?([^";]+)"?/i);
   const filename = match?.[1] ?? fallbackName;
@@ -112,12 +112,45 @@ async function downloadFile(path: string, fallbackName: string) {
 function DataIoPage() {
   useDocumentTitle("Datos y backups · Back Office");
   const [busy, setBusy] = useState<string | null>(null);
-  const [importBusy, setImportBusy] = useState(false);
-  const [lastImport, setLastImport] = useState<ImportResult | null>(null);
-  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importBusy, setImportBusy] = useState<string | null>(null);
+  const [lastImport, setLastImport] = useState<{ scope: string; result: ImportResult } | null>(
+    null,
+  );
   const [resetOpen, setResetOpen] = useState(false);
   const [resetConfirm, setResetConfirm] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
+
+  const handleDownload = async (entity: string, label: string, fallback: string) => {
+    setBusy(entity);
+    try {
+      await downloadFile(`/api/admin/dataio/export?entity=${entity}`, fallback);
+      toast.success(`Backup descargado: ${label}`);
+    } catch (e) {
+      toast.error(`Falló la descarga de ${label}: ${(e as Error).message}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleImport = async (scope: string, label: string, file: File, dryRun: boolean) => {
+    setImportBusy(scope);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const url = `/api/admin/dataio/import?scope=${scope}${dryRun ? "&dry_run=true" : ""}`;
+      const res = await authedFetch(url, { method: "POST", body: fd });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.detail ?? `${res.status} ${res.statusText}`);
+      setLastImport({ scope, result: json as ImportResult });
+      toast.success(
+        `${label} — ${dryRun ? "simulación" : "restaurado"}: +${json.total_inserted ?? 0} nuevos, ~${json.total_updated ?? 0} actualizados`,
+      );
+    } catch (e) {
+      toast.error(`Restaurar ${label} falló: ${(e as Error).message}`);
+    } finally {
+      setImportBusy(null);
+    }
+  };
 
   const handleResetOperacional = async () => {
     setResetBusy(true);
@@ -130,7 +163,7 @@ function DataIoPage() {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.detail ?? `${res.status} ${res.statusText}`);
       toast.success(
-        `Borrado: ${json.deleted?.clientes ?? 0} clientes, ${json.deleted?.alquileres ?? 0} alquileres`,
+        `Borrado: ${json.deleted?.clientes ?? 0} clientes, ${json.deleted?.alquileres ?? 0} pedidos`,
       );
       setLastImport(null);
       setResetOpen(false);
@@ -142,46 +175,6 @@ function DataIoPage() {
     }
   };
 
-  const handleDownload = async (entity: string, label: string) => {
-    setBusy(entity);
-    try {
-      const fallback =
-        entity === "operacional-all"
-          ? "backup.zip"
-          : entity.includes("-all") || entity === "full"
-            ? `${entity}.zip`
-            : entity.endsWith("-csv")
-              ? `${entity.slice(0, -4)}.csv`
-              : `${entity}.json`;
-      await downloadFile(`/api/admin/dataio/export?entity=${entity}`, fallback);
-      toast.success(`Descargado: ${label}`);
-    } catch (e) {
-      toast.error(`Falló la descarga de ${label}: ${(e as Error).message}`);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const handleImportOperacional = async (file: File, dryRun: boolean) => {
-    setImportBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const url = `/api/admin/dataio/import?scope=operacional${dryRun ? "&dry_run=true" : ""}`;
-      const res = await authedFetch(url, { method: "POST", body: fd });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.detail ?? `${res.status} ${res.statusText}`);
-      setLastImport(json as ImportResult);
-      toast.success(
-        `Import ${dryRun ? "(simulado)" : "OK"}: +${json.total_inserted ?? 0} ins, ~${json.total_updated ?? 0} upd`,
-      );
-    } catch (e) {
-      toast.error(`Import falló: ${(e as Error).message}`);
-    } finally {
-      setImportBusy(false);
-    }
-  };
-
   return (
     <div className="px-4 md:px-6 py-6 space-y-8 max-w-4xl mx-auto">
       <header>
@@ -190,397 +183,342 @@ function DataIoPage() {
         </div>
         <h1 className="font-display text-3xl text-ink">Datos y backups</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Catálogo (versionado en el repo) y datos operacionales (clientes/pedidos): backup,
-          restaurar y borrar todo para arrancar de cero.
+          Guardá una copia de tus datos, restaurala cuando quieras, o borrá todo para arrancar de
+          cero.
         </p>
       </header>
 
-      {/* ─── CATÁLOGO ─── */}
-      <section className="rounded-lg border bg-card p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="font-display text-lg flex items-center gap-2">
-              <FileArchive className="size-4" />
-              Catálogo completo
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              ZIP con los 8 JSONs del catálogo. Si los commiteás a{" "}
-              <code className="text-xs">data/catalog/</code>, pasan a ser la baseline oficial que se
-              importa al startup.
-            </p>
-          </div>
-          <Button
-            onClick={() => handleDownload("catalog-all", "Catálogo completo")}
-            disabled={busy !== null}
-            className="shrink-0"
-          >
-            {busy === "catalog-all" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Download className="size-4" />
-            )}
-            Descargar ZIP
-          </Button>
-        </div>
-      </section>
+      {/* Guía del flujo (lenguaje claro) */}
+      <div className="rounded-lg border border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/10 p-4 text-sm space-y-1.5">
+        <div className="font-medium text-ink">Cómo usarlo para probar antes del lanzamiento</div>
+        <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
+          <li>
+            <strong className="text-foreground">Descargá los backups</strong> que quieras guardar
+            (cada uno es un solo archivo <code>backup-…-fecha.zip</code>).
+          </li>
+          <li>Probá libremente: hacé pedidos como si fueras un cliente.</li>
+          <li>
+            Cuando quieras <strong className="text-foreground">arrancar de cero</strong>: “Borrar
+            clientes y pedidos” → escribí <code>{RESET_CONFIRMATION}</code>. Vuelve la numeración a
+            #1.
+          </li>
+          <li>
+            Para <strong className="text-foreground">recuperar</strong> lo guardado: en cada grupo,
+            “Restaurar (simular)” te muestra qué va a pasar; después “Restaurar (aplicar)”.
+          </li>
+        </ol>
+      </div>
 
+      {/* ─── BACKUPS por grupo ─── */}
       <section className="space-y-3">
-        <h2 className="font-display text-lg">Catálogo · por entidad</h2>
-        <div className="rounded-lg border bg-card divide-y">
-          {CATALOG_ENTITIES.map((e) => (
-            <EntityRow key={e.key} entity={e} busy={busy} onDownload={handleDownload} />
+        <h2 className="font-display text-lg">Backup y restaurar</h2>
+        <div className="space-y-3">
+          {GROUPS.map((g) => (
+            <GroupCard
+              key={g.scope}
+              group={g}
+              busy={busy}
+              importBusy={importBusy}
+              lastImport={lastImport?.scope === g.scope ? lastImport.result : null}
+              onDownload={handleDownload}
+              onImport={handleImport}
+            />
           ))}
         </div>
+        <p className="text-xs text-muted-foreground">
+          Restaurar hace <strong>upsert</strong>: agrega lo que falta y actualiza lo que cambió, sin
+          borrar lo que no esté en el archivo. Los archivos con datos de clientes/pedidos{" "}
+          <strong className="text-foreground">nunca se commitean al repo</strong>.
+        </p>
       </section>
 
-      {/* ─── PLANILLAS CSV ─── */}
-      <section className="rounded-lg border bg-card p-5 space-y-3">
-        <div className="space-y-1">
-          <h2 className="font-display text-lg flex items-center gap-2">
-            <FileSpreadsheet className="size-4" />
-            Exportar a planilla (CSV)
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Una sola hoja por entidad, lista para abrir en Excel/Sheets. Hace los JOINs por vos
-            (marca, categorías y specs ya vienen en columnas). Alquileres y clientes incluyen datos
-            privados — <strong className="text-foreground">no commitear al repo.</strong>
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 pt-1">
-          <Button
-            variant="outline"
-            onClick={() => handleDownload("equipos-csv", "Equipos (CSV)")}
-            disabled={busy !== null}
-          >
-            {busy === "equipos-csv" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Download className="size-4" />
-            )}
-            Equipos
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => handleDownload("alquileres-csv", "Alquileres (CSV)")}
-            disabled={busy !== null}
-          >
-            {busy === "alquileres-csv" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Download className="size-4" />
-            )}
-            Alquileres
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => handleDownload("clientes-csv", "Clientes (CSV)")}
-            disabled={busy !== null}
-          >
-            {busy === "clientes-csv" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Download className="size-4" />
-            )}
-            Clientes
-          </Button>
-          <Button
-            onClick={() => handleDownload("csv-all", "Planillas (ZIP)")}
-            disabled={busy !== null}
-          >
-            {busy === "csv-all" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <FileArchive className="size-4" />
-            )}
-            Todo (ZIP)
-          </Button>
-        </div>
-      </section>
-
-      {/* ─── OPERACIONAL ─── */}
-      <section className="rounded-lg border border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/10 p-5 space-y-3">
+      {/* ─── Zona destructiva ─── */}
+      <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-5 space-y-2">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="size-5 text-amber-600 shrink-0 mt-0.5" />
+          <AlertTriangle className="size-5 text-destructive shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <h2 className="font-display text-lg flex items-center gap-2">
-              <Users className="size-4" />
-              Datos operacionales (privados)
-            </h2>
+            <h2 className="font-display text-lg text-destructive">Arrancar de cero</h2>
             <p className="text-sm text-muted-foreground">
-              Clientes y pedidos contienen datos personales (email, teléfono, CUIT, montos).
-              <strong className="text-foreground"> Nunca commitear al repo.</strong> Sirve para
-              backups o migrar entre ambientes.
+              Borra <strong>todos los clientes y pedidos</strong> (con sus items, pagos y
+              solicitudes) y reinicia los contadores, incluida la numeración de pedidos (el próximo
+              vuelve a ser #1). El catálogo y la configuración no se tocan.{" "}
+              <strong className="text-destructive">No es reversible</strong> — descargá el backup de
+              Clientes y Pedidos antes.
             </p>
           </div>
         </div>
+        <AlertDialog
+          open={resetOpen}
+          onOpenChange={(open) => {
+            setResetOpen(open);
+            if (!open) setResetConfirm("");
+          }}
+        >
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="sm">
+              <Trash2 className="size-4" />
+              Borrar clientes y pedidos
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Borrar TODOS los clientes y pedidos?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Elimina permanentemente todos los clientes, pedidos, items, pagos y solicitudes. El
+                catálogo y la configuración no se tocan.
+                <br />
+                <br />
+                Para confirmar, escribí{" "}
+                <code className="font-mono font-bold">{RESET_CONFIRMATION}</code> abajo:
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Input
+              autoFocus
+              value={resetConfirm}
+              onChange={(e) => setResetConfirm(e.target.value)}
+              placeholder={RESET_CONFIRMATION}
+              className="font-mono"
+            />
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={resetBusy}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={resetConfirm !== RESET_CONFIRMATION || resetBusy}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleResetOperacional();
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {resetBusy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Trash2 className="size-4" />
+                )}
+                Borrar definitivamente
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </section>
 
-        {/* Guía para probar antes del lanzamiento (lenguaje claro para el dueño) */}
-        <div className="rounded-md border border-amber-500/30 bg-card p-4 text-sm space-y-1.5">
-          <div className="font-medium text-ink">
-            Flujo recomendado para probar antes del lanzamiento
-          </div>
-          <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
-            <li>
-              <strong className="text-foreground">Descargá el backup</strong> (botón de abajo) y
-              guardalo en tu compu. Es un solo archivo <code>backup-fecha.zip</code>.
-            </li>
-            <li>Probá libremente: hacé pedidos como si fueras un cliente.</li>
-            <li>
-              Cuando quieras <strong className="text-foreground">arrancar de cero</strong>: botón
-              rojo “Borrar clientes y alquileres” → escribí <code>{RESET_CONFIRMATION}</code>.
-              Vuelve todo a cero, incluida la numeración de pedidos (el próximo vuelve a ser #1).
-            </li>
-            <li>
-              Si querés <strong className="text-foreground">recuperar lo que guardaste</strong>:
-              “Subir ZIP · dry-run” (te muestra qué va a pasar) y después “Subir ZIP · aplicar”.
-            </li>
-          </ol>
-        </div>
+      {/* ─── Avanzado (plegado) ─── */}
+      <details className="rounded-lg border bg-card">
+        <summary className="cursor-pointer select-none px-5 py-4 font-display text-lg flex items-center gap-2">
+          <FileArchive className="size-4" />
+          Avanzado · exportar por entidad / CSV
+        </summary>
+        <div className="border-t px-5 py-5 space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Para casos puntuales: versionar el catálogo en git, o abrir los datos en Excel. El
+            catálogo oficial vive en <code className="text-xs">data/catalog/</code> y se importa al
+            arrancar.
+          </p>
 
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Button
-            onClick={() => handleDownload("operacional-all", "Backup (clientes + pedidos)")}
-            disabled={busy !== null}
-          >
-            {busy === "operacional-all" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Download className="size-4" />
-            )}
-            Descargar backup
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => handleDownload("full", "Backup completo")}
-            disabled={busy !== null}
-          >
-            {busy === "full" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <FileArchive className="size-4" />
-            )}
-            Backup full (catálogo + operacional)
-          </Button>
-        </div>
-
-        <div className="rounded-md border bg-card divide-y">
-          {OPERATIONAL_ENTITIES.map((e) => (
-            <EntityRow key={e.key} entity={e} busy={busy} onDownload={handleDownload} />
-          ))}
-        </div>
-
-        {/* Import operacional */}
-        <div className="border-t border-amber-500/20 pt-4 space-y-3">
-          <div className="space-y-1">
-            <h3 className="font-medium text-sm flex items-center gap-2">
-              <Database className="size-4" />
-              Importar datos operacionales
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Subí un ZIP con <code>clientes.json</code> y/o <code>alquileres.json</code>. Upsert
-              por email (clientes) y numero_pedido (alquileres). Probá con <strong>dry-run</strong>{" "}
-              primero — no toca la DB pero reporta el delta esperado.
-            </p>
-          </div>
-          <input
-            ref={importInputRef}
-            type="file"
-            accept=".zip"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              const dryRun = e.target.dataset.dryRun === "true";
-              handleImportOperacional(f, dryRun);
-              e.target.value = "";
-              delete e.target.dataset.dryRun;
-            }}
-          />
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                if (importInputRef.current) {
-                  importInputRef.current.dataset.dryRun = "true";
-                  importInputRef.current.click();
-                }
-              }}
-              disabled={importBusy}
+              onClick={() =>
+                handleDownload("catalog-all", "Catálogo completo (JSON)", "catalogo.zip")
+              }
+              disabled={busy !== null}
             >
-              {importBusy ? (
+              {busy === "catalog-all" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
-                <Upload className="size-4" />
+                <FileArchive className="size-4" />
               )}
-              Subir ZIP · dry-run
+              Catálogo (ZIP de JSONs)
             </Button>
             <Button
+              variant="outline"
               size="sm"
-              onClick={() => {
-                if (importInputRef.current) {
-                  importInputRef.current.dataset.dryRun = "false";
-                  importInputRef.current.click();
-                }
-              }}
-              disabled={importBusy}
+              onClick={() => handleDownload("csv-all", "Planillas (CSV)", "planillas-csv.zip")}
+              disabled={busy !== null}
             >
-              {importBusy ? (
+              {busy === "csv-all" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
-                <Upload className="size-4" />
+                <FileSpreadsheet className="size-4" />
               )}
-              Subir ZIP · aplicar
+              Planillas CSV (ZIP)
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleDownload("full", "Backup completo", "backup-full.zip")}
+              disabled={busy !== null}
+            >
+              {busy === "full" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Database className="size-4" />
+              )}
+              Todo en un ZIP
             </Button>
           </div>
 
-          {lastImport && (
-            <div className="text-xs font-mono bg-background border rounded px-3 py-2 space-y-1">
-              <div>
-                {lastImport.dry_run ? "[DRY-RUN] " : ""}
-                Total: +{lastImport.total_inserted} ins, ~{lastImport.total_updated} upd
-              </div>
-              {Object.entries(lastImport.stats).map(([entity, s]) => (
-                <div key={entity} className="text-muted-foreground">
-                  {entity}: +{s.inserted ?? 0} ins, ~{s.updated ?? 0} upd
+          <div className="rounded-md border divide-y">
+            {CATALOG_ENTITIES.map((e) => (
+              <div key={e.key} className="flex items-center justify-between gap-4 px-4 py-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileJson className="size-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm truncate">{e.label}</span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Zona destructiva: wipe clientes + alquileres */}
-        <div className="border-t border-destructive/30 pt-4 mt-2 space-y-2">
-          <div className="space-y-1">
-            <h3 className="font-medium text-sm flex items-center gap-2 text-destructive">
-              <Trash2 className="size-4" />
-              Borrar todo (clientes + alquileres)
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Elimina <strong>todos los clientes y alquileres</strong> (incluyendo items, pagos y
-              solicitudes de modificación via cascade). Útil para hacer un wipe-and-reimport limpio.{" "}
-              <strong className="text-destructive">No es reversible</strong> — hacé un backup antes
-              (botón "Descargar ZIP" más arriba).
-            </p>
-          </div>
-          <AlertDialog
-            open={resetOpen}
-            onOpenChange={(open) => {
-              setResetOpen(open);
-              if (!open) setResetConfirm("");
-            }}
-          >
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm">
-                <Trash2 className="size-4" />
-                Borrar clientes y alquileres
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Borrar TODOS los datos operacionales?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Esta acción elimina permanentemente todos los clientes, alquileres, items, pagos y
-                  solicitudes de modificación de la base de datos. El catálogo (equipos, marcas,
-                  etc.) no se toca.
-                  <br />
-                  <br />
-                  Para confirmar, escribí{" "}
-                  <code className="font-mono font-bold">{RESET_CONFIRMATION}</code> abajo:
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <Input
-                autoFocus
-                value={resetConfirm}
-                onChange={(e) => setResetConfirm(e.target.value)}
-                placeholder={RESET_CONFIRMATION}
-                className="font-mono"
-              />
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={resetBusy}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  disabled={resetConfirm !== RESET_CONFIRMATION || resetBusy}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleResetOperacional();
-                  }}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDownload(e.key, e.label, `${e.key}.json`)}
+                  disabled={busy !== null}
+                  className="shrink-0"
                 >
-                  {resetBusy ? (
+                  {busy === e.key ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : (
-                    <Trash2 className="size-4" />
+                    <Download className="size-4" />
                   )}
-                  Borrar definitivamente
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  JSON
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
-      </section>
-
-      {/* ─── CLI HINT ─── */}
-      <section className="rounded-lg border border-dashed bg-muted/30 p-5 space-y-2">
-        <h3 className="font-medium text-sm">CLI equivalente</h3>
-        <pre className="text-xs bg-background border rounded px-3 py-2 overflow-x-auto">
-          {`# Catálogo (default — JSONs versionados)
-python -m backend.dataio.cli export
-python -m backend.dataio.cli import --dry-run
-python -m backend.dataio.cli import
-python -m backend.dataio.cli diff           # DB vs JSON
-
-# Operacional (ad-hoc, NO commitear)
-python -m backend.dataio.cli export --scope operacional --out /tmp/backup/
-python -m backend.dataio.cli import --scope operacional --in /tmp/backup/ --dry-run
-
-# Backup full
-python -m backend.dataio.cli export --scope all --out /tmp/full-backup/`}
-        </pre>
-      </section>
+      </details>
     </div>
   );
 }
 
-type ImportResult = {
-  ok: boolean;
-  dry_run: boolean;
-  stats: Record<string, { inserted?: number; updated?: number; skipped?: number }>;
-  total_inserted: number;
-  total_updated: number;
-};
-
-function EntityRow({
-  entity,
+function GroupCard({
+  group,
   busy,
+  importBusy,
+  lastImport,
   onDownload,
+  onImport,
 }: {
-  entity: { key: string; label: string; desc: string };
+  group: { scope: string; label: string; Icon: typeof Settings; desc: string };
   busy: string | null;
-  onDownload: (key: string, label: string) => void;
+  importBusy: string | null;
+  lastImport: ImportResult | null;
+  onDownload: (entity: string, label: string, fallback: string) => void;
+  onImport: (scope: string, label: string, file: File, dryRun: boolean) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [confirmFile, setConfirmFile] = useState<File | null>(null);
+  const { scope, label, Icon, desc } = group;
+  const backupEntity = `backup-${scope}`;
+  const downloading = busy === backupEntity;
+  const importing = importBusy === scope;
+
   return (
-    <div className="flex items-center justify-between gap-4 px-5 py-4">
-      <div className="space-y-0.5 min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <FileJson className="size-4 text-muted-foreground shrink-0" />
-          <span className="font-medium truncate">{entity.label}</span>
+    <div className="rounded-lg border bg-card p-5 space-y-3">
+      <div className="flex items-start gap-3">
+        <div className="grid size-9 place-items-center rounded-md bg-muted shrink-0">
+          <Icon className="size-4" />
         </div>
-        <p className="text-xs text-muted-foreground pl-6">{entity.desc}</p>
+        <div className="min-w-0">
+          <h3 className="font-display text-base text-ink">{label}</h3>
+          <p className="text-sm text-muted-foreground">{desc}</p>
+        </div>
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onDownload(entity.key, entity.label)}
-        disabled={busy !== null}
-        className="shrink-0"
-      >
-        {busy === entity.key ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : (
-          <Download className="size-4" />
-        )}
-        JSON
-      </Button>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".zip"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          const dryRun = e.target.dataset.dryRun === "true";
+          e.target.value = "";
+          delete e.target.dataset.dryRun;
+          if (!f) return;
+          // Simular: directo. Aplicar: pide confirmación antes de pisar datos.
+          if (dryRun) onImport(scope, label, f, true);
+          else setConfirmFile(f);
+        }}
+      />
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          onClick={() => onDownload(backupEntity, label, `backup-${scope}.zip`)}
+          disabled={busy !== null || importing}
+        >
+          {downloading ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Download className="size-4" />
+          )}
+          Descargar backup
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            if (inputRef.current) {
+              inputRef.current.dataset.dryRun = "true";
+              inputRef.current.click();
+            }
+          }}
+          disabled={importing}
+        >
+          {importing ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          Restaurar (simular)
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            if (inputRef.current) {
+              inputRef.current.dataset.dryRun = "false";
+              inputRef.current.click();
+            }
+          }}
+          disabled={importing}
+        >
+          {importing ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          Restaurar (aplicar)
+        </Button>
+      </div>
+
+      {lastImport && (
+        <div className="text-xs font-mono bg-background border rounded px-3 py-2 space-y-1">
+          <div>
+            {lastImport.dry_run ? "[SIMULACIÓN] " : ""}+{lastImport.total_inserted} nuevos, ~
+            {lastImport.total_updated} actualizados
+          </div>
+          {Object.entries(lastImport.stats).map(([entity, s]) => (
+            <div key={entity} className="text-muted-foreground">
+              {entity}: +{s.inserted ?? 0} / ~{s.updated ?? 0}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <AlertDialog open={confirmFile !== null} onOpenChange={(o) => !o && setConfirmFile(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Restaurar {label}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se va a aplicar el archivo <code className="font-mono">{confirmFile?.name}</code>:
+              agrega lo que falte y <strong>pisa lo que ya exista</strong> con lo del archivo (no
+              borra lo que no esté). Si no estás seguro, cancelá y probá primero con “Restaurar
+              (simular)”.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={importing}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={importing}
+              onClick={(e) => {
+                e.preventDefault();
+                if (confirmFile) onImport(scope, label, confirmFile, false);
+                setConfirmFile(null);
+              }}
+            >
+              Restaurar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -779,6 +779,79 @@ def import_alquileres(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# CONFIG — ajustes, plantillas de mail, descuentos (upsert por clave natural)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def import_app_settings(
+    conn, rows: list[dict], resolver: KeyResolver
+) -> dict[str, int]:
+    items = _validate_rows(rows, schema.AppSetting, "app_settings")
+    stats = {"inserted": 0, "updated": 0, "skipped": 0}
+    for s in items:
+        cur = conn.execute(
+            """
+            INSERT INTO app_settings (key, value, updated_by)
+            VALUES (?, ?, 'dataio-import')
+            ON CONFLICT (key) DO UPDATE SET
+                value = EXCLUDED.value,
+                updated_at = CURRENT_TIMESTAMP,
+                updated_by = 'dataio-import'
+            RETURNING (xmax = 0) AS inserted
+            """,
+            (s.key, s.value),
+        )
+        row = cur.fetchone()
+        stats["inserted" if row and row["inserted"] else "updated"] += 1
+    return stats
+
+
+def import_email_templates(
+    conn, rows: list[dict], resolver: KeyResolver
+) -> dict[str, int]:
+    items = _validate_rows(rows, schema.EmailTemplate, "email_templates")
+    stats = {"inserted": 0, "updated": 0, "skipped": 0}
+    for t in items:
+        cur = conn.execute(
+            """
+            INSERT INTO email_templates (key, subject, body_html, body_text, updated_by)
+            VALUES (?, ?, ?, ?, 'dataio-import')
+            ON CONFLICT (key) DO UPDATE SET
+                subject = EXCLUDED.subject,
+                body_html = EXCLUDED.body_html,
+                body_text = EXCLUDED.body_text,
+                updated_at = CURRENT_TIMESTAMP,
+                updated_by = 'dataio-import'
+            RETURNING (xmax = 0) AS inserted
+            """,
+            (t.key, t.subject, t.body_html, t.body_text),
+        )
+        row = cur.fetchone()
+        stats["inserted" if row and row["inserted"] else "updated"] += 1
+    return stats
+
+
+def import_descuentos_jornada(
+    conn, rows: list[dict], resolver: KeyResolver
+) -> dict[str, int]:
+    items = _validate_rows(rows, schema.DescuentoJornada, "descuentos_jornada")
+    stats = {"inserted": 0, "updated": 0, "skipped": 0}
+    for d in items:
+        cur = conn.execute(
+            """
+            INSERT INTO descuentos_jornada (jornadas, pct)
+            VALUES (?, ?)
+            ON CONFLICT (jornadas) DO UPDATE SET pct = EXCLUDED.pct
+            RETURNING (xmax = 0) AS inserted
+            """,
+            (d.jornadas, d.pct),
+        )
+        row = cur.fetchone()
+        stats["inserted" if row and row["inserted"] else "updated"] += 1
+    return stats
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Dispatch
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -791,6 +864,9 @@ IMPORTERS = {
     "equipos": import_equipos,
     "equipo_specs": import_equipo_specs,
     "equipo_fichas": import_equipo_fichas,
+    "app_settings": import_app_settings,
+    "email_templates": import_email_templates,
+    "descuentos_jornada": import_descuentos_jornada,
     "clientes": import_clientes,
     "alquileres": import_alquileres,
 }
