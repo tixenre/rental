@@ -404,6 +404,7 @@ function GroupCard({
   onImport: (scope: string, label: string, file: File, dryRun: boolean) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [confirmFile, setConfirmFile] = useState<File | null>(null);
   const { scope, label, Icon, desc } = group;
   const backupEntity = `backup-${scope}`;
   const downloading = busy === backupEntity;
@@ -428,11 +429,13 @@ function GroupCard({
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (!f) return;
           const dryRun = e.target.dataset.dryRun === "true";
-          onImport(scope, label, f, dryRun);
           e.target.value = "";
           delete e.target.dataset.dryRun;
+          if (!f) return;
+          // Simular: directo. Aplicar: pide confirmación antes de pisar datos.
+          if (dryRun) onImport(scope, label, f, true);
+          else setConfirmFile(f);
         }}
       />
 
@@ -489,6 +492,33 @@ function GroupCard({
           ))}
         </div>
       )}
+
+      <AlertDialog open={confirmFile !== null} onOpenChange={(o) => !o && setConfirmFile(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Restaurar {label}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se va a aplicar el archivo <code className="font-mono">{confirmFile?.name}</code>:
+              agrega lo que falte y <strong>pisa lo que ya exista</strong> con lo del archivo (no
+              borra lo que no esté). Si no estás seguro, cancelá y probá primero con “Restaurar
+              (simular)”.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={importing}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={importing}
+              onClick={(e) => {
+                e.preventDefault();
+                if (confirmFile) onImport(scope, label, confirmFile, false);
+                setConfirmFile(null);
+              }}
+            >
+              Restaurar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
