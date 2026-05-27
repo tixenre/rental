@@ -363,3 +363,28 @@ class TestNoRegresionTipo:
         problemas = _check_stock(conn, 2, "2026-06-02T00:00:00", "2026-06-03T00:00:00")
         assert len(problemas) == 1
         assert "disponible: 0" in problemas[0]
+
+
+class TestCentinelaNoLeak:
+    """El centinela (es_recurso_interno) no debe filtrarse en las vistas admin
+    de equipos. Verificamos que cada query que enumera/conteo equipos lleve el
+    filtro `es_recurso_interno = FALSE` (no hay BD en CI; inspeccionamos el SQL
+    embebido en cada handler, que es estático)."""
+
+    def _src(self, fn):
+        import inspect
+        return inspect.getsource(fn)
+
+    def test_dashboard_uso_excluye_centinela(self):
+        from routes.equipos import admin_dashboard_uso
+        src = self._src(admin_dashboard_uso)
+        # top_alquilados, sin_uso y stats globales (total_equipos).
+        assert src.count("es_recurso_interno = FALSE") >= 3
+
+    def test_sin_serie_excluye_centinela(self):
+        from routes.equipos import admin_equipos_sin_serie
+        assert "es_recurso_interno = FALSE" in self._src(admin_equipos_sin_serie)
+
+    def test_clasificar_excluye_centinela(self):
+        from routes.equipos import admin_clasificar
+        assert "es_recurso_interno = FALSE" in self._src(admin_clasificar)
