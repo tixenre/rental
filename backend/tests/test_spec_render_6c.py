@@ -175,3 +175,25 @@ def test_render_number_con_unidad():
 
 def test_render_number_sin_unidad():
     assert render_spec_value("320", "number") == "320"
+
+
+# ── Data legacy no-canónica (rango/number crudos) → render igual aplica unidad ──
+
+
+def test_render_rango_legacy_plano_con_unidad():
+    """Rango guardado crudo (no JSON): "24-70" → "24-70 mm"."""
+    assert render_spec_value("24-70", "rango", "mm") == "24-70 mm"
+
+
+def test_render_rango_legacy_fijo_prefijo():
+    """Apertura legacy "2.8" (rango, unidad f/) → "f/2.8"."""
+    assert render_spec_value("2.8", "rango", "f/") == "f/2.8"
+
+
+def test_render_rango_legacy_grados():
+    assert render_spec_value("34.3-84.1", "rango", "°") == "34.3-84.1°"
+
+
+def test_render_number_unidad_pegada_no_duplica():
+    """Peso legacy con unidad pegada "1020 g" → "1020 g" (no "1020 g g")."""
+    assert render_spec_value("1020 g", "number", "g") == "1020 g"
