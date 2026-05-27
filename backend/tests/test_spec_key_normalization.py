@@ -160,12 +160,12 @@ def test_cobertura_real_iluminacion():
 
 
 def test_cobertura_real_modificadores():
-    """Extractor genérico de Modificadores resuelve labels B&H en inglés.
+    """Parser bespoke de Modificadores extrae specs desde labels reales de B&H.
 
-    Verifica que los aliases nuevos (Type→modificador_subtipo, Shape→forma,
-    Diameter→diametro_cm, Grid Included→incluye_grid, Internal Baffle→incluye_difusor,
-    Foldable→plegable, Light Loss→light_loss_stops) funcionan sobre un fixture
-    con labels en inglés tal como los trae B&H. Antes de esta fase quedaban vacíos.
+    Verifica que el parser bespoke llena los campos del registry desde los
+    labels canónicos de B&H (Item Type, Accepts Grids, Interior Baffle,
+    Quick Open Type, Light Loss/Gain, Light Compatibility, Dimensions).
+    El fixture usa esos labels reales — mismo formato que los HTMLs de B&H.
     """
     from services.equipo_html_extractor import extract_from_html
     html = _load_fixture("softbox_bh.html")
