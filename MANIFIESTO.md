@@ -273,6 +273,7 @@ Histórico: `docs/archive/` conserva auditorías viejas (`BUGS.md`, `MEJORAS.md`
 | [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Workflow de PRs, auditoría, mobile gate |
 | [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md) | Deploy y rollback |
 | [`docs/SISTEMA_SPECS.md`](docs/SISTEMA_SPECS.md) | **Manual técnico del sistema de specs / catálogo / datasets / autocompletar / compat** |
+| [`docs/FLUJO_PEDIDOS.md`](docs/FLUJO_PEDIDOS.md) | Recorrido del pedido: estados, confirmación visible, mails, `id` vs `numero_pedido` |
 | [`docs/MOBILE.md`](docs/MOBILE.md) | Componentes y patrones mobile |
 | [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md) | Criterio mobile + checklist + status por ruta |
 | [`docs/DATASET_ILUMINACION.md`](docs/DATASET_ILUMINACION.md) | Dataset curado de luces + workflow seed por categoría |
@@ -280,7 +281,9 @@ Histórico: `docs/archive/` conserva auditorías viejas (`BUGS.md`, `MEJORAS.md`
 
 ### Cosas que NO existen todavía
 
-Aclaración para no buscarlas en vano: pagos online (Stripe/MercadoPago), notificaciones por email, multi-tenant, dark mode, app mobile nativa.
+Aclaración para no buscarlas en vano: pagos online (Stripe/MercadoPago), multi-tenant, dark mode, app mobile nativa.
+
+Las **notificaciones por email** sí están **construidas** (`backend/services/email/`, plantillas editables en `/admin/email-templates`) pero **no activadas** — caen al backend `test` hasta configurar el proveedor (`RESEND_API_KEY`/`SMTP_*`). Ver [`docs/FLUJO_PEDIDOS.md`](docs/FLUJO_PEDIDOS.md) §3.
 
 ### Sesión nueva pierde el rumbo
 
