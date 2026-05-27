@@ -50,7 +50,7 @@ def list_entities(_admin: dict = Depends(require_admin)):
 
 
 def _zip_response(zip_bytes: bytes, filename_prefix: str) -> StreamingResponse:
-    ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    ts = datetime.utcnow().strftime("%Y-%m-%d")
     return StreamingResponse(
         io.BytesIO(zip_bytes),
         media_type="application/zip",
@@ -76,7 +76,7 @@ def export_dataio(
 
         if entity == "operacional-all":
             zip_bytes = orchestrator.export_to_zip_bytes(conn, list(OPERATIONAL_ENTITIES))
-            return _zip_response(zip_bytes, "operacional")
+            return _zip_response(zip_bytes, "backup")
 
         if entity == "full":
             zip_bytes = orchestrator.export_to_zip_bytes(conn, list(ENTITY_ORDER))
