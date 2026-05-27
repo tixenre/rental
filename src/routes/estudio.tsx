@@ -427,7 +427,7 @@ function EstudioPage() {
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start">
           <StudioBookingForm config={bookingConfig} />
           {packActivo && (
-            <aside className="rounded-2xl border hairline bg-amber/10 p-5">
+            <aside className="rounded-2xl border hairline bg-amber/10 p-5 lg:sticky lg:top-20 lg:self-start">
               <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/60">
                 Pack · add-on opcional
               </div>
