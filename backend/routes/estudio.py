@@ -4,14 +4,22 @@ routes/estudio.py — CRUD del Estudio (singleton) + galería de fotos (E1).
 
 import json
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from admin_guard import require_admin
-from database import get_db
+from database import get_db, now_ar
+from routes.alquileres import (
+    _check_stock,
+    _dispatch_pedido_creado_emails,
+    _get_alquiler_detail,
+    _next_numero_pedido,
+    _rango_con_buffer,
+    get_disponibilidad,
+)
 from routes.equipos import (
     _download_image_bytes,
     _ext_from_ctype,
@@ -309,3 +317,153 @@ def reorder_fotos(body: ReorderBody, request: Request):
         conn.close()
 
     return {"fotos": fotos}
+
+
+# ── Reserva del estudio por horas (E2) ────────────────────────────────────────
+#
+# REGLA SAGRADA: el motor de reservas (_check_stock / get_disponibilidad /
+# _rango_con_buffer) NO se modifica — se reusa tal cual. La reserva del estudio
+# es un pedido normal (tipo='estudio') con UN ítem: el equipo centinela
+# (estudio.equipo_id, cantidad=1). El buffer propio del estudio se aplica
+# expandiendo el rango ANTES de chequear el centinela, nunca metiendo lógica
+# nueva adentro del motor.
+
+
+def _franja_estudio(estudio, fecha: str, start: str, horas: int) -> tuple[datetime, datetime]:
+    """Valida y arma la franja [fecha_desde, fecha_hasta] de una reserva.
+
+    - `horas` debe ser >= min_horas del estudio.
+    - La franja [start, start+horas] debe caer dentro de [open_hour, close_hour].
+
+    Devuelve (fecha_desde, fecha_hasta) como datetimes. Lanza HTTPException 400
+    si algo no valida.
+    """
+    min_horas = estudio["min_horas"]
+    if horas < min_horas:
+        raise HTTPException(400, f"El mínimo de reserva es de {min_horas} horas")
+    try:
+        hh, mm = (int(x) for x in start.split(":"))
+        dia = datetime.strptime(fecha, "%Y-%m-%d")
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(400, "Fecha u hora inválida (esperado fecha=YYYY-MM-DD, start=HH:MM)")
+
+    inicio_min = hh * 60 + mm
+    fin_min = inicio_min + horas * 60
+    open_h, close_h = estudio["open_hour"], estudio["close_hour"]
+    if inicio_min < open_h * 60 or fin_min > close_h * 60:
+        raise HTTPException(
+            400,
+            f"La franja debe estar entre las {open_h:02d}:00 y las {close_h:02d}:00",
+        )
+
+    fecha_desde = dia.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    fecha_hasta = fecha_desde + timedelta(hours=horas)
+    return fecha_desde, fecha_hasta
+
+
+def _estudio_check_conflicto(conn, pedido_id: int, fecha_desde, fecha_hasta, buffer_horas: int) -> list[str]:
+    """Chequea que el centinela esté libre en la franja, aplicando el buffer
+    PROPIO del estudio. Expande el rango con `_rango_con_buffer` y delega en
+    `_check_stock` (que ya hace el lock FOR UPDATE y cuenta overlaps). Devuelve
+    la lista de problemas (vacía = libre)."""
+    fd_buf, fh_buf = _rango_con_buffer(
+        fecha_desde.isoformat(), fecha_hasta.isoformat(), buffer_horas
+    )
+    return _check_stock(conn, pedido_id, fd_buf, fh_buf)
+
+
+@router.get("/estudio/disponibilidad")
+def estudio_disponibilidad(
+    fecha: str = Query(..., description="YYYY-MM-DD"),
+    start: str = Query(..., description="HH:MM"),
+    horas: int = Query(..., description="Duración en horas (>= min_horas)"),
+):
+    """¿El estudio está libre en [fecha start, +horas]? Aplica el buffer propio
+    del estudio y reusa el motor de disponibilidad (get_disponibilidad)."""
+    conn = get_db()
+    try:
+        estudio = _get_estudio_row(conn)
+    finally:
+        conn.close()
+
+    if not estudio["equipo_id"]:
+        raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
+
+    fecha_desde, fecha_hasta = _franja_estudio(estudio, fecha, start, horas)
+    fd_buf, fh_buf = _rango_con_buffer(
+        fecha_desde.isoformat(), fecha_hasta.isoformat(), estudio["buffer_horas"]
+    )
+    disponibles = get_disponibilidad(fd_buf, fh_buf)
+    libre = disponibles.get(str(estudio["equipo_id"]), 0) >= 1
+    return {"libre": libre}
+
+
+class EstudioReservaCreate(BaseModel):
+    fecha: str
+    start: str
+    horas: int
+    cliente_nombre: str
+    cliente_email: Optional[str] = None
+    cliente_telefono: Optional[str] = None
+
+
+@router.post("/estudio/reservas", status_code=201)
+def crear_reserva_estudio(body: EstudioReservaCreate, background: BackgroundTasks):
+    """Reserva real del estudio por horas. Entra como solicitud
+    (estado='presupuesto'). Espejo de create_pedido, en UNA transacción, reusando
+    el motor de stock/overlap SAGRADO."""
+    conn = get_db()
+    try:
+        estudio = _get_estudio_row(conn)
+        if not estudio["equipo_id"]:
+            raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
+
+        fecha_desde, fecha_hasta = _franja_estudio(
+            estudio, body.fecha, body.start, body.horas
+        )
+        hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
+        if fecha_desde < hoy:
+            raise HTTPException(400, "La fecha no puede ser en el pasado")
+
+        monto_total = (estudio["precio_hora"] or 0) * body.horas
+        next_num = _next_numero_pedido(conn)
+        cur = conn.execute(
+            """
+            INSERT INTO alquileres (cliente_nombre, cliente_email, cliente_telefono,
+                                    fecha_desde, fecha_hasta, monto_total, estado,
+                                    fuente, tipo, estudio_con_pack, numero_pedido)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                body.cliente_nombre, body.cliente_email, body.cliente_telefono,
+                fecha_desde, fecha_hasta, monto_total, "presupuesto",
+                "estudio", "estudio", False, next_num,
+            ),
+        )
+        pedido_id = cur.lastrowid
+
+        conn.execute(
+            """
+            INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
+            VALUES (?,?,?,?,?)
+            """,
+            (pedido_id, estudio["equipo_id"], 1, 0, 0),
+        )
+
+        # Chequeo final bajo FOR UPDATE para cerrar la race de doble-booking.
+        problemas = _estudio_check_conflicto(
+            conn, pedido_id, fecha_desde, fecha_hasta, estudio["buffer_horas"]
+        )
+        if problemas:
+            raise HTTPException(409, "El estudio no está disponible en esa franja")
+
+        conn.commit()
+        pedido = _get_alquiler_detail(conn, pedido_id)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    _dispatch_pedido_creado_emails(background, pedido)
+    return pedido
