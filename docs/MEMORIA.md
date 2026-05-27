@@ -105,8 +105,9 @@
 ### 2026-05-27 — El Estudio: producto aparte que reusa el motor de reservas
 - **Contexto:** el **Estudio** es un espacio físico que se alquila — parte del inventario pero **fuera
   de categorías/specs**. Se reserva **por horas** (no por día, mín 2h, tarifa plana), con un **pack
-  opcional dinámico** (gripería/luces/modificadores disponibles esas horas) y **slots fijos
-  recurrentes mensuales** (ej. "miércoles 8-20 Filmar"). No es un equipo más.
+  opcional curado** (lista de equipos elegida en el back-office, tabla `estudio_pack_equipos`; los
+  que estén ocupados en la franja no se ofrecen pero **no bloquean** la reserva — best-effort) y
+  **slots fijos recurrentes mensuales** (ej. "miércoles 8-20 Filmar"). No es un equipo más.
 - **Decisión:** modelarlo **reusando el motor de reservas existente, sin tocarlo ni duplicarlo**. La
   reserva vive en `alquileres`/`alquiler_items` con una columna `tipo` (`DEFAULT 'diaria'` → cero
   impacto en lo existente); un **equipo "centinela"** invisible (stock=1, sin categorías/specs)
@@ -115,9 +116,11 @@
   mensuales** que fluyen por estadísticas/pagos como cualquier alquiler. **El core de reservas es
   sagrado → no se modifica** (el buffer propio del estudio se aplica expandiendo el rango antes de
   llamar, nunca adentro del motor).
-- **Consecuencias:** no se abre un segundo sistema de reservas paralelo. Plan + etapas (E1-E4,
-  multi-foto, slots) viven en GitHub **#548**. Follow-ups habilitados: multi-foto en equipos (el
-  componente `PhotoGallery` se construyó genérico), pago online, distribución proporcional del pack.
+- **Consecuencias:** no se abre un segundo sistema de reservas paralelo. Plan v1 + etapas (E1-E4,
+  multi-foto, slots) viven en GitHub **#548**; la v2 (rediseño UI mobile-first, login obligatorio,
+  pack curado, features/FAQ editables) en **#555**. Follow-ups habilitados: multi-foto en equipos (el
+  componente `PhotoGallery` se construyó genérico), pago online, **revenue separado estudio≠rental**
+  (distribución proporcional del pack → rental; espacio/slot → estudio — es contabilidad, iniciativa aparte).
 
 ---
 
