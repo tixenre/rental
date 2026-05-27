@@ -210,6 +210,11 @@ export type EstudioConfig = {
   direccion: string;
   como_llegar: string;
   testimonios: Array<{ autor: string; texto: string }> | null;
+  // Lo que pegó el dueño en el admin (shortlink, URL larga o iframe HTML).
+  // Usado para el botón "Ver en Google Maps".
+  mapa_url: string;
+  // URL embebible derivada por el backend — la usamos como src del <iframe>.
+  mapa_embed_url: string;
   updated_at: string | null;
   fotos: EstudioFoto[];
   // Lista curada del pack con cantidades (stock total) para la ficha pública.

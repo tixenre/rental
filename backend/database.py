@@ -1189,6 +1189,9 @@ def init_db():
     conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS direccion TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS como_llegar TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS testimonios_json TEXT")
+    # Mapa: el dueño pega un link/iframe; el backend lo parsea y guarda ambos.
+    conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS mapa_url TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS mapa_embed_url TEXT NOT NULL DEFAULT ''")
     # E4: slots fijos recurrentes mensuales (ej. "miércoles 8-20 Filmar $X jun-dic").
     # Bloquean su franja para el público mientras el rango de meses esté activo y
     # generan un pedido por mes (tipo='estudio_fijo') para estadísticas + pagos.
