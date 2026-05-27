@@ -209,6 +209,8 @@ export type EstudioConfig = {
   faq: Array<{ q: string; a: string }> | null;
   updated_at: string | null;
   fotos: EstudioFoto[];
+  // Lista curada del pack con cantidades (stock total) para la ficha pública.
+  pack_equipos?: EstudioPackEquipo[];
 };
 
 export function apiGetEstudio() {

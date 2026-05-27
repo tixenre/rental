@@ -146,12 +146,18 @@ def _insert_foto(conn, url: str, path: str) -> dict:
 
 @router.get("/estudio")
 def get_estudio():
-    """Devuelve la configuración pública del estudio + fotos ordenadas."""
+    """Devuelve la configuración pública del estudio + fotos + pack curado.
+
+    `pack_equipos` es la lista curada del pack con cantidades (stock total) para
+    mostrar "qué incluye" en la ficha — independiente de la franja. La
+    disponibilidad real por franja sigue saliendo de /estudio/disponibilidad."""
     conn = get_db()
     try:
         row = _get_estudio_row(conn)
         fotos = _get_fotos(conn)
-        return _build_response(row, fotos)
+        resp = _build_response(row, fotos)
+        resp["pack_equipos"] = _pack_curado(conn)
+        return resp
     finally:
         conn.close()
 
@@ -476,11 +482,14 @@ def _pack_disponible(conn, fecha_desde, fecha_hasta, exclude_pedido_id: int | No
 
 
 def _pack_curado(conn) -> list[dict]:
-    """Lista curada del pack para el admin: todos los equipos elegidos (en orden),
-    con nombre/marca/foto — sin filtrar por disponibilidad (eso es del público)."""
+    """Lista curada del pack (en orden), con nombre/marca/foto y `cantidad` =
+    stock total del equipo en el Rental (lo que muestra la ficha pública como
+    "5× C-stand"). Sin filtrar por disponibilidad de franja (eso es del público
+    en `_pack_disponible`). Sirve al admin y a la ficha pública."""
     rows = conn.execute(
         f"""
-        SELECT pe.equipo_id AS id, pe.orden, e.nombre, e.foto_url, {MARCA_SUBQUERY}
+        SELECT pe.equipo_id AS id, pe.orden, e.nombre, e.foto_url, e.cantidad,
+               {MARCA_SUBQUERY}
         FROM estudio_pack_equipos pe
         JOIN equipos e ON e.id = pe.equipo_id
         WHERE pe.estudio_id = 1
@@ -494,6 +503,7 @@ def _pack_curado(conn) -> list[dict]:
             "nombre": r["nombre"],
             "marca": r["marca"],
             "foto_url": r["foto_url"],
+            "cantidad": r["cantidad"],
             "orden": r["orden"],
         }
         for r in rows
