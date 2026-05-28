@@ -233,12 +233,18 @@ import { Button } from "@/components/ui/button";
 **Fuente única**: `src/components/kit/EstadoBadge.tsx`, con la paleta
 secundaria oficial de marca (`bg-azul/10`, `bg-verde/10`, …).
 
-Usado por `/cliente/portal` (migración PR E1). **Admin** (`/admin/pedidos`,
-`/admin/pedidos/$id`) sigue temporalmente con sus mappings inline
-(`ESTADO_CLASS`, `ESTADO_PILL`) usando Tailwind genéricos — la migración
-del admin necesita un prop `label` override para preservar el alias
-"presupuesto → Solicitado" propio del admin, y vive como follow-up
-(issue #575).
+Usado por `/cliente/portal` (PR E1) **y por el admin** (`/admin/pedidos`
+list + `/admin/pedidos/$id` detalle, PR E2). El admin pasa el prop opcional
+`label` para preservar su alias visible "presupuesto → Solicitado": el texto
+se overridea, pero el color sale del map por `estado` (presupuesto → azul,
+paleta de marca documentada). Los mappings inline viejos (`ESTADO_CLASS`,
+`ESTADO_PILL`) con Tailwind genéricos quedaron eliminados.
+
+Pendiente (follow-up, issue #575): el helper compartido `pedidoEstadoVariant`
+(`clientes.lazy`, `CalendarioWidget`) todavía mapea a variants de shadcn
+`Badge` — consolidar con `EstadoBadge` es una decisión visual aparte
+(rows de historial / leyenda de calendario, contextos distintos a los chips
+de pedido).
 
 ### Otros componentes del kit (`src/components/kit/`)
 

@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { BottomSheet, ActionMenu } from "@/components/mobile";
 import {
   DropdownMenu,
@@ -206,16 +207,6 @@ export type PedidoPageProps = {
   onClose?: () => void;
 };
 
-// Pill de estado coloreado por estado (paleta del mock del handoff).
-const ESTADO_PILL: Record<string, string> = {
-  borrador: "bg-muted/60 text-muted-foreground border-transparent",
-  presupuesto: "bg-amber-soft text-amber-700 border-amber/40",
-  confirmado: "bg-green-50 text-green-700 border-green-200",
-  retirado: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  devuelto: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  finalizado: "bg-slate-100 text-slate-500 border-slate-200",
-  cancelado: "bg-red-50 text-red-600 border-red-200",
-};
 // El mock muestra "Solicitado" para el estado interno 'presupuesto'.
 const estadoLabel = (e: PedidoEstado) => (e === "presupuesto" ? "Solicitado" : ESTADO_LABEL[e]);
 
@@ -460,9 +451,11 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
               aria-label="Cambios sin enviar"
             />
           )}
-          <Badge variant="outline" className={cn("ml-1 shrink-0", ESTADO_PILL[pedido.estado])}>
-            {estadoLabel(pedido.estado)}
-          </Badge>
+          <EstadoBadge
+            estado={pedido.estado}
+            label={estadoLabel(pedido.estado)}
+            className="ml-1 shrink-0"
+          />
         </div>
 
         <div className="flex items-center gap-2 shrink-0">

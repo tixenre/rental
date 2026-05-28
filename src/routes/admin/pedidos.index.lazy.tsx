@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
+import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { authedJson } from "@/lib/authedFetch";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
@@ -57,17 +58,6 @@ const ESTADO_FILTERS: { id: EstadoFilter; label: string }[] = [
   { id: "cerrados", label: "Cerrados" },
   { id: "todos", label: "Todos" },
 ];
-
-const ESTADO_CLASS: Record<string, string> = {
-  borrador: "bg-muted/60 text-muted-foreground border-transparent",
-  presupuesto: "bg-blue-50 text-blue-700 border-blue-200",
-  solicitado: "bg-amber-50 text-amber-700 border-amber-200",
-  confirmado: "bg-green-50 text-green-700 border-green-200",
-  retirado: "bg-green-100 text-green-800 border-green-300",
-  devuelto: "bg-slate-100 text-slate-600 border-slate-300",
-  finalizado: "bg-slate-100 text-slate-500 border-slate-200",
-  cancelado: "bg-red-50 text-red-600 border-red-200",
-};
 
 const fmtArs = (n: number | null | undefined) =>
   n ? `$${Math.round(Number(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : "$0";
@@ -312,9 +302,7 @@ function PedidosPage() {
                 subtitle={p.cliente_email ?? undefined}
                 badge={
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <Badge variant="outline" className={ESTADO_CLASS[p.estado] ?? ""}>
-                      {estadoLabel(p.estado)}
-                    </Badge>
+                    <EstadoBadge estado={p.estado} label={estadoLabel(p.estado)} />
                     {p.tiene_solicitud_pendiente && (
                       <Badge variant="outline" className="border-amber text-amber-700 bg-amber-50">
                         Modificación pendiente
@@ -417,9 +405,7 @@ function PedidosPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <Badge variant="outline" className={ESTADO_CLASS[p.estado] ?? ""}>
-                        {estadoLabel(p.estado)}
-                      </Badge>
+                      <EstadoBadge estado={p.estado} label={estadoLabel(p.estado)} />
                       {p.tiene_solicitud_pendiente && (
                         <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wide text-amber-700">
                           <Pencil className="h-3 w-3" /> mod.

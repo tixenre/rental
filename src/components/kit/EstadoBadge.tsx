@@ -13,9 +13,10 @@ export type { EstadoPedido };
  * `src/components/rental/EstadoBadge.tsx` (que usaba `bg-blue-50` Tailwind
  * genéricos) fue eliminada al migrar `cliente.portal.tsx`.
  *
- * Admin (`/admin/pedidos`, `/admin/pedidos/$id`) sigue con su mapping
- * inline temporalmente — issue #575 trackea la migración con prop
- * `label` para preservar el override de "Solicitado".
+ * Admin (`/admin/pedidos`, `/admin/pedidos/$id`) también la consume (PR E2).
+ * Usa el prop opcional `label` para preservar su alias visible
+ * "presupuesto → Solicitado": el texto se overridea, el color sigue saliendo
+ * del map por `estado` (presupuesto → azul, la paleta de marca documentada).
  */
 const ESTADO_MAP: Record<EstadoPedido, { label: string; cls: string }> = {
   borrador: {
@@ -58,15 +59,20 @@ const ESTADO_MAP: Record<EstadoPedido, { label: string; cls: string }> = {
 
 export function EstadoBadge({
   estado,
+  label: labelOverride,
   className,
 }: {
   estado: EstadoPedido | string;
+  /** Override del texto visible. El color sigue saliendo del map por `estado`.
+   *  Lo usa el admin para mostrar "Solicitado" sobre el estado `presupuesto`. */
+  label?: string;
   className?: string;
 }) {
-  const { label, cls } = ESTADO_MAP[estado as EstadoPedido] ?? {
+  const { label: mappedLabel, cls } = ESTADO_MAP[estado as EstadoPedido] ?? {
     label: estado,
     cls: "bg-muted text-muted-foreground border-transparent",
   };
+  const label = labelOverride ?? mappedLabel;
   return (
     <span
       className={cn(
