@@ -161,6 +161,46 @@
   --input:             var(--rbl-stroke);
   --ring:              color-mix(in oklch, #FAB428 60%, transparent);
 
+  /* ── Shadows ─────────────────────────────────────────────────────── */
+  --shadow-sm:  0 1px 2px oklch(0.18 0.01 60 / 6%);
+  --shadow-md:  0 4px 12px oklch(0.18 0.01 60 / 8%),  0 1px 3px oklch(0.18 0.01 60 / 5%);
+  --shadow-lg:  0 12px 32px oklch(0.18 0.01 60 / 10%), 0 2px 8px oklch(0.18 0.01 60 / 6%);
+  --shadow-xl:  0 24px 56px oklch(0.18 0.01 60 / 12%), 0 6px 16px oklch(0.18 0.01 60 / 8%);
+
+  /* ── Spacing (4 px base · T-shirt steps) ─────────────────────────── */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* ── Motion ──────────────────────────────────────────────────────── */
+  --duration-fast:  120ms;
+  --duration-base:  200ms;
+  --duration-slow:  350ms;
+  --duration-xslow: 550ms;
+  --ease-default: cubic-bezier(0.32, 0.72, 0, 1);   /* snappy settle */
+  --ease-out:     cubic-bezier(0, 0, 0.2, 1);        /* standard decel */
+  --ease-bounce:  cubic-bezier(0.34, 1.56, 0.64, 1); /* overshoot spring */
+
+  /* ── Z-index scale ───────────────────────────────────────────────── */
+  --z-raised:   10;   /* cards on hover, floating labels */
+  --z-dropdown: 100;  /* menus, popovers */
+  --z-sticky:   200;  /* nav, topbar */
+  --z-modal:    300;  /* dialogs, drawers */
+  --z-toast:    400;  /* snackbars */
+  --z-tooltip:  500;  /* always on top */
+
+  /* ── Breakpoints (reference — use in @media, not as var()) ───────── */
+  /* sm: 640px · md: 768px · lg: 1024px · xl: 1280px · 2xl: 1536px   */
+
   /* Charts pull from the secondary palette */
   --chart-1: var(--rbl-amber);
   --chart-2: var(--rbl-azul);
