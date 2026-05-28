@@ -850,18 +850,18 @@ function PedidoCard({
                       className={cn(
                         "rounded-md border px-3.5 py-3 flex items-start gap-2.5",
                         isAprobada
-                          ? "border-emerald-300 bg-emerald-50"
+                          ? "border-verde/30 bg-verde/10"
                           : isRechazada
-                            ? "border-rose-300 bg-rose-50"
-                            : "border-violet-300 bg-violet-50",
+                            ? "border-destructive/30 bg-destructive/10"
+                            : "border-azul/30 bg-azul/10",
                       )}
                     >
                       {isAprobada ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-verde mt-0.5 shrink-0" />
                       ) : isRechazada ? (
-                        <XCircle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />
+                        <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                       ) : (
-                        <Info className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />
+                        <Info className="h-4 w-4 text-azul mt-0.5 shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="font-sans text-[13px] font-semibold text-ink">{titulo}</div>
