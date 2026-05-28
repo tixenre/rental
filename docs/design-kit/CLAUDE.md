@@ -1,14 +1,5 @@
 # Rambla Rental — Design System Reference for Claude Code
 
-> **Para sesiones dentro de `tixenre/rental`**: la referencia canónica del
-> repo es [`docs/DESIGN_SYSTEM.md`](../../docs/DESIGN_SYSTEM.md) — está
-> adaptada al código real de `src/` y se actualiza con cada PR de UI. Este
-> archivo viene del bundle del kit portable y está bien alineado en la
-> mayoría, pero puede tener **drift en APIs de componentes** (caso
-> conocido: dice `Button variant="primary"` pero el repo usa shadcn
-> naming `variant="default"` + el `"amber"` agregado por PR #577).
-> Cuando difieren, manda `docs/DESIGN_SYSTEM.md`.
-
 This file is the authoritative quick-reference for everything UI/design in this repo.
 Read this before touching any component, page, or stylesheet.
 

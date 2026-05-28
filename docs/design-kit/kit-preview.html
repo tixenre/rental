@@ -4,9 +4,51 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kit Preview · Rambla Rental</title>
-<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="colors_and_type.css">
 <style>
+  /* Alias cortos + tokens propuestos (PROPOSED_TOKENS.md) montados acá para
+   * que esta QA page sea un PREVIEW VIVO del PR de tokens. Cuando entren a
+   * src/styles.css, este bloque se borra y todo sigue funcionando igual. */
+  :root {
+    --verde: var(--rbl-verde); --azul: var(--rbl-azul);
+    --naranja: var(--rbl-naranja); --rosa: var(--rbl-rosa); --amber-hot: var(--rbl-amber-hot);
+    --shadow-sm: 0 1px 2px oklch(0.18 0.01 60 / 6%);
+    --shadow-md: 0 4px 12px oklch(0.18 0.01 60 / 8%), 0 1px 3px oklch(0.18 0.01 60 / 5%);
+    --shadow-lg: 0 12px 32px oklch(0.18 0.01 60 / 10%), 0 2px 8px oklch(0.18 0.01 60 / 6%);
+    --shadow-xl: 0 24px 56px oklch(0.18 0.01 60 / 12%), 0 6px 16px oklch(0.18 0.01 60 / 8%);
+    --duration-fast: 120ms; --duration-base: 200ms; --duration-slow: 350ms; --duration-xslow: 550ms;
+    --ease-default: cubic-bezier(0.32,0.72,0,1);
+    --ease-out: cubic-bezier(0,0,0.2,1);
+    --ease-bounce: cubic-bezier(0.34,1.56,0.64,1);
+  }
   body { background: var(--background); color: var(--foreground); margin: 0; }
+
+  /* ── Token specimens (sección 00) ─────────────────────────────── */
+  .token-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .token-cell {
+    border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+    background: var(--surface-elevated); padding: 20px 18px 14px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .token-chip { height: 56px; border-radius: var(--radius-md); background: var(--surface-elevated); border: 1px solid color-mix(in oklch, var(--hairline) 60%, transparent); }
+  .token-chip.sm { box-shadow: var(--shadow-sm); }
+  .token-chip.md { box-shadow: var(--shadow-md); }
+  .token-chip.lg { box-shadow: var(--shadow-lg); }
+  .token-chip.xl { box-shadow: var(--shadow-xl); }
+  .token-name { font-family: var(--font-mono); font-size: 11px; color: var(--ink); font-weight: 500; }
+  .token-use { font-family: var(--font-sans); font-size: 11px; color: var(--muted-foreground); margin-top: -8px; }
+  /* motion */
+  .motion-cell {
+    border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+    background: var(--surface-elevated); padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 10px; cursor: pointer;
+  }
+  .motion-cell:hover .motion-ball { transform: translateX(calc(100% - 16px)); }
+  .motion-track { height: 16px; border-radius: 9999px; background: var(--surface); position: relative; overflow: hidden; }
+  .motion-ball { position: absolute; top: 1px; left: 1px; width: 14px; height: 14px; border-radius: 50%; background: var(--amber); }
+  .motion-info { display: flex; justify-content: space-between; align-items: baseline; }
+  .motion-name { font-family: var(--font-mono); font-size: 11px; color: var(--ink); font-weight: 500; }
+  .motion-ms { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
 
   /* Mock topbar */
   .top {
@@ -174,6 +216,7 @@
   .stat-card {
     border: 1px solid var(--hairline); border-radius: var(--radius-lg);
     background: var(--surface-elevated); padding: 18px 20px;
+    box-shadow: var(--shadow-sm);
   }
   .stat-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
   .stat-value { font-family: var(--font-display); font-weight: 900; font-size: 36px; color: var(--ink); line-height: 1; margin: 8px 0; font-variant-numeric: tabular-nums; }
@@ -198,9 +241,10 @@
     transition: transform 200ms cubic-bezier(0,0,0.2,1), box-shadow 200ms;
     cursor: pointer;
   }
+  .eq-card { box-shadow: var(--shadow-sm); }
   .eq-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px oklch(0.18 0.01 60 / 8%), 0 1px 3px oklch(0.18 0.01 60 / 5%);
+    box-shadow: var(--shadow-md);
   }
   .eq-photo {
     aspect-ratio: 1;
@@ -228,7 +272,7 @@
     border-radius: var(--radius-md);
     background: var(--surface-elevated);
     border: 1px solid var(--hairline);
-    box-shadow: 0 12px 32px oklch(0.18 0.01 60 / 10%);
+    box-shadow: var(--shadow-lg);
     min-width: 320px;
   }
   .toast-icon { flex-shrink: 0; margin-top: 1px; }
@@ -260,6 +304,34 @@
   </section>
 
   <main>
+
+    <!-- Tokens propuestos -->
+    <section>
+      <div class="sec-head">
+        <div>
+          <div class="sec-eye">00 · Tokens · shadows + motion</div>
+          <h2 class="sec-title">Preview vivo del PR de tokens</h2>
+          <p class="sec-desc">Escala de sombras tintada con ink cálido (no negro) y curvas de motion calibradas sobre los patterns reales. Pasá el mouse por las pistas para ver cada duración.</p>
+        </div>
+        <a class="sec-path">PROPOSED_TOKENS.md → src/styles.css</a>
+      </div>
+      <div class="specimen">
+        <div class="spec-label">Shadows · oklch(0.18 0.01 60) + alpha</div>
+        <div class="token-grid">
+          <div class="token-cell"><div class="token-chip sm"></div><div class="token-name">--shadow-sm</div><div class="token-use">cards en reposo</div></div>
+          <div class="token-cell"><div class="token-chip md"></div><div class="token-name">--shadow-md</div><div class="token-use">dropdowns, hover lift</div></div>
+          <div class="token-cell"><div class="token-chip lg"></div><div class="token-name">--shadow-lg</div><div class="token-use">toasts, FABs</div></div>
+          <div class="token-cell"><div class="token-chip xl"></div><div class="token-name">--shadow-xl</div><div class="token-use">modales</div></div>
+        </div>
+        <div class="spec-label" style="margin-top:8px;">Motion · hover para reproducir · ease-default [0.32,0.72,0,1]</div>
+        <div class="token-grid">
+          <div class="motion-cell"><div class="motion-info"><span class="motion-name">--duration-fast</span><span class="motion-ms">120ms</span></div><div class="motion-track"><div class="motion-ball" style="transition:transform 120ms var(--ease-default)"></div></div></div>
+          <div class="motion-cell"><div class="motion-info"><span class="motion-name">--duration-base</span><span class="motion-ms">200ms</span></div><div class="motion-track"><div class="motion-ball" style="transition:transform 200ms var(--ease-default)"></div></div></div>
+          <div class="motion-cell"><div class="motion-info"><span class="motion-name">--duration-slow</span><span class="motion-ms">350ms</span></div><div class="motion-track"><div class="motion-ball" style="transition:transform 350ms var(--ease-default)"></div></div></div>
+          <div class="motion-cell"><div class="motion-info"><span class="motion-name">--duration-xslow</span><span class="motion-ms">550ms</span></div><div class="motion-track"><div class="motion-ball" style="transition:transform 550ms var(--ease-default)"></div></div></div>
+        </div>
+      </div>
+    </section>
 
     <!-- Buttons -->
     <section>
@@ -531,7 +603,21 @@
   </main>
 
   <footer>
-    <div class="foot-eye">Rambla Rental · kit preview · QA visual sin login</div>
+    <div class="foot-eye" style="margin-bottom:12px;">Rambla Rental · kit preview · QA visual sin login</div>
+    <div style="display:flex; gap:10px 18px; flex-wrap:wrap; justify-content:center; font-family:var(--font-sans); font-size:13px;">
+      <a href="preview/equipment-card.html" style="color:var(--ink); text-decoration:none;">EquipmentCard</a>
+      <a href="preview/qty-stepper.html" style="color:var(--ink); text-decoration:none;">QtyStepper</a>
+      <a href="preview/rental-date-modal-states.html" style="color:var(--ink); text-decoration:none;">DateModal · estados</a>
+      <a href="preview/cart-drawer-states.html" style="color:var(--ink); text-decoration:none;">CartDrawer · estados</a>
+      <a href="preview/form-states.html" style="color:var(--ink); text-decoration:none;">Form states</a>
+      <a href="preview/admin-table.html" style="color:var(--ink); text-decoration:none;">Admin table</a>
+      <a href="preview/sticky-stack.html" style="color:var(--ink); text-decoration:none;">Sticky stack</a>
+      <a href="preview/dataviz.html" style="color:var(--ink); text-decoration:none;">Data viz</a>
+      <a href="preview/skeleton.html" style="color:var(--ink); text-decoration:none;">Skeletons</a>
+      <a href="preview/toasts.html" style="color:var(--ink); text-decoration:none;">Toasts</a>
+      <a href="preview/print.html" style="color:var(--ink); text-decoration:none;">Print</a>
+      <a href="changelog.html" style="color:var(--ink); text-decoration:none;">Changelog ↗</a>
+    </div>
   </footer>
 
 </body>

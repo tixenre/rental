@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Changelog del sistema · Rambla Rental</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<style>
+:root{
+  --verde: var(--rbl-verde); --azul: var(--rbl-azul);
+  --naranja: var(--rbl-naranja); --rosa: var(--rbl-rosa); --amber-hot: var(--rbl-amber-hot);
+}
+body { background: var(--background); color: var(--foreground); margin: 0; }
+
+/* topbar */
+.top { position: sticky; top: 0; z-index: 50; height: 56px; background: color-mix(in oklch, var(--background) 95%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--hairline); display: flex; align-items: center; padding: 0 24px; }
+.top-brand { font-family: var(--font-display); font-weight: 900; font-size: 20px; line-height: 1; text-transform: lowercase; letter-spacing: 0.01em; color: var(--ink); }
+.top-eye { margin-left: auto; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+
+/* hero */
+.hero { background: var(--ink); color: var(--background); padding: 56px 40px 48px; position: relative; overflow: hidden; }
+.hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px); background-size: 4px 4px; }
+.hero-eye { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--amber); position: relative; }
+.hero-title { font-family: var(--font-display); font-weight: 900; font-size: clamp(44px, 6.5vw, 76px); line-height: 0.92; letter-spacing: 0.005em; text-transform: lowercase; margin: 14px 0 0; color: var(--background); position: relative; text-wrap: balance; }
+.hero-sub { font-family: var(--font-sans); font-size: 14px; line-height: 1.55; color: color-mix(in oklch, var(--background) 70%, transparent); max-width: 56ch; margin: 14px 0 0; position: relative; }
+
+main { max-width: 940px; margin: 0 auto; padding: 0 24px; }
+
+/* version blocks on a timeline */
+.release { display: grid; grid-template-columns: 160px 1fr; gap: 0; border-bottom: 1px solid var(--hairline); padding: 48px 0; position: relative; }
+.release:last-child { border-bottom: 0; }
+@media (max-width: 680px){ .release { grid-template-columns: 1fr; gap: 18px; } }
+
+.rel-meta { position: relative; }
+.rel-ver { font-family: var(--font-display); font-weight: 900; font-size: 30px; line-height: 1; color: var(--ink); }
+.rel-date { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); margin-top: 8px; }
+.rel-tag { display: inline-block; margin-top: 12px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; padding: 4px 9px; border-radius: 9999px; }
+.rel-tag.now { background: var(--amber); color: var(--ink); font-weight: 700; }
+.rel-tag.shipped { background: color-mix(in oklch, var(--verde) 14%, transparent); color: var(--verde); border: 1px solid color-mix(in oklch, var(--verde) 30%, transparent); }
+.rel-tag.proposed { background: color-mix(in oklch, var(--azul) 12%, transparent); color: var(--azul); border: 1px solid color-mix(in oklch, var(--azul) 30%, transparent); }
+
+.rel-body { display: flex; flex-direction: column; gap: 18px; }
+.rel-head { font-family: var(--font-sans); font-weight: 700; font-size: 22px; line-height: 1.15; letter-spacing: -0.015em; color: var(--ink); }
+.rel-lead { font-family: var(--font-sans); font-size: 14px; line-height: 1.55; color: var(--muted-foreground); max-width: 60ch; }
+
+/* change entries */
+.change { display: flex; gap: 12px; align-items: baseline; }
+.change-kind { flex-shrink: 0; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; padding: 3px 7px; border-radius: 4px; min-width: 56px; text-align: center; }
+.kind-add { background: color-mix(in oklch, var(--verde) 16%, transparent); color: var(--verde); }
+.kind-fix { background: color-mix(in oklch, var(--azul) 14%, transparent); color: var(--azul); }
+.kind-chg { background: color-mix(in oklch, var(--amber) 22%, transparent); color: color-mix(in oklch, var(--ink) 90%, var(--amber)); }
+.kind-doc { background: var(--surface); color: var(--muted-foreground); border: 1px solid var(--hairline); }
+.change-txt { font-family: var(--font-sans); font-size: 13px; line-height: 1.5; color: var(--foreground); }
+.change-txt code { font-family: var(--font-mono); font-size: 11px; color: var(--ink); background: var(--surface); padding: 1px 5px; border-radius: 4px; }
+
+/* before/after token cards */
+.ba { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px){ .ba { grid-template-columns: 1fr; } }
+.ba-col { border: 1px solid var(--hairline); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-elevated); }
+.ba-col-head { padding: 9px 14px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; border-bottom: 1px solid var(--hairline); }
+.ba-before .ba-col-head { color: var(--muted-foreground); }
+.ba-after .ba-col-head { color: var(--ink); background: color-mix(in oklch, var(--amber) 14%, transparent); }
+.ba-stage { padding: 24px; display: flex; align-items: center; justify-content: center; gap: 14px; min-height: 96px; background: var(--background); }
+.demo-card { width: 96px; height: 60px; border-radius: var(--radius-md); background: var(--surface-elevated); border: 1px solid var(--hairline); }
+.sh-flat { box-shadow: 0 4px 12px rgba(0,0,0,0.16); } /* cold/black — the "before" */
+.sh-warm-md { box-shadow: 0 4px 12px oklch(0.18 0.01 60 / 8%), 0 1px 3px oklch(0.18 0.01 60 / 5%); }
+.sh-warm-lg { box-shadow: 0 12px 32px oklch(0.18 0.01 60 / 10%), 0 2px 8px oklch(0.18 0.01 60 / 6%); }
+.sh-warm-xl { box-shadow: 0 24px 56px oklch(0.18 0.01 60 / 12%), 0 6px 16px oklch(0.18 0.01 60 / 8%); }
+.ba-cap { font-family: var(--font-mono); font-size: 9px; color: var(--muted-foreground); text-align: center; padding: 0 0 12px; }
+
+/* token table */
+.tok-table { border: 1px solid var(--hairline); border-radius: var(--radius-lg); overflow: hidden; }
+.tok-row { display: grid; grid-template-columns: 150px 1fr; gap: 16px; padding: 11px 16px; border-bottom: 1px solid var(--hairline); align-items: center; }
+.tok-row:last-child { border-bottom: 0; }
+.tok-row:nth-child(odd) { background: var(--surface); }
+.tok-name { font-family: var(--font-mono); font-size: 12px; color: var(--ink); font-weight: 500; }
+.tok-val { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); overflow-x: auto; }
+
+/* motion demo */
+.motion-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.motion-chip { font-family: var(--font-sans); font-size: 12px; font-weight: 600; color: var(--ink); background: var(--surface-elevated); border: 1px solid var(--hairline); border-radius: var(--radius-md); padding: 10px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.motion-chip .mc-token { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; color: var(--muted-foreground); }
+.motion-chip .mc-ball { width: 14px; height: 14px; border-radius: 50%; background: var(--amber); margin-top: 4px; }
+
+footer { padding: 40px 24px 56px; text-align: center; border-top: 1px solid var(--hairline); }
+.foot-eye { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+.foot-link { font-family: var(--font-sans); font-size: 13px; color: var(--ink); }
+</style>
+</head>
+<body>
+
+  <header class="top">
+    <span class="top-brand">rambla</span>
+    <span class="top-eye">changelog del sistema</span>
+  </header>
+
+  <section class="hero">
+    <div class="hero-eye">Design system · qué cambió</div>
+    <h1 class="hero-title">el sistema,<br>versión por versión.</h1>
+    <p class="hero-sub">Cada token, componente y pattern que entra o cambia, con el antes y el después. Para que el equipo sepa qué se puede usar y desde cuándo.</p>
+  </section>
+
+  <main>
+
+    <!-- ── Próximo · 1.4 (PROPOSED_TOKENS) ─────────────────────── -->
+    <div class="release">
+      <div class="rel-meta">
+        <div class="rel-ver">1.4</div>
+        <div class="rel-date">en PR · #58x</div>
+        <span class="rel-tag proposed">Propuesto</span>
+      </div>
+      <div class="rel-body">
+        <div class="rel-head">Shadows y motion, por fin como tokens.</div>
+        <div class="rel-lead">Las sombras y curvas que ya vivían inline en CartMiniBar, hover lifts y fly-to-cart pasan a ser tokens nombrados. Calibrados sobre los patterns reales — no genéricos de Tailwind.</div>
+
+        <div class="change"><span class="change-kind kind-add">add</span><span class="change-txt">Escala <code>--shadow-sm/md/lg/xl</code> tintada con <code>oklch(0.18 0.01 60)</code> en vez de negro puro — mantiene el tono cálido del hueso.</span></div>
+
+        <div class="ba">
+          <div class="ba-col ba-before">
+            <div class="ba-col-head">Antes · negro plano</div>
+            <div class="ba-stage"><div class="demo-card sh-flat"></div></div>
+            <div class="ba-cap">rgba(0,0,0,.16) — gris azulado</div>
+          </div>
+          <div class="ba-col ba-after">
+            <div class="ba-col-head">Después · ink cálido</div>
+            <div class="ba-stage"><div class="demo-card sh-warm-md"></div></div>
+            <div class="ba-cap">--shadow-md</div>
+          </div>
+        </div>
+
+        <div class="tok-table">
+          <div class="tok-row"><span class="tok-name">--shadow-sm</span><span class="tok-val">0 1px 2px oklch(.18 .01 60 / 6%) · cards en reposo</span></div>
+          <div class="tok-row"><span class="tok-name">--shadow-md</span><span class="tok-val">0 4px 12px / 8% + 0 1px 3px / 5% · dropdowns, hover lift</span></div>
+          <div class="tok-row"><span class="tok-name">--shadow-lg</span><span class="tok-val">0 12px 32px / 10% + 0 2px 8px / 6% · toasts, FABs</span></div>
+          <div class="tok-row"><span class="tok-name">--shadow-xl</span><span class="tok-val">0 24px 56px / 12% + 0 6px 16px / 8% · modales</span></div>
+        </div>
+
+        <div class="change"><span class="change-kind kind-add">add</span><span class="change-txt"><code>--duration-fast/base/slow/xslow</code> + <code>--ease-default/out/bounce</code>. <code>--duration-xslow</code> (550ms) matchea exacto la curva de fly-to-cart.</span></div>
+
+        <div class="motion-row" id="motion-demos">
+          <button class="motion-chip" data-dur="120">fast<span class="mc-token">120ms · press</span><span class="mc-ball"></span></button>
+          <button class="motion-chip" data-dur="200">base<span class="mc-token">200ms · hover</span><span class="mc-ball"></span></button>
+          <button class="motion-chip" data-dur="350">slow<span class="mc-token">350ms · entry</span><span class="mc-ball"></span></button>
+          <button class="motion-chip" data-dur="550">xslow<span class="mc-token">550ms · fly</span><span class="mc-ball"></span></button>
+        </div>
+        <div class="change"><span class="change-kind kind-doc">doc</span><span class="change-txt">Tocá un chip para ver la curva. <code>--ease-default</code> <code>[0.32,0.72,0,1]</code> — arranca rápido, desacelera mucho.</span></div>
+
+        <div class="change"><span class="change-kind kind-doc">doc</span><span class="change-txt">Al mergear: sacar de <code>DESIGN_SYSTEM.md</code> la sección "tokens que el kit documenta y NO existen", y las callouts ⚠ de drift en <code>extended.html</code>.</span></div>
+        <div class="change"><span class="change-kind kind-chg">chg</span><span class="change-txt">Las sombras signature del CartMiniBar siguen <b>inline</b> (no tokens): direccionales hacia arriba, no entran a la escala.</span></div>
+      </div>
+    </div>
+
+    <!-- ── Actual · 1.3 (kit + nuevos patterns) ─────────────────── -->
+    <div class="release">
+      <div class="rel-meta">
+        <div class="rel-ver">1.3</div>
+        <div class="rel-date">may. 2024</div>
+        <span class="rel-tag now">Actual</span>
+      </div>
+      <div class="rel-body">
+        <div class="rel-head">Kit portable + recetas de admin.</div>
+        <div class="rel-lead">El kit visual deja de ser solo specimens de marca y suma todo lo que el admin necesitaba: datos, carga y feedback.</div>
+        <div class="change"><span class="change-kind kind-add">add</span><span class="change-txt"><b>Data viz</b> — bar, line, donut, sparkline y bullet con la paleta <code>--chart-1…5</code> en orden fijo.</span></div>
+        <div class="change"><span class="change-kind kind-add">add</span><span class="change-txt"><b>Skeleton recipes</b> — shimmer cálido (no el gris de shadcn) para EquipmentCard, chip rail, CartMiniBar y filas.</span></div>
+        <div class="change"><span class="change-kind kind-add">add</span><span class="change-txt"><b>Toasts (sonner)</b> — 4 variantes + neutral con barra de acento y el patrón <b>undo</b> de carrito.</span></div>
+        <div class="change"><span class="change-kind kind-add">add</span><span class="change-txt"><b>Print stylesheet</b> — presupuesto y remito A4 con tinta plana, tabular y <code>@page</code>.</span></div>
+        <div class="change"><span class="change-kind kind-add">add</span><span class="change-txt">Specimen <b>EquipmentCard</b> con anatomía y estados: default, en-carrito, sin stock, pack.</span></div>
+        <div class="change"><span class="change-kind kind-fix">fix</span><span class="change-txt">Alias cortos <code>--verde/azul/naranja/rosa</code> documentados en el kit portable para que los specimens rendericen standalone.</span></div>
+      </div>
+    </div>
+
+    <!-- ── 1.2 ──────────────────────────────────────────────────── -->
+    <div class="release">
+      <div class="rel-meta">
+        <div class="rel-ver">1.2</div>
+        <div class="rel-date">abr. 2024</div>
+        <span class="rel-tag shipped">Estable</span>
+      </div>
+      <div class="rel-body">
+        <div class="rel-head">Patterns de Rambla, documentados.</div>
+        <div class="rel-lead">Los comportamientos propios del producto dejan de vivir solo en el código.</div>
+        <div class="change"><span class="change-kind kind-add">add</span><span class="change-txt">7 pattern specimens: topbar amber-on-scroll, CartMiniBar, chip rail, fly-to-cart, cart drawer, rental date modal, equipment row.</span></div>
+        <div class="change"><span class="change-kind kind-chg">chg</span><span class="change-txt">TopBar snap del amber-on-scroll fijado en <b>65%</b> de <code>--amber-pct</code>.</span></div>
+        <div class="change"><span class="change-kind kind-chg">chg</span><span class="change-txt">Curva canónica de fly-to-cart unificada en <code>[0.22, 1, 0.36, 1]</code>, 550ms.</span></div>
+      </div>
+    </div>
+
+    <!-- ── 1.0 ──────────────────────────────────────────────────── -->
+    <div class="release">
+      <div class="rel-meta">
+        <div class="rel-ver">1.0</div>
+        <div class="rel-date">mar. 2024</div>
+        <span class="rel-tag shipped">Estable</span>
+      </div>
+      <div class="rel-body">
+        <div class="rel-head">Fundación.</div>
+        <div class="rel-lead">Tokens, tipografía y componentes base sobre el manual de marca.</div>
+        <div class="change"><span class="change-kind kind-add">add</span><span class="change-txt">Paleta sobre <code>--amber #FAB428</code> (Pantone 1235 C) + hueso e ink cálidos en oklch.</span></div>
+        <div class="change"><span class="change-kind kind-add">add</span><span class="change-txt">TT Commons (UI) + Champ Black (display) locales. JetBrains Mono para tabular.</span></div>
+        <div class="change"><span class="change-kind kind-add">add</span><span class="change-txt">Primitivas shadcn: Button (5 variantes), Input, EstadoBadge (9 estados), escala de radios y z-index.</span></div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <div class="foot-eye" style="margin-bottom:8px;">Rambla Rental · design system</div>
+    <div class="foot-link">Tokens en <code style="font-family:var(--font-mono);font-size:12px;">src/styles.css</code> · specimens en <code style="font-family:var(--font-mono);font-size:12px;">docs/design-kit/</code></div>
+  </footer>
+
+<script>
+document.querySelectorAll('.motion-chip').forEach(chip => {
+  const ball = chip.querySelector('.mc-ball');
+  const dur = chip.dataset.dur + 'ms';
+  chip.addEventListener('click', () => {
+    ball.style.transition = 'none';
+    ball.style.transform = 'translateX(0)';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      ball.style.transition = `transform ${dur} cubic-bezier(0.32,0.72,0,1)`;
+      ball.style.transform = 'translateX(120px)';
+    }));
+    setTimeout(() => {
+      ball.style.transition = `transform ${dur} cubic-bezier(0.32,0.72,0,1)`;
+      ball.style.transform = 'translateX(0)';
+    }, parseInt(chip.dataset.dur) + 280);
+  });
+});
+</script>
+</body>
+</html>

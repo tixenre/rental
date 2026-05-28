@@ -23,26 +23,26 @@
  * faces, not Google substitutes. JetBrains Mono kept for tabular numerics
  * and code-style chrome (it's a tooling-side choice, not in the manual). */
 
-@font-face { font-family: "TT Commons"; font-weight: 100; font-style: normal; font-display: swap; src: url("kit/fonts/TT_Commons_Thin_0.otf")             format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 100; font-style: italic; font-display: swap; src: url("kit/fonts/TT_Commons_Thin_Italic_0.otf")      format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 200; font-style: normal; font-display: swap; src: url("kit/fonts/TT_Commons_ExtraLight_0.otf")       format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 200; font-style: italic; font-display: swap; src: url("kit/fonts/TT_Commons_ExtraLight_Italic_0.otf") format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 300; font-style: normal; font-display: swap; src: url("kit/fonts/TT_Commons_Light_0.otf")            format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 300; font-style: italic; font-display: swap; src: url("kit/fonts/TT_Commons_Light_Italic_0.otf")     format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 400; font-style: normal; font-display: swap; src: url("kit/fonts/TT_Commons_Regular_0.otf")          format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 400; font-style: italic; font-display: swap; src: url("kit/fonts/TT_Commons_Italic_0.otf")           format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 500; font-style: normal; font-display: swap; src: url("kit/fonts/TT_Commons_Medium_0.otf")           format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 500; font-style: italic; font-display: swap; src: url("kit/fonts/TT_Commons_Medium_Italic_0.otf")    format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 600; font-style: normal; font-display: swap; src: url("kit/fonts/TT_Commons_DemiBold_0.otf")         format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 600; font-style: italic; font-display: swap; src: url("kit/fonts/TT_Commons_DemiBold_Italic_0.otf")  format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 700; font-style: normal; font-display: swap; src: url("kit/fonts/TT_Commons_Bold_0.otf")             format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 700; font-style: italic; font-display: swap; src: url("kit/fonts/TT_Commons_Bold_Italic_0.otf")      format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 800; font-style: normal; font-display: swap; src: url("kit/fonts/TT_Commons_Extrabold_0.otf")        format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 800; font-style: italic; font-display: swap; src: url("kit/fonts/TT_Commons_Extrabold_Italic_0.otf") format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 900; font-style: normal; font-display: swap; src: url("kit/fonts/TT_Commons_Black_0.otf")            format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 900; font-style: italic; font-display: swap; src: url("kit/fonts/TT_Commons_Black_Italic_0.otf")     format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 100; font-style: normal; font-display: swap; src: url("fonts/TT_Commons_Thin_0.otf")             format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 100; font-style: italic; font-display: swap; src: url("fonts/TT_Commons_Thin_Italic_0.otf")      format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 200; font-style: normal; font-display: swap; src: url("fonts/TT_Commons_ExtraLight_0.otf")       format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 200; font-style: italic; font-display: swap; src: url("fonts/TT_Commons_ExtraLight_Italic_0.otf") format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 300; font-style: normal; font-display: swap; src: url("fonts/TT_Commons_Light_0.otf")            format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 300; font-style: italic; font-display: swap; src: url("fonts/TT_Commons_Light_Italic_0.otf")     format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 400; font-style: normal; font-display: swap; src: url("fonts/TT_Commons_Regular_0.otf")          format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 400; font-style: italic; font-display: swap; src: url("fonts/TT_Commons_Italic_0.otf")           format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 500; font-style: normal; font-display: swap; src: url("fonts/TT_Commons_Medium_0.otf")           format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 500; font-style: italic; font-display: swap; src: url("fonts/TT_Commons_Medium_Italic_0.otf")    format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 600; font-style: normal; font-display: swap; src: url("fonts/TT_Commons_DemiBold_0.otf")         format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 600; font-style: italic; font-display: swap; src: url("fonts/TT_Commons_DemiBold_Italic_0.otf")  format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 700; font-style: normal; font-display: swap; src: url("fonts/TT_Commons_Bold_0.otf")             format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 700; font-style: italic; font-display: swap; src: url("fonts/TT_Commons_Bold_Italic_0.otf")      format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 800; font-style: normal; font-display: swap; src: url("fonts/TT_Commons_Extrabold_0.otf")        format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 800; font-style: italic; font-display: swap; src: url("fonts/TT_Commons_Extrabold_Italic_0.otf") format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 900; font-style: normal; font-display: swap; src: url("fonts/TT_Commons_Black_0.otf")            format("opentype"); }
+@font-face { font-family: "TT Commons"; font-weight: 900; font-style: italic; font-display: swap; src: url("fonts/TT_Commons_Black_Italic_0.otf")     format("opentype"); }
 
-@font-face { font-family: "Champ Black"; font-weight: 900; font-style: normal; font-display: swap; src: url("kit/fonts/Champ-Black.ttf") format("truetype"); }
+@font-face { font-family: "Champ Black"; font-weight: 900; font-style: normal; font-display: swap; src: url("fonts/Champ-Black.ttf") format("truetype"); }
 
 /* JetBrains Mono — kept from the production stack for tabular nums + code. */
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap");

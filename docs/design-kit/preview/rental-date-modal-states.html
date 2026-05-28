@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pattern · RentalDateModal — estados</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+:root{
+  --verde: var(--rbl-verde); --azul: var(--rbl-azul);
+  --naranja: var(--rbl-naranja); --rosa: var(--rbl-rosa);
+  --shadow-xl: 0 24px 56px oklch(0.18 0.01 60 / 12%), 0 6px 16px oklch(0.18 0.01 60 / 8%);
+}
+.card { gap: 18px; padding: 22px; }
+.sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+
+/* ── Gallery grid ─────────────────────────────────────────────── */
+.gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 720px){ .gallery { grid-template-columns: 1fr; } }
+
+.state { display: flex; flex-direction: column; gap: 8px; }
+.state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+.state-tag .d { width: 7px; height: 7px; border-radius: 50%; }
+.state-tag.ok { color: var(--verde); } .state-tag.ok .d { background: var(--verde); }
+.state-tag.warn { color: color-mix(in oklch, var(--ink) 80%, var(--naranja)); } .state-tag.warn .d { background: var(--amber); }
+.state-tag.err { color: var(--destructive); } .state-tag.err .d { background: var(--destructive); }
+.state-tag.empty { color: var(--muted-foreground); } .state-tag.empty .d { background: var(--muted-foreground); }
+
+/* ── Mini modal frame ─────────────────────────────────────────── */
+.mf { border-radius: var(--radius-xl); overflow: hidden; border: 1px solid var(--hairline); background: var(--background); box-shadow: var(--shadow-xl); display: flex; flex-direction: column; }
+.mf-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--hairline); background: color-mix(in oklch, var(--surface) 30%, transparent); }
+.mf-eye { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+.mf-title { font-family: var(--font-display); font-weight: 900; font-size: 17px; color: var(--ink); line-height: 1.1; text-transform: lowercase; margin-top: 2px; }
+.mf-close { width: 26px; height: 26px; border-radius: 50%; background: transparent; border: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ink); }
+
+.mf-pick { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.pk-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pk-card { border: 1px solid color-mix(in oklch, var(--ink) 15%, transparent); border-radius: var(--radius-md); background: color-mix(in oklch, var(--surface) 40%, transparent); padding: 8px 10px; }
+.pk-card.amber { background: color-mix(in oklch, var(--amber) 8%, transparent); }
+.pk-card.empty { border-style: dashed; border-color: var(--hairline); }
+.pk-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 5px; }
+.pk-inner { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pk-date { font-family: var(--font-display); font-weight: 900; font-size: 13px; color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums; }
+.pk-date.ph { color: color-mix(in oklch, var(--muted-foreground) 70%, transparent); font-family: var(--font-sans); font-weight: 500; font-size: 12px; }
+.pk-time { font-family: var(--font-mono); font-size: 11px; color: var(--ink); border: 1px solid var(--hairline); background: var(--background); padding: 3px 6px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+.pk-time.ph { color: color-mix(in oklch, var(--muted-foreground) 70%, transparent); }
+
+.j-step { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.j-step button { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--hairline); background: var(--background); color: var(--ink); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.j-step button:disabled { color: color-mix(in oklch, var(--muted-foreground) 45%, transparent); }
+.j-count { display: flex; align-items: baseline; gap: 4px; }
+.j-num { font-family: var(--font-display); font-weight: 900; font-size: 20px; color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums; }
+.j-lbl { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted-foreground); }
+
+.pk-dev { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid color-mix(in oklch, var(--amber) 45%, transparent); background: color-mix(in oklch, var(--amber) 14%, transparent); border-radius: var(--radius-md); }
+.pk-dev.bump { border-color: color-mix(in oklch, var(--naranja) 45%, transparent); background: color-mix(in oklch, var(--naranja) 12%, transparent); }
+.pk-dev .pk-date small { font-family: var(--font-mono); font-size: 9px; color: var(--naranja); letter-spacing: 0.1em; margin-left: 5px; }
+
+/* warning / error bars */
+.bar { display: flex; align-items: flex-start; gap: 6px; padding: 6px 9px; border-radius: 6px; font-family: var(--font-sans); font-size: 10.5px; line-height: 1.4; }
+.bar.amber { background: color-mix(in oklch, var(--amber) 12%, transparent); border: 1px solid color-mix(in oklch, var(--amber) 35%, transparent); color: var(--ink); }
+.bar.error { background: color-mix(in oklch, var(--destructive) 8%, transparent); border: 1px solid color-mix(in oklch, var(--destructive) 30%, transparent); color: var(--destructive); }
+.bar.muted { color: var(--muted-foreground); padding: 3px 0; }
+.bar svg { flex-shrink: 0; margin-top: 1px; }
+.bar b { font-weight: 600; }
+
+/* compact calendar */
+.mf-cal { border-top: 1px solid var(--hairline); padding: 8px 12px; display: flex; justify-content: center; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; width: 100%; }
+.cal-hd { grid-column: 1/-1; font-family: var(--font-display); font-weight: 900; font-size: 11px; color: var(--ink); text-transform: lowercase; text-align: center; padding: 2px 0 4px; }
+.cal-dow { font-family: var(--font-mono); font-size: 7px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted-foreground); text-align: center; }
+.cal-day { font-family: var(--font-mono); font-size: 10px; color: var(--ink); height: 22px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; position: relative; }
+.cal-day.muted { color: color-mix(in oklch, var(--muted-foreground) 55%, transparent); }
+.cal-day.dis { color: var(--hairline); text-decoration: line-through; }
+.cal-day.range { background: color-mix(in oklch, var(--amber) 30%, transparent); }
+.cal-day.start, .cal-day.end { background: var(--ink); color: var(--background); font-weight: 700; }
+.cal-day.closed { background: color-mix(in oklch, var(--destructive) 14%, transparent); color: var(--destructive); }
+.cal-day.nostock { background: color-mix(in oklch, var(--destructive) 12%, transparent); color: var(--destructive); }
+.cal-day.nostock::after { content: ""; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 3px; height: 3px; border-radius: 50%; background: var(--destructive); }
+
+/* footer */
+.mf-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 14px; border-top: 1px solid var(--hairline); background: color-mix(in oklch, var(--surface) 50%, transparent); }
+.mf-clear { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); background: transparent; border: 0; cursor: pointer; }
+.mf-count { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink); }
+.mf-count.muted { color: var(--muted-foreground); }
+.mf-apply { height: 32px; padding: 0 18px; border-radius: 9999px; background: var(--amber); color: var(--ink); border: 0; cursor: pointer; font-family: var(--font-sans); font-weight: 600; font-size: 12px; }
+.mf-apply:disabled { background: var(--surface); color: color-mix(in oklch, var(--muted-foreground) 60%, transparent); cursor: not-allowed; }
+
+pre.code { font-family: var(--font-mono); font-size: 11px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.65; margin: 0; }
+.k { color: #FFCC55; } .s { color: #ED7BAD; } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+.note { font-family: var(--font-sans); font-size: 11px; line-height: 1.55; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+.note b { color: var(--foreground); font-weight: 600; }
+.note code { font-family: var(--font-mono); font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="t-eyebrow">Pattern · RentalDateModal — estados de borde</div>
+  <div class="sub-eye">Complementa el specimen base (estado feliz). Acá: vacío · jornada extra · día cerrado · sin stock.</div>
+
+  <div class="gallery">
+
+    <!-- ── 1. Vacío / inicial ─────────────────────────────────── -->
+    <div class="state">
+      <span class="state-tag empty"><span class="d"></span>Vacío · sin retiro elegido</span>
+      <div class="mf">
+        <div class="mf-head">
+          <div><div class="mf-eye">Fechas del alquiler</div><div class="mf-title">elegí tus fechas</div></div>
+          <button class="mf-close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="mf-pick">
+          <div class="pk-row">
+            <div class="pk-card empty"><div class="pk-label">Retiro</div><div class="pk-inner"><span class="pk-date ph">elegí en el calendario</span></div></div>
+            <div class="pk-card amber"><div class="pk-label">Jornadas</div><div class="j-step"><button disabled><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg></button><div class="j-count"><span class="j-num">1</span><span class="j-lbl">jorn.</span></div><button><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
+          </div>
+          <div class="bar muted"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Tocá un día para fijar el retiro. La devolución se calcula sola.</div>
+        </div>
+        <div class="mf-cal">
+          <div class="cal">
+            <div class="cal-hd">junio 2026</div>
+            <div class="cal-dow">L</div><div class="cal-dow">M</div><div class="cal-dow">M</div><div class="cal-dow">J</div><div class="cal-dow">V</div><div class="cal-dow">S</div><div class="cal-dow">D</div>
+            <div class="cal-day muted">26</div><div class="cal-day muted">27</div><div class="cal-day muted">28</div><div class="cal-day muted">29</div><div class="cal-day muted">30</div><div class="cal-day muted">31</div><div class="cal-day">1</div>
+            <div class="cal-day">2</div><div class="cal-day">3</div><div class="cal-day">4</div><div class="cal-day">5</div><div class="cal-day">6</div><div class="cal-day">7</div><div class="cal-day dis">8</div>
+            <div class="cal-day">9</div><div class="cal-day">10</div><div class="cal-day">11</div><div class="cal-day">12</div><div class="cal-day">13</div><div class="cal-day">14</div><div class="cal-day dis">15</div>
+          </div>
+        </div>
+        <div class="mf-foot"><button class="mf-clear">Limpiar</button><span class="mf-count muted">sin fechas</span><button class="mf-apply" disabled>Aplicar</button></div>
+      </div>
+    </div>
+
+    <!-- ── 2. Jornada extra (warning) ─────────────────────────── -->
+    <div class="state">
+      <span class="state-tag warn"><span class="d"></span>Advertencia · suma jornada por hora</span>
+      <div class="mf">
+        <div class="mf-head">
+          <div><div class="mf-eye">Fechas del alquiler</div><div class="mf-title">elegí tus fechas</div></div>
+          <button class="mf-close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="mf-pick">
+          <div class="pk-row">
+            <div class="pk-card"><div class="pk-label">Retiro</div><div class="pk-inner"><span class="pk-date">02 jun</span><span class="pk-time">18:00</span></div></div>
+            <div class="pk-card amber"><div class="pk-label">Jornadas</div><div class="j-step"><button><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg></button><div class="j-count"><span class="j-num">3</span><span class="j-lbl">jorn.</span></div><button><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
+          </div>
+          <div class="pk-dev bump"><div><div class="pk-label">Devolución</div><span class="pk-date">06 jun <small>+1 J</small></span></div><span class="pk-time">19:30</span></div>
+          <div class="bar amber"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span>Devolver <b>19:30</b> (más tarde que el retiro) suma una jornada. Ajustá a <b>≤ 18:00</b> para mantener 3 J.</span></div>
+        </div>
+        <div class="mf-cal">
+          <div class="cal">
+            <div class="cal-hd">junio 2026</div>
+            <div class="cal-dow">L</div><div class="cal-dow">M</div><div class="cal-dow">M</div><div class="cal-dow">J</div><div class="cal-dow">V</div><div class="cal-dow">S</div><div class="cal-dow">D</div>
+            <div class="cal-day muted">26</div><div class="cal-day muted">27</div><div class="cal-day muted">28</div><div class="cal-day muted">29</div><div class="cal-day muted">30</div><div class="cal-day muted">31</div><div class="cal-day">1</div>
+            <div class="cal-day start">2</div><div class="cal-day range">3</div><div class="cal-day range">4</div><div class="cal-day range">5</div><div class="cal-day end">6</div><div class="cal-day">7</div><div class="cal-day dis">8</div>
+          </div>
+        </div>
+        <div class="mf-foot"><button class="mf-clear">Limpiar</button><span class="mf-count">4 jornadas</span><button class="mf-apply">Aplicar</button></div>
+      </div>
+    </div>
+
+    <!-- ── 3. Día cerrado (error) ─────────────────────────────── -->
+    <div class="state">
+      <span class="state-tag err"><span class="d"></span>Error · retiro en día cerrado</span>
+      <div class="mf">
+        <div class="mf-head">
+          <div><div class="mf-eye">Fechas del alquiler</div><div class="mf-title">elegí tus fechas</div></div>
+          <button class="mf-close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="mf-pick">
+          <div class="pk-row">
+            <div class="pk-card" style="border-color:color-mix(in oklch,var(--destructive) 40%,transparent)"><div class="pk-label">Retiro</div><div class="pk-inner"><span class="pk-date" style="color:var(--destructive)">07 jun</span><span class="pk-time">—</span></div></div>
+            <div class="pk-card amber"><div class="pk-label">Jornadas</div><div class="j-step"><button><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg></button><div class="j-count"><span class="j-num">2</span><span class="j-lbl">jorn.</span></div><button><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
+          </div>
+          <div class="bar error"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg><span>El <b>domingo 7</b> el depósito está cerrado. Elegí otro día de retiro.</span></div>
+        </div>
+        <div class="mf-cal">
+          <div class="cal">
+            <div class="cal-hd">junio 2026</div>
+            <div class="cal-dow">L</div><div class="cal-dow">M</div><div class="cal-dow">M</div><div class="cal-dow">J</div><div class="cal-dow">V</div><div class="cal-dow">S</div><div class="cal-dow">D</div>
+            <div class="cal-day muted">26</div><div class="cal-day muted">27</div><div class="cal-day muted">28</div><div class="cal-day muted">29</div><div class="cal-day muted">30</div><div class="cal-day muted">31</div><div class="cal-day dis">1</div>
+            <div class="cal-day">2</div><div class="cal-day">3</div><div class="cal-day">4</div><div class="cal-day">5</div><div class="cal-day">6</div><div class="cal-day dis">7</div><div class="cal-day closed">7</div>
+            <div class="cal-day">9</div><div class="cal-day">10</div><div class="cal-day">11</div><div class="cal-day">12</div><div class="cal-day">13</div><div class="cal-day">14</div><div class="cal-day dis">15</div>
+          </div>
+        </div>
+        <div class="mf-foot"><button class="mf-clear">Limpiar</button><span class="mf-count muted">día cerrado</span><button class="mf-apply" disabled>Aplicar</button></div>
+      </div>
+    </div>
+
+    <!-- ── 4. Sin stock en el rango (error) ───────────────────── -->
+    <div class="state">
+      <span class="state-tag err"><span class="d"></span>Error · rango cruza día sin stock</span>
+      <div class="mf">
+        <div class="mf-head">
+          <div><div class="mf-eye">Fechas del alquiler</div><div class="mf-title">elegí tus fechas</div></div>
+          <button class="mf-close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="mf-pick">
+          <div class="pk-row">
+            <div class="pk-card"><div class="pk-label">Retiro</div><div class="pk-inner"><span class="pk-date">02 jun</span><span class="pk-time">18:00</span></div></div>
+            <div class="pk-card amber"><div class="pk-label">Jornadas</div><div class="j-step"><button><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg></button><div class="j-count"><span class="j-num">4</span><span class="j-lbl">jorn.</span></div><button><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
+          </div>
+          <div class="bar error"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span><b>RØDE NTG5</b> no tiene stock el <b>4 jun</b>. Acortá a 1 J o sacá el equipo del pedido.</span></div>
+        </div>
+        <div class="mf-cal">
+          <div class="cal">
+            <div class="cal-hd">junio 2026</div>
+            <div class="cal-dow">L</div><div class="cal-dow">M</div><div class="cal-dow">M</div><div class="cal-dow">J</div><div class="cal-dow">V</div><div class="cal-dow">S</div><div class="cal-dow">D</div>
+            <div class="cal-day muted">26</div><div class="cal-day muted">27</div><div class="cal-day muted">28</div><div class="cal-day muted">29</div><div class="cal-day muted">30</div><div class="cal-day muted">31</div><div class="cal-day">1</div>
+            <div class="cal-day start">2</div><div class="cal-day range">3</div><div class="cal-day nostock">4</div><div class="cal-day range">5</div><div class="cal-day end">6</div><div class="cal-day">7</div><div class="cal-day dis">8</div>
+          </div>
+        </div>
+        <div class="mf-foot"><button class="mf-clear">Limpiar</button><span class="mf-count muted">sin stock · 4 jun</span><button class="mf-apply" disabled>Aplicar</button></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Code ─────────────────────────────────────────────────── -->
+  <div class="t-eyebrow" style="margin-top:4px;">Lógica de estados</div>
+  <pre class="code"><span class="c">/* El Aplicar se habilita solo si el rango es 100% válido */</span>
+const blocked = range.some(d =&gt; isClosed(d) || hasNoStock(d, cartItems));
+const extraJornada = endTime &gt; startTime;   <span class="c">// devolver más tarde que retiro</span>
+
+const canApply = start &amp;&amp; !blocked;          <span class="c">// jornada extra NO bloquea: avisás, no impedís</span>
+
+<span class="c">/* Tres niveles de feedback, nunca dos a la vez */</span>
+{blocked        &amp;&amp; &lt;<span class="k">Bar</span> variant=<span class="s">"error"</span>&gt;…&lt;/&gt;}   <span class="c">// destructive · bloquea Aplicar</span>
+{extraJornada   &amp;&amp; &lt;<span class="k">Bar</span> variant=<span class="s">"warn"</span>&gt;…&lt;/&gt;}    <span class="c">// amber · informa, deja seguir</span>
+{!start         &amp;&amp; &lt;<span class="k">Bar</span> variant=<span class="s">"muted"</span>&gt;…&lt;/&gt;}   <span class="c">// hint inicial</span></pre>
+
+  <!-- ── Note ─────────────────────────────────────────────────── -->
+  <div class="note">
+    <b>Jerarquía de feedback (una sola por vez):</b> error <code>--destructive</code> &gt; warning <code>--amber</code> &gt; hint muted. El error bloquea <code>Aplicar</code>; la advertencia de jornada extra <b>no</b> — avisás y dejás decidir. ·
+    <b>Vacío:</b> retiro con borde dashed + placeholder, devolución oculta (no existe sin retiro), <code>Aplicar</code> disabled, hint muted. ·
+    <b>Jornada extra:</b> la card de devolución vira a <code>--naranja</code> y muestra <code>+1 J</code>; el footer cuenta 4 J. La copy ofrece la salida concreta (≤ 18:00). ·
+    <b>Día cerrado:</b> día tachado + marcado en destructive; viene de <code>useHorarios</code>. ·
+    <b>Sin stock:</b> el día dentro del rango se marca con punto destructive; el error nombra <b>qué equipo</b> y <b>qué día</b>, y da dos salidas. ·
+    <b>Por qué validar en cliente</b> si el backend igual rechaza: feedback inmediato sin round-trip — el usuario corrige antes de mandar.
+  </div>
+
+</div>
+</body>
+</html>

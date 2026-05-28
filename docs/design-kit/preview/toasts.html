@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pattern · Toasts (sonner)</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+:root{
+  --verde: var(--rbl-verde); --azul: var(--rbl-azul);
+  --naranja: var(--rbl-naranja); --rosa: var(--rbl-rosa);
+  --shadow-lg: 0 12px 32px oklch(0.18 0.01 60 / 10%), 0 2px 8px oklch(0.18 0.01 60 / 6%);
+  --duration-slow: 350ms;
+  --ease-default: cubic-bezier(0.32,0.72,0,1);
+}
+.card { gap: 22px; padding: 22px; }
+
+/* ── Toast base (matches sonner skin) ─────────────────────────── */
+.toast {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 14px 14px 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-lg);
+  width: 100%; box-sizing: border-box;
+  position: relative; overflow: hidden;
+}
+/* left accent bar — colored per variant */
+.toast::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--accent-c, var(--hairline));
+}
+.toast-icon { flex-shrink: 0; margin-top: 1px; color: var(--accent-c, var(--muted-foreground)); }
+.toast-body { flex: 1; min-width: 0; }
+.toast-title { font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.toast-sub { font-family: var(--font-sans); font-size: 12px; color: var(--muted-foreground); margin-top: 2px; line-height: 1.4; }
+.toast-action {
+  flex-shrink: 0; align-self: center;
+  font-family: var(--font-sans); font-size: 12px; font-weight: 600; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-sm);
+  padding: 6px 11px; cursor: pointer; white-space: nowrap;
+  transition: background 150ms, border-color 150ms;
+}
+.toast-action:hover { background: var(--amber); border-color: var(--amber); }
+.toast-close {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; border: 0;
+  background: transparent; color: var(--muted-foreground); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.toast-close:hover { background: var(--surface); }
+
+.toast.success { --accent-c: var(--verde); }
+.toast.info    { --accent-c: var(--azul); }
+.toast.warning { --accent-c: var(--naranja); }
+.toast.error   { --accent-c: var(--destructive); }
+
+/* progress bar (auto-dismiss) */
+.toast-progress { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--accent-c, var(--hairline)); opacity: 0.45; }
+
+/* spec layout */
+.toast-stack { display: flex; flex-direction: column; gap: 10px; max-width: 380px; }
+
+/* ── Live region (bottom-right, like sonner) ──────────────────── */
+.live { display: flex; flex-direction: column; gap: 10px; max-width: 380px; }
+.live .toast { animation: toast-in var(--duration-slow) var(--ease-default) both; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
+.toast.leaving { animation: toast-out 220ms ease-in both; }
+@keyframes toast-out { to { opacity: 0; transform: translateX(20px); } }
+
+.trigger-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.trigger {
+  font-family: var(--font-sans); font-size: 13px; font-weight: 600;
+  border-radius: var(--radius-md); padding: 0 16px; height: 38px; cursor: pointer;
+  border: 1px solid var(--hairline); background: var(--surface-elevated); color: var(--ink);
+  display: inline-flex; align-items: center; gap: 7px;
+  transition: transform 120ms var(--ease-default), background 150ms;
+}
+.trigger:active { transform: scale(0.97); }
+.trigger .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+pre.code { font-family: var(--font-mono); font-size: 11px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.65; margin: 0; }
+.k { color: #FFCC55; } .s { color: #ED7BAD; } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+.note { font-family: var(--font-sans); font-size: 11px; line-height: 1.55; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+.note b { color: var(--foreground); font-weight: 600; }
+.note code { font-family: var(--font-mono); font-size: 10px; }
+.sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="t-eyebrow">Pattern · Toasts (sonner) — feedback efímero</div>
+
+  <!-- ── Static specimens — 4 variantes + undo ────────────────── -->
+  <div class="toast-stack">
+
+    <div class="toast success">
+      <span class="toast-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+      <div class="toast-body">
+        <div class="toast-title">Pedido #1247 enviado</div>
+        <div class="toast-sub">Te llevamos a tu portal para seguir el estado.</div>
+      </div>
+      <span class="toast-progress" style="width:40%"></span>
+    </div>
+
+    <div class="toast info">
+      <span class="toast-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>
+      <div class="toast-body">
+        <div class="toast-title">Descuento aplicado · 5% por jornada</div>
+        <div class="toast-sub">3 jornadas o más activa el descuento.</div>
+      </div>
+    </div>
+
+    <div class="toast warning">
+      <span class="toast-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+      <div class="toast-body">
+        <div class="toast-title">Seleccioná fechas antes de confirmar</div>
+        <div class="toast-sub">Tu pedido necesita retiro y devolución.</div>
+      </div>
+    </div>
+
+    <div class="toast error">
+      <span class="toast-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
+      <div class="toast-body">
+        <div class="toast-title">No pudimos guardar el pedido</div>
+        <div class="toast-sub">Revisá tu conexión y probá de nuevo.</div>
+      </div>
+      <button class="toast-action">Reintentar</button>
+    </div>
+
+    <!-- Undo (acción de carrito) -->
+    <div class="toast">
+      <span class="toast-icon" style="color:var(--ink)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+      <div class="toast-body">
+        <div class="toast-title">Sony a7s III quitada del carrito</div>
+      </div>
+      <button class="toast-action">Deshacer</button>
+    </div>
+
+  </div>
+
+  <!-- ── Interactive triggers → live region ───────────────────── -->
+  <div class="sub-eye" style="margin-top:4px;">Probá en vivo · aparecen abajo a la derecha</div>
+  <div class="trigger-row">
+    <button class="trigger" onclick="fireToast('success')"><span class="dot" style="background:var(--verde)"></span>success</button>
+    <button class="trigger" onclick="fireToast('info')"><span class="dot" style="background:var(--azul)"></span>info</button>
+    <button class="trigger" onclick="fireToast('warning')"><span class="dot" style="background:var(--naranja)"></span>warning</button>
+    <button class="trigger" onclick="fireToast('error')"><span class="dot" style="background:var(--destructive)"></span>error</button>
+    <button class="trigger" onclick="fireToast('undo')"><span class="dot" style="background:var(--ink)"></span>undo</button>
+  </div>
+
+  <!-- ── Code ─────────────────────────────────────────────────── -->
+  <div class="t-eyebrow" style="margin-top:4px;">Implementación</div>
+  <pre class="code"><span class="c">/* App.tsx — un solo Toaster, abajo a la derecha */</span>
+&lt;<span class="k">Toaster</span>
+  position=<span class="s">"bottom-right"</span>
+  offset={<span class="s">16</span>}
+  toastOptions={{
+    classNames: {
+      toast: <span class="s">"rounded-[10px] border-hairline shadow-lg bg-surface-elevated"</span>,
+      title: <span class="s">"font-sans text-[13px] font-semibold text-ink"</span>,
+      description: <span class="s">"text-[12px] text-muted-foreground"</span>,
+    },
+  }}
+/&gt;
+
+<span class="c">/* Llamadas — voz de marca: vos, lowercase de sistema, punto final */</span>
+toast.<span class="k">success</span>(<span class="s">"Pedido #1247 enviado"</span>, {
+  description: <span class="s">"Te llevamos a tu portal para seguir el estado."</span>,
+  duration: <span class="s">4000</span>,
+});
+
+<span class="c">/* Undo — el patrón canónico para acciones destructivas del carrito */</span>
+toast(<span class="s">"Sony a7s III quitada del carrito"</span>, {
+  action: { label: <span class="s">"Deshacer"</span>, onClick: () =&gt; restoreItem(id) },
+  duration: <span class="s">6000</span>, <span class="c">// más tiempo: la acción es reversible</span>
+});</pre>
+
+  <!-- ── Note ─────────────────────────────────────────────────── -->
+  <div class="note">
+    <b>4 variantes + neutral:</b> success <code>--verde</code> · info <code>--azul</code> · warning <code>--naranja</code> · error <code>--destructive</code> · neutral (undo) sin color. La barra de acento de 3px a la izquierda es la única señal cromática — el resto queda en bone+ink. ·
+    <b>Duración por gravedad:</b> success 4s · info/warning 5s · undo 6s (reversible, dale tiempo) · error es <code>Infinity</code> hasta que el usuario lo cierre o reintente. ·
+    <b>Acción, no link:</b> "Reintentar" / "Deshacer" como botón a la derecha. Una sola acción por toast. ·
+    <b>Copy:</b> primera persona, específico — <code>"No pudimos guardar el pedido"</code>, nunca <code>"Error 500"</code>. ·
+    <b>Nunca para confirmaciones bloqueantes</b> — eso es un modal. El toast es para lo que ya pasó.
+  </div>
+
+</div>
+
+<!-- live region -->
+<div class="live" id="live" style="position:fixed; right:16px; bottom:16px; z-index:9999;"></div>
+
+<script>
+const variants = {
+  success: { cls:'success', title:'Pedido #1247 enviado', sub:'Te llevamos a tu portal para seguir el estado.', dur:4000,
+    icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>' },
+  info: { cls:'info', title:'Descuento aplicado · 5% por jornada', sub:'3 jornadas o más activa el descuento.', dur:5000,
+    icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>' },
+  warning: { cls:'warning', title:'Seleccioná fechas antes de confirmar', sub:'Tu pedido necesita retiro y devolución.', dur:5000,
+    icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>' },
+  error: { cls:'error', title:'No pudimos guardar el pedido', sub:'Revisá tu conexión y probá de nuevo.', dur:7000, action:'Reintentar',
+    icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>' },
+  undo: { cls:'', title:'Sony a7s III quitada del carrito', sub:'', dur:6000, action:'Deshacer',
+    icon:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>' },
+};
+
+function fireToast(kind) {
+  const v = variants[kind];
+  const live = document.getElementById('live');
+  const el = document.createElement('div');
+  el.className = 'toast ' + v.cls;
+  el.innerHTML = `
+    <span class="toast-icon" ${v.cls==='' ? 'style="color:var(--ink)"' : ''}>${v.icon}</span>
+    <div class="toast-body"><div class="toast-title">${v.title}</div>${v.sub ? `<div class="toast-sub">${v.sub}</div>` : ''}</div>
+    ${v.action ? `<button class="toast-action">${v.action}</button>` : `<button class="toast-close"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>`}
+  `;
+  live.appendChild(el);
+  const dismiss = () => { el.classList.add('leaving'); setTimeout(() => el.remove(), 220); };
+  el.querySelector('.toast-close')?.addEventListener('click', dismiss);
+  el.querySelector('.toast-action')?.addEventListener('click', dismiss);
+  setTimeout(dismiss, v.dur);
+}
+</script>
+</body>
+</html>
