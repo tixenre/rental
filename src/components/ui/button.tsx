@@ -17,6 +17,10 @@ export const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        // Rambla brand CTA — siempre amber, sin reverse. Pensado para hero,
+        // estudio, y otros disparadores destacados sobre fondo claro u oscuro.
+        // Source: docs/design-kit/kit/components/button.tsx (variant "amber").
+        amber: "bg-amber text-ink shadow-sm hover:bg-amber-hot",
       },
       size: {
         default: "h-9 px-4 py-2",
@@ -24,10 +28,18 @@ export const buttonVariants = cva(
         lg: "h-10 rounded-md px-8",
         icon: "h-9 w-9",
       },
+      // Eje "shape" del kit Rambla. Default = rounded (radius-md, mismo que
+      // el base actual). Pill = redondeo full, para CTAs y filter chips.
+      // tailwind-merge resuelve el override de rounded-md ↔ rounded-full.
+      shape: {
+        rounded: "",
+        pill: "rounded-full",
+      },
     },
     defaultVariants: {
       variant: "default",
       size: "default",
+      shape: "rounded",
     },
   },
 );
@@ -38,10 +50,14 @@ export interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, shape, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
     return (
-      <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+      <Comp
+        className={cn(buttonVariants({ variant, size, shape, className }))}
+        ref={ref}
+        {...props}
+      />
     );
   },
 );
