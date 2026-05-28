@@ -76,6 +76,9 @@ function fmtDate(iso: string): string {
   return d.toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" });
 }
 
+// Tier 3 (categórico): un color por tipo de cambio del changelog, elegidos
+// para distinguirse entre sí, no semánticos. Ver docs/DESIGN_SYSTEM.md.
+/* eslint-disable no-restricted-syntax */
 function kindFor(type: ChangelogEntry["type"]): { icon: React.ReactNode; color: string } {
   switch (type) {
     case "fix":
@@ -93,3 +96,4 @@ function kindFor(type: ChangelogEntry["type"]): { icon: React.ReactNode; color: 
       return { icon: <Plus className="h-3 w-3 text-white" />, color: "bg-ink" };
   }
 }
+/* eslint-enable no-restricted-syntax */

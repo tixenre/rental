@@ -64,9 +64,11 @@ estos tokens vía el bloque `@theme inline` al inicio de `src/styles.css`.
 
 Todo color en `src/` tiene que venir de uno de estos cuatro tiers. Nada de
 Tailwind genérico (`bg-slate-100`, `text-blue-700`, …) ni hex crudo
-ad-hoc por pantalla — esa es la deuda que se barre en
-[#584](https://github.com/tixenre/rental/issues/584) y que el guardrail de
-ESLint (Fase 2) bloquea.
+ad-hoc por pantalla — esa es la deuda que se barrió en
+[#584](https://github.com/tixenre/rental/issues/584). **El guardrail de
+ESLint ya está activo** (`no-restricted-syntax` en `eslint.config.js`):
+una clase de escala genérica (`text-green-700`, `bg-blue-500`, …) en
+`className` **rompe el lint** (bloqueante en CI).
 
 | Tier | Para qué | De dónde sale |
 |---|---|---|
@@ -78,6 +80,20 @@ ESLint (Fase 2) bloquea.
 **Regla:** colores genéricos/hex sólo se permiten en tiers 3 y 4, y ahí
 viven en constantes centralizadas y documentadas — nunca sueltos en una
 pantalla. Cualquier otro color sale de un token (tiers 1-2).
+
+**Cómo exceptuar (tiers 3 y 4):** envolvé la constante con
+`/* eslint-disable no-restricted-syntax */` … `/* eslint-enable */` (o
+`// eslint-disable-next-line no-restricted-syntax` en una línea) **con un
+comentario que diga qué tier es y por qué**. Para un archivo que es entero
+una marca de terceros (ej. `WhatsAppButton.tsx`) hay un override por archivo
+en `eslint.config.js`. El hex de terceros (WhatsApp `#25D366`, logo de
+Google) no lo agarra la regla — pero igual va documentado acá.
+
+**Pendiente — escala `amber-NNN`:** la regla **todavía no** prohíbe el amber
+genérico de Tailwind (`text-amber-700`, etc.) porque el tratamiento del
+amber-texto está en revisión visual diferida con el dueño. Cuando se
+resuelva, se suma `amber` a la lista de escalas en `eslint.config.js`
+(`GENERIC_COLOR_RE`) y se barren los usos restantes.
 
 ### Tipografía
 
