@@ -16,7 +16,6 @@ export type OrderStatus =
   | "devuelto"
   | "cancelado";
 
-
 export type OrderItemInput = {
   id: string;
   name: string;
