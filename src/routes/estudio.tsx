@@ -534,36 +534,50 @@ function EstudioPage() {
       )}
 
       {/* ─── FAQ ─────────────────────────────────────────────────────── */}
-      {faq.length > 0 && (
-        <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-          <h2 className="font-display text-2xl sm:text-3xl">Preguntas frecuentes</h2>
-          <div className="mt-6 space-y-3">
-            {faq.map((f) => (
-              <details key={f.q} className="group rounded-xl border hairline bg-surface px-4 py-3">
-                <summary className="cursor-pointer list-none font-medium">{f.q}</summary>
-                <p className="mt-2 text-sm text-muted-foreground">{f.a}</p>
-              </details>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Filtro defensivo: si alguna fila viene basura (q sin a, o al revés),
+          la ocultamos en público — el admin tiene un filtro similar al guardar,
+          pero por las dudas. */}
+      {(() => {
+        const faqVisible = faq.filter((f) => f.q.trim() && f.a.trim());
+        if (faqVisible.length === 0) return null;
+        return (
+          <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
+            <h2 className="font-display text-2xl sm:text-3xl">Preguntas frecuentes</h2>
+            <div className="mt-6 space-y-3">
+              {faqVisible.map((f) => (
+                <details
+                  key={f.q}
+                  className="group rounded-xl border hairline bg-surface px-4 py-3"
+                >
+                  <summary className="cursor-pointer list-none font-medium">{f.q}</summary>
+                  <p className="mt-2 text-sm text-muted-foreground">{f.a}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* ─── Prueba social ───────────────────────────────────────────── */}
-      {testimonios.length > 0 && (
-        <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-          <h2 className="font-display text-2xl sm:text-3xl">Trabajaron acá</h2>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {testimonios.map((t, i) => (
-              <figure key={i} className="rounded-xl border hairline bg-surface p-5">
-                <blockquote className="text-sm leading-relaxed text-ink">“{t.texto}”</blockquote>
-                <figcaption className="mt-3 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                  {t.autor}
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        </section>
-      )}
+      {(() => {
+        const testimoniosVisibles = testimonios.filter((t) => t.autor.trim() && t.texto.trim());
+        if (testimoniosVisibles.length === 0) return null;
+        return (
+          <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
+            <h2 className="font-display text-2xl sm:text-3xl">Trabajaron acá</h2>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {testimoniosVisibles.map((t, i) => (
+                <figure key={i} className="rounded-xl border hairline bg-surface p-5">
+                  <blockquote className="text-sm leading-relaxed text-ink">“{t.texto}”</blockquote>
+                  <figcaption className="mt-3 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                    {t.autor}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* ─── CTA WhatsApp ────────────────────────────────────────────── */}
       <section className="border-t hairline bg-ink text-amber px-4 py-12 lg:px-12 lg:py-16">

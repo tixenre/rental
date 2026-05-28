@@ -38,14 +38,18 @@ const featureSchema = z.object({
   value: z.string(),
 });
 
+// FAQ y testimonios: schemas permisivos. Si el dueño hace "Añadir" y deja la
+// fila vacía sin completar, NO bloqueamos el guardado — las filas totalmente
+// vacías se filtran en el handler de submit (`stripEmpty`). El filtro defensivo
+// también vive en `/estudio.tsx` (front público) por si llegara algo basura.
 const faqSchema = z.object({
-  q: z.string().min(1, "Requerido"),
-  a: z.string().min(1, "Requerido"),
+  q: z.string(),
+  a: z.string(),
 });
 
 const testimonioSchema = z.object({
-  autor: z.string().min(1, "Requerido"),
-  texto: z.string().min(1, "Requerido"),
+  autor: z.string(),
+  texto: z.string(),
 });
 
 const schema = z.object({
@@ -556,13 +560,22 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
   const packActivo = watch("pack_activo");
 
   const mutation = useMutation({
-    mutationFn: (values: FormValues) =>
-      estudioAdminApi.update({
+    mutationFn: (values: FormValues) => {
+      // Filtramos filas totalmente vacías antes de guardar — si el dueño hizo
+      // "Añadir" y dejó la fila sin completar (caso típico cuando se arrepiente
+      // o se distrae), no la persistimos. Features tienen seed canónico con
+      // value vacío a propósito (admin las muestra; público las filtra), así
+      // que ahí solo dropeamos las que tienen el label vacío también.
+      const faqLimpio = values.faq.filter((f) => f.q.trim() || f.a.trim());
+      const testimoniosLimpio = values.testimonios.filter((t) => t.autor.trim() || t.texto.trim());
+      const featuresLimpio = values.features.filter((f) => f.label.trim());
+      return estudioAdminApi.update({
         ...values,
-        features_json: JSON.stringify(values.features),
-        faq_json: JSON.stringify(values.faq),
-        testimonios_json: JSON.stringify(values.testimonios),
-      }),
+        features_json: JSON.stringify(featuresLimpio),
+        faq_json: JSON.stringify(faqLimpio),
+        testimonios_json: JSON.stringify(testimoniosLimpio),
+      });
+    },
     onSuccess: () => {
       toast.success("Estudio guardado");
       onSaved();
