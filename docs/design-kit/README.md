@@ -10,6 +10,30 @@ brand manual (`uploads/RAMBLA branding.pdf`).
 
 ---
 
+## ⚠ Source-of-truth ladder (read before porting components)
+
+Claude Design exports each component in two formats — and they can drift.
+Order of authority when integrating into `src/components/*`:
+
+1. **`index.html`** (the showcase landing). This is the canonical visual
+   contract. When in doubt, this wins.
+2. **`preview/components-*.html`** (per-component specimens). Detailed
+   demos. Usually agree with the showcase, but can be older drafts. If
+   they disagree with the showcase, the showcase wins.
+3. **`kit/components/*.tsx`** (the React export). **Treat as draft.**
+   Useful as a starting point for the port, but verify against the HTML
+   above before trusting any class. The TSX can have silent drift —
+   e.g. ViewToggle exported `rounded-full` while the showcase + specimen
+   both draw it boxy.
+
+When the TSX drifts from the HTML, fix the port in `src/components/*` to
+match the HTML and leave `docs/design-kit/kit/*` untouched (it's a snapshot
+of one Claude Design generation; the next regeneration corrects it).
+
+See `docs/MEMORIA.md → 2026-05-28` for the full decision.
+
+---
+
 ## What is Rambla?
 
 Rambla Rental is a small/medium audiovisual rental house: cameras, lenses,

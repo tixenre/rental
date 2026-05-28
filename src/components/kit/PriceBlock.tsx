@@ -32,7 +32,7 @@ export function PriceBlock({
       <div className="font-display text-lg font-black leading-none text-ink">
         {showTotal ? formatARS(total) : formatARS(pricePerDay)}
       </div>
-      <div className="mt-0.5 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
+      <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
         {showTotal ? (
           <>
             {jornadas} J ·{" "}

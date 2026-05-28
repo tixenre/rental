@@ -62,7 +62,7 @@ function AddonPill({ item }: { item: AddonItem }) {
       <Check className="h-2.5 w-2.5 shrink-0 text-amber" strokeWidth={3} />
       <span className="max-w-[140px] truncate">{item.name}</span>
       {qty && (
-        <span className="ml-0.5 rounded-full bg-ink px-1 py-0 font-mono text-[9px] text-amber">
+        <span className="ml-0.5 inline-flex h-[14px] min-w-[16px] items-center justify-center rounded-full bg-ink px-1 font-mono text-[9px] font-bold text-amber">
           ×{qty}
         </span>
       )}

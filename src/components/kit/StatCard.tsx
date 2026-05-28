@@ -32,7 +32,10 @@ export function StatCard({
       </div>
       <div
         className={cn(
-          "mt-1.5 font-display text-2xl font-black leading-none tabular text-ink",
+          // Tamaño del value: showcase + specimen dicen 28-30px (font-display).
+          // El TSX original usaba text-2xl (24px) — drift. text-3xl (30px) match
+          // exacto con el showcase.
+          "mt-1.5 font-display text-3xl font-black leading-none tracking-[-0.01em] tabular text-ink",
           valueClassName,
         )}
       >

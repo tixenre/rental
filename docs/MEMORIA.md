@@ -228,6 +228,27 @@
   **supervisor** lo verifica en su revisión. Extiende la decisión *2026-05-26 — Curación de la
   memoria* (que cura *dentro* de MEMORIA) a la **consistencia ENTRE docs**.
 
+### 2026-05-28 — Kit del design-system: el HTML manda, el TSX es draft
+- **What:** Claude Design exporta el kit (`docs/design-kit/`) en **dos formatos en paralelo**:
+  (a) las pantallas en HTML/CSS — el `index.html` showcase + los `preview/components-*.html`
+  specimens, y (b) los componentes en React (`kit/components/*.tsx`). El HTML es el medio nativo
+  de Claude Design — lo que el dueño itera visualmente — y el TSX se exporta de yapa. Caso
+  testigo: ViewToggle salió `rounded-full` en el TSX pero los HTML (showcase + specimen) lo
+  dibujan boxy con `border-radius: 12px`. **Drift silencioso** que tragué porteando fiel al TSX.
+- **Decisión:** los **HTMLs son el contrato visual** (source of truth). El TSX es **borrador de
+  implementación** que sirve de starting point pero hay que **verificarlo contra el HTML antes de
+  portarlo**. Cuando showcase y specimen disagree, **manda el showcase** (`docs/design-kit/index.html`).
+  Caso EstadoBadge: showcase + TSX + README dicen brand palette; el specimen usa Tailwind defaults
+  como demo — el outlier es el specimen, no el TSX.
+- **How to apply:** cualquier porte de `docs/design-kit/kit/components/*.tsx` a `src/components/*`
+  **lee primero el specimen + showcase** y reescribe el TSX si difieren. El `/kit-preview` del repo
+  (cuando exista) compara la versión portada contra el showcase lado a lado. La nota está en
+  `docs/design-kit/README.md` para que cualquier sesión futura la encuentre antes de copiar.
+- **Consecuencias:** el TSX del snapshot puede quedar desincronizado con el HTML del mismo bundle
+  — no es un error nuestro, es un problema upstream de Claude Design. Cuando lo detectamos,
+  alineamos al HTML en `src/` y dejamos el snapshot intacto (Claude Design corrige en la próxima
+  regeneración). No tocamos `docs/design-kit/kit/*` para arreglar drift — el kit es una foto.
+
 ### 2026-05-26 — Eficiencia de sesión: modelo según tarea + limpiar contexto
 - **What:**
   - **Auditar / planificar / decidir / arquitectura** → Opus (effort alto).
