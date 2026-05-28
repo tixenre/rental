@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pattern · Fly to cart +1</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { gap: 20px; padding: 22px; }
+
+/* ── Demo stage ───────────────────────────────────────────────── */
+.stage {
+  position: relative;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+  background: var(--surface);
+  min-height: 280px;
+  display: flex; flex-direction: column;
+}
+
+/* Fake catalog cards */
+.catalog {
+  flex: 1; padding: 16px;
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
+}
+.eq-card {
+  background: var(--surface-elevated); border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.eq-photo {
+  height: 52px; background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+}
+.eq-body { padding: 8px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.eq-brand { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); }
+.eq-name  { font-family: var(--font-sans); font-size: 11px; font-weight: 500; color: var(--ink); line-height: 1.3; }
+.eq-price { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
+.eq-add {
+  margin: 0 8px 8px; height: 28px; border-radius: 9999px;
+  background: var(--ink); color: var(--background);
+  border: 0; font-family: var(--font-sans); font-size: 11px; font-weight: 500;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;
+  transition: transform 120ms cubic-bezier(0.32,0.72,0,1);
+  position: relative; overflow: visible;
+}
+.eq-add:active { transform: scale(0.96); }
+.eq-add svg { color: var(--background); }
+
+/* Cart bar */
+.cart-bar {
+  border-top: 2px solid color-mix(in oklch, var(--amber) 60%, transparent);
+  background: color-mix(in oklch, var(--background) 98%, transparent);
+  backdrop-filter: blur(16px);
+  padding: 10px 16px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 -8px 32px -8px rgba(0,0,0,0.15);
+}
+.cart-icon-wrap { position: relative; flex-shrink: 0; }
+.cart-circle {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+}
+.cart-circle svg { color: var(--background); }
+.cart-badge {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 17px; height: 17px; border-radius: 9999px;
+  background: var(--amber);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  color: var(--ink); padding: 0 3px;
+  border: 2px solid var(--background);
+  transition: transform 0ms;
+}
+.cart-info { flex: 1; }
+.cart-label { font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--ink); }
+.cart-meta  { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.cart-cta {
+  height: 36px; border-radius: 9999px; background: var(--amber); color: var(--ink);
+  border: 0; padding: 0 14px; font-family: var(--font-sans); font-size: 12px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+
+/* ── Flying pill ──────────────────────────────────────────────── */
+.fly-pill {
+  position: fixed;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--amber); color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  outline: 3px solid color-mix(in oklch, var(--amber) 40%, transparent);
+  outline-offset: 2px;
+  pointer-events: none; z-index: 9999;
+  will-change: transform, opacity;
+}
+
+/* Pop animation keyframes */
+@keyframes icon-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.25); }
+  70%  { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+.cart-circle.pop { animation: icon-pop 450ms cubic-bezier(0,0,0.2,1) both; }
+
+@keyframes badge-bump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}
+.cart-badge.bump { animation: badge-bump 350ms cubic-bezier(0.34,1.56,0.64,1) both; }
+
+/* ── Three frames ─────────────────────────────────────────────── */
+.frames { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.frame-card {
+  border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+  background: var(--surface); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.frame-body { flex: 1; padding: 12px; min-height: 80px; position: relative; }
+.frame-label {
+  padding: 8px 10px; border-top: 1px solid var(--hairline);
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--muted-foreground); text-align: center;
+}
+
+/* Frame 1 — initial state */
+.f1-card {
+  background: var(--surface-elevated); border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm); padding: 10px; display: flex; flex-direction: column; gap: 4px;
+}
+.f1-btn {
+  height: 26px; border-radius: 9999px; background: var(--ink); color: var(--background);
+  border: 0; font-family: var(--font-sans); font-size: 11px; display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+.f1-target {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Frame 2 — mid flight */
+.pill-static {
+  position: absolute;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--amber); color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+  outline: 2px solid color-mix(in oklch, var(--amber) 40%, transparent);
+  outline-offset: 2px;
+}
+.flight-path {
+  position: absolute; inset: 0; pointer-events: none;
+  overflow: visible;
+}
+
+/* Frame 3 — pop */
+.circle-pop {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  animation: icon-pop 450ms cubic-bezier(0,0,0.2,1) infinite 0.8s;
+}
+.badge-pop {
+  position: absolute; top: -2px; right: -2px;
+  min-width: 14px; height: 14px; border-radius: 9999px;
+  background: var(--amber);
+  font-family: var(--font-mono); font-size: 8px; font-weight: 700;
+  color: var(--ink); display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--background);
+  animation: badge-bump 350ms cubic-bezier(0.34,1.56,0.64,1) infinite 0.8s;
+}
+
+/* ── Data-attr doc ────────────────────────────────────────────── */
+.attr-doc {
+  border: 1px solid var(--hairline); border-radius: var(--radius-lg); overflow: hidden;
+}
+.attr-doc-head {
+  padding: 10px 14px; background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground);
+}
+.attr-row {
+  display: grid; grid-template-columns: 140px 1fr;
+  padding: 9px 14px; border-bottom: 1px solid var(--hairline);
+  gap: 12px; align-items: start;
+}
+.attr-row:last-child { border-bottom: 0; }
+.attr-key {
+  font-family: var(--font-mono); font-size: 11px; color: var(--amber);
+  background: var(--ink); padding: 2px 6px; border-radius: 4px;
+  align-self: flex-start; width: fit-content;
+}
+.attr-desc { font-family: var(--font-sans); font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+
+/* ── Code ─────────────────────────────────────────────────────── */
+pre.code {
+  font-family: var(--font-mono); font-size: 11px;
+  background: var(--ink); color: var(--background);
+  padding: 14px 16px; border-radius: var(--radius-sm);
+  overflow-x: auto; line-height: 1.65; margin: 0;
+}
+.k { color: #FFCC55; }
+.s { color: #ED7BAD; }
+.c { color: oklch(0.6 0.01 70); font-style: italic; }
+
+.note {
+  font-family: var(--font-sans); font-size: 11px; line-height: 1.55;
+  color: var(--muted-foreground); border-top: 1px dashed var(--hairline);
+  padding-top: 10px;
+}
+.note b { color: var(--foreground); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="t-eyebrow">Pattern · Fly to Cart "+1" — microinteracción</div>
+  <div style="font-family:var(--font-sans);font-size:12px;color:var(--muted-foreground);">
+    Tocá "Agregar" en cualquier card para ver la animación.
+  </div>
+
+  <!-- ── Live demo ──────────────────────────────────────────────── -->
+  <div class="stage" id="stage">
+    <div class="catalog">
+      <div class="eq-card">
+        <div class="eq-photo">📷</div>
+        <div class="eq-body">
+          <div class="eq-brand">Sony</div>
+          <div class="eq-name">A7S III</div>
+          <div class="eq-price">$ 24.500/J</div>
+        </div>
+        <button class="eq-add" onclick="flyToCart(this)">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Agregar
+        </button>
+      </div>
+      <div class="eq-card">
+        <div class="eq-photo">💡</div>
+        <div class="eq-body">
+          <div class="eq-brand">Aputure</div>
+          <div class="eq-name">600d Pro</div>
+          <div class="eq-price">$ 12.000/J</div>
+        </div>
+        <button class="eq-add" onclick="flyToCart(this)">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Agregar
+        </button>
+      </div>
+      <div class="eq-card">
+        <div class="eq-photo">🎙</div>
+        <div class="eq-body">
+          <div class="eq-brand">RØDE</div>
+          <div class="eq-name">NTG5</div>
+          <div class="eq-price">$ 6.000/J</div>
+        </div>
+        <button class="eq-add" onclick="flyToCart(this)">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Agregar
+        </button>
+      </div>
+    </div>
+
+    <div class="cart-bar">
+      <div class="cart-icon-wrap">
+        <div class="cart-circle" id="cart-circle" data-cart-icon>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        </div>
+        <div class="cart-badge" id="cart-badge" style="display:none;">0</div>
+      </div>
+      <div class="cart-info">
+        <div class="cart-label" id="cart-label">Carrito vacío</div>
+        <div class="cart-meta" id="cart-meta">Sumá equipos</div>
+      </div>
+      <button class="cart-cta">Ver carrito</button>
+    </div>
+  </div>
+
+  <!-- ── Three frames ───────────────────────────────────────────── -->
+  <div class="t-eyebrow" style="margin-top:4px;">Tres frames — mecánica</div>
+  <div class="frames">
+
+    <!-- Frame 1 — initial -->
+    <div class="frame-card">
+      <div class="frame-body" style="display:flex;flex-direction:column;gap:6px;">
+        <div class="f1-card">
+          <div style="height:28px;background:var(--surface);border-radius:4px;"></div>
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);">$ 24.500/J</div>
+          <div class="f1-btn">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Agregar
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div class="f1-target">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </div>
+          <span style="font-family:var(--font-sans);font-size:11px;color:var(--muted-foreground);">Carrito vacío</span>
+        </div>
+      </div>
+      <div class="frame-label">1 · botón tocado — origin = rect.center del botón</div>
+    </div>
+
+    <!-- Frame 2 — mid flight -->
+    <div class="frame-card">
+      <div class="frame-body">
+        <svg class="flight-path" viewBox="0 0 140 100" fill="none" style="position:absolute;inset:0;width:100%;height:100%;">
+          <path d="M 90 25 Q 120 10 110 80" stroke="color-mix(in oklch, var(--amber) 40%, transparent)" stroke-width="1.5" stroke-dasharray="4 4"/>
+        </svg>
+        <!-- Origin pill ghosted -->
+        <div class="pill-static" style="top:18px;right:40px;opacity:0.3;width:22px;height:22px;font-size:9px;">+1</div>
+        <!-- Mid-flight pill -->
+        <div class="pill-static" style="top:42px;right:22px;">+1</div>
+        <!-- Target -->
+        <div style="position:absolute;bottom:14px;left:14px;display:flex;align-items:center;gap:5px;">
+          <div class="f1-target">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="frame-label">2 · 250ms — bezier(0.22,1,0.36,1) · scale 1→0.4</div>
+    </div>
+
+    <!-- Frame 3 — pop -->
+    <div class="frame-card">
+      <div class="frame-body" style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;display:inline-flex;">
+          <div class="circle-pop">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </div>
+          <div class="badge-pop">1</div>
+        </div>
+      </div>
+      <div class="frame-label">3 · 550ms — pop [1, 1.25, 0.95, 1] · badge +1</div>
+    </div>
+
+  </div>
+
+  <!-- ── data-attr contract ──────────────────────────────────────── -->
+  <div class="t-eyebrow" style="margin-top:4px;">Contrato de data-attributes</div>
+  <div class="attr-doc">
+    <div class="attr-doc-head">API entre EquipmentCard y FlyToCartLayer</div>
+    <div class="attr-row">
+      <span class="attr-key">data-cart-icon</span>
+      <span class="attr-desc">En el círculo del carrito (CartMiniBar). El <code>FlyToCartLayer</code> hace <code>querySelector('[data-cart-icon]')</code> para leer <code>getBoundingClientRect().center</code> como destino del vuelo. Si no está en el DOM → no anima.</span>
+    </div>
+    <div class="attr-row">
+      <span class="attr-key">flyKey (store)</span>
+      <span class="attr-desc">Timestamp que actúa como <code>key</code> del AnimatePresence. Permite re-disparar la animación aunque el origin sea el mismo (taps rápidos = la última reemplaza a la anterior, nunca se acumulan).</span>
+    </div>
+  </div>
+
+  <!-- ── Code ───────────────────────────────────────────────────── -->
+  <div class="t-eyebrow" style="margin-top:4px;">Implementación (vanilla — sin Framer Motion)</div>
+  <pre class="code"><span class="c">/* Curva signature del vuelo — siempre esta, no otra */</span>
+<span class="k">const</span> EASING = <span class="s">"cubic-bezier(0.22, 1, 0.36, 1)"</span>;
+<span class="k">const</span> DURATION = <span class="s">550</span>;   <span class="c">// ms — vuelo total</span>
+<span class="k">const</span> POP_DELAY = <span class="s">500</span>;  <span class="c">// ms — pop del ícono al llegar</span>
+
+<span class="k">function</span> <span class="s">flyToCart</span>(originEl) {
+  <span class="k">const</span> origin = originEl.getBoundingClientRect();
+  <span class="k">const</span> target = document.querySelector(<span class="s">"[data-cart-icon]"</span>)
+                   ?.getBoundingClientRect();
+
+  <span class="k">if</span> (!target) <span class="k">return</span>; <span class="c">// barra no montada → no animar</span>
+
+  <span class="c">/* Crear pill */</span>
+  <span class="k">const</span> pill = document.createElement(<span class="s">"div"</span>);
+  pill.textContent = <span class="s">"+1"</span>;
+  pill.className = <span class="s">"fly-pill"</span>;
+  pill.style.cssText = `
+    left: ${origin.left + origin.width / <span class="s">2</span> - <span class="s">18</span>}px;
+    top:  ${origin.top  + origin.height/ <span class="s">2</span> - <span class="s">18</span>}px;
+    pointer-events: none; aria-hidden: true;
+  `;
+  document.body.appendChild(pill);
+
+  <span class="c">/* Calcular desplazamiento final */</span>
+  <span class="k">const</span> dx = (target.left + target.width / <span class="s">2</span>) - (origin.left + origin.width / <span class="s">2</span>);
+  <span class="k">const</span> dy = (target.top  + target.height/ <span class="s">2</span>) - (origin.top  + origin.height/ <span class="s">2</span>);
+
+  <span class="c">/* Web Animations API — curva en dos etapas */</span>
+  pill.animate([
+    { transform: <span class="s">"translate(0,0) scale(1)"</span>,     opacity: <span class="s">1</span> },
+    { transform: `translate(${dx}px,${dy}px) scale(0.4)`, opacity: <span class="s">0.8</span> },
+  ], { duration: DURATION, easing: EASING, fill: <span class="s">"forwards"</span> })
+     .onfinish = () => pill.remove();
+
+  <span class="c">/* Pop del ícono destino al llegar */</span>
+  setTimeout(() => {
+    document.querySelector(<span class="s">"[data-cart-icon]"</span>)
+      ?.classList.add(<span class="s">"pop"</span>);
+    setTimeout(() =>
+      document.querySelector(<span class="s">"[data-cart-icon]"</span>)
+        ?.classList.remove(<span class="s">"pop"</span>), <span class="s">450</span>);
+  }, POP_DELAY);
+}</pre>
+
+  <!-- ── Note ───────────────────────────────────────────────────── -->
+  <div class="note">
+    <b>z-index: 60</b> (<code style="font-family:var(--font-mono);font-size:10px;">z-[60]</code> en Tailwind) — encima del CartMiniBar (z-40) y el TopBar (z-50 via --z-topbar). ·
+    <b>Pill exacto:</b> <code style="font-family:var(--font-mono);font-size:10px;">h-9 w-9</code> (36px) · <code style="font-family:var(--font-mono);font-size:10px;">-translate-x-1/2 -translate-y-1/2</code> centrado en coords del store · <code style="font-family:var(--font-mono);font-size:10px;">ring-2 ring-amber/40</code> halo. ·
+    <b>onExitComplete:</b> el pop del ícono se dispara en <code style="font-family:var(--font-mono);font-size:10px;">AnimatePresence onExitComplete</code>, no en <code style="font-family:var(--font-mono);font-size:10px;">onAnimationComplete</code>. ·
+    <b>flyKey:</b> counter incremental en Zustand — <code style="font-family:var(--font-mono);font-size:10px;">triggerFly()</code> incrementa el counter que es la <code style="font-family:var(--font-mono);font-size:10px;">key</code> del AnimatePresence. Taps rápidos reemplazan sin apilar.
+  </div>
+
+</div>
+
+<script>
+let cartCount = 0;
+
+function flyToCart(originEl) {
+  const origin = originEl.getBoundingClientRect();
+  const iconEl = document.getElementById('cart-circle');
+  const target = iconEl.getBoundingClientRect();
+
+  // Create pill
+  const pill = document.createElement('div');
+  pill.className = 'fly-pill';
+  pill.textContent = '+1';
+  pill.style.left = (origin.left + origin.width  / 2 - 18) + 'px';
+  pill.style.top  = (origin.top  + origin.height / 2 - 18) + 'px';
+  document.body.appendChild(pill);
+
+  const dx = (target.left + target.width  / 2) - (origin.left + origin.width  / 2);
+  const dy = (target.top  + target.height / 2) - (origin.top  + origin.height / 2);
+
+  pill.animate([
+    { transform: 'translate(0,0) scale(1)',                      opacity: 1   },
+    { transform: `translate(${dx}px,${dy}px) scale(0.4)`,        opacity: 0.8 },
+  ], {
+    duration: 550,
+    easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+    fill: 'forwards',
+  }).onfinish = () => {
+    pill.remove();
+    // Pop
+    iconEl.classList.remove('pop');
+    void iconEl.offsetWidth;
+    iconEl.classList.add('pop');
+    setTimeout(() => iconEl.classList.remove('pop'), 450);
+
+    // Badge bump
+    cartCount++;
+    const badge = document.getElementById('cart-badge');
+    badge.style.display = 'flex';
+    badge.textContent = cartCount;
+    badge.classList.remove('bump');
+    void badge.offsetWidth;
+    badge.classList.add('bump');
+    setTimeout(() => badge.classList.remove('bump'), 350);
+
+    // Update label
+    document.getElementById('cart-label').textContent = cartCount + (cartCount === 1 ? ' ítem' : ' ítems');
+    document.getElementById('cart-meta').textContent  = 'Sin fechas';
+  };
+}
+</script>
+</body>
+</html>
