@@ -25,15 +25,6 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
   cancelado: "Cancelado",
 };
 
-export const STATUS_TONE: Record<OrderStatus, string> = {
-  borrador: "bg-muted text-muted-foreground",
-  solicitado: "bg-amber/20 text-ink",
-  confirmado: "bg-green-500/15 text-green-700",
-  entregado: "bg-blue-500/15 text-blue-700",
-  devuelto: "bg-foreground text-background",
-  cancelado: "bg-destructive/10 text-destructive",
-};
-
 export function isEditable(status: OrderStatus) {
   return status === "borrador" || status === "solicitado";
 }

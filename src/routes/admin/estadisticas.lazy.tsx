@@ -121,7 +121,7 @@ function EstadisticasPage() {
                     <span className="tabular-nums text-ink">{fmtArs(c.total_ars)}</span>
                     <span
                       className={`inline-flex items-center gap-1 font-mono text-xs tabular-nums w-20 justify-end ${
-                        c.crecimiento_pct >= 0 ? "text-emerald-700" : "text-destructive"
+                        c.crecimiento_pct >= 0 ? "text-verde" : "text-destructive"
                       }`}
                     >
                       {c.crecimiento_pct >= 0 ? (
