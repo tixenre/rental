@@ -11,11 +11,19 @@ interface Option<T extends string> {
 /**
  * ViewToggle — segmented control con pill deslizante.
  *
- * Source: `docs/design-kit/kit/components/view-toggle.tsx`. Usado en la
- * sub-toolbar del catálogo (Grid / Lista) y donde sea que haya 2-3
- * opciones mutuamente excluyentes. El label activo va en `text-amber`
- * sobre el pill ink. Los inactivos en `text-muted-foreground`, hover
- * `text-ink`.
+ * Source: `docs/design-kit/kit/components/view-toggle.tsx` (lógica) +
+ * `docs/design-kit/index.html` y `docs/design-kit/preview/components-view-toggle.html`
+ * (look visual canónico).
+ *
+ * Nota de drift: el JSX original del kit usaba `rounded-full` pero el
+ * showcase y el specimen del kit lo dibujan más "boxy" (radius-lg outer,
+ * radius-md inner). Alineamos con el visual canónico — el kit/.tsx queda
+ * para corregir en una próxima regeneración de Claude Design.
+ *
+ * Usado en la sub-toolbar del catálogo (Grid / Lista) y donde sea que
+ * haya 2-3 opciones mutuamente excluyentes. El label activo va en
+ * `text-amber` sobre el pill ink. Los inactivos en `text-muted-foreground`,
+ * hover `text-ink`.
  */
 export function ViewToggle<T extends string>({
   options,
@@ -43,13 +51,13 @@ export function ViewToggle<T extends string>({
     <div
       ref={containerRef}
       className={cn(
-        "relative inline-flex items-center rounded-full border border-hairline bg-surface p-0.5",
+        "relative inline-flex items-center rounded-lg border border-hairline bg-surface p-[3px]",
         className,
       )}
     >
       <span
         aria-hidden
-        className="pointer-events-none absolute top-0.5 bottom-0.5 rounded-full bg-ink transition-all duration-200 ease-out"
+        className="pointer-events-none absolute top-[3px] bottom-[3px] rounded-md bg-ink transition-all duration-200 ease-out"
         style={{ left: indicator.left, width: indicator.width }}
       />
       {options.map((opt) => (
@@ -58,7 +66,7 @@ export function ViewToggle<T extends string>({
           type="button"
           onClick={() => onChange(opt.value)}
           className={cn(
-            "relative z-10 inline-flex items-center gap-1.5 rounded-full px-5 py-2 font-sans text-sm font-bold transition-colors",
+            "relative z-10 inline-flex items-center gap-1.5 rounded-md px-5 py-2 font-sans text-sm font-bold transition-colors",
             value === opt.value ? "text-amber" : "text-muted-foreground hover:text-ink",
           )}
         >
