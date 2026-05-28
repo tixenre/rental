@@ -161,42 +161,37 @@
   --input:             var(--rbl-stroke);
   --ring:              color-mix(in oklch, #FAB428 60%, transparent);
 
-  /* ── Shadows ─────────────────────────────────────────────────────── */
-  --shadow-sm:  0 1px 2px oklch(0.18 0.01 60 / 6%);
-  --shadow-md:  0 4px 12px oklch(0.18 0.01 60 / 8%),  0 1px 3px oklch(0.18 0.01 60 / 5%);
-  --shadow-lg:  0 12px 32px oklch(0.18 0.01 60 / 10%), 0 2px 8px oklch(0.18 0.01 60 / 6%);
-  --shadow-xl:  0 24px 56px oklch(0.18 0.01 60 / 12%), 0 6px 16px oklch(0.18 0.01 60 / 8%);
+  /* ── Shadows ───────────────────────────────────────────────────────
+   * NOTE: No --shadow-* tokens are defined in production styles.css.
+   * Use Tailwind utilities (shadow-sm/md/lg) or arbitrary values for
+   * signature shadows (e.g. CartMiniBar bottom-fixed):
+   *   shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.15)]   ← bar
+   *   shadow-[0_-12px_24px_-8px_rgba(0,0,0,0.08)]  ← hover preview
+   * ──────────────────────────────────────────────────────────────── */
 
-  /* ── Spacing (4 px base · T-shirt steps) ─────────────────────────── */
-  --space-1:   4px;
-  --space-2:   8px;
-  --space-3:  12px;
-  --space-4:  16px;
-  --space-5:  20px;
-  --space-6:  24px;
-  --space-8:  32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-16: 64px;
-  --space-20: 80px;
-  --space-24: 96px;
+  /* ── Spacing ───────────────────────────────────────────────────────
+   * NOTE: No --space-* tokens are defined in production. Use Tailwind
+   * spacing scale directly (p-2, p-4, gap-6, etc.). Base unit is 4 px.
+   *   p-1=4 · p-2=8 · p-3=12 · p-4=16 · p-6=24 · p-8=32 · p-12=48
+   *   p-16=64 · p-20=80 · p-24=96
+   * ──────────────────────────────────────────────────────────────── */
 
-  /* ── Motion ──────────────────────────────────────────────────────── */
-  --duration-fast:  120ms;
-  --duration-base:  200ms;
-  --duration-slow:  350ms;
-  --duration-xslow: 550ms;
-  --ease-default: cubic-bezier(0.32, 0.72, 0, 1);   /* snappy settle */
-  --ease-out:     cubic-bezier(0, 0, 0.2, 1);        /* standard decel */
-  --ease-bounce:  cubic-bezier(0.34, 1.56, 0.64, 1); /* overshoot spring */
+  /* ── Motion ────────────────────────────────────────────────────────
+   * NOTE: No --duration-* or --ease-* tokens in production. Inline.
+   *   transition-[background,color] duration-150 ease-out  ← most UI
+   *   duration-300 ease-out                                ← hero / slow
+   *   Framer Motion fly-to-cart curve: [0.22, 1, 0.36, 1]
+   *   Framer Motion pop:               scale [1, 1.25, 0.95, 1]
+   * ──────────────────────────────────────────────────────────────── */
 
-  /* ── Z-index scale ───────────────────────────────────────────────── */
-  --z-raised:   10;   /* cards on hover, floating labels */
-  --z-dropdown: 100;  /* menus, popovers */
-  --z-sticky:   200;  /* nav, topbar */
-  --z-modal:    300;  /* dialogs, drawers */
-  --z-toast:    400;  /* snackbars */
-  --z-tooltip:  500;  /* always on top */
+  /* ── Z-index scale (production names — use these, do not invent) ── */
+  --z-sub-toolbar:    30;   /* filter toolbar in catalog list */
+  --z-cat-bar:        40;   /* category tabs sticky bar      */
+  --z-cart-strip:     45;   /* cart status strip             */
+  --z-topbar-amber:   49;   /* topbar amber layer            */
+  --z-topbar:         50;   /* topbar                         */
+  --z-scrim:          60;   /* drawer scrim, fly-to-cart pill */
+  --z-drawer:         61;   /* drawers, modals                */
 
   /* ── Breakpoints (reference — use in @media, not as var()) ───────── */
   /* sm: 640px · md: 768px · lg: 1024px · xl: 1280px · 2xl: 1536px   */
@@ -207,6 +202,10 @@
   --chart-3: var(--rbl-naranja);
   --chart-4: var(--rbl-verde);
   --chart-5: var(--rbl-rosa);
+
+  /* ── Dynamic vars (set by JS at runtime) ─────────────────────────── */
+  --amber-pct:    0%;     /* topbar amber-on-scroll progress (TopBar pattern) */
+  --cart-strip-h: 0px;    /* cart strip presence height (CartStrip mount) */
 
   /* ── Semantic type roles ─────────────────────────────────────────── */
   /* Use these as CSS recipes; the .wordmark utility further below is the
@@ -354,6 +353,44 @@ html, body {
 
 /* Numeric tabular alignment — prices, counts, timestamps */
 .tabular { font-variant-numeric: tabular-nums; }
+
+/* Safe area insets for iOS (notch, home indicator) — pair with sticky bars */
+.safe-t { padding-top:    env(safe-area-inset-top); }
+.safe-b { padding-bottom: env(safe-area-inset-bottom); }
+.safe-x {
+  padding-left:  env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Rambla seal: the Logo SVG uses these class names for path fills.
+ * In .topbar-snap context the seal inverts (R becomes amber on bone). */
+.topbar-seal .seal-badge { fill: var(--amber); transition: fill .12s; }
+.topbar-seal .seal-r     { fill: var(--background); transition: fill .12s; }
+.topbar-snap .topbar-seal .seal-badge { fill: var(--background); }
+.topbar-snap .topbar-seal .seal-r     { fill: var(--amber); }
+
+/* Mobile topbar snap — applied via CSS class on <html> when --amber-pct >= 65%
+ * (desktop uses React state instead). */
+.topbar-snap .date-pill-snap {
+  background: var(--background) !important;
+  border-color: var(--background) !important;
+  color: var(--ink);
+}
+.topbar-snap .user-btn-snap {
+  background: var(--background) !important;
+  border-color: var(--background) !important;
+  color: var(--ink);
+}
+
+/* Mobile catalog animations — used by EquipmentRow expand + drawer slide */
+@keyframes expand-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
 
 /* iOS-safe minimum font size on inputs to avoid focus-zoom */
 @media (max-width: 640px) {

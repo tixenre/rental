@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kit Preview · Rambla Rental</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { background: var(--background); color: var(--foreground); margin: 0; }
+
+  /* Mock topbar */
+  .top {
+    position: sticky; top: 0; z-index: 50;
+    height: 56px;
+    background: color-mix(in oklch, var(--background) 95%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; padding: 0 24px;
+  }
+  .top-brand { font-family: var(--font-display); font-weight: 900; font-size: 20px; line-height: 1; text-transform: lowercase; letter-spacing: 0.01em; color: var(--ink); }
+  .top-eye { margin-left: auto; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+
+  /* Hero */
+  .hero {
+    background: var(--amber); color: var(--ink);
+    padding: 56px 40px 48px;
+    border-bottom: 1px solid var(--hairline);
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(20,16,12,.06) 1px, transparent 1px);
+    background-size: 4px 4px;
+  }
+  .hero-eye { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: color-mix(in oklch, var(--ink) 70%, transparent); position: relative; }
+  .hero-title {
+    font-family: var(--font-display); font-weight: 900;
+    font-size: clamp(48px, 7vw, 84px); line-height: 0.92;
+    letter-spacing: 0.005em; text-transform: lowercase;
+    margin: 14px 0 0; color: var(--ink); position: relative;
+    text-wrap: balance;
+  }
+  .hero-sub { font-family: var(--font-sans); font-size: 14px; line-height: 1.55; color: color-mix(in oklch, var(--ink) 75%, transparent); max-width: 56ch; margin: 14px 0 0; position: relative; }
+
+  /* Container */
+  main { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+  /* Section */
+  section { padding: 56px 0; border-bottom: 1px solid var(--hairline); }
+  section:last-of-type { border-bottom: 0; }
+
+  .sec-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px; margin-bottom: 28px;
+  }
+  .sec-eye { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sec-title { font-family: var(--font-sans); font-weight: 700; font-size: 28px; line-height: 1.1; letter-spacing: -0.015em; margin: 4px 0 0; }
+  .sec-desc { font-family: var(--font-sans); font-size: 14px; line-height: 1.55; color: var(--muted-foreground); max-width: 52ch; margin: 6px 0 0; }
+  .sec-path { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted-foreground); padding: 6px 10px; border-radius: 9999px; border: 1px solid var(--hairline); }
+
+  /* Specimen card */
+  .specimen {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-xl);
+    padding: 28px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .spec-row-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px; align-items: start;
+  }
+  .spec-row-flex {
+    display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+  }
+  .spec-label {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px;
+  }
+  .spec-stack { display: flex; flex-direction: column; gap: 8px; }
+
+  /* ── Button specimens ─────────────────────────────────────────── */
+  .btn {
+    height: 40px; padding: 0 18px; border-radius: var(--radius-md);
+    border: 0; cursor: pointer; font-family: var(--font-sans);
+    font-size: 14px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    transition: opacity 150ms, transform 120ms cubic-bezier(0.32,0.72,0,1), background 150ms;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-amber { background: var(--amber); color: var(--ink); }
+  .btn-amber:hover { filter: brightness(1.1); }
+  .btn-ink { background: var(--ink); color: var(--background); }
+  .btn-ink:hover { opacity: 0.9; }
+  .btn-outline { background: transparent; color: var(--ink); border: 1px solid var(--hairline); }
+  .btn-outline:hover { border-color: var(--ink); background: var(--surface-elevated); }
+  .btn-ghost { background: transparent; color: var(--ink); }
+  .btn-ghost:hover { background: var(--surface-elevated); }
+  .btn-destructive { background: var(--destructive); color: white; }
+  .btn-pill { border-radius: 9999px; }
+  .btn-sm { height: 32px; padding: 0 14px; font-size: 13px; }
+  .btn-lg { height: 44px; padding: 0 22px; font-size: 15px; }
+
+  /* ── Input ───────────────────────────────────────────────────── */
+  .field-label {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--muted-foreground);
+    display: block; margin-bottom: 6px;
+  }
+  .input {
+    width: 100%; height: 40px; border-radius: var(--radius-sm);
+    border: 1px solid var(--hairline); background: var(--surface-elevated);
+    padding: 0 14px; font-family: var(--font-sans); font-size: 14px; color: var(--ink);
+    box-sizing: border-box;
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+  .input:focus { outline: 0; border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+  .input.error { border-color: var(--destructive); }
+  .input.error:focus { box-shadow: 0 0 0 3px color-mix(in oklch, var(--destructive) 14%, transparent); }
+  .search-wrap { position: relative; }
+  .search-wrap .ico { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted-foreground); pointer-events: none; }
+  .search-wrap .input { padding-left: 38px; }
+
+  /* ── Badge ────────────────────────────────────────────────────── */
+  .badge {
+    display: inline-flex; align-items: center; padding: 3px 10px;
+    border-radius: 9999px; font-family: var(--font-sans);
+    font-size: 12px; font-weight: 500;
+    border: 1px solid;
+  }
+  .badge-borrador { background: var(--surface); color: var(--muted-foreground); border-color: var(--hairline); }
+  .badge-presupuesto { background: color-mix(in oklch, var(--azul) 12%, transparent); color: var(--azul); border-color: color-mix(in oklch, var(--azul) 30%, transparent); }
+  .badge-solicitado { background: color-mix(in oklch, var(--amber) 15%, transparent); color: color-mix(in oklch, var(--ink) 100%, transparent); border-color: color-mix(in oklch, var(--amber) 50%, transparent); }
+  .badge-confirmado { background: color-mix(in oklch, var(--verde) 12%, transparent); color: var(--verde); border-color: color-mix(in oklch, var(--verde) 30%, transparent); }
+  .badge-retirado { background: color-mix(in oklch, var(--ink) 90%, transparent); color: var(--amber); border-color: var(--ink); }
+  .badge-devuelto { background: var(--surface); color: var(--ink); border-color: var(--hairline); }
+  .badge-cancelado { background: color-mix(in oklch, var(--destructive) 10%, transparent); color: var(--destructive); border-color: color-mix(in oklch, var(--destructive) 30%, transparent); }
+  .badge-atrasado { background: color-mix(in oklch, var(--naranja) 12%, transparent); color: var(--naranja); border-color: color-mix(in oklch, var(--naranja) 30%, transparent); }
+
+  /* ── AddonPills ───────────────────────────────────────────────── */
+  .addon-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .addon-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 9999px;
+    background: var(--surface-elevated); color: var(--ink);
+    border: 1px solid var(--hairline);
+    font-family: var(--font-sans); font-size: 11px; white-space: nowrap;
+  }
+  .addon-pill.more { color: var(--muted-foreground); font-family: var(--font-mono); }
+
+  /* ── PriceBlock ──────────────────────────────────────────────── */
+  .price-block { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+  .price-amount { font-family: var(--font-display); font-weight: 900; font-size: 32px; color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums; }
+  .price-meta { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); }
+  .price-period { font-family: var(--font-display); font-weight: 900; font-size: 17px; color: var(--amber); font-variant-numeric: tabular-nums; }
+
+  /* ── ViewToggle ───────────────────────────────────────────────── */
+  .vt {
+    display: inline-flex; padding: 2px; border-radius: 9999px;
+    background: var(--surface-elevated); border: 1px solid var(--hairline);
+    position: relative;
+  }
+  .vt button {
+    position: relative; z-index: 1; height: 30px; padding: 0 14px;
+    border: 0; background: transparent; cursor: pointer;
+    font-family: var(--font-sans); font-size: 12px; font-weight: 500;
+    color: var(--muted-foreground); border-radius: 9999px;
+    display: inline-flex; align-items: center; gap: 5px;
+    transition: color 150ms;
+  }
+  .vt button.active { color: var(--ink); background: var(--background); box-shadow: 0 1px 2px oklch(0.18 0.01 60 / 6%); font-weight: 600; }
+
+  /* ── StatCard ────────────────────────────────────────────────── */
+  .stat-card {
+    border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+    background: var(--surface-elevated); padding: 18px 20px;
+  }
+  .stat-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .stat-value { font-family: var(--font-display); font-weight: 900; font-size: 36px; color: var(--ink); line-height: 1; margin: 8px 0; font-variant-numeric: tabular-nums; }
+  .stat-meta { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+  .stat-meta.up { color: var(--verde); }
+
+  /* ── EmptyState ─────────────────────────────────────────────── */
+  .empty {
+    text-align: center; padding: 40px 24px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .empty-icon { color: var(--muted-foreground); opacity: 0.4; }
+  .empty-title { font-family: var(--font-display); font-weight: 900; font-size: 24px; color: var(--ink); line-height: 1.1; text-transform: lowercase; letter-spacing: 0.005em; }
+  .empty-sub { font-family: var(--font-sans); font-size: 13px; color: var(--muted-foreground); max-width: 36ch; }
+  .empty-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+
+  /* ── EquipmentCard ─────────────────────────────────────────── */
+  .eq-card {
+    border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+    background: var(--surface-elevated); overflow: hidden;
+    display: flex; flex-direction: column;
+    transition: transform 200ms cubic-bezier(0,0,0.2,1), box-shadow 200ms;
+    cursor: pointer;
+  }
+  .eq-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px oklch(0.18 0.01 60 / 8%), 0 1px 3px oklch(0.18 0.01 60 / 5%);
+  }
+  .eq-photo {
+    aspect-ratio: 1;
+    background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 56px;
+  }
+  .eq-info { padding: 12px 14px 4px; }
+  .eq-brand { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+  .eq-name { font-family: var(--font-display); font-weight: 900; font-size: 15px; color: var(--ink); line-height: 1.15; text-transform: lowercase; letter-spacing: 0.005em; margin: 2px 0 0; }
+  .eq-cardprice { padding: 8px 14px 14px; display: flex; justify-content: space-between; align-items: center; }
+  .eq-cardprice-val { font-family: var(--font-display); font-weight: 900; font-size: 16px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .eq-cardprice-meta { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted-foreground); }
+  .eq-add {
+    width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--hairline);
+    background: var(--background); color: var(--ink); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 120ms, border-color 120ms;
+  }
+  .eq-add:hover { background: var(--amber); border-color: var(--amber); }
+
+  /* ── Toast ───────────────────────────────────────────────────── */
+  .toast {
+    display: flex; gap: 12px; padding: 14px 16px;
+    border-radius: var(--radius-md);
+    background: var(--surface-elevated);
+    border: 1px solid var(--hairline);
+    box-shadow: 0 12px 32px oklch(0.18 0.01 60 / 10%);
+    min-width: 320px;
+  }
+  .toast-icon { flex-shrink: 0; margin-top: 1px; }
+  .toast-body { flex: 1; }
+  .toast-title { font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--ink); }
+  .toast-sub { font-family: var(--font-sans); font-size: 12px; color: var(--muted-foreground); margin-top: 2px; }
+  .toast.success .toast-icon { color: var(--verde); }
+  .toast.error .toast-icon { color: var(--destructive); }
+  .toast.info .toast-icon { color: var(--azul); }
+
+  /* Footer */
+  footer { padding: 32px 24px; text-align: center; border-top: 1px solid var(--hairline); }
+  .foot-eye { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+
+  <!-- TopBar mock -->
+  <header class="top">
+    <span class="top-brand">rambla</span>
+    <span class="top-eye">kit preview · QA visual</span>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero" style="border-bottom:0;">
+    <div class="hero-eye">Catálogo · kit preview · todos los componentes</div>
+    <h1 class="hero-title">design system,<br>vivo y completo.</h1>
+    <p class="hero-sub">Todos los componentes del kit en una sola pantalla. QA visual para chequear que el look se mantenga consistente en cada cambio.</p>
+  </section>
+
+  <main>
+
+    <!-- Buttons -->
+    <section>
+      <div class="sec-head">
+        <div>
+          <div class="sec-eye">01 · Button</div>
+          <h2 class="sec-title">Acción primaria, secundaria, ghost</h2>
+          <p class="sec-desc">5 variantes × 3 tamaños × 2 shapes. Press state -3%, transición 120ms easeOut.</p>
+        </div>
+        <a class="sec-path">src/components/ui/button.tsx</a>
+      </div>
+      <div class="specimen">
+        <div class="spec-row-flex">
+          <button class="btn btn-amber">Reservar</button>
+          <button class="btn btn-ink">Confirmar</button>
+          <button class="btn btn-outline">Cancelar</button>
+          <button class="btn btn-ghost">Limpiar</button>
+          <button class="btn btn-destructive">Eliminar</button>
+        </div>
+        <div class="spec-row-flex">
+          <button class="btn btn-amber btn-sm">Sumar</button>
+          <button class="btn btn-amber">Reservar</button>
+          <button class="btn btn-amber btn-lg">Confirmar reserva</button>
+          <button class="btn btn-amber btn-pill">
+            Ver catálogo
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Input -->
+    <section>
+      <div class="sec-head">
+        <div>
+          <div class="sec-eye">02 · Input · SearchInput · FieldLabel</div>
+          <h2 class="sec-title">Estados de entrada</h2>
+          <p class="sec-desc">Focus ring 3px amber-soft. Error usa destructive con mismo grosor. Anti-zoom iOS: min 16px.</p>
+        </div>
+        <a class="sec-path">src/components/ui/input.tsx</a>
+      </div>
+      <div class="specimen">
+        <div class="spec-row-grid">
+          <div>
+            <label class="field-label">Email</label>
+            <input class="input" value="hola@productora.com" readonly>
+          </div>
+          <div>
+            <label class="field-label">Búsqueda</label>
+            <div class="search-wrap">
+              <svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              <input class="input" placeholder="Buscar equipo, marca…">
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Error · validación</label>
+            <input class="input error" value="hola@incompleto">
+            <div style="font-family:var(--font-sans);font-size:11px;color:var(--destructive);margin-top:4px;">Ingresá un correo válido.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EstadoBadge -->
+    <section>
+      <div class="sec-head">
+        <div>
+          <div class="sec-eye">03 · EstadoBadge</div>
+          <h2 class="sec-title">9 estados del flujo de pedido</h2>
+          <p class="sec-desc">Paleta secundaria de marca como semántica. Solo aparecen en portal cliente y admin — nunca en marketing.</p>
+        </div>
+        <a class="sec-path">src/components/kit/estado-badge.tsx</a>
+      </div>
+      <div class="specimen">
+        <div class="spec-row-flex">
+          <span class="badge badge-borrador">Borrador</span>
+          <span class="badge badge-presupuesto">Presupuesto</span>
+          <span class="badge badge-solicitado">Solicitado</span>
+          <span class="badge badge-confirmado">Confirmado</span>
+          <span class="badge badge-retirado">Retirado</span>
+          <span class="badge badge-devuelto">Devuelto</span>
+          <span class="badge badge-atrasado">Atrasado</span>
+          <span class="badge badge-cancelado">Cancelado</span>
+          <span class="badge badge-cancelado">Perdido</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- AddonPills + PriceBlock + ViewToggle -->
+    <section>
+      <div class="sec-head">
+        <div>
+          <div class="sec-eye">04 · AddonPills · PriceBlock · ViewToggle</div>
+          <h2 class="sec-title">Building blocks del catálogo</h2>
+        </div>
+        <a class="sec-path">src/components/kit/*.tsx</a>
+      </div>
+      <div class="specimen">
+        <div class="spec-row-grid">
+          <div>
+            <div class="spec-label">AddonPills · max 3 + más</div>
+            <div class="addon-row">
+              <div class="addon-pill">Batería × 2</div>
+              <div class="addon-pill">Cargador</div>
+              <div class="addon-pill">Tarjeta SD 64GB</div>
+              <div class="addon-pill more">+2</div>
+            </div>
+          </div>
+          <div>
+            <div class="spec-label">PriceBlock · con período</div>
+            <div class="price-block">
+              <div style="display:flex;align-items:baseline;gap:6px;">
+                <span class="price-amount">$ 24.500</span>
+                <span class="price-meta">/ jornada</span>
+              </div>
+              <div class="price-period">$ 73.500 · 3 j</div>
+            </div>
+          </div>
+          <div>
+            <div class="spec-label">ViewToggle</div>
+            <div class="vt">
+              <button class="active">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                Grid
+              </button>
+              <button>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                Lista
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- StatCard -->
+    <section>
+      <div class="sec-head">
+        <div>
+          <div class="sec-eye">05 · StatCard</div>
+          <h2 class="sec-title">Métricas del dashboard admin</h2>
+          <p class="sec-desc">Número grande en Champ Black tabular. Label en eyebrow mono. Meta abajo con delta semántico.</p>
+        </div>
+        <a class="sec-path">src/components/kit/stat-card.tsx</a>
+      </div>
+      <div class="specimen">
+        <div class="spec-row-grid">
+          <div class="stat-card">
+            <div class="stat-label">Pedidos · mayo</div>
+            <div class="stat-value">42</div>
+            <div class="stat-meta up">+8 vs. abril</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Ingresos · mayo</div>
+            <div class="stat-value">$ 2.840.500</div>
+            <div class="stat-meta">ARS</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Equipos activos</div>
+            <div class="stat-value">187</div>
+            <div class="stat-meta">95% en uso</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EquipmentCard -->
+    <section>
+      <div class="sec-head">
+        <div>
+          <div class="sec-eye">06 · EquipmentCard</div>
+          <h2 class="sec-title">Card del catálogo (grid mode)</h2>
+          <p class="sec-desc">Hover lift -2px + shadow-md. Click → expand inline o nav a ficha. Botón Agregar dispara fly-to-cart.</p>
+        </div>
+        <a class="sec-path">src/components/kit/equipment-card.tsx</a>
+      </div>
+      <div class="specimen">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+          <div class="eq-card">
+            <div class="eq-photo">📷</div>
+            <div class="eq-info"><div class="eq-brand">Sony</div><div class="eq-name">a7s III</div></div>
+            <div class="eq-cardprice">
+              <div><div class="eq-cardprice-val">$ 24.500</div><div class="eq-cardprice-meta">/ jornada</div></div>
+              <button class="eq-add"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+            </div>
+          </div>
+          <div class="eq-card">
+            <div class="eq-photo">💡</div>
+            <div class="eq-info"><div class="eq-brand">Aputure</div><div class="eq-name">600d pro</div></div>
+            <div class="eq-cardprice">
+              <div><div class="eq-cardprice-val">$ 12.000</div><div class="eq-cardprice-meta">/ jornada</div></div>
+              <button class="eq-add"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+            </div>
+          </div>
+          <div class="eq-card">
+            <div class="eq-photo">🎙</div>
+            <div class="eq-info"><div class="eq-brand">RØDE</div><div class="eq-name">NTG5</div></div>
+            <div class="eq-cardprice">
+              <div><div class="eq-cardprice-val">$ 6.000</div><div class="eq-cardprice-meta">/ jornada</div></div>
+              <button class="eq-add"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+            </div>
+          </div>
+          <div class="eq-card">
+            <div class="eq-photo">🎬</div>
+            <div class="eq-info"><div class="eq-brand">DJI</div><div class="eq-name">RS4 pro</div></div>
+            <div class="eq-cardprice">
+              <div><div class="eq-cardprice-val">$ 15.000</div><div class="eq-cardprice-meta">/ jornada</div></div>
+              <button class="eq-add"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EmptyState -->
+    <section>
+      <div class="sec-head">
+        <div>
+          <div class="sec-eye">07 · EmptyState</div>
+          <h2 class="sec-title">Sin resultados, accionable</h2>
+          <p class="sec-desc">Siempre con CTA. Copy de marca (lowercase, periodo final, "vos").</p>
+        </div>
+        <a class="sec-path">src/components/kit/empty-state.tsx</a>
+      </div>
+      <div class="specimen">
+        <div class="empty">
+          <div class="empty-icon">
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          </div>
+          <div class="empty-title">sin resultados.</div>
+          <div class="empty-sub">No hay equipos para "vintage". Probá con otro término o explorá las categorías populares.</div>
+          <div class="empty-actions">
+            <button class="btn btn-outline btn-sm">Cámaras</button>
+            <button class="btn btn-outline btn-sm">Lentes</button>
+            <button class="btn btn-outline btn-sm">Iluminación</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Toasts -->
+    <section>
+      <div class="sec-head">
+        <div>
+          <div class="sec-eye">08 · Toast (sonner)</div>
+          <h2 class="sec-title">Feedback inline · success, error, info</h2>
+          <p class="sec-desc">Sonner con border-radius del sistema. shadow-lg. Auto-dismiss 4-6s según gravedad.</p>
+        </div>
+        <a class="sec-path">sonner · src/App.tsx Toaster</a>
+      </div>
+      <div class="specimen">
+        <div class="spec-stack">
+          <div class="toast success">
+            <div class="toast-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></div>
+            <div class="toast-body"><div class="toast-title">Pedido #1247 enviado</div><div class="toast-sub">Te llevamos a tu portal para seguir el estado.</div></div>
+          </div>
+          <div class="toast error">
+            <div class="toast-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <div class="toast-body"><div class="toast-title">Seleccioná fechas antes de confirmar</div><div class="toast-sub">Tu pedido necesita fechas de retiro y devolución.</div></div>
+          </div>
+          <div class="toast info">
+            <div class="toast-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><circle cx="12" cy="16" r="0.5" fill="currentColor"/></svg></div>
+            <div class="toast-body"><div class="toast-title">Descuento aplicado · 5% por jornada</div><div class="toast-sub">3 jornadas o más activa el descuento.</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="foot-eye">Rambla Rental · kit preview · QA visual sin login</div>
+  </footer>
+
+</body>
+</html>

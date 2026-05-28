@@ -829,15 +829,21 @@ cp -r path/to/kit src/kit</pre>
     <a class="module-path" href="colors_and_type.css">colors_and_type.css</a>
   </div>
 
-  <div class="module-eyebrow" style="margin-bottom:12px;">Sombras</div>
+  <div class="module-eyebrow" style="margin-bottom:6px;">Sombras</div>
+  <p style="font-family:var(--font-sans);font-size:11px;color:var(--muted-foreground);margin:0 0 12px;line-height:1.5;">
+    No hay <code class="inline">--shadow-*</code> tokens. Producción usa Tailwind directo (<code class="inline">shadow-md</code>) o arbitrary values inline. Mostramos abajo los presets y la sombra signature del CartMiniBar.
+  </p>
   <div class="shadow-grid" style="margin-bottom:36px;">
-    <div class="shadow-card"><div class="shadow-pill" style="box-shadow:var(--shadow-sm);"></div><div class="shadow-token">--shadow-sm<br><span style="color:var(--ink);font-size:8px;">cards planas</span></div></div>
-    <div class="shadow-card"><div class="shadow-pill" style="box-shadow:var(--shadow-md);"></div><div class="shadow-token">--shadow-md<br><span style="color:var(--ink);font-size:8px;">dropdowns</span></div></div>
-    <div class="shadow-card"><div class="shadow-pill" style="box-shadow:var(--shadow-lg);"></div><div class="shadow-token">--shadow-lg<br><span style="color:var(--ink);font-size:8px;">modales</span></div></div>
-    <div class="shadow-card"><div class="shadow-pill" style="box-shadow:var(--shadow-xl);"></div><div class="shadow-token">--shadow-xl<br><span style="color:var(--ink);font-size:8px;">drawers</span></div></div>
+    <div class="shadow-card"><div class="shadow-pill" style="box-shadow:0 1px 2px oklch(0.18 0.01 60 / 6%);"></div><div class="shadow-token">shadow-sm<br><span style="color:var(--ink);font-size:8px;">cards en reposo</span></div></div>
+    <div class="shadow-card"><div class="shadow-pill" style="box-shadow:0 4px 12px oklch(0.18 0.01 60 / 8%), 0 1px 3px oklch(0.18 0.01 60 / 5%);"></div><div class="shadow-token">shadow-md<br><span style="color:var(--ink);font-size:8px;">dropdowns</span></div></div>
+    <div class="shadow-card"><div class="shadow-pill" style="box-shadow:0 12px 32px oklch(0.18 0.01 60 / 10%), 0 2px 8px oklch(0.18 0.01 60 / 6%);"></div><div class="shadow-token">shadow-lg<br><span style="color:var(--ink);font-size:8px;">drawers</span></div></div>
+    <div class="shadow-card" style="outline:2px solid var(--amber);outline-offset:-1px;"><div class="shadow-pill" style="box-shadow:0 -8px 32px -8px rgba(0,0,0,0.15);"></div><div class="shadow-token">CartMiniBar ✦<br><span style="color:var(--ink);font-size:8px;font-family:var(--font-mono);">shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.15)]</span></div></div>
   </div>
 
-  <div class="module-eyebrow" style="margin-bottom:12px;">Espaciado — base 4 px</div>
+  <div class="module-eyebrow" style="margin-bottom:6px;">Espaciado — base 4 px</div>
+  <p style="font-family:var(--font-sans);font-size:11px;color:var(--muted-foreground);margin:0 0 12px;line-height:1.5;">
+    No hay <code class="inline">--space-*</code> tokens. Usar Tailwind directo: <code class="inline">p-2</code> (8px), <code class="inline">gap-6</code> (24px), etc. Esta escala visual es referencia.
+  </p>
   <div class="space-rows" style="margin-bottom:36px;">
     <div class="space-row"><span class="space-token">--space-1</span><div class="space-bar-wrap"><div class="space-bar" style="width:2%"></div></div><span class="space-val">4px</span></div>
     <div class="space-row"><span class="space-token">--space-2</span><div class="space-bar-wrap"><div class="space-bar" style="width:4%"></div></div><span class="space-val">8px</span></div>
@@ -852,7 +858,10 @@ cp -r path/to/kit src/kit</pre>
     <div class="space-row"><span class="space-token">--space-24</span><div class="space-bar-wrap"><div class="space-bar" style="width:50%"></div></div><span class="space-val">96px</span></div>
   </div>
 
-  <div class="module-eyebrow" style="margin-bottom:12px;">Motion — pasá el mouse para animar</div>
+  <div class="module-eyebrow" style="margin-bottom:6px;">Motion — pasá el mouse para animar</div>
+  <p style="font-family:var(--font-sans);font-size:11px;color:var(--muted-foreground);margin:0 0 12px;line-height:1.5;">
+    No hay <code class="inline">--duration-*</code> ni <code class="inline">--ease-*</code> tokens. Usar Tailwind: <code class="inline">transition duration-150 ease-out</code>. La signature canonónica es la del fly-to-cart: <code class="inline">[0.22, 1, 0.36, 1]</code>.
+  </p>
   <div class="motion-grid" style="margin-bottom:36px;">
     <div class="motion-card">
       <div class="motion-track"><div class="motion-ball mb-fast"></div></div>
@@ -870,16 +879,17 @@ cp -r path/to/kit src/kit</pre>
 
   <div class="ref-tables">
     <div class="ref-table">
-      <div class="ref-thead">Z-index scale</div>
-      <div class="ref-row"><span class="ref-key">--z-raised</span><span class="ref-desc">10 · cards hover, labels flotantes</span></div>
-      <div class="ref-row"><span class="ref-key">--z-dropdown</span><span class="ref-desc">100 · menús, popovers</span></div>
-      <div class="ref-row"><span class="ref-key">--z-sticky</span><span class="ref-desc">200 · nav, topbar</span></div>
-      <div class="ref-row"><span class="ref-key">--z-modal</span><span class="ref-desc">300 · diálogos, drawers</span></div>
-      <div class="ref-row"><span class="ref-key">--z-toast</span><span class="ref-desc">400 · snackbars</span></div>
-      <div class="ref-row"><span class="ref-key">--z-tooltip</span><span class="ref-desc">500 · siempre encima</span></div>
+      <div class="ref-thead">Z-index scale (producción)</div>
+      <div class="ref-row"><span class="ref-key">--z-sub-toolbar</span><span class="ref-desc">30 · filter toolbar (catalog list)</span></div>
+      <div class="ref-row"><span class="ref-key">--z-cat-bar</span><span class="ref-desc">40 · category tabs sticky bar</span></div>
+      <div class="ref-row"><span class="ref-key">--z-cart-strip</span><span class="ref-desc">45 · cart status strip</span></div>
+      <div class="ref-row"><span class="ref-key">--z-topbar-amber</span><span class="ref-desc">49 · topbar amber layer</span></div>
+      <div class="ref-row"><span class="ref-key">--z-topbar</span><span class="ref-desc">50 · topbar</span></div>
+      <div class="ref-row"><span class="ref-key">--z-scrim</span><span class="ref-desc">60 · drawer scrim, fly-to-cart pill</span></div>
+      <div class="ref-row"><span class="ref-key">--z-drawer</span><span class="ref-desc">61 · drawers, modales</span></div>
     </div>
     <div class="ref-table">
-      <div class="ref-thead">Breakpoints · solo en @media, no como var()</div>
+      <div class="ref-thead">Breakpoints · Tailwind defaults, solo @media</div>
       <div class="ref-row"><span class="ref-key">sm</span><span class="ref-desc">640px · landscape mobile</span></div>
       <div class="ref-row"><span class="ref-key">md</span><span class="ref-desc">768px · tablet portrait</span></div>
       <div class="ref-row"><span class="ref-key">lg</span><span class="ref-desc">1024px · tablet landscape</span></div>
