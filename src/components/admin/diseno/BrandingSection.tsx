@@ -12,13 +12,23 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Upload, Loader2, MessageCircle, Image as ImageIcon, Check } from "lucide-react";
+import {
+  Upload,
+  Loader2,
+  MessageCircle,
+  Image as ImageIcon,
+  Check,
+  Type,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { adminApi } from "@/lib/admin/api";
 import { authedJson } from "@/lib/authedFetch";
+import { HERO_TAGLINES_DEFAULT, parseHeroTaglines, type HeroTagline } from "@/lib/hero-taglines";
 
 type Setting = { key: string; value: string; updated_at: string | null; updated_by: string | null };
 
@@ -81,6 +91,47 @@ export function BrandingSection() {
   });
 
   const phoneChanged = phoneInput.trim() !== (phoneQ.data ?? "").trim();
+
+  // ── Hero taglines ─────────────────────────────────────────────────
+  const taglinesQ = useQuery({
+    queryKey: ["settings", "hero_taglines"],
+    queryFn: () => fetchSetting("hero_taglines"),
+  });
+  const [taglineRows, setTaglineRows] = useState<HeroTagline[]>(HERO_TAGLINES_DEFAULT);
+  useEffect(() => {
+    if (taglinesQ.data) setTaglineRows(parseHeroTaglines(taglinesQ.data));
+  }, [taglinesQ.data]);
+
+  const taglinesMut = useMutation({
+    mutationFn: (rows: HeroTagline[]) =>
+      adminApi.updateSetting("hero_taglines", JSON.stringify(rows)),
+    onSuccess: (data) => {
+      toast.success("Taglines guardados");
+      qc.setQueryData(["settings", "hero_taglines"], data.value);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  function updateTaglineLine(idx: number, lineIdx: 0 | 1, val: string) {
+    setTaglineRows((prev) =>
+      prev.map((t, i) =>
+        i === idx ? ([lineIdx === 0 ? val : t[0], lineIdx === 1 ? val : t[1]] as HeroTagline) : t,
+      ),
+    );
+  }
+
+  function addTagline() {
+    if (taglineRows.length >= 12) return;
+    setTaglineRows((prev) => [...prev, ["nueva línea 1", "nueva línea 2"]]);
+  }
+
+  function removeTagline(idx: number) {
+    if (taglineRows.length <= 1) return;
+    setTaglineRows((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  const taglinesChanged =
+    JSON.stringify(taglineRows) !== JSON.stringify(parseHeroTaglines(taglinesQ.data ?? ""));
 
   return (
     <section className="space-y-6">
@@ -194,6 +245,76 @@ export function BrandingSection() {
             Probar enlace →
           </a>
         )}
+      </div>
+
+      {/* Hero taglines */}
+      <div className="rounded-lg border hairline bg-background p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Type className="h-4 w-4 text-amber" />
+          <h2 className="font-display text-lg text-ink">Taglines del hero</h2>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Frases que rotan aleatoriamente en el hero del catálogo en cada visita. Cada tagline tiene
+          dos líneas. Mínimo 1, máximo 12.
+        </p>
+
+        <div className="space-y-2">
+          {taglineRows.map((t, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <div className="flex-1 grid grid-cols-2 gap-2">
+                <Input
+                  value={t[0]}
+                  onChange={(e) => updateTaglineLine(i, 0, e.target.value)}
+                  placeholder="Línea 1"
+                  className="font-display"
+                />
+                <Input
+                  value={t[1]}
+                  onChange={(e) => updateTaglineLine(i, 1, e.target.value)}
+                  placeholder="Línea 2"
+                  className="font-display"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => removeTagline(i)}
+                disabled={taglineRows.length <= 1}
+                className="shrink-0 text-muted-foreground hover:text-destructive transition disabled:opacity-30"
+                aria-label="Eliminar tagline"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addTagline}
+            disabled={taglineRows.length >= 12}
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" /> Agregar
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!taglinesChanged || taglinesMut.isPending}
+            onClick={() => taglinesMut.mutate(taglineRows)}
+          >
+            {taglinesMut.isPending ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Guardando…
+              </>
+            ) : (
+              <>
+                <Check className="h-3.5 w-3.5 mr-1" /> Guardar
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </section>
   );

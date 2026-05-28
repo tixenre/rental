@@ -1029,6 +1029,11 @@ def init_db():
         VALUES ('modificacion_ventana_horas', '24', 'system-seed')
         ON CONFLICT (key) DO NOTHING
     """)
+    conn.execute("""
+        INSERT INTO app_settings (key, value, updated_by)
+        VALUES ('hero_taglines', '[["rental, estudio,","rambla."],["en rambla,","en mardel."],["en rambla,","tu proyecto."],["en rambla,","tu rodaje."]]', 'system-seed')
+        ON CONFLICT (key) DO NOTHING
+    """)
 
     # Sugerencias automáticas ignoradas (#352). Cuando el admin descarta una
     # sugerencia, la persistimos por (tipo, ref) para no volver a mostrarla.

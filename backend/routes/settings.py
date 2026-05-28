@@ -59,6 +59,29 @@ def _validar_horarios(value: str) -> str:
     return json.dumps(out)
 
 
+def _validar_hero_taglines(value: str) -> str:
+    """Valida el JSON de taglines del hero.
+
+    Forma: [["línea 1", "línea 2"], ...]. Mínimo 1, máximo 12."""
+    try:
+        data = json.loads(value)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, f"hero_taglines debe ser JSON válido ({e})")
+    if not isinstance(data, list) or len(data) == 0:
+        raise HTTPException(400, "hero_taglines debe ser una lista con al menos un tagline")
+    if len(data) > 12:
+        raise HTTPException(400, "hero_taglines no puede tener más de 12 taglines")
+    out = []
+    for item in data:
+        if not isinstance(item, list) or len(item) != 2:
+            raise HTTPException(400, "Cada tagline debe ser una lista de exactamente 2 strings")
+        l1, l2 = str(item[0]).strip(), str(item[1]).strip()
+        if not l1 or not l2:
+            raise HTTPException(400, "Cada línea del tagline debe tener texto")
+        out.append([l1, l2])
+    return json.dumps(out, ensure_ascii=False)
+
+
 def _validar_faq(value: str) -> str:
     """Valida y normaliza el JSON de preguntas frecuentes.
 
@@ -113,6 +136,7 @@ ALLOWED_SETTINGS_KEYS = {
     "buffer_horas_alquiler",  # Horas de prep/revisión exigidas entre alquileres. Int >= 0.
     "horarios_retiro",   # Horas habilitadas de retiro/devolución por día de semana. JSON.
     "faq_json",          # Preguntas frecuentes editables. JSON [{title, items:[{q,a}]}].
+    "hero_taglines",     # Taglines del hero del catálogo. JSON [[línea1, línea2], ...].
 }
 
 
@@ -194,6 +218,8 @@ def update_setting(key: str, payload: dict, request: Request):
         value = _validar_horarios(value)
     if key == "faq_json":
         value = _validar_faq(value)
+    if key == "hero_taglines":
+        value = _validar_hero_taglines(value)
     actor = (session.get("email") or session.get("user_id") or "admin")[:255]
     conn = get_db()
     try:

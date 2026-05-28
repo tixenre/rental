@@ -30,6 +30,7 @@ import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
+import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
 import { apiGetDescuentosJornada, apiGetDiasBloqueados } from "@/lib/api";
@@ -163,6 +164,26 @@ function HeroBanner({
   equipCount: number;
 }) {
   const navigate = useNavigate();
+
+  const { data: taglinesData } = useQuery({
+    queryKey: ["settings", "hero_taglines"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/settings/hero_taglines");
+        if (!res.ok) return HERO_TAGLINES_DEFAULT;
+        const d = await res.json();
+        return parseHeroTaglines(d.value as string);
+      } catch {
+        return HERO_TAGLINES_DEFAULT;
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const taglines = taglinesData ?? HERO_TAGLINES_DEFAULT;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const taglineIdx = useMemo(() => Math.floor(Math.random() * 4), []);
+  const tagline = taglines[taglineIdx % taglines.length];
+
   return (
     <div ref={heroRef} className="relative bg-amber" style={{ padding: "28px 20px 32px" }}>
       <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-4">
@@ -170,11 +191,9 @@ function HeroBanner({
       </div>
 
       <div className="font-display text-[46px] font-black text-ink leading-[1] tracking-[-0.02em] mb-[18px]">
-        un lugar
+        {tagline[0]}
         <br />
-        donde pasan
-        <br />
-        cosas.
+        {tagline[1]}
       </div>
 
       <p className="font-sans text-[15px] leading-[1.55] text-ink/75 mb-7">

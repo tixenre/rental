@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
 import {
   LayoutGrid,
@@ -37,6 +38,7 @@ import {
   type SpecFilterDef,
 } from "@/hooks/useEquipos";
 import type { BackendMarca, BackendCategoria } from "@/lib/api";
+import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
@@ -180,6 +182,25 @@ function Index() {
   const { data: allEquipos = [], isLoading, isError } = useEquipos(startDate, endDate);
   const { data: backendCats = [] } = useCategorias();
   const { data: marcasData } = useMarcas();
+
+  const { data: taglinesData } = useQuery({
+    queryKey: ["settings", "hero_taglines"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/settings/hero_taglines");
+        if (!res.ok) return HERO_TAGLINES_DEFAULT;
+        const d = await res.json();
+        return parseHeroTaglines(d.value as string);
+      } catch {
+        return HERO_TAGLINES_DEFAULT;
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const taglines = taglinesData ?? HERO_TAGLINES_DEFAULT;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const taglineIdx = useMemo(() => Math.floor(Math.random() * 4), []);
+  const tagline = taglines[taglineIdx % taglines.length];
 
   // Categorías derivadas, ordenadas por prioridad del backend.
   // Las que no aparecen en /api/categorias quedan al final, alfabéticas.
@@ -422,11 +443,9 @@ function Index() {
             Catálogo · {isLoading ? "…" : allEquipos.length} equipos · Mar del Plata
           </div>
           <h1 className="mt-4 wordmark text-5xl sm:text-7xl md:text-[7rem] lg:text-[8.5rem] leading-[0.9] md:leading-[0.85] text-balance break-words">
-            un lugar
+            {tagline[0]}
             <br />
-            donde pasan
-            <br />
-            cosas.
+            {tagline[1]}
           </h1>
           <p className="mt-6 max-w-xl text-base text-ink/80">
             Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales. Elegí fechas
