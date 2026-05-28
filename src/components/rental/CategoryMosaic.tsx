@@ -28,7 +28,9 @@ export function CategoryMosaic({
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {categories.map((c) => {
-            const count = getCount ? getCount(c) : allEquipos.filter((e) => e.category === c).length;
+            const count = getCount
+              ? getCount(c)
+              : allEquipos.filter((e) => e.category === c).length;
             return (
               <button
                 key={c}
@@ -40,7 +42,9 @@ export function CategoryMosaic({
                 </span>
                 <div className="flex w-full items-baseline justify-between gap-2">
                   <span className="font-display text-base leading-tight text-ink">{c}</span>
-                  <span className="font-mono text-[10px] tabular text-muted-foreground">{count}</span>
+                  <span className="font-mono text-[10px] tabular text-muted-foreground">
+                    {count}
+                  </span>
                 </div>
               </button>
             );
