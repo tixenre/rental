@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pattern · Form states</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+:root{
+  --verde: var(--rbl-verde); --azul: var(--rbl-azul);
+  --naranja: var(--rbl-naranja); --rosa: var(--rbl-rosa);
+  --shadow-sm: 0 1px 2px oklch(0.18 0.01 60 / 6%);
+  --shadow-md: 0 4px 12px oklch(0.18 0.01 60 / 8%), 0 1px 3px oklch(0.18 0.01 60 / 5%);
+}
+.card { gap: 22px; padding: 22px; }
+.sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+.divider { border: 0; border-top: 1px dashed var(--hairline); margin: 0; }
+
+/* ── Field primitives ──────────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 0; }
+.fl {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--muted-foreground);
+  display: flex; align-items: center; gap: 5px; margin-bottom: 6px;
+}
+.fl .req { color: var(--amber); font-size: 11px; line-height: 1; }
+.fl .opt { font-style: normal; font-weight: 400; opacity: 0.65; letter-spacing: 0.1em; }
+.input-wrap { position: relative; }
+.inp {
+  width: 100%; height: 40px; border-radius: var(--radius-sm);
+  border: 1px solid var(--hairline); background: var(--surface-elevated);
+  padding: 0 14px; font-family: var(--font-sans); font-size: 14px; color: var(--ink);
+  box-sizing: border-box; outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+  -webkit-appearance: none;
+}
+.inp::placeholder { color: color-mix(in oklch, var(--muted-foreground) 65%, transparent); }
+.inp:focus { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+.inp.err { border-color: var(--destructive); }
+.inp.err:focus { box-shadow: 0 0 0 3px color-mix(in oklch, var(--destructive) 13%, transparent); }
+.inp.ok { border-color: color-mix(in oklch, var(--verde) 55%, transparent); }
+.inp.ok:focus { box-shadow: 0 0 0 3px color-mix(in oklch, var(--verde) 14%, transparent); }
+.inp:disabled { background: var(--surface); color: var(--muted-foreground); cursor: not-allowed; border-color: var(--hairline); opacity: 0.7; }
+.inp.loading { pointer-events: none; }
+/* Search icon slot */
+.inp.with-ico { padding-left: 38px; }
+.ico-l { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted-foreground); pointer-events: none; }
+/* Trailing icon slot */
+.ico-r { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--muted-foreground); background: none; border: 0; padding: 2px; }
+.ico-r:hover { color: var(--ink); }
+/* Textarea */
+.textarea {
+  width: 100%; min-height: 80px; border-radius: var(--radius-sm);
+  border: 1px solid var(--hairline); background: var(--surface-elevated);
+  padding: 10px 14px; font-family: var(--font-sans); font-size: 14px; color: var(--ink);
+  box-sizing: border-box; outline: none; resize: vertical;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+.textarea:focus { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+.textarea.err { border-color: var(--destructive); }
+/* Select */
+.select {
+  width: 100%; height: 40px; border-radius: var(--radius-sm);
+  border: 1px solid var(--hairline); background: var(--surface-elevated);
+  padding: 0 38px 0 14px; font-family: var(--font-sans); font-size: 14px; color: var(--ink);
+  box-sizing: border-box; outline: none; appearance: none; cursor: pointer;
+  transition: border-color 150ms, box-shadow 150ms;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8278' stroke-width='2.5' stroke-linecap='round' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 13px center;
+}
+.select:focus { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+/* Helper / error text */
+.helper { font-family: var(--font-sans); font-size: 11px; color: var(--muted-foreground); margin-top: 5px; line-height: 1.4; }
+.helper.err-msg { color: var(--destructive); display: flex; align-items: flex-start; gap: 4px; }
+.helper.ok-msg { color: var(--verde); display: flex; align-items: center; gap: 4px; }
+/* Loading skeleton */
+.inp-sk {
+  width: 100%; height: 40px; border-radius: var(--radius-sm);
+  --sk-base: color-mix(in oklch, var(--hairline) 55%, var(--surface));
+  --sk-sheen: color-mix(in oklch, var(--surface-elevated) 80%, var(--amber-soft, transparent));
+  background: var(--sk-base); position: relative; overflow: hidden;
+}
+.inp-sk::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, var(--sk-sheen), transparent); animation: sk-sh 1.4s ease-in-out infinite; }
+@keyframes sk-sh { 100% { transform: translateX(100%); } }
+
+/* ── States grid ───────────────────────────────────────────────── */
+.states-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+
+/* ── Full form panel ───────────────────────────────────────────── */
+.form-panel { border: 1px solid var(--hairline); border-radius: var(--radius-xl); background: var(--surface-elevated); padding: 24px; max-width: 400px; box-shadow: var(--shadow-md); }
+.form-panel .fp-title { font-family: var(--font-display); font-weight: 900; font-size: 22px; color: var(--ink); text-transform: lowercase; line-height: 1.1; margin-bottom: 18px; }
+.form-panel .fields { display: flex; flex-direction: column; gap: 14px; }
+/* form-level error */
+.form-err { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: var(--radius-sm); background: color-mix(in oklch, var(--destructive) 8%, transparent); border: 1px solid color-mix(in oklch, var(--destructive) 28%, transparent); margin-bottom: 16px; }
+.form-err svg { flex-shrink: 0; color: var(--destructive); margin-top: 1px; }
+.form-err .msg { font-family: var(--font-sans); font-size: 12px; color: var(--destructive); line-height: 1.45; }
+.form-err .msg b { font-weight: 600; }
+/* submit btn */
+.submit-btn { width: 100%; height: 44px; border-radius: var(--radius-md); background: var(--ink); color: var(--background); border: 0; cursor: pointer; font-family: var(--font-sans); font-weight: 600; font-size: 14px; letter-spacing: 0.06em; margin-top: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: opacity 150ms; }
+.submit-btn:hover { opacity: 0.9; }
+.submit-btn.loading { background: color-mix(in oklch, var(--ink) 65%, transparent); cursor: progress; }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in oklch, var(--background) 30%, transparent); border-top-color: var(--background); animation: spin 0.7s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* copy rules table */
+.copy-table { border: 1px solid var(--hairline); border-radius: var(--radius-lg); overflow: hidden; }
+.copy-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 1px solid var(--hairline); }
+.copy-row:last-child { border-bottom: 0; }
+.copy-row:nth-child(even) { background: var(--surface); }
+.copy-cell { padding: 9px 14px; font-family: var(--font-sans); font-size: 12px; line-height: 1.45; }
+.copy-cell.bad { color: var(--destructive); font-family: var(--font-mono); font-size: 11px; }
+.copy-cell.good { color: var(--verde); font-family: var(--font-mono); font-size: 11px; }
+.copy-cell.head { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); background: var(--surface); }
+
+pre.code { font-family: var(--font-mono); font-size: 11px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.65; margin: 0; }
+.k { color: #FFCC55; } .s { color: #ED7BAD; } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+.note { font-family: var(--font-sans); font-size: 11px; line-height: 1.55; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+.note b { color: var(--foreground); font-weight: 600; }
+.note code { font-family: var(--font-mono); font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="t-eyebrow">Pattern · Form states — campos y validación</div>
+
+  <!-- ── 1. Field anatomy ────────────────────────────────────── -->
+  <div class="sub-eye">Anatomía del campo</div>
+  <div style="max-width:320px; display:flex; flex-direction:column; gap:4px;">
+    <label class="fl">
+      <span>Correo electrónico</span><span class="req">*</span>
+    </label>
+    <div class="input-wrap">
+      <input class="inp" value="lucia@farofilms.com" readonly>
+    </div>
+    <span class="helper">El correo con el que querés recibir el presupuesto.</span>
+  </div>
+  <div style="font-family:var(--font-sans);font-size:11px;color:var(--muted-foreground);line-height:1.7;max-width:480px;">
+    Tres capas siempre presentes: <strong style="color:var(--ink)">FieldLabel</strong> (eyebrow mono 9px · requerido marcado en amber ·) → <strong style="color:var(--ink)">Input</strong> (40px, surface-elevated, hairline) → <strong style="color:var(--ink)">Helper</strong> (sans 11px, sin ícono en neutro).
+  </div>
+
+  <hr class="divider">
+
+  <!-- ── 2. All states ────────────────────────────────────────── -->
+  <div class="sub-eye">Estados · todos</div>
+  <div class="states-grid">
+
+    <div class="field">
+      <div class="sub-eye" style="margin-bottom:8px;">Default</div>
+      <label class="fl">Email</label>
+      <div class="input-wrap"><input class="inp" placeholder="hola@productora.com" readonly></div>
+    </div>
+
+    <div class="field">
+      <div class="sub-eye" style="margin-bottom:8px;">Focus · amber ring</div>
+      <label class="fl">Email</label>
+      <div class="input-wrap"><input class="inp" style="border-color:var(--amber);box-shadow:0 0 0 3px var(--amber-soft);" value="lucia@farofilms.com" readonly></div>
+    </div>
+
+    <div class="field">
+      <div class="sub-eye" style="margin-bottom:8px;">Error</div>
+      <label class="fl">Email</label>
+      <div class="input-wrap"><input class="inp err" value="lucia@incompleto"></div>
+      <span class="helper err-msg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Ingresá un correo válido.</span>
+    </div>
+
+    <div class="field">
+      <div class="sub-eye" style="margin-bottom:8px;">Success · verificado</div>
+      <label class="fl">Email</label>
+      <div class="input-wrap">
+        <input class="inp ok" value="lucia@farofilms.com" readonly>
+        <span class="ico-r"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--verde);"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+      </div>
+      <span class="helper ok-msg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>Correo verificado.</span>
+    </div>
+
+    <div class="field">
+      <div class="sub-eye" style="margin-bottom:8px;">Disabled</div>
+      <label class="fl" style="opacity:0.5;">Email</label>
+      <div class="input-wrap"><input class="inp" disabled value="lucia@farofilms.com"></div>
+    </div>
+
+    <div class="field">
+      <div class="sub-eye" style="margin-bottom:8px;">Con ícono · búsqueda</div>
+      <label class="fl">Buscar equipo</label>
+      <div class="input-wrap">
+        <svg class="ico-l" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input class="inp with-ico" placeholder="Sony, Aputure, gimbal…">
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="sub-eye" style="margin-bottom:8px;">Password · toggle</div>
+      <label class="fl">Contraseña</label>
+      <div class="input-wrap">
+        <input class="inp" id="pw-inp" type="password" value="mi-contraseña" style="padding-right:42px;" readonly>
+        <button class="ico-r" onclick="togglePw(this)" aria-label="Mostrar contraseña">
+          <svg id="pw-eye" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="sub-eye" style="margin-bottom:8px;">Loading · remoto</div>
+      <label class="fl" style="opacity:0.5;">Referido por</label>
+      <div class="inp-sk"></div>
+      <span class="helper" style="opacity:0.5;">Validando código…</span>
+    </div>
+
+  </div>
+
+  <hr class="divider">
+
+  <!-- ── 3. Select + Textarea ─────────────────────────────────── -->
+  <div class="sub-eye">Select · Textarea</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div class="field">
+      <label class="fl">Tipo de proyecto</label>
+      <select class="select">
+        <option>Publicidad</option>
+        <option>Spot corporativo</option>
+        <option>Videoclip</option>
+        <option>Documental</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="fl">Tipo de proyecto · error</label>
+      <select class="select" style="border-color:var(--destructive);">
+        <option value="">Elegí una opción</option>
+      </select>
+      <span class="helper err-msg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Seleccioná el tipo de proyecto.</span>
+    </div>
+    <div class="field" style="grid-column:1/-1;">
+      <label class="fl">Notas para el equipo <span class="opt">(opcional)</span></label>
+      <textarea class="textarea" placeholder="Necesito el equipo limpio y probado. El rodaje es en exteriores."></textarea>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ── 4. Full form in error state ──────────────────────────── -->
+  <div class="sub-eye">Formulario completo · estado de error + form-level error</div>
+  <div class="form-panel">
+    <div class="fp-title">crear cuenta.</div>
+    <div class="form-err">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+      <div class="msg"><b>No pudimos crear tu cuenta.</b> El correo ya está registrado. Usá otro o ingresá con tu cuenta existente.</div>
+    </div>
+    <div class="fields">
+      <div class="field">
+        <label class="fl">Nombre completo <span class="req">*</span></label>
+        <input class="inp" value="Lucía Méndez" readonly>
+      </div>
+      <div class="field">
+        <label class="fl">Correo electrónico <span class="req">*</span></label>
+        <input class="inp err" value="lucia@farofilms.com" readonly>
+        <span class="helper err-msg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Este correo ya tiene una cuenta.</span>
+      </div>
+      <div class="field">
+        <label class="fl">Contraseña <span class="req">*</span></label>
+        <div class="input-wrap">
+          <input class="inp" type="password" value="mi-contraseña" style="padding-right:42px;" readonly>
+          <button class="ico-r" aria-label="Mostrar contraseña"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+      </div>
+    </div>
+    <button class="submit-btn">Crear cuenta</button>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ── 5. Copy rules ─────────────────────────────────────────── -->
+  <div class="sub-eye">Copy de errores · reglas</div>
+  <div class="copy-table">
+    <div class="copy-row"><div class="copy-cell head">❌ Nunca</div><div class="copy-cell head">✅ Siempre</div></div>
+    <div class="copy-row"><div class="copy-cell bad">Error: email inválido</div><div class="copy-cell good">Ingresá un correo válido.</div></div>
+    <div class="copy-row"><div class="copy-cell bad">Error 422</div><div class="copy-cell good">No pudimos guardar. Revisá los campos marcados.</div></div>
+    <div class="copy-row"><div class="copy-cell bad">Required field</div><div class="copy-cell good">Completá este campo.</div></div>
+    <div class="copy-row"><div class="copy-cell bad">Password too short</div><div class="copy-cell good">Usá al menos 8 caracteres.</div></div>
+    <div class="copy-row"><div class="copy-cell bad">Invalid date range</div><div class="copy-cell good">La devolución tiene que ser después del retiro.</div></div>
+  </div>
+
+  <!-- ── Code ─────────────────────────────────────────────────── -->
+  <div class="t-eyebrow" style="margin-top:4px;">Implementación</div>
+  <pre class="code"><span class="c">/* Focus ring — siempre amber, 3px, amber-soft fill */</span>
+.inp:focus {
+  border-color: <span class="k">var</span>(--amber);
+  box-shadow: <span class="s">0 0 0 3px</span> <span class="k">var</span>(--amber-soft);
+}
+<span class="c">/* Error — mismo grosor, tinte destructive */</span>
+.inp.err:focus {
+  box-shadow: <span class="s">0 0 0 3px</span> color-mix(in oklch, <span class="k">var</span>(--destructive) <span class="s">13%</span>, transparent);
+}
+
+<span class="c">/* React Hook Form — validar en onBlur, no onChange */</span>
+<span class="k">useForm</span>({ mode: <span class="s">"onBlur"</span> })
+
+<span class="c">/* Error message bajo el campo, nunca tooltip */</span>
+{errors.email &amp;&amp; (
+  &lt;<span class="k">FieldError</span>&gt;{errors.email.message}&lt;/&gt;
+)}</pre>
+
+  <!-- ── Note ─────────────────────────────────────────────────── -->
+  <div class="note">
+    <b>Validar en onBlur</b> — no en onChange (reduce ruido mientras el usuario escribe) ni solo en submit (demasiado tarde). Excepción: búsqueda libre siempre en onChange. ·
+    <b>Copy en primera persona, específico:</b> "Ingresá un correo válido." — no "Error", no código HTTP. Terminá con punto. ·
+    <b>Ícono en el helper de error</b> (circle-warning) para que el mensaje sea accesible más allá del color. ·
+    <b>Campo requerido:</b> marca amber <code>*</code> junto al label, nunca al final del formulario. <b>Opcional</b> (se aclara la excepción, no la regla). ·
+    <b>Form-level error</b> arriba del formulario, antes del primer campo — nombra específicamente qué salió mal y ofrece salida. ·
+    <b>Loading remoto</b> (ej. validar código de referido): skeleton sobre el input, no spinner dentro. ·
+    <b>Disabled ≠ no existe</b> — siempre se ve el campo, aunque no sea editable. Nunca lo ocultes.
+  </div>
+
+</div>
+
+<script>
+function togglePw(btn) {
+  const inp = document.getElementById('pw-inp');
+  const svg = document.getElementById('pw-eye');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    svg.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
+  } else {
+    inp.type = 'password';
+    svg.innerHTML = '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>';
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Rambla Rental — Public catalog (UI kit)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="../../assets/favicon-512.png">
+<link rel="stylesheet" href="styles.css">
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="data.js"></script>
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+function App() {
+  const [mode, setMode] = useState("grid");
+  const [query, setQuery] = useState("");
+  const [selectedCat, setSelectedCat] = useState(null);
+  const [selectedBrand, setSelectedBrand] = useState(null);
+  const [cart, setCart] = useState({});
+  const [cartOpen, setCartOpen] = useState(false);
+  const [openedItemId, setOpenedItemId] = useState(null); // null = catalog, id = ficha
+
+  // Demo date range — Jue 15 may → Sáb 17 may, 3 jornadas
+  const hasDates = true;
+  const jornadas = 3;
+  const dateLabel = "Jue 15 may 10:00 → Sáb 17 may 18:00";
+
+  const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return EQUIPMENT.filter((e) => {
+      if (selectedCat && e.category !== selectedCat) return false;
+      if (selectedBrand && e.brand !== selectedBrand) return false;
+      if (q) {
+        const hay = `${e.name} ${e.brand} ${e.category}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [query, selectedCat, selectedBrand]);
+
+  const counts = useMemo(() => {
+    const c = {};
+    EQUIPMENT.forEach((e) => { c[e.category] = (c[e.category] || 0) + 1; });
+    return c;
+  }, []);
+
+  const onAdd = (id) => setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
+  const onRemove = (id) => setCart((c) => {
+    const next = { ...c };
+    if ((next[id] || 0) <= 1) delete next[id];
+    else next[id] -= 1;
+    return next;
+  });
+
+  const openedItem = openedItemId
+    ? EQUIPMENT.find((e) => e.id === openedItemId)
+    : null;
+
+  // Ficha view
+  if (openedItem) {
+    return (
+      <div className="app">
+        <TopBar
+          cartCount={cartCount}
+          onCartOpen={() => setCartOpen(true)}
+          onDateOpen={() => alert("Modal de fechas — demo.")}
+          hasDates={hasDates}
+          dateLabel={dateLabel}
+          jornadas={jornadas}
+        />
+        <main>
+          <Ficha
+            item={openedItem}
+            qty={cart[openedItem.id] || 0}
+            onAdd={onAdd}
+            onRemove={onRemove}
+            onBack={() => setOpenedItemId(null)}
+            jornadas={jornadas}
+          />
+        </main>
+        <Footer />
+        <CartDrawer
+          open={cartOpen}
+          onClose={() => setCartOpen(false)}
+          cart={cart}
+          equipment={EQUIPMENT}
+          onAdd={onAdd}
+          onRemove={onRemove}
+          jornadas={jornadas}
+        />
+      </div>
+    );
+  }
+
+  const visibleCategories = selectedCat ? [selectedCat] : CATEGORIES;
+  const onOpenItem = (id) => { setOpenedItemId(id); window.scrollTo({top: 0}); };
+  const showMiniBar = mode === "list";
+
+  return (
+    <div className={"app" + (showMiniBar ? " has-minibar" : "")}>
+      <TopBar
+        cartCount={cartCount}
+        onCartOpen={() => setCartOpen(true)}
+        onDateOpen={() => alert("Modal de fechas — demo.")}
+        hasDates={hasDates}
+        dateLabel={dateLabel}
+        jornadas={jornadas}
+      />
+      <main>
+        <Hero />
+        <SubToolbar
+          mode={mode}
+          setMode={setMode}
+          query={query}
+          setQuery={setQuery}
+          visibleCount={filtered.length}
+          total={EQUIPMENT.length}
+        />
+
+        {/* Category mosaic + brand row only on grid mode without filters */}
+        {mode === "grid" && !selectedCat && !selectedBrand && !query.trim() && (
+          <>
+            <CategoryMosaic categories={CATEGORIES} selected={selectedCat} onSelect={setSelectedCat} counts={counts} />
+            <BrandRow brands={BRANDS} selected={selectedBrand} onSelect={setSelectedBrand} />
+          </>
+        )}
+
+        {(selectedCat || selectedBrand || query.trim()) && (
+          <div className="section" style={{paddingBottom: 0, paddingTop: 24}}>
+            <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap"}}>
+              <span style={{
+                fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.25em",
+                textTransform: "uppercase", color: "var(--muted-foreground)"
+              }}>Filtrando por</span>
+              {selectedCat && (
+                <button onClick={() => setSelectedCat(null)}
+                  style={{display: "inline-flex", alignItems: "center", gap: 6, background: "var(--amber-soft)", color: "var(--ink)", padding: "5px 12px", borderRadius: 9999, border: "1px solid color-mix(in oklch, var(--amber) 50%, transparent)", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 12}}
+                >{selectedCat} ×</button>
+              )}
+              {selectedBrand && (
+                <button onClick={() => setSelectedBrand(null)}
+                  style={{display: "inline-flex", alignItems: "center", gap: 6, background: "var(--amber-soft)", color: "var(--ink)", padding: "5px 12px", borderRadius: 9999, border: "1px solid color-mix(in oklch, var(--amber) 50%, transparent)", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 12}}
+                >{selectedBrand} ×</button>
+              )}
+              {query.trim() && (
+                <button onClick={() => setQuery("")}
+                  style={{display: "inline-flex", alignItems: "center", gap: 6, background: "var(--amber-soft)", color: "var(--ink)", padding: "5px 12px", borderRadius: 9999, border: "1px solid color-mix(in oklch, var(--amber) 50%, transparent)", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 12}}
+                >"{query}" ×</button>
+              )}
+              <button onClick={() => { setSelectedCat(null); setSelectedBrand(null); setQuery(""); }}
+                style={{marginLeft: 4, padding: "5px 12px", borderRadius: 9999, border: "1px solid var(--hairline)", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 12, cursor: "pointer", color: "var(--muted-foreground)"}}
+              >Ver todo</button>
+            </div>
+          </div>
+        )}
+
+        {/* List vs Grid mode */}
+        {mode === "list" ? (
+          <ListView
+            items={filtered}
+            cart={cart}
+            onAdd={onAdd}
+            onRemove={onRemove}
+            onOpen={onOpenItem}
+          />
+        ) : (
+          visibleCategories.map((c) => {
+            const items = filtered.filter((e) => e.category === c);
+            return (
+              <CategoryCarousel
+                key={c}
+                category={c}
+                items={items}
+                cart={cart}
+                onAdd={onAdd}
+                onRemove={onRemove}
+                onOpen={onOpenItem}
+              />
+            );
+          })
+        )}
+
+        {mode === "grid" && filtered.length === 0 && (
+          <div className="section">
+            <div style={{background: "var(--surface)", border: "1px solid var(--hairline)", borderRadius: 12, padding: "44px 24px", textAlign: "center"}}>
+              <div style={{fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 22, color: "var(--muted-foreground)"}}>Sin resultados</div>
+              <div style={{marginTop: 6, color: "var(--muted-foreground)", fontSize: 13}}>Probá con otra categoría, marca o término de búsqueda.</div>
+            </div>
+          </div>
+        )}
+      </main>
+      <Footer />
+      <CartDrawer
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        cart={cart}
+        equipment={EQUIPMENT}
+        onAdd={onAdd}
+        onRemove={onRemove}
+        jornadas={jornadas}
+      />
+      {showMiniBar && (
+        <CartMiniBar
+          cart={cart}
+          equipment={EQUIPMENT}
+          jornadas={jornadas}
+          onOpen={() => setCartOpen(true)}
+        />
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

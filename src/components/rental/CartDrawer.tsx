@@ -272,8 +272,8 @@ export function CartDrawer({
             transition={{ type: "tween", duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
             className={
               isBottom
-                ? // Mobile: pantalla completa (con safe-area), sin rounded ni drag
-                  "fixed inset-0 z-50 flex h-[100dvh] w-full flex-col bg-background shadow-2xl"
+                ? // Mobile: bottom sheet 80vh con esquinas redondeadas arriba
+                  "fixed inset-x-0 bottom-0 z-50 flex h-[80vh] w-full flex-col rounded-t-2xl bg-background shadow-2xl"
                 : // Desktop: panel lateral
                   "fixed right-0 top-0 z-50 flex h-[100dvh] w-full max-w-md flex-col border-l hairline bg-background"
             }

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Rambla Rental — Admin back-office (UI kit)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="../../assets/favicon-512.png">
+<link rel="stylesheet" href="styles.css">
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="data.js"></script>
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+function App() {
+  const [section, setSection] = useState("equipos");
+  const [query, setQuery] = useState("");
+  const [catFilter, setCatFilter] = useState("Todas");
+  const [brandFilter, setBrandFilter] = useState("Todas");
+  const [stateFilter, setStateFilter] = useState("Todos");
+  const [tab, setTab] = useState("todos");
+  const [selected, setSelected] = useState(new Set());
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return ADMIN_EQUIPMENT.filter((e) => {
+      if (q) {
+        const hay = `${e.name} ${e.brand} ${e.cat} ${e.tags.join(" ")}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (catFilter !== "Todas" && e.cat !== catFilter) return false;
+      if (brandFilter !== "Todas" && e.brand !== brandFilter) return false;
+      if (stateFilter === "Visible" && e.state !== "visible") return false;
+      if (stateFilter === "Oculto" && e.state !== "hidden") return false;
+      if (stateFilter === "Ficha incompleta" && e.state !== "incomplete") return false;
+      if (stateFilter === "En mantenimiento" && e.state !== "maintenance") return false;
+      if (tab === "nuevos" && !e.new) return false;
+      if (tab === "destacados" && !e.tags.includes("destacado")) return false;
+      if (tab === "incompletos" && e.state !== "incomplete") return false;
+      return true;
+    });
+  }, [query, catFilter, brandFilter, stateFilter, tab]);
+
+  const toggle = (id) => setSelected((s) => {
+    const next = new Set(s);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const toggleAll = (check) => {
+    if (check) setSelected(new Set(filtered.map(e => e.id)));
+    else setSelected(new Set());
+  };
+
+  return (
+    <div className="app">
+      <Sidebar section={section} setSection={setSection} />
+      <div className="main">
+        <header className="topbar">
+          <div>
+            <div className="crumbs">Inventario · Equipos</div>
+            <h1 className="h-title">Equipos</h1>
+          </div>
+          <div className="topbar-actions">
+            <button className="btn btn-outline">Importar CSV</button>
+            <button className="btn btn-primary"><APlus /> Nuevo equipo</button>
+          </div>
+        </header>
+        <KPIStrip />
+        <Toolbar
+          query={query} setQuery={setQuery}
+          catFilter={catFilter} setCatFilter={setCatFilter}
+          brandFilter={brandFilter} setBrandFilter={setBrandFilter}
+          stateFilter={stateFilter} setStateFilter={setStateFilter}
+        />
+        <div className="table-wrap">
+          <div className="table-meta">
+            <div className="tabs">
+              <button className={tab === "todos" ? "active" : ""} onClick={() => setTab("todos")}>Todos</button>
+              <button className={tab === "nuevos" ? "active" : ""} onClick={() => setTab("nuevos")}>Nuevos</button>
+              <button className={tab === "destacados" ? "active" : ""} onClick={() => setTab("destacados")}>Destacados</button>
+              <button className={tab === "incompletos" ? "active" : ""} onClick={() => setTab("incompletos")}>Ficha incompleta</button>
+            </div>
+            <div className="count">{filtered.length} resultados · {ADMIN_EQUIPMENT.length} totales</div>
+          </div>
+          <EquiposTable items={filtered} selected={selected} toggle={toggle} toggleAll={toggleAll} />
+        </div>
+      </div>
+      <BulkBar
+        count={selected.size}
+        onClear={() => setSelected(new Set())}
+        onShow={() => alert(`Mostrar ${selected.size} en catálogo`)}
+        onHide={() => alert(`Ocultar ${selected.size}`)}
+        onDelete={() => alert(`Eliminar (soft) ${selected.size}`)}
+      />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
