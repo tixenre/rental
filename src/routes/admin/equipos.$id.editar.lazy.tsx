@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 
 import { adminApi, type EquipoInput } from "@/lib/admin/api";
 import { EquipoFormDialogV2 } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
+import { popEquiposReturnSearch } from "@/lib/admin/equiposReturnSearch";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/equipos/$id/editar")({
@@ -35,7 +36,10 @@ function EditarEquipoRoute() {
     },
   });
 
-  const goBack = () => navigate({ to: "/admin/equipos" });
+  // Volver a la lista restaurando los filtros/búsqueda/sort que tenía cuando
+  // se entró a editar (sessionStorage seteada por equipos.index).
+  const goBack = () =>
+    navigate({ to: "/admin/equipos", search: popEquiposReturnSearch() as never });
 
   if (!equipoId) {
     return <div className="p-6 text-sm text-destructive">ID inválido</div>;

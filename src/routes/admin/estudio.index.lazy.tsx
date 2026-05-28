@@ -22,6 +22,7 @@ import {
 } from "@/lib/admin/api";
 import { uploadStudioFile } from "@/lib/studio/photos";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { AdminSection } from "@/components/admin/AdminSection";
 
 export const Route = createLazyFileRoute("/admin/estudio/")({
   component: EstudioAdminPage,
@@ -878,12 +879,23 @@ function GaleriaSection({
 
 // ── Helpers de UI ─────────────────────────────────────────────────────────────
 
+function slugifyForStorage(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  // Cada sección es colapsable y persiste su estado por título (slug).
+  // Antes era un scroll lineal de ~900 líneas; ahora el dueño abre lo que
+  // necesita y deja el resto cerrado.
   return (
-    <section className="rounded-2xl border hairline bg-surface p-5 space-y-4">
-      <h2 className="font-display text-lg text-ink">{title}</h2>
-      {children}
-    </section>
+    <AdminSection title={title} storageKey={`estudio:${slugifyForStorage(title)}`}>
+      <section className="rounded-2xl border hairline bg-surface p-5 space-y-4">{children}</section>
+    </AdminSection>
   );
 }
 

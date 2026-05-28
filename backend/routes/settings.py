@@ -59,6 +59,29 @@ def _validar_horarios(value: str) -> str:
     return json.dumps(out)
 
 
+def _validar_hero_taglines(value: str) -> str:
+    """Valida el JSON de taglines del hero.
+
+    Forma: [["línea 1", "línea 2"], ...]. Mínimo 1, máximo 12."""
+    try:
+        data = json.loads(value)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, f"hero_taglines debe ser JSON válido ({e})")
+    if not isinstance(data, list) or len(data) == 0:
+        raise HTTPException(400, "hero_taglines debe ser una lista con al menos un tagline")
+    if len(data) > 12:
+        raise HTTPException(400, "hero_taglines no puede tener más de 12 taglines")
+    out = []
+    for item in data:
+        if not isinstance(item, list) or len(item) != 2:
+            raise HTTPException(400, "Cada tagline debe ser una lista de exactamente 2 strings")
+        l1, l2 = str(item[0]).strip(), str(item[1]).strip()
+        if not l1 or not l2:
+            raise HTTPException(400, "Cada línea del tagline debe tener texto")
+        out.append([l1, l2])
+    return json.dumps(out, ensure_ascii=False)
+
+
 def _validar_faq(value: str) -> str:
     """Valida y normaliza el JSON de preguntas frecuentes.
 
@@ -113,6 +136,25 @@ ALLOWED_SETTINGS_KEYS = {
     "buffer_horas_alquiler",  # Horas de prep/revisión exigidas entre alquileres. Int >= 0.
     "horarios_retiro",   # Horas habilitadas de retiro/devolución por día de semana. JSON.
     "faq_json",          # Preguntas frecuentes editables. JSON [{title, items:[{q,a}]}].
+    "hero_taglines",     # Taglines del hero del catálogo. JSON [[línea1, línea2], ...].
+    # ── Datos del negocio (editables desde "Diseño y marca") ─────────
+    # Si vienen vacíos en el frontend, el hook useBusinessContact cae al
+    # default hardcodeado en src/data/contact.ts.
+    "business_address",        # Dirección free-form display ("Calle X 123, Mar del Plata").
+    "business_maps_url",       # URL absoluta a Google Maps con la ubicación.
+    "business_phone_display",  # Display human-readable del teléfono ("+54 9 223 585 2510").
+    "business_email",          # Email de contacto público ("hola@rambla.studio").
+    "business_instagram",      # Handle de IG sin @ ("ramblarental").
+}
+
+# Keys cuyo valor puede borrarse (volver al default) desde la UI. El resto
+# rechaza string vacía para no romper cálculos / settings críticas.
+CLEARABLE_SETTINGS_KEYS = {
+    "business_address",
+    "business_maps_url",
+    "business_phone_display",
+    "business_email",
+    "business_instagram",
 }
 
 
@@ -171,9 +213,27 @@ def update_setting(key: str, payload: dict, request: Request):
     if key not in ALLOWED_SETTINGS_KEYS:
         raise HTTPException(400, f"Setting '{key}' no es editable")
     value = payload.get("value")
-    if value is None or str(value).strip() == "":
-        raise HTTPException(400, "El valor no puede estar vacío")
+    is_empty = value is None or str(value).strip() == ""
+    if is_empty:
+        if key not in CLEARABLE_SETTINGS_KEYS:
+            raise HTTPException(400, "El valor no puede estar vacío")
+        # Para claves "limpiables" borrar la fila → cae al default del cliente.
+        conn = get_db()
+        try:
+            conn.execute("DELETE FROM app_settings WHERE key = ?", (key,))
+            conn.commit()
+            return {"key": key, "value": "", "updated_by": None}
+        finally:
+            conn.close()
     value = str(value).strip()
+    # Validaciones livianas para datos de contacto (display-only).
+    if key == "business_email" and "@" not in value:
+        raise HTTPException(400, "Email inválido (falta @)")
+    if key == "business_instagram":
+        # Aceptamos con o sin @, lo normalizamos sin @.
+        value = value.lstrip("@")
+        if not value:
+            raise HTTPException(400, "Handle de Instagram vacío")
     # Validación específica por key: ciertas settings son numéricas.
     if key in ("usd_rate", "roi_pct_default", "shipping_usd"):
         try:
@@ -194,6 +254,8 @@ def update_setting(key: str, payload: dict, request: Request):
         value = _validar_horarios(value)
     if key == "faq_json":
         value = _validar_faq(value)
+    if key == "hero_taglines":
+        value = _validar_hero_taglines(value)
     actor = (session.get("email") or session.get("user_id") or "admin")[:255]
     conn = get_db()
     try:

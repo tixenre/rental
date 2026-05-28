@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Instagram, MessageCircle, MapPin, Phone, Mail, Clock } from "lucide-react";
 
 import { CONTACT, whatsappUrl } from "@/data/contact";
+import { useBusinessContact } from "@/hooks/useBusinessContact";
 import logoWordmark from "@/assets/rambla-wordmark.webp";
 
 /**
@@ -27,6 +28,7 @@ export function Footer() {
 // ── Mobile compact ──────────────────────────────────────────────────────────
 
 function FooterMobile() {
+  const contact = useBusinessContact();
   return (
     <footer className="md:hidden border-t hairline bg-background">
       <div className="px-4 py-6 space-y-4">
@@ -59,7 +61,7 @@ function FooterMobile() {
           </Link>
           <span className="text-muted-foreground/40">·</span>
           <a
-            href={`https://instagram.com/${CONTACT.social.instagram}`}
+            href={`https://instagram.com/${contact.instagram}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-ink hover:text-amber transition"
@@ -83,20 +85,20 @@ function FooterMobile() {
         {/* Contacto compacto */}
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
           <a
-            href={CONTACT.address.mapsUrl}
+            href={contact.mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 hover:text-ink transition"
           >
             <MapPin className="h-3 w-3 shrink-0" />
-            {CONTACT.address.city}
+            {contact.address}
           </a>
           <a
-            href={`mailto:${CONTACT.email}`}
+            href={`mailto:${contact.email}`}
             className="inline-flex items-center gap-1 hover:text-ink transition"
           >
             <Mail className="h-3 w-3 shrink-0" />
-            {CONTACT.email}
+            {contact.email}
           </a>
         </div>
 
@@ -112,6 +114,7 @@ function FooterMobile() {
 // ── Desktop full ────────────────────────────────────────────────────────────
 
 function FooterDesktop() {
+  const contact = useBusinessContact();
   return (
     <footer className="hidden md:block border-t hairline bg-background">
       <div className="mx-auto max-w-7xl px-6 lg:px-12 py-12">
@@ -144,22 +147,12 @@ function FooterDesktop() {
               <li className="flex items-start gap-2.5">
                 <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                 <a
-                  href={CONTACT.address.mapsUrl}
+                  href={contact.mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-ink hover:text-amber transition"
+                  className="text-ink hover:text-amber transition whitespace-pre-line"
                 >
-                  {CONTACT.address.line2 ? (
-                    <>
-                      {CONTACT.address.line2}
-                      <br />
-                      <span className="text-muted-foreground">
-                        {CONTACT.address.city}, {CONTACT.address.province}
-                      </span>
-                    </>
-                  ) : (
-                    `${CONTACT.address.city}, ${CONTACT.address.province}`
-                  )}
+                  {contact.address}
                 </a>
               </li>
               <li className="flex items-start gap-2.5">
@@ -170,16 +163,16 @@ function FooterDesktop() {
                   rel="noopener noreferrer"
                   className="font-mono tabular text-ink hover:text-amber transition"
                 >
-                  {CONTACT.phoneDisplay}
+                  {contact.phoneDisplay}
                 </a>
               </li>
               <li className="flex items-start gap-2.5">
                 <Mail className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                 <a
-                  href={`mailto:${CONTACT.email}`}
+                  href={`mailto:${contact.email}`}
                   className="text-ink hover:text-amber transition"
                 >
-                  {CONTACT.email}
+                  {contact.email}
                 </a>
               </li>
               <li className="flex items-start gap-2.5">
@@ -218,12 +211,12 @@ function FooterDesktop() {
               </li>
               <li>
                 <a
-                  href={`https://instagram.com/${CONTACT.social.instagram}`}
+                  href={`https://instagram.com/${contact.instagram}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-ink hover:text-amber transition"
                 >
-                  <Instagram className="h-4 w-4" />@{CONTACT.social.instagram}
+                  <Instagram className="h-4 w-4" />@{contact.instagram}
                 </a>
               </li>
             </ul>

@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown,
   ArrowUp,
-  Upload,
   Loader2,
-  Image as ImageIcon,
   TrendingUp,
   TrendingDown,
   Sparkles,
@@ -33,6 +31,7 @@ import { adminApi, descuentosJornadaApi } from "@/lib/admin/api";
 import { interpolarDescuento } from "@/lib/api";
 import { FAQ_GROUPS, parseFaq, type FaqGroup } from "@/data/faq";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { AdminSection } from "@/components/admin/AdminSection";
 
 export const Route = createLazyFileRoute("/admin/settings")({
   component: SettingsPage,
@@ -53,19 +52,29 @@ function SettingsPage() {
         </p>
       </header>
 
-      <AparienciaSection />
+      <AdminSection title="Descuentos por jornadas" storageKey="settings:descuentos">
+        <DescuentosJornadaSection />
+      </AdminSection>
 
-      <DescuentosJornadaSection />
+      <AdminSection title="Buffer entre alquileres" storageKey="settings:buffer">
+        <BufferSection />
+      </AdminSection>
 
-      <BufferSection />
+      <AdminSection title="Horarios de retiro" storageKey="settings:horarios">
+        <HorariosSection />
+      </AdminSection>
 
-      <HorariosSection />
+      <AdminSection title="Preguntas frecuentes" storageKey="settings:faq" defaultOpen={false}>
+        <FaqSection />
+      </AdminSection>
 
-      <FaqSection />
+      <AdminSection title="Cambio y precios" storageKey="settings:cambio">
+        <CambioYPreciosSection />
+      </AdminSection>
 
-      <CambioYPreciosSection />
-
-      <RankingSection />
+      <AdminSection title="Ranking automático" storageKey="settings:ranking" defaultOpen={false}>
+        <RankingSection />
+      </AdminSection>
     </div>
   );
 }
@@ -557,87 +566,6 @@ function FaqSection() {
           <Button onClick={save} disabled={!groups || updateMut.isPending}>
             {updateMut.isPending ? "Guardando…" : "Guardar FAQ"}
           </Button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ── Apariencia (logo del sitio) ─────────────────────────────────────────────
-
-function AparienciaSection() {
-  const qc = useQueryClient();
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const { data: settings } = useQuery({
-    queryKey: ["admin", "settings"],
-    queryFn: () => adminApi.listSettings(),
-  });
-
-  const logoUrl = settings?.items.find((s) => s.key === "logo_url")?.value ?? null;
-
-  const uploadMut = useMutation({
-    mutationFn: (file: File) => adminApi.uploadLogo(file),
-    onSuccess: () => {
-      toast.success("Logo actualizado");
-      qc.invalidateQueries({ queryKey: ["admin", "settings"] });
-      qc.invalidateQueries({ queryKey: ["settings"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  function handleFile(file: File) {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Solo se admiten imágenes");
-      return;
-    }
-    uploadMut.mutate(file);
-  }
-
-  return (
-    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
-      <h2 className="font-display text-lg text-ink flex items-center gap-2">
-        <ImageIcon className="h-4 w-4 text-muted-foreground" />
-        Apariencia
-      </h2>
-
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="flex-shrink-0 w-32 h-16 rounded-md border hairline bg-muted flex items-center justify-center overflow-hidden">
-          {logoUrl ? (
-            <img src={logoUrl} alt="Logo actual" className="object-contain w-full h-full p-2" />
-          ) : (
-            <span className="text-xs text-muted-foreground">Sin logo</span>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <p className="text-sm text-muted-foreground">
-            PNG, SVG o WebP recomendado. Máx 5 MB. Se optimiza automáticamente.
-          </p>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => inputRef.current?.click()}
-            disabled={uploadMut.isPending}
-          >
-            {uploadMut.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Upload className="h-4 w-4 mr-2" />
-            )}
-            {uploadMut.isPending ? "Subiendo…" : "Subir logo"}
-          </Button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleFile(f);
-              e.target.value = "";
-            }}
-          />
         </div>
       </div>
     </section>

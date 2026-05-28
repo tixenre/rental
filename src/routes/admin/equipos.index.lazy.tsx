@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/select";
 
 import { adminApi, type Equipo, type EquipoInput, type FaltaField } from "@/lib/admin/api";
+import { stashEquiposReturnSearch } from "@/lib/admin/equiposReturnSearch";
 import { ActionMenu } from "@/components/mobile";
 import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquipoDialog";
 import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
@@ -195,12 +196,17 @@ function EquiposPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Antes de navegar al editor, persistimos los search params actuales para
+  // que el goBack los restaure (3 entrypoints: botón fila, menú móvil, duplicado).
+  const stashReturnSearch = () => stashEquiposReturnSearch(search);
+
   const duplicateMut = useMutation({
     mutationFn: (id: number) => adminApi.duplicateEquipo(id),
     onSuccess: (eq) => {
       toast.success(`Duplicado: "${eq.nombre}"`);
       invalidate();
       // Ir al editor del duplicado para que el admin lo termine de configurar.
+      stashReturnSearch();
       navigate({ to: "/admin/equipos/$id/editar", params: { id: String(eq.id) } });
     },
     onError: (e: Error) => toast.error(`No se pudo duplicar: ${e.message}`),
@@ -314,7 +320,12 @@ function EquiposPage() {
           >
             <BarChart3 className="h-4 w-4 mr-1" /> Uso
           </Button>
-          <Button onClick={() => navigate({ to: "/admin/equipos/nuevo" })}>
+          <Button
+            onClick={() => {
+              stashReturnSearch();
+              navigate({ to: "/admin/equipos/nuevo" });
+            }}
+          >
             <Plus className="h-4 w-4 mr-1" /> Nuevo equipo
           </Button>
         </div>
@@ -426,6 +437,27 @@ function EquiposPage() {
             "Papelera"
           )}
         </Button>
+        {(q || etiqueta || categoria || marca || soloIncompletos || falta) && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              updateFilters({
+                q: "",
+                etiqueta: "",
+                categoria: "",
+                marca: "",
+                solo_incompletos: false,
+                falta: undefined,
+              })
+            }
+            title="Limpiar todos los filtros (mantiene papelera)"
+            className="md:w-auto text-muted-foreground hover:text-ink"
+          >
+            Limpiar filtros
+          </Button>
+        )}
       </div>
 
       {equiposQ.error && (
@@ -789,9 +821,13 @@ function EquiposPage() {
                       size="icon"
                       variant="ghost"
                       title="Editar"
-                      onClick={() =>
-                        navigate({ to: "/admin/equipos/$id/editar", params: { id: String(eq.id) } })
-                      }
+                      onClick={() => {
+                        stashReturnSearch();
+                        navigate({
+                          to: "/admin/equipos/$id/editar",
+                          params: { id: String(eq.id) },
+                        });
+                      }}
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -856,9 +892,14 @@ function EquiposPage() {
           {
             label: "Editar",
             icon: <Pencil className="h-4 w-4" />,
-            onClick: () =>
-              menuEquipo &&
-              navigate({ to: "/admin/equipos/$id/editar", params: { id: String(menuEquipo.id) } }),
+            onClick: () => {
+              if (!menuEquipo) return;
+              stashReturnSearch();
+              navigate({
+                to: "/admin/equipos/$id/editar",
+                params: { id: String(menuEquipo.id) },
+              });
+            },
           },
           {
             label: "Duplicar equipo",

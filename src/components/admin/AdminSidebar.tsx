@@ -78,7 +78,7 @@ const items: NavItem[] = [
   { title: "Solicitudes", url: "/admin/solicitudes", icon: Inbox },
   { title: "Clientes", url: "/admin/clientes", icon: Users },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
-  { title: "Diseño", url: "/admin/diseno", icon: Palette },
+  { title: "Diseño y marca", url: "/admin/diseno", icon: Palette },
   { title: "Novedades", url: "/admin/novedades", icon: Sparkles },
   { title: "Emails", url: "/admin/email-templates", icon: Mail },
   { title: "Datos y backups", url: "/admin/dataio", icon: HardDriveDownload },
@@ -93,9 +93,27 @@ export function AdminSidebar({ email }: { email: string }) {
   });
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => ({
-    "/admin/equipos": true, // empieza expandido si estoy en una sub-ruta
-  }));
+  // Estado open/closed de cada grupo, persistido en localStorage para que el
+  // dueño no tenga que re-abrir el inventario cada vez que entra.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    const fallback = { "/admin/equipos": true };
+    if (typeof window === "undefined") return fallback;
+    try {
+      const raw = window.localStorage.getItem("admin-sidebar:openGroups");
+      if (raw) return { ...fallback, ...(JSON.parse(raw) as Record<string, boolean>) };
+    } catch {
+      /* ignored */
+    }
+    return fallback;
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("admin-sidebar:openGroups", JSON.stringify(openGroups));
+    } catch {
+      /* ignored */
+    }
+  }, [openGroups]);
 
   // Cuando navego a una sub-ruta, auto-expandir el grupo padre
   useEffect(() => {
