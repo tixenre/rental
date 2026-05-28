@@ -29,9 +29,13 @@ export const Route = createLazyFileRoute("/admin/estudio/")({
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
+// El value puede estar vacío: features con value en blanco se ocultan en
+// público (filtro en /estudio.tsx) y quedan listadas en admin para que el
+// dueño las complete cuando quiera. Si forzamos `min(1)` acá, el submit
+// silenciosamente falla validación (button "Guardar" no dispara nada).
 const featureSchema = z.object({
   label: z.string().min(1, "Requerido"),
-  value: z.string().min(1, "Requerido"),
+  value: z.string(),
 });
 
 const faqSchema = z.object({
@@ -566,8 +570,17 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
     onError: (e) => toast.error("Error guardando", { description: (e as Error).message }),
   });
 
+  // Si la validación falla, react-hook-form NO llama al success-handler — el
+  // submit "no hace nada". Surfaciamos un toast para que no se sienta roto.
+  const onInvalid = (errs: typeof errors) => {
+    const fields = Object.keys(errs).join(", ");
+    toast.error("Revisá los campos marcados", {
+      description: fields ? `Campos con error: ${fields}` : undefined,
+    });
+  };
+
   return (
-    <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-8">
+    <form onSubmit={handleSubmit((v) => mutation.mutate(v), onInvalid)} className="space-y-8">
       {/* ── Datos generales ── */}
       <Section title="Datos generales">
         <Field label="Nombre" error={errors.nombre?.message}>
