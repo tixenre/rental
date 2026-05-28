@@ -4,7 +4,7 @@ import { authedFetch } from "@/lib/authedFetch";
 import { clienteApi } from "@/lib/cliente/api";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { StatCard } from "@/components/rental/StatCard";
-import { EstadoBadge } from "@/components/rental/EstadoBadge";
+import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import {
   ArrowRight,
   ChevronDown,

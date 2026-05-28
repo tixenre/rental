@@ -6,7 +6,11 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  // `docs/design-kit/` es un snapshot del kit exportado por Claude Design
+  // (artefacto de documentación, no código de prod). No lo lintamos —
+  // sus .tsx vienen con su propio estilo upstream y no aportan calidad al
+  // chequearlos acá. El supervisor cuida la consistencia del kit en sus PRs.
+  { ignores: ["dist", ".output", ".vinxi", "docs/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
