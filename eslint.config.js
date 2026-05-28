@@ -10,12 +10,9 @@ import tseslint from "typescript-eslint";
 // de los tokens de marca (`verde`, `azul`, `destructive`, `amber`, surfaces).
 // Ver docs/DESIGN_SYSTEM.md → Tiers de color.
 //
-// NOTA: `amber-NNN` (escala genérica) NO se prohíbe todavía — el tratamiento
-// del amber-texto está en revisión visual diferida con el dueño. Cuando se
-// resuelva, sumar `amber` a la lista de escalas de abajo.
 const GENERIC_COLOR_RE =
   "(?:text|bg|border|ring|ring-offset|outline|divide|from|via|to|fill|stroke|decoration|accent|caret|placeholder|shadow)-" +
-  "(?:slate|gray|zinc|neutral|stone|red|orange|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-" +
+  "(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-" +
   "(?:50|[1-9]00|950)";
 const GENERIC_COLOR_MSG =
   "Usá tokens del design system (verde/azul/destructive/amber/surfaces) en vez de colores genéricos de Tailwind. " +

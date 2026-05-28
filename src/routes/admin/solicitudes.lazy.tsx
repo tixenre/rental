@@ -462,9 +462,7 @@ function SolicitudCard({
                 return (
                   <li key={equipo_id} className="px-3 py-1.5 flex items-center gap-2">
                     <span className="flex-1 text-ink truncate text-sm">{nombre}</span>
-                    {dirty && (
-                      <span className="text-[10px] text-amber-700">cliente: {original}</span>
-                    )}
+                    {dirty && <span className="text-[10px] text-amber">cliente: {original}</span>}
                     <div className="flex items-center gap-0.5">
                       <Button
                         size="icon"

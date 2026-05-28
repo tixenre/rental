@@ -90,7 +90,7 @@ function AdminLoginPage() {
           {devMode && (
             <button
               onClick={handleDevLogin}
-              className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-amber-50 border-amber-300 py-2.5 text-sm font-medium text-amber-900 transition hover:bg-amber-100 active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-amber/10 border-amber/30 py-2.5 text-sm font-medium text-ink transition hover:bg-amber/15 active:scale-[0.98]"
             >
               Entrar en modo desarrollo
             </button>

@@ -268,8 +268,7 @@ function TemplateBoundRow({
         {validation.message && (
           <div
             className={
-              "text-[10px] " +
-              (validation.severity === "error" ? "text-destructive" : "text-amber-700")
+              "text-[10px] " + (validation.severity === "error" ? "text-destructive" : "text-amber")
             }
           >
             {validation.severity === "error" ? "✗ " : "⚠ "}
@@ -491,7 +490,7 @@ function CustomSortableRow({
         </Button>
       </div>
       {tmplCollision && (
-        <div className="ml-6 text-[10px] text-amber-700 italic">
+        <div className="ml-6 text-[10px] text-amber italic">
           ⚠ Existe la spec oficial <strong>"{tmplCollision.label}"</strong> en el template —
           eliminala y usá la del template para que entre al sistema estructurado.
         </div>

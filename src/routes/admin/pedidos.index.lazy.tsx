@@ -304,7 +304,7 @@ function PedidosPage() {
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <EstadoBadge estado={p.estado} label={estadoLabel(p.estado)} />
                     {p.tiene_solicitud_pendiente && (
-                      <Badge variant="outline" className="border-amber text-amber-700 bg-amber-50">
+                      <Badge variant="outline" className="border-amber text-amber bg-amber/10">
                         Modificación pendiente
                       </Badge>
                     )}
@@ -407,7 +407,7 @@ function PedidosPage() {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <EstadoBadge estado={p.estado} label={estadoLabel(p.estado)} />
                       {p.tiene_solicitud_pendiente && (
-                        <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                        <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wide text-amber">
                           <Pencil className="h-3 w-3" /> mod.
                         </span>
                       )}

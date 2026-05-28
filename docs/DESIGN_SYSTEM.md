@@ -89,11 +89,7 @@ una marca de terceros (ej. `WhatsAppButton.tsx`) hay un override por archivo
 en `eslint.config.js`. El hex de terceros (WhatsApp `#25D366`, logo de
 Google) no lo agarra la regla — pero igual va documentado acá.
 
-**Pendiente — escala `amber-NNN`:** la regla **todavía no** prohíbe el amber
-genérico de Tailwind (`text-amber-700`, etc.) porque el tratamiento del
-amber-texto está en revisión visual diferida con el dueño. Cuando se
-resuelva, se suma `amber` a la lista de escalas en `eslint.config.js`
-(`GENERIC_COLOR_RE`) y se barren los usos restantes.
+La escala genérica `amber-NNN` de Tailwind (`text-amber-700`, etc.) **también está prohibida** por el guardrail — `amber` fue sumado a `GENERIC_COLOR_RE` en el PR #590 junto al barrido completo de usos. Usar `text-amber`, `bg-amber/10`, `border-amber/30` (tokens de marca), o `text-ink` cuando el texto va sobre fondo amber.
 
 ### Tipografía
 
