@@ -48,6 +48,7 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 | [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Playbook de auditoría + PRs + mobile gate |
 | [`docs/ISSUE_LABELS.md`](docs/ISSUE_LABELS.md) | Labels (3 dimensiones obligatorias) |
 | [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md) | Criterio mobile + status por ruta |
+| [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) | Design system canónico: tokens, componentes, mobile rules, voz/tono, patterns. Manda sobre el kit portable (`docs/design-kit/`) |
 | [`.claude/agents/supervisor.md`](.claude/agents/supervisor.md) | El agente revisor |
 
 @docs/MEMORIA.md
