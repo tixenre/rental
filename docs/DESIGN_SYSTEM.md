@@ -206,19 +206,19 @@ Defined as utility classes en `src/styles.css`:
 | Categoría | Dónde vive | Notas |
 |---|---|---|
 | **Primitivas UI** (Button, Input, Card, Dialog, …) | `src/components/ui/*` | shadcn/Radix base. Naming shadcn (`variant="default"`, no `"primary"`). |
-| **Componentes de aplicación (`rental/`)** | `src/components/rental/*` | EquipmentCard, TopBar, Footer, CartMiniBar, EstadoBadge integrados con queries + estado. |
+| **Componentes de aplicación (`rental/`)** | `src/components/rental/*` | EquipmentCard, TopBar, Footer, CartMiniBar integrados con queries + estado. |
 | **Componentes admin** | `src/components/admin/*` | Tablas, modales, sidebar del back-office. |
-| **Kit portátil ports** | `src/components/kit/*` (llegará con PR #577) | Versiones presentacionales del kit. Pensados para convivir con los integrados. |
+| **Kit portátil ports** | `src/components/kit/*` | Versiones presentacionales del kit, con paleta de marca. Adoptadas piecewise (issue #575). EstadoBadge ya es la única fuente del repo. |
 
 ### Button (`src/components/ui/button.tsx`)
 
 ```tsx
 import { Button } from "@/components/ui/button";
 
-// variants: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link" | "amber"*
+// variants: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link" | "amber"
 // sizes:    "default" (h-9) | "sm" (h-8) | "lg" (h-10) | "icon" (h-9 w-9)
-// shape:    "rounded" (default) | "pill"*
-//   * agregados por la iniciativa del kit (PR #577 cuando merge)
+// shape:    "rounded" (default) | "pill"
+// "amber" y el axis "shape" fueron agregados por PR #577 — ya en producción.
 
 <Button variant="default">Reservar</Button>
 <Button variant="amber" shape="pill" asChild><a href="/estudio">→</a></Button>
@@ -230,19 +230,20 @@ import { Button } from "@/components/ui/button";
 
 ### EstadoBadge
 
-Hoy en producción vive una sola versión: `src/components/rental/EstadoBadge.tsx`,
-integrada con la lógica de pedido y usa `bg-blue-50` genérico.
+**Fuente única**: `src/components/kit/EstadoBadge.tsx`, con la paleta
+secundaria oficial de marca (`bg-azul/10`, `bg-verde/10`, …).
 
-Cuando merge PR #577, va a sumarse en paralelo `src/components/kit/EstadoBadge.tsx`
-— versión presentacional con la paleta secundaria de marca
-(`bg-azul/10`, `bg-verde/10`, …). Issue #575 mapea la migración
-componente-por-componente de la integrada al look del kit, una pantalla
-por vez.
+Usado por `/cliente/portal` (migración PR E1). **Admin** (`/admin/pedidos`,
+`/admin/pedidos/$id`) sigue temporalmente con sus mappings inline
+(`ESTADO_CLASS`, `ESTADO_PILL`) usando Tailwind genéricos — la migración
+del admin necesita un prop `label` override para preservar el alias
+"presupuesto → Solicitado" propio del admin, y vive como follow-up
+(issue #575).
 
-### Otros componentes del kit (cuando merge PR #577)
+### Otros componentes del kit (`src/components/kit/`)
 
-PR #577 va a traer al repo, bajo `src/components/kit/`, las versiones
-presentacionales de:
+Versiones presentacionales del kit ya disponibles para adopción
+piecewise (PR #577 las trajo a producción):
 
 - `AddonPills` — items "incluye" sobre rows de equipo.
 - `EmptyState` — pattern "nada para mostrar".
@@ -251,11 +252,10 @@ presentacionales de:
 - `StatCard` — número grande para dashboards.
 - `Input` + `SearchInput` + `FieldLabel` — variantes branded de inputs.
 
-También va a montar una ruta pública sin login `/kit-preview` que los
-muestra todos para QA visual.
-
-Hasta entonces, la referencia visual viva está en `docs/design-kit/preview/*.html`
-(specimens del kit portable) y en `docs/design-kit/index.html` (showcase).
+La ruta pública `/kit-preview` (sin login, `noindex`) los muestra todos
+para QA visual — útil para comparar contra el showcase de Claude Design
+en `docs/design-kit/index.html` antes de adoptarlos en una pantalla
+concreta.
 
 ---
 

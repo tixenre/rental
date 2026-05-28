@@ -9,9 +9,13 @@ export type { EstadoPedido };
  * Source: `docs/design-kit/kit/components/estado-badge.tsx`. Versión del kit
  * con paleta secundaria oficial (--rosa/azul/verde/naranja).
  *
- * Convive en paralelo con `src/components/rental/EstadoBadge.tsx` (versión
- * integrada con lógica del repo). La adopción definitiva se decide en el
- * issue de auditoría #575.
+ * Source of truth única del repo desde PR E1 — la versión vieja en
+ * `src/components/rental/EstadoBadge.tsx` (que usaba `bg-blue-50` Tailwind
+ * genéricos) fue eliminada al migrar `cliente.portal.tsx`.
+ *
+ * Admin (`/admin/pedidos`, `/admin/pedidos/$id`) sigue con su mapping
+ * inline temporalmente — issue #575 trackea la migración con prop
+ * `label` para preservar el override de "Solicitado".
  */
 const ESTADO_MAP: Record<EstadoPedido, { label: string; cls: string }> = {
   borrador: {
