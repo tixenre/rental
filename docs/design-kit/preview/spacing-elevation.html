@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Spacing · Hairlines & shadows</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { background: var(--background); }
+.row { gap: 16px; align-items: stretch; }
+.box { flex: 1; background: var(--surface-elevated); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; justify-content: space-between; min-height: 110px; }
+.b1 { border: 1px solid var(--hairline); }
+.b2 { box-shadow: 0 1px 0 var(--hairline), 0 1px 2px rgba(20,16,12,.04); }
+.b3 { box-shadow: 0 0 0 1px var(--amber), 0 0 0 4px var(--amber-soft); }
+.b4 { box-shadow: 0 8px 24px -8px rgba(20,16,12,.18), 0 2px 6px rgba(20,16,12,.06); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="row">
+      <div class="box b1"><div class="label">hairline</div><div class="token subtle">1px · 12% ink</div></div>
+      <div class="box b2"><div class="label">shadow · sm</div><div class="token subtle">card resting</div></div>
+      <div class="box b3"><div class="label">ring · amber</div><div class="token subtle">selected · focus</div></div>
+      <div class="box b4"><div class="label">shadow · lg</div><div class="token subtle">modal · CTA</div></div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,14 +1,8 @@
 import { Check } from "lucide-react";
+import type { AddonItem } from "../types/equipment";
 import { cn } from "./lib/cn";
 
-export interface AddonItem {
-  /** Identificador estable (id en BD o slug). Para el `key` de React. */
-  id?: string;
-  /** Texto visible. Truncado a 140px si es muy largo. */
-  name: string;
-  /** Cantidad. Si es > 1, aparece como badge ink/amber al final de la pill. */
-  qty?: number;
-}
+export type { AddonItem };
 
 /**
  * AddonPills — listado horizontal de items "incluye" sobre la row de un equipo.

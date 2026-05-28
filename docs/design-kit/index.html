@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rambla Rental Design Kit</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Aliases para que la landing use los mismos nombres que kit/tokens.css
+   * (colors_and_type.css del DS expone --rbl-* — los rebauticamos sin prefijo). */
+  :root {
+    --rosa:      var(--rbl-rosa);
+    --azul:      var(--rbl-azul);
+    --naranja:   var(--rbl-naranja);
+    --verde:     var(--rbl-verde);
+    --amber-hot: var(--rbl-amber-hot);
+  }
+
+  /* ── Page chrome ─────────────────────────────────────────────── */
+  body { background: var(--background); color: var(--ink); margin: 0; }
+  main { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  a { color: inherit; }
+  ::selection { background: var(--amber); color: var(--ink); }
+
+  /* ── Top nav ─────────────────────────────────────────────────── */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in oklch, var(--background) 95%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .nav-inner {
+    max-width: 1180px; margin: 0 auto;
+    height: 56px; padding: 0 24px;
+    display: flex; align-items: center; gap: 18px;
+  }
+  .nav-brand {
+    font-family: var(--font-display); font-weight: 900;
+    font-size: 22px; line-height: 1; letter-spacing: 0.01em;
+    text-transform: lowercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .nav-brand .dot {
+    width: 9px; height: 9px; border-radius: 9999px;
+    background: var(--amber);
+    display: inline-block;
+  }
+  .nav-links {
+    margin-left: auto; display: flex; gap: 4px; align-items: center;
+  }
+  .nav-links a {
+    font-family: var(--font-mono); font-size: 10px;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    text-decoration: none; color: var(--muted-foreground);
+    padding: 8px 12px; border-radius: 9999px;
+    transition: color .15s, background .15s;
+  }
+  .nav-links a:hover { color: var(--ink); background: var(--amber-soft); }
+
+  /* ── Hero ────────────────────────────────────────────────────── */
+  .hero {
+    padding: 80px 0 64px;
+    border-bottom: 1px solid var(--hairline);
+    position: relative;
+  }
+  .hero-eyebrow {
+    font-family: var(--font-mono); font-size: 10px;
+    letter-spacing: 0.25em; text-transform: uppercase;
+    color: var(--muted-foreground);
+    display: flex; gap: 14px; align-items: center;
+    margin-bottom: 18px;
+  }
+  .hero-eyebrow .pill {
+    color: var(--ink);
+    background: var(--amber);
+    padding: 4px 10px; border-radius: 9999px;
+  }
+  .hero h1 {
+    font-family: var(--font-display); font-weight: 900;
+    font-size: clamp(56px, 9vw, 128px); line-height: 0.88;
+    letter-spacing: -0.01em; text-transform: lowercase;
+    margin: 0 0 22px; text-wrap: balance;
+    max-width: 14ch;
+  }
+  .hero h1 .amber { color: var(--amber); }
+  .hero .sub {
+    font-family: var(--font-sans); font-size: 18px; line-height: 1.45;
+    color: var(--muted-foreground); max-width: 56ch;
+    margin: 0 0 28px;
+  }
+  .hero-ctas { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* ── Buttons (real components, hand-written CSS) ─────────────── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: var(--font-sans); font-weight: 500; font-size: 14px;
+    height: 36px; padding: 0 16px; border-radius: 8px; border: 0;
+    cursor: pointer; white-space: nowrap;
+    transition: background .15s, color .15s, border-color .15s;
+    text-decoration: none;
+  }
+  .btn-primary { background: var(--ink); color: var(--background); box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+  .btn-primary:hover { background: var(--amber); color: var(--ink); }
+  .btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--hairline); }
+  .btn-secondary:hover { background: var(--amber-soft); border-color: oklch(0.18 0.01 60 / 30%); }
+  .btn-ghost { background: transparent; color: var(--ink); }
+  .btn-ghost:hover { background: var(--amber-soft); }
+  .btn-destructive { background: var(--destructive); color: var(--destructive-foreground); }
+  .btn-destructive:hover { background: color-mix(in oklch, var(--destructive) 90%, transparent); }
+  .btn-amber { background: var(--amber); color: var(--ink); }
+  .btn-amber:hover { background: var(--amber-hot); }
+  .btn-lg { height: 44px; padding: 0 24px; font-size: 16px; }
+  .btn-sm { height: 32px; padding: 0 12px; font-size: 12px; }
+  .btn-pill { border-radius: 9999px; }
+  .btn-icon { width: 36px; padding: 0; }
+
+  /* ── Section frame ───────────────────────────────────────────── */
+  section.module {
+    padding: 64px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .module-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 24px; margin-bottom: 32px;
+    flex-wrap: wrap;
+  }
+  .module-eyebrow {
+    font-family: var(--font-mono); font-size: 10px;
+    letter-spacing: 0.25em; text-transform: uppercase;
+    color: var(--muted-foreground);
+    margin-bottom: 8px;
+  }
+  .module-title {
+    font-family: var(--font-sans); font-weight: 700;
+    font-size: 36px; line-height: 1.05; letter-spacing: -0.015em;
+    margin: 0;
+  }
+  .module-desc {
+    font-family: var(--font-sans); font-size: 15px; line-height: 1.5;
+    color: var(--muted-foreground); max-width: 52ch;
+    margin: 8px 0 0;
+  }
+  .module-path {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--ink); background: var(--surface);
+    padding: 6px 10px; border-radius: 6px;
+    border: 1px solid var(--hairline);
+    white-space: nowrap;
+  }
+
+  /* ── Install block ───────────────────────────────────────────── */
+  .install-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  }
+  .install-step {
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 22px 22px 20px;
+    background: var(--surface);
+    position: relative;
+  }
+  .install-step .n {
+    position: absolute; top: -10px; left: 16px;
+    width: 24px; height: 24px; border-radius: 9999px;
+    background: var(--ink); color: var(--amber);
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  .install-step h3 {
+    margin: 6px 0 10px;
+    font-family: var(--font-sans); font-weight: 600; font-size: 16px;
+  }
+  .install-step p {
+    margin: 0 0 12px;
+    font-family: var(--font-sans); font-size: 13px; line-height: 1.45;
+    color: var(--muted-foreground);
+  }
+  pre.code, code.inline {
+    font-family: var(--font-mono); font-size: 12px;
+    background: var(--ink); color: var(--background);
+    padding: 12px 14px; border-radius: 8px;
+    overflow-x: auto;
+    line-height: 1.5;
+  }
+  code.inline {
+    padding: 2px 6px; font-size: 12px;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--hairline);
+    border-radius: 4px;
+  }
+  pre.code .c-key { color: #FFCC55; }
+  pre.code .c-str { color: #ED7BAD; }
+  pre.code .c-com { color: oklch(0.6 0.01 70); font-style: italic; }
+  pre.code .c-tag { color: #1097DB; }
+
+  /* ── File tree ──────────────────────────────────────────────── */
+  .tree {
+    display: grid; grid-template-columns: 320px 1fr; gap: 32px;
+    align-items: start;
+  }
+  .tree-block {
+    background: var(--ink); color: var(--background);
+    border-radius: 12px; padding: 22px 24px;
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.85;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .tree-block .dir { color: var(--amber); }
+  .tree-block .com { color: oklch(0.65 0.01 70); }
+  .tree-legend p {
+    font-family: var(--font-sans); font-size: 14px; line-height: 1.55;
+    margin: 0 0 12px; color: var(--ink);
+  }
+  .tree-legend p strong { color: var(--ink); font-weight: 600; }
+  .tree-legend .legend-row {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 10px 0;
+    border-top: 1px dashed var(--hairline);
+  }
+  .tree-legend .legend-row:first-of-type { border-top: 0; padding-top: 0; }
+  .tree-legend .legend-row code {
+    font-family: var(--font-mono); font-size: 12px;
+    background: var(--amber-soft); color: var(--ink);
+    padding: 2px 6px; border-radius: 4px; white-space: nowrap;
+    height: fit-content; margin-top: 1px;
+  }
+  .tree-legend .legend-row span {
+    font-family: var(--font-sans); font-size: 13px; line-height: 1.45;
+    color: var(--muted-foreground);
+  }
+  .tree-legend .legend-row span b { color: var(--ink); font-weight: 600; }
+
+  /* ── Component preview frame ─────────────────────────────────── */
+  .preview {
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    background: var(--surface-elevated);
+    overflow: hidden;
+  }
+  .preview-stage {
+    padding: 36px 28px;
+    display: flex; flex-wrap: wrap; gap: 14px;
+    align-items: center; justify-content: center;
+    min-height: 140px;
+    background:
+      radial-gradient(var(--hairline) 1px, transparent 1px) 0 0 / 16px 16px,
+      var(--surface);
+  }
+  .preview-foot {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 18px;
+    background: var(--surface);
+    border-top: 1px solid var(--hairline);
+  }
+  .preview-foot .label {
+    font-family: var(--font-mono); font-size: 10px;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .preview-foot code {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--ink);
+  }
+
+  /* ── Component cards ─────────────────────────────────────────── */
+  .comp-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 20px;
+  }
+  .comp-card {
+    display: flex; flex-direction: column;
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    background: var(--surface-elevated);
+    overflow: hidden;
+    transition: border-color .15s;
+  }
+  .comp-card:hover { border-color: oklch(0.18 0.01 60 / 30%); }
+  .comp-card-head {
+    padding: 16px 18px 14px;
+    border-bottom: 1px solid var(--hairline);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .comp-card-name {
+    font-family: var(--font-sans); font-weight: 600;
+    font-size: 16px; color: var(--ink);
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .comp-card-name code {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--muted-foreground); font-weight: 400;
+  }
+  .comp-card-desc {
+    font-family: var(--font-sans); font-size: 13px;
+    color: var(--muted-foreground); line-height: 1.45;
+  }
+  .comp-card-stage {
+    padding: 28px 20px;
+    flex: 1;
+    display: flex; flex-direction: column; gap: 12px;
+    align-items: center; justify-content: center;
+    background:
+      radial-gradient(var(--hairline) 1px, transparent 1px) 0 0 / 16px 16px,
+      var(--surface);
+  }
+  .comp-card-foot {
+    padding: 10px 16px;
+    display: flex; gap: 14px; align-items: center;
+    background: var(--surface);
+    border-top: 1px solid var(--hairline);
+  }
+  .comp-card-foot a {
+    font-family: var(--font-mono); font-size: 10px;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--muted-foreground); text-decoration: none;
+    transition: color .15s;
+  }
+  .comp-card-foot a:hover { color: var(--amber); }
+  .comp-card-foot a.path { margin-left: auto; }
+
+  /* ── Token previews ──────────────────────────────────────────── */
+  .swatches {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .swatch {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--hairline);
+    background: var(--surface-elevated);
+  }
+  .swatch-fill {
+    aspect-ratio: 5 / 3;
+    display: flex; align-items: flex-end; padding: 10px;
+    font-family: var(--font-mono); font-size: 10px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .swatch-meta {
+    padding: 8px 12px;
+    border-top: 1px solid var(--hairline);
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--ink);
+    display: flex; justify-content: space-between;
+  }
+  .swatch-meta .v { color: var(--muted-foreground); }
+
+  .type-scale > div + div { margin-top: 18px; padding-top: 18px; border-top: 1px dashed var(--hairline); }
+  .type-row { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; }
+  .type-row .meta {
+    font-family: var(--font-mono); font-size: 10px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--muted-foreground);
+    white-space: nowrap; min-width: 110px; text-align: right;
+  }
+
+  /* ── Specific component preview styles (mirror Tailwind output) ── */
+  /* AddonPills */
+  .ap { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 6px; border-radius: 9999px; background: var(--amber-soft); font-family: var(--font-sans); font-size: 10px; color: var(--ink); white-space: nowrap; }
+  .ap-check { color: var(--amber); font-size: 9px; font-weight: 700; }
+  .ap-qty { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 14px; padding: 0 4px; border-radius: 9999px; background: var(--ink); color: var(--amber); font-family: var(--font-mono); font-size: 9px; font-weight: 700; margin-left: 2px; }
+  .ap-more { background: transparent; border: 1px dashed color-mix(in oklch, var(--ink) 25%, transparent); color: var(--muted-foreground); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em; padding: 2px 8px; }
+  .ap-empty { color: var(--muted-foreground); font-style: italic; font-size: 10px; border: 1px solid var(--hairline); padding: 2px 8px; border-radius: 9999px; }
+
+  /* EstadoBadge */
+  .eb { display: inline-flex; align-items: center; border-radius: 9999px; border: 1px solid; padding: 2px 8px; font-family: var(--font-sans); font-size: 10px; font-weight: 500; }
+  .eb-borrador    { background: var(--muted); color: var(--muted-foreground); border-color: transparent; }
+  .eb-presupuesto { background: color-mix(in oklch, var(--azul) 10%, transparent); color: var(--azul); border-color: color-mix(in oklch, var(--azul) 30%, transparent); }
+  .eb-solicitado  { background: color-mix(in oklch, var(--amber) 15%, transparent); color: var(--ink); border-color: color-mix(in oklch, var(--amber) 50%, transparent); }
+  .eb-confirmado  { background: color-mix(in oklch, var(--verde) 10%, transparent); color: var(--verde); border-color: color-mix(in oklch, var(--verde) 30%, transparent); }
+  .eb-retirado    { background: color-mix(in oklch, var(--verde) 20%, transparent); color: var(--verde); border-color: color-mix(in oklch, var(--verde) 40%, transparent); }
+  .eb-cancelado   { background: color-mix(in oklch, var(--destructive) 10%, transparent); color: var(--destructive); border-color: color-mix(in oklch, var(--destructive) 30%, transparent); }
+
+  /* StatCard */
+  .sc { border-radius: 12px; border: 1px solid var(--hairline); background: var(--surface); padding: 14px 18px; min-width: 180px; }
+  .sc-l { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sc-v { margin-top: 6px; font-family: var(--font-display); font-weight: 900; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .sc-m { margin-top: 4px; font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
+
+  /* EquipmentCard (mini preview) */
+  .ec { width: 220px; border-radius: 12px; border: 1px solid var(--hairline); background: var(--surface); overflow: hidden; display: flex; flex-direction: column; }
+  .ec-photo { aspect-ratio: 1; background: linear-gradient(135deg, var(--amber-soft), var(--surface), var(--amber-soft)); display: grid; place-items: center; position: relative; }
+  .ec-photo .initials { font-family: var(--font-display); font-weight: 900; font-size: 36px; color: color-mix(in oklch, var(--ink) 25%, transparent); }
+  .ec-badge { position: absolute; top: 8px; left: 8px; display: inline-flex; gap: 4px; align-items: center; background: var(--ink); color: var(--amber); padding: 2px 8px; border-radius: 9999px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+  .ec-info { padding: 6px 10px 8px; }
+  .ec-brand { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+  .ec-name { font-family: var(--font-sans); font-weight: 600; font-size: 13px; color: var(--ink); margin-top: 2px; }
+  .ec-pricerow { display: flex; align-items: baseline; gap: 6px; margin-top: 2px; }
+  .ec-price { font-family: var(--font-sans); font-weight: 600; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .ec-per { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); }
+
+  /* TopBar mini */
+  .tb { height: 56px; background: var(--background); border: 1px solid var(--hairline); border-radius: 999px; padding: 0 14px; display: flex; align-items: center; gap: 12px; width: 100%; max-width: 540px; }
+  .tb-logo { font-family: var(--font-display); font-weight: 900; font-size: 18px; letter-spacing: 0.01em; text-transform: lowercase; }
+  .tb-date { margin: 0 auto; height: 36px; border-radius: 9999px; border: 2px solid var(--ink); background: var(--background); padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-sans); font-size: 13px; font-weight: 500; }
+  .tb-icon { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 10px; border-radius: 9999px; border: 1px solid var(--hairline); font-family: var(--font-sans); font-size: 12px; font-weight: 500; background: var(--background); }
+
+  /* Input demo */
+  .ip-field { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 240px; }
+  .ip-lbl { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .ip-input { height: 36px; border-radius: 6px; border: 1px solid var(--hairline); background: var(--surface-elevated); padding: 0 12px; font-family: var(--font-sans); font-size: 13px; color: var(--ink); outline: none; }
+  .ip-search { position: relative; width: 100%; max-width: 240px; }
+  .ip-search input { width: 100%; height: 40px; border-radius: 9999px; border: 2px solid var(--hairline); background: var(--surface-elevated); padding: 0 16px 0 36px; font-family: var(--font-sans); font-size: 13px; color: var(--ink); outline: none; box-sizing: border-box; }
+  .ip-search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--muted-foreground); }
+
+  /* PriceBlock demo */
+  .pb-demo { padding: 12px 18px; border-radius: 10px; border: 1px solid var(--hairline); background: var(--surface); text-align: right; min-width: 130px; }
+  .pb-main { font-family: var(--font-display); font-size: 22px; font-weight: 900; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -0.01em; }
+  .pb-meta { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-foreground); margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .pb-meta b { font-weight: 600; color: var(--ink); opacity: 0.7; }
+
+  /* ViewToggle demo */
+  .vt {
+    position: relative; display: inline-flex; align-items: center;
+    padding: 3px; border-radius: 12px;
+    border: 1.5px solid var(--hairline); background: var(--surface);
+  }
+  .vt::before {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: calc(50% - 3px); height: calc(100% - 6px);
+    background: var(--ink); border-radius: 9px;
+    transition: transform .28s cubic-bezier(.32,.72,0,1);
+    z-index: 0;
+  }
+  .vt[data-active="b"]::before { transform: translateX(100%); }
+  .vt-btn {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 18px; border-radius: 9px;
+    font-family: var(--font-sans); font-size: 13px; font-weight: 700;
+    color: var(--muted-foreground); white-space: nowrap;
+    background: transparent; cursor: pointer; border: 0;
+    transition: color .2s ease;
+  }
+  .vt-btn.active { color: var(--amber); }
+
+  /* EmptyState demo */
+  .es {
+    width: 100%; max-width: 280px;
+    padding: 28px 18px; text-align: center;
+    border-radius: 10px; border: 1px dashed var(--hairline);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .es-icon {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: var(--amber-soft); color: var(--amber);
+    display: grid; place-items: center;
+    margin-bottom: 2px;
+  }
+  .es-title { font-family: var(--font-display); font-size: 18px; font-weight: 900; color: var(--ink); }
+  .es-sub { font-family: var(--font-sans); font-size: 12px; color: var(--muted-foreground); max-width: 220px; line-height: 1.5; }
+  .es-chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin-top: 4px; }
+  .es-chip { padding: 3px 10px; border-radius: 9999px; border: 1px solid var(--hairline); background: var(--surface-elevated); font-size: 10px; font-family: var(--font-sans); color: var(--ink); cursor: pointer; }
+  .es-chip:hover { border-color: var(--ink); background: var(--muted); }
+
+  /* ── Footer ──────────────────────────────────────────────────── */
+  footer.f {
+    padding: 48px 0 40px;
+    background: var(--surface);
+    border-top: 1px solid var(--hairline);
+  }
+  .f-inner {
+    display: grid; grid-template-columns: 1fr auto; gap: 32px;
+    max-width: 1180px; margin: 0 auto; padding: 0 24px;
+    align-items: center;
+  }
+  .f-inner .tagline {
+    font-family: var(--font-display); font-weight: 900;
+    font-size: 26px; line-height: 1; letter-spacing: 0.01em;
+    text-transform: lowercase;
+  }
+  .f-inner .meta {
+    font-family: var(--font-mono); font-size: 10px;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--muted-foreground);
+    text-align: right;
+  }
+
+  /* ── Mobile ──────────────────────────────────────────────────── */
+  @media (max-width: 720px) {
+    .install-grid { grid-template-columns: 1fr; }
+    .tree { grid-template-columns: 1fr; }
+    .nav-links a { padding: 6px 8px; font-size: 9px; }
+    .nav-links a:not(.primary) { display: none; }
+    .module-head { flex-direction: column; align-items: flex-start; }
+    .module-title { font-size: 28px; }
+    .hero { padding: 56px 0 48px; }
+    .f-inner { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────────────── -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-brand"><span class="dot"></span>rambla <span style="color:var(--muted-foreground)">·</span> kit</a>
+    <div class="nav-links">
+      <a href="#install">Instalar</a>
+      <a href="#estructura">Estructura</a>
+      <a href="#tokens">Tokens</a>
+      <a href="#componentes">Componentes</a>
+      <a href="kit/INSTALL.md" class="primary" style="color:var(--ink); background: var(--amber);">INSTALL.md →</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Hero ──────────────────────────────────────────────────────── -->
+<main>
+<section class="hero">
+  <div class="hero-eyebrow">
+    <span class="pill">v1 · MAY 2026</span>
+    <span>Tailwind v4 · React 19 · TypeScript</span>
+  </div>
+  <h1>un kit<br>para volver<br>a usar.</h1>
+  <p class="sub">
+    Diseño Rambla Rental empaquetado como módulos drop-in: tokens, fuentes, recetas tipográficas y componentes React. Lo mismo que ya está en producción en <code class="inline">tixenre/rental</code>, listo para copiar en proyectos nuevos.
+  </p>
+  <div class="hero-ctas">
+    <a class="btn btn-primary btn-lg" href="#install">Instalar →</a>
+    <a class="btn btn-secondary btn-lg" href="#componentes">Ver componentes</a>
+    <a class="btn btn-ghost btn-lg" href="kit/INSTALL.md">INSTALL.md</a>
+  </div>
+</section>
+
+<!-- ── Install ──────────────────────────────────────────────────── -->
+<section class="module" id="install">
+  <div class="module-head">
+    <div>
+      <div class="module-eyebrow">01 · Quick start</div>
+      <h2 class="module-title">Instalación en 3 pasos</h2>
+      <p class="module-desc">Pegale esto a Claude Code en cualquier proyecto Tailwind v4 + React, o seguilos a mano.</p>
+    </div>
+    <a class="module-path" href="kit/INSTALL.md">kit/INSTALL.md</a>
+  </div>
+
+  <div class="install-grid">
+    <div class="install-step">
+      <span class="n">1</span>
+      <h3>Copiá el kit</h3>
+      <p>Mové la carpeta <code class="inline">kit/</code> a <code class="inline">src/kit/</code> de tu proyecto. Las fuentes vienen adentro.</p>
+      <pre class="code"><span class="c-com"># desde la raíz de tu proyecto</span>
+cp -r path/to/kit src/kit</pre>
+    </div>
+
+    <div class="install-step">
+      <span class="n">2</span>
+      <h3>Wireá los imports CSS</h3>
+      <p>En <code class="inline">src/styles.css</code>, justo después de Tailwind:</p>
+<pre class="code"><span class="c-key">@import</span> <span class="c-str">"tailwindcss"</span>;
+
+<span class="c-key">@import</span> <span class="c-str">"./kit/fonts.css"</span>;
+<span class="c-key">@import</span> <span class="c-str">"./kit/tokens.css"</span>;
+<span class="c-key">@import</span> <span class="c-str">"./kit/recipes.css"</span>;</pre>
+    </div>
+
+    <div class="install-step">
+      <span class="n">3</span>
+      <h3>Instalá las deps</h3>
+      <p>Lo que los componentes necesitan más allá de Tailwind:</p>
+      <pre class="code">npm install clsx tailwind-merge \
+  class-variance-authority \
+  @radix-ui/react-slot lucide-react</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ── Estructura ───────────────────────────────────────────────── -->
+<section class="module" id="estructura">
+  <div class="module-head">
+    <div>
+      <div class="module-eyebrow">02 · Qué hay en la caja</div>
+      <h2 class="module-title">Estructura del kit</h2>
+      <p class="module-desc">Tres archivos CSS de base + componentes React tipados. Cada pieza es independiente, no hay barril único.</p>
+    </div>
+  </div>
+
+  <div class="tree">
+    <div class="tree-block"><span class="dir">kit/</span>
+├── <span class="dir">fonts/</span>           <span class="com">tt commons + champ black</span>
+├── fonts.css        <span class="com">@font-face</span>
+├── tokens.css       <span class="com">@theme + :root</span>
+├── recipes.css      <span class="com">.t-* .wordmark .grain</span>
+├── index.css        <span class="com">atajo de los 3</span>
+├── INSTALL.md
+├── <span class="dir">lib/</span>
+│   └── format.ts    <span class="com">formatARS, ranges</span>
+├── <span class="dir">types/</span>
+│   └── equipment.ts <span class="com">Equipment, EstadoPedido</span>
+└── <span class="dir">components/</span>
+    ├── <span class="dir">lib/</span>
+    │   └── cn.ts
+    ├── button.tsx
+    ├── input.tsx    <span class="com">+ Search + Label</span>
+    ├── addon-pills.tsx
+    ├── estado-badge.tsx
+    ├── equipment-card.tsx
+    ├── price-block.tsx
+    ├── view-toggle.tsx
+    ├── empty-state.tsx
+    ├── stat-card.tsx
+    └── topbar.tsx</div>
+
+    <div class="tree-legend">
+      <div class="legend-row">
+        <code>tokens.css</code>
+        <span><b>El corazón.</b> Bloque <code style="font-family:var(--font-mono);font-size:11px">@theme inline</code> con colores, radii, type stacks. Tailwind v4 lo lee y genera utilities: <code style="font-family:var(--font-mono);font-size:11px">bg-amber, text-ink, border-hairline</code>.</span>
+      </div>
+      <div class="legend-row">
+        <code>fonts.css</code>
+        <span><b>TT Commons + Champ Black</b> vendoreadas localmente. Las del manual oficial de marca, no las free de Google.</span>
+      </div>
+      <div class="legend-row">
+        <code>recipes.css</code>
+        <span><b>Utilities compuestas</b> que no son tokens: type recipes (<code style="font-family:var(--font-mono);font-size:11px">.t-display-1, .t-h1, .t-eyebrow</code>), <code style="font-family:var(--font-mono);font-size:11px">.wordmark</code>, <code style="font-family:var(--font-mono);font-size:11px">.grain</code>, <code style="font-family:var(--font-mono);font-size:11px">.bg-amber-tape</code>, safe-area helpers.</span>
+      </div>
+      <div class="legend-row">
+        <code>components/</code>
+        <span><b>Diez piezas presentacionales</b>, una por archivo. Tipadas, con JSDoc + ejemplo. No traen store; recibís estado por props.</span>
+      </div>
+      <div class="legend-row">
+        <code>lib/ + types/</code>
+        <span><b>Capa chica de utilidades.</b> <code style="font-family:var(--font-mono);font-size:11px">formatARS, formatRentalRange, jornadaLabel</code> + tipos compartidos <code style="font-family:var(--font-mono);font-size:11px">Equipment, AddonItem, EstadoPedido</code>.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Tokens preview ───────────────────────────────────────────── -->
+<section class="module" id="tokens">
+  <div class="module-head">
+    <div>
+      <div class="module-eyebrow">03 · Tokens</div>
+      <h2 class="module-title">Colores y tipografía</h2>
+      <p class="module-desc">Lo que se exporta como utilities Tailwind apenas importás <code class="inline">tokens.css</code>.</p>
+    </div>
+    <a class="module-path" href="kit/tokens.css">kit/tokens.css</a>
+  </div>
+
+  <!-- Color swatches -->
+  <div class="swatches" style="margin-bottom: 32px">
+    <div class="swatch">
+      <div class="swatch-fill" style="background: var(--amber); color: var(--ink);">amber</div>
+      <div class="swatch-meta"><span>--amber</span><span class="v">#FAB428</span></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-fill" style="background: var(--ink); color: var(--amber);">ink</div>
+      <div class="swatch-meta"><span>--ink</span><span class="v">oklch(.14 .01 60)</span></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-fill" style="background: var(--background); color: var(--ink); border-bottom: 1px solid var(--hairline);">bone</div>
+      <div class="swatch-meta"><span>--background</span><span class="v">oklch(.985 .005 90)</span></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-fill" style="background: var(--surface); color: var(--ink); border-bottom: 1px solid var(--hairline);">surface</div>
+      <div class="swatch-meta"><span>--surface</span><span class="v">oklch(.97 .008 85)</span></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-fill" style="background: var(--rosa); color: var(--ink);">rosa</div>
+      <div class="swatch-meta"><span>--rosa</span><span class="v">#ED7BAD</span></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-fill" style="background: var(--azul); color: var(--background);">azul</div>
+      <div class="swatch-meta"><span>--azul</span><span class="v">#1097DB</span></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-fill" style="background: var(--naranja); color: var(--background);">naranja</div>
+      <div class="swatch-meta"><span>--naranja</span><span class="v">#E9552F</span></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-fill" style="background: var(--verde); color: var(--background);">verde</div>
+      <div class="swatch-meta"><span>--verde</span><span class="v">#009971</span></div>
+    </div>
+  </div>
+
+  <!-- Type scale -->
+  <div class="preview">
+    <div class="preview-stage" style="padding: 32px 28px; flex-direction: column; align-items: stretch; justify-content: flex-start;">
+      <div class="type-scale" style="width: 100%;">
+        <div class="type-row">
+          <span style="font-family: var(--font-display); font-weight: 900; font-size: 56px; line-height: 0.9; letter-spacing: -0.01em; text-transform: lowercase;">un lugar donde pasan</span>
+          <span class="meta">.t-display-1 · Champ Black</span>
+        </div>
+        <div class="type-row">
+          <span style="font-family: var(--font-display); font-weight: 900; font-size: 32px; line-height: 1; letter-spacing: -0.01em; text-transform: lowercase;">conocé el estudio</span>
+          <span class="meta">.t-display-2</span>
+        </div>
+        <div class="type-row">
+          <span style="font-family: var(--font-sans); font-weight: 700; font-size: 28px; line-height: 1.15; letter-spacing: -0.015em;">Cámaras destacadas</span>
+          <span class="meta">.t-h1 · TT Commons</span>
+        </div>
+        <div class="type-row">
+          <span style="font-family: var(--font-sans); font-weight: 700; font-size: 22px; line-height: 1.2; letter-spacing: -0.01em;">Pack todo incluido</span>
+          <span class="meta">.t-h2</span>
+        </div>
+        <div class="type-row">
+          <span style="font-family: var(--font-sans); font-size: 16px; line-height: 1.55;">Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales.</span>
+          <span class="meta">.t-body</span>
+        </div>
+        <div class="type-row">
+          <span style="font-family: var(--font-mono); font-weight: 500; font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground);">CATÁLOGO · 187 EQUIPOS · MAR DEL PLATA</span>
+          <span class="meta">.t-eyebrow · JetBrains Mono</span>
+        </div>
+      </div>
+    </div>
+    <div class="preview-foot">
+      <span class="label">Recetas tipográficas — Champ Black solo en display 1/2.</span>
+      <code>kit/recipes.css</code>
+    </div>
+  </div>
+</section>
+
+<!-- ── Componentes ──────────────────────────────────────────────── -->
+<section class="module" id="componentes">
+  <div class="module-head">
+    <div>
+      <div class="module-eyebrow">04 · Componentes</div>
+      <h2 class="module-title">Diez piezas, una por archivo</h2>
+      <p class="module-desc">Cada componente es presentacional, tipado y con JSDoc. Importás lo que usás, nada más. Versiones full en el repo.</p>
+    </div>
+  </div>
+
+  <div class="comp-grid">
+
+    <!-- Button -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">Button <code>button.tsx</code></div>
+        <div class="comp-card-desc">5 variants · 4 sizes · 2 shapes. La jugada: hover invierte ink ⇄ amber.</div>
+      </header>
+      <div class="comp-card-stage">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+          <button class="btn btn-primary">Reservar</button>
+          <button class="btn btn-secondary btn-pill">Ver carrito</button>
+          <button class="btn btn-ghost">Cancelar</button>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+          <button class="btn btn-amber btn-pill">Conocé el Estudio →</button>
+          <button class="btn btn-destructive btn-sm">Eliminar</button>
+        </div>
+      </div>
+      <footer class="comp-card-foot">
+        <a href="#code-button">Ver código ↓</a>
+        <a class="path" href="kit/components/button.tsx">kit/components/button.tsx</a>
+      </footer>
+    </article>
+
+    <!-- AddonPills -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">AddonPills <code>addon-pills.tsx</code></div>
+        <div class="comp-card-desc">Items "incluye" sobre la row de un equipo. Soporta qty, overflow y empty state.</div>
+      </header>
+      <div class="comp-card-stage">
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center;">
+          <span class="ap"><span class="ap-check">✓</span>Cuerpo</span>
+          <span class="ap"><span class="ap-check">✓</span>Batería NP-FZ100<span class="ap-qty">×2</span></span>
+          <span class="ap"><span class="ap-check">✓</span>Cargador dual</span>
+          <span class="ap ap-more">+3</span>
+        </div>
+        <div style="display: flex; gap: 6px; justify-content: center; margin-top: 4px;">
+          <span class="ap-empty">solo cuerpo</span>
+        </div>
+      </div>
+      <footer class="comp-card-foot">
+        <a href="preview/components-addon-pill.html">Specimen →</a>
+        <a class="path" href="kit/components/addon-pills.tsx">kit/components/addon-pills.tsx</a>
+      </footer>
+    </article>
+
+    <!-- EstadoBadge -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">EstadoBadge <code>estado-badge.tsx</code></div>
+        <div class="comp-card-desc">Ciclo de vida del pedido. 9 estados mapeados a la paleta secundaria.</div>
+      </header>
+      <div class="comp-card-stage">
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 320px;">
+          <span class="eb eb-borrador">Borrador</span>
+          <span class="eb eb-presupuesto">Presupuesto</span>
+          <span class="eb eb-solicitado">Solicitado</span>
+          <span class="eb eb-confirmado">Confirmado</span>
+          <span class="eb eb-retirado">Retirado</span>
+          <span class="eb eb-cancelado">Cancelado</span>
+        </div>
+      </div>
+      <footer class="comp-card-foot">
+        <a href="preview/components-estado-badge.html">Specimen →</a>
+        <a class="path" href="kit/components/estado-badge.tsx">kit/components/estado-badge.tsx</a>
+      </footer>
+    </article>
+
+    <!-- StatCard -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">StatCard <code>stat-card.tsx</code></div>
+        <div class="comp-card-desc">Bloque número grande del dashboard admin. Tabular nums.</div>
+      </header>
+      <div class="comp-card-stage">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+          <div class="sc">
+            <div class="sc-l">Pedidos · mayo</div>
+            <div class="sc-v">42</div>
+            <div class="sc-m">+8 vs. abril</div>
+          </div>
+          <div class="sc">
+            <div class="sc-l">Ingresos</div>
+            <div class="sc-v">$ 2.840.500</div>
+            <div class="sc-m">ARS · mayo</div>
+          </div>
+        </div>
+      </div>
+      <footer class="comp-card-foot">
+        <a href="preview/components-stat-card.html">Specimen →</a>
+        <a class="path" href="kit/components/stat-card.tsx">kit/components/stat-card.tsx</a>
+      </footer>
+    </article>
+
+    <!-- EquipmentCard -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">EquipmentCard <code>equipment-card.tsx</code></div>
+        <div class="comp-card-desc">Card 4:5 del catálogo público. Foto + info + add-to-cart.</div>
+      </header>
+      <div class="comp-card-stage">
+        <div class="ec">
+          <div class="ec-photo">
+            <span class="ec-badge"><span style="font-size:9px">✦</span> nuevo</span>
+            <span class="initials">A7</span>
+          </div>
+          <div class="ec-info">
+            <div class="ec-brand">SONY</div>
+            <div class="ec-name">Cámara Sony A7S III</div>
+            <div class="ec-pricerow">
+              <span class="ec-price">$ 24.500</span>
+              <span class="ec-per">/jornada</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="comp-card-foot">
+        <a href="preview/components-equipment-card.html">Specimen →</a>
+        <a class="path" href="kit/components/equipment-card.tsx">kit/components/equipment-card.tsx</a>
+      </footer>
+    </article>
+
+    <!-- TopBar -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">TopBar <code>topbar.tsx</code></div>
+        <div class="comp-card-desc">Header sticky con la jugada amber-scroll del mobile.</div>
+      </header>
+      <div class="comp-card-stage">
+        <div class="tb">
+          <span class="tb-logo">rambla</span>
+          <button class="tb-date">📅 Elegir fechas</button>
+          <span class="tb-icon">🛒 0</span>
+        </div>
+      </div>
+      <footer class="comp-card-foot">
+        <a href="preview/patterns-topbar-amber-scroll.html">Pattern →</a>
+        <a class="path" href="kit/components/topbar.tsx">kit/components/topbar.tsx</a>
+      </footer>
+    </article>
+
+    <!-- Input -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">Input · SearchInput · FieldLabel <code>input.tsx</code></div>
+        <div class="comp-card-desc">Campo de texto, search pill con ícono, y el eyebrow mono que va arriba de cada campo.</div>
+      </header>
+      <div class="comp-card-stage">
+        <div class="ip-field">
+          <span class="ip-lbl">Email</span>
+          <input class="ip-input" value="hola@productora.com">
+        </div>
+        <div class="ip-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input placeholder="Buscar equipo, marca…">
+        </div>
+      </div>
+      <footer class="comp-card-foot">
+        <a href="preview/components-inputs.html">Specimen →</a>
+        <a class="path" href="kit/components/input.tsx">kit/components/input.tsx</a>
+      </footer>
+    </article>
+
+    <!-- PriceBlock -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">PriceBlock <code>price-block.tsx</code></div>
+        <div class="comp-card-desc">Precio + tarifa + total opcional. Display font main, mono meta abajo. Tabular nums.</div>
+      </header>
+      <div class="comp-card-stage" style="flex-direction: row; gap: 16px;">
+        <div class="pb-demo">
+          <div class="pb-main">$ 24.500</div>
+          <div class="pb-meta">/ jornada</div>
+        </div>
+        <div class="pb-demo">
+          <div class="pb-main">$ 73.500</div>
+          <div class="pb-meta">3 J · <b>$ 24.500/J</b></div>
+        </div>
+      </div>
+      <footer class="comp-card-foot">
+        <a href="preview/components-price-block.html">Specimen →</a>
+        <a class="path" href="kit/components/price-block.tsx">kit/components/price-block.tsx</a>
+      </footer>
+    </article>
+
+    <!-- ViewToggle -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">ViewToggle <code>view-toggle.tsx</code></div>
+        <div class="comp-card-desc">Segmented control con pill deslizante. Grid/Lista, draft/publicado, etc.</div>
+      </header>
+      <div class="comp-card-stage">
+        <div class="vt" data-active="a" id="vtDemo">
+          <button class="vt-btn active" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
+            Grid
+          </button>
+          <button class="vt-btn" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            Lista
+          </button>
+        </div>
+      </div>
+      <footer class="comp-card-foot">
+        <a href="preview/components-view-toggle.html">Specimen →</a>
+        <a class="path" href="kit/components/view-toggle.tsx">kit/components/view-toggle.tsx</a>
+      </footer>
+    </article>
+
+    <!-- EmptyState -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">EmptyState <code>empty-state.tsx</code></div>
+        <div class="comp-card-desc">Pattern "nada para mostrar". Icono amber-soft + título + sub + acción.</div>
+      </header>
+      <div class="comp-card-stage">
+        <div class="es">
+          <div class="es-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+          <div class="es-title">Sin resultados</div>
+          <div class="es-sub">Probá con otra categoría.</div>
+          <div class="es-chips">
+            <span class="es-chip">Cámaras</span>
+            <span class="es-chip">Lentes</span>
+            <span class="es-chip">Audio</span>
+          </div>
+        </div>
+      </div>
+      <footer class="comp-card-foot">
+        <a href="preview/components-empty-state.html">Specimen →</a>
+        <a class="path" href="kit/components/empty-state.tsx">kit/components/empty-state.tsx</a>
+      </footer>
+    </article>
+
+  </div>
+
+  <!-- Inline code sample for Button -->
+  <div id="code-button" style="margin-top: 36px;">
+    <div class="module-eyebrow" style="margin-bottom: 12px;">Ejemplo · Button</div>
+    <pre class="code"><span class="c-key">import</span> { Button } <span class="c-key">from</span> <span class="c-str">"@/kit/components/button"</span>;
+
+<span class="c-key">export default function</span> <span class="c-tag">Demo</span>() {
+  <span class="c-key">return</span> (
+    &lt;<span class="c-tag">div</span> className=<span class="c-str">"flex gap-2"</span>&gt;
+      &lt;<span class="c-tag">Button</span>&gt;Reservar&lt;/<span class="c-tag">Button</span>&gt;
+      &lt;<span class="c-tag">Button</span> variant=<span class="c-str">"secondary"</span> shape=<span class="c-str">"pill"</span>&gt;Ver carrito&lt;/<span class="c-tag">Button</span>&gt;
+      &lt;<span class="c-tag">Button</span> variant=<span class="c-str">"ghost"</span> size=<span class="c-str">"icon"</span>&gt;&lt;<span class="c-tag">Search</span>/&gt;&lt;/<span class="c-tag">Button</span>&gt;
+      &lt;<span class="c-tag">Button</span> asChild&gt;
+        &lt;<span class="c-tag">a</span> href=<span class="c-str">"/estudio"</span>&gt;Conocé el Estudio&lt;/<span class="c-tag">a</span>&gt;
+      &lt;/<span class="c-tag">Button</span>&gt;
+    &lt;/<span class="c-tag">div</span>&gt;
+  );
+}</pre>
+  </div>
+</section>
+
+</main>
+
+<!-- ── Footer ───────────────────────────────────────────────────── -->
+<footer class="f">
+  <div class="f-inner">
+    <div>
+      <div class="tagline">un lugar donde pasan cosas.</div>
+      <div style="margin-top: 10px; font-family: var(--font-sans); font-size: 13px; color: var(--muted-foreground); max-width: 52ch;">
+        Diseño basado en <code class="inline">tixenre/rental@main</code>. Para sincronizar el kit con cambios upstream, ver INSTALL.md → Versionado.
+      </div>
+    </div>
+    <div class="meta">
+      © 2026 Rambla Rental<br>
+      Mar del Plata, Argentina
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ViewToggle demo interactividad
+  (function() {
+    const t = document.getElementById('vtDemo');
+    if (!t) return;
+    const btns = t.querySelectorAll('.vt-btn');
+    btns.forEach((b, i) => b.addEventListener('click', () => {
+      btns.forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      t.dataset.active = i === 0 ? 'a' : 'b';
+    }));
+  })();
+</script>
+
+</body>
+</html>

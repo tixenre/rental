@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Components · Buttons</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { background: var(--background); }
+.row { gap: 10px; align-items: center; flex-wrap: wrap; }
+button { font-family: var(--font-sans); border: 0; cursor: pointer; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 9999px; font-weight: 600; font-size: 14px; transition: all .15s; }
+.btn-primary { background: var(--ink); color: var(--background); }
+.btn-primary:hover { background: var(--amber); color: var(--ink); }
+.btn-amber { background: var(--amber); color: var(--ink); }
+.btn-amber:hover { filter: brightness(1.07); }
+.btn-outline { background: transparent; border: 1px solid var(--hairline); color: var(--ink); }
+.btn-outline:hover { border-color: var(--ink); }
+.btn-ghost { background: transparent; color: var(--ink); }
+.btn-ghost:hover { background: var(--amber-soft); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-lg { padding: 12px 24px; font-size: 15px; }
+.btn-disabled { opacity: .45; cursor: not-allowed; }
+.btn-destructive { background: var(--destructive); color: white; }
+.label-row { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); margin-top: 6px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="row">
+      <button class="btn btn-primary">Reservar</button>
+      <button class="btn btn-amber">Ver estudio →</button>
+      <button class="btn btn-outline">Ver pack</button>
+      <button class="btn btn-ghost">Cancelar</button>
+      <button class="btn btn-destructive">Eliminar</button>
+      <button class="btn btn-primary btn-disabled">Sin stock</button>
+    </div>
+    <div class="row">
+      <button class="btn btn-primary btn-sm">+ Agregar</button>
+      <button class="btn btn-primary">Confirmar pedido</button>
+      <button class="btn btn-amber btn-lg">Conocé el Estudio</button>
+    </div>
+    <div class="label-row">primary · amber · outline · ghost · destructive · sm/md/lg · all rounded-full</div>
+  </div>
+</body>
+</html>

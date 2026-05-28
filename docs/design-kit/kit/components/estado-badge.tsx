@@ -1,4 +1,7 @@
 import { cn } from "./lib/cn";
+import type { EstadoPedido } from "../types/equipment";
+
+export type { EstadoPedido };
 
 /**
  * EstadoBadge — chip de estado para pedidos.
@@ -22,17 +25,6 @@ import { cn } from "./lib/cn";
  *   <EstadoBadge estado="solicitado" />
  *   <EstadoBadge estado="confirmado" />
  */
-
-export type EstadoPedido =
-  | "borrador"
-  | "presupuesto"
-  | "solicitado"
-  | "confirmado"
-  | "retirado"
-  | "entregado"
-  | "devuelto"
-  | "finalizado"
-  | "cancelado";
 
 const ESTADO_MAP: Record<EstadoPedido, { label: string; cls: string }> = {
   borrador: {

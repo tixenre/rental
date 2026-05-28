@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Colors · Semantic surfaces</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { background: var(--background); }
+.grid { grid-template-columns: repeat(5, 1fr); }
+.swatch { min-height: 116px; padding: 12px; gap: 4px; }
+.bg-bg       { background: var(--background); }
+.bg-surface  { background: var(--surface); }
+.bg-card     { background: var(--card); box-shadow: 0 1px 0 var(--hairline); }
+.bg-muted    { background: var(--muted); }
+.bg-ink      { background: var(--ink); color: var(--background); }
+.bg-ink .token, .bg-ink .label.subtle { color: color-mix(in oklch, white 80%, transparent); }
+.swatch.outline { border: 1px dashed var(--hairline); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="grid">
+      <div class="swatch outline bg-bg"><div class="label">background</div><div class="token subtle">page</div></div>
+      <div class="swatch outline bg-surface"><div class="label">surface</div><div class="token subtle">panels</div></div>
+      <div class="swatch bg-card"><div class="label">card</div><div class="token subtle">elevated</div></div>
+      <div class="swatch bg-muted"><div class="label">muted</div><div class="token subtle">chips</div></div>
+      <div class="swatch bg-ink"><div class="label">ink</div><div class="token">primary buttons</div></div>
+    </div>
+  </div>
+</body>
+</html>

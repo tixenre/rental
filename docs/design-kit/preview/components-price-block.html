@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Components · Price block</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { background: var(--background); }
+.row { display: flex; gap: 32px; flex-wrap: wrap; }
+.demo {
+  padding: 12px 18px; border-radius: var(--radius-md);
+  border: 1px solid var(--hairline); background: var(--surface);
+  text-align: right;
+}
+.price-main {
+  font-family: var(--font-display); font-size: 18px; font-weight: 800; color: var(--ink);
+  font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -0.01em;
+}
+.price-meta {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted-foreground); margin-top: 3px; font-variant-numeric: tabular-nums;
+}
+.price-meta b { font-weight: 600; color: var(--ink); opacity: 0.7; }
+.eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="eyebrow">Price block — display font main + mono meta · tabular-nums</div>
+    <div class="row">
+      <div class="demo">
+        <div class="price-main">$ 73.500</div>
+        <div class="price-meta">3 J · <b>$ 24.500/J</b></div>
+      </div>
+      <div class="demo">
+        <div class="price-main">$ 24.500</div>
+        <div class="price-meta">/ jornada</div>
+      </div>
+    </div>
+    <div class="eyebrow">Rule: when N jornadas &gt; 1 → show total grande + per-jorn ref · when single jornada → show per-jorn only</div>
+  </div>
+</body>
+</html>

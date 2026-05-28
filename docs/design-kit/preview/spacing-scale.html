@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Spacing · Scale</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { background: var(--background); }
+.row { gap: 18px; align-items: flex-end; }
+.bar { background: var(--amber); height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--ink); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; }
+.stack { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.cap { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="row">
+      <div class="stack"><div class="bar" style="width: 8px;"></div><div class="cap">2 · 8px</div></div>
+      <div class="stack"><div class="bar" style="width: 12px;"></div><div class="cap">3 · 12px</div></div>
+      <div class="stack"><div class="bar" style="width: 16px;"></div><div class="cap">4 · 16px</div></div>
+      <div class="stack"><div class="bar" style="width: 24px;"></div><div class="cap">6 · 24px</div></div>
+      <div class="stack"><div class="bar" style="width: 32px;"></div><div class="cap">8 · 32px</div></div>
+      <div class="stack"><div class="bar" style="width: 48px;"></div><div class="cap">12 · 48px</div></div>
+      <div class="stack"><div class="bar" style="width: 64px;"></div><div class="cap">16 · 64px</div></div>
+      <div class="stack"><div class="bar" style="width: 96px;"></div><div class="cap">24 · 96px</div></div>
+    </div>
+  </div>
+</body>
+</html>

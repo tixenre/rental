@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Brand · Marks</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { background: var(--background); }
+.grid { grid-template-columns: repeat(4, 1fr); gap: 14px; align-items: stretch; }
+.mark { display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 8px; border: 1px solid var(--hairline); border-radius: var(--radius-md); background: var(--surface); }
+.mark img { height: 96px; width: auto; }
+.mark .label { color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="grid">
+      <div class="mark">
+        <img src="../assets/rambla-icon-r.png" alt="R seal">
+        <div class="label">R · seal</div>
+      </div>
+      <div class="mark">
+        <img src="../assets/rambla-icon-seal.png" alt="e seal">
+        <div class="label">e · seal alt</div>
+      </div>
+      <div class="mark">
+        <img src="../assets/rambla-icon-chair.png" alt="chair seal">
+        <div class="label">Chair · seal</div>
+      </div>
+      <div class="mark">
+        <img src="../assets/rambla-badge.png" alt="circular badge">
+        <div class="label">Circular badge</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
