@@ -789,7 +789,7 @@ function BoolValueInput({ value, onChange }: { value: string; onChange: (v: stri
         className={
           "px-3 py-1 transition border-r hairline " +
           (yes
-            ? "bg-emerald-100 text-emerald-800 font-medium"
+            ? "bg-verde/10 text-verde font-medium"
             : "bg-background text-muted-foreground hover:bg-muted/40")
         }
         aria-pressed={yes}

@@ -60,6 +60,25 @@ Las utilities Tailwind correspondientes (`bg-amber`, `text-ink`,
 `border-hairline`, `bg-rosa/10`, etc.) las genera Tailwind v4 directo de
 estos tokens vía el bloque `@theme inline` al inicio de `src/styles.css`.
 
+#### Tiers de color (de dónde puede salir un color)
+
+Todo color en `src/` tiene que venir de uno de estos cuatro tiers. Nada de
+Tailwind genérico (`bg-slate-100`, `text-blue-700`, …) ni hex crudo
+ad-hoc por pantalla — esa es la deuda que se barre en
+[#584](https://github.com/tixenre/rental/issues/584) y que el guardrail de
+ESLint (Fase 2) bloquea.
+
+| Tier | Para qué | De dónde sale |
+|---|---|---|
+| **1. Marca** | Identidad | `amber`, `amber-soft`, `amber-hot`, `ink`, `ink-pure`, `background`, `surface`, `muted`, `hairline`, … (tokens) |
+| **2. Status** | Estados semánticos (pedido, pago, éxito/error/info, delta +/−) | `azul`, `verde`, `rosa`, `naranja`, `destructive` (tokens). Mapeo: éxito/positivo → `verde`; error/negativo → `destructive`; info → `azul`; aviso → `amber`/`naranja` |
+| **3. Categórico** | Distinguir N ítems de una taxonomía donde 4 colores no alcanzan | **Paletas centralizadas y nombradas**, no inline. Ej.: `AVATAR_COLORS` (avatares de cliente), `kindFor` en `/admin/novedades` (tipos de changelog). Pueden usar hues fuera de la paleta de marca porque su función es la distinción, no la identidad |
+| **4. Excepción de terceros** | Affordances reconocibles de marcas externas | Verde WhatsApp (`#25D366`), colores del logo de Google (`#EA4335/#4285F4/#FBBC05/#34A853`). Documentadas acá, allow-listed en el guardrail |
+
+**Regla:** colores genéricos/hex sólo se permiten en tiers 3 y 4, y ahí
+viven en constantes centralizadas y documentadas — nunca sueltos en una
+pantalla. Cualquier otro color sale de un token (tiers 1-2).
+
 ### Tipografía
 
 ```css
