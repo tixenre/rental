@@ -6,29 +6,142 @@
 
 /* ── Fuentes de marca (Rambla) ──────────────────────────────────────────
  * TT Commons (primaria: body + UI + headings) + Champ Black (display:
- * showpieces + wordmark). Familia completa 100–900 + italics + Champ 900.
- * JetBrains Mono se carga en index.html.
+ * showpieces + wordmark). Familia completa 100-900 + italics shippeada
+ * localmente. JetBrains Mono se carga en index.html.
  */
-@font-face { font-family: "TT Commons"; font-weight: 100; font-style: normal;  font-display: swap; src: url("./assets/fonts/TT_Commons_Thin_0.otf")             format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 100; font-style: italic;  font-display: swap; src: url("./assets/fonts/TT_Commons_Thin_Italic_0.otf")      format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 200; font-style: normal;  font-display: swap; src: url("./assets/fonts/TT_Commons_ExtraLight_0.otf")        format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 200; font-style: italic;  font-display: swap; src: url("./assets/fonts/TT_Commons_ExtraLight_Italic_0.otf") format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 300; font-style: normal;  font-display: swap; src: url("./assets/fonts/TT_Commons_Light_0.otf")             format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 300; font-style: italic;  font-display: swap; src: url("./assets/fonts/TT_Commons_Light_Italic_0.otf")      format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 400; font-style: normal;  font-display: swap; src: url("./assets/fonts/TT_Commons_Regular_0.otf")           format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 400; font-style: italic;  font-display: swap; src: url("./assets/fonts/TT_Commons_Italic_0.otf")            format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 500; font-style: normal;  font-display: swap; src: url("./assets/fonts/TT_Commons_Medium_0.otf")            format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 500; font-style: italic;  font-display: swap; src: url("./assets/fonts/TT_Commons_Medium_Italic_0.otf")     format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 600; font-style: normal;  font-display: swap; src: url("./assets/fonts/TT_Commons_DemiBold_0.otf")          format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 600; font-style: italic;  font-display: swap; src: url("./assets/fonts/TT_Commons_DemiBold_Italic_0.otf")   format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 700; font-style: normal;  font-display: swap; src: url("./assets/fonts/TT_Commons_Bold_0.otf")              format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 700; font-style: italic;  font-display: swap; src: url("./assets/fonts/TT_Commons_Bold_Italic_0.otf")       format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 800; font-style: normal;  font-display: swap; src: url("./assets/fonts/TT_Commons_Extrabold_0.otf")         format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 800; font-style: italic;  font-display: swap; src: url("./assets/fonts/TT_Commons_Extrabold_Italic_0.otf")  format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 900; font-style: normal;  font-display: swap; src: url("./assets/fonts/TT_Commons_Black_0.otf")             format("opentype"); }
-@font-face { font-family: "TT Commons"; font-weight: 900; font-style: italic;  font-display: swap; src: url("./assets/fonts/TT_Commons_Black_Italic_0.otf")      format("opentype"); }
-@font-face { font-family: "Champ Black"; font-weight: 900; font-style: normal;  font-display: swap; src: url("./assets/fonts/Champ-Black.ttf") format("truetype"); }
-
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Thin_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Thin_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_ExtraLight_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 200;
+  font-style: italic;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_ExtraLight_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Light_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Light_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Regular_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Medium_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Medium_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_DemiBold_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_DemiBold_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Bold_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Bold_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Extrabold_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Extrabold_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Black_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+  src: url("./assets/fonts/TT_Commons_Black_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "Champ Black";
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+  src: url("./assets/fonts/Champ-Black.ttf") format("truetype");
+}
 
 /*
  * Rambla Rental — basado en el branding oficial (BATTI 2023)
@@ -109,34 +222,34 @@
   --z-drawer: 61;
 
   /* Dynamic vars (set via JS) */
-  --amber-pct: 0%;      /* topbar scroll progress 0%→100% */
-  --cart-strip-h: 0px;  /* cart strip presence */
+  --amber-pct: 0%; /* topbar scroll progress 0%→100% */
+  --cart-strip-h: 0px; /* cart strip presence */
 
   /* Shadows — tintadas con oklch del ink para mantener el tono cálido
    * del sistema. Tailwind's shadow-* defaults siguen funcionando como antes;
    * para opt-in al brand tint, usá `box-shadow: var(--shadow-md)` en CSS o
    * `shadow-[var(--shadow-md)]` en JSX. Valores en docs/design-kit/PROPOSED_TOKENS.md. */
-  --shadow-sm:  0 1px 2px oklch(0.18 0.01 60 / 6%);
-  --shadow-md:  0 4px 12px oklch(0.18 0.01 60 / 8%),  0 1px 3px oklch(0.18 0.01 60 / 5%);
-  --shadow-lg:  0 12px 32px oklch(0.18 0.01 60 / 10%), 0 2px 8px oklch(0.18 0.01 60 / 6%);
-  --shadow-xl:  0 24px 56px oklch(0.18 0.01 60 / 12%), 0 6px 16px oklch(0.18 0.01 60 / 8%);
+  --shadow-sm: 0 1px 2px oklch(0.18 0.01 60 / 6%);
+  --shadow-md: 0 4px 12px oklch(0.18 0.01 60 / 8%), 0 1px 3px oklch(0.18 0.01 60 / 5%);
+  --shadow-lg: 0 12px 32px oklch(0.18 0.01 60 / 10%), 0 2px 8px oklch(0.18 0.01 60 / 6%);
+  --shadow-xl: 0 24px 56px oklch(0.18 0.01 60 / 12%), 0 6px 16px oklch(0.18 0.01 60 / 8%);
 
   /* Motion — duraciones + easings canónicos del kit. Calibrados sobre
    * patterns reales del repo (press states, drawer settle, fly-to-cart). */
-  --duration-fast:  120ms;    /* press states, button bumps */
-  --duration-base:  200ms;    /* hover transitions, color changes */
-  --duration-slow:  350ms;    /* entry animations, slide-up */
-  --duration-xslow: 550ms;    /* fly-to-cart, hero reveals */
+  --duration-fast: 120ms; /* press states, button bumps */
+  --duration-base: 200ms; /* hover transitions, color changes */
+  --duration-slow: 350ms; /* entry animations, slide-up */
+  --duration-xslow: 550ms; /* fly-to-cart, hero reveals */
 
-  --ease-default: cubic-bezier(0.32, 0.72, 0, 1);    /* snappy settle, drawer */
-  --ease-out:     cubic-bezier(0, 0, 0.2, 1);         /* standard decel */
-  --ease-bounce:  cubic-bezier(0.34, 1.56, 0.64, 1);  /* overshoot, badge pop */
+  --ease-default: cubic-bezier(0.32, 0.72, 0, 1); /* snappy settle, drawer */
+  --ease-out: cubic-bezier(0, 0, 0.2, 1); /* standard decel */
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1); /* overshoot, badge pop */
 
   /* Brand light palette */
-  --background: oklch(0.985 0.005 90);          /* hueso casi blanco */
-  --foreground: oklch(0.18 0.01 60);            /* tinta negra cálida */
-  --ink: oklch(0.14 0.01 60);                   /* near-black cálido (UI) */
-  --ink-pure: #000;                             /* brand-exact: hero + print */
+  --background: oklch(0.985 0.005 90); /* hueso casi blanco */
+  --foreground: oklch(0.18 0.01 60); /* tinta negra cálida */
+  --ink: oklch(0.14 0.01 60); /* near-black cálido (UI) */
+  --ink-pure: #000; /* brand-exact: hero + print */
 
   --surface: oklch(0.97 0.008 85);
   --surface-elevated: oklch(1 0 0);
@@ -148,9 +261,9 @@
   --popover-foreground: oklch(0.18 0.01 60);
 
   /* Amarillo brand · Pantone 1235 C · #FAB428 — exacto, NO ALTERAR (regla 1.8) */
-  --amber: #FAB428;
-  --amber-soft: color-mix(in oklch, #FAB428 18%, transparent);
-  --amber-hot: #FFCC55;                          /* paso claro para amber-tape */
+  --amber: #fab428;
+  --amber-soft: color-mix(in oklch, #fab428 18%, transparent);
+  --amber-hot: #ffcc55; /* paso claro para amber-tape */
 
   --primary: oklch(0.18 0.01 60);
   --primary-foreground: oklch(0.985 0.005 90);
@@ -161,7 +274,7 @@
   --muted: oklch(0.94 0.008 85);
   --muted-foreground: oklch(0.42 0.01 70);
 
-  --accent: #FAB428;
+  --accent: #fab428;
   --accent-foreground: oklch(0.18 0.01 60);
 
   --destructive: oklch(0.62 0.22 27);
@@ -169,13 +282,13 @@
 
   --border: oklch(0.18 0.01 60 / 12%);
   --input: oklch(0.18 0.01 60 / 16%);
-  --ring: color-mix(in oklch, #FAB428 60%, transparent);
+  --ring: color-mix(in oklch, #fab428 60%, transparent);
 
   /* Paleta secundaria (del manual) — hex exactos Pantone, usar sparingly */
-  --rosa: #ED7BAD;      /* PANTONE 211 C */
-  --azul: #1097DB;      /* PANTONE 299 C */
-  --naranja: #E9552F;   /* PANTONE 172 C */
-  --verde: #009971;     /* PANTONE 7724 C */
+  --rosa: #ed7bad; /* PANTONE 211 C */
+  --azul: #1097db; /* PANTONE 299 C */
+  --naranja: #e9552f; /* PANTONE 172 C */
+  --verde: #009971; /* PANTONE 7724 C */
 
   --chart-1: var(--amber);
   --chart-2: var(--azul);
@@ -185,13 +298,13 @@
 
   --sidebar: oklch(0.985 0.005 90);
   --sidebar-foreground: oklch(0.18 0.01 60);
-  --sidebar-primary: #FAB428;
+  --sidebar-primary: #fab428;
   --sidebar-primary-foreground: oklch(0.18 0.01 60);
   /* Item activo/hover del sidebar admin: amber soft + ink (como el mock). */
   --sidebar-accent: var(--amber-soft);
   --sidebar-accent-foreground: oklch(0.18 0.01 60);
   --sidebar-border: oklch(0.18 0.01 60 / 12%);
-  --sidebar-ring: color-mix(in oklch, #FAB428 50%, transparent);
+  --sidebar-ring: color-mix(in oklch, #fab428 50%, transparent);
 }
 
 .dark {
@@ -265,11 +378,7 @@
     text-wrap: balance;
   }
   .bg-amber-tape {
-    background: repeating-linear-gradient(
-      -45deg,
-      var(--amber) 0 24px,
-      var(--amber-hot) 24px 48px
-    );
+    background: repeating-linear-gradient(-45deg, var(--amber) 0 24px, var(--amber-hot) 24px 48px);
   }
   /* Wordmark "rambla" — Champ Black ya trae el peso chunky redondeado;
    * solo lowercase + tracking leve para que respiren las letras. */
@@ -286,10 +395,7 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background-image: radial-gradient(
-      oklch(0.18 0.01 60 / 0.05) 1px,
-      transparent 1px
-    );
+    background-image: radial-gradient(oklch(0.18 0.01 60 / 0.05) 1px, transparent 1px);
     background-size: 4px 4px;
   }
   .grain {
@@ -316,12 +422,41 @@
     letter-spacing: -0.01em;
     text-transform: lowercase;
   }
-  .t-h1 { font-family: var(--font-sans); font-weight: 700; font-size: 1.875rem; line-height: 1.15; letter-spacing: -0.015em; }
-  .t-h2 { font-family: var(--font-sans); font-weight: 700; font-size: 1.5rem;   line-height: 1.2;  letter-spacing: -0.01em; }
-  .t-h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.125rem; line-height: 1.3; }
-  .t-body  { font-family: var(--font-sans); font-size: 1rem;     line-height: 1.55; }
-  .t-small { font-family: var(--font-sans); font-size: 0.875rem; line-height: 1.5; color: var(--muted-foreground); }
-  .t-mono  { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .t-h1 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 1.875rem;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+  }
+  .t-h2 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 1.5rem;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+  .t-h3 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 1.125rem;
+    line-height: 1.3;
+  }
+  .t-body {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+  .t-small {
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--muted-foreground);
+  }
+  .t-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
   .t-eyebrow {
     font-family: var(--font-mono);
     font-weight: 500;
@@ -332,8 +467,12 @@
   }
 
   /* Safe area insets para iOS (notch, home indicator) */
-  .safe-t { padding-top: env(safe-area-inset-top); }
-  .safe-b { padding-bottom: env(safe-area-inset-bottom); }
+  .safe-t {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-b {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
   .safe-x {
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
@@ -342,10 +481,20 @@
   /* Rambla seal: badge amber + R bone por default. En el topbar móvil
      amber-on-scroll, al pasar 65% del progreso (.topbar-snap), los
      colores se invierten — el badge se vuelve bone y la R amber. */
-  .topbar-seal .seal-badge { fill: var(--amber); transition: fill .12s; }
-  .topbar-seal .seal-r     { fill: var(--background); transition: fill .12s; }
-  .topbar-snap .topbar-seal .seal-badge { fill: var(--background); }
-  .topbar-snap .topbar-seal .seal-r     { fill: var(--amber); }
+  .topbar-seal .seal-badge {
+    fill: var(--amber);
+    transition: fill 0.12s;
+  }
+  .topbar-seal .seal-r {
+    fill: var(--background);
+    transition: fill 0.12s;
+  }
+  .topbar-snap .topbar-seal .seal-badge {
+    fill: var(--background);
+  }
+  .topbar-snap .topbar-seal .seal-r {
+    fill: var(--amber);
+  }
 
   /* Topbar móvil snap: cuando el scroll-amber pasa 65%, el date-pill y
      el botón de sesión se invierten a fondo bone con ink. */
@@ -372,10 +521,20 @@
 
 /* ── Mobile catalog animations ────────────────────────────────────── */
 @keyframes expand-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 @keyframes slide-up {
-  from { transform: translateY(100%); }
-  to   { transform: translateY(0); }
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }

@@ -273,7 +273,7 @@ export function CartDrawer({
             className={
               isBottom
                 ? // Mobile: bottom sheet ~80% con esquinas redondeadas arriba
-                  "fixed bottom-0 left-0 right-0 z-50 flex h-[80dvh] w-full flex-col rounded-t-2xl bg-background shadow-2xl"
+                  "fixed inset-x-0 bottom-0 z-50 flex h-[80dvh] w-full flex-col rounded-t-2xl bg-background shadow-2xl"
                 : // Desktop: panel lateral
                   "fixed right-0 top-0 z-50 flex h-[100dvh] w-full max-w-md flex-col border-l hairline bg-background"
             }

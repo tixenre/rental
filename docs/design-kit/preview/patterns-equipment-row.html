@@ -37,7 +37,7 @@
 
 /* Info */
 .info { flex: 1; min-width: 0; }
-.info-line1 { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+.info-line1 { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
 .info-line1 .new-badge {
   display: inline-flex; align-items: center; gap: 3px;
   padding: 1px 6px; border-radius: 9999px;
@@ -55,8 +55,8 @@
 .info-name svg { flex-shrink: 0; color: var(--muted-foreground); transition: transform 150ms; }
 .info-name.flip svg { transform: rotate(180deg); }
 
-/* Addon pills inline (desktop) */
-.addons { display: flex; gap: 4px; flex-wrap: wrap; max-width: 220px; }
+/* Addon pills inline (desktop) — columna fija que puede ceder ancho a info */
+.addons { display: flex; gap: 4px; flex-wrap: wrap; flex: 0 1 172px; overflow: hidden; }
 .addon-pill {
   font-family: var(--font-sans); font-size: 10px;
   padding: 2px 7px; border-radius: 9999px;
@@ -65,38 +65,42 @@
 }
 .addon-pill.more { color: var(--muted-foreground); font-family: var(--font-mono); }
 
-/* Price block */
-.price { text-align: right; flex-shrink: 0; }
-.price-amount { font-family: var(--font-display); font-weight: 900; font-size: 15px; color: var(--ink); font-variant-numeric: tabular-nums; }
-.price-meta { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
-.price-total { font-family: var(--font-display); font-weight: 900; font-size: 12px; color: var(--amber); font-variant-numeric: tabular-nums; margin-top: 2px; }
+/* Price block — ancho fijo. Jerarquía: el total del PERÍODO es el número
+ * protagonista (display ink); el por-jornada queda secundario y chico. */
+.price { text-align: right; flex-shrink: 0; width: 112px; }
+.price-amount { font-family: var(--font-display); font-weight: 900; font-size: 17px; color: var(--ink); line-height: 1; font-variant-numeric: tabular-nums; }
+.price-meta { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); margin-top: 3px; }
+/* Secundario: precio por jornada cuando el protagonista es el total */
+.price-sub { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; margin-top: 4px; }
 
-/* CTA */
+/* CTA — Agregar y stepper comparten EXACTO el mismo box (ancho + alto)
+ * para que la fila no se mueva al sumar al carrito. */
+.cta-add, .cta-stepper {
+  width: 108px; height: 34px; box-sizing: border-box;
+  border-radius: var(--radius-sm); flex-shrink: 0;
+}
 .cta-add {
-  height: 32px; padding: 0 12px; border-radius: var(--radius-sm);
   border: 1px solid var(--hairline); background: var(--background); color: var(--ink);
-  cursor: pointer; flex-shrink: 0;
+  cursor: pointer;
   font-family: var(--font-sans); font-size: 10px; font-weight: 500;
   letter-spacing: 0.12em; text-transform: uppercase;
-  display: flex; align-items: center; gap: 5px;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
   transition: background 150ms, border-color 150ms, color 150ms;
 }
 .cta-add:hover { background: var(--amber); border-color: var(--amber); color: var(--ink); }
 
 .cta-stepper {
-  display: inline-flex; align-items: center; gap: 0;
+  display: inline-flex; align-items: center; justify-content: space-between;
   padding: 2px; border: 1px solid color-mix(in oklch, var(--amber) 50%, transparent);
   background: color-mix(in oklch, var(--amber) 18%, transparent);
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
 }
 .cta-stepper button {
-  width: 24px; height: 24px; border: 0; background: transparent; cursor: pointer;
+  width: 28px; height: 28px; border: 0; background: transparent; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  color: var(--amber); border-radius: 3px;
+  color: color-mix(in oklch, var(--ink) 70%, var(--amber)); border-radius: 3px; flex-shrink: 0;
 }
-.cta-stepper button:hover { background: color-mix(in oklch, var(--amber) 25%, transparent); }
-.cta-stepper-count { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--ink); width: 20px; text-align: center; font-variant-numeric: tabular-nums; }
+.cta-stepper button:hover { background: color-mix(in oklch, var(--amber) 28%, transparent); }
+.cta-stepper-count { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--ink); flex: 1; text-align: center; font-variant-numeric: tabular-nums; }
 
 /* Expanded inline */
 .expand-body {
@@ -170,7 +174,6 @@
         <div class="info">
           <div class="info-line1">
             <span>Sony</span><span>·</span><span>Cámaras</span>
-            <span style="color:var(--muted-foreground);">· 4 disp.</span>
           </div>
           <div class="info-name">a7s III</div>
         </div>
@@ -198,19 +201,17 @@
         <div class="info">
           <div class="info-line1">
             <span>Aputure</span><span>·</span><span>Iluminación</span>
-            <span class="new-badge"><svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4-6.2-4.5-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg>nuevo</span>
-            <span style="color:var(--muted-foreground);">· 6 disp.</span>
           </div>
-          <div class="info-name">600d pro</div>
+          <div class="info-name">600d pro <span class="new-badge"><svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4-6.2-4.5-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg>nuevo</span></div>
         </div>
         <div class="addons">
           <div class="addon-pill">Bola difusora</div>
           <div class="addon-pill">Cable XLR</div>
         </div>
         <div class="price">
-          <div class="price-amount">$ 12.000</div>
-          <div class="price-meta">/ jornada</div>
-          <div class="price-total">$ 36.000 · 3 j</div>
+          <div class="price-amount">$ 36.000</div>
+          <div class="price-meta">3 jornadas</div>
+          <div class="price-sub">$ 12.000 / j</div>
         </div>
         <div class="cta-stepper">
           <button><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
@@ -218,7 +219,7 @@
           <button><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
         </div>
       </div>
-      <div class="state-label">selected · qty &gt; 0 · price-total visible (con fechas)</div>
+      <div class="state-label">selected · qty &gt; 0 · total del período protagonista (con fechas)</div>
     </div>
 
     <!-- Expanded (mobile expand) -->
@@ -230,7 +231,6 @@
           <div class="info">
             <div class="info-line1">
               <span>RØDE</span><span>·</span><span>Audio</span>
-              <span style="color:var(--muted-foreground);">· 3 disp.</span>
             </div>
             <div class="info-name flip">NTG5 shotgun <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></div>
           </div>
@@ -302,10 +302,12 @@
         <div class="info">
           <div class="info-line1" style="font-size:8px;"><span>Sony</span></div>
           <div class="info-name flip" style="font-size:13px;">a7s III <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></div>
-          <div style="display:flex;align-items:baseline;gap:4px;margin-top:2px;">
-            <span style="font-family:var(--font-display);font-weight:900;font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums;">$ 24.500</span>
-            <span style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-foreground);">/jornada</span>
-            <span style="font-family:var(--font-display);font-weight:900;font-size:10px;color:var(--amber);font-variant-numeric:tabular-nums;margin-left:3px;">· $ 73.500 total</span>
+          <div style="margin-top:2px;">
+            <div style="display:flex;align-items:baseline;gap:5px;">
+              <span style="font-family:var(--font-display);font-weight:900;font-size:13px;color:var(--ink);font-variant-numeric:tabular-nums;">$ 73.500</span>
+              <span style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-foreground);">3 jornadas</span>
+            </div>
+            <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);font-variant-numeric:tabular-nums;">$ 24.500 / jornada</span>
           </div>
         </div>
         <button class="cta-add" style="width:32px;height:32px;padding:0;border-radius:50%;justify-content:center;">
@@ -322,7 +324,7 @@
             <span style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-foreground);">/jornada</span>
           </div>
         </div>
-        <div class="cta-stepper" style="padding:1px;">
+        <div class="cta-stepper" style="padding:1px;width:auto;height:auto;">
           <button style="width:30px;height:30px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
           <span class="cta-stepper-count">2</span>
           <button style="width:30px;height:30px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
@@ -336,10 +338,11 @@
     <div class="spec-thead">Anatomy & decisions</div>
     <div class="spec-row"><span class="spec-key">click target</span><span class="spec-val">El thumb + info son un solo <code>&lt;button&gt;</code> que toggle expanded · separa de los actions (stepper, trash) para no confundir intent</span></div>
     <div class="spec-row"><span class="spec-key">expand mobile only</span><span class="spec-val">El expanded vive en <code>lg:hidden</code> · en desktop el detalle lo muestra el <code>&lt;PreviewPane&gt;</code> lateral</span></div>
-    <div class="spec-row"><span class="spec-key">price-total visible</span><span class="spec-val">Aparece <b>solo</b> si <code>hasDateRange &amp;&amp; jornadas &gt; 1</code> · color amber para llamar la atención</span></div>
+    <div class="spec-row"><span class="spec-key">jerarquía precio</span><span class="spec-val">Con <code>hasDateRange &amp;&amp; jornadas &gt; 1</code> el <b>total del período</b> es el número protagonista (display ink); el por-jornada baja a línea secundaria muted. Sin fechas o 1 jornada: solo el por-jornada. Nunca amber en el precio — baja contraste.</span></div>
     <div class="spec-row"><span class="spec-key">stepper touch</span><span class="spec-val">Mobile: botones <code>h-9 w-9</code> (36px+) · Desktop: <code>h-7 w-7</code> compactos</span></div>
     <div class="spec-row"><span class="spec-key">no stock</span><span class="spec-val"><code>opacity-50</code> en row · CTA disabled · indicador "sin stock" en destructive</span></div>
-    <div class="spec-row"><span class="spec-key">new badge</span><span class="spec-val">Inline en line1 · <code>bg-ink text-amber</code> con icon Sparkles · solo si <code>item.isNew</code></span></div>
+    <div class="spec-row"><span class="spec-key">new badge</span><span class="spec-val">Junto al <b>nombre</b> (no en la línea meta, que se mantiene limpia) · <code>bg-ink text-amber</code> con icon Sparkles · solo si <code>item.isNew</code></span></div>
+    <div class="spec-row"><span class="spec-key">disponibilidad</span><span class="spec-val">El contador se muestra <b>solo</b> cuando el stock está bajo (<code>stock-low</code> amber) o agotado (<code>stock-out</code> destructive). Con stock sano no se muestra — menos ruido en la línea meta.</span></div>
     <div class="spec-row"><span class="spec-key">addons inline</span><span class="spec-val">Desktop <code>lg:flex</code> · max 3 con "+N" para el resto · quick-peek sin click</span></div>
     <div class="spec-row"><span class="spec-key">expand transition</span><span class="spec-val">Framer Motion AnimatePresence · <code>height: 0 → auto, opacity: 0 → 1</code>, <code>duration: 0.22</code> easeOut</span></div>
   </div>

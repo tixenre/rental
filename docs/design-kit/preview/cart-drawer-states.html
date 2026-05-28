@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pattern · CartDrawer — estados</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+:root{
+  --verde: var(--rbl-verde); --azul: var(--rbl-azul);
+  --naranja: var(--rbl-naranja); --rosa: var(--rbl-rosa);
+  --shadow-lg: 0 12px 32px oklch(0.18 0.01 60 / 10%), 0 2px 8px oklch(0.18 0.01 60 / 6%);
+  --ease-default: cubic-bezier(0.32,0.72,0,1);
+}
+.card { gap: 18px; padding: 22px; }
+.sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+
+/* ── Gallery ──────────────────────────────────────────────────── */
+.gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 680px){ .gallery { grid-template-columns: 1fr; } }
+.state { display: flex; flex-direction: column; gap: 8px; }
+.state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+.state-tag .d { width: 7px; height: 7px; border-radius: 50%; }
+.state-tag.empty { color: var(--muted-foreground); } .state-tag.empty .d { background: var(--muted-foreground); }
+.state-tag.warn { color: color-mix(in oklch, var(--ink) 78%, var(--naranja)); } .state-tag.warn .d { background: var(--amber); }
+.state-tag.err { color: var(--destructive); } .state-tag.err .d { background: var(--destructive); }
+.state-tag.load { color: var(--azul); } .state-tag.load .d { background: var(--azul); }
+
+/* ── Drawer frame (mobile) ────────────────────────────────────── */
+.frame { position: relative; width: 100%; max-width: 340px; margin: 0 auto; border-radius: 20px; border: 3px solid var(--ink); background: var(--background); height: 460px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-lg); }
+.f-status { height: 22px; display: flex; justify-content: space-between; align-items: center; padding: 6px 16px 0; font-family: var(--font-mono); font-size: 9px; color: var(--ink); flex-shrink: 0; }
+.f-status .dots { display: flex; gap: 3px; } .f-status .dots div { width: 4px; height: 4px; border-radius: 50%; background: var(--ink); }
+
+.dr-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 12px 16px 10px; border-bottom: 1px solid var(--hairline); flex-shrink: 0; }
+.dr-eye { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+.dr-title { font-family: var(--font-display); font-weight: 900; font-size: 20px; color: var(--ink); line-height: 1.1; text-transform: lowercase; margin-top: 2px; }
+.dr-count { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted-foreground); margin-top: 3px; }
+.dr-close { width: 28px; height: 28px; border-radius: 50%; background: transparent; border: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ink); }
+.dr-close:hover { background: var(--surface); }
+
+/* date pill — set / unset */
+.dr-date { margin: 10px 16px; padding: 9px 12px; border-radius: 9999px; display: flex; align-items: center; gap: 8px; cursor: pointer; flex-shrink: 0; }
+.dr-date.set { border: 2px solid color-mix(in oklch, var(--amber) 50%, transparent); background: color-mix(in oklch, var(--amber) 10%, transparent); }
+.dr-date.unset { border: 2px dashed color-mix(in oklch, var(--naranja) 55%, transparent); background: color-mix(in oklch, var(--naranja) 7%, transparent); justify-content: space-between; }
+.dr-date svg { color: var(--amber); flex-shrink: 0; }
+.dr-date.unset svg { color: var(--naranja); }
+.dr-date-text { font-family: var(--font-sans); font-size: 12px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.dr-date.unset .dr-date-text { color: color-mix(in oklch, var(--ink) 85%, var(--naranja)); }
+.dr-date-j { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.dr-date .chev { margin-left: auto; color: var(--muted-foreground); }
+
+/* items */
+.dr-items { flex: 1; overflow-y: auto; padding: 4px 16px 10px; display: flex; flex-direction: column; gap: 8px; }
+.dr-item { display: flex; gap: 8px; padding: 9px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); background: var(--surface); }
+.dr-item.bad { border-color: color-mix(in oklch, var(--destructive) 45%, transparent); background: color-mix(in oklch, var(--destructive) 5%, var(--surface)); }
+.dr-thumb { width: 52px; height: 44px; border-radius: 4px; background: var(--background); border: 1px solid var(--hairline); display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+.dr-info { flex: 1; min-width: 0; }
+.dr-brand { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+.dr-name { font-family: var(--font-display); font-weight: 900; font-size: 12px; color: var(--ink); line-height: 1.15; text-transform: lowercase; margin-top: 1px; }
+.dr-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; gap: 6px; }
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--hairline); border-radius: 9999px; background: var(--background); }
+.stepper button { width: 24px; height: 24px; border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ink); border-radius: 50%; }
+.stepper-count { font-family: var(--font-mono); font-size: 11px; color: var(--ink); width: 16px; text-align: center; font-variant-numeric: tabular-nums; }
+.dr-line { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); text-align: right; line-height: 1.3; }
+.dr-line .ink { color: var(--ink); font-weight: 600; }
+.dr-line .ph { color: color-mix(in oklch, var(--muted-foreground) 65%, transparent); }
+.dr-trash { width: 24px; height: 24px; border-radius: 50%; border: 0; background: transparent; color: var(--muted-foreground); cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.dr-trash:hover { color: var(--destructive); background: var(--surface); }
+
+/* inline conflict bar inside an item */
+.item-conflict { display: flex; align-items: center; gap: 6px; margin-top: 7px; padding: 5px 7px; border-radius: 5px; background: color-mix(in oklch, var(--destructive) 9%, transparent); }
+.item-conflict span { font-family: var(--font-sans); font-size: 10px; color: var(--destructive); line-height: 1.3; }
+.item-conflict .fix { margin-left: auto; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--destructive); background: transparent; border: 1px solid color-mix(in oklch, var(--destructive) 35%, transparent); border-radius: 9999px; padding: 3px 7px; cursor: pointer; white-space: nowrap; }
+
+/* empty state */
+.dr-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; }
+.dr-empty-icon { color: var(--muted-foreground); opacity: 0.35; }
+.dr-empty-title { font-family: var(--font-display); font-weight: 900; font-size: 19px; color: var(--ink); line-height: 1.1; text-transform: lowercase; }
+.dr-empty-sub { font-family: var(--font-sans); font-size: 12px; color: var(--muted-foreground); max-width: 30ch; line-height: 1.5; }
+.dr-empty-cta { margin-top: 4px; height: 38px; padding: 0 18px; border-radius: var(--radius-md); background: var(--ink); color: var(--background); border: 0; cursor: pointer; font-family: var(--font-sans); font-weight: 600; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
+
+/* footer */
+.dr-foot { border-top: 1px solid var(--hairline); padding: 11px 16px 14px; background: var(--background); flex-shrink: 0; }
+.tot-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+.tot-row .lbl { font-family: var(--font-sans); font-size: 11px; color: var(--muted-foreground); }
+.tot-row .val { font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
+.tot-main { display: flex; justify-content: space-between; align-items: baseline; padding-top: 7px; margin-bottom: 11px; border-top: 1px solid var(--hairline); }
+.tot-main .lbl { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+.tot-main .val { font-family: var(--font-display); font-weight: 900; font-size: 22px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tot-main .val.ph { color: color-mix(in oklch, var(--muted-foreground) 60%, transparent); font-size: 18px; }
+
+/* hint / blocker bars in footer */
+.foot-bar { display: flex; align-items: center; gap: 6px; padding: 7px 9px; border-radius: 6px; margin-bottom: 10px; font-family: var(--font-sans); font-size: 10.5px; line-height: 1.35; }
+.foot-bar.warn { background: color-mix(in oklch, var(--amber) 12%, transparent); border: 1px solid color-mix(in oklch, var(--amber) 35%, transparent); color: var(--ink); }
+.foot-bar.err { background: color-mix(in oklch, var(--destructive) 8%, transparent); border: 1px solid color-mix(in oklch, var(--destructive) 30%, transparent); color: var(--destructive); }
+.foot-bar svg { flex-shrink: 0; }
+.foot-bar b { font-weight: 600; }
+
+.dr-cta { width: 100%; height: 42px; border-radius: var(--radius-md); background: var(--amber); color: var(--ink); border: 0; cursor: pointer; font-family: var(--font-sans); font-weight: 600; font-size: 12px; letter-spacing: 0.15em; text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.dr-cta:disabled { background: var(--surface); color: color-mix(in oklch, var(--muted-foreground) 55%, transparent); cursor: not-allowed; }
+.dr-cta.loading { background: color-mix(in oklch, var(--amber) 55%, var(--surface)); color: var(--ink); cursor: progress; }
+
+/* spinner */
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in oklch, var(--ink) 30%, transparent); border-top-color: var(--ink); animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* loading dim overlay on items */
+.items-dim { position: relative; }
+.items-dim > .dr-item { opacity: 0.55; pointer-events: none; }
+
+pre.code { font-family: var(--font-mono); font-size: 11px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.65; margin: 0; }
+.k { color: #FFCC55; } .s { color: #ED7BAD; } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+.note { font-family: var(--font-sans); font-size: 11px; line-height: 1.55; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+.note b { color: var(--foreground); font-weight: 600; }
+.note code { font-family: var(--font-mono); font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="t-eyebrow">Pattern · CartDrawer — estados</div>
+  <div class="sub-eye">Complementa el specimen base (estado lleno). Acá: vacío · sin fechas · item sin stock · confirmando.</div>
+
+  <div class="gallery">
+
+    <!-- ── 1. Vacío ───────────────────────────────────────────── -->
+    <div class="state">
+      <span class="state-tag empty"><span class="d"></span>Vacío · sin equipos</span>
+      <div class="frame">
+        <div class="f-status"><span>9:41</span><div class="dots"><div></div><div></div><div></div></div><span>100%</span></div>
+        <div class="dr-head">
+          <div><div class="dr-eye">Tu pedido</div><div class="dr-title">cotización</div></div>
+          <button class="dr-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="dr-empty">
+          <div class="dr-empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg></div>
+          <div class="dr-empty-title">tu pedido está vacío.</div>
+          <div class="dr-empty-sub">Sumá equipos del catálogo y armá tu cotización en un toque.</div>
+          <button class="dr-empty-cta">Explorar catálogo <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 2. Sin fechas ──────────────────────────────────────── -->
+    <div class="state">
+      <span class="state-tag warn"><span class="d"></span>Sin fechas · no puede cotizar</span>
+      <div class="frame">
+        <div class="f-status"><span>9:41</span><div class="dots"><div></div><div></div><div></div></div><span>100%</span></div>
+        <div class="dr-head">
+          <div><div class="dr-eye">Tu pedido</div><div class="dr-title">cotización</div><div class="dr-count">2 equipos</div></div>
+          <button class="dr-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <button class="dr-date unset">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          <span class="dr-date-text">elegí las fechas</span>
+          <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <div class="dr-items">
+          <div class="dr-item">
+            <div class="dr-thumb">📷</div>
+            <div class="dr-info"><div class="dr-brand">Sony</div><div class="dr-name">a7s III</div>
+              <div class="dr-actions"><div class="stepper"><button>–</button><span class="stepper-count">1</span><button>+</button></div><div class="dr-line"><span class="ph">$ 24.500 / día</span></div></div>
+            </div>
+            <button class="dr-trash"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+          </div>
+          <div class="dr-item">
+            <div class="dr-thumb">💡</div>
+            <div class="dr-info"><div class="dr-brand">Aputure</div><div class="dr-name">600d pro</div>
+              <div class="dr-actions"><div class="stepper"><button>–</button><span class="stepper-count">1</span><button>+</button></div><div class="dr-line"><span class="ph">$ 12.000 / día</span></div></div>
+            </div>
+            <button class="dr-trash"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+          </div>
+        </div>
+        <div class="dr-foot">
+          <div class="tot-main"><span class="lbl">Total</span><span class="val ph">— elegí fechas</span></div>
+          <button class="dr-cta" disabled>Elegí fechas primero</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 3. Item sin stock sobrevenido ──────────────────────── -->
+    <div class="state">
+      <span class="state-tag err"><span class="d"></span>Conflicto · equipo sin stock para las fechas</span>
+      <div class="frame">
+        <div class="f-status"><span>9:41</span><div class="dots"><div></div><div></div><div></div></div><span>100%</span></div>
+        <div class="dr-head">
+          <div><div class="dr-eye">Tu pedido</div><div class="dr-title">cotización</div><div class="dr-count">3 equipos · 1 con conflicto</div></div>
+          <button class="dr-close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <button class="dr-date set">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          <span class="dr-date-text">lun 2 → jue 5</span><span class="dr-date-j">· 3 j</span>
+        </button>
+        <div class="dr-items">
+          <div class="dr-item">
+            <div class="dr-thumb">📷</div>
+            <div class="dr-info"><div class="dr-brand">Sony</div><div class="dr-name">a7s III</div>
+              <div class="dr-actions"><div class="stepper"><button>–</button><span class="stepper-count">1</span><button>+</button></div><div class="dr-line"><span class="ink">$ 73.500</span> · 3 j</div></div>
+            </div>
+          </div>
+          <div class="dr-item bad">
+            <div class="dr-thumb">🎙</div>
+            <div class="dr-info"><div class="dr-brand">RØDE</div><div class="dr-name">NTG5</div>
+              <div class="item-conflict">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                <span>Sin stock el <b>4 jun</b></span>
+                <button class="fix">Cambiar fechas</button>
+              </div>
+            </div>
+            <button class="dr-trash"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+          </div>
+        </div>
+        <div class="dr-foot">
+          <div class="foot-bar err">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+            <span><b>1 equipo</b> sin stock para estas fechas. Quitalo o cambiá las fechas para confirmar.</span>
+          </div>
+          <button class="dr-cta" disabled>Resolvé el conflicto</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 4. Confirmando (loading) ───────────────────────────── -->
+    <div class="state">
+      <span class="state-tag load"><span class="d"></span>Confirmando · enviando solicitud</span>
+      <div class="frame">
+        <div class="f-status"><span>9:41</span><div class="dots"><div></div><div></div><div></div></div><span>100%</span></div>
+        <div class="dr-head">
+          <div><div class="dr-eye">Tu pedido</div><div class="dr-title">cotización</div><div class="dr-count">3 equipos</div></div>
+          <button class="dr-close" style="opacity:0.4;cursor:not-allowed;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <button class="dr-date set" style="opacity:0.6;pointer-events:none;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          <span class="dr-date-text">lun 2 → jue 5</span><span class="dr-date-j">· 3 j</span>
+        </button>
+        <div class="dr-items items-dim">
+          <div class="dr-item"><div class="dr-thumb">📷</div><div class="dr-info"><div class="dr-brand">Sony</div><div class="dr-name">a7s III</div><div class="dr-actions"><div class="stepper"><button>–</button><span class="stepper-count">1</span><button>+</button></div><div class="dr-line"><span class="ink">$ 73.500</span> · 3 j</div></div></div></div>
+          <div class="dr-item"><div class="dr-thumb">💡</div><div class="dr-info"><div class="dr-brand">Aputure</div><div class="dr-name">600d pro</div><div class="dr-actions"><div class="stepper"><button>–</button><span class="stepper-count">2</span><button>+</button></div><div class="dr-line"><span class="ink">$ 72.000</span> · 3 j</div></div></div></div>
+        </div>
+        <div class="dr-foot">
+          <div class="tot-row"><span class="lbl">Subtotal · 3 j</span><span class="val">$ 163.500</span></div>
+          <div class="tot-main"><span class="lbl">Total · IVA incl.</span><span class="val">$ 187.943</span></div>
+          <button class="dr-cta loading" disabled><span class="spin"></span> Enviando solicitud…</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Code ─────────────────────────────────────────────────── -->
+  <div class="t-eyebrow" style="margin-top:4px;">Lógica de gating del Confirmar</div>
+  <pre class="code"><span class="c">/* El CTA depende de tres puertas, en orden de prioridad */</span>
+const empty     = items.length === <span class="s">0</span>;
+const noDates    = !range;
+const conflicts  = items.filter(i =&gt; !hasStock(i, range));   <span class="c">// sobrevenido</span>
+
+const cta =
+  empty        ? <span class="s">null</span>                       <span class="c">// no hay drawer footer, hay EmptyState</span>
+: noDates       ? { label: <span class="s">"Elegí fechas primero"</span>, disabled: <span class="k">true</span> }
+: conflicts.length ? { label: <span class="s">"Resolvé el conflicto"</span>, disabled: <span class="k">true</span> }
+: submitting    ? { label: <span class="s">"Enviando solicitud…"</span>, loading: <span class="k">true</span> }
+:                 { label: <span class="s">"Confirmar solicitud"</span> };
+
+<span class="c">/* El conflicto se re-chequea al abrir el drawer y al cambiar fechas
+   (useQuery dias-bloqueados) — el stock pudo cambiar desde que se agregó. */</span></pre>
+
+  <!-- ── Note ─────────────────────────────────────────────────── -->
+  <div class="note">
+    <b>Cuatro estados, una sola puerta visible:</b> el footer muestra el bloqueo de mayor prioridad — vacío &gt; sin fechas &gt; conflicto &gt; enviando &gt; ok. Nunca dos barras a la vez. ·
+    <b>Vacío</b> reemplaza toda la lista por <code>EmptyState</code> con CTA que cierra el drawer y lleva al catálogo — sin footer ni totales. ·
+    <b>Sin fechas:</b> date pill en dashed <code>--naranja</code>, precios de línea en placeholder muted (<code>$ X / día</code>, no total), total <code>— elegí fechas</code>, CTA disabled. El precio existe pero no se puede totalizar sin período. ·
+    <b>Conflicto sobrevenido:</b> el item culpable va con borde destructive + barra inline que nombra el día y ofrece <b>cambiar fechas</b>; el footer resume cuántos equipos fallan. Se re-chequea al abrir y al cambiar fechas — el stock pudo moverse. ·
+    <b>Confirmando:</b> items y date pill atenuados (<code>opacity .55</code>, sin interacción), close deshabilitado, CTA con spinner y <code>cursor: progress</code>. Al volver: toast success + navegación al portal. ·
+    El total en confirmando <b>no</b> se atenúa — el usuario quiere verlo mientras espera.
+  </div>
+
+</div>
+</body>
+</html>

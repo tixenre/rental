@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pattern · Sticky stack — CategoryBar + CartStrip</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+:root{
+  --verde: var(--rbl-verde); --azul: var(--rbl-azul);
+  --naranja: var(--rbl-naranja); --rosa: var(--rbl-rosa);
+  --shadow-sm: 0 1px 2px oklch(0.18 0.01 60 / 6%);
+  --duration-base: 200ms;
+  --ease-default: cubic-bezier(0.32,0.72,0,1);
+}
+.card { gap: 22px; padding: 22px; }
+.sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+
+/* ── Scroll viewport that demonstrates the sticky stack ───────── */
+.viewport {
+  position: relative; height: 380px; overflow-y: auto;
+  border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+  background: var(--background);
+}
+
+/* topbar (z 50) */
+.vp-top { position: sticky; top: 0; z-index: 50; height: 48px; background: color-mix(in oklch, var(--background) 95%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--hairline); display: flex; align-items: center; padding: 0 16px; }
+.vp-brand { font-family: var(--font-display); font-weight: 900; font-size: 17px; text-transform: lowercase; color: var(--ink); }
+.vp-top-cart { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
+
+/* cart strip (z 45) — appears below topbar when cart has items */
+.vp-strip { position: sticky; top: 48px; z-index: 45; height: 36px; background: var(--ink); color: var(--background); display: flex; align-items: center; gap: 10px; padding: 0 16px; }
+.vp-strip .s-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.vp-strip .s-label { font-family: var(--font-sans); font-size: 12px; font-weight: 500; }
+.vp-strip .s-meta { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; color: color-mix(in oklch, var(--background) 60%, transparent); }
+.vp-strip .s-cta { margin-left: auto; font-family: var(--font-sans); font-size: 11px; font-weight: 600; color: var(--ink); background: var(--amber); border: 0; border-radius: 9999px; padding: 4px 11px; cursor: pointer; }
+
+/* category bar (z 40) — sticks under the strip */
+.vp-cat { position: sticky; top: 84px; z-index: 40; background: color-mix(in oklch, var(--background) 96%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--hairline); padding: 8px 16px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.vp-cat::-webkit-scrollbar { display: none; }
+.cat-tab { flex-shrink: 0; font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: var(--muted-foreground); background: transparent; border: 0; padding: 6px 12px; border-radius: 9999px; cursor: pointer; white-space: nowrap; transition: color var(--duration-base), background var(--duration-base); }
+.cat-tab:hover { color: var(--ink); }
+.cat-tab.active { color: var(--ink); background: var(--surface); font-weight: 600; }
+.cat-tab.active::after { content: ""; }
+.cat-count { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); margin-left: 3px; }
+
+/* sub-toolbar (z 30) — filter row, only in list mode */
+.vp-sub { position: sticky; top: 129px; z-index: 30; background: var(--surface); border-bottom: 1px solid var(--hairline); padding: 7px 16px; display: flex; gap: 8px; align-items: center; }
+.vp-sub .f-pill { font-family: var(--font-sans); font-size: 11px; color: var(--ink); background: var(--surface-elevated); border: 1px solid var(--hairline); border-radius: 9999px; padding: 4px 10px; }
+.vp-sub .f-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+
+/* fake content */
+.vp-content { padding: 14px 16px; display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+.vp-cell { aspect-ratio: 4/3; border-radius: var(--radius-md); background: var(--surface); border: 1px solid var(--hairline); display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.vp-section-label { grid-column: 1/-1; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); padding-top: 8px; }
+
+/* ── z-index legend ───────────────────────────────────────────── */
+.zstack { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--hairline); border-radius: var(--radius-lg); overflow: hidden; }
+.zrow { display: grid; grid-template-columns: 130px 1fr 90px; gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--hairline); }
+.zrow:last-child { border-bottom: 0; }
+.zrow .zval { font-family: var(--font-display); font-weight: 900; font-size: 20px; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.zrow .ztok { font-family: var(--font-mono); font-size: 11px; color: var(--ink); }
+.zrow .zdesc { font-family: var(--font-sans); font-size: 12px; color: var(--muted-foreground); }
+.zrow.hi { background: color-mix(in oklch, var(--amber) 12%, transparent); }
+.zrow.hi .ztok { font-weight: 600; }
+
+pre.code { font-family: var(--font-mono); font-size: 11px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.65; margin: 0; }
+.k { color: #FFCC55; } .s { color: #ED7BAD; } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+.note { font-family: var(--font-sans); font-size: 11px; line-height: 1.55; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+.note b { color: var(--foreground); font-weight: 600; }
+.note code { font-family: var(--font-mono); font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="t-eyebrow">Pattern · Sticky stack — CategoryBar + CartStrip + sub-toolbar</div>
+
+  <!-- ── Live scroll demo ──────────────────────────────────────── -->
+  <div class="sub-eye">Scrolleá dentro · mirá cómo se apilan las barras sticky</div>
+  <div class="viewport">
+    <div class="vp-top">
+      <span class="vp-brand">rambla</span>
+      <span class="vp-top-cart"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg> 4</span>
+    </div>
+    <div class="vp-strip">
+      <span class="s-dot"></span>
+      <span class="s-label">4 equipos en tu pedido</span>
+      <span class="s-meta">lun 2 → jue 5 jun.</span>
+      <button class="s-cta">Ver pedido</button>
+    </div>
+    <div class="vp-cat">
+      <button class="cat-tab active">Todos <span class="cat-count">187</span></button>
+      <button class="cat-tab">Cámaras <span class="cat-count">24</span></button>
+      <button class="cat-tab">Lentes <span class="cat-count">41</span></button>
+      <button class="cat-tab">Iluminación <span class="cat-count">18</span></button>
+      <button class="cat-tab">Audio <span class="cat-count">12</span></button>
+      <button class="cat-tab">Soporte <span class="cat-count">9</span></button>
+      <button class="cat-tab">Monitores <span class="cat-count">5</span></button>
+    </div>
+    <div class="vp-sub">
+      <span class="f-eye">Filtros:</span>
+      <span class="f-pill">Disponible jun.</span>
+      <span class="f-pill">Sony</span>
+      <span class="f-eye" style="margin-left:auto;">187 resultados</span>
+    </div>
+    <div class="vp-content">
+      <div class="vp-section-label">Populares</div>
+      <div class="vp-cell">📷</div><div class="vp-cell">💡</div><div class="vp-cell">🎙</div>
+      <div class="vp-cell">🎬</div><div class="vp-cell">🎥</div><div class="vp-cell">📹</div>
+      <div class="vp-section-label">Cámaras</div>
+      <div class="vp-cell">📷</div><div class="vp-cell">📷</div><div class="vp-cell">📹</div>
+      <div class="vp-cell">📷</div><div class="vp-cell">📹</div><div class="vp-cell">📷</div>
+      <div class="vp-section-label">Lentes</div>
+      <div class="vp-cell">🔭</div><div class="vp-cell">🔭</div><div class="vp-cell">🔭</div>
+      <div class="vp-cell">🔭</div><div class="vp-cell">🔭</div><div class="vp-cell">🔭</div>
+    </div>
+  </div>
+
+  <!-- ── z-index stack legend ─────────────────────────────────── -->
+  <div class="sub-eye">El stack · de abajo hacia arriba (no inventes nombres nuevos)</div>
+  <div class="zstack">
+    <div class="zrow"><span class="ztok">--z-sub-toolbar</span><span class="zdesc">Fila de filtros (solo modo lista)</span><span class="zval">30</span></div>
+    <div class="zrow hi"><span class="ztok">--z-cat-bar</span><span class="zdesc">CategoryBar · tabs de categoría</span><span class="zval">40</span></div>
+    <div class="zrow hi"><span class="ztok">--z-cart-strip</span><span class="zdesc">CartStrip · estado del pedido</span><span class="zval">45</span></div>
+    <div class="zrow"><span class="ztok">--z-topbar-amber</span><span class="zdesc">Capa amber del topbar (scroll)</span><span class="zval">49</span></div>
+    <div class="zrow"><span class="ztok">--z-topbar</span><span class="zdesc">TopBar</span><span class="zval">50</span></div>
+    <div class="zrow"><span class="ztok">--z-scrim · --z-drawer</span><span class="zdesc">Scrim + drawers/modales</span><span class="zval">60·61</span></div>
+  </div>
+
+  <!-- ── Code ─────────────────────────────────────────────────── -->
+  <div class="t-eyebrow" style="margin-top:4px;">Implementación</div>
+  <pre class="code"><span class="c">/* Cada barra "se pega" justo debajo de la anterior.
+   El top acumula las alturas de las barras de arriba. */</span>
+.topbar      { position: sticky; top: <span class="s">0</span>;    z-index: <span class="k">var</span>(--z-topbar); }      <span class="c">/* 56px */</span>
+.cart-strip  { position: sticky; top: <span class="s">56px</span>; z-index: <span class="k">var</span>(--z-cart-strip); }  <span class="c">/* 36px */</span>
+.category-bar{ position: sticky; top: <span class="s">92px</span>; z-index: <span class="k">var</span>(--z-cat-bar); }      <span class="c">/* 48px */</span>
+.sub-toolbar { position: sticky; top: <span class="s">140px</span>;z-index: <span class="k">var</span>(--z-sub-toolbar); }
+
+<span class="c">/* CartStrip solo se monta si hay ítems. Su altura se expone
+   como var para que las barras de abajo ajusten su top. */</span>
+:root { --cart-strip-h: <span class="s">0px</span>; }           <span class="c">/* JS la setea a 36px al montar */</span>
+.category-bar { top: calc(<span class="s">56px</span> + <span class="k">var</span>(--cart-strip-h)); }</pre>
+
+  <!-- ── Note ─────────────────────────────────────────────────── -->
+  <div class="note">
+    <b>CartStrip (z 45)</b> aparece solo con ítems en el carrito; va en <code>--ink</code> con dot amber, muestra cantidad + ventana de fechas y CTA "Ver pedido". Es el puente entre el topbar y el contenido — no se confunde con el CartMiniBar (ese es bottom-fixed en mobile). ·
+    <b>CategoryBar (z 40)</b> tabs con scroll horizontal (mismo overflow que el chip rail); activo en <code>--surface</code> + w600. El count en mono. ·
+    <b>El top se acumula:</b> cada barra se pega bajo la anterior sumando alturas. Cuando la CartStrip se monta, <code>--cart-strip-h</code> empuja a la CategoryBar hacia abajo. ·
+    <b>sub-toolbar (z 30)</b> solo en modo lista. ·
+    <b>Nunca inventes z-index</b> — usá los nombres de la escala. El drawer (61) siempre tapa todo esto.
+  </div>
+
+</div>
+</body>
+</html>
