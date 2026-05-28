@@ -202,7 +202,7 @@ export function BrandingSection() {
       {/* WhatsApp phone */}
       <div className="rounded-lg border hairline bg-background p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <MessageCircle className="h-4 w-4 text-emerald-600" />
+          <MessageCircle className="h-4 w-4 text-verde" />
           <h2 className="font-display text-lg text-ink">WhatsApp del negocio</h2>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -240,7 +240,7 @@ export function BrandingSection() {
             href={`https://wa.me/${phoneQ.data.replace(/[^0-9]/g, "")}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 transition"
+            className="inline-flex items-center gap-1.5 text-xs text-verde hover:text-verde/80 transition"
           >
             Probar enlace →
           </a>

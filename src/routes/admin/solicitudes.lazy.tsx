@@ -373,7 +373,7 @@ function SolicitudCard({
           <ul className="divide-y hairline -mx-3">
             {itemsDiff.map((d) => {
               const delta = d.despues - d.antes;
-              const cls = delta > 0 ? "text-emerald-600" : "text-rose-600";
+              const cls = delta > 0 ? "text-verde" : "text-destructive";
               return (
                 <li key={d.equipo_id} className="px-3 py-1.5 flex items-center gap-2 text-sm">
                   <span className="flex-1 text-ink truncate">{d.nombre}</span>

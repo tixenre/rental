@@ -149,9 +149,7 @@ function DescuentosJornadaSection() {
                     <td className="px-3 py-2 tabular-nums font-medium">
                       {p.jornadas} {p.jornadas === 1 ? "día" : "días"}
                     </td>
-                    <td className="px-3 py-2 tabular-nums text-emerald-600 font-medium">
-                      {p.pct}%
-                    </td>
+                    <td className="px-3 py-2 tabular-nums text-verde font-medium">{p.pct}%</td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
                       {pctMedio !== null ? `${medio} días → ${pctMedio}%` : "—"}
                     </td>
@@ -656,7 +654,7 @@ function RankingSection() {
                         {c.antes.score} → {c.despues.score}
                       </span>
                       <span
-                        className={`tabular shrink-0 inline-flex items-center gap-0.5 ${delta > 0 ? "text-green-600" : delta < 0 ? "text-destructive" : "text-muted-foreground"}`}
+                        className={`tabular shrink-0 inline-flex items-center gap-0.5 ${delta > 0 ? "text-verde" : delta < 0 ? "text-destructive" : "text-muted-foreground"}`}
                       >
                         {delta > 0 ? (
                           <TrendingUp className="h-3 w-3" />
@@ -1042,7 +1040,7 @@ function PreciosManualesPanel({ onRecalcSelected }: { onRecalcSelected: (ids: nu
                         "px-3 py-1.5 text-right tabular-nums " +
                         (cambia
                           ? it.delta! > 0
-                            ? "text-emerald-600"
+                            ? "text-verde"
                             : "text-destructive"
                           : "text-muted-foreground")
                       }
