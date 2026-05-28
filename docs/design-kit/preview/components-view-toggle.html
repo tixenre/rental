@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Components · View toggle (segmented)</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { background: var(--background); }
+.row { gap: 12px; align-items: center; flex-wrap: wrap; }
+.view-toggle {
+  position: relative;
+  display: inline-flex; align-items: center;
+  padding: 3px; border-radius: 12px;
+  border: 1.5px solid var(--hairline); background: var(--surface);
+}
+.view-toggle::before {
+  content: "";
+  position: absolute; top: 3px; left: 3px;
+  width: calc(50% - 3px); height: calc(100% - 6px);
+  background: var(--ink); border-radius: 9px;
+  transition: transform .28s cubic-bezier(.32,.72,0,1);
+  z-index: 0;
+}
+.view-toggle[data-active="b"]::before { transform: translateX(100%); }
+.view-toggle-btn {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 22px; border-radius: 9px;
+  font-family: var(--font-sans); font-size: 13px; font-weight: 700;
+  color: var(--muted-foreground); white-space: nowrap;
+  background: transparent; cursor: pointer; border: 0;
+  transition: color .2s ease;
+}
+.view-toggle-btn.active { color: var(--amber); }
+.eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="eyebrow">Segmented control — sliding indicator</div>
+    <div class="row">
+      <div class="view-toggle" data-active="a" id="t1">
+        <button class="view-toggle-btn active">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
+          Grid
+        </button>
+        <button class="view-toggle-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          Lista
+        </button>
+      </div>
+    </div>
+    <div class="eyebrow">The pill slides — color contrast on amber backgrounds inverts (white/30 background instead of surface)</div>
+  </div>
+  <script>
+    // Toggle interactividad demo
+    const t = document.getElementById('t1');
+    const btns = t.querySelectorAll('.view-toggle-btn');
+    btns.forEach((b, i) => b.addEventListener('click', () => {
+      btns.forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      t.dataset.active = i === 0 ? 'a' : 'b';
+    }));
+  </script>
+</body>
+</html>

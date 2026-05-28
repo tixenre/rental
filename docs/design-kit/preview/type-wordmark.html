@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Type · Wordmark</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { background: var(--background); justify-content: center; padding: 22px 26px; gap: 14px; }
+.tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+.painted { display: flex; align-items: center; gap: 18px; }
+.painted img { height: 92px; width: auto; }
+.painted .caption { font-family: var(--font-sans); font-size: 11.5px; color: var(--muted-foreground); line-height: 1.5; max-width: 280px; }
+.painted .caption b { color: var(--ink); font-weight: 600; }
+.divider { height: 1px; background: var(--hairline); width: 100%; }
+.software { display: flex; align-items: center; gap: 18px; }
+.software .wm-text { font-family: var(--font-display); font-weight: 900; letter-spacing: 0.01em; text-transform: lowercase; color: var(--amber); font-size: 78px; line-height: 0.94; }
+.software .caption { font-family: var(--font-sans); font-size: 11.5px; color: var(--muted-foreground); line-height: 1.5; flex: 1; }
+.software .caption b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="tag">Logo · usar siempre que se pueda</div>
+    <div class="painted">
+      <img src="../assets/rambla-wordmark-only.png" alt="rambla">
+      <div class="caption">El <b>logo pintado oficial</b> (assets/rambla-wordmark-only.png). Es artwork hecho a mano — no es una tipografía. Para cualquier lockup, header, footer o mockup, <b>usar el PNG</b>.</div>
+    </div>
+    <div class="divider"></div>
+    <div class="tag">Fallback en código · solo si el PNG no entra</div>
+    <div class="software">
+      <div class="wm-text">rambla</div>
+      <div class="caption"><b>Champ Black</b> 900 + lowercase + tracking +0.01em. Aproximación tipográfica para body-text donde el PNG no funciona (hero gigante reflowable, etc). Para todo lo demás, usar el PNG de arriba.</div>
+    </div>
+  </div>
+</body>
+</html>

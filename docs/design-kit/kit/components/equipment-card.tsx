@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Check, Minus, Plus, Sparkles } from "lucide-react";
+import type { Equipment } from "../types/equipment";
+import { formatARS as defaultFormatARS } from "../lib/format";
 import { cn } from "./lib/cn";
+
+export type { Equipment };
 
 /**
  * EquipmentCard — la card 4:5 que arma la grilla del catálogo público.
@@ -36,24 +40,8 @@ import { cn } from "./lib/cn";
  *   />
  */
 
-export interface EquipmentItem {
-  id: string;
-  name: string;
-  brand: string;
-  category: string;
-  pricePerDay: number;
-  /** URL de la foto. Si es null/undefined o falla, se muestra placeholder con iniciales. */
-  fotoUrl?: string | null;
-  /** Stock total del equipo. 0 = sin stock. */
-  cantidad: number;
-  /** Badge "nuevo" arriba-izquierda. */
-  isNew?: boolean;
-  /** Badge "destacado" arriba-derecha (mutuamente excluyente con `selected`). */
-  destacado?: boolean;
-}
-
 export interface EquipmentCardProps {
-  item: EquipmentItem;
+  item: Equipment;
   /** Cantidad seleccionada en el carrito. 0 = no seleccionado. */
   qty: number;
   /** Disponible en las fechas elegidas. undefined = sin fechas (muestra stock total). */
@@ -69,19 +57,12 @@ export interface EquipmentCardProps {
   className?: string;
 }
 
-const defaultFormat = (n: number) =>
-  new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(n);
-
 export function EquipmentCard({
   item,
   qty,
   disponible,
   width,
-  formatPrice = defaultFormat,
+  formatPrice = defaultFormatARS,
   onAdd,
   onRemove,
   onOpen,

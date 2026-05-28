@@ -1,0 +1,54 @@
+/* Shared preview-card chrome. Keep cards minimal — the swatches/specimens
+ * carry the meaning; the Design System tab supplies the title outside. */
+@import url("../colors_and_type.css");
+
+html, body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+.card {
+  padding: 22px 24px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-sizing: border-box;
+}
+.row { display: flex; gap: 12px; align-items: stretch; }
+.grid { display: grid; gap: 12px; }
+.col { display: flex; flex-direction: column; gap: 6px; }
+.meta {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 9px;
+  color: var(--muted-foreground);
+}
+.value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--foreground);
+}
+.swatch {
+  flex: 1;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline);
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 96px;
+}
+.label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+.subtle { color: var(--muted-foreground); }
+.token { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink); }
+.bone-bg { background: var(--background); }
+.ink-bg  { background: var(--ink); color: var(--background); }
+.amber-bg{ background: var(--amber); color: var(--ink); }

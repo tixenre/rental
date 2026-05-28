@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Type · Display</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { background: var(--background); gap: 18px; }
+
+.section {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 16px 16px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline);
+  background: var(--surface-elevated);
+}
+.section-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--hairline);
+}
+.section-title {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--ink);
+}
+.section-note {
+  font-family: var(--font-sans);
+  font-size: 11px; color: var(--muted-foreground);
+  text-align: right;
+}
+
+.line { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; }
+.line + .line { padding-top: 8px; border-top: 1px dashed var(--hairline); }
+
+.sample { color: var(--ink); }
+
+/* Champ Black — display only */
+.s-d1 {
+  font-family: var(--font-display); font-weight: 900;
+  font-size: 46px; line-height: 0.92;
+  letter-spacing: -0.01em; text-transform: lowercase;
+}
+.s-d2 {
+  font-family: var(--font-display); font-weight: 900;
+  font-size: 30px; line-height: 0.95;
+  letter-spacing: -0.005em; text-transform: lowercase;
+}
+
+/* TT Commons — sans for everything else */
+.s-h1 { font-family: var(--font-sans); font-weight: 700; font-size: 26px; line-height: 1.15; letter-spacing: -0.015em; }
+.s-h2 { font-family: var(--font-sans); font-weight: 700; font-size: 20px; line-height: 1.2;  letter-spacing: -0.01em; }
+.s-h3 { font-family: var(--font-sans); font-weight: 600; font-size: 16px; line-height: 1.3; }
+.s-name { font-family: var(--font-sans); font-weight: 700; font-size: 15px; line-height: 1.25; letter-spacing: -0.005em; }
+
+.meta-r { text-align: right; flex-shrink: 0; min-width: 86px; }
+.meta-r .label { white-space: nowrap; }
+.meta-r .token { white-space: nowrap; }
+
+/* The do/don't comparison */
+.compare {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  margin-top: 2px;
+}
+.compare-cell {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline);
+  background: var(--background);
+  padding: 12px 12px 10px;
+  display: flex; flex-direction: column; gap: 6px;
+  position: relative;
+}
+.compare-cell.bad  { border-color: color-mix(in oklch, var(--rbl-destructive) 35%, var(--hairline)); }
+.compare-cell.good { border-color: color-mix(in oklch, var(--rbl-verde) 35%, var(--hairline)); }
+
+.compare-tag {
+  position: absolute; top: -8px; left: 10px;
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 9999px;
+  background: var(--background);
+}
+.compare-cell.bad  .compare-tag { color: var(--rbl-destructive); border: 1px solid color-mix(in oklch, var(--rbl-destructive) 35%, transparent); }
+.compare-cell.good .compare-tag { color: var(--rbl-verde);       border: 1px solid color-mix(in oklch, var(--rbl-verde) 35%, transparent); }
+
+.compare-eyebrow {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-top: 4px;
+}
+.compare-name-bad {
+  font-family: var(--font-display); font-weight: 900;
+  font-size: 18px; line-height: 1.05;
+  letter-spacing: -0.005em; text-transform: lowercase;
+  color: var(--ink);
+}
+.compare-name-good {
+  font-family: var(--font-sans); font-weight: 700;
+  font-size: 16px; line-height: 1.2;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+.compare-foot {
+  font-family: var(--font-sans); font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 2px;
+}
+
+.rule-eyebrow {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+</style>
+</head>
+<body>
+  <div class="card">
+
+    <!-- ── Display (Champ Black) ────────────────────────────────── -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Display — Champ Black</div>
+        <div class="section-note">solo para títulos muy títulos</div>
+      </div>
+
+      <div class="line">
+        <div class="sample s-d1">un lugar donde&nbsp;pasan</div>
+        <div class="meta-r">
+          <div class="label subtle">display 1</div>
+          <div class="token">46 · 900</div>
+        </div>
+      </div>
+      <div class="line">
+        <div class="sample s-d2">conocé el estudio</div>
+        <div class="meta-r">
+          <div class="label subtle">display 2</div>
+          <div class="token">30 · 900</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Sans (TT Commons) ────────────────────────────────────── -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Headings + nombres — TT Commons</div>
+        <div class="section-note">todo lo demás, incluido el nombre del equipo</div>
+      </div>
+
+      <div class="line">
+        <div class="sample s-h1">Cámaras destacadas</div>
+        <div class="meta-r">
+          <div class="label subtle">h1</div>
+          <div class="token">26 · 700</div>
+        </div>
+      </div>
+      <div class="line">
+        <div class="sample s-h2">Pack todo incluido</div>
+        <div class="meta-r">
+          <div class="label subtle">h2</div>
+          <div class="token">20 · 700</div>
+        </div>
+      </div>
+      <div class="line">
+        <div class="sample s-h3">Detalles del pedido</div>
+        <div class="meta-r">
+          <div class="label subtle">h3</div>
+          <div class="token">16 · 600</div>
+        </div>
+      </div>
+      <div class="line">
+        <div class="sample s-name">Cámara RED Komodo X — Sensor Súper 35</div>
+        <div class="meta-r">
+          <div class="label subtle">equipo</div>
+          <div class="token">15 · 700</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Do / Don't ───────────────────────────────────────────── -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Nombre del equipo</div>
+        <div class="section-note">Champ Black marea cuando hay mucho texto</div>
+      </div>
+
+      <div class="compare">
+        <div class="compare-cell bad">
+          <div class="compare-tag">✗ no</div>
+          <div class="compare-eyebrow">RED</div>
+          <div class="compare-name-bad">cámara RED Komodo X — Sensor S35</div>
+          <div class="compare-foot">Champ Black + lowercase satura las cards y rompe el ritmo de la grilla.</div>
+        </div>
+        <div class="compare-cell good">
+          <div class="compare-tag">✓ sí</div>
+          <div class="compare-eyebrow">RED</div>
+          <div class="compare-name-good">Cámara RED Komodo X — Sensor S35</div>
+          <div class="compare-foot">TT Commons Bold + sentence case. Tabular, legible, predecible.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rule-eyebrow">
+      Regla: Champ Black solo en display 1 / display 2 (hero, section openers). Todo lo demás — h1/h2/h3, nombres de equipos, botones, body — va en TT Commons.
+    </div>
+
+  </div>
+</body>
+</html>

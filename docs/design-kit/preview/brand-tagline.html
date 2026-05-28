@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Brand · Tagline — alternativas</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { background: var(--background); gap: 16px; padding: 22px 22px; }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* ── Reference: the current line ──────────────────────────────────── */
+.ref {
+  position: relative; overflow: hidden;
+  background: var(--amber); color: var(--ink);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.ref-grain {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(rgba(20,16,12,.07) 1px, transparent 1px);
+  background-size: 4px 4px;
+}
+.ref-text {
+  font-family: var(--font-display); font-weight: 900;
+  font-size: 28px; line-height: 0.95;
+  letter-spacing: 0.005em; text-transform: lowercase;
+  position: relative;
+}
+.ref-tag {
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: 0.24em; text-transform: uppercase;
+  color: color-mix(in oklch, var(--ink) 70%, transparent);
+  border: 1px solid color-mix(in oklch, var(--ink) 30%, transparent);
+  padding: 4px 8px; border-radius: 9999px;
+  white-space: nowrap; position: relative;
+  background: color-mix(in oklch, var(--amber) 60%, white 0%);
+}
+
+/* ── Section divider ──────────────────────────────────────────────── */
+.divider {
+  display: flex; align-items: center; gap: 12px;
+  padding-top: 4px;
+}
+.divider-line { flex: 1; height: 1px; background: var(--hairline); }
+
+/* ── Options grid ─────────────────────────────────────────────────── */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.opt {
+  position: relative; overflow: hidden;
+  background: var(--amber); color: var(--ink);
+  border-radius: var(--radius-lg);
+  padding: 18px 18px 16px;
+  min-height: 168px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  gap: 14px;
+}
+.opt-grain {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(rgba(20,16,12,.07) 1px, transparent 1px);
+  background-size: 4px 4px;
+}
+
+.opt-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 8px;
+  position: relative;
+}
+.opt-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: color-mix(in oklch, var(--ink) 65%, transparent);
+}
+.opt-num {
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 500;
+  color: color-mix(in oklch, var(--ink) 55%, transparent);
+}
+
+.opt-text {
+  font-family: var(--font-display); font-weight: 900;
+  font-size: 30px; line-height: 0.95;
+  letter-spacing: 0.005em; text-transform: lowercase;
+  position: relative;
+  text-wrap: balance;
+}
+
+.opt-foot {
+  font-family: var(--font-sans);
+  font-size: 11px; font-weight: 500;
+  color: color-mix(in oklch, var(--ink) 75%, transparent);
+  position: relative;
+  line-height: 1.35;
+  border-top: 1px solid color-mix(in oklch, var(--ink) 18%, transparent);
+  padding-top: 8px;
+}
+
+/* Alt finish — one option on ink instead of amber for tonal variety */
+.opt.ink {
+  background: var(--ink); color: var(--amber);
+}
+.opt.ink .opt-eyebrow { color: color-mix(in oklch, var(--amber) 75%, transparent); }
+.opt.ink .opt-num { color: color-mix(in oklch, var(--amber) 60%, transparent); }
+.opt.ink .opt-foot {
+  color: color-mix(in oklch, var(--amber) 80%, transparent);
+  border-top-color: color-mix(in oklch, var(--amber) 30%, transparent);
+}
+.opt.ink .opt-grain {
+  background-image: radial-gradient(rgba(255,200,80,.10) 1px, transparent 1px);
+}
+
+.footnote {
+  font-family: var(--font-sans);
+  font-size: 11px; color: var(--muted-foreground);
+  line-height: 1.5;
+  border-top: 1px dashed var(--hairline);
+  padding-top: 10px;
+}
+.footnote b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="card">
+
+    <div class="eyebrow">Brand · Tagline — explorando dirección: lugar / identidad geográfica</div>
+
+    <!-- Current line, downgraded to reference -->
+    <div class="ref">
+      <div class="ref-grain"></div>
+      <div class="ref-text">un lugar donde pasan&nbsp;cosas.</div>
+      <div class="ref-tag">actual · en revisión</div>
+    </div>
+
+    <div class="divider">
+      <div class="eyebrow">Opciones</div>
+      <div class="divider-line"></div>
+    </div>
+
+    <div class="grid-2">
+
+      <div class="opt">
+        <div class="opt-grain"></div>
+        <div class="opt-head">
+          <div class="opt-eyebrow">Marca = lugar</div>
+          <div class="opt-num">01</div>
+        </div>
+        <div class="opt-text">rental en la&nbsp;rambla.</div>
+        <div class="opt-foot">Doble lectura — la rambla de Mar del Plata, y la marca. Corto, anclado, fácil de decir.</div>
+      </div>
+
+      <div class="opt">
+        <div class="opt-grain"></div>
+        <div class="opt-head">
+          <div class="opt-eyebrow">Categórico + lugar</div>
+          <div class="opt-num">02</div>
+        </div>
+        <div class="opt-text">audiovisual en mar del&nbsp;plata.</div>
+        <div class="opt-foot">Lo más explícito — dice qué somos y dónde. Funciona para SEO y para quien no conoce la marca.</div>
+      </div>
+
+      <div class="opt">
+        <div class="opt-grain"></div>
+        <div class="opt-head">
+          <div class="opt-eyebrow">Promesa + lugar</div>
+          <div class="opt-num">03</div>
+        </div>
+        <div class="opt-text">tu rental frente al&nbsp;mar.</div>
+        <div class="opt-foot">"Tu" suma cercanía rioplatense, "frente al mar" sin nombrar la ciudad pero la evoca. Más cálido.</div>
+      </div>
+
+      <div class="opt ink">
+        <div class="opt-grain"></div>
+        <div class="opt-head">
+          <div class="opt-eyebrow">Local específico</div>
+          <div class="opt-num">04</div>
+        </div>
+        <div class="opt-text">del faro a la&nbsp;rambla.</div>
+        <div class="opt-foot">Para quien conoce la ciudad — dos hitos marplatenses. Tono más in-the-know, riesgo: opaco para foráneos.</div>
+      </div>
+
+    </div>
+
+    <div class="footnote">
+      Todas usan el mismo lockup: <b>Champ Black lowercase</b> sobre <b>amber</b> (o ink, para variedad tonal). El punto final se mantiene — es parte del ritmo. <br>Pendiente: decidir si la actual se retira, baja a sub-hero, o queda en paralelo según contexto.
+    </div>
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Type · Scale</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { background: var(--background); padding: 16px 24px; gap: 6px; }
+.row { display: grid; grid-template-columns: 60px 1fr 80px 80px; align-items: baseline; gap: 16px; padding: 4px 0; border-bottom: 1px dashed var(--hairline); }
+.row:last-child { border-bottom: 0; }
+.tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+.sample { font-family: var(--font-display); color: var(--ink); letter-spacing: -0.01em; line-height: 1; }
+.sample.body { font-family: var(--font-sans); letter-spacing: 0; }
+.meta-num { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); text-align: right; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="row"><div class="tag">d1</div><div class="sample" style="font-size:40px; font-weight:700;">Aa</div><div class="meta-num">clamp · ≤136</div><div class="meta-num">0.9 lh</div></div>
+    <div class="row"><div class="tag">d2</div><div class="sample" style="font-size:30px; font-weight:700;">Aa</div><div class="meta-num">clamp · ≤64</div><div class="meta-num">1.0 lh</div></div>
+    <div class="row"><div class="tag">h1</div><div class="sample" style="font-size:24px; font-weight:600;">Aa</div><div class="meta-num">30 px</div><div class="meta-num">1.15 lh</div></div>
+    <div class="row"><div class="tag">h2</div><div class="sample" style="font-size:20px; font-weight:600;">Aa</div><div class="meta-num">24 px</div><div class="meta-num">1.2 lh</div></div>
+    <div class="row"><div class="tag">body</div><div class="sample body" style="font-size:16px;">Aa</div><div class="meta-num">16 px</div><div class="meta-num">1.55 lh</div></div>
+    <div class="row"><div class="tag">small</div><div class="sample body" style="font-size:13px; color: var(--muted-foreground);">Aa</div><div class="meta-num">14 px</div><div class="meta-num">1.5 lh</div></div>
+    <div class="row"><div class="tag">eyebrow</div><div class="sample body" style="font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.25em; font-size: 10px; color: var(--muted-foreground);">AA</div><div class="meta-num">10 px</div><div class="meta-num">.25em</div></div>
+  </div>
+</body>
+</html>

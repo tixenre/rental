@@ -49,12 +49,20 @@ src/
 │   ├── tokens.css
 │   ├── recipes.css
 │   ├── index.css               ← (opcional) atajo que importa los 3
+│   ├── lib/
+│   │   └── format.ts           ← formatARS, formatRentalRange, jornadaLabel
+│   ├── types/
+│   │   └── equipment.ts        ← Equipment, AddonItem, EstadoPedido, CatalogView
 │   └── components/
 │       ├── lib/cn.ts
 │       ├── button.tsx
+│       ├── input.tsx           ← Input, SearchInput, FieldLabel
 │       ├── addon-pills.tsx
 │       ├── estado-badge.tsx
 │       ├── equipment-card.tsx
+│       ├── price-block.tsx
+│       ├── view-toggle.tsx
+│       ├── empty-state.tsx
 │       ├── stat-card.tsx
 │       └── topbar.tsx
 └── styles.css                  ← tu CSS principal
@@ -95,7 +103,7 @@ JetBrains Mono se carga desde Google Fonts — agregalo en `index.html`:
 
 ```bash
 npm install clsx tailwind-merge class-variance-authority \
-            @radix-ui/react-slot lucide-react
+            @radix-ui/react-slot lucide-react date-fns
 ```
 
 | Paquete | Quién lo usa |
@@ -103,7 +111,8 @@ npm install clsx tailwind-merge class-variance-authority \
 | `clsx` + `tailwind-merge` | `cn()` en `kit/components/lib/cn.ts` |
 | `class-variance-authority` | `Button` (variants) |
 | `@radix-ui/react-slot` | `Button asChild` prop |
-| `lucide-react` | iconos en `AddonPills`, `EquipmentCard`, `TopBar` |
+| `lucide-react` | iconos en `AddonPills`, `EquipmentCard`, `Input`, `TopBar`, `EmptyState` |
+| `date-fns` | `formatRentalRange` en `kit/lib/format.ts` |
 
 ---
 
@@ -146,11 +155,19 @@ export default function Demo() {
   - variants: `primary` · `secondary` · `ghost` · `destructive` · `amber`
   - sizes: `sm` · `md` · `lg` · `icon`
   - shapes: `rounded` · `pill`
+- **`Input` · `SearchInput` · `FieldLabel`** — text input, search pill con ícono, y el eyebrow mono que va arriba de cada campo.
 - **`AddonPills`** — listado horizontal "incluye" sobre rows de equipo.
-- **`EstadoBadge`** — chips del ciclo de vida del pedido (`borrador` → `cancelado`).
+- **`EstadoBadge`** — chips del ciclo de vida del pedido (`borrador` → `cancelado`), 9 estados mapeados a la paleta secundaria.
 - **`EquipmentCard`** — card 4:5 del catálogo, presentational.
-- **`StatCard`** — bloque número-grande del dashboard admin.
+- **`PriceBlock`** — precio + tarifa + total opcional (display font + mono tabular).
+- **`ViewToggle`** — segmented control con pill deslizante. Grid/Lista, draft/published, etc.
+- **`EmptyState`** — icono amber-soft + título + sub + acción opcional como `children`.
+- **`StatCard`** — bloque número grande del dashboard admin.
 - **`TopBar`** — header sticky con el efecto amber-scroll del mobile.
+
+### Utilidades (TS)
+- **`lib/format.ts`** — `formatARS`, `formatRentalRange`, `countJornadas`, `jornadaLabel`.
+- **`types/equipment.ts`** — `Equipment`, `AddonItem`, `EstadoPedido`, `EquipmentCategory`, `CatalogView`.
 
 ---
 

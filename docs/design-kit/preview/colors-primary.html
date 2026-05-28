@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Colors · Primary palette</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { background: var(--background); padding: 18px 22px; }
+.grid { grid-template-columns: repeat(3, 1fr); }
+.swatch { min-height: 150px; position: relative; padding: 16px; gap: 4px; border-radius: var(--radius-md); display: flex; flex-direction: column; }
+.swatch.amber { background: #FAB428; color: #000000; }
+.swatch.ink   { background: #000000; color: #FFFFFF; }
+.swatch.white { background: #FFFFFF; color: #000000; border: 1px solid var(--hairline); }
+.swatch .name { font-family: var(--font-sans); font-weight: 600; font-size: 15px; letter-spacing: -0.01em; color: inherit; }
+.swatch .hex { font-family: var(--font-mono); font-size: 14px; font-weight: 500; letter-spacing: 0.04em; color: inherit; margin-top: auto; }
+.swatch .meta { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; line-height: 1.65; color: inherit; }
+.swatch.ink .meta, .swatch.ink .hex { color: #FFFFFF; }
+.swatch.amber .meta, .swatch.amber .hex { color: #000000; }
+.swatch.white .meta, .swatch.white .hex { color: #000000; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="grid">
+      <div class="swatch amber">
+        <div class="name">Amarillo Rambla</div>
+        <div class="meta">
+          PANTONE 1235 C<br>
+          CMYK 0 · 34 · 88 · 0<br>
+          RGB 255 · 183 · 40
+        </div>
+        <div class="hex">#FAB428</div>
+      </div>
+      <div class="swatch ink">
+        <div class="name">Negro</div>
+        <div class="meta">
+          PANTONE Neutral Black C<br>
+          CMYK 0 · 0 · 0 · 100<br>
+          RGB 0 · 0 · 0
+        </div>
+        <div class="hex">#000000</div>
+      </div>
+      <div class="swatch white">
+        <div class="name">Blanco</div>
+        <div class="meta">
+          RGB 255 · 255 · 255<br>
+          &nbsp;<br>
+          &nbsp;
+        </div>
+        <div class="hex">#FFFFFF</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
