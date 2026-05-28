@@ -424,7 +424,7 @@ export function CartDrawer({
                                       <span
                                         className={
                                           lineaDto > 0
-                                            ? "text-emerald-600 font-medium"
+                                            ? "text-verde font-medium"
                                             : "text-muted-foreground"
                                         }
                                       >
@@ -490,7 +490,7 @@ export function CartDrawer({
                   <span className="tabular">{formatARS(subtotalTotal)}</span>
                 </div>
                 {descuentoPct > 0 && (
-                  <div className="flex items-center justify-between text-sm text-emerald-600">
+                  <div className="flex items-center justify-between text-sm text-verde">
                     <span>
                       {descuentoLabel(descuentoOrigen, d, clienteSession?.nombre)} · {descuentoPct}%
                     </span>

@@ -822,14 +822,14 @@ function CartSheet({
                       className={cn(
                         "inline-flex items-center px-1.5 py-px rounded-full font-mono text-[9px] font-bold",
                         descuentoOrigen === "cliente"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-blue-100 text-blue-700",
+                          ? "bg-verde/10 text-verde"
+                          : "bg-azul/10 text-azul",
                       )}
                     >
                       −{descuentoPct}%
                     </span>
                   </div>
-                  <span className="font-mono text-[13px] font-semibold text-green-700 tabular-nums">
+                  <span className="font-mono text-[13px] font-semibold text-verde tabular-nums">
                     −{formatARS(descuentoMonto)}
                   </span>
                 </div>

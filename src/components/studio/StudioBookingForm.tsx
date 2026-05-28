@@ -79,11 +79,11 @@ function DispoChip({ status, motivo }: { status: Disponibilidad; motivo: string 
     },
     libre: {
       text: "Disponible",
-      className: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
+      className: "bg-verde/10 text-verde border-verde/20",
     },
     ocupado: {
       text: motivo ?? "Ocupado en esa franja",
-      className: "bg-red-500/10 text-red-700 border-red-500/20",
+      className: "bg-destructive/10 text-destructive border-destructive/20",
     },
     error: {
       text: "No pudimos verificar — reintentá",
@@ -413,7 +413,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
   return (
     <div className="space-y-4">
       {returnedFromLogin && auth === "in" && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800">
+        <div className="rounded-xl border border-verde/30 bg-verde/10 px-4 py-3 text-sm text-verde">
           <span className="font-medium">Sesión iniciada.</span> Revisá los datos y apretá Reservar
           para confirmar tu sesión en el estudio.
         </div>
@@ -622,7 +622,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
         </div>
 
         {errorMsg && (
-          <p className="mt-3 rounded-md border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-700">
+          <p className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             {errorMsg}
           </p>
         )}
@@ -664,7 +664,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
           </p>
         )}
         {date && disponibilidad === "ocupado" && (
-          <p className="mt-3 text-center text-xs text-red-700">
+          <p className="mt-3 text-center text-xs text-destructive">
             Probá otro horario o fecha — esa franja está ocupada.
           </p>
         )}
