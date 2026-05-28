@@ -468,7 +468,7 @@ function DestacadasCounter({ items }: { items: SpecTemplate[] }) {
   const over = total > max;
   return (
     <div
-      className={`flex items-center gap-2 text-xs ${over ? "text-amber-700" : "text-muted-foreground"}`}
+      className={`flex items-center gap-2 text-xs ${over ? "text-amber" : "text-muted-foreground"}`}
     >
       <span className="font-mono uppercase tracking-widest">
         Ficha técnica destacada: {total}/{max}
@@ -849,7 +849,7 @@ function SpecTemplateFormModal({
                   {specInfo.unidad ? ` · ${specInfo.unidad}` : ""}
                 </span>
                 {specInfo.es_compatibilidad && (
-                  <span className="text-[9px] bg-amber-soft/60 text-amber-800 px-1 rounded">
+                  <span className="text-[9px] bg-amber-soft/60 text-ink px-1 rounded">
                     compat {specInfo.compatibilidad_modo}
                   </span>
                 )}

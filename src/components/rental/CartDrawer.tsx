@@ -542,7 +542,7 @@ export function CartDrawer({
                 </button>
 
                 {!startDate || !endDate ? (
-                  <p className="flex items-center justify-center gap-1.5 text-center text-xs text-amber-700">
+                  <p className="flex items-center justify-center gap-1.5 text-center text-xs text-amber">
                     <AlertCircle className="h-3.5 w-3.5" />
                     Elegí fechas para confirmar
                   </p>

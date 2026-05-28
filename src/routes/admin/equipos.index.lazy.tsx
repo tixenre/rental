@@ -720,7 +720,7 @@ function EquiposPage() {
                     )}
                     {!eq.ficha_completa && (
                       <span
-                        className="text-[10px] text-amber-700 bg-amber-soft/40 px-1 py-0.5 rounded shrink-0"
+                        className="text-[10px] text-amber bg-amber-soft/40 px-1 py-0.5 rounded shrink-0"
                         title="Ficha pendiente — marcala como completa en el form cuando termines de cargarla"
                       >
                         pendiente
@@ -1280,7 +1280,7 @@ function FaltaBanner({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-amber/40 bg-amber-soft px-4 py-2.5">
-      <AlertCircle className="h-4 w-4 shrink-0 text-amber-700" />
+      <AlertCircle className="h-4 w-4 shrink-0 text-amber" />
       <div className="flex-1 min-w-0 text-sm">
         <span className="font-medium text-ink">Filtrando equipos {FALTA_LABELS[falta]}</span>
         <span className="text-muted-foreground">

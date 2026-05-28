@@ -404,7 +404,7 @@ export function DashboardUsoDialog({
                             </Badge>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="text-xs tabular-nums font-medium text-amber-700">
+                            <div className="text-xs tabular-nums font-medium text-amber">
                               {fmtMoneda(p.pendiente)}
                             </div>
                             <div className="text-[10px] text-muted-foreground tabular-nums">
@@ -458,7 +458,7 @@ export function DashboardUsoDialog({
                             <TableCell className="text-right tabular-nums text-xs">
                               {fmtMoneda(p.monto_total)}
                             </TableCell>
-                            <TableCell className="text-right tabular-nums text-xs font-medium text-amber-700">
+                            <TableCell className="text-right tabular-nums text-xs font-medium text-amber">
                               {fmtMoneda(p.pendiente)}
                             </TableCell>
                           </TableRow>

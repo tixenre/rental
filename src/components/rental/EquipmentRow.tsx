@@ -180,7 +180,7 @@ export function EquipmentRow({ item, disponible }: { item: Equipment; disponible
                 disponible <= 0
                   ? "text-destructive"
                   : disponible === 1
-                    ? "text-amber-600"
+                    ? "text-amber"
                     : "text-muted-foreground",
               )}
             >

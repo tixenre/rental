@@ -189,7 +189,7 @@ function DataIoPage() {
       </header>
 
       {/* Guía del flujo (lenguaje claro) */}
-      <div className="rounded-lg border border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/10 p-4 text-sm space-y-1.5">
+      <div className="rounded-lg border border-amber/30 bg-amber/5 p-4 text-sm space-y-1.5">
         <div className="font-medium text-ink">Cómo usarlo para probar antes del lanzamiento</div>
         <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
           <li>

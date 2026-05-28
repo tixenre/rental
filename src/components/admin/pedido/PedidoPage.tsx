@@ -1648,7 +1648,7 @@ function HistorialModificaciones({ items }: { items: PedidoHistorialItem[] }) {
                 </span>
               )}
               {overrideAplicado && (
-                <span className="text-[10px] text-amber-700">modificada al aprobar</span>
+                <span className="text-[10px] text-amber">modificada al aprobar</span>
               )}
               <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
                 {fmtFecha(h.created_at)}
@@ -1665,7 +1665,7 @@ function HistorialModificaciones({ items }: { items: PedidoHistorialItem[] }) {
               </div>
             )}
             {overrideAplicado && a && (
-              <div className="text-xs text-amber-700 mt-1 tabular-nums">
+              <div className="text-xs text-amber mt-1 tabular-nums">
                 Aplicado: {fmtFecha(a.fecha_desde ?? "")} → {fmtFecha(a.fecha_hasta ?? "")}
                 {a.items && ` · ${a.items.length} item${a.items.length !== 1 ? "s" : ""}`}
               </div>

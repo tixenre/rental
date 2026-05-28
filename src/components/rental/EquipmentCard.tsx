@@ -151,7 +151,7 @@ export function EquipmentCard({
                   sinStock
                     ? "text-destructive"
                     : stockBajo
-                      ? "text-amber-600"
+                      ? "text-amber"
                       : "text-muted-foreground",
                 )}
               >
