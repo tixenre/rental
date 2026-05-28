@@ -4,9 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { adminApi, ESTADO_LABEL, type CalendarioPedido } from "@/lib/admin/api";
-import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
+import { adminApi, type CalendarioPedido } from "@/lib/admin/api";
+import { EstadoBadge } from "@/components/kit/EstadoBadge";
 
 const MESES = [
   "Enero",
@@ -254,9 +253,7 @@ export function CalendarioWidget({
           <div className="flex flex-wrap gap-1.5 text-xs">
             {(["presupuesto", "confirmado", "retirado", "devuelto", "finalizado"] as const).map(
               (e) => (
-                <Badge key={e} variant={pedidoEstadoVariant(e)}>
-                  {ESTADO_LABEL[e]}
-                </Badge>
+                <EstadoBadge key={e} estado={e} />
               ),
             )}
           </div>

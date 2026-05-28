@@ -6,7 +6,6 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -28,8 +27,8 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, ESTADO_LABEL, type Cliente } from "@/lib/admin/api";
+import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
-import { pedidoEstadoVariant } from "@/lib/admin/pedido-estado";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/clientes")({
@@ -38,6 +37,9 @@ export const Route = createLazyFileRoute("/admin/clientes")({
 
 const fmtArs = (n: number | null | undefined) =>
   n ? `$${Math.round(Number(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : "$0";
+
+const estadoLabel = (e: string) =>
+  e === "presupuesto" ? "Solicitado" : (ESTADO_LABEL[e as keyof typeof ESTADO_LABEL] ?? e);
 const fmtFecha = (s: string | null) => (s ? s.slice(0, 10) : "—");
 
 function ClientesPage() {
@@ -330,9 +332,7 @@ function ClienteHistorialSheet({
                       <div className="font-mono text-xs text-muted-foreground">
                         #{p.numero_pedido ?? p.id}
                       </div>
-                      <Badge variant={pedidoEstadoVariant(p.estado)}>
-                        {ESTADO_LABEL[p.estado]}
-                      </Badge>
+                      <EstadoBadge estado={p.estado} label={estadoLabel(p.estado)} />
                     </div>
                     <div className="text-sm mt-1">
                       {fmtFecha(p.fecha_desde)} → {fmtFecha(p.fecha_hasta)}
