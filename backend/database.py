@@ -1189,6 +1189,9 @@ def init_db():
     conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS direccion TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS como_llegar TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS testimonios_json TEXT")
+    # Mapa: el dueño pega un link/iframe; el backend lo parsea y guarda ambos.
+    conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS mapa_url TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE estudio ADD COLUMN IF NOT EXISTS mapa_embed_url TEXT NOT NULL DEFAULT ''")
     # E4: slots fijos recurrentes mensuales (ej. "miércoles 8-20 Filmar $X jun-dic").
     # Bloquean su franja para el público mientras el rango de meses esté activo y
     # generan un pedido por mes (tipo='estudio_fijo') para estadísticas + pagos.
@@ -1225,11 +1228,26 @@ def init_db():
     # Seed idempotente: inserta la fila singleton si no existe, con los valores
     # del copy original de src/data/studio.ts. Precios en 0 (el dueño los setea).
     import json as _json
+    # Lista canónica de 16 features. Las con value="" se ocultan del público
+    # (filtro en src/routes/estudio.tsx) y solo aparecen en /admin/estudio
+    # como casilleros para que el dueño los complete a medida.
     _features_seed = _json.dumps([
-        {"label": "Superficie", "value": "— m²"},
-        {"label": "Ciclorama", "value": "Infinito"},
-        {"label": "Altura", "value": "— m"},
+        {"label": "Superficie", "value": ""},
+        {"label": "Altura", "value": ""},
+        {"label": "Ciclorama", "value": "6×6 m"},
         {"label": "Climatización", "value": "Sí"},
+        {"label": "Living", "value": "Sí"},
+        {"label": "Área de trabajo", "value": "Sí"},
+        {"label": "Entrada para autos", "value": "Sí"},
+        {"label": "Cocina", "value": "Sí"},
+        {"label": "WiFi", "value": ""},
+        {"label": "Camarín / vestuario", "value": ""},
+        {"label": "Potencia eléctrica", "value": ""},
+        {"label": "Insonorización", "value": ""},
+        {"label": "Pet friendly", "value": ""},
+        {"label": "Acceso 24h", "value": ""},
+        {"label": "Estacionamiento", "value": ""},
+        {"label": "Rigging / tomas de techo", "value": ""},
     ])
     _faq_seed = _json.dumps([
         {"q": "¿Cuál es el mínimo de reserva?",
@@ -1256,9 +1274,8 @@ def init_db():
             1,
             'El Estudio',
             'Foto y video en Mar del Plata',
-            'Un espacio pensado para producciones audiovisuales. Ciclorama '
-            'infinito, climatización y todo el equipo de Rambla a mano. '
-            'Ideal para producto, retrato, video corporativo, redes sociales y shoots editoriales.',
+            'Un espacio para producciones audiovisuales con todos los equipos de Rambla Rental a mano. '
+            'Ideal para rodajes grandes — flexible para los chicos.',
             0, 2, 8, 22, 0,
             TRUE,
             'Pack Todo Incluido',

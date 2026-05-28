@@ -83,6 +83,8 @@ class TestBuildResponse:
             "direccion": "",
             "como_llegar": "",
             "testimonios_json": None,
+            "mapa_url": "",
+            "mapa_embed_url": "",
             "updated_at": None,
         }
         defaults.update(overrides)

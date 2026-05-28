@@ -62,6 +62,7 @@ const schema = z.object({
   faq: z.array(faqSchema),
   direccion: z.string(),
   como_llegar: z.string(),
+  mapa_url: z.string(),
   testimonios: z.array(testimonioSchema),
 });
 
@@ -86,6 +87,7 @@ function configToForm(c: EstudioConfig): FormValues {
     faq: c.faq ?? [],
     direccion: c.direccion,
     como_llegar: c.como_llegar,
+    mapa_url: c.mapa_url,
     testimonios: c.testimonios ?? [],
   };
 }
@@ -582,10 +584,17 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
       {/* ── Ubicación ── */}
       <Section title="Ubicación">
         <p className="-mt-1 text-xs text-muted-foreground">
-          La dirección alimenta el mapa de la página pública. Si está vacía, no se muestra el
-          bloque.
+          Si pegás un link de Google Maps, mostramos un mapa en la página pública. Sin link y sin
+          dirección, el bloque entero se oculta.
         </p>
-        <Field label="Dirección" error={errors.direccion?.message}>
+        <Field
+          label="Mapa de Google (link o código embed)"
+          error={errors.mapa_url?.message}
+          hint='Pegá el link que da "Compartir" en la app de Google Maps (ej. https://maps.app.goo.gl/...) o el código iframe de "Compartir → Insertar mapa". Dejalo vacío para no mostrar mapa.'
+        >
+          <Textarea {...register("mapa_url")} rows={2} placeholder="https://maps.app.goo.gl/..." />
+        </Field>
+        <Field label="Dirección (texto)" error={errors.direccion?.message}>
           <Input {...register("direccion")} placeholder="Av. Colón 1234, Mar del Plata" />
         </Field>
         <Field label="Cómo llegar / estacionamiento" error={errors.como_llegar?.message}>
@@ -855,10 +864,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({
   label,
   error,
+  hint,
   children,
 }: {
   label: string;
   error?: string;
+  hint?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -867,6 +878,7 @@ function Field({
         {label}
       </label>
       {children}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );

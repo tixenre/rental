@@ -1651,6 +1651,8 @@ export type EstudioConfig = {
   direccion: string;
   como_llegar: string;
   testimonios: Array<{ autor: string; texto: string }> | null;
+  mapa_url: string;
+  mapa_embed_url: string;
   updated_at: string | null;
   fotos: EstudioFoto[];
 };
@@ -1674,6 +1676,7 @@ export type EstudioInput = {
   direccion?: string;
   como_llegar?: string;
   testimonios_json?: string;
+  mapa_url?: string;
 };
 
 export type FotoOrdenItem = { id: number; orden: number; es_principal: boolean };

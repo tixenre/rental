@@ -5,19 +5,34 @@ export const STUDIO = {
   name: "El Estudio",
   tagline: "Foto y video en Mar del Plata",
   description:
-    "Un espacio pensado para producciones audiovisuales. Ciclorama " +
-    "infinito, climatización y todo el equipo de Rambla a mano. " +
-    "Ideal para producto, retrato, video corporativo, redes sociales y " +
-    "shoots editoriales.",
+    "Un espacio para producciones audiovisuales con todos los equipos de " +
+    "Rambla Rental a mano. Ideal para rodajes grandes — flexible para los chicos.",
   pricePerHour: 0, // TODO: precio real $/hora
   minHours: 3,
   openHour: 8, // 08:00
   closeHour: 22, // 22:00 (último inicio razonable)
+  // Las medidas concretas (superficie, altura) y atributos del espacio viven
+  // acá — la descripción se mantiene corta y narrativa, sin duplicar specs.
+  // Lista canónica en admin: el dueño completa los `value` que faltan; las
+  // features con value vacío se OCULTAN en la página pública (filtro en
+  // /estudio.tsx) hasta que tengan dato real.
   features: [
-    { label: "Superficie", value: "— m²" },
-    { label: "Ciclorama", value: "Infinito" },
-    { label: "Altura", value: "— m" },
+    { label: "Superficie", value: "" },
+    { label: "Altura", value: "" },
+    { label: "Ciclorama", value: "6×6 m" },
     { label: "Climatización", value: "Sí" },
+    { label: "Living", value: "Sí" },
+    { label: "Área de trabajo", value: "Sí" },
+    { label: "Entrada para autos", value: "Sí" },
+    { label: "Cocina", value: "Sí" },
+    { label: "WiFi", value: "" },
+    { label: "Camarín / vestuario", value: "" },
+    { label: "Potencia eléctrica", value: "" },
+    { label: "Insonorización", value: "" },
+    { label: "Pet friendly", value: "" },
+    { label: "Acceso 24h", value: "" },
+    { label: "Estacionamiento", value: "" },
+    { label: "Rigging / tomas de techo", value: "" },
   ],
   gallery: 6, // cantidad de placeholders hasta que haya fotos reales
   faq: [

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Camera, Check, MessageCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, MessageCircle } from "lucide-react";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { CartDrawer } from "@/components/rental/CartDrawer";
 import { StudioBookingForm } from "@/components/studio/StudioBookingForm";
@@ -289,15 +289,30 @@ function EstudioPage() {
   const faq = data?.faq ?? STUDIO.faq;
   const fotos = useMemo(() => data?.fotos ?? [], [data?.fotos]);
   const packActivo = data?.pack_activo ?? true;
-  const packNombre = data?.pack_nombre ?? STUDIO.addon.name;
-  const packDescripcion = data?.pack_descripcion ?? STUDIO.addon.description;
-  const packPrecio = data?.pack_precio ?? STUDIO.addon.pricePerDay;
   const packEquipos = useMemo(() => data?.pack_equipos ?? [], [data?.pack_equipos]);
   const precioHora = data?.precio_hora ?? STUDIO.pricePerHour;
   const minHours = data?.min_horas ?? STUDIO.minHours;
   const direccion = data?.direccion ?? "";
   const comoLlegar = data?.como_llegar ?? "";
+  const mapaUrl = data?.mapa_url ?? "";
+  const mapaEmbedUrl = data?.mapa_embed_url ?? "";
   const testimonios = data?.testimonios ?? [];
+  // Mostramos el bloque "Dónde estamos" si hay mapa configurado o dirección.
+  // El mapa puede venir solo (sin dirección) y al revés.
+  const tieneUbicacion = !!(mapaEmbedUrl || direccion);
+  // Link para "Ver en Google Maps": prioridad al link original del dueño (más
+  // corto, abre la app móvil); si no, generamos uno desde la dirección.
+  const verMapaHref =
+    mapaUrl ||
+    (direccion
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`
+      : "");
+  // src del iframe: el embed_url resuelto por el backend, o fallback con direccion.
+  const iframeSrc =
+    mapaEmbedUrl ||
+    (direccion
+      ? `https://www.google.com/maps?q=${encodeURIComponent(direccion)}&output=embed`
+      : "");
 
   // Foto principal para el hero: la marcada como principal o la primera.
   // El resto va a la galería (sin repetir la del hero).
@@ -314,8 +329,6 @@ function EstudioPage() {
         openHour: data.open_hour,
         closeHour: data.close_hour,
         packActivo: data.pack_activo,
-        packNombre: data.pack_nombre,
-        packDescripcion: data.pack_descripcion,
         packPrecio: data.pack_precio,
       }
     : undefined;
@@ -362,9 +375,10 @@ function EstudioPage() {
             </div>
           </div>
 
-          {/* Foto hero — full-bleed en mobile (cancela el px-4 del section con
-              -mx-4 y saca el redondeo); en desktop vuelve a la celda del grid. */}
-          <div className="order-1 lg:order-2 -mx-4 lg:mx-0">
+          {/* Foto hero — full-bleed real en mobile/tablet (margen negativo basado
+              en el viewport, no en el padding del padre, así no depende del
+              contexto). En lg vuelve a la celda del grid con redondeo. */}
+          <div className="order-1 lg:order-2 mx-[calc(50%-50vw)] w-screen lg:mx-0 lg:w-auto">
             {fotoHero ? (
               <div className="aspect-[16/10] sm:aspect-[4/3] w-full overflow-hidden rounded-none lg:rounded-2xl bg-ink/5">
                 <img
@@ -426,86 +440,95 @@ function EstudioPage() {
           {packActivo && (
             <aside className="rounded-2xl border hairline bg-amber/10 p-5 lg:sticky lg:top-20 lg:self-start">
               <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/60">
-                Pack · add-on opcional
+                Estudio + equipos · qué incluye
               </div>
-              <h3 className="mt-1 font-display text-xl">{packNombre}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{packDescripcion}</p>
-              <div className="mt-3 text-2xl font-semibold tabular">
-                {packPrecio > 0 ? formatARS(packPrecio) : "Consultar"}
-              </div>
+              {/* Mostramos solo la grilla de equipos curados (sin duplicar
+                  precio/descripción/título — eso ya vive en el card del paso 01). */}
               {packEquipos.length > 0 ? (
                 <StudioPackKit equipos={packEquipos} title="Equipos incluidos" />
               ) : (
-                <ul className="mt-4 space-y-2">
-                  {STUDIO.addon.includes.map((it) => (
-                    <li
-                      key={it}
-                      className="flex items-start gap-2 rounded-lg bg-ink/5 px-3 py-2 text-sm"
-                    >
-                      <Check className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>{it}</span>
-                    </li>
-                  ))}
-                </ul>
+                <p className="mt-4 rounded-lg bg-ink/5 px-3 py-2 text-sm text-muted-foreground">
+                  Llegá con la cámara — el día de la reserva te confirmamos qué luces y griperías
+                  están libres en tu franja.
+                </p>
               )}
-              <p className="mt-3 text-xs text-muted-foreground">
-                Activá el pack al reservar (en el formulario) — se incluye lo que esté disponible en
-                tu franja.
-              </p>
             </aside>
           )}
         </div>
       </section>
 
       {/* ─── Características del espacio ─────────────────────────────── */}
-      <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-        <h2 className="font-display text-2xl sm:text-3xl">Características del espacio</h2>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Lo que vas a encontrar en el lugar. No incluye equipos ni staff — el equipamiento es el
-          pack opcional de arriba.
-        </p>
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {features.map((f) => (
-            <div key={f.label} className="rounded-xl border hairline bg-surface p-4">
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                {f.label}
-              </div>
-              <div className="mt-1 text-lg font-semibold">{f.value}</div>
+      {/* Solo features con valor real — las que viven en el admin con value
+          vacío o placeholder "—" se ocultan en público hasta que el dueño las
+          complete. Permite tener una lista canónica en admin sin "—" feos en
+          la web. */}
+      {(() => {
+        const isFilled = (v: string) => {
+          const t = (v ?? "").trim();
+          return t.length > 0 && t !== "—" && !/^—\s*(m|m²|m\^2)?$/i.test(t);
+        };
+        const visibles = features.filter((f) => isFilled(f.value));
+        if (visibles.length === 0) return null;
+        return (
+          <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
+            <h2 className="font-display text-2xl sm:text-3xl">Características del espacio</h2>
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+              Lo que vas a encontrar en el lugar. No incluye equipos ni staff — el equipamiento es
+              el pack opcional de arriba.
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {visibles.map((f) => (
+                <div key={f.label} className="rounded-xl border hairline bg-surface p-4">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                    {f.label}
+                  </div>
+                  <div className="mt-1 text-lg font-semibold">{f.value}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
+          </section>
+        );
+      })()}
 
       {/* ─── Ubicación ───────────────────────────────────────────────── */}
-      {direccion && (
+      {tieneUbicacion && (
         <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
           <h2 className="font-display text-2xl sm:text-3xl">Dónde estamos</h2>
           <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:items-start">
             <div>
-              <p className="text-base text-ink">{direccion}</p>
+              {direccion && <p className="text-base text-ink">{direccion}</p>}
               {comoLlegar && (
-                <p className="mt-3 whitespace-pre-line text-sm text-muted-foreground">
+                <p
+                  className={cn(
+                    direccion ? "mt-3" : "",
+                    "whitespace-pre-line text-sm text-muted-foreground",
+                  )}
+                >
                   {comoLlegar}
                 </p>
               )}
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 inline-flex items-center gap-2 rounded-full border hairline bg-surface px-4 py-2 text-sm text-ink transition hover:border-ink"
-              >
-                Ver en Google Maps
-              </a>
+              {verMapaHref && (
+                <a
+                  href={verMapaHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex items-center gap-2 rounded-full border hairline bg-surface px-4 py-2 text-sm text-ink transition hover:border-ink"
+                >
+                  Ver en Google Maps
+                </a>
+              )}
             </div>
-            <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border hairline bg-ink/5">
-              <iframe
-                title="Mapa del estudio"
-                src={`https://www.google.com/maps?q=${encodeURIComponent(direccion)}&output=embed`}
-                className="h-full w-full border-0"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
+            {iframeSrc && (
+              <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border hairline bg-ink/5">
+                <iframe
+                  title="Mapa del estudio"
+                  src={iframeSrc}
+                  className="h-full w-full border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+            )}
           </div>
         </section>
       )}

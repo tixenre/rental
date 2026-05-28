@@ -107,6 +107,8 @@ def _build_response(row, fotos: list) -> dict:
         "direccion": row["direccion"],
         "como_llegar": row["como_llegar"],
         "testimonios": _parse_json_field(row["testimonios_json"]),
+        "mapa_url": row["mapa_url"],
+        "mapa_embed_url": row["mapa_embed_url"],
         "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
         "fotos": fotos,
     }
@@ -186,6 +188,9 @@ class EstudioUpdate(BaseModel):
     direccion: Optional[str] = None
     como_llegar: Optional[str] = None
     testimonios_json: Optional[str] = None
+    # Link de Google Maps que pega el dueño (shortlink, URL larga o iframe HTML).
+    # El backend lo parsea/resuelve y deriva `mapa_embed_url`.
+    mapa_url: Optional[str] = None
 
 
 @router.patch("/admin/estudio")
@@ -193,6 +198,31 @@ def patch_estudio(body: EstudioUpdate, request: Request):
     require_admin(request)
 
     updates = {k: v for k, v in body.dict().items() if v is not None}
+
+    # Si el dueño cambió `mapa_url`, derivamos `mapa_embed_url`. Si lo dejó vacío,
+    # vaciamos ambos.
+    if "mapa_url" in updates:
+        from services.maps_url import MapsParseError, parse_maps_input
+
+        raw = (updates["mapa_url"] or "").strip()
+        if not raw:
+            updates["mapa_url"] = ""
+            updates["mapa_embed_url"] = ""
+        else:
+            try:
+                parsed = parse_maps_input(raw)
+            except MapsParseError as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"No pude leer ese link de Google Maps: {e}. "
+                        "Probá copiar 'Compartir → Insertar mapa' (código iframe) "
+                        "o el link que da 'Compartir' en la app de Maps."
+                    ),
+                ) from e
+            updates["mapa_url"] = parsed.raw_url
+            updates["mapa_embed_url"] = parsed.embed_url
+
     conn = get_db()
     try:
         if updates:
