@@ -176,6 +176,29 @@ class TestRenderTemplate:
             render_template("no_existe", {})
 
 
+class TestBrandedLayout:
+    """El html se envuelve en el shell branded común; el text queda plano."""
+
+    def test_html_envuelto_en_layout(self, fake_db_with_templates):
+        r = render_template(
+            "pedido_creado_cliente", {"cliente_nombre": "Juan", "numero_pedido": 7}
+        )
+        html = r["html"]
+        assert "<!DOCTYPE html>" in html
+        assert "Rambla Rental" in html  # footer / marca
+        assert "#FAB428" in html  # barra de acento amber
+        assert "<img" in html  # logo
+        # El contenido del body sigue presente dentro del shell.
+        assert "Pedido 7 — Juan" in html
+
+    def test_text_no_se_envuelve(self, fake_db_with_templates):
+        r = render_template(
+            "pedido_creado_cliente", {"cliente_nombre": "Juan", "numero_pedido": 7}
+        )
+        assert "<!DOCTYPE" not in r["text"]
+        assert "Pedido 7 — Juan" in r["text"]
+
+
 # ── send_email — happy path con InMemoryBackend ────────────────────────────────
 
 class TestSendEmailOk:

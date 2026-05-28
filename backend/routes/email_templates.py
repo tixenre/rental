@@ -25,17 +25,33 @@ router = APIRouter()
 
 # Sample context para previews — refleja los placeholders comunes que
 # pueden aparecer en cualquier template. Pisable por el caller.
+_PREVIEW_ITEMS_HTML = (
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+    'style="border-collapse:collapse;font-size:14px;margin:4px 0 8px;">'
+    '<tr style="border-bottom:1px solid #ececec;">'
+    '<td style="padding:8px 8px 8px 0;color:#2a251e;">Sony FX3</td>'
+    '<td style="padding:8px 12px;text-align:center;color:#8a8378;white-space:nowrap;">× 1</td>'
+    '<td style="padding:8px 0;text-align:right;white-space:nowrap;color:#2a251e;">$ 9.000</td></tr>'
+    '<tr style="border-bottom:1px solid #ececec;">'
+    '<td style="padding:8px 8px 8px 0;color:#2a251e;">RØDE NTG</td>'
+    '<td style="padding:8px 12px;text-align:center;color:#8a8378;white-space:nowrap;">× 2</td>'
+    '<td style="padding:8px 0;text-align:right;white-space:nowrap;color:#2a251e;">$ 3.500</td></tr>'
+    "</table>"
+)
+
 _PREVIEW_CONTEXT: dict[str, Any] = {
-    "cliente_nombre": "Pérez, Juan",
+    "cliente_nombre": "Juan Pérez",
     "cliente_email": "juan@ejemplo.com",
-    "cliente_telefono": "+598 99 123 456",
+    "cliente_telefono": "+54 9 223 585 2510",
     "numero_pedido": "1234",
-    "fecha_desde": "lun 20 may",
-    "fecha_hasta": "vie 24 may",
+    "fecha_desde": "20 may · 10:00",
+    "fecha_hasta": "24 may · 18:00",
     "total": "$ 12.500",
-    "items_html": "<ul><li>Sony FX3 × 1</li><li>RØDE NTG × 2</li></ul>",
+    "notas": "Necesito un trípode extra.",
+    "items_html": _PREVIEW_ITEMS_HTML,
     "items_text": "- Sony FX3 × 1\n- RØDE NTG × 2",
-    "admin_url": "https://rambla.com.uy/admin/pedidos/1234",
+    "admin_url": "https://ramblarental.com/admin/pedidos/1234",
+    "portal_url": "https://ramblarental.com/cliente/portal",
 }
 
 
