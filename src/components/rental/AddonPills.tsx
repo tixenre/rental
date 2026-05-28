@@ -17,10 +17,13 @@ import { cn } from "@/lib/utils";
 export function AddonPills({
   items,
   max = 3,
+  emptyLabel = "solo cuerpo",
   className,
 }: {
   items?: IncludedItem[];
   max?: number;
+  /** Texto del pill vacío cuando no hay addons. Default: "solo cuerpo". */
+  emptyLabel?: string;
   className?: string;
 }) {
   const list = items ?? [];
@@ -28,8 +31,8 @@ export function AddonPills({
   if (list.length === 0) {
     return (
       <div className={cn("flex items-center", className)}>
-        <span className="inline-flex items-center rounded-full border hairline px-2 py-0.5 text-[10px] italic text-muted-foreground">
-          solo cuerpo
+        <span className="inline-flex items-center rounded-full border border-hairline px-2 py-0.5 text-[10px] italic text-muted-foreground">
+          {emptyLabel}
         </span>
       </div>
     );
@@ -63,7 +66,7 @@ function AddonPill({ item }: { item: IncludedItem }) {
       <Check className="h-2.5 w-2.5 shrink-0 text-amber" strokeWidth={3} />
       <span className="max-w-[140px] truncate">{item.name}</span>
       {qty && (
-        <span className="ml-0.5 rounded-full bg-ink px-1 py-0 font-mono text-[9px] text-amber">
+        <span className="ml-0.5 inline-flex h-[14px] min-w-[16px] items-center justify-center rounded-full bg-ink px-1 font-mono text-[9px] font-bold text-amber">
           ×{qty}
         </span>
       )}

@@ -14,13 +14,14 @@ export function StatCard({
   valueClassName?: string;
 }) {
   return (
-    <div className={cn("rounded-lg border hairline bg-surface px-4 py-3", className)}>
+    <div className={cn("rounded-lg border border-hairline bg-surface px-4 py-3", className)}>
       <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </div>
       <div
         className={cn(
-          "mt-1.5 font-display text-2xl font-black leading-none tabular-nums text-ink",
+          // text-3xl (30px) alineado con el showcase de docs/design-kit (era text-2xl).
+          "mt-1.5 font-display text-3xl font-black leading-none tracking-[-0.01em] tabular-nums text-ink",
           valueClassName,
         )}
       >
