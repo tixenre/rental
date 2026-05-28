@@ -1,0 +1,46 @@
+/* ─────────────────────────────────────────────────────────────────────
+ * Rambla Rental — Brand Fonts
+ *
+ * Vendored from the official Rambla brand manual (BATTI 2023).
+ * TT Commons → primary, Champ Black → display only.
+ * JetBrains Mono is loaded separately from Google Fonts in index.html.
+ *
+ * Drop the entire `kit/fonts/` folder next to this file when you copy.
+ * ──────────────────────────────────────────────────────────────────── */
+
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 400; font-style: normal; font-display: swap;
+  src: url("./fonts/TT_Commons_Regular_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 500; font-style: normal; font-display: swap;
+  src: url("./fonts/TT_Commons_Medium_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 600; font-style: normal; font-display: swap;
+  src: url("./fonts/TT_Commons_DemiBold_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 700; font-style: normal; font-display: swap;
+  src: url("./fonts/TT_Commons_Bold_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 800; font-style: normal; font-display: swap;
+  src: url("./fonts/TT_Commons_Extrabold_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 900; font-style: normal; font-display: swap;
+  src: url("./fonts/TT_Commons_Black_0.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "Champ Black";
+  font-weight: 900; font-style: normal; font-display: swap;
+  src: url("./fonts/Champ-Black.ttf") format("truetype");
+}
