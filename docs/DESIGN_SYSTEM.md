@@ -109,18 +109,75 @@ estos tokens vía el bloque `@theme inline` al inicio de `src/styles.css`.
 > con alguno de los siete arriba — `--z-scrim` y `--z-drawer` son los más
 > reusables.
 
-### Tokens que el kit documenta y NO existen en el repo hoy
+### Shadows — opt-in al brand tint
 
-El bundle v3 del kit documenta:
-- **Spacing scale** (`--space-1`…`--space-24`)
-- **Shadow scale** (`--shadow-sm/md/lg/xl`)
-- **Motion** (`--duration-fast/base/slow/xslow`, `--ease-default/out/bounce`)
+Cuatro tokens nuevos para sombras tintadas con `oklch` del ink (en vez
+del negro puro de las shadow defaults de Tailwind, que choca con el
+bone+ink cálido del sistema). Las utilities `shadow-sm`/`shadow-md`/
+etc. de Tailwind siguen funcionando con sus defaults; el tint es opt-in
+vía `var()`:
 
-**Estos NO están en `src/styles.css` hoy.** Para spacing usamos Tailwind
-defaults (`gap-4`, `p-6`); para shadow usamos `shadow-sm`/`shadow-md`/etc.
-de Tailwind; para motion usamos `transition-colors duration-150` y
-`framer-motion` directo. Agregar estos tokens es una iniciativa
-pendiente (PR C del plan del kit) — cuando entren, este doc se actualiza.
+```tsx
+className="shadow-sm"                         // Tailwind default (sin cambios)
+className="shadow-[var(--shadow-md)]"          // brand-tinted opt-in
+```
+
+```css
+--shadow-sm:  0 1px 2px oklch(0.18 0.01 60 / 6%);
+--shadow-md:  0 4px 12px oklch(0.18 0.01 60 / 8%),  0 1px 3px oklch(0.18 0.01 60 / 5%);
+--shadow-lg:  0 12px 32px oklch(0.18 0.01 60 / 10%), 0 2px 8px oklch(0.18 0.01 60 / 6%);
+--shadow-xl:  0 24px 56px oklch(0.18 0.01 60 / 12%), 0 6px 16px oklch(0.18 0.01 60 / 8%);
+```
+
+Mapeo: `sm` → cards en reposo · `md` → dropdowns + hover lift · `lg` →
+toasts + FABs · `xl` → modales + dialogs.
+
+**Sombras signature siguen siendo inline** (no son tokens — son únicas
+de un componente):
+- `shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.15)]` → CartMiniBar (sube)
+- `shadow-[0_-12px_24px_-8px_rgba(0,0,0,0.08)]` → CartMiniBar preview hover
+
+### Motion — duraciones + easings canónicos
+
+```css
+--duration-fast:  120ms;    /* press states, button bumps */
+--duration-base:  200ms;    /* hover transitions, color changes */
+--duration-slow:  350ms;    /* entry animations, slide-up */
+--duration-xslow: 550ms;    /* fly-to-cart, hero reveals */
+
+--ease-default: cubic-bezier(0.32, 0.72, 0, 1);    /* snappy settle, drawer */
+--ease-out:     cubic-bezier(0, 0, 0.2, 1);         /* standard decel */
+--ease-bounce:  cubic-bezier(0.34, 1.56, 0.64, 1);  /* overshoot, badge pop */
+```
+
+`--duration-xslow` matchea exactamente la `duration: 0.55` del
+FlyToCartLayer. `--ease-default` es el del CartDrawer Framer Motion.
+`--ease-bounce` es la signature del badge pop al sumar al carrito.
+
+Uso opt-in:
+
+```tsx
+className="transition duration-[var(--duration-fast)] ease-[var(--ease-default)]"
+```
+
+Tailwind defaults (`duration-150`, `ease-out`) siguen funcionando para
+el resto.
+
+### Spacing — Tailwind ya cubre
+
+**NO se crean tokens `--space-*`.** Tailwind v4 ya provee `p-1`…`p-96`
+sobre base 4px, e introducir `--space-*` sería redundante y rompería la
+intuición de devs que conocen Tailwind. Referencia rápida:
+
+| Tailwind | px | Uso típico |
+|---|---|---|
+| `p-1` `gap-1` | 4 | Stepper button gap |
+| `p-2` `gap-2` | 8 | Chip rail gap, inline pill |
+| `p-3` `gap-3` | 12 | Card body, button gap |
+| `p-4` `gap-4` | 16 | Drawer item |
+| `p-6` `gap-6` | 24 | Section, card padding |
+| `p-8` `gap-8` | 32 | Hero mobile |
+| `p-12` `gap-12` | 48 | Hero desktop, container |
 
 ---
 
