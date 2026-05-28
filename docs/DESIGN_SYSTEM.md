@@ -8,8 +8,7 @@
 > El **kit portable** (`docs/design-kit/`) es un export de Claude Design
 > pensado para llevar el look a otros proyectos. **No es la fuente de
 > verdad de este repo.** Cuando el kit y este doc difieren, manda este
-> doc + `src/styles.css`. Ver decisión `2026-05-28` en
-> [`docs/MEMORIA.md`](MEMORIA.md).
+> doc + `src/styles.css` (ver "Source-of-truth ladder" más abajo).
 
 ---
 
@@ -152,7 +151,7 @@ Defined as utility classes en `src/styles.css`:
 | **Primitivas UI** (Button, Input, Card, Dialog, …) | `src/components/ui/*` | shadcn/Radix base. Naming shadcn (`variant="default"`, no `"primary"`). |
 | **Componentes de aplicación (`rental/`)** | `src/components/rental/*` | EquipmentCard, TopBar, Footer, CartMiniBar, EstadoBadge integrados con queries + estado. |
 | **Componentes admin** | `src/components/admin/*` | Tablas, modales, sidebar del back-office. |
-| **Kit portátil ports** | `src/components/kit/*` (PR #577) | Versiones presentacionales del kit. Conviven con los integrados. |
+| **Kit portátil ports** | `src/components/kit/*` (llegará con PR #577) | Versiones presentacionales del kit. Pensados para convivir con los integrados. |
 
 ### Button (`src/components/ui/button.tsx`)
 
@@ -174,18 +173,19 @@ import { Button } from "@/components/ui/button";
 
 ### EstadoBadge
 
-Hoy hay dos versiones conviviendo:
-- `src/components/rental/EstadoBadge.tsx` — integrado con la lógica de
-  pedido, usa `bg-blue-50` genérico.
-- `src/components/kit/EstadoBadge.tsx` (PR #577) — paleta secundaria de
-  marca (`bg-azul/10`, `bg-verde/10`, …).
+Hoy en producción vive una sola versión: `src/components/rental/EstadoBadge.tsx`,
+integrada con la lógica de pedido y usa `bg-blue-50` genérico.
 
-Issue #575 mapea la migración de la versión integrada a la paleta de
-marca, una pantalla por vez.
+Cuando merge PR #577, va a sumarse en paralelo `src/components/kit/EstadoBadge.tsx`
+— versión presentacional con la paleta secundaria de marca
+(`bg-azul/10`, `bg-verde/10`, …). Issue #575 mapea la migración
+componente-por-componente de la integrada al look del kit, una pantalla
+por vez.
 
-### Otros componentes del kit ya portados
+### Otros componentes del kit (cuando merge PR #577)
 
-Cuando PR #577 merge, en `src/components/kit/`:
+PR #577 va a traer al repo, bajo `src/components/kit/`, las versiones
+presentacionales de:
 
 - `AddonPills` — items "incluye" sobre rows de equipo.
 - `EmptyState` — pattern "nada para mostrar".
@@ -194,8 +194,11 @@ Cuando PR #577 merge, en `src/components/kit/`:
 - `StatCard` — número grande para dashboards.
 - `Input` + `SearchInput` + `FieldLabel` — variantes branded de inputs.
 
-Hay un `/kit-preview` (ruta pública sin login) que los muestra todos para
-QA visual.
+También va a montar una ruta pública sin login `/kit-preview` que los
+muestra todos para QA visual.
+
+Hasta entonces, la referencia visual viva está en `docs/design-kit/preview/*.html`
+(specimens del kit portable) y en `docs/design-kit/index.html` (showcase).
 
 ---
 
@@ -269,10 +272,11 @@ button:active {
   transition: transform 120ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* Card hover interactivo */
+/* Card hover interactivo — usá la utility Tailwind hoy. Cuando exista el
+   token --shadow-md en src/styles.css, podés switchear a box-shadow: var(--shadow-md). */
 .card-interactive:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);  /* cuando tengamos el token */
+  @apply shadow-md;
 }
 
 /* Stagger en grid de catálogo */
