@@ -1,5 +1,6 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { CategoriasSection } from "@/components/admin/equipos-mgmt/CategoriasSection";
+import { DisenoSection } from "@/components/admin/diseno/DisenoSection";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/equipos/categorias")({
@@ -16,10 +17,11 @@ function CategoriasPage() {
         </div>
         <h1 className="font-display text-3xl text-ink">Categorías</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Árbol jerárquico de categorías que organiza el catálogo público y el inventario.
+          Árbol jerárquico de categorías y cómo aparecen en el catálogo público.
         </p>
       </header>
       <CategoriasSection />
+      <DisenoSection />
     </div>
   );
 }

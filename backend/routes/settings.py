@@ -113,6 +113,24 @@ ALLOWED_SETTINGS_KEYS = {
     "buffer_horas_alquiler",  # Horas de prep/revisión exigidas entre alquileres. Int >= 0.
     "horarios_retiro",   # Horas habilitadas de retiro/devolución por día de semana. JSON.
     "faq_json",          # Preguntas frecuentes editables. JSON [{title, items:[{q,a}]}].
+    # ── Datos del negocio (editables desde "Diseño y marca") ─────────
+    # Si vienen vacíos en el frontend, el hook useBusinessContact cae al
+    # default hardcodeado en src/data/contact.ts.
+    "business_address",        # Dirección free-form display ("Calle X 123, Mar del Plata").
+    "business_maps_url",       # URL absoluta a Google Maps con la ubicación.
+    "business_phone_display",  # Display human-readable del teléfono ("+54 9 223 585 2510").
+    "business_email",          # Email de contacto público ("hola@rambla.studio").
+    "business_instagram",      # Handle de IG sin @ ("ramblarental").
+}
+
+# Keys cuyo valor puede borrarse (volver al default) desde la UI. El resto
+# rechaza string vacía para no romper cálculos / settings críticas.
+CLEARABLE_SETTINGS_KEYS = {
+    "business_address",
+    "business_maps_url",
+    "business_phone_display",
+    "business_email",
+    "business_instagram",
 }
 
 
@@ -171,9 +189,27 @@ def update_setting(key: str, payload: dict, request: Request):
     if key not in ALLOWED_SETTINGS_KEYS:
         raise HTTPException(400, f"Setting '{key}' no es editable")
     value = payload.get("value")
-    if value is None or str(value).strip() == "":
-        raise HTTPException(400, "El valor no puede estar vacío")
+    is_empty = value is None or str(value).strip() == ""
+    if is_empty:
+        if key not in CLEARABLE_SETTINGS_KEYS:
+            raise HTTPException(400, "El valor no puede estar vacío")
+        # Para claves "limpiables" borrar la fila → cae al default del cliente.
+        conn = get_db()
+        try:
+            conn.execute("DELETE FROM app_settings WHERE key = ?", (key,))
+            conn.commit()
+            return {"key": key, "value": "", "updated_by": None}
+        finally:
+            conn.close()
     value = str(value).strip()
+    # Validaciones livianas para datos de contacto (display-only).
+    if key == "business_email" and "@" not in value:
+        raise HTTPException(400, "Email inválido (falta @)")
+    if key == "business_instagram":
+        # Aceptamos con o sin @, lo normalizamos sin @.
+        value = value.lstrip("@")
+        if not value:
+            raise HTTPException(400, "Handle de Instagram vacío")
     # Validación específica por key: ciertas settings son numéricas.
     if key in ("usd_rate", "roi_pct_default", "shipping_usd"):
         try:
