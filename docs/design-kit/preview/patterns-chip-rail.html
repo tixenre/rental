@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pattern · Chip Rail overflow horizontal</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { gap: 20px; padding: 22px; }
+
+/* ── Rail container ───────────────────────────────────────────── */
+.rail-wrap {
+  position: relative;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+  background: var(--surface-elevated);
+}
+.rail-section {
+  padding: 14px 0 14px 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+.rail-section:last-child { border-bottom: 0; }
+.rail-row-label {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-bottom: 10px; padding-right: 16px;
+}
+
+/* The rail itself */
+.chip-rail {
+  display: flex; align-items: center; gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE */
+  scroll-snap-type: x mandatory;
+  padding-right: 48px; /* room for fade */
+  position: relative;
+}
+.chip-rail::-webkit-scrollbar { display: none; }
+
+/* Fade hint on right */
+.rail-fade {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 48px;
+  background: linear-gradient(to right, transparent, var(--surface-elevated));
+  pointer-events: none; z-index: 1;
+}
+
+/* Rail label (shrink-0) */
+.rail-label {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--muted-foreground);
+  white-space: nowrap; flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
+/* ── Chips ────────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 32px; border-radius: 9999px;
+  padding: 0 12px;
+  font-family: var(--font-sans); font-size: 12px; font-weight: 500;
+  white-space: nowrap; flex-shrink: 0;
+  cursor: pointer; border: 1px solid;
+  scroll-snap-align: start;
+  transition:
+    background 150ms var(--ease-out),
+    border-color 150ms var(--ease-out),
+    color 150ms;
+}
+
+/* Default */
+.chip.default {
+  border-color: var(--hairline);
+  background: var(--surface);
+  color: var(--ink);
+}
+.chip.default:hover {
+  border-color: color-mix(in oklch, var(--ink) 40%, transparent);
+  background: color-mix(in oklch, var(--surface) 50%, var(--surface-elevated));
+}
+
+/* Active */
+.chip.active {
+  border-color: color-mix(in oklch, var(--amber) 60%, transparent);
+  background: color-mix(in oklch, var(--amber) 15%, transparent);
+  color: var(--ink); font-weight: 600;
+}
+
+/* With count */
+.chip-count {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--muted-foreground); font-weight: 400;
+}
+
+/* With X */
+.chip-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: color-mix(in oklch, var(--ink) 15%, transparent);
+  flex-shrink: 0;
+}
+.chip-x svg { display: block; }
+
+/* Disabled */
+.chip.disabled {
+  opacity: 0.5; cursor: not-allowed;
+  border-color: var(--hairline); background: var(--surface); color: var(--ink);
+  pointer-events: none;
+}
+
+/* ── Interactive demo ─────────────────────────────────────────── */
+.demo-wrap {
+  border-radius: var(--radius-lg); border: 1px solid var(--hairline);
+  overflow: hidden; background: var(--surface-elevated);
+}
+.demo-head {
+  padding: 14px 16px 0;
+}
+.demo-search {
+  width: 100%; height: 38px; border-radius: var(--radius-sm);
+  border: 1px solid var(--hairline); background: var(--surface);
+  padding: 0 12px 0 36px; box-sizing: border-box;
+  font-family: var(--font-sans); font-size: 13px; color: var(--ink);
+  outline: none; position: relative;
+}
+.search-wrap { position: relative; }
+.search-icon {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  color: var(--muted-foreground); pointer-events: none;
+}
+.demo-rail-wrap { position: relative; padding: 10px 0 10px 16px; }
+
+/* ── Code ─────────────────────────────────────────────────────── */
+pre.code {
+  font-family: var(--font-mono); font-size: 11px;
+  background: var(--ink); color: var(--background);
+  padding: 14px 16px; border-radius: var(--radius-sm);
+  overflow-x: auto; line-height: 1.65; margin: 0;
+}
+.k { color: #FFCC55; }
+.s { color: #ED7BAD; }
+.c { color: oklch(0.6 0.01 70); font-style: italic; }
+
+.note {
+  font-family: var(--font-sans); font-size: 11px; line-height: 1.55;
+  color: var(--muted-foreground); border-top: 1px dashed var(--hairline);
+  padding-top: 10px;
+}
+.note b { color: var(--foreground); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="t-eyebrow">Pattern · Chip Rail — overflow horizontal scrolleable</div>
+
+  <!-- ── Estados ────────────────────────────────────────────────── -->
+  <div class="rail-wrap">
+
+    <!-- Default + activo mezclados (Populares) -->
+    <div class="rail-section">
+      <div class="rail-row-label">Default + activo · "Populares"</div>
+      <div style="position:relative;">
+        <div class="chip-rail" id="rail-populares">
+          <span class="rail-label">Populares:</span>
+          <button class="chip active" onclick="toggleChip(this)">Pack boda</button>
+          <button class="chip default" onclick="toggleChip(this)">Pack entrevista</button>
+          <button class="chip default" onclick="toggleChip(this)">Sony FX3</button>
+          <button class="chip default" onclick="toggleChip(this)">Aputure 600d</button>
+          <button class="chip default" onclick="toggleChip(this)">RØDE NTG</button>
+          <button class="chip default" onclick="toggleChip(this)">Pack 3 LEDs</button>
+          <button class="chip default" onclick="toggleChip(this)">Manfrotto</button>
+        </div>
+        <div class="rail-fade"></div>
+      </div>
+    </div>
+
+    <!-- Con count -->
+    <div class="rail-section">
+      <div class="rail-row-label">Con count · categorías</div>
+      <div style="position:relative;">
+        <div class="chip-rail">
+          <span class="rail-label">Categorías:</span>
+          <button class="chip active">Cámaras <span class="chip-count">(24)</span></button>
+          <button class="chip default">Lentes <span class="chip-count">(41)</span></button>
+          <button class="chip default">Iluminación <span class="chip-count">(18)</span></button>
+          <button class="chip default">Audio <span class="chip-count">(12)</span></button>
+          <button class="chip default">Soporte <span class="chip-count">(9)</span></button>
+          <button class="chip default">Grips <span class="chip-count">(7)</span></button>
+          <button class="chip default">Monitores <span class="chip-count">(5)</span></button>
+        </div>
+        <div class="rail-fade"></div>
+      </div>
+    </div>
+
+    <!-- Con X (filtros activos) -->
+    <div class="rail-section">
+      <div class="rail-row-label">Con X · filtros activos (admin)</div>
+      <div style="position:relative;">
+        <div class="chip-rail" id="rail-filters">
+          <span class="rail-label">Filtros:</span>
+          <button class="chip active" onclick="removeChip(this)">Cámaras <span class="chip-x"><svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l6 6M8 2l-6 6"/></svg></span></button>
+          <button class="chip active" onclick="removeChip(this)">Disponible <span class="chip-x"><svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l6 6M8 2l-6 6"/></svg></span></button>
+          <button class="chip active" onclick="removeChip(this)">lun 2 → jue 5 jun. <span class="chip-x"><svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 2l6 6M8 2l-6 6"/></svg></span></button>
+        </div>
+        <div class="rail-fade"></div>
+      </div>
+    </div>
+
+    <!-- Disabled -->
+    <div class="rail-section">
+      <div class="rail-row-label">Disabled · sin resultados</div>
+      <div style="position:relative;">
+        <div class="chip-rail">
+          <span class="rail-label">Categorías:</span>
+          <button class="chip active">Cámaras</button>
+          <button class="chip disabled">Lentes</button>
+          <button class="chip disabled">Iluminación</button>
+          <button class="chip disabled">Audio</button>
+        </div>
+        <div class="rail-fade"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Demo contextual ────────────────────────────────────────── -->
+  <div class="t-eyebrow" style="margin-top:4px;">Demo en contexto · catálogo público</div>
+  <div class="demo-wrap">
+    <div class="demo-head">
+      <div class="search-wrap">
+        <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input class="demo-search" placeholder="Buscar equipo, marca…" readonly>
+      </div>
+    </div>
+    <div class="demo-rail-wrap">
+      <div style="position:relative;">
+        <div class="chip-rail">
+          <span class="rail-label">Populares:</span>
+          <button class="chip default" onclick="toggleChip(this)">Pack boda</button>
+          <button class="chip default" onclick="toggleChip(this)">Pack entrevista</button>
+          <button class="chip active" onclick="toggleChip(this)">Sony FX3</button>
+          <button class="chip default" onclick="toggleChip(this)">Aputure 600d</button>
+          <button class="chip default" onclick="toggleChip(this)">RØDE NTG</button>
+          <button class="chip default" onclick="toggleChip(this)">Pack 3 LEDs</button>
+          <button class="chip default" onclick="toggleChip(this)">Manfrotto</button>
+        </div>
+        <div class="rail-fade"></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 16px 14px;">
+      <div style="background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius-sm);height:56px;"></div>
+      <div style="background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius-sm);height:56px;"></div>
+      <div style="background:var(--surface);border:1px solid var(--hairline);border-radius:var(--radius-sm);height:56px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Code ───────────────────────────────────────────────────── -->
+  <div class="t-eyebrow" style="margin-top:4px;">Implementación</div>
+  <pre class="code"><span class="c">/* Container — scroll horizontal sin scrollbar visible */</span>
+.chip-rail {
+  display: flex; align-items: center; gap: <span class="s">8px</span>;
+  overflow-x: auto;
+  scrollbar-width: none;          <span class="c">/* Firefox */</span>
+  -ms-overflow-style: none;       <span class="c">/* IE */</span>
+  scroll-snap-type: x mandatory;  <span class="c">/* opcional — snap en chips */</span>
+
+  <span class="c">/* scroll-padding = padding-left del padre */</span>
+  scroll-padding-left: <span class="s">16px</span>;
+}
+.chip-rail::-webkit-scrollbar { display: none; }
+
+<span class="c">/* Label fijo a la izquierda — no se comprime */</span>
+.rail-label { flex-shrink: <span class="s">0</span>; scroll-snap-align: start; }
+
+<span class="c">/* Chip base */</span>
+.chip {
+  flex-shrink: <span class="s">0</span>;  <span class="c">/* crítico — no comprimir */</span>
+  white-space: nowrap;
+  scroll-snap-align: start;
+}
+
+<span class="c">/* Fade hint visual (no semántico) */</span>
+.rail-fade {
+  position: absolute; right: 0; top: 0; bottom: 0; width: <span class="s">48px</span>;
+  background: linear-gradient(to right, transparent, <span class="k">var</span>(--surface-elevated));
+  pointer-events: none;
+}
+
+<span class="c">/* Estado activo */</span>
+.chip.active {
+  border-color: color-mix(in oklch, <span class="k">var</span>(--amber) <span class="s">60%</span>, transparent);
+  background:   color-mix(in oklch, <span class="k">var</span>(--amber) <span class="s">15%</span>, transparent);
+  font-weight: <span class="s">600</span>;
+}</pre>
+
+  <!-- ── Note ───────────────────────────────────────────────────── -->
+  <div class="note">
+    <b>scrollbar-none</b> no es un bug — es parte del pattern. La barra de scroll está oculta intencionalmente. ·
+    <b>Solo en modo lista</b> (no grid): en el catálogo desktop, el rail de Populares aparece bajo el cat-bar únicamente cuando <code style="font-family:var(--font-mono);font-size:10px;">view=list</code>. En grid mode no se monta. ·
+    <b>Chips exactos en producción:</b> <code style="font-family:var(--font-mono);font-size:10px;">["Pack boda", "Pack entrevista", "Sony FX3", "Aputure 600d", "ØDE NTG", "Pack 3 LEDs", "Manfrotto"]</code> ·
+    <b>Comportamiento:</b> click en chip setea <code style="font-family:var(--font-mono);font-size:10px;">query</code> al texto del chip (o lo limpia si ya estaba activo) — no filtra por categoría, filtra por texto libre.
+  </div>
+
+</div>
+
+<script>
+function toggleChip(el) {
+  el.classList.toggle('active');
+  el.classList.toggle('default');
+}
+function removeChip(el) {
+  el.style.opacity = '0';
+  el.style.transform = 'scale(0.8)';
+  el.style.transition = 'opacity 150ms, transform 150ms';
+  setTimeout(() => el.remove(), 150);
+}
+</script>
+</body>
+</html>

@@ -35,30 +35,14 @@
   .nav-inner {
     max-width: 1180px; margin: 0 auto;
     height: 56px; padding: 0 24px;
-    display: flex; align-items: center; gap: 18px;
+    display: flex; align-items: center;
   }
   .nav-brand {
     font-family: var(--font-display); font-weight: 900;
     font-size: 22px; line-height: 1; letter-spacing: 0.01em;
     text-transform: lowercase;
-    display: flex; align-items: center; gap: 8px;
+    text-decoration: none; color: var(--ink);
   }
-  .nav-brand .dot {
-    width: 9px; height: 9px; border-radius: 9999px;
-    background: var(--amber);
-    display: inline-block;
-  }
-  .nav-links {
-    margin-left: auto; display: flex; gap: 4px; align-items: center;
-  }
-  .nav-links a {
-    font-family: var(--font-mono); font-size: 10px;
-    letter-spacing: 0.22em; text-transform: uppercase;
-    text-decoration: none; color: var(--muted-foreground);
-    padding: 8px 12px; border-radius: 9999px;
-    transition: color .15s, background .15s;
-  }
-  .nav-links a:hover { color: var(--ink); background: var(--amber-soft); }
 
   /* ── Hero ────────────────────────────────────────────────────── */
   .hero {
@@ -478,12 +462,141 @@
     text-align: right;
   }
 
+  /* ── Shadows ─────────────────────────────────────────────────── */
+  .shadow-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+  .shadow-card {
+    background: var(--surface-elevated); border-radius: var(--radius-lg);
+    border: 1px solid var(--hairline);
+    padding: 24px 16px 16px;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+  }
+  .shadow-pill {
+    width: 52px; height: 52px; border-radius: var(--radius-lg);
+    background: var(--surface-elevated);
+  }
+  .shadow-token { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); text-align: center; }
+
+  /* ── Spacing ─────────────────────────────────────────────────── */
+  .space-rows { display: flex; flex-direction: column; gap: 5px; }
+  .space-row  { display: grid; grid-template-columns: 80px 1fr 40px; align-items: center; gap: 12px; }
+  .space-bar-wrap { height: 12px; background: var(--surface); border-radius: 4px; overflow: hidden; }
+  .space-bar  { background: var(--amber); height: 100%; border-radius: 4px; }
+  .space-token{ font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
+  .space-val  { font-family: var(--font-mono); font-size: 10px; color: var(--ink); text-align: right; }
+
+  /* ── Motion ──────────────────────────────────────────────────── */
+  .motion-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  .motion-card {
+    border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+    background: var(--surface); padding: 18px 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .motion-track {
+    height: 32px; background: var(--surface-elevated);
+    border-radius: var(--radius-sm); position: relative; overflow: hidden;
+    border: 1px solid var(--hairline); cursor: pointer;
+  }
+  .motion-ball {
+    position: absolute; top: 50%; left: 5px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--amber); transform: translateY(-50%);
+  }
+  .motion-track:hover .motion-ball, .motion-track.playing .motion-ball { left: calc(100% - 27px); }
+  .mb-fast   { transition: left 120ms cubic-bezier(0.32,0.72,0,1); }
+  .mb-base   { transition: left 200ms cubic-bezier(0,0,0.2,1); }
+  .mb-bounce { transition: left 350ms cubic-bezier(0.34,1.56,0.64,1); }
+  .motion-name { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
+  .motion-val  { font-family: var(--font-mono); font-size: 9px; color: var(--ink); }
+
+  /* ── Reference tables ────────────────────────────────────────── */
+  .ref-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .ref-table  { border: 1px solid var(--hairline); border-radius: var(--radius-lg); overflow: hidden; }
+  .ref-thead  {
+    padding: 9px 14px; background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--muted-foreground);
+  }
+  .ref-row {
+    display: grid; grid-template-columns: 110px 1fr;
+    padding: 7px 14px; border-bottom: 1px solid var(--hairline);
+    align-items: center; gap: 10px;
+  }
+  .ref-row:last-child { border-bottom: 0; }
+  .ref-key  { font-family: var(--font-mono); font-size: 11px; color: var(--ink); }
+  .ref-desc { font-family: var(--font-sans); font-size: 12px; color: var(--muted-foreground); }
+
+  /* ── Form states ─────────────────────────────────────────────── */
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(170px,1fr)); gap: 20px; }
+  .form-field { display: flex; flex-direction: column; gap: 6px; }
+  .form-lbl   {
+    font-family: var(--font-mono); font-size: 9px;
+    letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground);
+  }
+  .form-inp {
+    height: 36px; border-radius: var(--radius-sm);
+    border: 1px solid var(--hairline); background: var(--surface-elevated);
+    padding: 0 12px; font-family: var(--font-sans); font-size: 13px; color: var(--ink);
+    outline: none; width: 100%; box-sizing: border-box;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .form-inp.focus    { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+  .form-inp.error    { border-color: var(--destructive); box-shadow: 0 0 0 3px color-mix(in oklch,var(--destructive) 12%,transparent); }
+  .form-inp.disabled { opacity: 0.45; cursor: not-allowed; background: var(--muted); }
+  .form-hint { font-family: var(--font-sans); font-size: 11px; line-height: 1.4; }
+  .form-hint.err { color: var(--destructive); }
+  .form-hint.muted { color: var(--muted-foreground); }
+
+  /* ── Dark mode specimen ───────────────────────────────────────── */
+  .dark-spec {
+    background: oklch(0.16 0.01 60); border-radius: var(--radius-xl);
+    padding: 28px 24px; display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start;
+  }
+  .dk-card {
+    background: oklch(0.20 0.01 60); border: 1px solid oklch(1 0 0 / 10%);
+    border-radius: var(--radius-lg); padding: 16px 18px; min-width: 160px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .dk-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: oklch(0.60 0.01 70); }
+  .dk-val   { font-family: var(--font-display); font-weight: 900; font-size: 28px; color: oklch(0.97 0.008 85); line-height: 1; }
+  .dk-meta  { font-family: var(--font-mono); font-size: 10px; color: oklch(0.55 0.01 70); }
+  .dk-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 9999px; font-family: var(--font-sans); font-size: 11px; font-weight: 500; }
+  .dk-badge.amber { background: color-mix(in oklch,#FAB428 15%,transparent); color: #FAB428; border: 1px solid color-mix(in oklch,#FAB428 30%,transparent); }
+  .dk-badge.green { background: color-mix(in oklch,#009971 15%,transparent); color: #009971; border: 1px solid color-mix(in oklch,#009971 30%,transparent); }
+  .dk-btns  { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dk-btn   { display: inline-flex; align-items: center; height: 36px; padding: 0 16px; border-radius: 8px; font-family: var(--font-sans); font-weight: 500; font-size: 14px; cursor: pointer; border: 0; }
+  .dk-btn.primary { background: #FAB428; color: oklch(0.16 0.01 60); }
+  .dk-btn.ghost   { background: oklch(1 0 0 / 8%); color: oklch(0.97 0.008 85); }
+  .dk-input {
+    height: 36px; border-radius: var(--radius-sm); border: 1px solid oklch(1 0 0 / 15%);
+    background: oklch(0.24 0.01 60); padding: 0 12px;
+    font-family: var(--font-sans); font-size: 13px; color: oklch(0.97 0.008 85);
+    outline: none; width: 200px; box-sizing: border-box;
+  }
+  .dk-top {
+    width: 100%; background: oklch(0.20 0.01 60);
+    border: 1px solid oklch(1 0 0 / 10%);
+    border-radius: var(--radius-lg); height: 44px;
+    display: flex; align-items: center; padding: 0 16px;
+  }
+  .dk-wordmark { font-family: var(--font-display); font-weight: 900; font-size: 20px; letter-spacing: 0.01em; text-transform: lowercase; color: oklch(0.97 0.008 85); }
+
+  /* ── Icon grid ────────────────────────────────────────────────── */
+  .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px,1fr)); gap: 8px; }
+  .icon-cell {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 14px 6px; border-radius: var(--radius-sm);
+    border: 1px solid var(--hairline); background: var(--surface);
+    transition: border-color .15s, background .15s;
+  }
+  .icon-cell:hover { border-color: oklch(0.18 0.01 60 / 30%); background: var(--surface-elevated); }
+  .icon-cell svg { color: var(--ink); flex-shrink: 0; }
+  .icon-name { font-family: var(--font-mono); font-size: 8px; color: var(--muted-foreground); text-align: center; word-break: break-all; }
+
   /* ── Mobile ──────────────────────────────────────────────────── */
   @media (max-width: 720px) {
     .install-grid { grid-template-columns: 1fr; }
     .tree { grid-template-columns: 1fr; }
-    .nav-links a { padding: 6px 8px; font-size: 9px; }
-    .nav-links a:not(.primary) { display: none; }
     .module-head { flex-direction: column; align-items: flex-start; }
     .module-title { font-size: 28px; }
     .hero { padding: 56px 0 48px; }
@@ -496,14 +609,7 @@
 <!-- ── Nav ──────────────────────────────────────────────────────── -->
 <nav class="nav">
   <div class="nav-inner">
-    <a href="#" class="nav-brand"><span class="dot"></span>rambla <span style="color:var(--muted-foreground)">·</span> kit</a>
-    <div class="nav-links">
-      <a href="#install">Instalar</a>
-      <a href="#estructura">Estructura</a>
-      <a href="#tokens">Tokens</a>
-      <a href="#componentes">Componentes</a>
-      <a href="kit/INSTALL.md" class="primary" style="color:var(--ink); background: var(--amber);">INSTALL.md →</a>
-    </div>
+    <a href="#" class="nav-brand">rambla</a>
   </div>
 </nav>
 
@@ -521,7 +627,7 @@
   <div class="hero-ctas">
     <a class="btn btn-primary btn-lg" href="#install">Instalar →</a>
     <a class="btn btn-secondary btn-lg" href="#componentes">Ver componentes</a>
-    <a class="btn btn-ghost btn-lg" href="kit/INSTALL.md">INSTALL.md</a>
+    <a class="btn btn-amber btn-lg btn-pill" href="extended.html">Referencia extendida →</a>
   </div>
 </section>
 
@@ -712,11 +818,159 @@ cp -r path/to/kit src/kit</pre>
   </div>
 </section>
 
+<!-- ── Fundamentos adicionales ──────────────────────────────────── -->
+<section class="module" id="fundamentos">
+  <div class="module-head">
+    <div>
+      <div class="module-eyebrow">04 · Fundamentos adicionales</div>
+      <h2 class="module-title">Sombras, espaciado, motion, z-index</h2>
+      <p class="module-desc">Tokens de nivel medio — elevación, ritmo de layout y comportamiento animado.</p>
+    </div>
+    <a class="module-path" href="colors_and_type.css">colors_and_type.css</a>
+  </div>
+
+  <div class="module-eyebrow" style="margin-bottom:12px;">Sombras</div>
+  <div class="shadow-grid" style="margin-bottom:36px;">
+    <div class="shadow-card"><div class="shadow-pill" style="box-shadow:var(--shadow-sm);"></div><div class="shadow-token">--shadow-sm<br><span style="color:var(--ink);font-size:8px;">cards planas</span></div></div>
+    <div class="shadow-card"><div class="shadow-pill" style="box-shadow:var(--shadow-md);"></div><div class="shadow-token">--shadow-md<br><span style="color:var(--ink);font-size:8px;">dropdowns</span></div></div>
+    <div class="shadow-card"><div class="shadow-pill" style="box-shadow:var(--shadow-lg);"></div><div class="shadow-token">--shadow-lg<br><span style="color:var(--ink);font-size:8px;">modales</span></div></div>
+    <div class="shadow-card"><div class="shadow-pill" style="box-shadow:var(--shadow-xl);"></div><div class="shadow-token">--shadow-xl<br><span style="color:var(--ink);font-size:8px;">drawers</span></div></div>
+  </div>
+
+  <div class="module-eyebrow" style="margin-bottom:12px;">Espaciado — base 4 px</div>
+  <div class="space-rows" style="margin-bottom:36px;">
+    <div class="space-row"><span class="space-token">--space-1</span><div class="space-bar-wrap"><div class="space-bar" style="width:2%"></div></div><span class="space-val">4px</span></div>
+    <div class="space-row"><span class="space-token">--space-2</span><div class="space-bar-wrap"><div class="space-bar" style="width:4%"></div></div><span class="space-val">8px</span></div>
+    <div class="space-row"><span class="space-token">--space-3</span><div class="space-bar-wrap"><div class="space-bar" style="width:6%"></div></div><span class="space-val">12px</span></div>
+    <div class="space-row"><span class="space-token">--space-4</span><div class="space-bar-wrap"><div class="space-bar" style="width:8%"></div></div><span class="space-val">16px</span></div>
+    <div class="space-row"><span class="space-token">--space-6</span><div class="space-bar-wrap"><div class="space-bar" style="width:12%"></div></div><span class="space-val">24px</span></div>
+    <div class="space-row"><span class="space-token">--space-8</span><div class="space-bar-wrap"><div class="space-bar" style="width:17%"></div></div><span class="space-val">32px</span></div>
+    <div class="space-row"><span class="space-token">--space-10</span><div class="space-bar-wrap"><div class="space-bar" style="width:21%"></div></div><span class="space-val">40px</span></div>
+    <div class="space-row"><span class="space-token">--space-12</span><div class="space-bar-wrap"><div class="space-bar" style="width:25%"></div></div><span class="space-val">48px</span></div>
+    <div class="space-row"><span class="space-token">--space-16</span><div class="space-bar-wrap"><div class="space-bar" style="width:33%"></div></div><span class="space-val">64px</span></div>
+    <div class="space-row"><span class="space-token">--space-20</span><div class="space-bar-wrap"><div class="space-bar" style="width:42%"></div></div><span class="space-val">80px</span></div>
+    <div class="space-row"><span class="space-token">--space-24</span><div class="space-bar-wrap"><div class="space-bar" style="width:50%"></div></div><span class="space-val">96px</span></div>
+  </div>
+
+  <div class="module-eyebrow" style="margin-bottom:12px;">Motion — pasá el mouse para animar</div>
+  <div class="motion-grid" style="margin-bottom:36px;">
+    <div class="motion-card">
+      <div class="motion-track"><div class="motion-ball mb-fast"></div></div>
+      <div><div class="motion-name">--duration-fast + --ease-default</div><div class="motion-val">120ms · cubic-bezier(0.32, 0.72, 0, 1)</div></div>
+    </div>
+    <div class="motion-card">
+      <div class="motion-track"><div class="motion-ball mb-base"></div></div>
+      <div><div class="motion-name">--duration-base + --ease-out</div><div class="motion-val">200ms · cubic-bezier(0, 0, 0.2, 1)</div></div>
+    </div>
+    <div class="motion-card">
+      <div class="motion-track"><div class="motion-ball mb-bounce"></div></div>
+      <div><div class="motion-name">--duration-slow + --ease-bounce</div><div class="motion-val">350ms · cubic-bezier(0.34, 1.56, 0.64, 1)</div></div>
+    </div>
+  </div>
+
+  <div class="ref-tables">
+    <div class="ref-table">
+      <div class="ref-thead">Z-index scale</div>
+      <div class="ref-row"><span class="ref-key">--z-raised</span><span class="ref-desc">10 · cards hover, labels flotantes</span></div>
+      <div class="ref-row"><span class="ref-key">--z-dropdown</span><span class="ref-desc">100 · menús, popovers</span></div>
+      <div class="ref-row"><span class="ref-key">--z-sticky</span><span class="ref-desc">200 · nav, topbar</span></div>
+      <div class="ref-row"><span class="ref-key">--z-modal</span><span class="ref-desc">300 · diálogos, drawers</span></div>
+      <div class="ref-row"><span class="ref-key">--z-toast</span><span class="ref-desc">400 · snackbars</span></div>
+      <div class="ref-row"><span class="ref-key">--z-tooltip</span><span class="ref-desc">500 · siempre encima</span></div>
+    </div>
+    <div class="ref-table">
+      <div class="ref-thead">Breakpoints · solo en @media, no como var()</div>
+      <div class="ref-row"><span class="ref-key">sm</span><span class="ref-desc">640px · landscape mobile</span></div>
+      <div class="ref-row"><span class="ref-key">md</span><span class="ref-desc">768px · tablet portrait</span></div>
+      <div class="ref-row"><span class="ref-key">lg</span><span class="ref-desc">1024px · tablet landscape</span></div>
+      <div class="ref-row"><span class="ref-key">xl</span><span class="ref-desc">1280px · desktop</span></div>
+      <div class="ref-row"><span class="ref-key">2xl</span><span class="ref-desc">1536px · pantallas anchas</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Form states ───────────────────────────────────────────────── -->
+<section class="module" id="form-states">
+  <div class="module-head">
+    <div>
+      <div class="module-eyebrow">05 · Estados de formulario</div>
+      <h2 class="module-title">Default, focus, error, disabled</h2>
+      <p class="module-desc">El focus ring usa el amber — coherente con el accent del sistema. Error usa --destructive.</p>
+    </div>
+    <a class="module-path" href="kit/components/input.tsx">input.tsx</a>
+  </div>
+  <div class="form-grid">
+    <div class="form-field">
+      <span class="form-lbl">Default</span>
+      <input class="form-inp" value="hola@productora.com" readonly>
+      <span class="form-hint muted">Campo en reposo</span>
+    </div>
+    <div class="form-field">
+      <span class="form-lbl">Focus</span>
+      <input class="form-inp focus" value="hola@productora.com" readonly>
+      <span class="form-hint muted">border: amber · ring 3px amber-soft</span>
+    </div>
+    <div class="form-field">
+      <span class="form-lbl">Error</span>
+      <input class="form-inp error" value="correo inválido" readonly>
+      <span class="form-hint err">Ingresá un correo válido.</span>
+    </div>
+    <div class="form-field">
+      <span class="form-lbl">Disabled</span>
+      <input class="form-inp disabled" value="no editable" readonly>
+      <span class="form-hint muted">opacity 0.45 · cursor not-allowed</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Dark mode ─────────────────────────────────────────────────── -->
+<section class="module" id="dark-mode">
+  <div class="module-head">
+    <div>
+      <div class="module-eyebrow">06 · Dark mode</div>
+      <h2 class="module-title">Activar con .dark o data-theme="dark"</h2>
+      <p class="module-desc">Fondo oscuro con tinte cálido, amber se mantiene como accent. Funciona en ambos modos sin ajustes.</p>
+    </div>
+    <a class="module-path" href="colors_and_type.css">.dark { … }</a>
+  </div>
+  <div class="dark-spec">
+    <div class="dk-top"><span class="dk-wordmark">rambla</span></div>
+    <div class="dk-card">
+      <div class="dk-label">Pedidos · mayo</div>
+      <div class="dk-val">42</div>
+      <div class="dk-meta">+8 vs. abril</div>
+    </div>
+    <div class="dk-card">
+      <div class="dk-label">Ingresos</div>
+      <div class="dk-val">$ 2.840.500</div>
+      <div class="dk-meta">ARS · mayo</div>
+    </div>
+    <div class="dk-card" style="min-width:auto;">
+      <div class="dk-label">Estados</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+        <span class="dk-badge amber">Solicitado</span>
+        <span class="dk-badge green">Confirmado</span>
+      </div>
+    </div>
+    <div class="dk-card" style="flex:1;min-width:160px;">
+      <div class="dk-label">Búsqueda</div>
+      <input class="dk-input" placeholder="Buscar equipo…" readonly style="margin-top:6px;">
+    </div>
+    <div class="dk-card" style="min-width:auto;">
+      <div class="dk-label">Acciones</div>
+      <div class="dk-btns" style="margin-top:6px;">
+        <button class="dk-btn primary">Reservar</button>
+        <button class="dk-btn ghost">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ── Componentes ──────────────────────────────────────────────── -->
 <section class="module" id="componentes">
   <div class="module-head">
     <div>
-      <div class="module-eyebrow">04 · Componentes</div>
+      <div class="module-eyebrow">07 · Componentes</div>
       <h2 class="module-title">Diez piezas, una por archivo</h2>
       <p class="module-desc">Cada componente es presentacional, tipado y con JSDoc. Importás lo que usás, nada más. Versiones full en el repo.</p>
     </div>
@@ -850,18 +1104,140 @@ cp -r path/to/kit src/kit</pre>
     <article class="comp-card">
       <header class="comp-card-head">
         <div class="comp-card-name">TopBar <code>topbar.tsx</code></div>
-        <div class="comp-card-desc">Header sticky con la jugada amber-scroll del mobile.</div>
+        <div class="comp-card-desc">Sticky header con amber-on-scroll. Tres estados: inicio → transición → snapped (≥ 65% del hero).</div>
       </header>
-      <div class="comp-card-stage">
-        <div class="tb">
-          <span class="tb-logo">rambla</span>
-          <button class="tb-date">📅 Elegir fechas</button>
-          <span class="tb-icon">🛒 0</span>
+      <div class="comp-card-stage" style="flex-direction:column; gap:8px; padding:20px;">
+
+        <!-- Frame 0% -->
+        <div style="width:100%; border-radius:8px; overflow:hidden; border:1px solid var(--hairline);">
+          <div style="height:40px; display:flex; align-items:center; padding:0 12px; gap:10px; background:color-mix(in oklch, var(--amber) 0%, color-mix(in oklch, var(--background) 92%, transparent)); border-bottom:1px solid var(--hairline); backdrop-filter:blur(12px);">
+            <div style="width:7px;height:7px;border-radius:50%;background:var(--amber);flex-shrink:0;"></div>
+            <span style="font-family:var(--font-display);font-weight:900;font-size:15px;text-transform:lowercase;letter-spacing:0.01em;">rambla</span>
+            <div style="margin:0 auto;height:26px;border-radius:9999px;border:1.5px solid color-mix(in oklch,var(--ink) 20%,transparent);background:color-mix(in oklch,var(--amber) 10%,transparent);padding:0 10px;display:inline-flex;align-items:center;font-family:var(--font-sans);font-size:11px;font-weight:500;color:var(--ink);white-space:nowrap;">lun 2 → jue 5 jun.</div>
+            <div style="height:26px;border-radius:9999px;border:1px solid var(--hairline);padding:0 10px;display:inline-flex;align-items:center;font-family:var(--font-sans);font-size:11px;color:var(--ink);">Entrar</div>
+          </div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-foreground);text-align:center;">0% · inicio</div>
+
+        <!-- Frame ~35% -->
+        <div style="width:100%; border-radius:8px; overflow:hidden; border:1px solid var(--hairline);">
+          <div style="height:40px; display:flex; align-items:center; padding:0 12px; gap:10px; background:color-mix(in oklch, var(--amber) 35%, color-mix(in oklch, var(--background) 92%, transparent)); border-bottom:1px solid var(--hairline); backdrop-filter:blur(12px);">
+            <div style="width:7px;height:7px;border-radius:50%;background:var(--amber);flex-shrink:0;"></div>
+            <span style="font-family:var(--font-display);font-weight:900;font-size:15px;text-transform:lowercase;letter-spacing:0.01em;">rambla</span>
+            <div style="margin:0 auto;height:26px;border-radius:9999px;border:1.5px solid color-mix(in oklch,var(--ink) 20%,transparent);background:color-mix(in oklch,var(--amber) 10%,transparent);padding:0 10px;display:inline-flex;align-items:center;font-family:var(--font-sans);font-size:11px;font-weight:500;color:var(--ink);white-space:nowrap;">lun 2 → jue 5 jun.</div>
+            <div style="height:26px;border-radius:9999px;border:1px solid var(--hairline);padding:0 10px;display:inline-flex;align-items:center;font-family:var(--font-sans);font-size:11px;color:var(--ink);">Entrar</div>
+          </div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-foreground);text-align:center;">35% · transición</div>
+
+        <!-- Frame 65%+ snapped -->
+        <div style="width:100%; border-radius:8px; overflow:hidden; border:1px solid var(--hairline); outline:2px solid var(--amber); outline-offset:-1px;">
+          <div style="height:40px; display:flex; align-items:center; padding:0 12px; gap:10px; background:color-mix(in oklch, var(--amber) 80%, color-mix(in oklch, var(--background) 92%, transparent)); border-bottom:1px solid transparent; backdrop-filter:blur(12px);">
+            <div style="width:7px;height:7px;border-radius:50%;background:var(--background);flex-shrink:0;"></div>
+            <span style="font-family:var(--font-display);font-weight:900;font-size:15px;text-transform:lowercase;letter-spacing:0.01em;">rambla</span>
+            <div style="margin:0 auto;height:26px;border-radius:9999px;border:1.5px solid color-mix(in oklch,var(--background) 80%,transparent);background:color-mix(in oklch,var(--background) 25%,transparent);padding:0 10px;display:inline-flex;align-items:center;font-family:var(--font-sans);font-size:11px;font-weight:500;color:var(--ink);white-space:nowrap;">lun 2 → jue 5 jun.</div>
+            <div style="height:26px;border-radius:9999px;border:1px solid transparent;background:color-mix(in oklch,var(--background) 30%,transparent);padding:0 10px;display:inline-flex;align-items:center;font-family:var(--font-sans);font-size:11px;color:var(--ink);">Entrar</div>
+          </div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink);text-align:center;font-weight:600;">≥ 65% · snapped ✦</div>
+
+      </div>
+      <footer class="comp-card-foot">
+        <a href="preview/patterns-topbar-amber-scroll.html">Specimen interactivo →</a>
+        <a class="path" href="kit/components/topbar.tsx">kit/components/topbar.tsx</a>
+      </footer>
+    </article>
+
+    <!-- CartMiniBar -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">CartMiniBar <code>cart-minibar.tsx</code></div>
+        <div class="comp-card-desc">Barra de carrito bottom-fixed. border-t amber · sombra invertida · safe-area-inset.</div>
+      </header>
+      <div class="comp-card-stage" style="flex-direction:column;padding:0;gap:0;">
+        <div style="padding:12px 14px;display:flex;flex-direction:column;gap:6px;">
+          <div style="height:8px;border-radius:4px;background:var(--hairline);width:90%;"></div>
+          <div style="height:8px;border-radius:4px;background:color-mix(in oklch,var(--amber) 25%,var(--surface));width:60%;"></div>
+        </div>
+        <div style="border-top:2px solid color-mix(in oklch,var(--amber) 60%,transparent);background:color-mix(in oklch,var(--background) 98%,transparent);padding:10px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 -6px 20px -4px rgba(0,0,0,0.12);">
+          <div style="position:relative;flex-shrink:0;">
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--ink);display:flex;align-items:center;justify-content:center;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            </div>
+            <div style="position:absolute;top:-2px;right:-2px;width:16px;height:16px;border-radius:50%;background:var(--amber);font-family:var(--font-mono);font-size:8px;font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:center;border:2px solid var(--background);">3</div>
+          </div>
+          <div style="flex:1;">
+            <div style="font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--ink);">3 ítems</div>
+            <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-foreground);">3 jornadas</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted-foreground);">total</div>
+            <div style="font-family:var(--font-display);font-weight:900;font-size:15px;color:var(--ink);">$ 142.500</div>
+          </div>
+          <button style="flex-shrink:0;height:32px;border-radius:9999px;background:var(--amber);color:var(--ink);border:0;padding:0 12px;font-family:var(--font-sans);font-size:12px;font-weight:600;cursor:pointer;">Ver carrito</button>
         </div>
       </div>
       <footer class="comp-card-foot">
-        <a href="preview/patterns-topbar-amber-scroll.html">Pattern →</a>
-        <a class="path" href="kit/components/topbar.tsx">kit/components/topbar.tsx</a>
+        <a href="preview/patterns-cart-minibar.html">Specimen interactivo →</a>
+        <a class="path" href="kit/components/cart-minibar.tsx">cart-minibar.tsx</a>
+      </footer>
+    </article>
+
+    <!-- Chip Rail -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">Chip Rail <code>chip-rail.tsx</code></div>
+        <div class="comp-card-desc">Fila horizontal de chips con overflow scrolleable. scrollbar-none · snap · fade hint a la derecha.</div>
+      </header>
+      <div class="comp-card-stage" style="flex-direction:column;gap:10px;padding:14px;">
+        <div style="position:relative;width:100%;">
+          <div style="display:flex;align-items:center;gap:8px;overflow:hidden;padding-right:36px;">
+            <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-foreground);flex-shrink:0;">Populares:</span>
+            <button style="flex-shrink:0;height:28px;border-radius:9999px;padding:0 10px;font-family:var(--font-sans);font-size:11px;font-weight:600;border:1px solid color-mix(in oklch,var(--amber) 60%,transparent);background:color-mix(in oklch,var(--amber) 15%,transparent);color:var(--ink);white-space:nowrap;">Sony FX3</button>
+            <button style="flex-shrink:0;height:28px;border-radius:9999px;padding:0 10px;font-family:var(--font-sans);font-size:11px;border:1px solid var(--hairline);background:var(--surface);color:var(--ink);white-space:nowrap;">Aputure 600d</button>
+            <button style="flex-shrink:0;height:28px;border-radius:9999px;padding:0 10px;font-family:var(--font-sans);font-size:11px;border:1px solid var(--hairline);background:var(--surface);color:var(--ink);white-space:nowrap;">RØDE NTG5</button>
+            <button style="flex-shrink:0;height:28px;border-radius:9999px;padding:0 10px;font-family:var(--font-sans);font-size:11px;border:1px solid var(--hairline);background:var(--surface);color:var(--ink);white-space:nowrap;">DJI RS4</button>
+          </div>
+          <div style="position:absolute;right:0;top:0;bottom:0;width:36px;background:linear-gradient(to right,transparent,var(--surface-elevated));pointer-events:none;"></div>
+        </div>
+      </div>
+      <footer class="comp-card-foot">
+        <a href="preview/patterns-chip-rail.html">Specimen interactivo →</a>
+        <a class="path" href="kit/components/chip-rail.tsx">chip-rail.tsx</a>
+      </footer>
+    </article>
+
+    <!-- Fly to Cart -->
+    <article class="comp-card">
+      <header class="comp-card-head">
+        <div class="comp-card-name">Fly to Cart <code>fly-to-cart-layer.tsx</code></div>
+        <div class="comp-card-desc">Pill "+1" amber que vuela desde el botón Agregar hasta data-cart-icon. Pop + badge bump al llegar.</div>
+      </header>
+      <div class="comp-card-stage" style="flex-direction:column;gap:8px;padding:14px;align-items:center;justify-content:center;">
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <button style="height:28px;border-radius:9999px;background:var(--ink);color:var(--background);border:0;padding:0 12px;font-family:var(--font-sans);font-size:11px;font-weight:500;">+ Agregar</button>
+            <span style="font-family:var(--font-mono);font-size:8px;color:var(--muted-foreground);letter-spacing:0.15em;text-transform:uppercase;">origin</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--amber);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--ink);box-shadow:0 3px 10px rgba(0,0,0,0.15);outline:2px solid color-mix(in oklch,var(--amber) 40%,transparent);outline-offset:2px;">+1</div>
+            <svg width="24" height="12" viewBox="0 0 24 12" fill="none"><path d="M0 6h20M14 1l6 5-6 5" stroke="var(--muted-foreground)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <div style="position:relative;">
+              <div style="width:36px;height:36px;border-radius:50%;background:var(--ink);display:flex;align-items:center;justify-content:center;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+              </div>
+              <div style="position:absolute;top:-2px;right:-2px;width:15px;height:15px;border-radius:50%;background:var(--amber);font-family:var(--font-mono);font-size:8px;font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:center;border:2px solid var(--background);">1</div>
+            </div>
+            <span style="font-family:var(--font-mono);font-size:8px;color:var(--muted-foreground);letter-spacing:0.15em;text-transform:uppercase;">[data-cart-icon]</span>
+          </div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);text-align:center;letter-spacing:0.12em;">550ms · cubic-bezier(0.22, 1, 0.36, 1)</div>
+      </div>
+      <footer class="comp-card-foot">
+        <a href="preview/patterns-fly-to-cart.html">Specimen interactivo →</a>
+        <a class="path" href="kit/components/fly-to-cart-layer.tsx">fly-to-cart-layer.tsx</a>
       </footer>
     </article>
 
@@ -983,13 +1359,73 @@ cp -r path/to/kit src/kit</pre>
 
 </main>
 
+<!-- ── Iconografía ──────────────────────────────────────────────── -->
+<section style="border-top:1px solid var(--hairline); padding: 64px 0;">
+<main>
+  <div class="module-head">
+    <div>
+      <div class="module-eyebrow">08 · Iconografía</div>
+      <h2 class="module-title">Lucide React — subset en uso</h2>
+      <p class="module-desc">stroke-width 1.5 · tamaños 16 / 20 / 24 px. Importar individualmente, no el barrel completo.</p>
+    </div>
+    <a class="module-path" href="https://lucide.dev">lucide.dev →</a>
+  </div>
+  <div class="icon-grid">
+    <!-- Search -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="icon-name">Search</span></div>
+    <!-- ShoppingBag -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span class="icon-name">ShoppingBag</span></div>
+    <!-- Calendar -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span class="icon-name">Calendar</span></div>
+    <!-- Filter -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg><span class="icon-name">Filter</span></div>
+    <!-- Grid2x2 -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span class="icon-name">Grid2x2</span></div>
+    <!-- List -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg><span class="icon-name">List</span></div>
+    <!-- ChevronDown -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg><span class="icon-name">ChevronDown</span></div>
+    <!-- ChevronRight -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg><span class="icon-name">ChevronRight</span></div>
+    <!-- X -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg><span class="icon-name">X</span></div>
+    <!-- Plus -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="icon-name">Plus</span></div>
+    <!-- Trash2 -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg><span class="icon-name">Trash2</span></div>
+    <!-- Pencil -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg><span class="icon-name">Pencil</span></div>
+    <!-- Check -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="icon-name">Check</span></div>
+    <!-- AlertCircle -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span class="icon-name">AlertCircle</span></div>
+    <!-- Camera -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg><span class="icon-name">Camera</span></div>
+    <!-- MapPin -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg><span class="icon-name">MapPin</span></div>
+    <!-- ArrowRight -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg><span class="icon-name">ArrowRight</span></div>
+    <!-- Star -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span class="icon-name">Star</span></div>
+    <!-- Loader2 -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span class="icon-name">Loader2</span></div>
+    <!-- Menu -->
+    <div class="icon-cell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg><span class="icon-name">Menu</span></div>
+  </div>
+  <p style="font-family:var(--font-sans);font-size:12px;color:var(--muted-foreground);margin-top:20px;line-height:1.55;">
+    Importar individualmente: <code class="inline">import { Camera } from "lucide-react"</code>. 
+    Siempre <code class="inline">strokeWidth={1.5}</code>. Para íconos de status usar color semántico (<code class="inline">text-verde</code>, <code class="inline">text-destructive</code>), no hardcodear hex.
+  </p>
+</main>
+</section>
+
 <!-- ── Footer ───────────────────────────────────────────────────── -->
 <footer class="f">
   <div class="f-inner">
     <div>
-      <div class="tagline">un lugar donde pasan cosas.</div>
+      <div class="tagline" id="footer-tagline"></div>
       <div style="margin-top: 10px; font-family: var(--font-sans); font-size: 13px; color: var(--muted-foreground); max-width: 52ch;">
-        Diseño basado en <code class="inline">tixenre/rental@main</code>. Para sincronizar el kit con cambios upstream, ver INSTALL.md → Versionado.
+        Diseño basado en <code class="inline">tixenre/rental@main</code>. → <a href="extended.html" style="color:var(--ink);text-decoration:underline;text-underline-offset:3px;">Referencia extendida: voz, grid, feedback, datos, a11y</a>
       </div>
     </div>
     <div class="meta">
@@ -1000,7 +1436,7 @@ cp -r path/to/kit src/kit</pre>
 </footer>
 
 <script>
-  // ViewToggle demo interactividad
+  // ViewToggle demo
   (function() {
     const t = document.getElementById('vtDemo');
     if (!t) return;
@@ -1010,6 +1446,18 @@ cp -r path/to/kit src/kit</pre>
       b.classList.add('active');
       t.dataset.active = i === 0 ? 'a' : 'b';
     }));
+  })();
+
+  // Footer tagline — misma pool que el hero, una al azar por visita
+  (function() {
+    const pool = [
+      "rental, estudio, rambla.",
+      "con rambla, en mardel.",
+      "en rambla, tu proyecto.",
+      "en rambla, tu rodaje.",
+    ];
+    const el = document.getElementById('footer-tagline');
+    if (el) el.textContent = pool[Math.floor(Math.random() * pool.length)];
   })();
 </script>
 

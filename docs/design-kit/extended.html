@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rambla Design Kit · Extended Reference</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --rosa: var(--rbl-rosa); --azul: var(--rbl-azul);
+    --naranja: var(--rbl-naranja); --verde: var(--rbl-verde);
+    --amber-hot: var(--rbl-amber-hot);
+  }
+  body { background: var(--background); color: var(--ink); margin: 0; }
+  main { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  a { color: inherit; }
+  ::selection { background: var(--amber); color: var(--ink); }
+
+  /* ── Nav ────────────────────────────────────────────────────── */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in oklch, var(--background) 95%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .nav-inner {
+    max-width: 1180px; margin: 0 auto;
+    height: 56px; padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-brand {
+    font-family: var(--font-display); font-weight: 900;
+    font-size: 22px; line-height: 1; letter-spacing: 0.01em;
+    text-transform: lowercase; text-decoration: none; color: var(--ink);
+  }
+  .nav-back {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--muted-foreground);
+    text-decoration: none; padding: 6px 12px; border-radius: 9999px;
+    border: 1px solid var(--hairline); transition: color .15s, background .15s;
+  }
+  .nav-back:hover { color: var(--ink); background: var(--amber-soft); }
+
+  /* ── Hero ────────────────────────────────────────────────────── */
+  .hero { padding: 56px 0 48px; border-bottom: 1px solid var(--hairline); }
+  .hero-eye {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.25em;
+    text-transform: uppercase; color: var(--muted-foreground);
+    display: flex; gap: 14px; align-items: center; margin-bottom: 16px;
+  }
+  .hero-eye .pill { color: var(--ink); background: var(--amber); padding: 3px 10px; border-radius: 9999px; }
+  .hero h1 {
+    font-family: var(--font-display); font-weight: 900;
+    font-size: clamp(40px, 7vw, 96px); line-height: 0.9;
+    letter-spacing: -0.01em; text-transform: lowercase;
+    margin: 0 0 16px;
+  }
+  .hero p { font-family: var(--font-sans); font-size: 17px; line-height: 1.5; color: var(--muted-foreground); max-width: 54ch; margin: 0; }
+
+  /* ── Module ──────────────────────────────────────────────────── */
+  section.mod { padding: 64px 0; border-bottom: 1px solid var(--hairline); }
+  .mod-head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; margin-bottom: 32px; flex-wrap: wrap; }
+  .mod-eye { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; }
+  .mod-title { font-family: var(--font-sans); font-weight: 700; font-size: 34px; line-height: 1.05; letter-spacing: -0.015em; margin: 0; }
+  .mod-desc { font-family: var(--font-sans); font-size: 15px; line-height: 1.5; color: var(--muted-foreground); max-width: 52ch; margin: 8px 0 0; }
+  .mod-path {
+    font-family: var(--font-mono); font-size: 11px; color: var(--ink);
+    background: var(--surface); padding: 6px 10px; border-radius: 6px;
+    border: 1px solid var(--hairline); white-space: nowrap; text-decoration: none;
+  }
+  .sub-eye { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 12px; }
+  code.ic {
+    font-family: var(--font-mono); font-size: 12px;
+    background: var(--surface); color: var(--ink);
+    padding: 2px 6px; border-radius: 4px; border: 1px solid var(--hairline);
+  }
+  pre.blk {
+    font-family: var(--font-mono); font-size: 12px;
+    background: var(--ink); color: var(--background);
+    padding: 16px 18px; border-radius: 10px; overflow-x: auto; line-height: 1.65;
+    margin: 0;
+  }
+  pre.blk .k { color: #FFCC55; }
+  pre.blk .s { color: #ED7BAD; }
+  pre.blk .c { color: oklch(0.6 0.01 70); font-style: italic; }
+
+  /* ── Voz y tono ──────────────────────────────────────────────── */
+  .voice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .voice-block {
+    border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .voice-block-head {
+    padding: 10px 16px; background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .voice-row {
+    display: grid; grid-template-columns: 1fr 80px;
+    padding: 10px 16px; border-bottom: 1px solid var(--hairline);
+    gap: 12px; align-items: center;
+  }
+  .voice-row:last-child { border-bottom: 0; }
+  .voice-text { font-family: var(--font-sans); font-size: 13px; color: var(--ink); line-height: 1.4; }
+  .voice-mark { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; text-align: right; }
+  .voice-mark.ok  { color: var(--verde); }
+  .voice-mark.bad { color: var(--destructive); }
+  .voice-row.bad .voice-text { color: var(--muted-foreground); text-decoration: line-through; }
+
+  .voice-rules {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px; margin-top: 24px;
+  }
+  .voice-rule {
+    border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+    padding: 16px 18px; background: var(--surface);
+  }
+  .voice-rule-title { font-family: var(--font-sans); font-weight: 600; font-size: 14px; color: var(--ink); margin-bottom: 6px; }
+  .voice-rule-body  { font-family: var(--font-sans); font-size: 13px; color: var(--muted-foreground); line-height: 1.5; }
+  .voice-rule .ex   { font-family: var(--font-display); font-size: 15px; font-weight: 900; color: var(--ink); text-transform: lowercase; margin-top: 8px; }
+
+  /* ── Grid & layout ───────────────────────────────────────────── */
+  .grid-spec { display: flex; flex-direction: column; gap: 20px; }
+  .grid-demo {
+    border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .grid-demo-label {
+    padding: 9px 16px; background: var(--surface); border-bottom: 1px solid var(--hairline);
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground);
+  }
+  .grid-demo-stage { padding: 16px; }
+  .col-row { display: flex; gap: 4px; }
+  .col-unit {
+    flex: 1; height: 32px; border-radius: 4px;
+    background: color-mix(in oklch, var(--amber) 20%, var(--surface));
+    border: 1px solid color-mix(in oklch, var(--amber) 40%, transparent);
+    display: grid; place-items: center;
+    font-family: var(--font-mono); font-size: 8px; color: color-mix(in oklch, var(--ink) 50%, transparent);
+  }
+  .layout-table { width: 100%; border-collapse: collapse; }
+  .layout-table th {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--muted-foreground); text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--hairline);
+  }
+  .layout-table td { font-family: var(--font-sans); font-size: 13px; padding: 9px 14px; border-bottom: 1px solid var(--hairline); color: var(--ink); }
+  .layout-table tr:last-child td { border-bottom: 0; }
+  .layout-table td:not(:first-child) { font-family: var(--font-mono); font-size: 12px; }
+
+  /* ── Skeleton ────────────────────────────────────────────────── */
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+  }
+  .sk {
+    background: linear-gradient(90deg, var(--surface) 25%, var(--surface-elevated) 50%, var(--surface) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease infinite;
+    border-radius: var(--radius-sm);
+  }
+  .sk-card {
+    border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+    padding: 16px; display: flex; flex-direction: column; gap: 10px;
+    background: var(--surface-elevated);
+  }
+  .sk-photo { aspect-ratio: 1; border-radius: var(--radius-md); }
+  .sk-line  { height: 12px; }
+  .sk-line.short { width: 60%; }
+  .sk-line.xshort { width: 35%; }
+  .sk-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .sk-list { display: flex; flex-direction: column; gap: 10px; }
+  .sk-list-row {
+    display: flex; gap: 14px; align-items: center;
+    padding: 14px 16px; border: 1px solid var(--hairline);
+    border-radius: var(--radius-lg); background: var(--surface-elevated);
+  }
+  .sk-avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; }
+  .sk-list-body { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+
+  /* ── Toast ───────────────────────────────────────────────────── */
+  .toast-stack { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .toast {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 14px 16px; border-radius: var(--radius-lg);
+    border: 1px solid; min-width: 300px;
+    box-shadow: var(--shadow-lg); background: var(--surface-elevated);
+  }
+  .toast-icon { flex-shrink: 0; margin-top: 1px; }
+  .toast-body { flex: 1; }
+  .toast-title { font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--ink); }
+  .toast-desc  { font-family: var(--font-sans); font-size: 12px; color: var(--muted-foreground); margin-top: 2px; line-height: 1.4; }
+  .toast-close { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); cursor: pointer; padding: 0 4px; margin-top: -1px; }
+  .t-success { border-color: color-mix(in oklch, var(--verde) 30%, transparent); }
+  .t-error   { border-color: color-mix(in oklch, var(--destructive) 30%, transparent); }
+  .t-warning { border-color: color-mix(in oklch, var(--naranja) 30%, transparent); }
+  .t-info    { border-color: color-mix(in oklch, var(--azul) 30%, transparent); }
+  .ic-success { color: var(--verde); }
+  .ic-error   { color: var(--destructive); }
+  .ic-warning { color: var(--naranja); }
+  .ic-info    { color: var(--azul); }
+
+  /* ── Data viz ────────────────────────────────────────────────── */
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  .chart-legend { display: flex; flex-direction: column; gap: 8px; }
+  .chart-row { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); background: var(--surface); }
+  .chart-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .chart-name { font-family: var(--font-sans); font-size: 13px; color: var(--ink); flex: 1; }
+  .chart-token { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
+  .chart-use   { font-family: var(--font-mono); font-size: 9px; color: var(--muted-foreground); letter-spacing: 0.1em; text-transform: uppercase; }
+  .mini-bar-chart { border: 1px solid var(--hairline); border-radius: var(--radius-lg); padding: 20px 18px; background: var(--surface-elevated); }
+  .bar-chart-rows { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: grid; grid-template-columns: 80px 1fr 36px; gap: 10px; align-items: center; }
+  .bar-label { font-family: var(--font-mono); font-size: 9px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.1em; }
+  .bar-track { height: 18px; background: var(--surface); border-radius: 4px; overflow: hidden; }
+  .bar-fill  { height: 100%; border-radius: 4px; }
+  .bar-val   { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); text-align: right; }
+
+  /* ── Focus & a11y ────────────────────────────────────────────── */
+  .focus-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .focus-card {
+    border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+    padding: 24px; background: var(--surface);
+    display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
+  }
+  .focus-demo-btn {
+    height: 36px; padding: 0 16px; border-radius: 8px;
+    font-family: var(--font-sans); font-weight: 500; font-size: 14px;
+    background: var(--ink); color: var(--background); border: 0; cursor: pointer;
+  }
+  .focus-demo-btn.ring { outline: 3px solid var(--amber); outline-offset: 2px; }
+  .focus-demo-inp {
+    height: 36px; border-radius: var(--radius-sm); border: 1px solid var(--hairline);
+    background: var(--surface-elevated); padding: 0 12px;
+    font-family: var(--font-sans); font-size: 13px; color: var(--ink);
+    outline: none; width: 100%; box-sizing: border-box;
+  }
+  .focus-demo-inp.ring { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+  .focus-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+  .contrast-table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+  .contrast-table th { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--hairline); }
+  .contrast-table td { font-family: var(--font-sans); font-size: 13px; padding: 9px 14px; border-bottom: 1px solid var(--hairline); }
+  .contrast-table tr:last-child td { border-bottom: 0; }
+  .contrast-sample { display: inline-block; padding: 3px 10px; border-radius: 4px; font-family: var(--font-sans); font-size: 12px; font-weight: 500; }
+  .pass { color: var(--verde); font-family: var(--font-mono); font-size: 10px; font-weight: 600; }
+  .wcag { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
+
+  /* ── Elevation ───────────────────────────────────────────────── */
+  .elev-stack { display: flex; flex-direction: column; gap: 0; }
+  .elev-row {
+    display: grid; grid-template-columns: 180px 120px 1fr;
+    padding: 14px 18px; border-bottom: 1px solid var(--hairline);
+    align-items: center; gap: 20px;
+  }
+  .elev-row:last-child { border-bottom: 0; }
+  .elev-chip {
+    padding: 8px 14px; border-radius: var(--radius-sm);
+    font-family: var(--font-sans); font-size: 12px; font-weight: 500;
+    color: var(--ink); display: inline-block;
+  }
+  .elev-token { font-family: var(--font-mono); font-size: 11px; color: var(--ink); }
+  .elev-use   { font-family: var(--font-sans); font-size: 13px; color: var(--muted-foreground); line-height: 1.4; }
+
+  /* ── Formato de datos ────────────────────────────────────────── */
+  .fmt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .fmt-block {
+    border: 1px solid var(--hairline); border-radius: var(--radius-lg); overflow: hidden;
+  }
+  .fmt-head {
+    padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--hairline);
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground);
+  }
+  .fmt-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .fmt-row:last-child { border-bottom: 0; }
+  .fmt-raw { padding: 10px 16px; font-family: var(--font-mono); font-size: 12px; color: var(--muted-foreground); border-right: 1px solid var(--hairline); }
+  .fmt-out { padding: 10px 16px; font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--ink); }
+  .fmt-fn  { font-family: var(--font-mono); font-size: 11px; color: var(--amber); margin-top: 2px; display: block; }
+
+  /* ── Imagery ─────────────────────────────────────────────────── */
+  .img-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+  .img-card { display: flex; flex-direction: column; gap: 8px; }
+  .img-placeholder {
+    border-radius: var(--radius-lg); border: 1.5px dashed var(--hairline);
+    background:
+      repeating-linear-gradient(45deg, var(--surface) 0, var(--surface) 10px, var(--surface-elevated) 10px, var(--surface-elevated) 20px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; color: var(--muted-foreground);
+  }
+  .img-ratio-label {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em;
+  }
+  .img-caption { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+  .img-use     { font-family: var(--font-sans); font-size: 12px; color: var(--muted-foreground); }
+
+  /* ── Footer ──────────────────────────────────────────────────── */
+  footer.f { padding: 48px 0 40px; background: var(--surface); border-top: 1px solid var(--hairline); }
+  .f-inner { display: grid; grid-template-columns: 1fr auto; gap: 32px; max-width: 1180px; margin: 0 auto; padding: 0 24px; align-items: center; }
+  .f-tagline { font-family: var(--font-display); font-weight: 900; font-size: 24px; line-height: 1; letter-spacing: 0.01em; text-transform: lowercase; }
+  .f-meta { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); text-align: right; }
+
+  @media (max-width: 720px) {
+    .voice-grid, .chart-grid, .fmt-grid { grid-template-columns: 1fr; }
+    .mod-head { flex-direction: column; align-items: flex-start; }
+    .mod-title { font-size: 26px; }
+    .elev-row { grid-template-columns: 1fr; gap: 6px; }
+    .f-inner { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-brand">rambla</a>
+    <a href="index.html" class="nav-back">← Fundamentos</a>
+  </div>
+</nav>
+
+<main>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-eye">
+    <span class="pill">Extended · 13 secciones</span>
+    <span>Voz · Layout · Feedback · Datos · Accesibilidad</span>
+  </div>
+  <h1>referencia<br>extendida.</h1>
+  <p>Todo lo que no entra en tokens ni en componentes, pero que define cómo se habla, cómo se mide y cómo se presentan los datos en Rambla.</p>
+</div>
+
+<!-- ── 09 · Voz y tono ────────────────────────────────────────── -->
+<section class="mod" id="voz">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">09 · Voz y tono</div>
+      <h2 class="mod-title">Cómo habla Rambla</h2>
+      <p class="mod-desc">Tono cercano, directo, rioplatense. "Vos", minúsculas en el copy de marca, puntuación que da ritmo.</p>
+    </div>
+  </div>
+
+  <!-- Reglas base -->
+  <div class="voice-rules" style="margin-bottom: 32px;">
+    <div class="voice-rule">
+      <div class="voice-rule-title">Minúsculas en marca</div>
+      <div class="voice-rule-body">El wordmark, los taglines y los títulos de hero van en lowercase. Headings de UI van en Title Case normal.</div>
+      <div class="voice-rule ex">rental, estudio, rambla.</div>
+    </div>
+    <div class="voice-rule">
+      <div class="voice-rule-title">Tuteo rioplatense</div>
+      <div class="voice-rule-body">Siempre "vos" y segunda persona singular. No "usted", no "tú". El tono es el de un colega del rubro.</div>
+      <div class="voice-rule ex">reservá · elegí · confirmá</div>
+    </div>
+    <div class="voice-rule">
+      <div class="voice-rule-title">Punto final como remate</div>
+      <div class="voice-rule-body">Los taglines y titulares de hero terminan con punto. No signo de exclamación, no elipsis. El punto es autoridad, no frialdad.</div>
+      <div class="voice-rule ex">en rambla, tu rodaje.</div>
+    </div>
+    <div class="voice-rule">
+      <div class="voice-rule-title">Números sin ambigüedad</div>
+      <div class="voice-rule-body">Precios con $ sin espacio, separador de miles con punto. Días con "J" abreviado. Rangos con "→".</div>
+      <div class="voice-rule ex">$ 24.500 · 3 J · lun → jue</div>
+    </div>
+  </div>
+
+  <!-- Ejemplos ✓ / ✗ -->
+  <div class="voice-grid">
+    <div class="voice-block">
+      <div class="voice-block-head">CTAs y botones</div>
+      <div class="voice-row"><span class="voice-text">Reservar</span><span class="voice-mark ok">✓ usar</span></div>
+      <div class="voice-row bad"><span class="voice-text">Reserva ahora!</span><span class="voice-mark bad">✗ evitar</span></div>
+      <div class="voice-row"><span class="voice-text">Ver catálogo</span><span class="voice-mark ok">✓ usar</span></div>
+      <div class="voice-row bad"><span class="voice-text">Haga click aquí</span><span class="voice-mark bad">✗ evitar</span></div>
+      <div class="voice-row"><span class="voice-text">Agregar al carrito</span><span class="voice-mark ok">✓ usar</span></div>
+      <div class="voice-row bad"><span class="voice-text">Añadir al carro</span><span class="voice-mark bad">✗ neutro</span></div>
+    </div>
+    <div class="voice-block">
+      <div class="voice-block-head">Mensajes de error</div>
+      <div class="voice-row"><span class="voice-text">Ingresá un correo válido.</span><span class="voice-mark ok">✓ usar</span></div>
+      <div class="voice-row bad"><span class="voice-text">Error: email inválido</span><span class="voice-mark bad">✗ técnico</span></div>
+      <div class="voice-row"><span class="voice-text">Las fechas se superponen con otra reserva.</span><span class="voice-mark ok">✓ usar</span></div>
+      <div class="voice-row bad"><span class="voice-text">Conflict: date overlap detected</span><span class="voice-mark bad">✗ evitar</span></div>
+      <div class="voice-row"><span class="voice-text">Algo salió mal. Intentá de nuevo.</span><span class="voice-mark ok">✓ usar</span></div>
+      <div class="voice-row bad"><span class="voice-text">Error 500 — Internal Server Error</span><span class="voice-mark bad">✗ evitar</span></div>
+    </div>
+    <div class="voice-block">
+      <div class="voice-block-head">Empty states</div>
+      <div class="voice-row"><span class="voice-text">No hay equipos para estas fechas.</span><span class="voice-mark ok">✓ usar</span></div>
+      <div class="voice-row bad"><span class="voice-text">No se encontraron resultados</span><span class="voice-mark bad">✗ genérico</span></div>
+      <div class="voice-row"><span class="voice-text">Tu carrito está vacío. Empezá por el catálogo.</span><span class="voice-mark ok">✓ usar</span></div>
+      <div class="voice-row bad"><span class="voice-text">Carrito vacío</span><span class="voice-mark bad">✗ cortante</span></div>
+    </div>
+    <div class="voice-block">
+      <div class="voice-block-head">Confirmaciones y feedback</div>
+      <div class="voice-row"><span class="voice-text">¡Listo! Tu reserva está confirmada.</span><span class="voice-mark ok">✓ usar</span></div>
+      <div class="voice-row bad"><span class="voice-text">Transacción completada exitosamente</span><span class="voice-mark bad">✗ evitar</span></div>
+      <div class="voice-row"><span class="voice-text">Equipo eliminado del carrito.</span><span class="voice-mark ok">✓ usar</span></div>
+      <div class="voice-row bad"><span class="voice-text">Item removed successfully</span><span class="voice-mark bad">✗ inglés</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 10 · Grid & layout ─────────────────────────────────────── -->
+<section class="mod" id="grid">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">10 · Grid & layout</div>
+      <h2 class="mod-title">Sistema de columnas</h2>
+      <p class="mod-desc">12 columnas, gutter de 24px en desktop y 16px en mobile. Container max-width 1180px.</p>
+    </div>
+  </div>
+
+  <div class="grid-spec">
+    <div class="grid-demo">
+      <div class="grid-demo-label">Desktop · 12 columnas · gutter 24px · max-width 1180px</div>
+      <div class="grid-demo-stage">
+        <div class="col-row">
+          <div class="col-unit">1</div><div class="col-unit">2</div><div class="col-unit">3</div>
+          <div class="col-unit">4</div><div class="col-unit">5</div><div class="col-unit">6</div>
+          <div class="col-unit">7</div><div class="col-unit">8</div><div class="col-unit">9</div>
+          <div class="col-unit">10</div><div class="col-unit">11</div><div class="col-unit">12</div>
+        </div>
+      </div>
+    </div>
+
+    <table class="layout-table" style="border: 1px solid var(--hairline); border-radius: var(--radius-lg); overflow: hidden;">
+      <thead>
+        <tr>
+          <th>Breakpoint</th><th>Columnas</th><th>Gutter</th><th>Container padding</th><th>Catálogo — cols de equipo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>base (< 640px)</td><td>4</td><td>12px</td><td>16px</td><td>2 columnas</td></tr>
+        <tr><td>sm (≥ 640px)</td><td>8</td><td>16px</td><td>20px</td><td>2 columnas</td></tr>
+        <tr><td>md (≥ 768px)</td><td>12</td><td>20px</td><td>24px</td><td>3 columnas</td></tr>
+        <tr><td>lg (≥ 1024px)</td><td>12</td><td>24px</td><td>24px</td><td>4 columnas</td></tr>
+        <tr><td>xl (≥ 1280px)</td><td>12</td><td>24px</td><td>24px</td><td>4–5 columnas</td></tr>
+      </tbody>
+    </table>
+
+    <pre class="blk"><span class="c">/* Tailwind v4 — container config en styles.css */</span>
+<span class="k">@theme</span> {
+  <span class="k">--container-max</span>: <span class="s">1180px</span>;
+  <span class="k">--container-padding</span>: <span class="s">24px</span>;
+}
+
+<span class="c">/* Catálogo grid — responsive con auto-fit */</span>
+.catalog-grid {
+  <span class="k">display</span>: grid;
+  <span class="k">grid-template-columns</span>: repeat(auto-fill, minmax(<span class="s">220px</span>, <span class="s">1fr</span>));
+  <span class="k">gap</span>: <span class="s">var(--space-6)</span>;
+}</pre>
+  </div>
+</section>
+
+<!-- ── 11 · Skeleton / loading ────────────────────────────────── -->
+<section class="mod" id="skeleton">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">11 · Skeleton / loading</div>
+      <h2 class="mod-title">Estados de carga</h2>
+      <p class="mod-desc">Shimmer de izquierda a derecha, 1.4s ease. Mismo layout que el componente real para evitar layout shift.</p>
+    </div>
+  </div>
+
+  <div class="sub-eye" style="margin-bottom:14px;">Vista catálogo — grid de cards</div>
+  <div class="sk-grid" style="margin-bottom:32px;">
+    <div class="sk-card"><div class="sk sk-photo"></div><div class="sk sk-line"></div><div class="sk sk-line short"></div><div class="sk sk-line xshort"></div></div>
+    <div class="sk-card"><div class="sk sk-photo"></div><div class="sk sk-line"></div><div class="sk sk-line short"></div><div class="sk sk-line xshort"></div></div>
+    <div class="sk-card"><div class="sk sk-photo"></div><div class="sk sk-line"></div><div class="sk sk-line short"></div><div class="sk sk-line xshort"></div></div>
+  </div>
+
+  <div class="sub-eye" style="margin-bottom:14px;">Vista lista</div>
+  <div class="sk-list" style="margin-bottom:28px;">
+    <div class="sk-list-row"><div class="sk sk-avatar"></div><div class="sk-list-body"><div class="sk sk-line"></div><div class="sk sk-line short"></div></div></div>
+    <div class="sk-list-row"><div class="sk sk-avatar"></div><div class="sk-list-body"><div class="sk sk-line"></div><div class="sk sk-line short"></div></div></div>
+    <div class="sk-list-row"><div class="sk sk-avatar"></div><div class="sk-list-body"><div class="sk sk-line"></div><div class="sk sk-line short"></div></div></div>
+  </div>
+
+  <pre class="blk"><span class="c">/* kit/recipes.css */</span>
+<span class="k">@keyframes</span> shimmer {
+  <span class="s">0%</span>   { background-position: <span class="s">-200% 0</span>; }
+  <span class="s">100%</span> { background-position:  <span class="s">200% 0</span>; }
+}
+.skeleton {
+  background: linear-gradient(90deg,
+    <span class="k">var</span>(--surface) 25%, <span class="k">var</span>(--surface-elevated) 50%, <span class="k">var</span>(--surface) 75%);
+  background-size: <span class="s">200% 100%</span>;
+  animation: shimmer <span class="s">1.4s ease infinite</span>;
+  border-radius: <span class="k">var</span>(--radius-sm);
+}</pre>
+</section>
+
+<!-- ── 12 · Toast & alertas ───────────────────────────────────── -->
+<section class="mod" id="toast">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">12 · Toast & alertas</div>
+      <h2 class="mod-title">Feedback del sistema</h2>
+      <p class="mod-desc">4 variantes semánticas. Posición: bottom-right en desktop, bottom-center en mobile. shadow-lg. Auto-dismiss en 4s.</p>
+    </div>
+    <a class="mod-path" href="kit/components/toast.tsx">toast.tsx</a>
+  </div>
+
+  <div class="toast-stack">
+    <div class="toast t-success">
+      <svg class="toast-icon ic-success" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>
+      <div class="toast-body"><div class="toast-title">Reserva confirmada</div><div class="toast-desc">Sony A7S III · lun 2 → jue 5 de jun.</div></div>
+      <span class="toast-close">✕</span>
+    </div>
+    <div class="toast t-error">
+      <svg class="toast-icon ic-error" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      <div class="toast-body"><div class="toast-title">No se pudo guardar</div><div class="toast-desc">Revisá tu conexión e intentá de nuevo.</div></div>
+      <span class="toast-close">✕</span>
+    </div>
+    <div class="toast t-warning">
+      <svg class="toast-icon ic-warning" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <div class="toast-body"><div class="toast-title">Equipo con disponibilidad limitada</div><div class="toast-desc">Quedan 2 unidades para esas fechas.</div></div>
+      <span class="toast-close">✕</span>
+    </div>
+    <div class="toast t-info">
+      <svg class="toast-icon ic-info" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <div class="toast-body"><div class="toast-title">Precio actualizado</div><div class="toast-desc">La tarifa de jornada cambió desde que abriste el carrito.</div></div>
+      <span class="toast-close">✕</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── 13 · Data viz ──────────────────────────────────────────── -->
+<section class="mod" id="dataviz">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">13 · Data viz</div>
+      <h2 class="mod-title">Colores de gráficos</h2>
+      <p class="mod-desc">Orden fijo: amber → azul → naranja → verde → rosa. El amber siempre es la serie principal (ingresos, pedidos).</p>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-legend">
+      <div class="chart-row"><div class="chart-dot" style="background:var(--amber)"></div><div class="chart-name">Ingresos / métrica principal</div><div style="display:flex;flex-direction:column;"><span class="chart-token">--chart-1</span><span class="chart-use">serie 1</span></div></div>
+      <div class="chart-row"><div class="chart-dot" style="background:var(--azul)"></div><div class="chart-name">Pedidos confirmados</div><div style="display:flex;flex-direction:column;"><span class="chart-token">--chart-2</span><span class="chart-use">serie 2</span></div></div>
+      <div class="chart-row"><div class="chart-dot" style="background:var(--naranja)"></div><div class="chart-name">Pedidos cancelados</div><div style="display:flex;flex-direction:column;"><span class="chart-token">--chart-3</span><span class="chart-use">serie 3</span></div></div>
+      <div class="chart-row"><div class="chart-dot" style="background:var(--verde)"></div><div class="chart-name">Equipos activos</div><div style="display:flex;flex-direction:column;"><span class="chart-token">--chart-4</span><span class="chart-use">serie 4</span></div></div>
+      <div class="chart-row"><div class="chart-dot" style="background:var(--rbl-rosa)"></div><div class="chart-name">Clientes nuevos</div><div style="display:flex;flex-direction:column;"><span class="chart-token">--chart-5</span><span class="chart-use">serie 5</span></div></div>
+    </div>
+    <div class="mini-bar-chart">
+      <div class="sub-eye" style="margin-bottom:16px;">Ingresos mayo · ejemplo</div>
+      <div class="bar-chart-rows">
+        <div class="bar-row"><span class="bar-label">Cámaras</span><div class="bar-track"><div class="bar-fill" style="width:88%;background:var(--amber)"></div></div><span class="bar-val">88%</span></div>
+        <div class="bar-row"><span class="bar-label">Ópticas</span><div class="bar-track"><div class="bar-fill" style="width:62%;background:var(--azul)"></div></div><span class="bar-val">62%</span></div>
+        <div class="bar-row"><span class="bar-label">Luces</span><div class="bar-track"><div class="bar-fill" style="width:44%;background:var(--naranja)"></div></div><span class="bar-val">44%</span></div>
+        <div class="bar-row"><span class="bar-label">Audio</span><div class="bar-track"><div class="bar-fill" style="width:31%;background:var(--verde)"></div></div><span class="bar-val">31%</span></div>
+        <div class="bar-row"><span class="bar-label">Soportes</span><div class="bar-track"><div class="bar-fill" style="width:18%;background:var(--rbl-rosa)"></div></div><span class="bar-val">18%</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 14 · Focus & accesibilidad ─────────────────────────────── -->
+<section class="mod" id="a11y">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">14 · Focus & accesibilidad</div>
+      <h2 class="mod-title">Navegación por teclado y contraste</h2>
+      <p class="mod-desc">focus-visible con amber ring. Contraste WCAG AA mínimo en todos los pares de color de marca.</p>
+    </div>
+  </div>
+
+  <div class="focus-grid" style="margin-bottom:32px;">
+    <div class="focus-card">
+      <span class="focus-label">Botón sin foco</span>
+      <button class="focus-demo-btn">Reservar</button>
+    </div>
+    <div class="focus-card">
+      <span class="focus-label">Botón con focus-visible</span>
+      <button class="focus-demo-btn ring">Reservar</button>
+    </div>
+    <div class="focus-card">
+      <span class="focus-label">Input sin foco</span>
+      <input class="focus-demo-inp" value="hola@productora.com" readonly>
+    </div>
+    <div class="focus-card">
+      <span class="focus-label">Input con focus-visible</span>
+      <input class="focus-demo-inp ring" value="hola@productora.com" readonly>
+    </div>
+  </div>
+
+  <pre class="blk" style="margin-bottom:24px;"><span class="c">/* kit/recipes.css — aplicar a todos los elementos interactivos */</span>
+:focus-visible {
+  outline: <span class="s">3px solid var(--amber)</span>;
+  outline-offset: <span class="s">2px</span>;
+}
+<span class="c">/* Para inputs — usar ring en lugar de outline */</span>
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: none;
+  border-color: <span class="s">var(--amber)</span>;
+  box-shadow: <span class="s">0 0 0 3px var(--amber-soft)</span>;
+}</pre>
+
+  <table class="contrast-table" style="border:1px solid var(--hairline);border-radius:var(--radius-lg);overflow:hidden;">
+    <thead><tr><th>Par de color</th><th>Muestra</th><th>Ratio</th><th>WCAG</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>ink sobre amber</td>
+        <td><span class="contrast-sample" style="background:var(--amber);color:var(--ink);">Texto</span></td>
+        <td style="font-family:var(--font-mono);font-size:12px;">7.2 : 1</td>
+        <td><span class="pass">AA ✓ · AAA ✓</span></td>
+      </tr>
+      <tr>
+        <td>amber sobre ink</td>
+        <td><span class="contrast-sample" style="background:var(--ink);color:var(--amber);">Texto</span></td>
+        <td style="font-family:var(--font-mono);font-size:12px;">7.2 : 1</td>
+        <td><span class="pass">AA ✓ · AAA ✓</span></td>
+      </tr>
+      <tr>
+        <td>ink sobre bone</td>
+        <td><span class="contrast-sample" style="background:var(--background);color:var(--ink);">Texto</span></td>
+        <td style="font-family:var(--font-mono);font-size:12px;">16.4 : 1</td>
+        <td><span class="pass">AA ✓ · AAA ✓</span></td>
+      </tr>
+      <tr>
+        <td>muted sobre bone</td>
+        <td><span class="contrast-sample" style="background:var(--background);color:var(--muted-foreground);">Texto</span></td>
+        <td style="font-family:var(--font-mono);font-size:12px;">4.6 : 1</td>
+        <td><span class="pass">AA ✓</span> <span class="wcag">(solo ≥ 14px)</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── 15 · Elevation semántica ───────────────────────────────── -->
+<section class="mod" id="elevation">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">15 · Elevation semántica</div>
+      <h2 class="mod-title">Qué superficie usa qué sombra</h2>
+      <p class="mod-desc">El sistema de sombras no es decorativo — cada nivel corresponde a una capa de UI específica.</p>
+    </div>
+  </div>
+
+  <div style="border:1px solid var(--hairline);border-radius:var(--radius-lg);overflow:hidden;">
+    <div class="elev-stack">
+      <div class="elev-row" style="background:var(--surface);">
+        <div><div class="elev-chip" style="background:var(--background);border:1px solid var(--hairline);">base</div></div>
+        <span class="elev-token">sin sombra</span>
+        <span class="elev-use">Fondo de página, filas de tabla, inputs en reposo</span>
+      </div>
+      <div class="elev-row">
+        <div><div class="elev-chip" style="box-shadow:var(--shadow-sm);background:var(--surface-elevated);">shadow-sm</div></div>
+        <span class="elev-token">--shadow-sm</span>
+        <span class="elev-use">Cards de equipo, StatCard, chips en hover</span>
+      </div>
+      <div class="elev-row">
+        <div><div class="elev-chip" style="box-shadow:var(--shadow-md);background:var(--surface-elevated);">shadow-md</div></div>
+        <span class="elev-token">--shadow-md</span>
+        <span class="elev-use">Dropdowns, popovers, date picker, tooltips</span>
+      </div>
+      <div class="elev-row">
+        <div><div class="elev-chip" style="box-shadow:var(--shadow-lg);background:var(--surface-elevated);">shadow-lg</div></div>
+        <span class="elev-token">--shadow-lg</span>
+        <span class="elev-use">Toasts, snackbars, floating action buttons</span>
+      </div>
+      <div class="elev-row">
+        <div><div class="elev-chip" style="box-shadow:var(--shadow-xl);background:var(--surface-elevated);">shadow-xl</div></div>
+        <span class="elev-token">--shadow-xl</span>
+        <span class="elev-use">Modales, drawers de carrito, dialogs de confirmación</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 16 · Formato de datos ──────────────────────────────────── -->
+<section class="mod" id="formatos">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">16 · Formato de datos</div>
+      <h2 class="mod-title">Precios, fechas y duraciones</h2>
+      <p class="mod-desc">Convenciones argentinas. Las funciones de <code class="ic">lib/format.ts</code> aplican estas reglas automáticamente.</p>
+    </div>
+    <a class="mod-path" href="kit/lib/format.ts">lib/format.ts</a>
+  </div>
+
+  <div class="fmt-grid">
+    <div class="fmt-block">
+      <div class="fmt-head">Precios · formatARS()</div>
+      <div class="fmt-row"><span class="fmt-raw">24500</span><span class="fmt-out">$ 24.500<span class="fmt-fn">formatARS(24500)</span></span></div>
+      <div class="fmt-row"><span class="fmt-raw">2840500</span><span class="fmt-out">$ 2.840.500<span class="fmt-fn">formatARS(2840500)</span></span></div>
+      <div class="fmt-row"><span class="fmt-raw">24500 × 3</span><span class="fmt-out">$ 73.500<span class="fmt-fn">formatARS(24500 * 3)</span></span></div>
+      <div class="fmt-row"><span class="fmt-raw">0</span><span class="fmt-out">$ 0<span class="fmt-fn">o "—" si es null</span></span></div>
+    </div>
+    <div class="fmt-block">
+      <div class="fmt-head">Fechas · convención AR (DD/MM/YYYY)</div>
+      <div class="fmt-row"><span class="fmt-raw">2026-06-02</span><span class="fmt-out">2 jun.<span class="fmt-fn">formato corto en UI</span></span></div>
+      <div class="fmt-row"><span class="fmt-raw">2026-06-02</span><span class="fmt-out">mar 2 jun. 2026<span class="fmt-fn">formato largo</span></span></div>
+      <div class="fmt-row"><span class="fmt-raw">[2026-06-02, 2026-06-05]</span><span class="fmt-out">lun 2 → jue 5 jun.<span class="fmt-fn">formatRentalRange()</span></span></div>
+      <div class="fmt-row"><span class="fmt-raw">cross-month range</span><span class="fmt-out">29 may → 3 jun.<span class="fmt-fn">ambos meses explícitos</span></span></div>
+    </div>
+    <div class="fmt-block">
+      <div class="fmt-head">Duración · jornadas</div>
+      <div class="fmt-row"><span class="fmt-raw">1</span><span class="fmt-out">1 jornada<span class="fmt-fn">jornadaLabel(1)</span></span></div>
+      <div class="fmt-row"><span class="fmt-raw">3</span><span class="fmt-out">3 jornadas<span class="fmt-fn">jornadaLabel(3)</span></span></div>
+      <div class="fmt-row"><span class="fmt-raw">compact</span><span class="fmt-out">3 J<span class="fmt-fn">formato corto en cards</span></span></div>
+    </div>
+    <div class="fmt-block">
+      <div class="fmt-head">Contadores y cantidades</div>
+      <div class="fmt-row"><span class="fmt-raw">187</span><span class="fmt-out">187 equipos<span class="fmt-fn">siempre con unidad</span></span></div>
+      <div class="fmt-row"><span class="fmt-raw">quantity: 2</span><span class="fmt-out">×2<span class="fmt-fn">en addon pills</span></span></div>
+      <div class="fmt-row"><span class="fmt-raw">overflow: 5</span><span class="fmt-out">+5<span class="fmt-fn">en pills de overflow</span></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 17 · Scrollbar ─────────────────────────────────────────── -->
+<section class="mod" id="scrollbar">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">17 · Scrollbar</div>
+      <h2 class="mod-title">Scrollbar personalizado</h2>
+      <p class="mod-desc">Webkit only (Chrome, Safari, Edge). Firefox usa <code class="ic">scrollbar-color</code>. Ancho 6px, esquinas redondeadas, thumb amber.</p>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+    <pre class="blk"><span class="c">/* kit/recipes.css */</span>
+
+<span class="c">/* Chrome · Safari · Edge */</span>
+::-webkit-scrollbar        { width: <span class="s">6px</span>; height: <span class="s">6px</span>; }
+::-webkit-scrollbar-track  { background: <span class="k">var</span>(--surface); }
+::-webkit-scrollbar-thumb  {
+  background: <span class="k">var</span>(--amber);
+  border-radius: <span class="s">9999px</span>;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: <span class="k">var</span>(--rbl-amber-hot);
+}
+
+<span class="c">/* Firefox */</span>
+* {
+  scrollbar-color: <span class="k">var</span>(--amber) <span class="k">var</span>(--surface);
+  scrollbar-width: thin;
+}</pre>
+
+    <div style="border:1px solid var(--hairline);border-radius:var(--radius-lg);overflow:hidden;">
+      <div style="padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--hairline);font-family:var(--font-mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-foreground);">Preview</div>
+      <div style="height:180px;overflow-y:scroll;padding:16px;display:flex;flex-direction:column;gap:8px;scrollbar-color:var(--amber) var(--surface);scrollbar-width:thin;">
+        <style>
+          .sb-demo::-webkit-scrollbar{width:6px}
+          .sb-demo::-webkit-scrollbar-track{background:var(--surface)}
+          .sb-demo::-webkit-scrollbar-thumb{background:var(--amber);border-radius:9999px}
+        </style>
+        <div class="sb-demo" style="height:180px;overflow-y:scroll;padding:16px;display:flex;flex-direction:column;gap:8px;">
+          <div style="background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--hairline);padding:12px;font-family:var(--font-sans);font-size:13px;">Sony A7S III</div>
+          <div style="background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--hairline);padding:12px;font-family:var(--font-sans);font-size:13px;">Canon EOS R5</div>
+          <div style="background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--hairline);padding:12px;font-family:var(--font-sans);font-size:13px;">BMPCC 6K Pro</div>
+          <div style="background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--hairline);padding:12px;font-family:var(--font-sans);font-size:13px;">RED KOMODO 6K</div>
+          <div style="background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--hairline);padding:12px;font-family:var(--font-sans);font-size:13px;">Arri Alexa Mini LF</div>
+          <div style="background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--hairline);padding:12px;font-family:var(--font-sans);font-size:13px;">Nikon Z8</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 18 · Print ─────────────────────────────────────────────── -->
+<section class="mod" id="print">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">18 · Print styles</div>
+      <h2 class="mod-title">Presupuestos e invoices</h2>
+      <p class="mod-desc">CSS para impresión de confirmaciones de reserva. A4. Sin nav, sin fondos de color, ink puro sobre blanco.</p>
+    </div>
+  </div>
+
+  <pre class="blk"><span class="c">/* kit/recipes.css */</span>
+<span class="k">@media print</span> {
+  <span class="c">/* Ocultar chrome de app */</span>
+  .nav, .topbar, .sidebar, .toast-container,
+  button:not(.print-show), [data-no-print] {
+    display: none <span class="s">!important</span>;
+  }
+
+  body {
+    background: white;
+    color: <span class="s">#000000</span>;  <span class="c">/* brand-exact ink per manual */</span>
+    font-family: <span class="k">var</span>(--font-sans);
+    font-size: <span class="s">11pt</span>;  <span class="c">/* mínimo legible en papel */</span>
+  }
+
+  <span class="c">/* Preservar amber solo en el wordmark */</span>
+  .wordmark { color: <span class="s">#FAB428</span>; }
+
+  <span class="c">/* Evitar page-break dentro de items */</span>
+  .equipment-row, .invoice-line { break-inside: avoid; }
+
+  <span class="c">/* Tabla de equipos imprimible */</span>
+  .print-table { width: <span class="s">100%</span>; border-collapse: collapse; }
+  .print-table th, .print-table td {
+    border-bottom: <span class="s">1px solid #ddd</span>;
+    padding: <span class="s">8pt 10pt</span>;
+    text-align: left;
+  }
+
+  <span class="c">/* Forzar URL de links en papel */</span>
+  a[href]::after { content: <span class="s">" ("</span> attr(href) <span class="s">")"</span>; font-size: <span class="s">8pt</span>; color: <span class="s">#666</span>; }
+  a[href^="#"]::after, a[href^="javascript:"]::after { content: none; }
+
+  @page { margin: 20mm; size: A4; }
+}</pre>
+</section>
+
+<!-- ── 19 · Imagen & fotografía ──────────────────────────────── -->
+<section class="mod" id="imagen">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">19 · Imagen & fotografía</div>
+      <h2 class="mod-title">Aspect ratios y estilo visual</h2>
+      <p class="mod-desc">Los equipos siempre en 1:1. El hero de landing acepta 16:9 o full-bleed. Fondos de card en amber-soft cuando no hay foto.</p>
+    </div>
+  </div>
+
+  <div class="img-grid" style="margin-bottom:28px;">
+    <div class="img-card">
+      <div class="img-placeholder" style="aspect-ratio:1/1;padding:24px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+        <span class="img-ratio-label">1 : 1</span>
+      </div>
+      <span class="img-caption">Equipment card</span>
+      <span class="img-use">Foto del equipo. Fondo blanco o amber-soft si no hay foto. Nunca crop.</span>
+    </div>
+    <div class="img-card">
+      <div class="img-placeholder" style="aspect-ratio:16/9;padding:24px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <span class="img-ratio-label">16 : 9</span>
+      </div>
+      <span class="img-caption">Hero / banner</span>
+      <span class="img-use">Landing, sección "Conocé el Estudio". Puede ser full-bleed.</span>
+    </div>
+    <div class="img-card">
+      <div class="img-placeholder" style="aspect-ratio:4/5;padding:24px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M7 21v-1a5 5 0 0 1 10 0v1"/></svg>
+        <span class="img-ratio-label">4 : 5</span>
+      </div>
+      <span class="img-caption">Perfil / testimonio</span>
+      <span class="img-use">Fotos de personas, testimonios de clientes.</span>
+    </div>
+    <div class="img-card">
+      <div class="img-placeholder" style="aspect-ratio:3/1;padding:24px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        <span class="img-ratio-label">3 : 1</span>
+      </div>
+      <span class="img-caption">Banner angosto</span>
+      <span class="img-use">Categorías, strips promocionales.</span>
+    </div>
+  </div>
+
+  <div style="border:1px solid var(--hairline);border-radius:var(--radius-lg);overflow:hidden;">
+    <div style="padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--hairline);font-family:var(--font-mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-foreground);">Reglas de fotografía</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0;">
+      <div style="padding:16px 18px;border-right:1px solid var(--hairline);border-bottom:1px solid var(--hairline);">
+        <div style="font-family:var(--font-sans);font-weight:600;font-size:14px;color:var(--ink);margin-bottom:6px;">Estilo fotográfico</div>
+        <div style="font-family:var(--font-sans);font-size:13px;color:var(--muted-foreground);line-height:1.5;">Fondo claro o neutro, iluminación limpia. Sin filtros saturados. El equipo como protagonista, no en contexto.</div>
+      </div>
+      <div style="padding:16px 18px;border-right:1px solid var(--hairline);border-bottom:1px solid var(--hairline);">
+        <div style="font-family:var(--font-sans);font-weight:600;font-size:14px;color:var(--ink);margin-bottom:6px;">Alt text</div>
+        <div style="font-family:var(--font-sans);font-size:13px;color:var(--muted-foreground);line-height:1.5;">Describir marca + modelo + tipo: <em>"Cámara Sony A7S III, vista frontal"</em>. No "imagen de equipo".</div>
+      </div>
+      <div style="padding:16px 18px;border-bottom:1px solid var(--hairline);">
+        <div style="font-family:var(--font-sans);font-weight:600;font-size:14px;color:var(--ink);margin-bottom:6px;">Fallback sin foto</div>
+        <div style="font-family:var(--font-sans);font-size:13px;color:var(--muted-foreground);line-height:1.5;">Fondo amber-soft con las iniciales del modelo en Champ Black, 25% opacity ink.</div>
+      </div>
+      <div style="padding:16px 18px;">
+        <div style="font-family:var(--font-sans);font-weight:600;font-size:14px;color:var(--ink);margin-bottom:6px;">Formato y tamaño</div>
+        <div style="font-family:var(--font-sans);font-size:13px;color:var(--muted-foreground);line-height:1.5;">WebP preferido. Cards: 600×600 @2x. Hero: 1920×1080 mínimo. Lazy load siempre.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 20 · Mobile ───────────────────────────────────────────────── -->
+<section class="mod" id="mobile">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">20 · Mobile</div>
+      <h2 class="mod-title">Consideraciones específicas de mobile</h2>
+      <p class="mod-desc">El catálogo es mobile-first. Estos patterns cubren lo que Tailwind y React no resuelven solos.</p>
+    </div>
+  </div>
+
+  <!-- Safe areas -->
+  <div class="sub-eye" style="margin-bottom:12px;">Safe areas — iOS notch & home bar</div>
+  <pre class="blk" style="margin-bottom:28px;"><span class="c">/* kit/recipes.css — aplicar en topbar, bottom bar, modales */</span>
+.topbar {
+  padding-top: <span class="s">env(safe-area-inset-top)</span>;
+  <span class="c">/* o en sticky: top = height + safe-area-inset-top */</span>
+}
+.bottom-bar, .cart-drawer-foot {
+  padding-bottom: calc(<span class="s">var(--space-4)</span> + <span class="s">env(safe-area-inset-bottom)</span>);
+}
+.cart-drawer {
+  <span class="c">/* Drawer ocupa hasta el safe area, no debajo */</span>
+  padding-bottom: <span class="s">env(safe-area-inset-bottom)</span>;
+  max-height: calc(100dvh - <span class="s">env(safe-area-inset-top)</span>);
+}
+<span class="c">/* En el &lt;head&gt; del HTML */</span>
+<span class="c">&lt;meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"&gt;</span></pre>
+
+  <!-- Touch targets -->
+  <div class="sub-eye" style="margin-bottom:12px;">Touch targets — mínimo 44 × 44 px</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px;">
+    <div>
+      <pre class="blk"><span class="c">/* Para elementos visualmente pequeños
+ * usar padding invisible extra */</span>
+.chip-touch {
+  position: relative;
+}
+.chip-touch::before {
+  content: <span class="s">""</span>;
+  position: absolute;
+  inset: <span class="s">-8px -4px</span>; <span class="c">/* expande hit area */</span>
+}
+
+<span class="c">/* Tailwind v4 */</span>
+&lt;button class=<span class="s">"min-h-[44px] min-w-[44px]"</span>&gt;</pre>
+    </div>
+    <div style="border:1px solid var(--hairline);border-radius:var(--radius-lg);padding:20px;background:var(--surface);">
+      <div class="sub-eye" style="margin-bottom:14px;">Componentes en riesgo de ser < 44px</div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-family:var(--font-sans);font-size:13px;color:var(--muted-foreground);">
+        <div style="display:flex;justify-content:space-between;"><span>Addon pills</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--destructive);">verificar</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Dots del ViewToggle</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--destructive);">verificar</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Botón ✕ de toast</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--destructive);">verificar</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Btn primary (h-36px)</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--naranja);">bordeline</span></div>
+        <div style="display:flex;justify-content:space-between;"><span>Btn lg (h-44px)</span><span style="font-family:var(--font-mono);font-size:11px;color:var(--verde);">✓ ok</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- iOS/Android fixes -->
+  <div class="sub-eye" style="margin-bottom:12px;">iOS & Android — fixes críticos</div>
+  <pre class="blk" style="margin-bottom:28px;"><span class="c">/* kit/recipes.css */</span>
+
+<span class="c">/* 1. Prevenir zoom automático en inputs (iOS) */</span>
+input, textarea, select {
+  font-size: max(<span class="s">16px</span>, <span class="s">1em</span>); <span class="c">/* ya está — confirmar que no se sobreescriba */</span>
+}
+
+<span class="c">/* 2. Eliminar flash gris al tocar (iOS/Android) */</span>
+* { -webkit-tap-highlight-color: <span class="s">transparent</span>; }
+
+<span class="c">/* 3. Smooth scroll nativo en iOS */</span>
+.scroll-container { -webkit-overflow-scrolling: <span class="s">touch</span>; }
+
+<span class="c">/* 4. Prevenir pull-to-refresh accidental en drawers */</span>
+.cart-drawer, .bottom-sheet { overscroll-behavior: <span class="s">contain</span>; }
+
+<span class="c">/* 5. Altura real del viewport (no afectada por browser chrome) */</span>
+.full-screen { height: <span class="s">100dvh</span>; } <span class="c">/* dvh en lugar de vh */</span>
+
+<span class="c">/* 6. Deshabilitar callout en imágenes (iOS long-press) */</span>
+img { -webkit-touch-callout: <span class="s">none</span>; }</pre>
+
+  <!-- Amber scroll -->
+  <div class="sub-eye" style="margin-bottom:12px;">Amber scroll — topbar que cambia al hacer scroll</div>
+  <pre class="blk" style="margin-bottom:28px;"><span class="c">/* kit/components/topbar.tsx */</span>
+<span class="k">import</span> { useEffect, useState } <span class="k">from</span> <span class="s">"react"</span>;
+
+<span class="k">export function</span> <span class="s">TopBar</span>() {
+  <span class="k">const</span> [scrolled, setScrolled] = useState(<span class="k">false</span>);
+
+  useEffect(() => {
+    <span class="k">const</span> onScroll = () => setScrolled(window.scrollY > <span class="s">48</span>);
+    window.addEventListener(<span class="s">"scroll"</span>, onScroll, { passive: <span class="k">true</span> });
+    <span class="k">return</span> () => window.removeEventListener(<span class="s">"scroll"</span>, onScroll);
+  }, []);
+
+  <span class="k">return</span> (
+    &lt;header className={cn(
+      <span class="s">"sticky top-0 z-[var(--z-sticky)] transition-colors"</span>,
+      <span class="s">"duration-[var(--duration-base)] ease-[var(--ease-out)]"</span>,
+      scrolled
+        ? <span class="s">"bg-amber border-b border-amber"</span>     <span class="c">// amber al scrollear</span>
+        : <span class="s">"bg-background/95 border-b border-hairline backdrop-blur-sm"</span>
+    )}&gt;
+      ...
+    &lt;/header&gt;
+  );
+}</pre>
+
+  <!-- Bottom sheet -->
+  <div class="sub-eye" style="margin-bottom:12px;">Bottom sheet — carrito en mobile</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px;align-items:start;">
+    <pre class="blk"><span class="c">/* CSS del drawer */</span>
+.bottom-sheet {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: <span class="k">var</span>(--z-modal);
+  background: <span class="k">var</span>(--surface-elevated);
+  border-radius: <span class="k">var</span>(--radius-2xl) <span class="k">var</span>(--radius-2xl) 0 0;
+  box-shadow: <span class="k">var</span>(--shadow-xl);
+  padding: <span class="s">20px 20px</span> calc(<span class="s">20px</span> + <span class="s">env(safe-area-inset-bottom)</span>);
+  max-height: <span class="s">85dvh</span>;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transform: translateY(<span class="s">100%</span>);
+  transition: transform <span class="k">var</span>(--duration-slow) <span class="k">var</span>(--ease-default);
+}
+.bottom-sheet.open {
+  transform: translateY(<span class="s">0</span>);
+}
+.bottom-sheet-handle {
+  width: <span class="s">36px</span>; height: <span class="s">4px</span>;
+  background: <span class="k">var</span>(--hairline);
+  border-radius: <span class="s">9999px</span>;
+  margin: 0 auto <span class="s">20px</span>;
+}</pre>
+    <div style="border:1px solid var(--hairline);border-radius:var(--radius-xl) var(--radius-xl) 0 0;background:var(--surface-elevated);padding:18px;box-shadow:var(--shadow-xl);">
+      <div style="width:36px;height:4px;background:var(--hairline);border-radius:9999px;margin:0 auto 16px;"></div>
+      <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-foreground);margin-bottom:12px;">Carrito · 3 equipos</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--hairline);">
+          <span style="font-family:var(--font-sans);font-size:13px;color:var(--ink);">Sony A7S III</span>
+          <span style="font-family:var(--font-mono);font-size:12px;color:var(--ink);">$ 24.500</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--hairline);">
+          <span style="font-family:var(--font-sans);font-size:13px;color:var(--ink);">Lente 35mm f/1.4</span>
+          <span style="font-family:var(--font-mono);font-size:12px;color:var(--ink);">$ 8.200</span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:12px 0;border-top:1px solid var(--hairline);margin-bottom:12px;">
+        <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-foreground);">Total · 3 jornadas</span>
+        <span style="font-family:var(--font-display);font-weight:900;font-size:20px;color:var(--ink);">$ 97.500</span>
+      </div>
+      <button style="width:100%;height:48px;background:var(--ink);color:var(--background);border:0;border-radius:var(--radius-md);font-family:var(--font-sans);font-weight:600;font-size:15px;cursor:pointer;">Confirmar reserva</button>
+    </div>
+  </div>
+
+  <!-- Thumb zone -->
+  <div class="sub-eye" style="margin-bottom:12px;">Thumb zone — zonas de alcance del pulgar</div>
+  <div style="display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center;margin-bottom:28px;">
+    <div style="width:140px;height:240px;border:2px solid var(--hairline);border-radius:20px;position:relative;background:var(--surface-elevated);overflow:hidden;flex-shrink:0;">
+      <!-- Zone verde - fácil -->
+      <div style="position:absolute;bottom:0;left:0;right:0;height:50%;background:color-mix(in oklch,var(--verde) 15%,transparent);"></div>
+      <!-- Zone amber - alcanzable -->
+      <div style="position:absolute;bottom:50%;left:0;right:0;height:28%;background:color-mix(in oklch,var(--amber) 20%,transparent);"></div>
+      <!-- Zone roja - difícil -->
+      <div style="position:absolute;top:0;left:0;right:0;height:22%;background:color-mix(in oklch,var(--destructive) 12%,transparent);"></div>
+      <!-- Labels -->
+      <div style="position:absolute;top:5%;left:50%;transform:translateX(-50%);font-family:var(--font-mono);font-size:8px;color:var(--destructive);text-align:center;white-space:nowrap;">difícil</div>
+      <div style="position:absolute;top:55%;left:50%;transform:translateX(-50%);font-family:var(--font-mono);font-size:8px;color:var(--ink);text-align:center;white-space:nowrap;">alcanzable</div>
+      <div style="position:absolute;bottom:8%;left:50%;transform:translateX(-50%);font-family:var(--font-mono);font-size:8px;color:var(--verde);text-align:center;white-space:nowrap;">fácil</div>
+      <!-- Home bar -->
+      <div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:40px;height:3px;background:var(--hairline);border-radius:9999px;"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="padding:12px 16px;border-radius:var(--radius-sm);border:1px solid color-mix(in oklch,var(--verde) 30%,transparent);background:color-mix(in oklch,var(--verde) 8%,transparent);">
+        <div style="font-family:var(--font-sans);font-weight:600;font-size:13px;color:var(--verde);margin-bottom:4px;">Zona verde — acción primaria</div>
+        <div style="font-family:var(--font-sans);font-size:12px;color:var(--muted-foreground);line-height:1.5;">CTA "Reservar", "Confirmar", botón de carrito. Zona inferior 50% de pantalla.</div>
+      </div>
+      <div style="padding:12px 16px;border-radius:var(--radius-sm);border:1px solid color-mix(in oklch,var(--amber) 40%,transparent);background:color-mix(in oklch,var(--amber) 10%,transparent);">
+        <div style="font-family:var(--font-sans);font-weight:600;font-size:13px;color:var(--ink);margin-bottom:4px;">Zona amber — acción secundaria</div>
+        <div style="font-family:var(--font-sans);font-size:12px;color:var(--muted-foreground);line-height:1.5;">Filtros, búsqueda, ViewToggle. Centro de pantalla, alcanzable con esfuerzo.</div>
+      </div>
+      <div style="padding:12px 16px;border-radius:var(--radius-sm);border:1px solid color-mix(in oklch,var(--destructive) 25%,transparent);background:color-mix(in oklch,var(--destructive) 6%,transparent);">
+        <div style="font-family:var(--font-sans);font-weight:600;font-size:13px;color:var(--destructive);margin-bottom:4px;">Zona roja — solo lectura</div>
+        <div style="font-family:var(--font-sans);font-size:12px;color:var(--muted-foreground);line-height:1.5;">Zona superior: wordmark, breadcrumb. No poner CTAs críticos acá.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Virtual keyboard -->
+  <div class="sub-eye" style="margin-bottom:12px;">Teclado virtual — layout shifts</div>
+  <pre class="blk"><span class="c">/* El viewport se achica cuando sube el teclado virtual.
+ * Usar dvh (dynamic viewport height) en lugar de vh. */</span>
+
+<span class="c">/* ✗ Evitar */</span>
+.modal { height: <span class="s">100vh</span>; }
+
+<span class="c">/* ✓ Usar */</span>
+.modal { height: <span class="s">100dvh</span>; }
+
+<span class="c">/* Date picker: cuando el input recibe foco, hacer scroll
+ * para que el picker quede visible sobre el teclado */</span>
+<span class="k">const</span> handleFocus = (e: React.FocusEvent) => {
+  setTimeout(() => {
+    e.target.scrollIntoView({ block: <span class="s">"center"</span>, behavior: <span class="s">"smooth"</span> });
+  }, <span class="s">300</span>); <span class="c">// esperar que el teclado termine de subir</span>
+};
+
+<span class="c">/* Detectar si el teclado está arriba (heurística) */</span>
+<span class="k">const</span> isKeyboardOpen =
+  window.visualViewport
+    ? window.visualViewport.height &lt; window.innerHeight * <span class="s">0.75</span>
+    : <span class="k">false</span>;</pre>
+</section>
+
+<!-- ── 21 · Micro-interacciones ───────────────────────────────────── -->
+<section class="mod" id="micro" style="border-bottom:0;">
+  <div class="mod-head">
+    <div>
+      <div class="mod-eye">21 · Micro-interacciones</div>
+      <h2 class="mod-title">Press states, hovers y transiciones</h2>
+      <p class="mod-desc">Pequeñas respuestas que hacen que la UI se sienta viva. Todas usan los tokens de motion definidos en sección 04.</p>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px;">
+    <pre class="blk"><span class="c">/* kit/recipes.css — micro-interacciones globales */</span>
+
+<span class="c">/* Press state en botones */</span>
+button:active, [role="button"]:active {
+  transform: scale(<span class="s">0.97</span>);
+  transition: transform <span class="k">var</span>(--duration-fast) <span class="k">var</span>(--ease-default);
+}
+
+<span class="c">/* Card hover lift */</span>
+.card-interactive {
+  transition:
+    transform <span class="k">var</span>(--duration-base) <span class="k">var</span>(--ease-out),
+    box-shadow <span class="k">var</span>(--duration-base) <span class="k">var</span>(--ease-out),
+    border-color <span class="k">var</span>(--duration-base) <span class="k">var</span>(--ease-out);
+}
+.card-interactive:hover {
+  transform: translateY(<span class="s">-2px</span>);
+  box-shadow: <span class="k">var</span>(--shadow-md);
+  border-color: oklch(<span class="s">0.18 0.01 60 / 30%</span>);
+}
+
+<span class="c">/* Skeleton de entrada al montar */</span>
+@keyframes fade-up {
+  <span class="s">from</span> { opacity: 0; transform: translateY(<span class="s">6px</span>); }
+  <span class="s">to</span>   { opacity: 1; transform: translateY(<span class="s">0</span>); }
+}
+.animate-in {
+  animation: fade-up <span class="k">var</span>(--duration-slow) <span class="k">var</span>(--ease-out) both;
+}
+
+<span class="c">/* Stagger en grids de cards */</span>
+.catalog-grid > *:nth-child(1) { animation-delay: 0ms; }
+.catalog-grid > *:nth-child(2) { animation-delay: 40ms; }
+.catalog-grid > *:nth-child(3) { animation-delay: 80ms; }
+.catalog-grid > *:nth-child(4) { animation-delay: 120ms; }</pre>
+
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <!-- Specimens interactivos -->
+      <div style="border:1px solid var(--hairline);border-radius:var(--radius-lg);padding:18px;background:var(--surface);">
+        <div class="sub-eye" style="margin-bottom:12px;">Probá los estados</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+          <button style="height:36px;padding:0 16px;border-radius:8px;background:var(--ink);color:var(--background);border:0;font-family:var(--font-sans);font-weight:500;font-size:14px;cursor:pointer;transition:transform 120ms cubic-bezier(0.32,0.72,0,1),background 200ms;active:transform:scale(0.97)" onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform=''" onmouseleave="this.style.transform=''">Presioná</button>
+          <button style="height:36px;padding:0 16px;border-radius:8px;background:var(--amber);color:var(--ink);border:0;font-family:var(--font-sans);font-weight:500;font-size:14px;cursor:pointer;transition:transform 120ms cubic-bezier(0.32,0.72,0,1)" onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform=''" onmouseleave="this.style.transform=''">Presioná</button>
+        </div>
+      </div>
+      <div style="border:1px solid var(--hairline);border-radius:var(--radius-lg);padding:18px;background:var(--surface);">
+        <div class="sub-eye" style="margin-bottom:12px;">Card hover lift</div>
+        <div style="padding:14px;background:var(--surface-elevated);border:1px solid var(--hairline);border-radius:var(--radius-md);cursor:pointer;transition:transform 200ms cubic-bezier(0,0,0.2,1),box-shadow 200ms cubic-bezier(0,0,0.2,1),border-color 200ms" onmouseenter="this.style.transform='translateY(-2px)';this.style.boxShadow='var(--shadow-md)';this.style.borderColor='oklch(0.18 0.01 60 / 30%)'" onmouseleave="this.style.transform='';this.style.boxShadow='';this.style.borderColor=''">
+          <div style="font-family:var(--font-sans);font-weight:600;font-size:13px;color:var(--ink);">Sony A7S III</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted-foreground);margin-top:4px;">$ 24.500 / jornada</div>
+        </div>
+      </div>
+      <div style="border:1px solid var(--hairline);border-radius:var(--radius-lg);padding:18px;background:var(--surface);">
+        <div class="sub-eye" style="margin-bottom:12px;">Stagger fade-up</div>
+        <div style="display:flex;gap:8px;" id="stagger-demo">
+          <div style="flex:1;height:40px;background:var(--amber-soft);border-radius:var(--radius-sm);border:1px solid var(--hairline);opacity:0;"></div>
+          <div style="flex:1;height:40px;background:var(--amber-soft);border-radius:var(--radius-sm);border:1px solid var(--hairline);opacity:0;"></div>
+          <div style="flex:1;height:40px;background:var(--amber-soft);border-radius:var(--radius-sm);border:1px solid var(--hairline);opacity:0;"></div>
+        </div>
+        <button onclick="animateStagger()" style="margin-top:10px;height:28px;padding:0 12px;border-radius:9999px;border:1px solid var(--hairline);background:var(--surface-elevated);font-family:var(--font-mono);font-size:9px;letter-spacing:0.15em;text-transform:uppercase;cursor:pointer;color:var(--muted-foreground);">replay</button>
+      </div>
+    </div>
+  </div>
+
+  <pre class="blk"><span class="c">/* Transiciones de página con React Router / Next.js App Router */</span>
+<span class="k">@keyframes</span> page-in {
+  <span class="s">from</span> { opacity: 0; transform: translateY(<span class="s">8px</span>); }
+  <span class="s">to</span>   { opacity: 1; transform: translateY(<span class="s">0</span>); }
+}
+.page-wrapper {
+  animation: page-in <span class="k">var</span>(--duration-slow) <span class="k">var</span>(--ease-out) both;
+}
+
+<span class="c">/* Agregar al contador de carrito (rebote al agregar item) */</span>
+@keyframes cart-bump {
+  <span class="s">0%, 100%</span> { transform: scale(<span class="s">1</span>); }
+  <span class="s">50%</span>      { transform: scale(<span class="s">1.3</span>); }
+}
+.cart-count-bump {
+  animation: cart-bump <span class="k">var</span>(--duration-base) <span class="k">var</span>(--ease-bounce);
+}</pre>
+</section>
+
+</main>
+
+<footer class="f">
+  <div class="f-inner">
+    <div>
+      <div class="f-tagline" id="footer-tagline-ext"></div>
+      <div style="margin-top:10px;font-family:var(--font-sans);font-size:13px;color:var(--muted-foreground);">
+        Extended reference — <a href="index.html" style="color:var(--ink);text-decoration:underline;text-underline-offset:3px;">← volver a Fundamentos</a>
+      </div>
+    </div>
+    <div class="f-meta">© 2026 Rambla Rental<br>Mar del Plata, Argentina</div>
+  </div>
+</footer>
+
+<script>
+  (function() {
+    const pool = ["rental, estudio, rambla.", "con rambla, en mardel.", "en rambla, tu proyecto.", "en rambla, tu rodaje."];
+    const el = document.getElementById("footer-tagline-ext");
+    if (el) el.textContent = pool[Math.floor(Math.random() * pool.length)];
+  })();
+
+  function animateStagger() {
+    const cards = document.querySelectorAll('#stagger-demo > div');
+    cards.forEach(c => { c.style.opacity = '0'; c.style.transform = 'translateY(6px)'; c.style.transition = 'none'; });
+    cards.forEach((c, i) => {
+      setTimeout(() => {
+        c.style.transition = 'opacity 350ms cubic-bezier(0,0,0.2,1), transform 350ms cubic-bezier(0,0,0.2,1)';
+        c.style.opacity = '1';
+        c.style.transform = 'translateY(0)';
+      }, i * 60);
+    });
+  }
+  animateStagger();
+</script>
+</body>
+</html>
