@@ -16,18 +16,6 @@ export type OrderStatus =
   | "devuelto"
   | "cancelado";
 
-export const STATUS_LABEL: Record<OrderStatus, string> = {
-  borrador: "Borrador",
-  solicitado: "Solicitado",
-  confirmado: "Confirmado",
-  entregado: "Entregado",
-  devuelto: "Devuelto",
-  cancelado: "Cancelado",
-};
-
-export function isEditable(status: OrderStatus) {
-  return status === "borrador" || status === "solicitado";
-}
 
 export type OrderItemInput = {
   id: string;
