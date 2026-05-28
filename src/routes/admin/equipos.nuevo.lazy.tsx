@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
 import { EquipoFormDialogV2 } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
+import { popEquiposReturnSearch } from "@/lib/admin/equiposReturnSearch";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/equipos/nuevo")({
@@ -23,7 +24,8 @@ function NuevoEquipoRoute() {
     onSettled: () => qc.invalidateQueries({ queryKey: ["admin", "equipos"] }),
   });
 
-  const goBack = () => navigate({ to: "/admin/equipos" });
+  const goBack = () =>
+    navigate({ to: "/admin/equipos", search: popEquiposReturnSearch() as never });
 
   return (
     <EquipoFormDialogV2

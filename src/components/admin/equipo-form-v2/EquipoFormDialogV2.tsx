@@ -155,6 +155,11 @@ export function EquipoFormDialogV2({
   const { rate: usdRate } = useUsdRate();
   const roiDefault = useRoiPctDefault();
 
+  // "Aplicar" (guardar sin cerrar) vs "Guardar" (cerrar al terminar). El
+  // botón Aplicar setea este ref a false antes de disparar el submit; en el
+  // success path consultamos el ref para decidir cerrar o quedarnos.
+  const closeOnSuccessRef = useRef(true);
+
   // ── Estado del form (react-hook-form) ──────────────────────────────
   const schema = useMemo(() => buildSchema(isEdit), [isEdit]);
   const form = useForm<FormValues>({
@@ -927,9 +932,22 @@ export function EquipoFormDialogV2({
             return;
           }
         }
-        toast.success(isEdit ? "Equipo actualizado" : "Equipo creado");
+        toast.success(
+          isEdit
+            ? closeOnSuccessRef.current
+              ? "Equipo actualizado"
+              : "Cambios aplicados"
+            : "Equipo creado",
+        );
       }
-      onOpenChange(false);
+      if (closeOnSuccessRef.current) {
+        onOpenChange(false);
+      } else {
+        // Aplicar: reseteamos el baseline de dirty para que las próximas
+        // ediciones se detecten como nuevas y el confirm-close vuelva a
+        // funcionar después de Aplicar.
+        form.reset(form.getValues(), { keepValues: true });
+      }
     },
     (errors) => {
       // Fallaba silencioso cuando había errores de validación zod (ej. nombre
@@ -1532,12 +1550,39 @@ export function EquipoFormDialogV2({
     </p>
   ) : null;
 
+  // En edit: dos botones — "Aplicar" persiste sin cerrar (para iterar sin
+  // perder posición), "Guardar" persiste y vuelve a la lista. En create solo
+  // mostramos "Guardar" porque el flujo post-create necesita el handoff a
+  // edit (missing-recommended) o la navegación.
+  const triggerApply = () => {
+    if (saving) return;
+    closeOnSuccessRef.current = false;
+    document.querySelector<HTMLFormElement>(`form[data-equipo-form-v2]`)?.requestSubmit();
+  };
   const footerActions = (
     <>
       <Button type="button" variant="ghost" onClick={() => handleCloseRequest(false)}>
         Cancelar
       </Button>
-      <Button type="submit" form={formId} disabled={saving}>
+      {isEdit && (
+        <Button type="button" variant="outline" disabled={saving} onClick={triggerApply}>
+          {saving ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Guardando…
+            </>
+          ) : (
+            "Aplicar"
+          )}
+        </Button>
+      )}
+      <Button
+        type="submit"
+        form={formId}
+        disabled={saving}
+        onClick={() => {
+          closeOnSuccessRef.current = true;
+        }}
+      >
         {saving ? (
           <>
             <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Guardando…
