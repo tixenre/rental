@@ -94,6 +94,10 @@ const fmtFecha = (s: string) => {
 
 // ── Avatar ────────────────────────────────────────────────────────────────
 
+// Tier 3 (categórico): paleta de avatares — colores distinguibles entre sí
+// para identidad visual, no semánticos. Off-brand a propósito. Ver
+// docs/DESIGN_SYSTEM.md → Tiers de color.
+/* eslint-disable no-restricted-syntax */
 const AVATAR_COLORS = [
   "bg-blue-500",
   "bg-violet-500",
@@ -104,6 +108,7 @@ const AVATAR_COLORS = [
   "bg-orange-500",
   "bg-teal-600",
 ];
+/* eslint-enable no-restricted-syntax */
 
 function avatarBg(name: string) {
   let h = 0;
@@ -1243,7 +1248,7 @@ function PagosSidebar({
       <div
         className={cn(
           "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-          estadoPago === "pagado" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700",
+          estadoPago === "pagado" ? "bg-verde/10 text-verde" : "bg-amber/15 text-ink",
         )}
       >
         {estadoPago === "pagado" ? "Pagado" : "Pago pendiente"}

@@ -1271,6 +1271,9 @@ function DocActions({
           className="flex-1 relative flex items-center gap-2.5 rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5 text-left transition hover:border-ink hover:bg-muted"
         >
           {showNewBadge && (
+            // TODO(diseño): badge "Nuevo" — tratamiento de color pendiente de
+            // revisión visual con el dueño (¿amber de marca o se mantiene?).
+            // eslint-disable-next-line no-restricted-syntax -- diferido, ver TODO
             <span className="absolute -top-1.5 -right-1.5 rounded-full bg-rose-500 text-white text-[9px] font-bold tracking-wide px-1.5 py-0.5 leading-none shadow">
               Nuevo
             </span>
