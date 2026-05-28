@@ -118,9 +118,9 @@ function FooterDesktop() {
   return (
     <footer className="hidden md:block border-t hairline bg-background">
       <div className="mx-auto max-w-7xl px-6 lg:px-12 py-12">
-        <div className="grid gap-10 md:grid-cols-12">
+        <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr]">
           {/* Branding + tagline */}
-          <div className="md:col-span-4">
+          <div>
             <img src={logoWordmark} alt="Rambla Rental" className="h-12 w-auto" loading="lazy" />
             <p className="mt-3 text-sm text-muted-foreground max-w-xs">
               Equipos audiovisuales y estudio de foto/video en Mar del Plata. Producciones de
@@ -139,7 +139,7 @@ function FooterDesktop() {
           </div>
 
           {/* Contacto */}
-          <div className="md:col-span-4">
+          <div>
             <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-4">
               Contacto
             </h3>
@@ -189,7 +189,7 @@ function FooterDesktop() {
           </div>
 
           {/* Navegación */}
-          <div className="md:col-span-4">
+          <div>
             <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-4">
               Navegación
             </h3>
