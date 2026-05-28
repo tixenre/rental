@@ -17,7 +17,10 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "e3f7a9c2b5d4"
-down_revision: Union[str, Sequence[str], None] = "d2e4f6a8c1b3"
+# Re-encadenada después del merge con main: PR #564 (email_copy_portal_link)
+# también basaba en d2e4f6a8c1b3 y se mergeó primero, así que linearizamos
+# la cadena para evitar heads divergentes.
+down_revision: Union[str, Sequence[str], None] = "e7c3a9f5d1b8"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
