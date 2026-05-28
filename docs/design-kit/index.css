@@ -1,0 +1,14 @@
+/* ─────────────────────────────────────────────────────────────────────
+ * Rambla Rental — Design Kit, single-import entry point.
+ *
+ * If you don't want to import three files separately, just:
+ *
+ *   @import "tailwindcss";
+ *   @import "./kit/index.css";
+ *
+ * and you've got fonts + tokens + recipes wired in.
+ * ──────────────────────────────────────────────────────────────────── */
+
+@import "./fonts.css";
+@import "./tokens.css";
+@import "./recipes.css";

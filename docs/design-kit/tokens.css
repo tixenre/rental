@@ -1,0 +1,172 @@
+/* ─────────────────────────────────────────────────────────────────────
+ * Rambla Rental — Design Tokens (Tailwind v4)
+ *
+ * Drop this into a Tailwind v4 project to get the full token surface:
+ *   colors, radii, font families, status palette, sidebar accents.
+ *
+ * USAGE — at the top of your src/styles.css:
+ *
+ *   @import "tailwindcss";
+ *   @import "./kit/fonts.css";
+ *   @import "./kit/tokens.css";
+ *   @import "./kit/recipes.css";
+ *
+ * Tailwind v4 reads `@theme` and generates utilities automatically:
+ *   bg-amber, text-ink, border-hairline, rounded-lg, font-display, …
+ *
+ * Brand-exact rules (DO NOT REWRITE):
+ *   --amber must stay #FAB428 (Pantone 1235 C). Don't oklch-ify.
+ *   --rosa #ED7BAD · --azul #1097DB · --naranja #E9552F · --verde #009971
+ *   are the only secondary-palette colors. Use only for status + charts.
+ * ──────────────────────────────────────────────────────────────────── */
+
+@theme inline {
+  /* ── Radii (six-step ladder) ──────────────────────────────────── */
+  --radius-sm:  calc(var(--radius) - 4px);
+  --radius-md:  calc(var(--radius) - 2px);
+  --radius-lg:  var(--radius);
+  --radius-xl:  calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  /* ── Type stacks ──────────────────────────────────────────────── */
+  --font-display: "Champ Black", "TT Commons", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    "TT Commons", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+
+  /* ── Color aliases (so `bg-foo` utilities exist) ──────────────── */
+  --color-background:         var(--background);
+  --color-foreground:         var(--foreground);
+  --color-card:               var(--card);
+  --color-card-foreground:    var(--card-foreground);
+  --color-popover:            var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary:            var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary:          var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted:              var(--muted);
+  --color-muted-foreground:   var(--muted-foreground);
+  --color-accent:             var(--accent);
+  --color-accent-foreground:  var(--accent-foreground);
+  --color-destructive:        var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border:             var(--border);
+  --color-input:              var(--input);
+  --color-ring:               var(--ring);
+
+  --color-surface:            var(--surface);
+  --color-surface-elevated:   var(--surface-elevated);
+  --color-hairline:           var(--hairline);
+
+  --color-amber:              var(--amber);
+  --color-amber-soft:         var(--amber-soft);
+  --color-amber-hot:          var(--amber-hot);
+  --color-ink:                var(--ink);
+  --color-ink-pure:           var(--ink-pure);
+
+  --color-rosa:               var(--rosa);
+  --color-azul:               var(--azul);
+  --color-naranja:            var(--naranja);
+  --color-verde:              var(--verde);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar:                    var(--sidebar);
+  --color-sidebar-foreground:         var(--sidebar-foreground);
+  --color-sidebar-primary:            var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent:             var(--sidebar-accent);
+  --color-sidebar-accent-foreground:  var(--sidebar-accent-foreground);
+  --color-sidebar-border:             var(--sidebar-border);
+  --color-sidebar-ring:               var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.75rem;
+
+  /* ── Brand light palette (default) ────────────────────────────── */
+  --background: oklch(0.985 0.005 90);   /* hueso casi blanco */
+  --foreground: oklch(0.18 0.01 60);     /* tinta negra cálida */
+  --ink:        oklch(0.14 0.01 60);     /* near-black cálido (UI) */
+  --ink-pure:   #000;                    /* brand-exact: hero + print */
+
+  --surface:          oklch(0.97 0.008 85);
+  --surface-elevated: oklch(1 0 0);
+  --hairline:         oklch(0.18 0.01 60 / 12%);
+
+  --card:                 oklch(1 0 0);
+  --card-foreground:      oklch(0.18 0.01 60);
+  --popover:              oklch(1 0 0);
+  --popover-foreground:   oklch(0.18 0.01 60);
+
+  /* Amarillo brand — Pantone 1235 C — NO ALTERAR */
+  --amber:      #FAB428;
+  --amber-soft: color-mix(in oklch, #FAB428 18%, transparent);
+  --amber-hot:  #FFCC55;
+
+  --primary:              oklch(0.18 0.01 60);
+  --primary-foreground:   oklch(0.985 0.005 90);
+
+  --secondary:            oklch(0.94 0.008 85);
+  --secondary-foreground: oklch(0.18 0.01 60);
+
+  --muted:                oklch(0.94 0.008 85);
+  --muted-foreground:     oklch(0.42 0.01 70);
+
+  --accent:               #FAB428;
+  --accent-foreground:    oklch(0.18 0.01 60);
+
+  --destructive:            oklch(0.62 0.22 27);
+  --destructive-foreground: oklch(0.98 0.005 80);
+
+  --border: oklch(0.18 0.01 60 / 12%);
+  --input:  oklch(0.18 0.01 60 / 16%);
+  --ring:   color-mix(in oklch, #FAB428 60%, transparent);
+
+  /* ── Secondary palette (Pantone-exact) — solo status + charts ── */
+  --rosa:    #ED7BAD;
+  --azul:    #1097DB;
+  --naranja: #E9552F;
+  --verde:   #009971;
+
+  --chart-1: var(--amber);
+  --chart-2: var(--azul);
+  --chart-3: var(--naranja);
+  --chart-4: var(--verde);
+  --chart-5: var(--rosa);
+
+  /* ── Sidebar (admin) ──────────────────────────────────────────── */
+  --sidebar:                    oklch(0.985 0.005 90);
+  --sidebar-foreground:         oklch(0.18 0.01 60);
+  --sidebar-primary:            #FAB428;
+  --sidebar-primary-foreground: oklch(0.18 0.01 60);
+  --sidebar-accent:             var(--amber-soft);
+  --sidebar-accent-foreground:  oklch(0.18 0.01 60);
+  --sidebar-border:             oklch(0.18 0.01 60 / 12%);
+  --sidebar-ring:               color-mix(in oklch, #FAB428 50%, transparent);
+
+  /* ── Dynamic vars (set via JS) ────────────────────────────────── */
+  --amber-pct:    0%;      /* topbar scroll progress 0%→100% */
+  --cart-strip-h: 0px;     /* cart strip presence */
+}
+
+.dark {
+  /* Variante invertida — espejo del merch negro del brand */
+  --background: oklch(0.16 0.01 60);
+  --foreground: oklch(0.97 0.008 85);
+  --surface:    oklch(0.20 0.01 60);
+  --surface-elevated: oklch(0.24 0.01 60);
+  --hairline:   oklch(1 0 0 / 12%);
+  --card:       oklch(0.20 0.01 60);
+  --card-foreground: oklch(0.97 0.008 85);
+  --muted:      oklch(0.24 0.01 60);
+  --muted-foreground: oklch(0.72 0.01 70);
+  --primary:    oklch(0.82 0.16 78);
+  --primary-foreground: oklch(0.16 0.01 60);
+}
