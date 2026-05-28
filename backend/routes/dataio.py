@@ -24,7 +24,6 @@ import logging
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -33,7 +32,7 @@ from admin_guard import require_admin
 from database import get_db
 from dataio import orchestrator
 from dataio.csv_exporters import CSV_EXPORTERS
-from dataio.paths import CATALOG_ENTITIES, ENTITY_ORDER, OPERATIONAL_ENTITIES
+from dataio.paths import BACKUP_GROUPS, CATALOG_ENTITIES, ENTITY_ORDER, OPERATIONAL_ENTITIES
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -50,7 +49,7 @@ def list_entities(_admin: dict = Depends(require_admin)):
 
 
 def _zip_response(zip_bytes: bytes, filename_prefix: str) -> StreamingResponse:
-    ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    ts = datetime.utcnow().strftime("%Y-%m-%d")
     return StreamingResponse(
         io.BytesIO(zip_bytes),
         media_type="application/zip",
@@ -70,13 +69,26 @@ def export_dataio(
     """Exporta una entidad como JSON, o un grupo como ZIP."""
     conn = get_db()
     try:
+        # ── Grupos de backup de la UI: backup-<grupo> → un solo ZIP ──
+        if entity.startswith("backup-"):
+            grupo = entity[len("backup-"):]
+            entities = BACKUP_GROUPS.get(grupo)
+            if entities is None:
+                raise HTTPException(
+                    400,
+                    f"Grupo de backup inválido: {grupo!r}. "
+                    f"Válidos: {[f'backup-{g}' for g in BACKUP_GROUPS]}",
+                )
+            zip_bytes = orchestrator.export_to_zip_bytes(conn, list(entities))
+            return _zip_response(zip_bytes, f"backup-{grupo}")
+
         if entity == "catalog-all":
             zip_bytes = orchestrator.export_to_zip_bytes(conn, list(CATALOG_ENTITIES))
             return _zip_response(zip_bytes, "catalogo")
 
         if entity == "operacional-all":
             zip_bytes = orchestrator.export_to_zip_bytes(conn, list(OPERATIONAL_ENTITIES))
-            return _zip_response(zip_bytes, "operacional")
+            return _zip_response(zip_bytes, "backup")
 
         if entity == "full":
             zip_bytes = orchestrator.export_to_zip_bytes(conn, list(ENTITY_ORDER))
@@ -132,23 +144,36 @@ def export_dataio(
         conn.close()
 
 
+# Scopes de import expuestos por la UI. Cada uno mapea a una lista de
+# entidades. "operacional" se mantiene por compatibilidad (clientes+pedidos).
+_IMPORT_SCOPES: dict[str, tuple[str, ...]] = {
+    **BACKUP_GROUPS,  # configuracion, clientes, pedidos
+    "operacional": OPERATIONAL_ENTITIES,
+}
+
+
 @router.post("/admin/dataio/import")
 async def import_dataio(
     file: UploadFile = File(...),
-    scope: Literal["operacional"] = Query(
-        "operacional",
-        description="Scope a importar. Solo 'operacional' habilitado desde UI.",
+    scope: str = Query(
+        "configuracion",
+        description="Grupo a restaurar: configuracion | clientes | pedidos.",
     ),
     dry_run: bool = Query(False, description="Simular sin commitear."),
     _admin: dict = Depends(require_admin),
 ):
-    """Importa un ZIP con JSONs de clientes/alquileres.
+    """Restaura (upsert) un ZIP con los JSONs de un grupo de backup.
 
-    Por seguridad, solo se permite `scope=operacional` desde la UI.
-    El catálogo se importa automáticamente al startup desde `/data/catalog/`.
+    Scopes: `configuracion` (catálogo + specs + ajustes + mails + descuentos),
+    `clientes`, `pedidos`. El upsert es por clave natural (no borra lo que no
+    esté en el ZIP). Probar siempre con `dry_run=true` primero.
     """
-    if scope != "operacional":
-        raise HTTPException(400, "Solo scope=operacional permitido desde UI")
+    entities = _IMPORT_SCOPES.get(scope)
+    if entities is None:
+        raise HTTPException(
+            400,
+            f"Scope inválido: {scope!r}. Válidos: {list(_IMPORT_SCOPES)}",
+        )
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(400, "Solo archivos .zip permitidos")
     content = await file.read()
@@ -165,14 +190,19 @@ async def import_dataio(
         stats = orchestrator.import_from_zip_bytes(
             conn,
             content,
-            only=list(OPERATIONAL_ENTITIES),
+            only=list(entities),
             dry_run=dry_run,
         )
 
-        # Bumpear secuencias post-import para que nuevos pedidos manuales
-        # no colisionen con los importados. Idempotente.
+        # Bumpear secuencias operacionales post-import para que nuevos pedidos
+        # manuales no colisionen con los importados. Idempotente. Solo si se
+        # tocaron clientes o pedidos.
         sequences_bumped = []
-        if not dry_run and stats.get("alquileres", {}).get("inserted", 0) > 0:
+        toco_operacional = (
+            stats.get("alquileres", {}).get("inserted", 0) > 0
+            or stats.get("clientes", {}).get("inserted", 0) > 0
+        )
+        if not dry_run and toco_operacional:
             sequences_bumped = _bump_operacional_sequences(conn)
 
         if not dry_run:

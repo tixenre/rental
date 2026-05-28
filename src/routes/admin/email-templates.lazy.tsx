@@ -65,6 +65,7 @@ const AVAILABLE_VARS: { name: string; help: string }[] = [
   { name: "items_html", help: "Lista de equipos como <ul><li>...</li></ul>" },
   { name: "items_text", help: "Lista de equipos como texto plano" },
   { name: "admin_url", help: "Link al pedido en el back-office (solo admin)" },
+  { name: "portal_url", help: "Link al portal del cliente (seguir el pedido)" },
 ];
 
 function EmailTemplatesPage() {

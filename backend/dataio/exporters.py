@@ -545,6 +545,46 @@ def export_alquileres(conn) -> list[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# CONFIG — ajustes, plantillas de mail, descuentos
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def export_app_settings(conn) -> list[dict]:
+    rows = conn.execute(
+        "SELECT key, value FROM app_settings ORDER BY key"
+    ).fetchall()
+    return [
+        schema.AppSetting(key=r["key"], value=r["value"]).model_dump()
+        for r in rows
+    ]
+
+
+def export_email_templates(conn) -> list[dict]:
+    rows = conn.execute(
+        "SELECT key, subject, body_html, body_text FROM email_templates ORDER BY key"
+    ).fetchall()
+    return [
+        schema.EmailTemplate(
+            key=r["key"],
+            subject=r["subject"],
+            body_html=r["body_html"],
+            body_text=r["body_text"],
+        ).model_dump()
+        for r in rows
+    ]
+
+
+def export_descuentos_jornada(conn) -> list[dict]:
+    rows = conn.execute(
+        "SELECT jornadas, pct FROM descuentos_jornada ORDER BY jornadas"
+    ).fetchall()
+    return [
+        schema.DescuentoJornada(jornadas=int(r["jornadas"]), pct=float(r["pct"])).model_dump()
+        for r in rows
+    ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Dispatch
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -557,6 +597,9 @@ EXPORTERS = {
     "equipos": export_equipos,
     "equipo_specs": export_equipo_specs,
     "equipo_fichas": export_equipo_fichas,
+    "app_settings": export_app_settings,
+    "email_templates": export_email_templates,
+    "descuentos_jornada": export_descuentos_jornada,
     "clientes": export_clientes,
     "alquileres": export_alquileres,
 }

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -181,6 +183,7 @@ function clearBookingQuery() {
 }
 
 export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) {
+  const navigate = useNavigate();
   const pricePerHour = config?.pricePerHour ?? STUDIO.pricePerHour;
   const minHours = config?.minHours ?? STUDIO.minHours;
   const openHour = config?.openHour ?? STUDIO.openHour;
@@ -231,7 +234,6 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
   const [disponibilidad, setDisponibilidad] = useState<Disponibilidad>("idle");
   const [motivo, setMotivo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [confirmada, setConfirmada] = useState<{ numero: number | null } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
@@ -306,7 +308,6 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
 
   // Chequeo de disponibilidad en vivo cuando hay fecha + hora + duración.
   useEffect(() => {
-    setConfirmada(null);
     setErrorMsg(null);
     if (!fechaISO) {
       setDisponibilidad("idle");
@@ -354,8 +355,12 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
         horas: hours,
         con_pack: withPack,
       });
-      setConfirmada({ numero: res.numero_pedido ?? null });
+      toast.success(`Reserva #${res.numero_pedido ?? res.id} enviada`, {
+        description: "Te llevamos a tu portal para seguir el estado y los próximos pasos.",
+        duration: 6000,
+      });
       setReturnedFromLogin(false);
+      navigate({ to: "/cliente/portal", search: { nuevo: res.id } });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "No se pudo crear la reserva";
       // Sesión vencida entre el pre-chequeo y el submit → pedir login de nuevo.
@@ -400,43 +405,10 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
     window.open(`https://wa.me/${STUDIO_PHONE}?text=${text}`, "_blank");
   };
 
-  if (confirmada) {
-    return (
-      <div className="rounded-2xl border hairline bg-surface p-6 sm:p-8 text-center">
-        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald-500/10 text-emerald-700">
-          <Check className="h-6 w-6" />
-        </div>
-        <h3 className="mt-4 font-display text-2xl">¡Solicitud enviada!</h3>
-        <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
-          Recibimos tu reserva del estudio
-          {confirmada.numero ? (
-            <>
-              {" "}
-              <span className="font-mono text-ink">#{confirmada.numero}</span>
-            </>
-          ) : null}{" "}
-          para el <span className="font-medium text-ink">{dateLabelFull}</span> de {startSlot} a{" "}
-          {endTime} ({hours} h). Te vamos a contactar para confirmarla.
-        </p>
-        <Button
-          variant="outline"
-          className="mt-6"
-          onClick={() => {
-            setConfirmada(null);
-            setDate(undefined);
-            setHours(minHours);
-            setStartSlot(`${pad(openHour)}:00`);
-            setWithPack(false);
-          }}
-        >
-          Reservar otra fecha
-        </Button>
-      </div>
-    );
-  }
-
-  const ctaLabel =
-    auth === "out" ? "Iniciar sesión y reservar" : auth === "checking" ? "Reservar" : "Reservar";
+  // Post-submit: la pantalla de confirmación local se quitó — ahora redirigimos
+  // al portal del cliente (decisión PR #564) con `?nuevo=<id>` para que destaque
+  // el pedido recién creado en el listado de "Mis pedidos".
+  const ctaLabel = auth === "out" ? "Iniciar sesión y reservar" : "Reservar";
 
   return (
     <div className="space-y-4">

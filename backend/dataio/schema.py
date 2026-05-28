@@ -281,6 +281,29 @@ class Alquiler(_Base):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# CONFIG — ajustes del sistema, plantillas de mail, descuentos
+# (parte del grupo "configuración" del backup; sin datos personales)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class AppSetting(_Base):
+    key: str  # clave natural (PK)
+    value: str
+
+
+class EmailTemplate(_Base):
+    key: str  # clave natural (PK)
+    subject: str
+    body_html: str
+    body_text: str
+
+
+class DescuentoJornada(_Base):
+    jornadas: int  # clave natural (UNIQUE)
+    pct: float
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Mapping entity → model (usado por exporters/importers)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -293,6 +316,9 @@ ENTITY_MODELS: dict[str, type[_Base]] = {
     "equipos": Equipo,
     "equipo_specs": EquipoSpec,
     "equipo_fichas": EquipoFicha,
+    "app_settings": AppSetting,
+    "email_templates": EmailTemplate,
+    "descuentos_jornada": DescuentoJornada,
     "clientes": Cliente,
     "alquileres": Alquiler,
 }
