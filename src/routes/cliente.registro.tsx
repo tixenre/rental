@@ -134,7 +134,8 @@ export default function ClienteRegistroPage() {
       .catch(() => setError("Error de red. Intentá de nuevo."));
   }, [token, navigate]);
 
-  const set = <K extends keyof FormState>(key: K) =>
+  const set =
+    <K extends keyof FormState>(key: K) =>
     (v: FormState[K]) =>
       setForm((f) => ({ ...f, [key]: v }));
 

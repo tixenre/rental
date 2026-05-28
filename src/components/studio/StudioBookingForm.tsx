@@ -721,4 +721,3 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
     </div>
   );
 }
-
