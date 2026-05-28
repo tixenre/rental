@@ -1107,7 +1107,7 @@ function EditableNameInput({
           <Button
             size="icon"
             variant="ghost"
-            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 shrink-0"
+            className="h-8 w-8 text-verde hover:text-verde/80 hover:bg-verde/10 shrink-0"
             onClick={save}
             title="Guardar (Enter)"
           >
