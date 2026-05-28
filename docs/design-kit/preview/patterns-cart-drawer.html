@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pattern · CartDrawer</title>
+<link rel="stylesheet" href="_card.css">
+<style>
+.card { gap: 20px; padding: 22px; }
+
+/* ── Layout: 2 variants side by side ──────────────────────────── */
+.variants { display: grid; grid-template-columns: 260px 1fr; gap: 14px; align-items: stretch; }
+
+/* ── Mobile full-screen drawer ───────────────────────────────── */
+.mobile-frame {
+  position: relative;
+  border-radius: 22px;
+  border: 3px solid var(--ink);
+  background: var(--background);
+  height: 540px; overflow: hidden;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px -8px rgba(0,0,0,0.18);
+}
+.frame-status {
+  height: 24px; background: var(--background);
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 16px 0; font-family: var(--font-mono); font-size: 9px; color: var(--ink);
+}
+.frame-status .dots { display: flex; gap: 3px; }
+.frame-status .dots div { width: 4px; height: 4px; border-radius: 50%; background: var(--ink); }
+
+/* ── Drawer header ───────────────────────────────────────────── */
+.dr-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 14px 16px 12px; border-bottom: 1px solid var(--hairline);
+  flex-shrink: 0;
+}
+.dr-eye { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+.dr-title { font-family: var(--font-display); font-weight: 900; font-size: 22px; color: var(--ink); line-height: 1.1; text-transform: lowercase; letter-spacing: 0.005em; margin-top: 2px; }
+.dr-close {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: transparent; border: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink); transition: background 120ms;
+}
+.dr-close:hover { background: var(--surface); }
+
+/* ── Date pill ───────────────────────────────────────────────── */
+.dr-date {
+  margin: 12px 16px; padding: 10px 14px;
+  border: 2px solid color-mix(in oklch, var(--amber) 50%, transparent);
+  background: color-mix(in oklch, var(--amber) 10%, transparent);
+  border-radius: 9999px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer; flex-shrink: 0;
+}
+.dr-date svg { color: var(--amber); flex-shrink: 0; }
+.dr-date-text {
+  font-family: var(--font-sans); font-size: 12px; font-weight: 600; color: var(--ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dr-date-jornadas { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); margin-left: 4px; }
+
+/* ── Items list ──────────────────────────────────────────────── */
+.dr-items { flex: 1; overflow-y: auto; padding: 4px 16px 12px; display: flex; flex-direction: column; gap: 8px; }
+.dr-item {
+  display: flex; gap: 8px; padding: 9px;
+  border: 1px solid var(--hairline); border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.dr-thumb {
+  width: 56px; height: 48px; border-radius: 4px;
+  background: var(--background); border: 1px solid var(--hairline);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.dr-item-info { flex: 1; min-width: 0; }
+.dr-item-brand { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+.dr-item-name { font-family: var(--font-display); font-weight: 900; font-size: 12px; color: var(--ink); line-height: 1.15; text-transform: lowercase; margin-top: 1px; }
+.dr-item-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; gap: 6px; }
+.stepper {
+  display: inline-flex; align-items: center; gap: 0;
+  border: 1px solid var(--hairline); border-radius: 9999px; background: var(--background);
+}
+.stepper button {
+  width: 26px; height: 26px; border: 0; background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink); border-radius: 50%;
+}
+.stepper button:hover { background: var(--surface); }
+.stepper-count { font-family: var(--font-mono); font-size: 11px; color: var(--ink); width: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+.dr-line-price { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); text-align: right; }
+.dr-line-price .ink { color: var(--ink); font-weight: 600; }
+.dr-trash {
+  width: 26px; height: 26px; border-radius: 50%; border: 0; background: transparent;
+  color: var(--muted-foreground); cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.dr-trash:hover { color: var(--destructive); background: var(--surface); }
+
+/* ── Drawer footer (totales) ─────────────────────────────────── */
+.dr-foot {
+  border-top: 1px solid var(--hairline); padding: 12px 16px 16px;
+  background: var(--background); flex-shrink: 0;
+}
+.dr-total-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.dr-total-row.muted { color: var(--muted-foreground); }
+.dr-total-row .lbl { font-family: var(--font-sans); font-size: 11px; }
+.dr-total-row .val { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.dr-total-row.discount { color: var(--verde); }
+.dr-total-main {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding-top: 8px; margin-bottom: 12px;
+  border-top: 1px solid var(--hairline);
+}
+.dr-total-main .lbl { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); }
+.dr-total-main .val { font-family: var(--font-display); font-weight: 900; font-size: 24px; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.dr-cta {
+  width: 100%; height: 44px; border-radius: var(--radius-md);
+  background: var(--amber); color: var(--ink); border: 0; cursor: pointer;
+  font-family: var(--font-sans); font-weight: 600; font-size: 13px;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+
+/* ── Desktop right panel ─────────────────────────────────────── */
+.desktop-frame {
+  position: relative;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline);
+  background: color-mix(in oklch, var(--ink) 60%, transparent);
+  height: 540px; overflow: hidden;
+  display: flex;
+}
+.desktop-content-bg {
+  flex: 1; padding: 14px;
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--background);
+}
+.desktop-scrim {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(2px);
+  display: flex; justify-content: flex-end;
+}
+.desktop-panel {
+  width: 260px; height: 100%;
+  background: var(--background);
+  border-left: 1px solid var(--hairline);
+  display: flex; flex-direction: column;
+  box-shadow: -12px 0 32px -8px rgba(0,0,0,0.2);
+}
+.bg-card-stub { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-sm); height: 60px; }
+
+/* ── Annotations ─────────────────────────────────────────────── */
+.label {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--muted-foreground);
+  text-align: center; margin-top: 6px;
+}
+.label.on { color: var(--ink); font-weight: 600; }
+
+/* ── Spec table ──────────────────────────────────────────────── */
+.spec-table {
+  border: 1px solid var(--hairline); border-radius: var(--radius-lg); overflow: hidden;
+}
+.spec-thead {
+  padding: 9px 14px; background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground);
+}
+.spec-row {
+  display: grid; grid-template-columns: 150px 1fr;
+  padding: 8px 14px; border-bottom: 1px solid var(--hairline);
+  gap: 10px; align-items: center;
+}
+.spec-row:last-child { border-bottom: 0; }
+.spec-key { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink); }
+.spec-val { font-family: var(--font-sans); font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+.spec-val code { font-family: var(--font-mono); font-size: 10.5px; background: var(--surface-elevated); padding: 1px 5px; border-radius: 3px; border: 1px solid var(--hairline); }
+
+.note {
+  font-family: var(--font-sans); font-size: 11px; line-height: 1.55;
+  color: var(--muted-foreground); border-top: 1px dashed var(--hairline);
+  padding-top: 10px;
+}
+.note b { color: var(--foreground); font-weight: 600; }
+.note code { font-family: var(--font-mono); font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="t-eyebrow">Pattern · CartDrawer — full-screen mobile · side panel desktop</div>
+
+  <!-- ── Variants side by side ─────────────────────────────────── -->
+  <div class="variants">
+
+    <!-- Mobile: full-screen drawer -->
+    <div>
+      <div class="mobile-frame">
+        <div class="frame-status">
+          <span>9:41</span>
+          <div class="dots"><div></div><div></div><div></div></div>
+          <span>100%</span>
+        </div>
+        <!-- Header -->
+        <div class="dr-head">
+          <div>
+            <div class="dr-eye">Tu pedido</div>
+            <div class="dr-title">cotización</div>
+          </div>
+          <button class="dr-close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <!-- Date pill -->
+        <button class="dr-date">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          <span class="dr-date-text">lun 2 18:00 → jue 5 18:00</span>
+          <span class="dr-date-jornadas">· 3 j</span>
+        </button>
+        <!-- Items -->
+        <div class="dr-items">
+          <div class="dr-item">
+            <div class="dr-thumb">📷</div>
+            <div class="dr-item-info">
+              <div class="dr-item-brand">Sony</div>
+              <div class="dr-item-name">a7s III</div>
+              <div class="dr-item-actions">
+                <div class="stepper">
+                  <button><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+                  <span class="stepper-count">1</span>
+                  <button><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+                </div>
+                <div class="dr-line-price"><span class="ink">$ 24.500</span><br>/día</div>
+              </div>
+            </div>
+            <button class="dr-trash">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
+          <div class="dr-item">
+            <div class="dr-thumb">💡</div>
+            <div class="dr-item-info">
+              <div class="dr-item-brand">Aputure ×2</div>
+              <div class="dr-item-name">600d pro</div>
+              <div class="dr-item-actions">
+                <div class="stepper">
+                  <button><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+                  <span class="stepper-count">2</span>
+                  <button><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+                </div>
+                <div class="dr-line-price"><span class="ink">$ 24.000</span><br>/día</div>
+              </div>
+            </div>
+            <button class="dr-trash">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
+          <div class="dr-item">
+            <div class="dr-thumb">🎙</div>
+            <div class="dr-item-info">
+              <div class="dr-item-brand">RØDE</div>
+              <div class="dr-item-name">NTG5</div>
+              <div class="dr-item-actions">
+                <div class="stepper">
+                  <button><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+                  <span class="stepper-count">1</span>
+                  <button><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+                </div>
+                <div class="dr-line-price"><span class="ink">$ 6.000</span><br>/día</div>
+              </div>
+            </div>
+            <button class="dr-trash">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
+        </div>
+        <!-- Footer -->
+        <div class="dr-foot">
+          <div class="dr-total-row muted"><span class="lbl">Subtotal · 3 jornadas</span><span class="val">$ 163.500</span></div>
+          <div class="dr-total-row discount"><span class="lbl">Descuento jornada 5% · 3 j</span><span class="val">−$ 8.175</span></div>
+          <div class="dr-total-row muted"><span class="lbl">IVA 21%</span><span class="val">+$ 32.618</span></div>
+          <div class="dr-total-main">
+            <span class="lbl">Total · IVA incluido</span>
+            <span class="val">$ 187.943</span>
+          </div>
+          <button class="dr-cta">Confirmar solicitud</button>
+        </div>
+      </div>
+      <div class="label on">Mobile · isBottom (h-[100dvh])</div>
+    </div>
+
+    <!-- Desktop: side panel -->
+    <div>
+      <div class="desktop-frame">
+        <div class="desktop-content-bg">
+          <div class="bg-card-stub"></div>
+          <div class="bg-card-stub"></div>
+          <div class="bg-card-stub"></div>
+          <div class="bg-card-stub"></div>
+          <div class="bg-card-stub"></div>
+          <div class="bg-card-stub"></div>
+        </div>
+        <!-- Scrim + side panel -->
+        <div class="desktop-scrim">
+          <div class="desktop-panel">
+            <!-- Same drawer content, narrower -->
+            <div class="dr-head" style="padding:12px 14px 10px;">
+              <div>
+                <div class="dr-eye">Tu pedido</div>
+                <div class="dr-title" style="font-size:18px;">cotización</div>
+              </div>
+              <button class="dr-close" style="width:28px;height:28px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <button class="dr-date" style="margin:10px 14px;padding:8px 12px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              <span class="dr-date-text" style="font-size:10px;">lun 2 → jue 5</span>
+              <span class="dr-date-jornadas">· 3 j</span>
+            </button>
+            <div class="dr-items" style="padding:2px 14px 10px;gap:6px;">
+              <div class="dr-item" style="padding:7px;">
+                <div class="dr-thumb" style="width:38px;height:32px;font-size:14px;">📷</div>
+                <div class="dr-item-info">
+                  <div class="dr-item-brand" style="font-size:7px;">Sony</div>
+                  <div class="dr-item-name" style="font-size:10px;">a7s III</div>
+                </div>
+                <button class="dr-trash" style="width:22px;height:22px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+              </div>
+              <div class="dr-item" style="padding:7px;">
+                <div class="dr-thumb" style="width:38px;height:32px;font-size:14px;">💡</div>
+                <div class="dr-item-info">
+                  <div class="dr-item-brand" style="font-size:7px;">Aputure ×2</div>
+                  <div class="dr-item-name" style="font-size:10px;">600d pro</div>
+                </div>
+                <button class="dr-trash" style="width:22px;height:22px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+              </div>
+              <div class="dr-item" style="padding:7px;">
+                <div class="dr-thumb" style="width:38px;height:32px;font-size:14px;">🎙</div>
+                <div class="dr-item-info">
+                  <div class="dr-item-brand" style="font-size:7px;">RØDE</div>
+                  <div class="dr-item-name" style="font-size:10px;">NTG5</div>
+                </div>
+                <button class="dr-trash" style="width:22px;height:22px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+              </div>
+            </div>
+            <div class="dr-foot" style="padding:10px 14px 12px;">
+              <div class="dr-total-main" style="margin-bottom:8px;">
+                <span class="lbl" style="font-size:8px;">Total</span>
+                <span class="val" style="font-size:20px;">$ 187.943</span>
+              </div>
+              <button class="dr-cta" style="height:38px;font-size:11px;">Confirmar solicitud</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="label on">Desktop · right slide (w-md, max-w-md)</div>
+    </div>
+
+  </div>
+
+  <!-- ── Spec / canonical values ─────────────────────────────── -->
+  <div class="spec-table">
+    <div class="spec-thead">Anatomy & canonical values</div>
+    <div class="spec-row"><span class="spec-key">scrim</span><span class="spec-val"><code>fixed inset-0 z-50 bg-black/60 backdrop-blur-sm</code> · click cierra</span></div>
+    <div class="spec-row"><span class="spec-key">drawer (mobile)</span><span class="spec-val"><code>fixed inset-0 z-50 h-[100dvh] w-full</code> · <code>bg-background</code> · sin rounded · paddingTop = <code>env(safe-area-inset-top)</code></span></div>
+    <div class="spec-row"><span class="spec-key">drawer (desktop)</span><span class="spec-val"><code>fixed right-0 top-0 h-[100dvh] w-full max-w-md</code> · <code>border-l hairline</code></span></div>
+    <div class="spec-row"><span class="spec-key">transition</span><span class="spec-val">Framer Motion · <code>tween 0.3s ease [0.32, 0.72, 0, 1]</code> · mobile <code>y:100%→0</code>, desktop <code>x:100%→0</code></span></div>
+    <div class="spec-row"><span class="spec-key">a11y</span><span class="spec-val">role="dialog" aria-modal · focus trap (Tab cycling) · Esc cierra · body scroll lock · focus al close-btn al abrir · restore al cerrar</span></div>
+    <div class="spec-row"><span class="spec-key">date pill</span><span class="spec-val"><code>border-2 border-amber/50 bg-amber/10</code> rounded-full · abre <code>&lt;RentalDateModal&gt;</code></span></div>
+    <div class="spec-row"><span class="spec-key">stepper</span><span class="spec-val">Botones <code>h-10 w-10</code> rounded-full (mobile touch target 44px+) · <code>aria-live="polite"</code> en el count</span></div>
+    <div class="spec-row"><span class="spec-key">empty state</span><span class="spec-val"><code>&lt;EmptyState icon title sub /&gt;</code> con CTA "Explorar catálogo" → cierra drawer</span></div>
+    <div class="spec-row"><span class="spec-key">footer total</span><span class="spec-val"><code>font-display text-3xl tabular text-ink</code> · subtotal/descuento/IVA arriba en mono · safe-area-inset-bottom</span></div>
+    <div class="spec-row"><span class="spec-key">submit</span><span class="spec-val">Validaciones: fechas → toast.error, sesión → panel inline "Necesitás cuenta" con login/register</span></div>
+  </div>
+
+  <!-- ── Note ──────────────────────────────────────────────────── -->
+  <div class="note">
+    <b>Bottom vs right placement:</b> el store <code>useCart().setDrawerOpen(true, "bottom"|"right")</code> elige. Mobile siempre <code>"bottom"</code>; desktop puede ser <code>"right"</code> (default catálogo) o <code>"bottom"</code> según contexto. ·
+    <b>Una sola animación:</b> mobile sube en Y, desktop entra en X. No mezclar. ·
+    <b>Date pill abre RentalDateModal anidado</b> — pattern aparte, monta fuera del drawer para que se vea encima. ·
+    <b>Body scroll lock</b> es crítico — sin él el body scrollea detrás del scrim en iOS.
+  </div>
+
+</div>
+</body>
+</html>
