@@ -281,6 +281,63 @@ class Alquiler(_Base):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# estudio.json (singleton + listas embebidas)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class EstudioFoto(_Base):
+    url: str
+    path: str | None = None
+    orden: int = 0
+    es_principal: bool = False
+
+
+class EstudioPackEquipo(_Base):
+    equipo_slug: str  # FK → equipos.slug
+    orden: int = 0
+
+
+class EstudioSlotFijo(_Base):
+    cliente: str
+    dia_semana: int
+    hora_desde: int
+    hora_hasta: int
+    valor_mensual: int = 0
+    mes_desde: str  # ISO date string "YYYY-MM-DD"
+    mes_hasta: str
+    activo: bool = True
+
+
+class Estudio(_Base):
+    # Singleton — equipo centinela que representa el espacio
+    equipo_slug: str | None = None  # FK → equipos.slug
+    nombre: str = "El Estudio"
+    tagline: str = ""
+    descripcion: str = ""
+    precio_hora: int = 0
+    min_horas: int = 2
+    open_hour: int = 8
+    close_hour: int = 22
+    buffer_horas: int = 0
+    pack_activo: bool = True
+    pack_nombre: str = ""
+    pack_descripcion: str = ""
+    pack_precio: int = 0
+    features_json: str | None = None
+    faq_json: str | None = None
+    direccion: str = ""
+    como_llegar: str = ""
+    testimonios_json: str | None = None
+    anticipacion_min_horas: int = 0
+    mapa_url: str = ""
+    mapa_embed_url: str = ""
+    # Listas embebidas — se reemplazan completas en cada import
+    fotos: list[EstudioFoto] = Field(default_factory=list)
+    pack_equipos: list[EstudioPackEquipo] = Field(default_factory=list)
+    slots_fijos: list[EstudioSlotFijo] = Field(default_factory=list)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CONFIG — ajustes del sistema, plantillas de mail, descuentos
 # (parte del grupo "configuración" del backup; sin datos personales)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -316,6 +373,7 @@ ENTITY_MODELS: dict[str, type[_Base]] = {
     "equipos": Equipo,
     "equipo_specs": EquipoSpec,
     "equipo_fichas": EquipoFicha,
+    "estudio": Estudio,
     "app_settings": AppSetting,
     "email_templates": EmailTemplate,
     "descuentos_jornada": DescuentoJornada,

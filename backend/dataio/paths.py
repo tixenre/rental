@@ -31,19 +31,19 @@ OPERATIONAL_ENTITIES: tuple[str, ...] = (
 )
 
 # Configuración / contenido del admin (sin datos personales): ajustes del
-# sistema, plantillas de mail y descuentos. No se versiona en git como el
-# catálogo, pero tampoco tiene PII — va junto al catálogo en el grupo
-# "configuración" del backup.
+# sistema, plantillas de mail, descuentos y configuración del estudio.
+# No se versiona en git como el catálogo, pero tampoco tiene PII — va junto
+# al catálogo en el grupo "configuración" del backup.
+# Nota: estudio va DESPUÉS de equipos en ENTITY_ORDER (FK equipo_id → equipos).
 CONFIG_ENTITIES: tuple[str, ...] = (
     "app_settings",
     "email_templates",
     "descuentos_jornada",
+    "estudio",
 )
 
 # ── Grupos de backup expuestos en la UI (/admin/dataio) ──────────────────────
-# El dueño ve 3 botones: Configuración, Clientes, Pedidos. Cada uno mapea a una
-# lista de entidades. (El estudio se sumará a CONFIGURACION_GROUP cuando su
-# entidad esté implementada y probada en una sesión local.)
+# El dueño ve 3 botones: Configuración, Clientes, Pedidos.
 CONFIGURACION_GROUP: tuple[str, ...] = CATALOG_ENTITIES + CONFIG_ENTITIES
 CLIENTES_GROUP: tuple[str, ...] = ("clientes",)
 PEDIDOS_GROUP: tuple[str, ...] = ("alquileres",)
@@ -55,8 +55,9 @@ BACKUP_GROUPS: dict[str, tuple[str, ...]] = {
 }
 
 # Orden canónico de TODAS las entidades, respetando FK dependencies.
-# Catálogo primero (marcas → equipos), luego config (standalone), después
-# operacional (clientes → alquileres → items/pagos).
+# Catálogo primero (marcas → equipos), luego config (app_settings, mails,
+# descuentos, estudio — este último depende de equipos vía equipo_id),
+# después operacional (clientes → alquileres → items/pagos).
 ENTITY_ORDER: tuple[str, ...] = CATALOG_ENTITIES + CONFIG_ENTITIES + OPERATIONAL_ENTITIES
 
 
