@@ -17,6 +17,14 @@ export function timeToMinutes(time: string): number {
   return h * 60 + m;
 }
 
+/**
+ * Fecha local → "YYYY-MM-DD" (sin corrimiento por timezone, a diferencia de
+ * `toISOString()` que pasa a UTC). Formato que esperan los endpoints de
+ * disponibilidad/días bloqueados.
+ */
+export const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 /** Combina una fecha (se ignora su hora) con "HH:MM" en un Date local. */
 export function combineDateTime(date: Date, time: string): Date {
   const d = startOfDay(date);
