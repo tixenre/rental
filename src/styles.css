@@ -508,6 +508,43 @@
     border-color: var(--background) !important;
     color: var(--ink);
   }
+
+  /*
+   * Estados de días en el Calendar del RentalDateModal.
+   * react-day-picker aplica el className del modifier a la celda del día.
+   * Los prefijos rdp-* son clases custom — no colisionan con rdp internos.
+   */
+
+  /* rdp-nostock — día sin stock para el carrito actual.
+     Activado por modifiers={{ nostock: nostockDates }}.
+     Fondo rojo suave + punto destructive debajo del número. */
+  .rdp-nostock {
+    position: relative;
+    background-color: color-mix(in oklch, var(--destructive) 12%, transparent) !important;
+    color: var(--destructive) !important;
+  }
+  .rdp-nostock::after {
+    content: "";
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--destructive);
+    pointer-events: none;
+  }
+
+  /* rdp-closed — día cerrado según horarios (domingos, feriados configurados).
+     Activado por modifiers={{ closed: closedDates }}.
+     Fondo rojo más tenue + texto destructive + tachado (cerrado != sin stock). */
+  .rdp-closed {
+    background-color: color-mix(in oklch, var(--destructive) 8%, transparent) !important;
+    color: var(--destructive) !important;
+    text-decoration: line-through;
+    opacity: 0.7;
+  }
 }
 
 /* Prevent iOS Safari from zooming in on input focus (font-size must be ≥ 16px) */
