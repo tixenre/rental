@@ -149,6 +149,20 @@
 - **Consecuencias:** refuerza la barra de calidad (§ "modularidad a prueba de balas"). El supervisor
   marca como hallazgo cualquier stepper/precio/favorito ad-hoc que duplique estos componentes.
 
+### 2026-05-29 — `RentalDateModal` = base única de selección de fechas (desktop + mobile)
+- **Contexto:** el catálogo mobile (`CatalogoMovil`) tenía su propio `DateSheet` (bottom-sheet con
+  `<input type=date>` nativo + `<select>` de horas) y un **estado de fechas local paralelo** al
+  carrito, mientras desktop usaba `RentalDateModal`. Dos UIs y dos estados para la misma decisión.
+- **Decisión:** hay **un solo selector de fechas** — `RentalDateModal` (responsive: calendario de
+  2 meses en desktop, 1 mes full-screen en mobile) — usado en todos lados. Se **retiró** el
+  `DateSheet` mobile. Las fechas del alquiler viven **solo en el cart-store** (`useCart`:
+  `startDate/endDate/startTime/endTime`, jornadas vía `days()`); el modal las lee y escribe, y toda
+  pantalla que las muestre las **deriva del store** (no estado local). La lógica de fechas se comparte
+  desde `src/lib/rental-dates.ts` (incluido el helper `ymd`); el core de reservas no se toca.
+- **Consecuencias:** no recrear un selector/sheet de fechas aparte ni un estado de fechas paralelo —
+  reusar `RentalDateModal` y `useCart`. El supervisor marca como hallazgo cualquier UI de fechas
+  ad-hoc o estado de fechas local que duplique la fuente única.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
