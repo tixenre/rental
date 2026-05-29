@@ -2,13 +2,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   X,
   Trash2,
-  Plus,
-  Minus,
   Loader2,
   AlertCircle,
   Calendar as CalendarIcon,
   ShoppingBag,
 } from "lucide-react";
+import { StepperPill } from "./equipment/shared/StepperPill";
 import { EmptyState } from "./EmptyState";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -376,39 +375,19 @@ export function CartDrawer({
                               <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
                                 {it.brand}
                               </div>
-                              <div className="line-clamp-2 font-display text-sm leading-tight">
+                              <div className="line-clamp-2 font-sans text-sm font-bold leading-tight">
                                 {it.name}
                               </div>
                               <div className="mt-2 flex items-center justify-between gap-2">
-                                <div
-                                  role="group"
-                                  aria-label={`Cantidad de ${it.name}`}
-                                  className="flex items-center gap-0.5 rounded-full border hairline"
-                                >
-                                  <button
-                                    onClick={() => remove(it.id)}
-                                    aria-label="Quitar uno"
-                                    className="grid h-10 w-10 place-items-center rounded-full hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
-                                  >
-                                    <Minus className="h-3.5 w-3.5" />
-                                  </button>
-                                  <span
-                                    className="w-6 text-center text-sm tabular"
-                                    aria-live="polite"
-                                  >
-                                    {qty}
-                                  </span>
-                                  <button
-                                    onClick={() => {
-                                      if (!reachedMax) add(it.id);
-                                    }}
-                                    disabled={reachedMax}
-                                    aria-label="Sumar uno"
-                                    className="grid h-10 w-10 place-items-center rounded-full hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
-                                  >
-                                    <Plus className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
+                                <StepperPill
+                                  qty={qty}
+                                  onIncrement={() => {
+                                    if (!reachedMax) add(it.id);
+                                  }}
+                                  onDecrement={() => remove(it.id)}
+                                  maxReached={reachedMax}
+                                  size="lg"
+                                />
                                 <div className="text-right">
                                   <div className="text-xs tabular text-ink">
                                     {formatARS(it.pricePerDay * qty)}
