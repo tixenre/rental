@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
-import { Plus, Minus, Sparkles, ChevronDown, ArrowRight } from "lucide-react";
+import { Plus, Minus, Sparkles, ChevronDown, ArrowRight, Heart } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
+import { useFavoritos } from "@/hooks/useFavoritos";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
@@ -36,6 +37,8 @@ export function EquipmentRow({ item, disponible }: { item: Equipment; disponible
   const selected = qty > 0;
   const navigate = useNavigate();
   const { data: clienteSession } = useClienteSession();
+  const fav = useFavoritos();
+  const isFav = fav.has(String(item.id));
   const conIva = aplicaIva(clienteSession?.perfil_impuestos);
   const openDetail = () =>
     navigate({ to: "/equipo/$slug", params: { slug: buildEquipoSlug(item) } });
@@ -188,6 +191,22 @@ export function EquipmentRow({ item, disponible }: { item: Equipment; disponible
             </div>
           )}
         </div>
+
+        {/* Favorito */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            fav.toggle(String(item.id));
+          }}
+          aria-label={isFav ? "Quitar de favoritos" : "Guardar en favoritos"}
+          className={cn(
+            "grid h-8 w-8 shrink-0 place-items-center rounded-full border border-hairline transition-all",
+            isFav ? "bg-amber border-amber text-ink" : "text-muted-foreground hover:text-ink",
+          )}
+        >
+          <Heart className={cn("h-3.5 w-3.5", isFav && "fill-current")} />
+        </button>
 
         {/* CTA */}
         {qty === 0 ? (

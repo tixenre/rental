@@ -1,8 +1,9 @@
 import { useState, type MouseEvent } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
-import { Check, Plus, Minus, Sparkles } from "lucide-react";
+import { Check, Heart, Plus, Minus, Sparkles } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
+import { useFavoritos } from "@/hooks/useFavoritos";
 import { useFlyToCart } from "@/lib/fly-to-cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
@@ -30,6 +31,8 @@ export function EquipmentCard({
   const triggerFly = useFlyToCart((s) => s.triggerFly);
   const [imgFailed, setImgFailed] = useState(false);
   const remove = useCart((s) => s.remove);
+  const fav = useFavoritos();
+  const isFav = fav.has(String(item.id));
 
   const handleAdd = (e: MouseEvent<HTMLButtonElement>) => {
     if (sinStock || reachedMax) return;
@@ -103,6 +106,23 @@ export function EquipmentCard({
             <Sparkles className="h-2.5 w-2.5" /> nuevo
           </div>
         )}
+        {/* Corazón favorito — bottom-left de la foto (sin conflicto con badges) */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            fav.toggle(String(item.id));
+          }}
+          aria-label={isFav ? "Quitar de favoritos" : "Guardar en favoritos"}
+          className={cn(
+            "absolute bottom-2 left-2 z-10 grid h-7 w-7 place-items-center rounded-full transition-all",
+            isFav
+              ? "bg-amber text-ink opacity-100"
+              : "bg-background/70 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-ink",
+          )}
+        >
+          <Heart className={cn("h-3.5 w-3.5", isFav && "fill-current")} />
+        </button>
         {/* Destacado: convive con isNew en otra esquina */}
         {item.destacado && (
           <div className="absolute right-2 top-2 rounded-full bg-amber/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-ink shadow-sm">

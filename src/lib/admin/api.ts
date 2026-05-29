@@ -1449,6 +1449,7 @@ export type EstadisticasData = {
     peor_total: number | null;
   };
   por_dueno: { dueno: string; total_ars: number; items: number }[];
+  favoritos_equipo?: { equipo: string; total_favoritos: number; clientes_unicos: number }[];
 };
 
 export type Cliente = {
