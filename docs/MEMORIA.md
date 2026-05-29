@@ -137,6 +137,18 @@
   desde CLAUDE.md + MANIFIESTO). WhatsApp requiere proveedor (Meta/Twilio), verificación y plantillas
   pre-aprobadas → cuando se encare, va como iniciativa propia.
 
+### 2026-05-29 — Módulo `equipment/shared/` = librería canónica de assets visuales (reusar, no recrear)
+- **Contexto:** el design handoff de las vistas de equipos introdujo `StepperPill`, `PriceBlock` y
+  `FavButton` como componentes compartidos. El handoff ya los define como tokens usados en las tres
+  vistas del catálogo **y** en el CartDrawer.
+- **Decisión:** viven en `src/components/rental/equipment/shared/` (exportados desde
+  `equipment/index.ts`) y son la **única** fuente de esos patrones (stepper de cantidad, bloque de
+  precio, botón favorito). Todo lugar que necesite uno **importa de ahí** — no se crea una variante
+  "parecida pero distinta". Se irán incorporando a más pantallas con el tiempo (ese es el objetivo).
+  `PriceBlock` calcula con `priceBreakdown()` (`@/lib/pricing`); `FavButton` se cablea a `useFavoritos`.
+- **Consecuencias:** refuerza la barra de calidad (§ "modularidad a prueba de balas"). El supervisor
+  marca como hallazgo cualquier stepper/precio/favorito ad-hoc que duplique estos componentes.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
