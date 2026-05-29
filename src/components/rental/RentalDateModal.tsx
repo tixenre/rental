@@ -276,7 +276,10 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
                   <Minus className="h-4 w-4" />
                 </button>
                 <div className="flex items-baseline gap-1.5 leading-none">
-                  <span className="font-display text-2xl font-black text-ink tabular-nums">
+                  <span
+                    data-testid="jornadas-count"
+                    className="font-display text-2xl font-black text-ink tabular-nums"
+                  >
                     {hasStart ? jornadas : "—"}
                   </span>
                   <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
