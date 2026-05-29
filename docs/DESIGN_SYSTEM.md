@@ -236,7 +236,7 @@ Defined as utility classes en `src/styles.css`:
 
 | Categoría | Dónde vive | Notas |
 |---|---|---|
-| **Primitivas UI** (Button, Input, Card, Dialog, …) | `src/components/ui/*` | shadcn/Radix base. Naming shadcn (`variant="default"`, no `"primary"`). |
+| **Primitivas UI** (Button, Input, Card, Dialog, …) | `src/components/ui/*` | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo). |
 | **Componentes de aplicación (`rental/`)** | `src/components/rental/*` | EquipmentCard, TopBar, Footer, CartMiniBar integrados con queries + estado. |
 | **Componentes admin** | `src/components/admin/*` | Tablas, modales, sidebar del back-office. |
 | **Kit portátil ports** | `src/components/kit/*` | Versiones presentacionales del kit, con paleta de marca. Adoptadas piecewise (issue #575). EstadoBadge ya es la única fuente del repo. |
@@ -246,18 +246,21 @@ Defined as utility classes en `src/styles.css`:
 ```tsx
 import { Button } from "@/components/ui/button";
 
-// variants: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link" | "amber"
+// variants: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link" | "primary" | "amber"
 // sizes:    "default" (h-9) | "sm" (h-8) | "lg" (h-10) | "icon" (h-9 w-9)
 // shape:    "rounded" (default) | "pill"
-// "amber" y el axis "shape" fueron agregados por PR #577 — ya en producción.
+// "amber" y el axis "shape" fueron agregados por PR #577. "primary" (ink→amber
+// al hover, CTA signature) por el Master Handoff — distinto de "amber".
 
 <Button variant="default">Reservar</Button>
+<Button variant="primary" shape="pill">Solicitar rental</Button>
 <Button variant="amber" shape="pill" asChild><a href="/estudio">→</a></Button>
 ```
 
 > **No renombrar `default` a `primary`** — eso rompería decenas de
-> `<Button variant="default">` que existen hoy. La signature de marca
-> (`amber` + `pill`) entra como **adición**, no como reemplazo.
+> `<Button variant="default">` que existen hoy. Las variantes de marca
+> (`primary` = fondo ink que invierte a amber en hover; `amber` = siempre amber,
+> sin inversión; + el axis `shape`) entran como **adición**, no como reemplazo.
 
 ### EstadoBadge
 

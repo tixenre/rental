@@ -17,8 +17,17 @@ export const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        // Rambla brand CTA — siempre amber, sin reverse. Pensado para hero,
-        // estudio, y otros disparadores destacados sobre fondo claro u oscuro.
+
+        // ── Rambla brand variants ─────────────────────────────────────────────
+
+        // primary — la jugada signature de marca: fondo ink, hover invierte a amber.
+        // CTA principal del catálogo, carrito y flows de reserva.
+        // Source: docs/design-kit/kit/components/button.tsx (variant "primary").
+        primary: "bg-ink text-background shadow-sm hover:bg-amber hover:text-ink",
+
+        // amber — siempre amber, sin inversión. Para CTAs sobre fondos oscuros
+        // (hero estudio, banners, etc.) o cuando el primario no tiene suficiente
+        // contraste con el fondo.
         // Source: docs/design-kit/kit/components/button.tsx (variant "amber").
         amber: "bg-amber text-ink shadow-sm hover:bg-amber-hot",
       },
