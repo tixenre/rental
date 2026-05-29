@@ -37,11 +37,10 @@ import { authedFetch } from "@/lib/authedFetch";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
-import { apiGetDescuentosJornada, apiGetDiasBloqueados } from "@/lib/api";
+import { apiGetDescuentosJornada } from "@/lib/api";
 import { useClienteSession, aplicaIva, IVA_PCT } from "@/lib/iva";
 import { computeCartTotal, descuentoLabel } from "@/lib/cart-total";
-import { deriveEndDate, franjaParaFecha, diaAbierto, timeToMinutes } from "@/lib/rental-dates";
-import { useHorarios } from "@/lib/horarios";
+import { RentalDateModal } from "@/components/rental/RentalDateModal";
 
 function fmtDate(d: Date | null): string {
   if (!d) return "—";
@@ -62,33 +61,6 @@ function fmtDate(d: Date | null): string {
   ];
   return `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
 }
-
-function ymd(d: Date | null): string {
-  if (!d) return "";
-  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-}
-
-function addDays120(d: Date): Date {
-  const x = new Date(d);
-  x.setDate(x.getDate() + 120);
-  return x;
-}
-
-const HORAS = [
-  "08:00",
-  "09:00",
-  "10:00",
-  "11:00",
-  "12:00",
-  "13:00",
-  "14:00",
-  "15:00",
-  "16:00",
-  "17:00",
-  "18:00",
-  "19:00",
-];
 
 const POPULAR_CHIPS = ["Sony FX3", "Aputure 600d", "RØDE", "Pack boda", "Pack entrevista"];
 
@@ -257,258 +229,6 @@ function SheetClose({ onClose }: { onClose: () => void }) {
   );
 }
 
-/* ── DateSheet ───────────────────────────────────────────────────── */
-interface DateSheetProps {
-  onClose: () => void;
-  onConfirm: (v: {
-    fechaDesde: Date;
-    jornadas: number;
-    horaDesde: string;
-    horaHasta: string;
-  }) => void;
-  initial: { fechaDesde: Date | null; jornadas: number; horaDesde: string; horaHasta: string };
-  /** Días (YYYY-MM-DD) sin disponibilidad para los equipos del carrito. */
-  diasBloqueados: Set<string>;
-}
-
-function DateSheet({ onClose, onConfirm, initial, diasBloqueados }: DateSheetProps) {
-  const [fechaDesde, setFechaDesde] = useState<Date | null>(initial.fechaDesde);
-  const [jornadas, setJornadas] = useState(initial.jornadas);
-  const [horaDesde, setHoraDesde] = useState(initial.horaDesde);
-  const [horaHasta, setHoraHasta] = useState(initial.horaHasta);
-
-  const fechaHasta = useMemo(
-    () => (fechaDesde ? deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta) : null),
-    [fechaDesde, jornadas, horaDesde, horaHasta],
-  );
-
-  // Horarios habilitados: filtramos las horas según la franja del día y
-  // bloqueamos confirmar si retiro o devolución caen en día cerrado. El
-  // backend valida igual; esto es el feedback en la UI.
-  const horarios = useHorarios();
-  const franjaDesde = franjaParaFecha(horarios, fechaDesde);
-  const franjaHasta = franjaParaFecha(horarios, fechaHasta);
-  const horasDesde = useMemo(
-    () =>
-      franjaDesde ? HORAS.filter((h) => h >= franjaDesde.desde && h <= franjaDesde.hasta) : HORAS,
-    [franjaDesde],
-  );
-  const horasHasta = useMemo(
-    () =>
-      franjaHasta ? HORAS.filter((h) => h >= franjaHasta.desde && h <= franjaHasta.hasta) : HORAS,
-    [franjaHasta],
-  );
-  const diaDesdeCerrado = !!fechaDesde && !diaAbierto(horarios, fechaDesde);
-  const diaHastaCerrado = !!fechaHasta && !diaAbierto(horarios, fechaHasta);
-  // ¿El período cruza un día sin disponibilidad para los equipos del carrito?
-  const rangoCruzaBloqueado = useMemo(() => {
-    if (!fechaDesde || !fechaHasta || diasBloqueados.size === 0) return false;
-    const d = new Date(fechaDesde);
-    d.setHours(0, 0, 0, 0);
-    const fin = new Date(fechaHasta);
-    fin.setHours(0, 0, 0, 0);
-    while (d <= fin) {
-      if (diasBloqueados.has(ymd(d))) return true;
-      d.setDate(d.getDate() + 1);
-    }
-    return false;
-  }, [fechaDesde, fechaHasta, diasBloqueados]);
-  // Snap de la hora a una opción válida cuando cambia la franja del día.
-  useEffect(() => {
-    if (horasDesde.length && !horasDesde.includes(horaDesde)) setHoraDesde(horasDesde[0]);
-  }, [horasDesde, horaDesde]);
-  useEffect(() => {
-    if (horasHasta.length && !horasHasta.includes(horaHasta)) setHoraHasta(horasHasta[0]);
-  }, [horasHasta, horaHasta]);
-
-  const selectStyle: React.CSSProperties = {
-    cursor: "pointer",
-    appearance: "none" as const,
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-    backgroundRepeat: "no-repeat",
-    backgroundPosition: "right 12px center",
-    paddingRight: 32,
-  };
-
-  return (
-    <>
-      {/* Scrim */}
-      <div
-        className="fixed inset-0 z-[60] animate-in fade-in duration-200"
-        style={{ background: "rgba(20,16,12,0.5)" }}
-        onClick={onClose}
-      />
-      {/* Sheet */}
-      <div
-        className="fixed inset-x-0 bottom-0 z-[61] bg-card flex flex-col max-h-[88%] animate-in slide-in-from-bottom duration-[260ms]"
-        style={{ borderRadius: "24px 24px 0 0", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)" }}
-      >
-        {/* Handle */}
-        <div className="w-9 h-1 rounded-full bg-hairline mx-auto mt-2.5 shrink-0" />
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-hairline shrink-0">
-          <span className="font-sans text-base font-bold text-ink">Período de alquiler</span>
-          <SheetClose onClose={onClose} />
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-          <div className="flex flex-col gap-[18px] px-5 pt-[18px] pb-2">
-            {/* Fecha de salida */}
-            <div className="flex flex-col gap-1.5">
-              <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
-                Fecha de salida
-              </span>
-              <input
-                type="date"
-                className="w-full px-3.5 py-[11px] rounded-[var(--radius-sm)] border-[1.5px] border-hairline bg-background text-ink text-sm outline-none focus:border-amber transition-colors"
-                style={{ fontFamily: "var(--font-sans)" }}
-                value={ymd(fechaDesde)}
-                min={ymd(new Date())}
-                onChange={(e) =>
-                  setFechaDesde(e.target.value ? new Date(e.target.value + "T12:00:00") : null)
-                }
-              />
-            </div>
-
-            {/* Hora de salida + devolución */}
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="flex flex-col gap-1.5">
-                <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
-                  Hora de salida
-                </span>
-                <select
-                  aria-label="Hora de salida"
-                  className="w-full px-3.5 py-[11px] rounded-[var(--radius-sm)] border-[1.5px] border-hairline bg-background text-ink text-sm outline-none focus:border-amber transition-colors"
-                  style={{ ...selectStyle, fontFamily: "var(--font-sans)" }}
-                  value={horaDesde}
-                  onChange={(e) => setHoraDesde(e.target.value)}
-                >
-                  {horasDesde.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
-                  Hora de devolución
-                </span>
-                <select
-                  aria-label="Hora de devolución"
-                  className="w-full px-3.5 py-[11px] rounded-[var(--radius-sm)] border-[1.5px] border-hairline bg-background text-ink text-sm outline-none focus:border-amber transition-colors"
-                  style={{ ...selectStyle, fontFamily: "var(--font-sans)" }}
-                  value={horaHasta}
-                  onChange={(e) => setHoraHasta(e.target.value)}
-                >
-                  {horasHasta.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Jornadas stepper */}
-            <div className="flex flex-col gap-1.5">
-              <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
-                Jornadas
-              </span>
-              <div className="flex items-center border-[1.5px] border-hairline rounded-[var(--radius-sm)] overflow-hidden bg-background">
-                <button
-                  className="px-[18px] py-[10px] text-xl font-bold text-muted-foreground hover:bg-muted hover:text-ink transition-colors leading-none"
-                  onClick={() => setJornadas((j) => Math.max(1, j - 1))}
-                >
-                  −
-                </button>
-                <div
-                  data-testid="jornadas-count"
-                  className="flex-1 text-center border-x border-hairline py-1.5 leading-none"
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontSize: 26,
-                    fontWeight: 900,
-                    color: "var(--ink)",
-                  }}
-                >
-                  {jornadas}
-                  <span className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground block">
-                    jornadas
-                  </span>
-                </div>
-                <button
-                  className="px-[18px] py-[10px] text-xl font-bold text-muted-foreground hover:bg-amber hover:text-ink transition-colors leading-none"
-                  onClick={() => setJornadas((j) => j + 1)}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            {/* Devolución calculada */}
-            {fechaDesde && (
-              <div
-                className="px-3.5 py-3 rounded-[var(--radius-sm)] border"
-                style={{
-                  background: "var(--amber-soft)",
-                  borderColor: "color-mix(in oklch, var(--amber) 40%, transparent)",
-                }}
-              >
-                <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-1">
-                  Devolución calculada
-                </div>
-                <div className="font-sans text-[15px] font-bold text-ink">
-                  {fmtDate(fechaHasta)}
-                </div>
-                <div className="font-mono text-[11px] text-muted-foreground mt-0.5">
-                  hasta las {horaHasta}
-                </div>
-                {timeToMinutes(horaHasta) > timeToMinutes(horaDesde) && (
-                  <div className="mt-1.5 text-[11px] text-ink leading-snug">
-                    Devolvés más tarde que tu retiro ({horaDesde}) → <strong>suma 1 jornada</strong>
-                    . Devolvé {horaDesde} o antes para no sumarla.
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="h-2" />
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-5 py-3 border-t border-hairline shrink-0" style={{ paddingBottom: 20 }}>
-          {(diaDesdeCerrado || diaHastaCerrado || rangoCruzaBloqueado) && (
-            <p className="mb-2 text-[12px] text-destructive text-center">
-              {diaDesdeCerrado
-                ? "El día de salida está cerrado — elegí otro."
-                : diaHastaCerrado
-                  ? `La devolución (${fmtDate(fechaHasta)}) cae en un día cerrado — ajustá las jornadas.`
-                  : "El período incluye días sin disponibilidad para algún equipo del carrito."}
-            </p>
-          )}
-          <button
-            disabled={!fechaDesde || diaDesdeCerrado || diaHastaCerrado || rangoCruzaBloqueado}
-            className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-[15px] font-bold text-center hover:bg-amber hover:text-ink transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-ink disabled:hover:text-amber"
-            onClick={() =>
-              fechaDesde &&
-              !diaDesdeCerrado &&
-              !diaHastaCerrado &&
-              !rangoCruzaBloqueado &&
-              onConfirm({ fechaDesde, jornadas, horaDesde, horaHasta })
-            }
-          >
-            {fechaDesde
-              ? `Confirmar — ${fmtDate(fechaDesde)} · ${jornadas} jorn.`
-              : "Elegí una fecha de salida"}
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
 /* ── CartItem (subcomponent with per-item imgFailed state) ───────── */
 function CartItem({
   eq,
@@ -575,6 +295,7 @@ interface CartSheetProps {
   cartItems: Record<string, number>;
   jornadas: number;
   fechaDesde: Date | null;
+  fechaHasta: Date | null;
   horaDesde: string;
   horaHasta: string;
 }
@@ -588,6 +309,7 @@ function CartSheet({
   cartItems,
   jornadas,
   fechaDesde,
+  fechaHasta,
   horaDesde,
   horaHasta,
 }: CartSheetProps) {
@@ -598,8 +320,6 @@ function CartSheet({
   const entries = Object.entries(cartItems)
     .map(([id, qty]) => ({ eq: equipos.find((e) => e.id === id)!, qty }))
     .filter((x) => x.eq);
-
-  const fechaHasta = fechaDesde ? deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta) : null;
 
   // Total unificado con drawer desktop y minibar vía lib/cart-total.
   // Sin fechas: estimado por jornada (J=1) sin descuento ni IVA.
@@ -630,7 +350,7 @@ function CartSheet({
 
   async function handleSubmit() {
     if (entries.length === 0) return;
-    if (!fechaDesde) {
+    if (!fechaDesde || !fechaHasta) {
       toast.error("Elegí las fechas del rental antes de solicitar.");
       return;
     }
@@ -654,7 +374,7 @@ function CartSheet({
       await createOrder({
         status: "solicitado",
         startDate: fechaDesde,
-        endDate: deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta),
+        endDate: fechaHasta,
         startTime: horaDesde,
         endTime: horaHasta,
         days: jornadas,
@@ -1363,30 +1083,14 @@ export function CatalogoMovil() {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   // Date state
-  const [fechaDesde, setFechaDesde] = useState<Date | null>(null);
-  const [jornadas, setJornadas] = useState(3);
-  const [horaDesde, setHoraDesde] = useState("10:00");
-  const [horaHasta, setHoraHasta] = useState("10:00");
-
-  // Días sin disponibilidad para los equipos del carrito (reservas reales).
-  const itemsParam = useMemo(
-    () =>
-      Object.entries(cart.items)
-        .filter(([id, qty]) => /^\d+$/.test(id) && qty > 0)
-        .map(([id, qty]) => `${id}:${qty}`)
-        .join(","),
-    [cart.items],
-  );
-  const diasBloqueadosQ = useQuery({
-    queryKey: ["dias-bloqueados", itemsParam],
-    queryFn: () => apiGetDiasBloqueados(itemsParam, ymd(new Date()), ymd(addDays120(new Date()))),
-    enabled: itemsParam !== "",
-    staleTime: 60_000,
-  });
-  const diasBloqueados = useMemo(
-    () => new Set(diasBloqueadosQ.data?.dias_bloqueados ?? []),
-    [diasBloqueadosQ.data],
-  );
+  // Fuente única: las fechas del alquiler viven en el cart store y las edita
+  // el RentalDateModal compartido (mismo calendario que desktop). Acá solo se
+  // leen para mostrarlas; la query de días bloqueados corre dentro del modal.
+  const fechaDesde = cart.startDate ?? null;
+  const fechaHasta = cart.endDate ?? null;
+  const horaDesde = cart.startTime;
+  const horaHasta = cart.endTime;
+  const jornadas = cart.days();
 
   // Sheet state
   const [showDateSheet, setShowDateSheet] = useState(false);
@@ -1426,12 +1130,6 @@ export function CatalogoMovil() {
     onScroll();
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
-
-  // Derived date values
-  const fechaHasta = useMemo(
-    () => (fechaDesde ? deriveEndDate(fechaDesde, jornadas, horaDesde, horaHasta) : null),
-    [fechaDesde, jornadas, horaDesde, horaHasta],
-  );
 
   const datePillLabel = useMemo(() => {
     if (!fechaDesde) return "Elegir fechas";
@@ -1551,31 +1249,6 @@ export function CatalogoMovil() {
     setActiveTab(cat);
     setExpanded(null);
   }, []);
-
-  const handleConfirmDates = useCallback(
-    ({
-      fechaDesde: fd,
-      jornadas: j,
-      horaDesde: hd,
-      horaHasta: hh,
-    }: {
-      fechaDesde: Date;
-      jornadas: number;
-      horaDesde: string;
-      horaHasta: string;
-    }) => {
-      setFechaDesde(fd);
-      setJornadas(j);
-      setHoraDesde(hd);
-      setHoraHasta(hh);
-      // Sync to cart store for cross-page consistency
-      cart.setDates(fd, deriveEndDate(fd, j, hd, hh));
-      cart.setStartTime(hd);
-      cart.setEndTime(hh);
-      setShowDateSheet(false);
-    },
-    [cart],
-  );
 
   // Height of compact search (used for category tabs top offset)
   // Cat-tabs sticky bajo el topbar (54px) + barra de búsqueda sticky (~65px).
@@ -1847,7 +1520,7 @@ export function CatalogoMovil() {
                 {totalItems} {totalItems === 1 ? "ítem" : "ítems"}
               </div>
               <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mt-0.5">
-                {jornadas} jornadas
+                {fechaDesde ? `${jornadas} jornadas` : "elegí fechas"}
               </div>
             </div>
             <div className="flex-1" />
@@ -1881,14 +1554,7 @@ export function CatalogoMovil() {
           fechaDesde={fechaDesde}
         />
       )}
-      {showDateSheet && (
-        <DateSheet
-          onClose={() => setShowDateSheet(false)}
-          onConfirm={handleConfirmDates}
-          initial={{ fechaDesde, jornadas, horaDesde, horaHasta }}
-          diasBloqueados={diasBloqueados}
-        />
-      )}
+      <RentalDateModal open={showDateSheet} onOpenChange={setShowDateSheet} />
       {showCartSheet && (
         <CartSheet
           onClose={() => setShowCartSheet(false)}
@@ -1897,6 +1563,7 @@ export function CatalogoMovil() {
           cartItems={cart.items}
           jornadas={jornadas}
           fechaDesde={fechaDesde}
+          fechaHasta={fechaHasta}
           horaDesde={horaDesde}
           horaHasta={horaHasta}
         />
