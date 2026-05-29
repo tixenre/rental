@@ -553,12 +553,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
                 onChange={() => setWithPack(false)}
                 className="sr-only"
               />
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="font-semibold">Solo el estudio</span>
-                <span className="font-mono text-xs tabular shrink-0 text-muted-foreground">
-                  {pricePerHour > 0 ? `${formatARS(pricePerHour)}/h` : "Consultar"}
-                </span>
-              </div>
+              <span className="font-semibold">Solo el estudio</span>
               <p className="text-xs text-muted-foreground">
                 Reservás el estudio por las horas elegidas. Traés tu equipamiento.
               </p>
@@ -578,12 +573,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
                 onChange={() => setWithPack(true)}
                 className="sr-only"
               />
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="font-semibold">Estudio + equipos</span>
-                <span className="font-mono text-xs tabular shrink-0">
-                  {packPrecio > 0 ? `+${formatARS(packPrecio)} fijo` : "Consultar"}
-                </span>
-              </div>
+              <span className="font-semibold">Estudio + equipos</span>
               <p className="text-xs text-muted-foreground">
                 Sumás <span className="text-ink font-medium">luces, griperías y modificadores</span>{" "}
                 durante toda la reserva. Llegás con la cámara y filmás.
@@ -597,28 +587,45 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
       {/* ── 2. Confirmar (total + CTAs) ────────────────────────────────── */}
       <Section step={2} title="Confirmar y reservar">
         {/* Total breakdown */}
-        <div className="rounded-xl bg-foreground p-4 text-background">
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-sm text-background/75">
+        <div className="rounded-[14px] border border-hairline overflow-hidden">
+          {/* Líneas de desglose */}
+          <div className="p-4 flex flex-col gap-1.5">
+            <div className="flex justify-between items-baseline text-sm text-muted-foreground">
               <span>
                 Estudio · {hours} h{pricePerHour > 0 && ` × ${formatARS(pricePerHour)}`}
               </span>
-              <span className="tabular">{subtotal > 0 ? formatARS(subtotal) : "—"}</span>
+              <span className="font-mono tabular text-ink">
+                {subtotal > 0 ? formatARS(subtotal) : "—"}
+              </span>
             </div>
             {withPack && (
-              <div className="flex items-center justify-between text-sm text-background/75">
-                <span>Equipos (luces, griperías, modificadores)</span>
-                <span className="tabular">{packPrecio > 0 ? formatARS(packPrecio) : "—"}</span>
+              <div className="flex justify-between items-baseline text-sm text-muted-foreground">
+                <span>Pack de equipos</span>
+                <span className="font-mono tabular text-ink">
+                  {packPrecio > 0 ? formatARS(packPrecio) : "—"}
+                </span>
               </div>
             )}
           </div>
-          <div className="mt-3 flex items-end justify-between border-t border-background/15 pt-3">
-            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-background/60">
-              Total estimado
-            </span>
-            <span className="text-2xl font-semibold tabular">
-              {total > 0 ? formatARS(total) : "A consultar"}
-            </span>
+
+          {/* Banda verde de disponibilidad */}
+          {fechaISO && disponibilidad === "libre" && (
+            <div className="flex items-center gap-2.5 px-4 py-2.5 bg-verde/5 border-y border-verde/12">
+              <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium bg-verde/10 text-verde border-verde/20">
+                <Check className="h-3 w-3" /> Disponible
+              </span>
+              <span className="text-xs text-muted-foreground tabular">
+                {dateLabel} · {startSlot} a {endTime}
+              </span>
+            </div>
+          )}
+
+          {/* Total */}
+          <div className="px-4 py-3.5">
+            <div className="flex justify-between items-baseline text-[15px] font-bold text-ink">
+              <span>Total</span>
+              <span className="font-mono tabular">{total > 0 ? formatARS(total) : "—"}</span>
+            </div>
           </div>
         </div>
 
@@ -631,7 +638,7 @@ export function StudioBookingForm({ config }: { config?: StudioBookingConfig }) 
         <Button
           onClick={handleReservarClick}
           disabled={!canSubmit}
-          className="mt-4 w-full bg-amber text-ink hover:bg-amber/90"
+          className="mt-4 w-full bg-ink text-amber hover:bg-[color-mix(in_oklch,var(--ink)_82%,var(--amber))]"
           size="lg"
         >
           {submitting ? (
