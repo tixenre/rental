@@ -63,11 +63,6 @@ function PhotoPlaceholder({
   );
 }
 
-/**
- * Galería con scroll-snap nativo (touch/swipe) + mouse-drag para desktop +
- * flechas. Sigue el patrón de CarouselRow (overflow-x-auto + snap-x), no
- * Embla, para que el feel sea idéntico al resto del sitio.
- */
 function DragGallery({
   fotos,
   placeholders,
@@ -112,17 +107,11 @@ function DragGallery({
     el.scrollBy({ left: dir * Math.round(el.clientWidth * 0.85), behavior: "smooth" });
   };
 
-  // Mouse-drag para desktop. En touch, el navegador maneja el swipe nativo.
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== "mouse") return;
     const el = ref.current;
     if (!el) return;
-    drag.current = {
-      active: true,
-      moved: false,
-      startX: e.clientX,
-      startScroll: el.scrollLeft,
-    };
+    drag.current = { active: true, moved: false, startX: e.clientX, startScroll: el.scrollLeft };
     el.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -136,7 +125,6 @@ function DragGallery({
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = ref.current;
     if (el && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
-    // pequeña pausa para que un click justo después del drag no dispare onClick.
     setTimeout(() => {
       drag.current.active = false;
       drag.current.moved = false;
@@ -174,9 +162,7 @@ function DragGallery({
           "flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 lg:gap-4 lg:px-12",
           "scroll-pl-4 lg:scroll-pl-12",
           "[&::-webkit-scrollbar]:hidden [scrollbar-width:none]",
-          // mouse-drag affordance en desktop
           "cursor-grab active:cursor-grabbing select-none",
-          // touch nativo: dejar que el navegador haga el pan-x
           "touch-pan-x",
         )}
       >
@@ -185,8 +171,6 @@ function DragGallery({
             key={it.key}
             className={cn(
               "snap-start shrink-0",
-              // mobile casi full-bleed (deja un asomo del próximo);
-              // sm: 2 por viewport; lg: ~2.6 por viewport
               "basis-[88%] sm:basis-[58%] lg:basis-[38%]",
               "aspect-[4/3] overflow-hidden rounded-xl bg-ink/5",
             )}
@@ -195,8 +179,6 @@ function DragGallery({
           </div>
         ))}
       </div>
-
-      {/* Flechas: solo desktop, sobre la franja con padding suficiente. */}
       <button
         type="button"
         onClick={() => scrollBy(-1)}
@@ -229,25 +211,20 @@ function DragGallery({
   );
 }
 
-/** Sticky CTA "Reservar" sólo en mobile. Se oculta cuando #reservar entra en viewport. */
 function MobileBookCta({ priceLabel }: { priceLabel: string | null }) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
     const target = document.getElementById("reservar");
     if (!target) return;
-    // Ocultar el sticky en cuanto cualquier parte del bloque de reserva
-    // entra en viewport — ya no aporta y taparía el formulario.
     const obs = new IntersectionObserver(
       (entries) => {
-        const e = entries[0];
-        setHidden(e.isIntersecting);
+        setHidden(entries[0].isIntersecting);
       },
       { threshold: 0 },
     );
     obs.observe(target);
     return () => obs.disconnect();
   }, []);
-
   return (
     <div
       className={cn(
@@ -297,30 +274,24 @@ function EstudioPage() {
   const mapaUrl = data?.mapa_url ?? "";
   const mapaEmbedUrl = data?.mapa_embed_url ?? "";
   const testimonios = data?.testimonios ?? [];
-  // Mostramos el bloque "Dónde estamos" si hay mapa configurado o dirección.
-  // El mapa puede venir solo (sin dirección) y al revés.
+
   const tieneUbicacion = !!(mapaEmbedUrl || direccion);
-  // Link para "Ver en Google Maps": prioridad al link original del dueño (más
-  // corto, abre la app móvil); si no, generamos uno desde la dirección.
   const verMapaHref =
     mapaUrl ||
     (direccion
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`
       : "");
-  // src del iframe: el embed_url resuelto por el backend, o fallback con direccion.
   const iframeSrc =
     mapaEmbedUrl ||
     (direccion
       ? `https://www.google.com/maps?q=${encodeURIComponent(direccion)}&output=embed`
       : "");
 
-  // Foto principal para el hero: la marcada como principal o la primera.
-  // El resto va a la galería (sin repetir la del hero).
   const fotoHero = fotos.find((f) => f.es_principal) ?? fotos[0];
-  const fotosGaleria = useMemo(() => {
-    if (!fotoHero) return fotos;
-    return fotos.filter((f) => f.id !== fotoHero.id);
-  }, [fotos, fotoHero]);
+  const fotosGaleria = useMemo(
+    () => (fotoHero ? fotos.filter((f) => f.id !== fotoHero.id) : fotos),
+    [fotos, fotoHero],
+  );
 
   const bookingConfig = data
     ? {
@@ -336,6 +307,9 @@ function EstudioPage() {
   const priceLabel = precioHora > 0 ? `${formatARS(precioHora)}/hora · mín ${minHours}h` : null;
   const priceAnchor = precioHora > 0 ? `Desde ${formatARS(precioHora)}/h · mín ${minHours}h` : null;
 
+  // Estado del modo compartido entre el formulario y el aside
+  const [withPack, setWithPack] = useState(false);
+
   return (
     <PublicLayout>
       {/* Back link */}
@@ -348,7 +322,7 @@ function EstudioPage() {
         </Link>
       </div>
 
-      {/* ─── Hero ──────────────────────────────────────────────────────── */}
+      {/* ─── Hero — eyebrow + wordmark gigante stacked ─────────────── */}
       <section className="px-4 pt-3 lg:px-12 lg:pt-6">
         <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-4">
           {tagline}
@@ -372,7 +346,7 @@ function EstudioPage() {
         </div>
       </section>
 
-      {/* ─── Foto hero — full-bleed debajo del texto ───────────────────── */}
+      {/* Foto hero — full-bleed debajo del texto */}
       <div className="mt-6">
         {fotoHero ? (
           <div className="w-full aspect-[16/11] md:aspect-[21/9] overflow-hidden">
@@ -429,20 +403,28 @@ function EstudioPage() {
           )}
         </div>
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start">
-          <StudioBookingForm config={bookingConfig} />
+          <StudioBookingForm
+            config={bookingConfig}
+            withPack={withPack}
+            onPackChange={setWithPack}
+          />
           {packActivo && (
-            <aside className="rounded-2xl border hairline bg-amber/10 p-5 lg:sticky lg:top-20 lg:self-start">
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/60">
+            <aside className="rounded-2xl border border-amber/35 bg-amber/8 p-5 lg:sticky lg:top-20 lg:self-start">
+              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/60 mb-3.5">
                 Estudio + equipos · qué incluye
               </div>
-              {/* Mostramos solo la grilla de equipos curados (sin duplicar
-                  precio/descripción/título — eso ya vive en el card del paso 01). */}
-              {packEquipos.length > 0 ? (
-                <StudioPackKit equipos={packEquipos} title="Equipos incluidos" />
+              {withPack ? (
+                packEquipos.length > 0 ? (
+                  <StudioPackKit equipos={packEquipos} title="Equipos incluidos" />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Llegá con la cámara — el día de la reserva te confirmamos qué luces y griperías
+                    están libres en tu franja.
+                  </p>
+                )
               ) : (
-                <p className="mt-4 rounded-lg bg-ink/5 px-3 py-2 text-sm text-muted-foreground">
-                  Llegá con la cámara — el día de la reserva te confirmamos qué luces y griperías
-                  están libres en tu franja.
+                <p className="text-[12px] text-muted-foreground leading-relaxed">
+                  Seleccioná "Estudio + equipos" para ver qué incluye el pack de luces y griperías.
                 </p>
               )}
             </aside>
@@ -451,10 +433,6 @@ function EstudioPage() {
       </section>
 
       {/* ─── Características del espacio ─────────────────────────────── */}
-      {/* Solo features con valor real — las que viven en el admin con value
-          vacío o placeholder "—" se ocultan en público hasta que el dueño las
-          complete. Permite tener una lista canónica en admin sin "—" feos en
-          la web. */}
       {(() => {
         const isFilled = (v: string) => {
           const t = (v ?? "").trim();
@@ -466,8 +444,7 @@ function EstudioPage() {
           <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
             <h2 className="font-display text-2xl sm:text-3xl">Características del espacio</h2>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-              Lo que vas a encontrar en el lugar. No incluye equipos ni staff — el equipamiento es
-              el pack opcional de arriba.
+              Lo que vas a encontrar en el lugar. No incluye equipos ni staff.
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {visibles.map((f) => (
@@ -527,9 +504,6 @@ function EstudioPage() {
       )}
 
       {/* ─── FAQ ─────────────────────────────────────────────────────── */}
-      {/* Filtro defensivo: si alguna fila viene basura (q sin a, o al revés),
-          la ocultamos en público — el admin tiene un filtro similar al guardar,
-          pero por las dudas. */}
       {(() => {
         const faqVisible = faq.filter((f) => f.q.trim() && f.a.trim());
         if (faqVisible.length === 0) return null;
@@ -551,17 +525,17 @@ function EstudioPage() {
         );
       })()}
 
-      {/* ─── Prueba social ───────────────────────────────────────────── */}
+      {/* ─── Testimonios ─────────────────────────────────────────────── */}
       {(() => {
-        const testimoniosVisibles = testimonios.filter((t) => t.autor.trim() && t.texto.trim());
-        if (testimoniosVisibles.length === 0) return null;
+        const tv = testimonios.filter((t) => t.autor.trim() && t.texto.trim());
+        if (tv.length === 0) return null;
         return (
           <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
             <h2 className="font-display text-2xl sm:text-3xl">Trabajaron acá</h2>
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {testimoniosVisibles.map((t, i) => (
+              {tv.map((t, i) => (
                 <figure key={i} className="rounded-xl border hairline bg-surface p-5">
-                  <blockquote className="text-sm leading-relaxed text-ink">“{t.texto}”</blockquote>
+                  <blockquote className="text-sm leading-relaxed text-ink">"{t.texto}"</blockquote>
                   <figcaption className="mt-3 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
                     {t.autor}
                   </figcaption>
@@ -580,13 +554,10 @@ function EstudioPage() {
           </div>
           <h2 className="mt-2 font-display text-3xl sm:text-4xl">Hablemos por WhatsApp</h2>
           <p className="mt-3 text-amber/80 max-w-lg">
-            Te respondemos en el día. Contanos qué necesitás y armamos un presupuesto a medida —
-            incluso si tu producción es más grande de lo que entra en el formulario.
+            Te respondemos en el día. Contanos qué necesitás y armamos un presupuesto a medida.
           </p>
           <a
-            href={`https://wa.me/${STUDIO_PHONE}?text=${encodeURIComponent(
-              "Hola Rambla! Quería consultar por el estudio.",
-            )}`}
+            href={`https://wa.me/${STUDIO_PHONE}?text=${encodeURIComponent("Hola Rambla! Quería consultar por el estudio.")}`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-6 inline-flex items-center gap-2 rounded-full bg-amber px-6 py-3 text-sm font-semibold text-ink transition hover:brightness-110"
@@ -597,11 +568,8 @@ function EstudioPage() {
         </div>
       </section>
 
-      {/* Padding extra al final para que el sticky CTA mobile no tape contenido */}
       <div className="h-20 lg:hidden" aria-hidden />
-
       <MobileBookCta priceLabel={priceLabel} />
-
       <CartDrawer allEquipos={[]} />
     </PublicLayout>
   );
