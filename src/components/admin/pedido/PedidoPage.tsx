@@ -583,7 +583,10 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                           cliente_nombre: `${c.apellido}, ${c.nombre}`,
                           cliente_email: c.email ?? "",
                           cliente_telefono: c.telefono ?? "",
-                          descuento_pct: c.descuento ?? draft.datos!.descuento_pct,
+                          // El descuento sigue al cliente: si el nuevo no tiene
+                          // uno propio, se resetea a 0 (antes quedaba pegado el
+                          // del cliente anterior).
+                          descuento_pct: c.descuento ?? 0,
                         })
                       }
                     />

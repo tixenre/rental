@@ -1632,6 +1632,13 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
 
 # ── PDFs ─────────────────────────────────────────────────────────────────────
 
+# Los documentos (remito/albarán/contrato) se generan al vuelo y siempre deben
+# reflejar el estado actual del pedido. Sin esto, el navegador cachea la URL
+# estática (es la misma siempre) y, tras editar el pedido —p. ej. cambiar el
+# cliente—, vuelve a servir el PDF viejo. `no-store` lo fuerza a re-pedirlo.
+_DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
+
+
 @router.get("/alquileres/{id}/pdf")
 async def pedido_pdf(id: int, request: Request, format: str = "pdf"):
     """`format=html` devuelve el preview HTML sin pasar por el renderer."""
@@ -1644,19 +1651,22 @@ async def pedido_pdf(id: int, request: Request, format: str = "pdf"):
         pedido = row_to_dict(row)
         pedido["items"] = _get_alquiler_items(conn, id)
         _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
+        # Desglose canónico (bruto/descuento/neto/IVA) para que el PDF muestre
+        # exactamente lo mismo que admin/portal — una sola fuente de verdad.
+        _enriquecer_pedido_con_total(conn, pedido)
     finally:
         conn.close()
 
     html = _pedido_html(pedido)
     if format == "html":
         from fastapi.responses import HTMLResponse
-        return HTMLResponse(content=html)
+        return HTMLResponse(content=html, headers=_DOC_NO_CACHE)
     pdf_bytes = await _render_pdf(html)
     filename  = _pedido_filename(pedido)
     return Response(
         content    = pdf_bytes,
         media_type = "application/pdf",
-        headers    = {"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers    = {"Content-Disposition": f'attachment; filename="{filename}"', **_DOC_NO_CACHE},
     )
 
 
@@ -1696,13 +1706,13 @@ async def pedido_albaran(id: int, request: Request, format: str = "pdf"):
     html = _albaran_html(pedido)
     if format == "html":
         from fastapi.responses import HTMLResponse
-        return HTMLResponse(content=html)
+        return HTMLResponse(content=html, headers=_DOC_NO_CACHE)
     pdf_bytes = await _render_pdf(html)
     filename  = _pedido_filename(pedido, suffix="albaran")
     return Response(
         content    = pdf_bytes,
         media_type = "application/pdf",
-        headers    = {"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers    = {"Content-Disposition": f'attachment; filename="{filename}"', **_DOC_NO_CACHE},
     )
 
 
@@ -1731,13 +1741,13 @@ async def pedido_contrato(id: int, request: Request, format: str = "pdf"):
     html = _contrato_html(pedido)
     if format == "html":
         from fastapi.responses import HTMLResponse
-        return HTMLResponse(content=html)
+        return HTMLResponse(content=html, headers=_DOC_NO_CACHE)
     pdf_bytes = await _render_pdf(html)
     filename  = _pedido_filename(pedido, suffix="contrato")
     return Response(
         content    = pdf_bytes,
         media_type = "application/pdf",
-        headers    = {"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers    = {"Content-Disposition": f'attachment; filename="{filename}"', **_DOC_NO_CACHE},
     )
 
 
