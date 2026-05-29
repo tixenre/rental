@@ -1,6 +1,6 @@
 """cliente_favoritos — equipos guardados por cliente
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: f1a9c7e3b5d2
 Revises: e3f7a9c2b5d4
 Create Date: 2026-05-29
 """
@@ -10,7 +10,7 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "a1b2c3d4e5f6"
+revision: str = "f1a9c7e3b5d2"
 down_revision: Union[str, Sequence[str], None] = "e3f7a9c2b5d4"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
