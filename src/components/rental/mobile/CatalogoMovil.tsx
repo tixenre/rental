@@ -18,7 +18,7 @@ import {
   Calendar,
   Loader2,
   Check,
-  Heart,
+  ChevronDown,
 } from "lucide-react";
 import { BottomSheet } from "@/components/mobile/BottomSheet";
 import { useNavigate } from "@tanstack/react-router";
@@ -26,17 +26,19 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useEquipos, useMarcas, useCategorias } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
-import { useFavoritos } from "@/hooks/useFavoritos";
 import { formatARS } from "@/lib/format";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
+import { StepperPill } from "@/components/rental/equipment/shared/StepperPill";
+import { PriceBlock } from "@/components/rental/equipment/shared/PriceBlock";
+import { FavButton } from "@/components/rental/equipment/shared/FavButton";
 import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
 import { apiGetDescuentosJornada, apiGetDiasBloqueados } from "@/lib/api";
-import { useClienteSession, IVA_PCT } from "@/lib/iva";
+import { useClienteSession, aplicaIva, IVA_PCT } from "@/lib/iva";
 import { computeCartTotal, descuentoLabel } from "@/lib/cart-total";
 import { deriveEndDate, franjaParaFecha, diaAbierto, timeToMinutes } from "@/lib/rental-dates";
 import { useHorarios } from "@/lib/horarios";
@@ -182,7 +184,7 @@ function HeroBanner({
     staleTime: 5 * 60 * 1000,
   });
   const taglines = taglinesData ?? HERO_TAGLINES_DEFAULT;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   const taglineIdx = useMemo(() => Math.floor(Math.random() * 4), []);
   const tagline = taglines[taglineIdx % taglines.length];
 
@@ -1121,14 +1123,15 @@ function EquipmentRow({
   onFicha,
 }: EquipmentRowProps) {
   const [imgFailed, setImgFailed] = useState(false);
-  const fav = useFavoritos();
-  const isFav = fav.has(String(eq.id));
-  const priceDisplay = fechaDesde
-    ? formatARS(eq.pricePerDay * jornadas)
-    : formatARS(eq.pricePerDay);
-  const priceMeta = fechaDesde ? `${jornadas} jorn.` : "/ jornada";
+  const { data: clienteSession } = useClienteSession();
+  const conIva = aplicaIva(clienteSession?.perfil_impuestos);
 
-  const expansionTotal = formatARS(eq.pricePerDay * (inCart || 1) * jornadas);
+  // Stock derivado de eq.cantidad (en mobile no se pasa disponibilidad por fecha).
+  const sinStock = eq.cantidad === 0;
+  const pocoStock = eq.cantidad != null && eq.cantidad > 0 && eq.cantidad <= 2;
+  const reachedMax = eq.cantidad != null && inCart >= eq.cantidad;
+
+  const nombrePublico = `${eq.brand} ${eq.name}`;
 
   const quickFacts = (
     eq.specsDestacados && eq.specsDestacados.length > 0
@@ -1145,110 +1148,101 @@ function EquipmentRow({
   return (
     <div
       className={cn(
-        "mb-1.5 rounded-[var(--radius-lg)] overflow-hidden border bg-card transition-all duration-150",
-        isExpanded ? "border-amber" : "border-hairline",
+        "mb-1.5 overflow-hidden rounded-lg border transition-all duration-150",
+        isExpanded
+          ? "border-ink/40 bg-accent/30"
+          : inCart > 0
+            ? "border-amber/60 bg-amber-soft/30"
+            : sinStock
+              ? "hairline opacity-50"
+              : "hairline bg-card",
       )}
-      style={isExpanded ? { boxShadow: "0 0 0 1.5px var(--amber)" } : undefined}
     >
       {/* Main row */}
       <div
-        className="flex items-center gap-2.5 p-[10px_12px_10px_10px] cursor-pointer select-none"
+        className="flex cursor-pointer select-none items-center gap-2.5 p-[10px_12px_10px_10px]"
         style={{ WebkitTapHighlightColor: "transparent" }}
         onClick={onTap}
       >
-        {/* Thumbnail */}
-        <div className="w-12 h-12 rounded-xl bg-surface border border-hairline flex items-center justify-center text-muted-foreground shrink-0 overflow-hidden">
-          {eq.fotoUrl && !imgFailed ? (
-            <img
-              src={eq.fotoUrl}
-              alt={eq.name}
-              className="w-full h-full object-contain p-1.5"
-              loading="lazy"
-              onError={() => setImgFailed(true)}
-            />
-          ) : (
-            <CatIcon cat={eq.category} size={20} />
-          )}
+        {/* Thumb cuadrado 1:1 + FavButton */}
+        <div className="relative shrink-0">
+          <div className="flex aspect-square w-12 items-center justify-center overflow-hidden rounded-md bg-white text-muted-foreground">
+            {eq.fotoUrl && !imgFailed ? (
+              <img
+                src={eq.fotoUrl}
+                alt={nombrePublico}
+                className="h-full w-full object-contain p-1.5"
+                loading="lazy"
+                onError={() => setImgFailed(true)}
+              />
+            ) : (
+              <CatIcon cat={eq.category} size={20} />
+            )}
+          </div>
+          <FavButton itemId={String(eq.id)} size="sm" className="absolute -right-1.5 -top-1.5" />
         </div>
 
         {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground leading-none">
-            {eq.brand} · {eq.category}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 font-mono text-[8px] uppercase leading-none tracking-[0.18em] text-muted-foreground">
+            <span className="truncate">{eq.category}</span>
+            {(sinStock || pocoStock) && (
+              <span className={cn("shrink-0", sinStock ? "text-destructive" : "text-amber")}>
+                · {sinStock ? "no disponible" : `${eq.cantidad} disp.`}
+              </span>
+            )}
           </div>
-          <div className="font-sans text-[15px] font-bold text-ink leading-tight mt-0.5 truncate">
-            {eq.name}
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <span className="truncate font-sans text-[15px] font-bold leading-tight text-ink">
+              {nombrePublico}
+            </span>
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+                isExpanded && "rotate-180",
+              )}
+            />
           </div>
         </div>
 
         {/* Price */}
-        <div className="text-right shrink-0">
-          <div
-            className={cn(
-              "font-mono font-bold leading-none",
-              fechaDesde ? "text-sm text-ink" : "text-xs text-muted-foreground",
-            )}
-            style={{ fontSize: fechaDesde ? 14 : 12, fontVariantNumeric: "tabular-nums" }}
-          >
-            {priceDisplay}
-          </div>
-          <div className="font-mono text-[8px] tracking-[0.1em] uppercase text-muted-foreground mt-0.5">
-            {priceMeta}
-          </div>
-        </div>
-
-        {/* Favorito */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            fav.toggle(String(eq.id));
-          }}
-          aria-label={isFav ? "Quitar de favoritos" : "Guardar en favoritos"}
-          className={cn(
-            "grid h-8 w-8 shrink-0 place-items-center rounded-full border border-hairline transition-all",
-            isFav ? "bg-amber border-amber text-ink" : "text-muted-foreground",
-          )}
-        >
-          <Heart className={cn("h-3.5 w-3.5", isFav && "fill-current")} />
-        </button>
+        <PriceBlock
+          perDay={eq.pricePerDay}
+          jornadas={fechaDesde ? jornadas : 0}
+          qty={inCart || 1}
+          conIva={conIva}
+          size="sm"
+          align="right"
+          className="shrink-0"
+        />
 
         {/* Action */}
-        {inCart > 0 ? (
-          <div
-            className="flex items-center rounded-full overflow-hidden shrink-0"
-            style={{ border: "1.5px solid var(--amber)", background: "var(--amber)" }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div onClick={(e) => e.stopPropagation()}>
+          {inCart > 0 ? (
+            <StepperPill
+              qty={inCart}
+              onIncrement={() => onAdd(1)}
+              onDecrement={() => onAdd(-1)}
+              maxReached={reachedMax}
+              size="md"
+            />
+          ) : (
             <button
-              className="w-[30px] h-8 grid place-items-center font-bold text-base text-ink hover:bg-ink/10 transition-colors leading-none"
-              onClick={() => onAdd(-1)}
+              type="button"
+              aria-label={`Agregar ${nombrePublico}`}
+              disabled={sinStock}
+              className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full border hairline bg-background text-ink transition-colors hover:border-amber hover:bg-amber active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (sinStock) return;
+                onAdd(1);
+                onTap(); // also expand
+              }}
             >
-              −
+              <Plus size={14} />
             </button>
-            <span className="font-mono text-[13px] font-bold text-ink px-1.5 min-w-[28px] text-center">
-              {inCart}
-            </span>
-            <button
-              className="w-[30px] h-8 grid place-items-center font-bold text-base text-ink hover:bg-ink/10 transition-colors leading-none disabled:opacity-40"
-              onClick={() => onAdd(1)}
-              disabled={eq.cantidad != null && inCart >= eq.cantidad}
-            >
-              +
-            </button>
-          </div>
-        ) : (
-          <button
-            className="w-[34px] h-[34px] rounded-full bg-ink text-background grid place-items-center shrink-0 transition-all duration-150 border-[1.5px] border-ink hover:bg-amber hover:border-amber hover:text-ink"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAdd(1);
-              onTap(); // also expand
-            }}
-          >
-            <Plus size={14} />
-          </button>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Expansion panel */}
@@ -1262,37 +1256,32 @@ function EquipmentRow({
           }}
         >
           {/* Total */}
-          <div className="flex items-baseline justify-between pb-2.5 mb-2.5 border-b border-hairline">
-            <div>
-              <div
-                className="font-mono font-bold leading-none text-ink"
-                style={{ fontSize: 22, fontVariantNumeric: "tabular-nums" }}
-              >
-                {expansionTotal}
-              </div>
-              <div className="font-mono text-[8px] tracking-[0.18em] uppercase text-muted-foreground mt-0.5">
-                {jornadas} jornadas{inCart > 1 ? ` · ${inCart} unidades` : ""}
-              </div>
-            </div>
-            <div className="font-mono text-[11px] text-muted-foreground">
-              {formatARS(eq.pricePerDay)}
-              <span className="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground ml-1">
-                /jorn.
+          <div className="mb-2.5 flex items-baseline justify-between border-b border-hairline pb-2.5">
+            <PriceBlock
+              perDay={eq.pricePerDay}
+              jornadas={fechaDesde ? jornadas : 0}
+              qty={inCart || 1}
+              conIva={conIva}
+              size="lg"
+            />
+            {inCart > 1 && (
+              <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
+                {inCart} unidades
               </span>
-            </div>
+            )}
           </div>
 
-          {/* Includes */}
+          {/* Includes — 2 columnas */}
           {eq.includes && eq.includes.length > 0 && (
             <div className="mb-2">
-              <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-1.5">
+              <div className="mb-1.5 font-mono text-[8px] uppercase tracking-[0.2em] text-muted-foreground">
                 Incluye
               </div>
-              <div className="flex flex-wrap gap-1">
+              <div className="grid grid-cols-2 gap-1">
                 {eq.includes.map((item, i) => (
                   <span
                     key={i}
-                    className="px-2.5 py-0.5 rounded-full border border-hairline bg-card font-sans text-[11px] text-ink"
+                    className="rounded-full border border-hairline bg-card px-2.5 py-0.5 font-sans text-[11px] text-ink"
                   >
                     <svg
                       width="8"
@@ -1341,7 +1330,7 @@ function EquipmentRow({
               onFicha();
             }}
           >
-            Ver ficha completa
+            Ver ficha técnica
             <ChevronRight size={12} />
           </button>
         </div>
