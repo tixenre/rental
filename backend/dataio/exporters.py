@@ -545,6 +545,113 @@ def export_alquileres(conn) -> list[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# estudio (singleton + listas embebidas: fotos, pack, slots)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def export_estudio(conn) -> list[dict]:
+    """Exporta el estudio singleton (id=1) con fotos, pack y slots embebidos.
+
+    Devuelve lista vacía si la fila aún no existe (estudio no configurado).
+    Las FKs a equipos se resuelven a slug para portabilidad entre ambientes.
+    """
+    row = conn.execute("SELECT * FROM estudio WHERE id = 1").fetchone()
+    if not row:
+        return []
+
+    # equipo_id → slug (centinela del espacio)
+    equipo_slug: str | None = None
+    if row["equipo_id"]:
+        slug_row = conn.execute(
+            "SELECT slug FROM equipos WHERE id = %s", (row["equipo_id"],)
+        ).fetchone()
+        equipo_slug = slug_row["slug"] if slug_row else None
+
+    # Fotos
+    foto_rows = conn.execute("""
+        SELECT url, path, orden, es_principal
+        FROM estudio_fotos
+        WHERE estudio_id = 1
+        ORDER BY orden, id
+    """).fetchall()
+    fotos = [
+        schema.EstudioFoto(
+            url=r["url"],
+            path=r["path"],
+            orden=int(r["orden"]),
+            es_principal=bool(r["es_principal"]),
+        ).model_dump()
+        for r in foto_rows
+    ]
+
+    # Pack — equipo_id → slug
+    pack_rows = conn.execute("""
+        SELECT e.slug AS equipo_slug, pe.orden
+        FROM estudio_pack_equipos pe
+        JOIN equipos e ON e.id = pe.equipo_id
+        WHERE pe.estudio_id = 1 AND e.slug IS NOT NULL
+        ORDER BY pe.orden, pe.id
+    """).fetchall()
+    pack_equipos = [
+        schema.EstudioPackEquipo(
+            equipo_slug=r["equipo_slug"],
+            orden=int(r["orden"]),
+        ).model_dump()
+        for r in pack_rows
+    ]
+
+    # Slots fijos
+    slot_rows = conn.execute("""
+        SELECT cliente, dia_semana, hora_desde, hora_hasta, valor_mensual,
+               mes_desde, mes_hasta, activo
+        FROM estudio_slots_fijos
+        ORDER BY dia_semana, hora_desde, id
+    """).fetchall()
+    slots_fijos = [
+        schema.EstudioSlotFijo(
+            cliente=r["cliente"],
+            dia_semana=int(r["dia_semana"]),
+            hora_desde=int(r["hora_desde"]),
+            hora_hasta=int(r["hora_hasta"]),
+            valor_mensual=int(r["valor_mensual"] or 0),
+            mes_desde=str(r["mes_desde"]),
+            mes_hasta=str(r["mes_hasta"]),
+            activo=bool(r["activo"]),
+        ).model_dump()
+        for r in slot_rows
+    ]
+
+    return [
+        schema.Estudio(
+            equipo_slug=equipo_slug,
+            nombre=row["nombre"],
+            tagline=row["tagline"] or "",
+            descripcion=row["descripcion"] or "",
+            precio_hora=int(row["precio_hora"] or 0),
+            min_horas=int(row["min_horas"] or 2),
+            open_hour=int(row["open_hour"] or 8),
+            close_hour=int(row["close_hour"] or 22),
+            buffer_horas=int(row["buffer_horas"] or 0),
+            pack_activo=bool(row["pack_activo"]),
+            pack_nombre=row["pack_nombre"] or "",
+            pack_descripcion=row["pack_descripcion"] or "",
+            pack_precio=int(row["pack_precio"] or 0),
+            features_json=row["features_json"],
+            faq_json=row["faq_json"],
+            direccion=row["direccion"] or "",
+            como_llegar=row["como_llegar"] or "",
+            testimonios_json=row["testimonios_json"],
+            anticipacion_min_horas=int(row["anticipacion_min_horas"] or 0),
+            mapa_url=row["mapa_url"] or "",
+            mapa_embed_url=row["mapa_embed_url"] or "",
+            fotos=fotos,
+            pack_equipos=pack_equipos,
+            slots_fijos=slots_fijos,
+        ).model_dump()
+    ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CONFIG — ajustes, plantillas de mail, descuentos
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -597,6 +704,7 @@ EXPORTERS = {
     "equipos": export_equipos,
     "equipo_specs": export_equipo_specs,
     "equipo_fichas": export_equipo_fichas,
+    "estudio": export_estudio,
     "app_settings": export_app_settings,
     "email_templates": export_email_templates,
     "descuentos_jornada": export_descuentos_jornada,

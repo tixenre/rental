@@ -779,6 +779,130 @@ def import_alquileres(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# estudio (singleton upsert WHERE id=1 + replace de listas hijas)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def import_estudio(
+    conn, rows: list[dict], resolver: KeyResolver
+) -> dict[str, int]:
+    """Upsert del singleton estudio (id=1) + replace de fotos, pack y slots.
+
+    Política de listas hijas: DELETE + reinsert (replace completo).
+    - fotos: sin clave natural propia — replace es lo correcto.
+    - pack_equipos: curado por el admin — replace mantiene el orden del JSON.
+    - slots_fijos: configuración recurrente — replace. Nota: si hay alquileres
+      con estudio_slot_id, esas FKs quedarán NULL hasta que se restaure también
+      el backup de pedidos (el ON DELETE SET NULL de la FK lo maneja el motor).
+    """
+    if not rows:
+        return {"inserted": 0, "updated": 0, "skipped": 0}
+    items = _validate_rows(rows, schema.Estudio, "estudio")
+    s = items[0]  # singleton — solo se procesa el primer elemento
+    stats = {"inserted": 0, "updated": 0, "skipped": 0}
+
+    # Resolver equipo centinela slug → id
+    equipo_id = resolver.equipo_id(s.equipo_slug) if s.equipo_slug else None
+
+    existing = conn.execute("SELECT id FROM estudio WHERE id = 1").fetchone()
+    if existing:
+        conn.execute(
+            """
+            UPDATE estudio SET
+                equipo_id = %s, nombre = %s, tagline = %s, descripcion = %s,
+                precio_hora = %s, min_horas = %s, open_hour = %s, close_hour = %s,
+                buffer_horas = %s, pack_activo = %s, pack_nombre = %s,
+                pack_descripcion = %s, pack_precio = %s, features_json = %s,
+                faq_json = %s, direccion = %s, como_llegar = %s,
+                testimonios_json = %s, anticipacion_min_horas = %s,
+                mapa_url = %s, mapa_embed_url = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+            """,
+            (
+                equipo_id, s.nombre, s.tagline, s.descripcion,
+                s.precio_hora, s.min_horas, s.open_hour, s.close_hour,
+                s.buffer_horas, s.pack_activo, s.pack_nombre,
+                s.pack_descripcion, s.pack_precio, s.features_json,
+                s.faq_json, s.direccion, s.como_llegar,
+                s.testimonios_json, s.anticipacion_min_horas,
+                s.mapa_url, s.mapa_embed_url,
+            ),
+        )
+        stats["updated"] += 1
+    else:
+        conn.execute(
+            """
+            INSERT INTO estudio (
+                id, equipo_id, nombre, tagline, descripcion,
+                precio_hora, min_horas, open_hour, close_hour, buffer_horas,
+                pack_activo, pack_nombre, pack_descripcion, pack_precio,
+                features_json, faq_json, direccion, como_llegar,
+                testimonios_json, anticipacion_min_horas, mapa_url, mapa_embed_url
+            ) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                      %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                equipo_id, s.nombre, s.tagline, s.descripcion,
+                s.precio_hora, s.min_horas, s.open_hour, s.close_hour,
+                s.buffer_horas, s.pack_activo, s.pack_nombre,
+                s.pack_descripcion, s.pack_precio, s.features_json,
+                s.faq_json, s.direccion, s.como_llegar,
+                s.testimonios_json, s.anticipacion_min_horas,
+                s.mapa_url, s.mapa_embed_url,
+            ),
+        )
+        stats["inserted"] += 1
+
+    # ── Fotos: replace ───────────────────────────────────────────────────────
+    conn.execute("DELETE FROM estudio_fotos WHERE estudio_id = 1")
+    for f in s.fotos:
+        conn.execute(
+            """
+            INSERT INTO estudio_fotos (estudio_id, url, path, orden, es_principal)
+            VALUES (1, %s, %s, %s, %s)
+            """,
+            (f.url, f.path, f.orden, f.es_principal),
+        )
+
+    # ── Pack equipos: replace ────────────────────────────────────────────────
+    conn.execute("DELETE FROM estudio_pack_equipos WHERE estudio_id = 1")
+    for pe in s.pack_equipos:
+        eq_id = resolver.equipo_id(pe.equipo_slug)
+        if eq_id is None:
+            raise ImportError_(
+                f"estudio.pack_equipos: equipo_slug='{pe.equipo_slug}' no existe"
+            )
+        conn.execute(
+            """
+            INSERT INTO estudio_pack_equipos (estudio_id, equipo_id, orden)
+            VALUES (1, %s, %s)
+            ON CONFLICT (estudio_id, equipo_id) DO UPDATE SET orden = EXCLUDED.orden
+            """,
+            (eq_id, pe.orden),
+        )
+
+    # ── Slots fijos: replace ─────────────────────────────────────────────────
+    # ON DELETE SET NULL en alquileres.estudio_slot_id maneja la FK automáticamente.
+    conn.execute("DELETE FROM estudio_slots_fijos")
+    for sl in s.slots_fijos:
+        conn.execute(
+            """
+            INSERT INTO estudio_slots_fijos
+                (cliente, dia_semana, hora_desde, hora_hasta, valor_mensual,
+                 mes_desde, mes_hasta, activo)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                sl.cliente, sl.dia_semana, sl.hora_desde, sl.hora_hasta,
+                sl.valor_mensual, sl.mes_desde, sl.mes_hasta, sl.activo,
+            ),
+        )
+
+    return stats
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CONFIG — ajustes, plantillas de mail, descuentos (upsert por clave natural)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -864,6 +988,7 @@ IMPORTERS = {
     "equipos": import_equipos,
     "equipo_specs": import_equipo_specs,
     "equipo_fichas": import_equipo_fichas,
+    "estudio": import_estudio,
     "app_settings": import_app_settings,
     "email_templates": import_email_templates,
     "descuentos_jornada": import_descuentos_jornada,
