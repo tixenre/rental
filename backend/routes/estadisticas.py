@@ -165,6 +165,19 @@ def get_estadisticas(request: Request):
             'peor_total':  mejor_peor_dict.get('peor_total'),
         }
 
+        # ── Equipos más favoriteados (analytics de comportamiento de clientes) ──
+        favoritos_equipo = conn.execute("""
+            SELECT
+                e.nombre                       AS equipo,
+                COUNT(*)                       AS total_favoritos,
+                COUNT(DISTINCT cf.cliente_id)  AS clientes_unicos
+            FROM cliente_favoritos cf
+            JOIN equipos e ON e.id = cf.equipo_id
+            GROUP BY cf.equipo_id, e.nombre
+            ORDER BY total_favoritos DESC
+            LIMIT 15
+        """).fetchall()
+
         return {
             "totales":              row_to_dict(totales),
             "por_mes":              [row_to_dict(r) for r in por_mes],
@@ -174,6 +187,7 @@ def get_estadisticas(request: Request):
             "clientes_recurrentes": [row_to_dict(r) for r in clientes_recurrentes],
             "mejor_peor_mes":       mejor_peor_mes,
             "por_dueno":            [row_to_dict(r) for r in por_dueno],
+            "favoritos_equipo":     [row_to_dict(r) for r in favoritos_equipo],
         }
     finally:
         conn.close()

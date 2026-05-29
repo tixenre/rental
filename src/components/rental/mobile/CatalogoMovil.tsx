@@ -18,6 +18,7 @@ import {
   Calendar,
   Loader2,
   Check,
+  Heart,
 } from "lucide-react";
 import { BottomSheet } from "@/components/mobile/BottomSheet";
 import { useNavigate } from "@tanstack/react-router";
@@ -25,6 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useEquipos, useMarcas, useCategorias } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
+import { useFavoritos } from "@/hooks/useFavoritos";
 import { formatARS } from "@/lib/format";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
@@ -1119,6 +1121,8 @@ function EquipmentRow({
   onFicha,
 }: EquipmentRowProps) {
   const [imgFailed, setImgFailed] = useState(false);
+  const fav = useFavoritos();
+  const isFav = fav.has(String(eq.id));
   const priceDisplay = fechaDesde
     ? formatARS(eq.pricePerDay * jornadas)
     : formatARS(eq.pricePerDay);
@@ -1192,6 +1196,22 @@ function EquipmentRow({
             {priceMeta}
           </div>
         </div>
+
+        {/* Favorito */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            fav.toggle(String(eq.id));
+          }}
+          aria-label={isFav ? "Quitar de favoritos" : "Guardar en favoritos"}
+          className={cn(
+            "grid h-8 w-8 shrink-0 place-items-center rounded-full border border-hairline transition-all",
+            isFav ? "bg-amber border-amber text-ink" : "text-muted-foreground",
+          )}
+        >
+          <Heart className={cn("h-3.5 w-3.5", isFav && "fill-current")} />
+        </button>
 
         {/* Action */}
         {inCart > 0 ? (

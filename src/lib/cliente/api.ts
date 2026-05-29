@@ -74,4 +74,22 @@ export const clienteApi = {
       `/api/cliente/pedidos/${pedidoId}/disponibilidad?${sp.toString()}`,
     );
   },
+
+  // ── Favoritos ──────────────────────────────────────────────────────────────
+
+  getFavoritos: () => authedJson<string[]>("/api/cliente/favoritos"),
+
+  addFavorito: (id: string) =>
+    authedJson<{ ok: boolean }>(`/api/cliente/favoritos/${id}`, { method: "POST" }),
+
+  removeFavorito: (id: string) =>
+    authedJson<{ ok: boolean }>(`/api/cliente/favoritos/${id}`, { method: "DELETE" }),
+
+  /** Merge bulk de localStorage al servidor al hacer login. */
+  syncFavoritos: (ids: string[]) =>
+    authedJson<{ synced: number }>("/api/cliente/favoritos/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: ids.map(Number) }),
+    }),
 };

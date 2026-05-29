@@ -11,6 +11,7 @@ import {
   Search,
   X,
   Check,
+  Heart,
   SearchX,
 } from "lucide-react";
 import { ViewToggle } from "@/components/rental/ViewToggle";
@@ -37,6 +38,7 @@ import {
   discoverFilterableSpecs,
   type SpecFilterDef,
 } from "@/hooks/useEquipos";
+import { useFavoritos } from "@/hooks/useFavoritos";
 import type { BackendMarca, BackendCategoria } from "@/lib/api";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { useCart } from "@/lib/cart-store";
@@ -273,6 +275,8 @@ function Index() {
   // para las fechas pickeadas). Solo tiene efecto cuando hay rango de fechas
   // — sin fechas, `disponible` queda undefined y todos pasan.
   const [disponiblesOnly, setDisponiblesOnly] = useState(false);
+  const [favoritosOnly, setFavoritosOnly] = useState(false);
+  const fav = useFavoritos();
   // Scroll-feel: `scrolled` se activa cuando el hero se tiñó >65% (mismo
   // umbral que el snap del topbar) → retinta el cat-bar para que combine con
   // el topbar amber. `spyCat` resalta el tab de la categoría en viewport
@@ -330,6 +334,9 @@ function Index() {
     if (disponiblesOnly) {
       list = list.filter((e) => e.disponible === undefined || e.disponible > 0);
     }
+    if (favoritosOnly) {
+      list = list.filter((e) => fav.has(String(e.id)));
+    }
     // Filtros por specs estructuradas (Fase H): match exacto del value
     // contra `equipo.specsRaw[key].value`. Si el equipo no tiene esa
     // spec (porque no está en su template de categoría), no matchea.
@@ -355,7 +362,7 @@ function Index() {
       });
     }
     return list;
-  }, [selectedCats, brand, query, disponiblesOnly, allEquipos, specFilters]);
+  }, [selectedCats, brand, query, disponiblesOnly, favoritosOnly, fav, allEquipos, specFilters]);
 
   // Specs filtrables — descubiertas del subset cat/brand/query (sin
   // aplicar spec-filters todavía, para que los valores disponibles no
@@ -586,6 +593,25 @@ function Index() {
             </div>
 
             <div className="flex-1 min-w-2" />
+
+            {/* Filtro Favoritos */}
+            {fav.count > 0 && (
+              <button
+                type="button"
+                onClick={() => setFavoritosOnly((v) => !v)}
+                className={cn(
+                  "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
+                  favoritosOnly
+                    ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
+                    : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
+                )}
+                aria-pressed={favoritosOnly}
+              >
+                <Heart className={cn("h-3 w-3", favoritosOnly && "fill-current")} />
+                Favoritos
+                <span className="font-mono text-[9px] tabular">{fav.count}</span>
+              </button>
+            )}
 
             {/* Filtro Disponibles — solo tiene efecto con fechas pickeadas */}
             <button

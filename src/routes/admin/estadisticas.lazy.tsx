@@ -161,6 +161,23 @@ function EstadisticasPage() {
               />
             </Section>
 
+            {/* Equipos más guardados como favoritos */}
+            {(data.favoritos_equipo?.length ?? 0) > 0 && (
+              <Section
+                title="Equipos más guardados"
+                subtitle="Equipos que los clientes marcan como favoritos"
+              >
+                <RankList
+                  items={(data.favoritos_equipo ?? []).map((e) => ({
+                    primary: e.equipo,
+                    secondary: `${e.clientes_unicos} cliente${e.clientes_unicos !== 1 ? "s" : ""}`,
+                    value: `${e.total_favoritos}×`,
+                  }))}
+                  icon={Heart}
+                />
+              </Section>
+            )}
+
             {/* Recurrentes */}
             <Section title="Clientes recurrentes" subtitle="Más de 1 alquiler">
               <RankList

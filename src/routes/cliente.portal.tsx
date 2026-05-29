@@ -1,5 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useEquipos } from "@/hooks/useEquipos";
+import { useFavoritos } from "@/hooks/useFavoritos";
+import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { authedFetch } from "@/lib/authedFetch";
 import { clienteApi } from "@/lib/cliente/api";
 import { PublicLayout } from "@/components/rental/PublicLayout";
@@ -212,6 +215,13 @@ function fmtTime(s?: string) {
 export default function ClientePortal() {
   const navigate = useNavigate();
   const { nuevo } = Route.useSearch();
+  const fav = useFavoritos();
+  const { data: allEquipos = [] } = useEquipos();
+  const favEquipos = useMemo(
+    () => allEquipos.filter((e) => fav.has(String(e.id))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allEquipos, fav.items],
+  );
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
@@ -459,6 +469,20 @@ export default function ClientePortal() {
             />
             <StatCard label="Histórico" value={String(historico)} meta="pedidos completados" />
           </div>
+        )}
+
+        {/* Mis favoritos */}
+        {favEquipos.length > 0 && (
+          <section className="mb-8">
+            <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-4">
+              Mis favoritos
+            </h2>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+              {favEquipos.map((item, i) => (
+                <EquipmentCard key={item.id} item={item} index={i} />
+              ))}
+            </div>
+          </section>
         )}
 
         <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-4">
