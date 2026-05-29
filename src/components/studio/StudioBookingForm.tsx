@@ -573,7 +573,7 @@ export function StudioBookingForm({
           </p>
         )}
         {date && disponibilidad === "error" && (
-          <p className="mt-3 text-center text-xs text-amber-600">
+          <p className="mt-3 text-center text-xs text-destructive">
             No pudimos verificar disponibilidad — reintentá.
           </p>
         )}
