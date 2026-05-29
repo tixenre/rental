@@ -349,54 +349,47 @@ function EstudioPage() {
       </div>
 
       {/* ─── Hero ──────────────────────────────────────────────────────── */}
-      <section className="px-4 pt-3 pb-8 lg:px-12 lg:pt-6 lg:pb-12">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-10">
-          <div className="order-2 lg:order-1">
-            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-              {tagline}
-            </p>
-            <h1 className="mt-2 wordmark text-[14vw] leading-[0.92] sm:text-[10vw] md:text-[5.5rem] lg:text-[6.25rem] text-balance">
-              {nombre}
-            </h1>
-            <p className="mt-4 max-w-lg text-base text-muted-foreground">{descripcion}</p>
-
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <a
-                href="#reservar"
-                className="inline-flex items-center justify-center rounded-full bg-ink px-6 py-3 text-sm font-semibold text-amber hover:brightness-110 transition"
-              >
-                Reservar
-              </a>
-              {priceAnchor && (
-                <span className="inline-flex items-center rounded-full border hairline bg-surface px-4 py-2 text-xs sm:text-sm tabular text-ink">
-                  {priceAnchor}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Foto hero — full-bleed real en mobile/tablet (margen negativo basado
-              en el viewport, no en el padding del padre, así no depende del
-              contexto). En lg vuelve a la celda del grid con redondeo. */}
-          <div className="order-1 lg:order-2 mx-[calc(50%-50vw)] w-screen lg:mx-0 lg:w-auto">
-            {fotoHero ? (
-              <div className="aspect-[16/10] sm:aspect-[4/3] w-full overflow-hidden rounded-none lg:rounded-2xl bg-ink/5">
-                <img
-                  src={fotoHero.url}
-                  alt={nombre}
-                  className="h-full w-full object-cover"
-                  loading="eager"
-                />
-              </div>
-            ) : (
-              <PhotoPlaceholder
-                className="aspect-[16/10] sm:aspect-[4/3] w-full rounded-none lg:rounded-xl"
-                label="FOTO PRINCIPAL"
-              />
-            )}
-          </div>
+      <section className="px-4 pt-3 lg:px-12 lg:pt-6">
+        <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-4">
+          {tagline}
+        </p>
+        <h1 className="wordmark text-[clamp(5rem,22vw,14rem)] leading-[0.88] tracking-[-0.02em]">
+          {nombre}
+        </h1>
+        <p className="mt-5 max-w-lg text-base text-muted-foreground">{descripcion}</p>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <a
+            href="#reservar"
+            className="inline-flex items-center justify-center rounded-full bg-ink px-6 py-3 text-sm font-semibold text-amber hover:brightness-110 transition"
+          >
+            Reservar
+          </a>
+          {priceAnchor && (
+            <span className="inline-flex items-center rounded-full border hairline bg-surface px-4 py-2 text-xs sm:text-sm tabular text-ink">
+              {priceAnchor}
+            </span>
+          )}
         </div>
       </section>
+
+      {/* ─── Foto hero — full-bleed debajo del texto ───────────────────── */}
+      <div className="mt-6">
+        {fotoHero ? (
+          <div className="w-full aspect-[16/11] md:aspect-[21/9] overflow-hidden">
+            <img
+              src={fotoHero.url}
+              alt={nombre}
+              className="h-full w-full object-cover"
+              loading="eager"
+            />
+          </div>
+        ) : (
+          <PhotoPlaceholder
+            className="aspect-[16/11] md:aspect-[21/9] w-full rounded-none"
+            label="FOTO PRINCIPAL"
+          />
+        )}
+      </div>
 
       {/* ─── Galería ─────────────────────────────────────────────────── */}
       {(fotosGaleria.length > 0 || !data) && (
