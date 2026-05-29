@@ -27,6 +27,7 @@ import {
   Receipt,
   LogOut,
   CircleCheckBig,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -52,6 +53,7 @@ import { useBusinessPhone } from "@/lib/business";
 import { jornadasFromISO as jornadasEntre } from "@/lib/rental-dates";
 import { whatsappLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
+import { GoogleIcon } from "@/components/ui/GoogleIcon";
 
 export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mis pedidos — Rambla Rental" }] }),
@@ -1700,9 +1702,27 @@ function PedidoTimeline({ pedido }: { pedido: Pedido }) {
   );
 }
 
-// ── ProfileDrawer: vista lateral del perfil del cliente ────────────────────
-// Reemplaza el drop-target del avatar pill en el TopBar. Solo lectura aquí
-// — la edición sigue viviendo en `/cliente/perfil` (link "Editar datos").
+// ── ProfileDrawer v2: panel de perfil del cliente ────────────────────────────
+
+function fmtDesde(isoStr?: string | null): string {
+  if (!isoStr) return "";
+  const d = new Date(isoStr.slice(0, 10) + "T12:00:00");
+  const meses = [
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+  ];
+  return `${meses[d.getMonth()]} ${d.getFullYear()}`;
+}
 
 function ProfileDrawer({
   open,
@@ -1721,129 +1741,131 @@ function ProfileDrawer({
 }) {
   if (!open) return null;
 
-  const initials = `${perfil.nombre[0] ?? ""}${perfil.apellido[0] ?? ""}`.toUpperCase();
-  const fullName = `${perfil.nombre} ${perfil.apellido}`;
-
-  const desde = perfil.created_at
-    ? new Date(perfil.created_at.slice(0, 10) + "T12:00:00").toLocaleDateString("es-AR", {
-        month: "long",
-        year: "numeric",
-      })
-    : null;
-
-  const perfilLabels: Record<string, string> = {
-    consumidor_final: "Consumidor final",
-    responsable_inscripto: "Resp. inscripto",
-    monotributo: "Monotributo",
-    exento: "Exento",
-  };
+  const desde = fmtDesde(perfil.created_at);
+  const inits = `${perfil.nombre[0] ?? ""}${perfil.apellido[0] ?? ""}`.toUpperCase();
 
   return (
     <>
       {/* Scrim */}
       <div
-        className="fixed inset-0 z-[60] bg-ink/40 backdrop-blur-sm"
+        className="fixed inset-0 z-[60] bg-ink/40 backdrop-blur-[2px]"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Drawer */}
-      <aside className="fixed top-0 right-0 bottom-0 z-[61] flex w-full max-w-[340px] flex-col border-l border-[var(--hairline)] bg-background shadow-xl animate-[slide-in-right_.25s_cubic-bezier(.32,.72,0,1)]">
-        {/* Header: avatar + nombre + cerrar */}
-        <div className="flex items-start justify-between p-5 pb-4">
-          <div>
-            <div className="mb-3 h-14 w-14 rounded-full bg-amber grid place-items-center font-display text-xl font-black text-ink">
-              {initials}
-            </div>
-            <div className="font-display text-2xl leading-none text-ink lowercase">
-              {fullName.toLowerCase()}.
-            </div>
-            <div className="mt-1.5 font-mono text-[10px] tracking-[0.1em] text-muted-foreground">
-              {perfil.email}
-            </div>
-          </div>
+      {/* Panel */}
+      <aside
+        className="fixed inset-y-0 right-0 z-[61] w-full max-w-[340px] bg-background border-l border-hairline flex flex-col overflow-y-auto animate-[slide-in-right_.22s_cubic-bezier(0.32,0.72,0,1)]"
+        role="dialog"
+        aria-label="Perfil"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-hairline shrink-0">
+          <span className="font-mono text-[10px] tracking-[.22em] uppercase text-muted-foreground">
+            Mi perfil
+          </span>
           <button
+            type="button"
             onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-full border border-[var(--hairline)] text-muted-foreground hover:bg-muted hover:text-ink transition"
+            className="w-8 h-8 rounded-full border border-hairline flex items-center justify-center text-muted-foreground hover:text-ink hover:border-ink transition-colors"
             aria-label="Cerrar"
           >
-            <XIcon className="h-3.5 w-3.5" />
+            <XIcon className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Stats rápidas */}
-        <div className="grid grid-cols-2 gap-2 px-5 pb-4 border-b border-[var(--hairline)]">
-          <div className="rounded-lg border border-[var(--hairline)] bg-surface px-3 py-2.5">
-            <div className="font-sans text-[20px] font-bold text-ink tabular-nums">
-              {pedidosCount}
+        {/* Content */}
+        <div className="flex flex-col gap-4 p-5 flex-1">
+          {/* ── Avatar + nombre ── */}
+          <div className="border border-hairline rounded-2xl overflow-hidden bg-surface-elevated">
+            {/* Avatar row */}
+            <div className="px-5 py-4 border-b border-hairline flex items-center gap-3.5">
+              <div className="w-[52px] h-[52px] rounded-full bg-amber flex items-center justify-center font-display font-black text-[20px] text-ink shrink-0 select-none">
+                {inits}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-sans text-[17px] font-bold text-ink leading-tight truncate">
+                  {perfil.nombre} {perfil.apellido}
+                </p>
+                {desde && (
+                  <p className="font-mono text-[9px] tracking-[.15em] uppercase text-muted-foreground mt-1">
+                    cliente desde {desde}
+                  </p>
+                )}
+              </div>
+              {/* Google verified badge */}
+              <div className="flex items-center gap-1 bg-[color-mix(in_oklch,#4285F4_10%,transparent)] border border-[color-mix(in_oklch,#4285F4_22%,transparent)] rounded-full px-2 py-1 shrink-0">
+                <GoogleIcon size={12} />
+                <span className="font-mono text-[8px] tracking-[.1em] uppercase text-[#4285F4]">
+                  Google
+                </span>
+              </div>
             </div>
-            <div className="font-mono text-[8.5px] uppercase tracking-[0.15em] text-muted-foreground mt-0.5">
-              Pedidos
-            </div>
-          </div>
-          <div className="rounded-lg border border-[var(--hairline)] bg-surface px-3 py-2.5">
-            <div className="font-sans text-[16px] font-bold text-ink tabular-nums leading-tight pt-0.5">
-              {fmt(totalAlquilado)}
-            </div>
-            <div className="font-mono text-[8.5px] uppercase tracking-[0.15em] text-muted-foreground mt-0.5">
-              Alquilado
-            </div>
-          </div>
-        </div>
 
-        {/* Datos de perfil */}
-        <div className="flex-1 overflow-y-auto px-5 py-3">
-          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-3">
-            Datos del perfil
-          </div>
-          <div className="flex flex-col divide-y divide-[var(--hairline)]">
+            {/* Email row */}
+            <div className="flex items-center gap-3 px-5 py-3 border-b border-hairline">
+              <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <span className="font-sans text-[13.5px] text-ink flex-1 min-w-0 truncate">
+                {perfil.email}
+              </span>
+              <div className="flex items-center gap-1 text-muted-foreground shrink-0">
+                <Lock className="w-2.5 h-2.5" />
+                <span className="font-mono text-[8px] tracking-[.1em] uppercase">Verificado</span>
+              </div>
+            </div>
+
+            {/* Teléfono row */}
             {perfil.telefono && (
-              <div className="flex items-center gap-3 py-2.5">
-                <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" strokeWidth={1.5} />
-                <span className="font-sans text-[13px] text-ink">{perfil.telefono}</span>
-              </div>
-            )}
-            {perfil.direccion && (
-              <div className="flex items-center gap-3 py-2.5">
-                <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" strokeWidth={1.5} />
-                <span className="font-sans text-[13px] text-ink">{perfil.direccion}</span>
-              </div>
-            )}
-            {perfil.cuit && (
-              <div className="flex items-center gap-3 py-2.5">
-                <Receipt className="h-3.5 w-3.5 text-muted-foreground shrink-0" strokeWidth={1.5} />
-                <span className="font-sans text-[13px] text-ink">{perfil.cuit}</span>
-              </div>
-            )}
-            {perfil.perfil_impuestos && (
-              <div className="flex items-center gap-3 py-2.5">
-                <Building2
-                  className="h-3.5 w-3.5 text-muted-foreground shrink-0"
-                  strokeWidth={1.5}
-                />
-                <span className="font-sans text-[13px] text-ink">
-                  {perfilLabels[perfil.perfil_impuestos] ?? perfil.perfil_impuestos}
+              <div className="flex items-center gap-3 px-5 py-3 border-b border-hairline">
+                <Phone className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span className="font-sans text-[13.5px] text-ink flex-1 min-w-0 truncate">
+                  {perfil.telefono}
                 </span>
+                <div className="flex items-center gap-1 text-muted-foreground shrink-0">
+                  <Lock className="w-2.5 h-2.5" />
+                  <span className="font-mono text-[8px] tracking-[.1em] uppercase">Verificado</span>
+                </div>
               </div>
             )}
-            {desde && (
-              <div className="flex items-center gap-3 py-2.5">
-                <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" strokeWidth={1.5} />
-                <span className="font-sans text-[13px] text-muted-foreground">
-                  Cliente desde {desde}
-                </span>
-              </div>
-            )}
+
+            {/* Nota de datos verificados */}
+            <div className="px-5 py-3">
+              <p className="font-sans text-[11.5px] text-muted-foreground leading-relaxed">
+                Datos verificados — no editables desde aquí. Para modificarlos contactá a Rambla.
+              </p>
+            </div>
+          </div>
+
+          {/* ── Stats ── */}
+          {/* font-sans en números/precios — Champ Black no va en UI funcional */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="border border-hairline rounded-xl p-3.5 bg-surface-elevated">
+              <p className="font-sans font-extrabold text-[26px] text-ink leading-none tabular-nums">
+                {pedidosCount}
+              </p>
+              <p className="font-mono text-[9px] tracking-[.15em] uppercase text-muted-foreground mt-1.5">
+                Pedidos realizados
+              </p>
+            </div>
+            <div className="border border-hairline rounded-xl p-3.5 bg-surface-elevated">
+              <p className="font-sans font-extrabold text-[20px] text-ink leading-none tabular-nums pt-1">
+                {fmt(totalAlquilado)}
+              </p>
+              <p className="font-mono text-[9px] tracking-[.15em] uppercase text-muted-foreground mt-1.5">
+                Total alquilado
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Footer: cerrar sesión */}
-        <div className="border-t border-[var(--hairline)] px-5 py-4">
+        {/* Footer — cerrar sesión */}
+        <div className="px-5 pb-6 pt-2 border-t border-hairline shrink-0 safe-b">
           <button
+            type="button"
             onClick={onLogout}
-            className="flex items-center gap-2 rounded-lg border border-destructive/25 bg-destructive/5 px-4 h-[42px] font-sans text-[13px] text-destructive transition hover:border-destructive/50 hover:bg-destructive/10 min-w-[160px]"
+            className="flex items-center gap-2 font-sans text-[13px] text-destructive border border-destructive/25 rounded-[10px] h-[42px] px-[18px] hover:border-destructive/50 hover:bg-destructive/5 transition-colors w-full"
           >
-            <LogOut className="h-3.5 w-3.5" strokeWidth={1.5} />
+            <LogOut className="w-3.5 h-3.5 shrink-0" />
             Cerrar sesión
           </button>
         </div>
