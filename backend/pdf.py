@@ -281,37 +281,66 @@ def _pedido_html(pedido: dict) -> str:
           <td class="right">{fmt_ars(comp_subtotal)}</td>
         </tr>"""
 
-    # Fuente de verdad: `monto_total` (neto, con descuento aplicado, sin IVA),
-    # calculado por `services/precios.calcular_total` en alquileres.py. Antes
-    # este PDF recomputaba la suma cruda sin descuento → mostraba más caro
-    # de lo facturado, y para RI calculaba IVA sobre la base inflada (#502).
-    total_neto = int(pedido.get("monto_total") or 0)
-    # IVA discriminado: sólo para Responsable Inscripto (Factura A).
-    # El resto ve el total como veían siempre (sin IVA agregado).
+    # ── Resumen de precios ────────────────────────────────────────────────
+    # Fuente de verdad ÚNICA: `services/precios.calcular_total`, ya aplicada en
+    # `_enriquecer_pedido_con_total` (endpoint admin) y en `_load_pedido_para_pdf`
+    # (portal cliente). El PDF sólo PINTA el desglose — no recomputa la fórmula.
+    # Si por algún caller faltara el desglose, caemos al neto persistido
+    # (`monto_total`) y derivamos lo mínimo, para no romper (#502).
     es_ri = es_responsable_inscripto(pedido.get("cliente_perfil_impuestos"))
-    iva_pct = int(IVA_PCT)
-    if es_ri:
-        iva_monto = int(round(total_neto * IVA_PCT / 100))
-        total_final = total_neto + iva_monto
-        totales_html = f"""
+    iva_pct = int(pedido.get("iva_pct") or IVA_PCT)
+    total_neto = int(
+        pedido["monto_neto"] if pedido.get("monto_neto") is not None
+        else (pedido.get("monto_total") or 0)
+    )
+    bruto = int(pedido.get("bruto") or total_neto)
+    descuento_pct = float(pedido.get("descuento_pct") or 0)
+    descuento_monto = int(
+        pedido["descuento_monto"] if pedido.get("descuento_monto") is not None
+        else max(0, bruto - total_neto)
+    )
+    iva_monto = int(
+        pedido["iva_monto"] if pedido.get("iva_monto") is not None
+        else (round(total_neto * IVA_PCT / 100) if es_ri else 0)
+    )
+    total_final = total_neto + iva_monto
+
+    filas = [f"""
       <div class="total-row" style="opacity:0.85">
-        <span class="total-label">Subtotal (neto)</span>
+        <span class="total-label">Subtotal</span>
+        <span class="total-val">{fmt_ars(bruto)}</span>
+      </div>"""]
+    if descuento_monto > 0:
+        pct_txt = f" ({descuento_pct:g}%)" if descuento_pct else ""
+        filas.append(f"""
+      <div class="total-row" style="opacity:0.85">
+        <span class="total-label">Descuento{pct_txt}</span>
+        <span class="total-val">−{fmt_ars(descuento_monto)}</span>
+      </div>""")
+    if es_ri:
+        if descuento_monto > 0:
+            filas.append(f"""
+      <div class="total-row" style="opacity:0.85">
+        <span class="total-label">Neto</span>
         <span class="total-val">{fmt_ars(total_neto)}</span>
-      </div>
+      </div>""")
+        filas.append(f"""
       <div class="total-row" style="opacity:0.85">
         <span class="total-label">IVA {iva_pct}%</span>
         <span class="total-val">{fmt_ars(iva_monto)}</span>
-      </div>
+      </div>""")
+    filas.append(f"""
       <div class="total-row">
         <span class="total-label">Total</span>
         <span class="total-val">{fmt_ars(total_final)}</span>
-      </div>"""
-    else:
-        totales_html = f"""
-      <div class="total-row">
-        <span class="total-label">Total</span>
-        <span class="total-val">{fmt_ars(total_neto)}</span>
-      </div>"""
+      </div>""")
+    if not es_ri:
+        filas.append("""
+      <div class="total-row" style="opacity:0.55;font-size:11px">
+        <span class="total-label">IVA no discriminado</span>
+        <span class="total-val"></span>
+      </div>""")
+    totales_html = "".join(filas)
 
     notas_html = f'<div class="notas"><strong>Notas:</strong> {html.escape(pedido["notas"])}</div>' \
                  if pedido.get("notas") else ""

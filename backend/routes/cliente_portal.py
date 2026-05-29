@@ -1296,14 +1296,25 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
         pedido["cliente_domicilio_fiscal"] = c.get("domicilio_fiscal")
         pedido["cliente_email_facturacion"] = c.get("email_facturacion")
 
+    # Desglose canónico (bruto/descuento/neto/IVA) — misma fuente de verdad
+    # que el admin: el PDF sólo pinta lo que devuelve `calcular_total`.
+    from routes.alquileres import _enriquecer_pedido_con_total
+    _enriquecer_pedido_con_total(conn, pedido)
+
     return pedido
+
+
+# Los documentos se generan al vuelo y deben reflejar siempre el estado actual
+# del pedido. Sin esto el navegador cachea la URL estática y sirve un PDF viejo
+# tras editar el pedido (mismo criterio que `_DOC_NO_CACHE` en alquileres.py).
+_DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
 
 def _pdf_response(pdf_bytes: bytes, filename: str) -> Response:
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        headers={"Content-Disposition": f'inline; filename="{filename}"', **_DOC_NO_CACHE},
     )
 
 
@@ -1319,7 +1330,7 @@ def _doc_response(
     """
     if format == "html":
         from fastapi.responses import HTMLResponse
-        return HTMLResponse(content=html_str)
+        return HTMLResponse(content=html_str, headers=_DOC_NO_CACHE)
     return None  # caller sigue con PDF
 
 
@@ -1332,7 +1343,7 @@ async def _doc_response_or_pdf(html_str: str, pdf_filename: str, format: str):
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{pdf_filename}"'},
+        headers={"Content-Disposition": f'inline; filename="{pdf_filename}"', **_DOC_NO_CACHE},
     )
 
 
