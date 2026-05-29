@@ -422,7 +422,7 @@ export default function ClientePortal() {
         onProfileClick: perfil ? () => setDrawerOpen(true) : undefined,
       }}
     >
-      <div className="bg-amber border-b border-[color-mix(in_oklch,var(--ink)_12%,transparent)]">
+      <div className="bg-amber border-b border-[color-mix(in_oklch,var(--ink)_12%,transparent)] grain relative overflow-hidden">
         <div className="w-full px-5 lg:px-12 xl:px-[72px] pt-9 pb-10">
           <div className="font-mono text-[10px] uppercase tracking-[0.26em] text-ink/60">
             Portal de clientes
@@ -743,7 +743,7 @@ function PedidoCard({
           onClick={handleToggle}
           className="flex-1 min-w-0 flex items-center gap-3.5 px-4 sm:px-[18px] py-3.5 transition hover:bg-[color-mix(in_oklch,var(--ink)_2%,transparent)] text-left"
         >
-          <span className="font-mono text-[11px] font-bold text-ink tracking-[0.05em]">
+          <span className="font-mono text-[13px] font-bold text-ink tracking-[0.04em]">
             #{pedido.numero_pedido}
           </span>
           {pendiente ? (
@@ -759,7 +759,7 @@ function PedidoCard({
             {fmtDate(pedido.fecha_hasta)}
           </span>
           {pedido.monto_total != null && (
-            <span className="font-display text-lg font-extrabold text-ink tabular-nums shrink-0">
+            <span className="font-sans text-[17px] font-extrabold text-ink tabular-nums shrink-0">
               {/* Header colapsado: muestra el total que el cliente paga
                   (con IVA si es RI) — alineado con el desglose expandido y
                   el carrito/PDF. Fallback al neto si el backend no envió
@@ -924,7 +924,7 @@ function PedidoCard({
                 <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">
                   Jornadas
                 </div>
-                <div className="font-display text-2xl font-black text-ink tabular-nums leading-none mt-1">
+                <div className="font-sans text-2xl font-extrabold text-ink tabular-nums leading-none mt-1">
                   {jornadas}
                 </div>
               </div>
@@ -1107,7 +1107,7 @@ function PedidoCard({
                 <span className="font-sans text-[15px] font-bold text-ink">
                   Total{conIva ? " · IVA incluído" : ""}
                 </span>
-                <span className="font-display text-[22px] font-black text-ink tabular-nums">
+                <span className="font-sans text-[22px] font-extrabold text-ink tabular-nums">
                   {fmt(total)}
                 </span>
               </div>
@@ -1719,193 +1719,135 @@ function ProfileDrawer({
   onClose: () => void;
   onLogout: () => void;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  if (!open) return null;
 
-  const initials = `${(perfil.nombre[0] ?? "").toUpperCase()}${(perfil.apellido[0] ?? "").toUpperCase()}`;
-  const clienteDesde = perfil.created_at
-    ? new Date(perfil.created_at.slice(0, 10) + "T12:00:00").getFullYear()
+  const initials = `${perfil.nombre[0] ?? ""}${perfil.apellido[0] ?? ""}`.toUpperCase();
+  const fullName = `${perfil.nombre} ${perfil.apellido}`;
+
+  const desde = perfil.created_at
+    ? new Date(perfil.created_at.slice(0, 10) + "T12:00:00").toLocaleDateString("es-AR", {
+        month: "long",
+        year: "numeric",
+      })
     : null;
+
+  const perfilLabels: Record<string, string> = {
+    consumidor_final: "Consumidor final",
+    responsable_inscripto: "Resp. inscripto",
+    monotributo: "Monotributo",
+    exento: "Exento",
+  };
 
   return (
     <>
+      {/* Scrim */}
       <div
-        className={cn(
-          "fixed inset-0 z-[90] bg-black/45 backdrop-blur-[2px] transition-opacity duration-200",
-          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
-        )}
+        className="fixed inset-0 z-[60] bg-ink/40 backdrop-blur-sm"
         onClick={onClose}
-        aria-hidden
+        aria-hidden="true"
       />
-      <aside
-        className={cn(
-          "fixed top-0 right-0 bottom-0 z-[100] flex w-[380px] max-w-[92vw] flex-col overflow-hidden",
-          "border-l border-[var(--hairline)] bg-background shadow-[-20px_0_60px_-10px_rgba(0,0,0,0.18)]",
-          "transition-transform duration-[260ms] ease-[cubic-bezier(.32,.72,.32,1)]",
-          open ? "translate-x-0" : "translate-x-full",
-        )}
-        aria-hidden={!open}
-        role="dialog"
-        aria-label="Mi cuenta"
-      >
-        <div className="flex items-center justify-between border-b border-[var(--hairline)] px-5 py-4">
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-            Mi cuenta
-          </span>
+
+      {/* Drawer */}
+      <aside className="fixed top-0 right-0 bottom-0 z-[61] flex w-full max-w-[340px] flex-col border-l border-[var(--hairline)] bg-background shadow-xl animate-[slide-in-right_.25s_cubic-bezier(.32,.72,0,1)]">
+        {/* Header: avatar + nombre + cerrar */}
+        <div className="flex items-start justify-between p-5 pb-4">
+          <div>
+            <div className="mb-3 h-14 w-14 rounded-full bg-amber grid place-items-center font-display text-xl font-black text-ink">
+              {initials}
+            </div>
+            <div className="font-display text-2xl leading-none text-ink lowercase">
+              {fullName.toLowerCase()}.
+            </div>
+            <div className="mt-1.5 font-mono text-[10px] tracking-[0.1em] text-muted-foreground">
+              {perfil.email}
+            </div>
+          </div>
           <button
-            type="button"
             onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-ink"
+            className="grid h-8 w-8 place-items-center rounded-full border border-[var(--hairline)] text-muted-foreground hover:bg-muted hover:text-ink transition"
             aria-label="Cerrar"
           >
-            <XIcon className="h-4 w-4" />
+            <XIcon className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-5">
-          <div className="flex items-center gap-3.5 border-b border-[var(--hairline)] pb-5 mb-5">
-            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-amber text-ink font-display text-[22px] font-black">
-              {initials}
+        {/* Stats rápidas */}
+        <div className="grid grid-cols-2 gap-2 px-5 pb-4 border-b border-[var(--hairline)]">
+          <div className="rounded-lg border border-[var(--hairline)] bg-surface px-3 py-2.5">
+            <div className="font-sans text-[20px] font-bold text-ink tabular-nums">
+              {pedidosCount}
             </div>
-            <div className="min-w-0">
-              <div className="font-display text-[22px] font-black text-ink leading-tight tracking-[-0.015em] truncate">
-                {perfil.nombre} {perfil.apellido}
-              </div>
-              {clienteDesde && (
-                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground mt-1">
-                  Cliente desde {clienteDesde}
-                </div>
-              )}
+            <div className="font-mono text-[8.5px] uppercase tracking-[0.15em] text-muted-foreground mt-0.5">
+              Pedidos
             </div>
           </div>
-
-          <ProfileSection title="Contacto">
-            <ProfileField icon={Mail} label="Email" value={perfil.email} />
-            <ProfileField icon={Phone} label="Teléfono" value={perfil.telefono} />
-            {perfil.direccion && (
-              <ProfileField icon={MapPin} label="Dirección" value={perfil.direccion} />
-            )}
-          </ProfileSection>
-
-          {(perfil.cuit || perfil.perfil_impuestos) && (
-            <ProfileSection title="Facturación">
-              {perfil.cuit && <ProfileField icon={Receipt} label="CUIT" value={perfil.cuit} mono />}
-              {perfil.perfil_impuestos && (
-                <ProfileField
-                  icon={Building2}
-                  label="Condición"
-                  value={
-                    (
-                      {
-                        consumidor_final: "Consumidor Final",
-                        responsable_inscripto: "Responsable Inscripto",
-                        monotributo: "Monotributo",
-                        exento: "Exento",
-                      } as Record<string, string>
-                    )[perfil.perfil_impuestos] ?? perfil.perfil_impuestos
-                  }
-                />
-              )}
-            </ProfileSection>
-          )}
-
-          <ProfileSection title="Resumen histórico">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-md border border-[var(--hairline)] bg-surface px-3.5 py-3">
-                <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Pedidos
-                </div>
-                <div className="font-display text-[22px] font-black text-ink tabular-nums leading-none mt-1">
-                  {pedidosCount}
-                </div>
-              </div>
-              <div className="rounded-md border border-[var(--hairline)] bg-surface px-3.5 py-3">
-                <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Total alquilado
-                </div>
-                <div className="font-display text-[22px] font-black text-ink tabular-nums leading-none mt-1">
-                  {fmt(totalAlquilado)}
-                </div>
-              </div>
+          <div className="rounded-lg border border-[var(--hairline)] bg-surface px-3 py-2.5">
+            <div className="font-sans text-[16px] font-bold text-ink tabular-nums leading-tight pt-0.5">
+              {fmt(totalAlquilado)}
             </div>
-          </ProfileSection>
+            <div className="font-mono text-[8.5px] uppercase tracking-[0.15em] text-muted-foreground mt-0.5">
+              Alquilado
+            </div>
+          </div>
         </div>
 
-        <div className="flex gap-2 border-t border-[var(--hairline)] px-5 py-3.5">
-          <Link
-            to="/cliente/perfil"
-            onClick={onClose}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-[var(--hairline)] py-2.5 font-sans text-xs font-bold text-ink transition hover:border-ink"
-          >
-            <Pencil className="h-3 w-3" />
-            Editar datos
-          </Link>
+        {/* Datos de perfil */}
+        <div className="flex-1 overflow-y-auto px-5 py-3">
+          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-3">
+            Datos del perfil
+          </div>
+          <div className="flex flex-col divide-y divide-[var(--hairline)]">
+            {perfil.telefono && (
+              <div className="flex items-center gap-3 py-2.5">
+                <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" strokeWidth={1.5} />
+                <span className="font-sans text-[13px] text-ink">{perfil.telefono}</span>
+              </div>
+            )}
+            {perfil.direccion && (
+              <div className="flex items-center gap-3 py-2.5">
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" strokeWidth={1.5} />
+                <span className="font-sans text-[13px] text-ink">{perfil.direccion}</span>
+              </div>
+            )}
+            {perfil.cuit && (
+              <div className="flex items-center gap-3 py-2.5">
+                <Receipt className="h-3.5 w-3.5 text-muted-foreground shrink-0" strokeWidth={1.5} />
+                <span className="font-sans text-[13px] text-ink">{perfil.cuit}</span>
+              </div>
+            )}
+            {perfil.perfil_impuestos && (
+              <div className="flex items-center gap-3 py-2.5">
+                <Building2
+                  className="h-3.5 w-3.5 text-muted-foreground shrink-0"
+                  strokeWidth={1.5}
+                />
+                <span className="font-sans text-[13px] text-ink">
+                  {perfilLabels[perfil.perfil_impuestos] ?? perfil.perfil_impuestos}
+                </span>
+              </div>
+            )}
+            {desde && (
+              <div className="flex items-center gap-3 py-2.5">
+                <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" strokeWidth={1.5} />
+                <span className="font-sans text-[13px] text-muted-foreground">
+                  Cliente desde {desde}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer: cerrar sesión */}
+        <div className="border-t border-[var(--hairline)] px-5 py-4">
           <button
-            type="button"
             onClick={onLogout}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-ink py-2.5 font-sans text-xs font-bold text-amber transition hover:bg-amber hover:text-ink"
+            className="flex items-center gap-2 rounded-lg border border-destructive/25 bg-destructive/5 px-4 h-[42px] font-sans text-[13px] text-destructive transition hover:border-destructive/50 hover:bg-destructive/10 min-w-[160px]"
           >
-            <LogOut className="h-3 w-3" />
+            <LogOut className="h-3.5 w-3.5" strokeWidth={1.5} />
             Cerrar sesión
           </button>
         </div>
       </aside>
     </>
-  );
-}
-
-function ProfileSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-5 last:mb-0">
-      <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2.5">
-        {title}
-      </div>
-      <div className="flex flex-col rounded-md border border-[var(--hairline)] bg-surface overflow-hidden">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function ProfileField({
-  icon: Icon,
-  label,
-  value,
-  mono,
-}: {
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-3 border-b border-[var(--hairline)] px-3.5 py-2.5 last:border-b-0">
-      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-sm bg-amber-soft text-amber">
-        <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
-          {label}
-        </div>
-        <div
-          className={cn(
-            "text-[13px] font-semibold text-ink mt-0.5 truncate",
-            mono ? "font-mono" : "font-sans",
-          )}
-        >
-          {value}
-        </div>
-      </div>
-    </div>
   );
 }
