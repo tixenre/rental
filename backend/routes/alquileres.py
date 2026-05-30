@@ -1094,6 +1094,48 @@ def _consolidar_items_por_equipo(items) -> dict:
     return out
 
 
+def _reservado_directo(conn, equipo_id: int, excl_pedido_id: int, fh_buf, fd_buf) -> int:
+    """Unidades de `equipo_id` reservadas DIRECTAMENTE (items que lo apuntan) por
+    otros pedidos activos que se pisan con el rango ya bufferizado [fd_buf, fh_buf].
+
+    Fuente única de la subquery de reserva directa: la comparten el gate
+    (`_check_stock`) y el chequeo hipotético del portal (`_check_stock_hipotetico`)
+    con SQL idéntico. Todos los valores van como bound params; el único token
+    interpolado es la constante interna ESTADOS_RESERVADO.
+    """
+    return conn.execute(f"""
+        SELECT COALESCE(SUM(pi2.cantidad), 0)
+        FROM alquiler_items pi2
+        JOIN alquileres p ON p.id = pi2.pedido_id
+        WHERE pi2.equipo_id = ?
+          AND p.id != ?
+          AND p.estado IN {ESTADOS_RESERVADO}
+          AND p.fecha_desde < ?
+          AND p.fecha_hasta > ?
+    """, (equipo_id, excl_pedido_id, fh_buf, fd_buf)).fetchone()[0]
+
+
+def _reservado_via_kit(conn, equipo_id: int, excl_pedido_id: int, fh_buf, fd_buf) -> int:
+    """Unidades de `equipo_id` reservadas INDIRECTAMENTE: otros pedidos activos
+    reservan un kit que tiene a `equipo_id` como componente (cantidad ponderada
+    por kc.cantidad), pisándose con el rango bufferizado [fd_buf, fh_buf].
+
+    Sin esto, dos pedidos podrían confirmarse sobre la misma unidad — uno vía kit
+    y otro directo. Mismas garantías de parametrización que `_reservado_directo`.
+    """
+    return conn.execute(f"""
+        SELECT COALESCE(SUM(pi2.cantidad * kc.cantidad), 0)
+        FROM alquiler_items pi2
+        JOIN alquileres p ON p.id = pi2.pedido_id
+        JOIN kit_componentes kc ON kc.equipo_id = pi2.equipo_id
+        WHERE kc.componente_id = ?
+          AND p.id != ?
+          AND p.estado IN {ESTADOS_RESERVADO}
+          AND p.fecha_desde < ?
+          AND p.fecha_hasta > ?
+    """, (equipo_id, excl_pedido_id, fh_buf, fd_buf)).fetchone()[0]
+
+
 def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> list[str]:
     """Devuelve lista de nombres de equipos sin stock suficiente para el rango dado.
 
@@ -1166,31 +1208,11 @@ def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> li
         stock_total = lock_result["cantidad"]
 
         # (a) Reservas directas — items que apuntan a este equipo.
-        reservado_directo = conn.execute(f"""
-            SELECT COALESCE(SUM(pi2.cantidad), 0)
-            FROM alquiler_items pi2
-            JOIN alquileres p ON p.id = pi2.pedido_id
-            WHERE pi2.equipo_id = ?
-              AND p.id != ?
-              AND p.estado IN {ESTADOS_RESERVADO}
-              AND p.fecha_desde < ?
-              AND p.fecha_hasta > ?
-        """, (it["equipo_id"], pedido_id, fh_buf, fd_buf)).fetchone()[0]
+        reservado_directo = _reservado_directo(conn, it["equipo_id"], pedido_id, fh_buf, fd_buf)
 
         # (b) Reservas vía kits — items que reservan un kit que tiene a este
-        # equipo como componente. Multiplicamos cantidad del item por
-        # cantidad del componente en el kit.
-        reservado_via_kit = conn.execute(f"""
-            SELECT COALESCE(SUM(pi2.cantidad * kc.cantidad), 0)
-            FROM alquiler_items pi2
-            JOIN alquileres p ON p.id = pi2.pedido_id
-            JOIN kit_componentes kc ON kc.equipo_id = pi2.equipo_id
-            WHERE kc.componente_id = ?
-              AND p.id != ?
-              AND p.estado IN {ESTADOS_RESERVADO}
-              AND p.fecha_desde < ?
-              AND p.fecha_hasta > ?
-        """, (it["equipo_id"], pedido_id, fh_buf, fd_buf)).fetchone()[0]
+        # equipo como componente (cantidad ponderada por kc.cantidad).
+        reservado_via_kit = _reservado_via_kit(conn, it["equipo_id"], pedido_id, fh_buf, fd_buf)
 
         # (c) Unidades fuera de servicio por mantenimiento (rango original).
         en_mantenimiento = _unidades_en_mantenimiento(

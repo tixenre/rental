@@ -77,6 +77,8 @@ def _funciones_motor():
         _dias_no_disponibles,
         _get_buffer_horas,
         _rango_con_buffer,
+        _reservado_directo,
+        _reservado_via_kit,
         _unidades_en_mantenimiento,
         get_disponibilidad,
     )
@@ -89,6 +91,8 @@ def _funciones_motor():
         _dias_no_disponibles,
         _get_buffer_horas,
         _rango_con_buffer,
+        _reservado_directo,
+        _reservado_via_kit,
         _unidades_en_mantenimiento,
         get_disponibilidad,
         _centinela_libre,
