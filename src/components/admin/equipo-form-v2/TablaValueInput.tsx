@@ -27,7 +27,21 @@ import type { SpecTablaColumna } from "@/lib/admin/api";
  *  número + unidad. El resto de tipos guarda un escalar (string/number/bool). */
 type ValorUnidad = { valor: number | string; unidad: string };
 type CellValue = string | number | boolean | ValorUnidad;
-type TablaRow = Record<string, CellValue>;
+
+// Id estable por fila para usarlo como React key. Keyear por índice rompía el
+// foco y mezclaba valores al borrar/reordenar filas (React reusa el DOM por
+// posición, no por identidad). El id es un Symbol que viaja con la fila: el
+// spread de `setCell` lo preserva, JSON.stringify lo ignora y filterEmptyRows
+// lo descarta (solo copia las keys de columnas) → no se serializa al backend.
+const ROW_ID: unique symbol = Symbol("tablaRowId");
+let rowIdSeq = 0;
+
+type TablaRow = Record<string, CellValue> & { [ROW_ID]?: number };
+
+function assignRowId(row: TablaRow): TablaRow {
+  row[ROW_ID] = rowIdSeq++;
+  return row;
+}
 
 function isValorUnidad(v: unknown): v is ValorUnidad {
   return typeof v === "object" && v !== null && "valor" in v && "unidad" in v;
@@ -37,7 +51,7 @@ function parseValue(value: string): TablaRow[] {
   if (!value?.trim()) return [];
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
+    return (Array.isArray(parsed) ? parsed : []).map(assignRowId);
   } catch {
     return [];
   }
@@ -105,7 +119,7 @@ export function TablaValueInput({
   }
 
   function addRow() {
-    commit([...localRows, {}]);
+    commit([...localRows, assignRowId({})]);
   }
 
   function removeRow(idx: number) {
@@ -153,7 +167,7 @@ export function TablaValueInput({
           row[c.key] = raw;
         }
       }
-      if (Object.keys(row).length > 0) newRows.push(row);
+      if (Object.keys(row).length > 0) newRows.push(assignRowId(row));
     }
     if (newRows.length === 0) return 0;
     commit([...localRows, ...newRows]);
@@ -226,7 +240,7 @@ export function TablaValueInput({
       )}
       {rows.map((row, idx) => (
         <div
-          key={idx}
+          key={row[ROW_ID]}
           className="grid gap-1.5 items-center"
           style={{ gridTemplateColumns: gridTemplate }}
         >
