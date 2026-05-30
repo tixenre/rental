@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Camera, MessageCircle } from "lucide-react";
-import { PublicLayout } from "@/components/rental/PublicLayout";
-import { CartDrawer } from "@/components/rental/CartDrawer";
+import { ArrowLeft, ArrowRight, MessageCircle, MapPin, ExternalLink } from "lucide-react";
 import { StudioBookingForm } from "@/components/studio/StudioBookingForm";
 import { StudioPackKit } from "@/components/studio/StudioPackKit";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
-import { apiGetEstudio, type EstudioFoto } from "@/lib/api";
+import { apiGetEstudio } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+// Coordenadas del estudio (Mar del Plata) — reemplazar con dirección real del admin
+const MAPA_EMBED_DEFAULT =
+  "https://maps.google.com/maps?q=-38.0028,-57.5578&z=15&hl=es&output=embed";
+const MAPA_URL_DEFAULT =
+  "https://www.google.com/maps/search/?api=1&query=Mar+del+Plata+Buenos+Aires+Argentina";
 
 export const Route = createFileRoute("/estudio")({
   head: () => ({
@@ -28,59 +32,44 @@ export const Route = createFileRoute("/estudio")({
         content:
           "Estudio de foto y video en Mar del Plata. Reservá por hora con pack de luces y griperías opcional.",
       },
-      { property: "og:image", content: "https://ramblarental.com/icon-512.png" },
+      {
+        property: "og:image",
+        content: "https://ramblarental.com/estudio/Rambla_Estudio_S7V9519-HDR.jpg",
+      },
       { property: "og:locale", content: "es_AR" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "El Estudio — Rambla Rental" },
       { name: "twitter:description", content: "Estudio de foto y video · Mar del Plata" },
-      { name: "twitter:image", content: "https://ramblarental.com/icon-512.png" },
+      {
+        name: "twitter:image",
+        content: "https://ramblarental.com/estudio/Rambla_Estudio_S7V9519-HDR.jpg",
+      },
     ],
     links: [{ rel: "canonical", href: "https://ramblarental.com/estudio" }],
   }),
   component: EstudioPage,
 });
 
-function PhotoPlaceholder({
-  className,
-  label = "Foto del estudio",
-}: {
-  className?: string;
-  label?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "relative flex items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-amber-soft via-surface to-amber-soft/40 border hairline",
-        className,
-      )}
-    >
-      <div className="absolute inset-0 grain opacity-20" />
-      <div className="relative flex flex-col items-center gap-2 text-ink/40">
-        <Camera className="h-7 w-7" />
-        <span className="font-mono text-[9px] uppercase tracking-[0.3em]">{label}</span>
-      </div>
-    </div>
-  );
-}
+// ── Grain overlay (reutilizado en secciones ink/amber) ─────────────────────
+const Grain = ({ opacity = 12 }: { opacity?: number }) => (
+  <div
+    className="pointer-events-none absolute inset-0"
+    style={{
+      backgroundImage: "radial-gradient(circle, oklch(0.85 0 0 / 12%) 1px, transparent 1px)",
+      backgroundSize: "5px 5px",
+      opacity: opacity / 100,
+    }}
+  />
+);
 
-function DragGallery({
-  fotos,
-  placeholders,
-  alt,
-}: {
-  fotos: EstudioFoto[];
-  placeholders: number;
-  alt: string;
-}) {
+type Photo = { src: string; alt: string; hero?: boolean; ciclorama?: boolean };
+
+// ── Galería horizontal arrastrable ─────────────────────────────────────────
+function DragGallery({ photos }: { photos: Photo[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(true);
-  const drag = useRef<{ active: boolean; moved: boolean; startX: number; startScroll: number }>({
-    active: false,
-    moved: false,
-    startX: 0,
-    startScroll: 0,
-  });
+  const drag = useRef({ active: false, startX: 0, startScroll: 0 });
 
   const update = useCallback(() => {
     const el = ref.current;
@@ -104,51 +93,30 @@ function DragGallery({
   const scrollBy = (dir: 1 | -1) => {
     const el = ref.current;
     if (!el) return;
-    el.scrollBy({ left: dir * Math.round(el.clientWidth * 0.85), behavior: "smooth" });
+    el.scrollBy({ left: dir * Math.round(el.clientWidth * 0.8), behavior: "smooth" });
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== "mouse") return;
     const el = ref.current;
     if (!el) return;
-    drag.current = { active: true, moved: false, startX: e.clientX, startScroll: el.scrollLeft };
+    drag.current = { active: true, startX: e.clientX, startScroll: el.scrollLeft };
     el.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!drag.current.active) return;
     const el = ref.current;
     if (!el) return;
-    const dx = e.clientX - drag.current.startX;
-    if (Math.abs(dx) > 5) drag.current.moved = true;
-    el.scrollLeft = drag.current.startScroll - dx;
+    el.scrollLeft = drag.current.startScroll - (e.clientX - drag.current.startX);
   };
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = ref.current;
-    if (el && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
-    setTimeout(() => {
-      drag.current.active = false;
-      drag.current.moved = false;
-    }, 0);
+    if (el?.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    drag.current.active = false;
   };
 
-  const items: Array<{ key: string | number; node: React.ReactNode }> =
-    fotos.length > 0
-      ? fotos.map((f, i) => ({
-          key: f.id,
-          node: (
-            <img
-              src={f.url}
-              alt={`${alt} — foto ${i + 1}`}
-              className="h-full w-full object-cover select-none"
-              draggable={false}
-              loading={i < 2 ? "eager" : "lazy"}
-            />
-          ),
-        }))
-      : Array.from({ length: placeholders }).map((_, i) => ({
-          key: i,
-          node: <PhotoPlaceholder className="h-full w-full" label={`FOTO ${i + 1}`} />,
-        }));
+  const arrowCls =
+    "absolute top-1/2 -translate-y-1/2 hidden lg:grid h-10 w-10 place-items-center rounded-full bg-background/90 border hairline backdrop-blur shadow-sm transition";
 
   return (
     <div className="relative">
@@ -158,24 +126,20 @@ function DragGallery({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className={cn(
-          "flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 lg:gap-4 lg:px-12",
-          "scroll-pl-4 lg:scroll-pl-12",
-          "[&::-webkit-scrollbar]:hidden [scrollbar-width:none]",
-          "cursor-grab active:cursor-grabbing select-none",
-          "touch-pan-x",
-        )}
+        className="flex gap-3 overflow-x-auto px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none] cursor-grab active:cursor-grabbing select-none touch-pan-x"
       >
-        {items.map((it) => (
+        {photos.map((photo, i) => (
           <div
-            key={it.key}
-            className={cn(
-              "snap-start shrink-0",
-              "basis-[88%] sm:basis-[58%] lg:basis-[38%]",
-              "aspect-[4/3] overflow-hidden rounded-xl bg-ink/5",
-            )}
+            key={photo.src}
+            className="snap-start shrink-0 basis-[86%] sm:basis-[56%] lg:basis-[36%] aspect-[4/3] overflow-hidden rounded-xl bg-surface"
           >
-            {it.node}
+            <img
+              src={photo.src}
+              alt={photo.alt}
+              loading={i < 3 ? "eager" : "lazy"}
+              draggable={false}
+              className="h-full w-full object-cover pointer-events-none select-none"
+            />
           </div>
         ))}
       </div>
@@ -185,9 +149,10 @@ function DragGallery({
         disabled={!canPrev}
         aria-label="Foto anterior"
         className={cn(
-          "absolute left-3 top-1/2 hidden -translate-y-1/2 lg:grid h-10 w-10 place-items-center rounded-full bg-background/90 border hairline shadow-sm backdrop-blur transition",
+          arrowCls,
+          "left-3",
           canPrev
-            ? "hover:border-ink hover:bg-ink hover:text-amber"
+            ? "hover:bg-ink hover:text-amber hover:border-ink"
             : "opacity-0 pointer-events-none",
         )}
       >
@@ -199,9 +164,10 @@ function DragGallery({
         disabled={!canNext}
         aria-label="Foto siguiente"
         className={cn(
-          "absolute right-3 top-1/2 hidden -translate-y-1/2 lg:grid h-10 w-10 place-items-center rounded-full bg-background/90 border hairline shadow-sm backdrop-blur transition",
+          arrowCls,
+          "right-3",
           canNext
-            ? "hover:border-ink hover:bg-ink hover:text-amber"
+            ? "hover:bg-ink hover:text-amber hover:border-ink"
             : "opacity-0 pointer-events-none",
         )}
       >
@@ -211,39 +177,37 @@ function DragGallery({
   );
 }
 
-function MobileBookCta({ priceLabel }: { priceLabel: string | null }) {
+// ── Barra mobile fija ──────────────────────────────────────────────────────
+function MobileBookBar({ priceLabel }: { priceLabel: string }) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
     const target = document.getElementById("reservar");
     if (!target) return;
-    const obs = new IntersectionObserver(
-      (entries) => {
-        setHidden(entries[0].isIntersecting);
-      },
-      { threshold: 0 },
-    );
+    const obs = new IntersectionObserver((entries) => setHidden(entries[0].isIntersecting), {
+      threshold: 0,
+    });
     obs.observe(target);
     return () => obs.disconnect();
   }, []);
+
   return (
     <div
       className={cn(
-        "fixed inset-x-0 bottom-0 z-30 lg:hidden",
-        "transition-transform duration-200",
+        "fixed inset-x-0 bottom-0 z-40 lg:hidden transition-transform duration-200",
         hidden ? "translate-y-full" : "translate-y-0",
       )}
       aria-hidden={hidden}
     >
-      <div className="pointer-events-auto flex items-center gap-3 border-t hairline bg-background/95 backdrop-blur px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="flex items-center gap-3 border-t hairline bg-background/95 backdrop-blur-xl px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="min-w-0 flex-1">
           <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
             Reservar el estudio
           </div>
-          <div className="truncate text-sm font-medium text-ink">{priceLabel ?? "A consultar"}</div>
+          <div className="truncate text-sm font-medium">{priceLabel}</div>
         </div>
         <a
           href="#reservar"
-          className="inline-flex items-center justify-center rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-amber hover:brightness-110 transition"
+          className="inline-flex items-center justify-center rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-amber hover:brightness-110 transition shrink-0"
         >
           Reservar
         </a>
@@ -252,6 +216,7 @@ function MobileBookCta({ priceLabel }: { priceLabel: string | null }) {
   );
 }
 
+// ── Página principal ───────────────────────────────────────────────────────
 function EstudioPage() {
   const { data } = useQuery({
     queryKey: ["estudio"],
@@ -259,39 +224,24 @@ function EstudioPage() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const nombre = data?.nombre ?? STUDIO.name;
-  const tagline = data?.tagline ?? STUDIO.tagline;
-  const descripcion = data?.descripcion ?? STUDIO.description;
-  const features = data?.features ?? STUDIO.features;
-  const faq = data?.faq ?? STUDIO.faq;
-  const fotos = useMemo(() => data?.fotos ?? [], [data?.fotos]);
-  const packActivo = data?.pack_activo ?? true;
-  const packEquipos = useMemo(() => data?.pack_equipos ?? [], [data?.pack_equipos]);
   const precioHora = data?.precio_hora ?? STUDIO.pricePerHour;
   const minHours = data?.min_horas ?? STUDIO.minHours;
-  const direccion = data?.direccion ?? "";
-  const comoLlegar = data?.como_llegar ?? "";
-  const mapaUrl = data?.mapa_url ?? "";
-  const mapaEmbedUrl = data?.mapa_embed_url ?? "";
-  const testimonios = data?.testimonios ?? [];
+  const packActivo = data?.pack_activo ?? true;
+  const packEquipos = useMemo(() => data?.pack_equipos ?? [], [data?.pack_equipos]);
+  const faq = data?.faq ?? STUDIO.faq;
+  const features = data?.features ?? STUDIO.features;
 
-  const tieneUbicacion = !!(mapaEmbedUrl || direccion);
+  // Ubicación — admin primero, fallback a coordenadas fijas MDQ
+  const direccion = data?.direccion ?? "Mar del Plata, Buenos Aires, Argentina";
+  const comoLlegar =
+    data?.como_llegar ??
+    "Acceso directo para descarga de equipos. Estacionamiento en la calle (zona azul gratuita los fines de semana).";
+  const iframeSrc = data?.mapa_embed_url ?? MAPA_EMBED_DEFAULT;
   const verMapaHref =
-    mapaUrl ||
-    (direccion
-      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`
-      : "");
-  const iframeSrc =
-    mapaEmbedUrl ||
-    (direccion
-      ? `https://www.google.com/maps?q=${encodeURIComponent(direccion)}&output=embed`
-      : "");
-
-  const fotoHero = fotos.find((f) => f.es_principal) ?? fotos[0];
-  const fotosGaleria = useMemo(
-    () => (fotoHero ? fotos.filter((f) => f.id !== fotoHero.id) : fotos),
-    [fotos, fotoHero],
-  );
+    data?.mapa_url ??
+    (data?.direccion
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.direccion)}`
+      : MAPA_URL_DEFAULT);
 
   const bookingConfig = data
     ? {
@@ -304,273 +254,394 @@ function EstudioPage() {
       }
     : undefined;
 
-  const priceLabel = precioHora > 0 ? `${formatARS(precioHora)}/hora · mín ${minHours}h` : null;
-  const priceAnchor = precioHora > 0 ? `Desde ${formatARS(precioHora)}/h · mín ${minHours}h` : null;
+  const priceLabel = `${formatARS(precioHora)} / hora · mín ${minHours}h`;
 
-  // Estado del modo compartido entre el formulario y el aside
+  // Fotos: admin primero, fallback a las fotos estáticas reales
+  const apiPhotos = useMemo(
+    () =>
+      (data?.fotos ?? []).map((f) => ({
+        src: f.url,
+        alt: "El Estudio",
+        hero: f.es_principal,
+        ciclorama: false as const,
+      })),
+    [data?.fotos],
+  );
+  const photos = apiPhotos.length > 0 ? apiPhotos : STUDIO.photos;
+  const heroPhoto = photos.find((p) => p.hero) ?? photos[0];
+  const galleryPhotos = photos.filter((p) => !p.hero);
+  const cicloramaPhoto =
+    photos.find((p) => p.ciclorama) ??
+    photos.find((p) => p.alt?.toLowerCase().includes("ciclo")) ??
+    photos[2];
+
   const [withPack, setWithPack] = useState(false);
 
   return (
-    <PublicLayout>
-      {/* Back link */}
-      <div className="px-4 pt-4 lg:px-12">
+    <div className="min-h-dvh bg-background text-ink">
+      {/* ── TopBar ───────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b hairline bg-background/95 backdrop-blur-xl px-4 lg:px-12">
         <Link
           to="/"
-          className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground hover:text-ink"
+          className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground hover:text-ink transition"
         >
-          <ArrowLeft className="h-3 w-3" /> Volver al catálogo
+          <ArrowLeft className="h-3 w-3" /> Catálogo
         </Link>
-      </div>
+        <div className="absolute left-1/2 -translate-x-1/2">
+          <Link to="/" aria-label="Rambla Rental">
+            <img
+              src="/wordmark.svg"
+              alt="Rambla Rental"
+              className="h-[17px] block"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+            <span className="wordmark text-xl leading-none font-black sr-only">rambla</span>
+          </Link>
+        </div>
+        <a
+          href="#reservar"
+          className="inline-flex items-center justify-center rounded-full bg-amber px-4 py-2 text-sm font-bold text-ink hover:brightness-105 transition"
+        >
+          Reservar
+        </a>
+      </header>
 
-      {/* ─── Hero — eyebrow + wordmark gigante stacked ─────────────── */}
-      <section className="px-4 pt-3 lg:px-12 lg:pt-6">
-        <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-4">
-          {tagline}
-        </p>
-        <h1 className="wordmark text-[clamp(5rem,22vw,14rem)] leading-[0.88] tracking-[-0.02em]">
-          {nombre}
-        </h1>
-        <p className="mt-5 max-w-lg text-base text-muted-foreground">{descripcion}</p>
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <a
-            href="#reservar"
-            className="inline-flex items-center justify-center rounded-full bg-ink px-6 py-3 text-sm font-semibold text-amber hover:brightness-110 transition"
-          >
-            Reservar
-          </a>
-          {priceAnchor && (
-            <span className="inline-flex items-center rounded-full border hairline bg-surface px-4 py-2 text-xs sm:text-sm tabular text-ink">
-              {priceAnchor}
-            </span>
+      <main>
+        {/* ── Hero — ink editorial ──────────────────────────────────── */}
+        <section className="relative overflow-hidden bg-ink px-4 lg:px-12 py-[clamp(2.5rem,5vw,4.5rem)] pb-[clamp(3rem,6vw,5rem)]">
+          <Grain />
+          <div className="relative">
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber/60 mb-4">
+              Estudio fotográfico y de video · Mar del Plata
+            </p>
+            <h1 className="font-display font-black text-amber leading-[0.88] tracking-[-0.02em] lowercase text-[clamp(5rem,22vw,13rem)]">
+              el estudio.
+            </h1>
+            <p className="mt-5 max-w-lg text-base leading-relaxed text-background/65">
+              Un espacio para producciones audiovisuales con todos los equipos de Rambla a mano.
+              Ideal para rodajes grandes — flexible para los chicos.
+            </p>
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              <a
+                href="#reservar"
+                className="inline-flex items-center justify-center rounded-full bg-amber px-6 py-3 text-sm font-bold text-ink hover:brightness-105 transition"
+              >
+                Reservar
+              </a>
+              <span className="inline-flex items-center rounded-full border border-background/20 px-4 py-2 font-mono text-xs text-background/70 tabular-nums whitespace-nowrap">
+                {priceLabel}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* Foto hero — full-bleed */}
+        <div className="aspect-[16/9] md:aspect-[21/9] w-full overflow-hidden bg-ink">
+          {heroPhoto && (
+            <img
+              src={heroPhoto.src}
+              alt="El Estudio — Rambla Rental"
+              loading="eager"
+              className="h-full w-full object-cover block"
+            />
           )}
         </div>
-      </section>
 
-      {/* Foto hero — full-bleed debajo del texto */}
-      <div className="mt-6">
-        {fotoHero ? (
-          <div className="w-full aspect-[16/11] md:aspect-[21/9] overflow-hidden">
-            <img
-              src={fotoHero.url}
-              alt={nombre}
-              className="h-full w-full object-cover"
-              loading="eager"
-            />
-          </div>
-        ) : (
-          <PhotoPlaceholder
-            className="aspect-[16/11] md:aspect-[21/9] w-full rounded-none"
-            label="FOTO PRINCIPAL"
-          />
-        )}
-      </div>
-
-      {/* ─── Galería ─────────────────────────────────────────────────── */}
-      {(fotosGaleria.length > 0 || !data) && (
-        <section className="border-t hairline pt-8 pb-10 lg:pt-12 lg:pb-14">
+        {/* ── Galería arrastrable ───────────────────────────────────── */}
+        <section className="border-t hairline pt-10 pb-12">
           <div className="mb-5 flex items-end justify-between gap-3 px-4 lg:px-12">
             <div>
-              <h2 className="font-display text-2xl sm:text-3xl">El espacio</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Deslizá para ver más.</p>
+              <h2 className="font-display font-black lowercase text-[clamp(1.75rem,4vw,2.5rem)] leading-[0.92]">
+                el espacio.
+              </h2>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                Deslizá para ver el estudio completo.
+              </p>
             </div>
-            {fotosGaleria.length > 0 && (
-              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
-                {fotosGaleria.length + (fotoHero ? 1 : 0)} fotos
-              </span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular-nums shrink-0">
+              {photos.length} fotos
+            </span>
+          </div>
+          <DragGallery photos={galleryPhotos.length > 0 ? galleryPhotos : photos} />
+        </section>
+
+        {/* ── Ciclorama — split editorial ink ──────────────────────── */}
+        <section className="grid lg:grid-cols-2">
+          {/* Texto — ink */}
+          <div className="relative overflow-hidden bg-ink px-[clamp(1.5rem,4vw,3.5rem)] py-[clamp(2.5rem,5vw,4.5rem)] flex flex-col justify-center">
+            <Grain opacity={10} />
+            <div className="relative">
+              <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-amber/55 mb-5">
+                La pieza central
+              </p>
+              <div className="flex items-baseline gap-1 leading-none">
+                <span className="font-display font-black text-amber leading-[0.88] tracking-[-0.02em] text-[clamp(5rem,14vw,9rem)]">
+                  6×6
+                </span>
+                <span className="font-mono text-amber/55 text-[clamp(1.25rem,3vw,2rem)] mb-1">
+                  m
+                </span>
+              </div>
+              <h2 className="font-display font-black text-amber lowercase leading-[0.9] tracking-[-0.02em] text-[clamp(2.25rem,6vw,4rem)] mt-1">
+                ciclorama.
+              </h2>
+              <p className="mt-5 max-w-sm text-[0.9375rem] leading-relaxed text-background/65">
+                La curva continua elimina el horizonte. Fondo limpio, sin sombras, listo para usar —
+                sin postproducción.
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-background/50">
+                Ideal para retratos, moda, productos, contenido de marca y rodajes comerciales.
+              </p>
+              <div className="mt-7 flex flex-wrap gap-2">
+                {["Curva continua", "Sin sombras", "Potencia extra", "Fondos de papel"].map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center rounded-full border border-amber/30 px-3.5 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-amber/70 whitespace-nowrap"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+              <a
+                href="#reservar"
+                className="mt-8 self-start inline-flex items-center gap-2 rounded-full bg-amber px-5 py-2.5 text-sm font-bold text-ink hover:brightness-105 transition"
+              >
+                Reservar el espacio
+                <ArrowRight className="h-3.5 w-3.5" />
+              </a>
+            </div>
+          </div>
+          {/* Foto ciclorama */}
+          <div className="min-h-72 lg:min-h-0 overflow-hidden">
+            {cicloramaPhoto && (
+              <img
+                src={cicloramaPhoto.src}
+                alt="Ciclorama 6×6 m"
+                loading="lazy"
+                className="h-full w-full object-cover block"
+              />
             )}
           </div>
-          <DragGallery fotos={fotosGaleria} placeholders={STUDIO.gallery} alt={nombre} />
         </section>
-      )}
 
-      {/* ─── Reservar + Pack ─────────────────────────────────────────── */}
-      <section
-        id="reservar"
-        className="border-t hairline px-4 py-10 lg:px-12 lg:py-14 scroll-mt-20 lg:scroll-mt-24"
-      >
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="font-display text-2xl sm:text-3xl">Reservá tu sesión</h2>
-            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-              Mínimo {minHours} horas. Elegí día y horario y reservá online — te contactamos para
-              confirmar.
-            </p>
-          </div>
-          {priceAnchor && (
-            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
-              {priceAnchor}
-            </span>
-          )}
-        </div>
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start">
-          <StudioBookingForm
-            config={bookingConfig}
-            withPack={withPack}
-            onPackChange={setWithPack}
-          />
-          {packActivo && (
-            <aside className="rounded-2xl border border-amber/35 bg-amber/8 p-5 lg:sticky lg:top-20 lg:self-start">
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/60 mb-3.5">
-                Estudio + equipos · qué incluye
-              </div>
-              {withPack ? (
-                packEquipos.length > 0 ? (
-                  <StudioPackKit equipos={packEquipos} title="Equipos incluidos" />
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Llegá con la cámara — el día de la reserva te confirmamos qué luces y griperías
-                    están libres en tu franja.
-                  </p>
-                )
-              ) : (
-                <p className="text-[12px] text-muted-foreground leading-relaxed">
-                  Seleccioná "Estudio + equipos" para ver qué incluye el pack de luces y griperías.
-                </p>
-              )}
-            </aside>
-          )}
-        </div>
-      </section>
-
-      {/* ─── Características del espacio ─────────────────────────────── */}
-      {(() => {
-        const isFilled = (v: string) => {
-          const t = (v ?? "").trim();
-          return t.length > 0 && t !== "—" && !/^—\s*(m|m²|m\^2)?$/i.test(t);
-        };
-        const visibles = features.filter((f) => isFilled(f.value));
-        if (visibles.length === 0) return null;
-        return (
-          <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-            <h2 className="font-display text-2xl sm:text-3xl">Características del espacio</h2>
-            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-              Lo que vas a encontrar en el lugar. No incluye equipos ni staff.
-            </p>
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {visibles.map((f) => (
-                <div key={f.label} className="rounded-xl border hairline bg-surface p-4">
-                  <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                    {f.label}
+        {/* ── El espacio incluye ────────────────────────────────────── */}
+        {(() => {
+          const visibles = features.filter((f) => (f.value ?? "").trim().length > 0);
+          if (visibles.length === 0) return null;
+          return (
+            <section className="bg-surface px-4 lg:px-12 py-12">
+              <h2 className="font-display font-black lowercase text-[clamp(1.5rem,3vw,2rem)]">
+                el espacio incluye.
+              </h2>
+              <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {visibles.map((f) => (
+                  <div key={f.label} className="rounded-xl border hairline bg-background p-3.5">
+                    <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground mb-1">
+                      {f.label}
+                    </div>
+                    <div className="font-semibold text-[0.9375rem]">{f.value}</div>
                   </div>
-                  <div className="mt-1 text-lg font-semibold">{f.value}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-        );
-      })()}
+                ))}
+              </div>
+            </section>
+          );
+        })()}
 
-      {/* ─── Ubicación ───────────────────────────────────────────────── */}
-      {tieneUbicacion && (
-        <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-          <h2 className="font-display text-2xl sm:text-3xl">Dónde estamos</h2>
-          <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:items-start">
-            <div>
-              {direccion && <p className="text-base text-ink">{direccion}</p>}
-              {comoLlegar && (
-                <p
-                  className={cn(
-                    direccion ? "mt-3" : "",
-                    "whitespace-pre-line text-sm text-muted-foreground",
-                  )}
-                >
-                  {comoLlegar}
+        {/* ── Reservar ─────────────────────────────────────────────── */}
+        <section
+          id="reservar"
+          className="relative overflow-hidden bg-amber px-4 lg:px-12 py-14 scroll-mt-16"
+        >
+          <Grain opacity={14} />
+          <div className="relative">
+            <div className="flex flex-wrap items-end justify-between gap-3 mb-7">
+              <div>
+                <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-ink/55 mb-2.5">
+                  Reservas
                 </p>
+                <h2 className="font-display font-black lowercase leading-[0.95] text-ink text-[clamp(1.75rem,4vw,2.75rem)]">
+                  reservá tu sesión.
+                </h2>
+                <p className="mt-2.5 max-w-md text-[0.9375rem] text-ink/65 leading-relaxed">
+                  Mínimo {minHours} horas. Elegí día y horario — te contactamos para confirmar.
+                </p>
+              </div>
+              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/50 tabular-nums whitespace-nowrap shrink-0">
+                {priceLabel}
+              </span>
+            </div>
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-start">
+              <StudioBookingForm
+                config={bookingConfig}
+                withPack={withPack}
+                onPackChange={setWithPack}
+              />
+              {packActivo && (
+                <aside className="rounded-2xl border border-ink/20 bg-ink/8 p-5 lg:sticky lg:top-20 lg:self-start">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/55 mb-3.5">
+                    Estudio + equipos · qué incluye
+                  </div>
+                  {withPack ? (
+                    packEquipos.length > 0 ? (
+                      <StudioPackKit equipos={packEquipos} title="Equipos incluidos" />
+                    ) : (
+                      <div className="flex flex-col gap-2.5">
+                        {STUDIO.addon.includes.map((item) => (
+                          <div key={item} className="flex gap-2.5 text-[0.8125rem] leading-relaxed">
+                            <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-ink shrink-0" />
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    <p className="text-[0.8125rem] text-ink/60 leading-relaxed">
+                      Seleccioná "Estudio + equipos" para ver qué incluye el pack de luces y
+                      griperías.
+                    </p>
+                  )}
+                </aside>
               )}
-              {verMapaHref && (
+            </div>
+          </div>
+        </section>
+
+        {/* ── En acción — trabajos ──────────────────────────────────── */}
+        <section className="bg-ink px-4 lg:px-12 py-14">
+          <div className="flex flex-wrap items-end justify-between gap-3 mb-8">
+            <div>
+              <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-amber/50 mb-2.5">
+                Producciones
+              </p>
+              <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,3.5rem)]">
+                en acción.
+              </h2>
+              <p className="mt-3 text-[0.9375rem] text-background/55 max-w-md">
+                Trabajos hechos por gente copada que pasó por el estudio.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {photos.slice(3, 9).map((photo, i) => (
+              <div
+                key={photo.src}
+                className="rounded-xl overflow-hidden border border-background/8 bg-background/5"
+              >
+                <div className="aspect-[3/2] overflow-hidden">
+                  <img
+                    src={photo.src}
+                    alt={photo.alt}
+                    loading="lazy"
+                    className="h-full w-full object-cover block transition-transform duration-300 hover:scale-[1.04]"
+                  />
+                </div>
+                <div className="px-3.5 py-3 flex items-center gap-2">
+                  <span className="rounded-full bg-amber/18 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] text-amber whitespace-nowrap">
+                    {i % 2 === 0 ? "Fotografía" : "Video"}
+                  </span>
+                  <span className="text-[0.8125rem] text-background/65 truncate">{photo.alt}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Dónde estamos ─────────────────────────────────────────── */}
+        <section className="border-t hairline bg-surface px-4 lg:px-12 py-14">
+          <h2 className="font-display font-black lowercase leading-[0.92] text-[clamp(1.75rem,4vw,2.5rem)] mb-8">
+            dónde estamos.
+          </h2>
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+            <div className="flex flex-col gap-4 pt-1">
+              <div className="flex items-start gap-3">
+                <MapPin className="h-4 w-4 text-amber mt-0.5 shrink-0" />
+                <p className="text-base font-semibold leading-snug">{direccion}</p>
+              </div>
+              <p className="text-[0.9375rem] text-muted-foreground leading-relaxed pl-7">
+                {comoLlegar}
+              </p>
+              <div className="pl-7">
                 <a
                   href={verMapaHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-4 inline-flex items-center gap-2 rounded-full border hairline bg-surface px-4 py-2 text-sm text-ink transition hover:border-ink"
+                  className="inline-flex items-center gap-2 rounded-full border hairline bg-background px-4 py-2 text-sm text-ink hover:border-ink transition"
                 >
-                  Ver en Google Maps
+                  Ver en Google Maps <ExternalLink className="h-3 w-3" />
                 </a>
-              )}
-            </div>
-            {iframeSrc && (
-              <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border hairline bg-ink/5">
-                <iframe
-                  title="Mapa del estudio"
-                  src={iframeSrc}
-                  className="h-full w-full border-0"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
               </div>
-            )}
+            </div>
+            <div className="aspect-[4/3] overflow-hidden rounded-2xl border hairline bg-surface min-h-60">
+              <iframe
+                title="Mapa del estudio"
+                src={iframeSrc}
+                className="h-full w-full border-0 block"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
           </div>
         </section>
-      )}
 
-      {/* ─── FAQ ─────────────────────────────────────────────────────── */}
-      {(() => {
-        const faqVisible = faq.filter((f) => f.q.trim() && f.a.trim());
-        if (faqVisible.length === 0) return null;
-        return (
-          <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-            <h2 className="font-display text-2xl sm:text-3xl">Preguntas frecuentes</h2>
-            <div className="mt-6 space-y-3">
-              {faqVisible.map((f) => (
-                <details
-                  key={f.q}
-                  className="group rounded-xl border hairline bg-surface px-4 py-3"
-                >
-                  <summary className="cursor-pointer list-none font-medium">{f.q}</summary>
-                  <p className="mt-2 text-sm text-muted-foreground">{f.a}</p>
-                </details>
-              ))}
+        {/* ── FAQ ───────────────────────────────────────────────────── */}
+        {faq.filter((f) => f.q.trim() && f.a.trim()).length > 0 && (
+          <section className="border-t hairline px-4 lg:px-12 py-12">
+            <h2 className="font-display font-black lowercase text-[clamp(1.5rem,3vw,2rem)] mb-5">
+              preguntas frecuentes.
+            </h2>
+            <div className="flex flex-col gap-2 max-w-2xl">
+              {faq
+                .filter((f) => f.q.trim() && f.a.trim())
+                .map((item) => (
+                  <details
+                    key={item.q}
+                    className="group rounded-xl border hairline bg-surface overflow-hidden"
+                  >
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 font-semibold text-[0.9375rem] select-none">
+                      {item.q}
+                      <span className="text-muted-foreground shrink-0 transition-transform group-open:rotate-180">
+                        ▾
+                      </span>
+                    </summary>
+                    <p className="px-4 pb-4 text-sm text-muted-foreground leading-relaxed">
+                      {item.a}
+                    </p>
+                  </details>
+                ))}
             </div>
           </section>
-        );
-      })()}
+        )}
 
-      {/* ─── Testimonios ─────────────────────────────────────────────── */}
-      {(() => {
-        const tv = testimonios.filter((t) => t.autor.trim() && t.texto.trim());
-        if (tv.length === 0) return null;
-        return (
-          <section className="border-t hairline px-4 py-10 lg:px-12 lg:py-14">
-            <h2 className="font-display text-2xl sm:text-3xl">Trabajaron acá</h2>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {tv.map((t, i) => (
-                <figure key={i} className="rounded-xl border hairline bg-surface p-5">
-                  <blockquote className="text-sm leading-relaxed text-ink">"{t.texto}"</blockquote>
-                  <figcaption className="mt-3 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                    {t.autor}
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
-          </section>
-        );
-      })()}
-
-      {/* ─── CTA WhatsApp ────────────────────────────────────────────── */}
-      <section className="border-t hairline bg-ink text-amber px-4 py-12 lg:px-12 lg:py-16">
-        <div className="max-w-2xl">
-          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber/70">
-            ¿Tenés dudas?
+        {/* ── CTA "hablemos." ───────────────────────────────────────── */}
+        <section className="bg-ink px-4 lg:px-12 py-16">
+          <div className="max-w-xl">
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber/60 mb-3">
+              ¿Tenés dudas?
+            </p>
+            <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,4rem)]">
+              hablemos.
+            </h2>
+            <p className="mt-4 text-[0.9375rem] leading-relaxed text-amber/65 max-w-sm">
+              Te respondemos en el día. Contanos qué necesitás y armamos un presupuesto a medida.
+            </p>
+            <a
+              href={`https://wa.me/${STUDIO_PHONE}?text=${encodeURIComponent("Hola Rambla! Quería consultar por el estudio.")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-7 inline-flex items-center gap-2 rounded-full bg-amber px-6 py-3 text-[0.9375rem] font-bold text-ink hover:brightness-105 transition"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Escribir por WhatsApp
+            </a>
           </div>
-          <h2 className="mt-2 font-display text-3xl sm:text-4xl">Hablemos por WhatsApp</h2>
-          <p className="mt-3 text-amber/80 max-w-lg">
-            Te respondemos en el día. Contanos qué necesitás y armamos un presupuesto a medida.
-          </p>
-          <a
-            href={`https://wa.me/${STUDIO_PHONE}?text=${encodeURIComponent("Hola Rambla! Quería consultar por el estudio.")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-6 inline-flex items-center gap-2 rounded-full bg-amber px-6 py-3 text-sm font-semibold text-ink transition hover:brightness-110"
-          >
-            <MessageCircle className="h-4 w-4" />
-            Escribir por WhatsApp
-          </a>
-        </div>
-      </section>
+        </section>
+      </main>
 
+      {/* Spacer mobile (detrás de la barra fija) */}
       <div className="h-20 lg:hidden" aria-hidden />
-      <MobileBookCta priceLabel={priceLabel} />
-      <CartDrawer allEquipos={[]} />
-    </PublicLayout>
+      <MobileBookBar priceLabel={priceLabel} />
+    </div>
   );
 }
