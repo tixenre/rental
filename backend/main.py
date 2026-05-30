@@ -94,6 +94,18 @@ ALLOWED_ORIGINS = [
     ).split(",") if o.strip()
 ]
 
+# Hardening pre-launch (#503): CORS con credenciales + localhost/wildcard en
+# prod es peligroso. No rompemos el boot (puede haber un caso legítimo), pero
+# lo gritamos fuerte en los logs (lo levanta Sentry) para que no pase callado.
+if os.getenv("RAILWAY_ENVIRONMENT"):
+    _inseguros = [o for o in ALLOWED_ORIGINS if "localhost" in o or "127.0.0.1" in o or o == "*"]
+    if _inseguros:
+        logger.error(
+            "CORS inseguro en producción: FRONTEND_ORIGINS incluye %s. "
+            "Revisá la env var en Railway (no debe tener localhost ni '*').",
+            _inseguros,
+        )
+
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
 app.add_middleware(BaseHTTPMiddleware, dispatch=request_id_middleware)
