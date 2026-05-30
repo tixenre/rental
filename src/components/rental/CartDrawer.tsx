@@ -12,7 +12,6 @@ import { EmptyState } from "./EmptyState";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
@@ -23,8 +22,8 @@ import { authedFetch } from "@/lib/authedFetch";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { RentalDateModal } from "./RentalDateModal";
-import { apiGetDescuentosJornada } from "@/lib/api";
-import { computeCartTotal, descuentoLabel } from "@/lib/cart-total";
+import { toLocalISO } from "@/lib/rental-dates";
+import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -77,28 +76,19 @@ export function CartDrawer({
     .filter(Boolean) as { it: Equipment; qty: number }[];
 
   const d = days();
-  // Sin fechas: mostramos un estimado por jornada (J=1) para que el
-  // cliente vea precios. En ese modo el helper devuelve sin descuento
-  // ni IVA (es solo referencia; el submit exige fechas válidas).
-  const hayFechas = d > 0;
-  const jornadasComputo = hayFechas ? d : 1;
-
-  const { data: descuentosPuntos = [] } = useQuery({
-    queryKey: ["descuentos-jornada"],
-    queryFn: apiGetDescuentosJornada,
-    staleTime: 60_000,
-  });
+  // Sin fechas: estimado por jornada (el backend devuelve 1 jornada sin
+  // descuento ni IVA — es solo referencia; el submit exige fechas válidas).
+  const hayFechas = !!(startDate && endDate);
 
   const { data: clienteSession } = useClienteSession();
 
-  const totales = computeCartTotal({
-    lines: list.map(({ it, qty }) => ({ pricePerDay: it.pricePerDay, qty })),
-    jornadas: jornadasComputo,
-    descuentosPuntos,
-    // Sin fechas: no aplicamos descuento ni IVA (modo estimado).
-    perfilImpuestos: hayFechas ? clienteSession?.perfil_impuestos : null,
-    descuentoClientePct: hayFechas ? clienteSession?.descuento : 0,
-  });
+  // Total calculado por el BACKEND (fuente única, /api/cotizar). El front no
+  // reimplementa la fórmula: manda ítems + fechas y muestra el desglose. #617.
+  const totales = useCotizacion({
+    items: list.map(({ it, qty }) => ({ equipoId: it._backendId ?? Number(it.id), cantidad: qty })),
+    fechaDesde: hayFechas ? toLocalISO(startDate!, startTime) : null,
+    fechaHasta: hayFechas ? toLocalISO(endDate!, endTime) : null,
+  }).data;
   const {
     subtotal: subtotalTotal,
     descuentoPct,

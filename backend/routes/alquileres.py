@@ -842,9 +842,13 @@ class CotizarRequest(BaseModel):
     items: list[CotizarItem] = []
     fecha_desde: Optional[str] = None
     fecha_hasta: Optional[str] = None
-    # Solo lo honra una sesión admin: cotizar para un cliente puntual (el
-    # builder de pedidos admin arma para OTRO cliente, no para la sesión).
+    # Los dos siguientes SOLO los honra una sesión admin (el builder de pedidos
+    # arma para OTRO cliente, no para la sesión):
+    #  - cliente_id: de qué cliente tomar el perfil tributario.
+    #  - descuento_pct: override del descuento del cliente (el admin lo edita
+    #    en vivo en el builder; gana sobre el `clientes.descuento` guardado).
     cliente_id: Optional[int] = None
+    descuento_pct: Optional[float] = None
 
 
 @router.post("/cotizar")
@@ -906,11 +910,12 @@ def cotizar(data: CotizarRequest, request: Request):
         # ¿Qué cliente? El logueado (sesión cliente) o, si es admin, el
         # `cliente_id` pedido (el builder admin cotiza para terceros).
         session = get_session(request)
+        es_admin = bool(session and is_admin_email(session.get("email")))
         target_cliente_id = None
         if session:
             if session.get("role") == "cliente" and session.get("cliente_id"):
                 target_cliente_id = session["cliente_id"]
-            elif is_admin_email(session.get("email")) and data.cliente_id:
+            elif es_admin and data.cliente_id:
                 target_cliente_id = data.cliente_id
         if target_cliente_id:
             c = conn.execute(
@@ -920,6 +925,9 @@ def cotizar(data: CotizarRequest, request: Request):
             if c:
                 perfil = c["perfil_impuestos"]
                 descuento_cliente_pct = c["descuento"] or 0.0
+        # Override de descuento del admin (lo edita en vivo en el builder).
+        if es_admin and data.descuento_pct is not None:
+            descuento_cliente_pct = data.descuento_pct
         descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
 
     desglose = calcular_total(

@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
 import { motion, useAnimationControls } from "framer-motion";
 import { ShoppingBag } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { useCart } from "@/lib/cart-store";
 import { useFlyToCart } from "@/lib/fly-to-cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
-import { apiGetDescuentosJornada } from "@/lib/api";
-import { useClienteSession } from "@/lib/iva";
-import { computeCartTotal } from "@/lib/cart-total";
+import { toLocalISO } from "@/lib/rental-dates";
+import { useCotizacion } from "@/lib/cotizacion";
 
 export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
   const items = useCart((s) => s.items);
   const days = useCart((s) => s.days)();
+  const startDate = useCart((s) => s.startDate);
+  const endDate = useCart((s) => s.endDate);
+  const startTime = useCart((s) => s.startTime);
+  const endTime = useCart((s) => s.endTime);
   const setDrawerOpen = useCart((s) => s.setDrawerOpen);
   const popKey = useFlyToCart((s) => s.popKey);
   const controls = useAnimationControls();
@@ -43,21 +45,16 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
     })
     .filter((x): x is { equipo: Equipment; qty: number } => x !== null);
 
-  // Total unificado con drawer/sheet vía lib/cart-total. Sin fechas:
-  // estimado por jornada (J=1) sin descuento ni IVA.
-  const hayFechas = days > 0;
-  const { data: descuentosPuntos = [] } = useQuery({
-    queryKey: ["descuentos-jornada"],
-    queryFn: apiGetDescuentosJornada,
-    staleTime: 60_000,
-  });
-  const { data: clienteSession } = useClienteSession();
-  const totales = computeCartTotal({
-    lines: previewItems.map(({ equipo, qty }) => ({ pricePerDay: equipo.pricePerDay, qty })),
-    jornadas: hayFechas ? days : 1,
-    descuentosPuntos,
-    perfilImpuestos: hayFechas ? clienteSession?.perfil_impuestos : null,
-    descuentoClientePct: hayFechas ? clienteSession?.descuento : 0,
+  // Total calculado por el BACKEND (fuente única, /api/cotizar) — mismo número
+  // que el drawer/sheet. Sin fechas → estimado de una jornada sin IVA. #617.
+  const hayFechas = !!(startDate && endDate);
+  const { data: totales } = useCotizacion({
+    items: previewItems.map(({ equipo, qty }) => ({
+      equipoId: equipo._backendId ?? Number(equipo.id),
+      cantidad: qty,
+    })),
+    fechaDesde: hayFechas ? toLocalISO(startDate!, startTime) : null,
+    fechaHasta: hayFechas ? toLocalISO(endDate!, endTime) : null,
   });
   const total = totales.total;
 

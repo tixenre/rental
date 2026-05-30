@@ -69,9 +69,7 @@ import {
 } from "@/lib/admin/api";
 import { clienteApi } from "@/lib/cliente/api";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
-import { apiGetDescuentosJornada } from "@/lib/api";
-import { computeCartTotal } from "@/lib/cart-total";
-import { type PerfilImpuestos } from "@/lib/iva";
+import { useCotizacion } from "@/lib/cotizacion";
 import {
   usePedidoDraft,
   jornadasEntre,
@@ -323,13 +321,17 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
     enabled: isCliente && !!pedido && !!draft.datos?.fecha_desde && !!draft.datos?.fecha_hasta,
   });
 
-  // Puntos de descuento por jornadas — los usa `computeCartTotal` para
-  // recalcular el total cuando el admin edita en vivo (alineado bit a
-  // bit con el backend services/precios).
-  const descuentosJornadaQ = useQuery({
-    queryKey: ["descuentos-jornada"],
-    queryFn: apiGetDescuentosJornada,
-    staleTime: 60_000,
+  // Total calculado por el BACKEND (fuente única, /api/cotizar). Se recotiza
+  // al editar el draft (ítems / fechas / descuento) y mantiene el valor previo
+  // mientras recalcula. El admin cotiza para el cliente del pedido (cliente_id)
+  // con su descuento editable. OJO: es un hook → va ANTES de los early-returns
+  // de abajo (regla de hooks). #617.
+  const cotizacionQ = useCotizacion({
+    items: (draft.items ?? []).map((it) => ({ equipoId: it.equipo_id, cantidad: it.cantidad })),
+    fechaDesde: draft.datos?.fecha_desde || null,
+    fechaHasta: draft.datos?.fecha_hasta || null,
+    clienteId: pedido?.cliente_id ?? null,
+    descuentoPct: draft.datos?.descuento_pct ?? null,
   });
 
   if (pedidoQ.isLoading) {
@@ -350,20 +352,10 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
 
   const jornadas = jornadasEntre(draft.datos.fecha_desde, draft.datos.fecha_hasta);
 
-  // Desglose canónico vía lib/cart-total (alineado bit a bit con el
-  // backend services/precios.calcular_total). Cierra #496: total e IVA
-  // coinciden con admin, portal cliente, carrito y PDF.
-  //
-  // Mientras el admin edita en vivo (draft con cambios pendientes),
-  // recomputamos local. Cuando no hay cambios, el resultado coincide
-  // con `pedido.total_con_iva` que envió el backend.
-  const totales = computeCartTotal({
-    lines: draft.items.map((it) => ({ pricePerDay: it.precio_jornada, qty: it.cantidad })),
-    jornadas,
-    descuentosPuntos: descuentosJornadaQ.data ?? [],
-    perfilImpuestos: (pedido.cliente_perfil_impuestos ?? null) as PerfilImpuestos | null,
-    descuentoClientePct: draft.datos.descuento_pct ?? 0,
-  });
+  // Desglose canónico del BACKEND (cotizacionQ, hoisteado arriba). Total e IVA
+  // coinciden con carrito, portal cliente y PDF — todos salen de
+  // services/precios.calcular_total. #617 / #496.
+  const totales = cotizacionQ.data;
   const bruto = totales.subtotal;
   const totalNeto = totales.totalNeto;
   const total = totales.total; // total con IVA si el cliente es RI, si no = neto

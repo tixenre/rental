@@ -7,6 +7,7 @@
  */
 
 import { authedJson, authedPostJson, authedFetch } from "./authedFetch";
+import { toLocalISO } from "./rental-dates";
 
 export type OrderStatus =
   | "borrador"
@@ -83,11 +84,6 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-function fmtIsoLocal(d: Date, time: string) {
-  const y = d.getFullYear();
-  return `${y}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${time}:00`;
-}
-
 function timePart(d: Date | null, fallback: string) {
   if (!d || isNaN(d.getTime())) return fallback;
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -160,8 +156,8 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   }
 
   const body = {
-    fecha_desde: input.startDate ? fmtIsoLocal(input.startDate, input.startTime) : null,
-    fecha_hasta: input.endDate ? fmtIsoLocal(input.endDate, input.endTime) : null,
+    fecha_desde: input.startDate ? toLocalISO(input.startDate, input.startTime) : null,
+    fecha_hasta: input.endDate ? toLocalISO(input.endDate, input.endTime) : null,
     notas: input.notes ?? null,
     items: items.map((it) => ({
       equipo_id: it.backendId!,

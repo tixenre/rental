@@ -182,6 +182,45 @@ class TestAdmin:
         assert out["con_iva"] is True
         assert out["total_final"] == 84700
 
+    def test_admin_override_descuento(self, patch_db, monkeypatch):
+        # El admin edita el descuento en vivo → override sobre el del cliente.
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: True)
+        patch_db(
+            FakeConn(precios={7: 10000}, perfil="consumidor_final", descuento=0),
+            session={"email": "admin@test.com"},
+        )
+        data = CotizarRequest(
+            items=[CotizarItem(equipo_id=7, cantidad=1)],
+            fecha_desde="2026-06-01T10:00:00",
+            fecha_hasta="2026-06-08T10:00:00",
+            cliente_id=99,
+            descuento_pct=20,
+        )
+        out = cotizar(data, request=None)
+
+        # 70000 - 20% = 56000 (cliente tenía 0% guardado; ganó el override).
+        assert out["descuento_pct"] == 20.0
+        assert out["descuento_monto"] == 14000
+        assert out["neto"] == 56000
+
+    def test_no_admin_ignora_descuento_override(self, patch_db, monkeypatch):
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: False)
+        patch_db(
+            FakeConn(precios={7: 10000}),
+            session={"role": "cliente", "cliente_id": 42},
+        )
+        data = CotizarRequest(
+            items=[CotizarItem(equipo_id=7, cantidad=1)],
+            fecha_desde="2026-06-01T10:00:00",
+            fecha_hasta="2026-06-08T10:00:00",
+            descuento_pct=50,
+        )
+        out = cotizar(data, request=None)
+
+        # Cliente no puede auto-aplicarse descuento → 0%.
+        assert out["descuento_monto"] == 0
+        assert out["neto"] == 70000
+
     def test_no_admin_ignora_cliente_id(self, patch_db, monkeypatch):
         # Sesión NO admin no puede cotizar para terceros → sin perfil aplicado.
         monkeypatch.setattr(alq, "is_admin_email", lambda email: False)
