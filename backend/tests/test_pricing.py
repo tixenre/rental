@@ -2,10 +2,8 @@
 
 import pytest
 
-from routes.alquileres import (
-    _consolidar_items_por_equipo,
-    _parse_precio,
-)
+from reservas import consolidar_items_por_equipo as _consolidar_items_por_equipo
+from routes.alquileres import _parse_precio
 
 
 pytestmark = pytest.mark.unit

@@ -20,11 +20,24 @@ from services.email.service import get_admin_to
 from services.precios import calcular_total, jornadas_periodo
 from config import SITE_URL
 
+# Motor de reservas: la fuente única vive en el paquete `reservas`. Acá se
+# importan solo los nombres que este módulo usa internamente (el endpoint
+# /disponibilidad delega en `calcular_disponibilidad`; las transiciones de
+# estado validan con `validar_stock`). `ESTADOS_RESERVADO` se re-exporta porque
+# es la constante canónica del dominio. El resto de las primitivas se importan
+# directo de `reservas` donde se usan (routes.estudio, routes.cliente_portal).
+# Ver issue #501, Fase 1.
+from reservas import ESTADOS_RESERVADO
+from reservas import (
+    calcular_disponibilidad as _calcular_disponibilidad,
+    dias_no_disponibles as _dias_no_disponibles,
+    validar_stock as _check_stock,
+)
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 ESTADOS_VALIDOS    = {"borrador", "presupuesto", "confirmado", "retirado", "devuelto", "finalizado", "cancelado"}
-ESTADOS_RESERVADO  = "('presupuesto','confirmado','retirado')"   # usado en SQL IN clauses
 
 
 def _es_historico(fuente: str | None) -> bool:
@@ -468,158 +481,6 @@ def _validar_horarios_habilitados(conn, fecha_desde, fecha_hasta) -> None:
     _check(fecha_hasta, "devolución")
 
 
-def _get_buffer_horas(conn) -> int:
-    """Horas de prep/revisión exigidas entre alquileres (setting global)."""
-    row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = ?", ("buffer_horas_alquiler",)
-    ).fetchone()
-    if not row:
-        return 0
-    try:
-        return max(0, int(row["value"]))
-    except (ValueError, TypeError):
-        return 0
-
-
-def _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas: int):
-    """Expande [desde, hasta] en `buffer_horas` por cada lado. Expandir el
-    rango nuevo equivale a exigir `buffer_horas` de gap contra los alquileres
-    existentes (el overlap es simétrico). Devuelve datetimes ISO completos
-    (con hora) para que el overlap respete la hora de retiro/devolución —no se
-    trunca a día.
-
-    Acepta str ISO o datetime (las columnas son TIMESTAMP)."""
-    if buffer_horas <= 0:
-        return fecha_desde, fecha_hasta
-    try:
-        d0 = to_datetime(fecha_desde) - datetime.timedelta(hours=buffer_horas)
-        d1 = to_datetime(fecha_hasta) + datetime.timedelta(hours=buffer_horas)
-        return d0.isoformat(), d1.isoformat()
-    except (ValueError, TypeError, AttributeError):
-        return fecha_desde, fecha_hasta
-
-
-def _unidades_en_mantenimiento(conn, equipo_id: int, fecha_desde: str, fecha_hasta: str) -> int:
-    """Unidades del equipo fuera de servicio por mantenimiento en el rango.
-
-    Una entrada con bloquea_stock=TRUE saca `cantidad` unidades durante
-    [fecha, fecha_hasta]. El overlap usa la misma convención half-open que
-    los alquileres. El buffer NO aplica acá (la ventana de mantenimiento es
-    exacta)."""
-    row = conn.execute("""
-        SELECT COALESCE(SUM(cantidad), 0)
-        FROM equipo_mantenimiento
-        WHERE equipo_id = ?
-          AND bloquea_stock = TRUE
-          AND fecha < ?
-          AND COALESCE(fecha_hasta, fecha) > ?
-    """, (equipo_id, fecha_hasta, fecha_desde)).fetchone()
-    return int((row[0] if row else 0) or 0)
-
-
-def _dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> list[str]:
-    """Días (YYYY-MM-DD) en [desde, hasta] donde algún equipo de `items`
-    ({equipo_id: cantidad_requerida}) NO tiene unidades libres suficientes.
-
-    Refleja la MISMA semántica que `get_disponibilidad` (reservas directas +
-    vía kit + mantenimiento + buffer), evaluada día por día. Fuente para
-    bloquear días en el calendario del cliente sin divergir del chequeo real
-    que corre al confirmar el pedido.
-    """
-    if not items:
-        return []
-    ids = list(items.keys())
-    ph = ",".join("?" for _ in ids)
-
-    d_desde = to_datetime(desde)
-    d_hasta = to_datetime(hasta)
-    if d_desde is None or d_hasta is None or d_hasta < d_desde:
-        return []
-    buffer_horas = _get_buffer_horas(conn)
-    buf = datetime.timedelta(hours=buffer_horas)
-    # Ventana amplia para traer segmentos relevantes (incluye buffer).
-    win_lo = (d_desde - buf).isoformat()
-    win_hi = (d_hasta + datetime.timedelta(days=1) + buf).isoformat()
-
-    stock = {
-        r["id"]: r["cantidad"]
-        for r in conn.execute(
-            f"SELECT id, cantidad FROM equipos WHERE id IN ({ph})", ids
-        ).fetchall()
-    }
-
-    # Segmentos de reserva (directos + vía kit), con su cantidad por equipo.
-    segs: dict[int, list[tuple]] = {eid: [] for eid in ids}
-    directas = conn.execute(
-        f"""
-        SELECT pi.equipo_id AS eid, p.fecha_desde AS fd, p.fecha_hasta AS fh, pi.cantidad AS cant
-        FROM alquiler_items pi
-        JOIN alquileres p ON p.id = pi.pedido_id
-        WHERE p.estado IN {ESTADOS_RESERVADO}
-          AND pi.equipo_id IN ({ph})
-          AND p.fecha_hasta > ? AND p.fecha_desde < ?
-        """,
-        (*ids, win_lo, win_hi),
-    ).fetchall()
-    for r in directas:
-        segs[r["eid"]].append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
-
-    via_kit = conn.execute(
-        f"""
-        SELECT kc.componente_id AS eid, p.fecha_desde AS fd, p.fecha_hasta AS fh,
-               pi.cantidad * kc.cantidad AS cant
-        FROM kit_componentes kc
-        JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
-        JOIN alquileres p ON p.id = pi.pedido_id
-        WHERE p.estado IN {ESTADOS_RESERVADO}
-          AND kc.componente_id IN ({ph})
-          AND p.fecha_hasta > ? AND p.fecha_desde < ?
-        """,
-        (*ids, win_lo, win_hi),
-    ).fetchall()
-    for r in via_kit:
-        segs.setdefault(r["eid"], []).append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
-
-    # Mantenimiento (sin buffer).
-    mant: dict[int, list[tuple]] = {eid: [] for eid in ids}
-    mrows = conn.execute(
-        f"""
-        SELECT equipo_id AS eid, fecha AS fd, COALESCE(fecha_hasta, fecha) AS fh, cantidad AS cant
-        FROM equipo_mantenimiento
-        WHERE bloquea_stock = TRUE
-          AND equipo_id IN ({ph})
-          AND COALESCE(fecha_hasta, fecha) > ? AND fecha < ?
-        """,
-        (*ids, win_lo, win_hi),
-    ).fetchall()
-    for r in mrows:
-        mant.setdefault(r["eid"], []).append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
-
-    bloqueados: list[str] = []
-    dia = d_desde.replace(hour=0, minute=0, second=0, microsecond=0)
-    fin = d_hasta.replace(hour=0, minute=0, second=0, microsecond=0)
-    while dia <= fin:
-        dia_next = dia + datetime.timedelta(days=1)
-        # Buffer expande la ventana del día (mismo criterio que _rango_con_buffer).
-        lo = dia - buf
-        hi = dia_next + buf
-        for eid, qty in items.items():
-            reservado = sum(
-                c for (sd, sh, c) in segs.get(eid, [])
-                if sd is not None and sh is not None and sd < hi and sh > lo
-            )
-            en_mant = sum(
-                c for (sd, sh, c) in mant.get(eid, [])
-                if sd is not None and sh is not None and sd < dia_next and sh > dia
-            )
-            disp = stock.get(eid, 0) - reservado - en_mant
-            if disp < max(1, qty):
-                bloqueados.append(dia.date().isoformat())
-                break
-        dia = dia_next
-    return bloqueados
-
-
 @router.get("/disponibilidad-dias")
 def get_disponibilidad_dias(
     items: str = Query(..., description="Lista 'equipo_id:cantidad' separada por coma"),
@@ -656,66 +517,12 @@ def get_disponibilidad(
     fecha_hasta: str = Query(...),
     exclude_pedido_id: int = Query(None),
 ):
+    """Endpoint fino: abre la conexión y delega en la fuente única de lectura
+    `reservas.calcular_disponibilidad`. Lo llaman también `routes.estudio` y
+    `routes.cliente_portal` con esta misma firma."""
     conn = get_db()
-    # exclude_pedido_id como NULL en SQL → (NULL IS NULL) = TRUE → no filtra nada
-    excl = exclude_pedido_id  # None o int, ambos seguros como parámetro
-
     try:
-        # Buffer: expandimos el rango consultado para exigir gap entre alquileres.
-        buffer_horas = _get_buffer_horas(conn)
-        fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
-
-        directas = conn.execute(f"""
-            SELECT e.id, e.cantidad,
-                   COALESCE(SUM(CASE
-                     WHEN p.estado IN {ESTADOS_RESERVADO}
-                          AND p.fecha_desde < ?
-                          AND p.fecha_hasta > ?
-                          AND (? IS NULL OR p.id != ?)
-                     THEN pi.cantidad ELSE 0
-                   END), 0) AS reservado
-            FROM equipos e
-            LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
-            LEFT JOIN alquileres p ON p.id = pi.pedido_id
-            GROUP BY e.id
-        """, (fh_buf, fd_buf, excl, excl)).fetchall()
-
-        reservado = {r["id"]: r["reservado"] for r in directas}
-        cantidad  = {r["id"]: r["cantidad"]  for r in directas}
-
-        via_kit = conn.execute(f"""
-            SELECT kc.componente_id,
-                   SUM(pi.cantidad * kc.cantidad) AS extra
-            FROM kit_componentes kc
-            JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
-            JOIN alquileres p ON p.id = pi.pedido_id
-            WHERE p.estado IN {ESTADOS_RESERVADO}
-              AND p.fecha_desde < ?
-              AND p.fecha_hasta > ?
-              AND (? IS NULL OR p.id != ?)
-            GROUP BY kc.componente_id
-        """, (fh_buf, fd_buf, excl, excl)).fetchall()
-
-        for r in via_kit:
-            reservado[r["componente_id"]] = reservado.get(r["componente_id"], 0) + r["extra"]
-
-        # Mantenimiento que bloquea stock (sin buffer — ventana exacta).
-        mant = conn.execute("""
-            SELECT equipo_id, COALESCE(SUM(cantidad), 0) AS bloqueado
-            FROM equipo_mantenimiento
-            WHERE bloquea_stock = TRUE
-              AND fecha < ?
-              AND COALESCE(fecha_hasta, fecha) > ?
-            GROUP BY equipo_id
-        """, (fecha_hasta, fecha_desde)).fetchall()
-        en_mant = {r["equipo_id"]: r["bloqueado"] for r in mant}
-
-        return {
-            str(eid): max(0, cantidad.get(eid, 0)
-                          - reservado.get(eid, 0)
-                          - en_mant.get(eid, 0))
-            for eid in cantidad
-        }
+        return _calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id)
     finally:
         conn.close()
 
@@ -1187,146 +994,6 @@ ESTADOS_REQUIEREN_FECHAS = {"confirmado", "retirado", "devuelto", "finalizado"}
 # estos requiere re-validar stock incluso si el destino no exige fechas/items
 # (caso típico: borrador → presupuesto).
 ESTADOS_QUE_RESERVAN = {"presupuesto", "confirmado", "retirado"}
-
-
-def _consolidar_items_por_equipo(items) -> dict:
-    """Consolida items del mismo equipo sumando cantidades.
-
-    Si un pedido tiene 2 items con equipo_id=42 (cantidad=2 cada uno),
-    necesitamos validar 4 vs stock, no 2 cada uno por separado. Sino
-    pasaría la validación con falsa negativa (cada iteración chequea
-    2 < stock sin sumar el otro item del mismo equipo).
-
-    Issue #102 — bug latente cuando el frontend permite items duplicados
-    o si se usa la API directamente.
-
-    Acepta iterable de filas con keys: equipo_id, cantidad, nombre, stock_total.
-    Devuelve dict[equipo_id, {equipo_id, cantidad_total, nombre, stock_total}].
-    """
-    out: dict[int, dict] = {}
-    for it in items:
-        eq_id = it["equipo_id"]
-        if eq_id not in out:
-            out[eq_id] = {
-                "equipo_id": eq_id,
-                "cantidad": 0,
-                "nombre": it["nombre"],
-                "stock_total": it["stock_total"],
-            }
-        out[eq_id]["cantidad"] += it["cantidad"]
-    return out
-
-
-def _check_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> list[str]:
-    """Devuelve lista de nombres de equipos sin stock suficiente para el rango dado.
-
-    Usa SELECT ... FOR UPDATE en equipos para evitar race conditions de concurrencia.
-
-    Si el pedido tiene varios items del MISMO equipo (raro pero posible si el
-    frontend tiene un bug o si se usa la API directamente), suma las cantidades
-    antes de validar — sino la validación pasaría con falsa negativa. Issue #102.
-
-    Para cada equipo del pedido, suma el stock reservado por TODOS los pedidos
-    activos en el rango, contando:
-      (a) `alquiler_items` que reserven directamente ese equipo, +
-      (b) `alquiler_items` de OTROS equipos que sean kits y tengan a este
-          equipo como componente (cantidad ponderada por kc.cantidad).
-    Sin (b) un kit no chequearía la disponibilidad de sus componentes y dos
-    pedidos podían quedar confirmados sobre la misma unidad — uno vía kit y
-    otro directo. `get_disponibilidad` ya sumaba (b); acá lo igualamos.
-
-    Además, expande los items del pedido para chequear también sus
-    componentes (si un item es un kit, exigimos stock para cada componente
-    multiplicando por su cantidad en el kit).
-    """
-    items = conn.execute("""
-        SELECT pi.equipo_id, pi.cantidad, e.nombre, e.cantidad AS stock_total
-        FROM alquiler_items pi
-        JOIN equipos e ON e.id = pi.equipo_id
-        WHERE pi.pedido_id = ?
-    """, (pedido_id,)).fetchall()
-
-    # Expandimos kits: cada item del pedido aporta demanda al equipo directo
-    # y también a cada componente del kit (cantidad ponderada).
-    expanded: list[dict] = [dict(r) for r in items]
-    for r in items:
-        comps = conn.execute("""
-            SELECT kc.componente_id, kc.cantidad AS kc_cant,
-                   e.nombre, e.cantidad AS stock_total
-            FROM kit_componentes kc
-            JOIN equipos e ON e.id = kc.componente_id
-            WHERE kc.equipo_id = ?
-        """, (r["equipo_id"],)).fetchall()
-        for c in comps:
-            expanded.append({
-                "equipo_id": c["componente_id"],
-                "cantidad": r["cantidad"] * c["kc_cant"],
-                "nombre": c["nombre"],
-                "stock_total": c["stock_total"],
-            })
-
-    consolidated = _consolidar_items_por_equipo(expanded)
-
-    # Buffer entre alquileres: expandimos el rango para exigir gap. Mantenimiento
-    # usa el rango original (ventana exacta).
-    buffer_horas = _get_buffer_horas(conn)
-    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
-
-    problemas = []
-    for it in consolidated.values():
-        # Lock la fila de equipo durante el chequeo para evitar race conditions.
-        # SELECT ... FOR UPDATE evita que otra transacción concurrente lea el stock
-        # mientras estamos validando.
-        lock_result = conn.execute(
-            "SELECT cantidad FROM equipos WHERE id = ? FOR UPDATE",
-            (it["equipo_id"],)
-        ).fetchone()
-
-        if not lock_result:
-            problemas.append(f"{it['nombre']} (equipo no encontrado)")
-            continue
-
-        stock_total = lock_result["cantidad"]
-
-        # (a) Reservas directas — items que apuntan a este equipo.
-        reservado_directo = conn.execute(f"""
-            SELECT COALESCE(SUM(pi2.cantidad), 0)
-            FROM alquiler_items pi2
-            JOIN alquileres p ON p.id = pi2.pedido_id
-            WHERE pi2.equipo_id = ?
-              AND p.id != ?
-              AND p.estado IN {ESTADOS_RESERVADO}
-              AND p.fecha_desde < ?
-              AND p.fecha_hasta > ?
-        """, (it["equipo_id"], pedido_id, fh_buf, fd_buf)).fetchone()[0]
-
-        # (b) Reservas vía kits — items que reservan un kit que tiene a este
-        # equipo como componente. Multiplicamos cantidad del item por
-        # cantidad del componente en el kit.
-        reservado_via_kit = conn.execute(f"""
-            SELECT COALESCE(SUM(pi2.cantidad * kc.cantidad), 0)
-            FROM alquiler_items pi2
-            JOIN alquileres p ON p.id = pi2.pedido_id
-            JOIN kit_componentes kc ON kc.equipo_id = pi2.equipo_id
-            WHERE kc.componente_id = ?
-              AND p.id != ?
-              AND p.estado IN {ESTADOS_RESERVADO}
-              AND p.fecha_desde < ?
-              AND p.fecha_hasta > ?
-        """, (it["equipo_id"], pedido_id, fh_buf, fd_buf)).fetchone()[0]
-
-        # (c) Unidades fuera de servicio por mantenimiento (rango original).
-        en_mantenimiento = _unidades_en_mantenimiento(
-            conn, it["equipo_id"], fecha_desde, fecha_hasta
-        )
-
-        reservado = reservado_directo + reservado_via_kit + en_mantenimiento
-        disponible = stock_total - reservado
-        if disponible < it["cantidad"]:
-            problemas.append(
-                f"{it['nombre']} (necesitás {it['cantidad']}, disponible: {max(0, disponible)})"
-            )
-    return problemas
 
 
 @router.patch("/alquileres/{id}")
