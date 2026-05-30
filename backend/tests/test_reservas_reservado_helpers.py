@@ -8,6 +8,7 @@ que ambos chequeos efectivamente comparten el helper.
 """
 import ast
 import inspect
+from types import SimpleNamespace
 
 import pytest
 
@@ -77,3 +78,66 @@ def test_gate_e_hipotetico_comparten_el_helper():
             if isinstance(n, ast.Name)
         }
         assert "_reservado_directo" in names, f"{fn.__name__} no usa el helper compartido"
+
+
+# ── _check_stock_hipotetico — conducta (cuenta directo + vía-kit) ────────────
+
+class _HipoteticoConn:
+    """FakeConn para `_check_stock_hipotetico`: stubea el lookup de equipo, el
+    lock FOR UPDATE, el buffer y las dos subqueries de reserva."""
+
+    def __init__(self, stock, directo=0, via_kit=0, buffer_horas=0):
+        self.stock = stock
+        self.directo = directo
+        self.via_kit = via_kit
+        self.buffer_horas = buffer_horas
+
+    def execute(self, sql, params=()):
+        s = " ".join(sql.split()).upper()
+        if "FROM APP_SETTINGS WHERE KEY = ?" in s:
+            return FakeCursor([FakeRow(value=str(self.buffer_horas))])
+        if "FROM EQUIPO_MANTENIMIENTO" in s:
+            return FakeCursor([FakeRow({0: 0})])
+        if "SELECT NOMBRE, CANTIDAD FROM EQUIPOS WHERE ID = ?" in s:
+            return FakeCursor([FakeRow(nombre="Cámara", cantidad=self.stock)])
+        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s:
+            return FakeCursor([FakeRow(cantidad=self.stock)])
+        if "JOIN KIT_COMPONENTES KC ON KC.EQUIPO_ID = PI2.EQUIPO_ID WHERE KC.COMPONENTE_ID = ?" in s:
+            return FakeCursor([FakeRow({0: self.via_kit})])
+        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s:
+            return FakeCursor([FakeRow({0: self.directo})])
+        return FakeCursor([])
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
+
+
+def _item(equipo_id, cantidad):
+    return SimpleNamespace(equipo_id=equipo_id, cantidad=cantidad)
+
+
+def test_hipotetico_cuenta_reserva_via_kit():
+    """Conducta corregida (cambio deliberado, aprobado por el dueño): si la única
+    unidad está reservada vía un kit, una propuesta directa por esa unidad se
+    rechaza — igual que el gate real. Antes era un undercount (no la contaba)."""
+    from routes.cliente_portal import _check_stock_hipotetico
+
+    conn = _HipoteticoConn(stock=1, directo=0, via_kit=1)
+    problemas = _check_stock_hipotetico(conn, 99, "2026-06-01", "2026-06-05", [_item(20, 1)])
+    assert len(problemas) == 1
+    assert "Cámara" in problemas[0]
+
+
+def test_hipotetico_con_stock_libre_acepta():
+    """Caso normal con stock de sobra: la propuesta pasa (no regresión)."""
+    from routes.cliente_portal import _check_stock_hipotetico
+
+    conn = _HipoteticoConn(stock=3, directo=0, via_kit=0)
+    problemas = _check_stock_hipotetico(conn, 99, "2026-06-01", "2026-06-05", [_item(20, 1)])
+    assert problemas == []
