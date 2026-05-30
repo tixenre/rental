@@ -1,3 +1,16 @@
+/**
+ * cliente.portal.tsx — Portal del cliente.
+ *
+ * Layout: sidebar 220px en desktop + bottom-nav en mobile, con 3 tabs:
+ * Pedidos · Notificaciones · Perfil. El perfil vive como tab (PerfilSection),
+ * no como drawer lateral. Notificaciones es un empty-state hasta que exista el
+ * endpoint (ver TODO en NotificacionesSection).
+ *
+ * Toda la lógica de pedidos (fetch, filtros, cancelaciones, documentos,
+ * solicitudes, timeline) se preserva en los componentes PedidoCard, DocActions,
+ * DocPreviewModal, DocAvailablePopup, PedidoTimeline, buildTimelineSteps.
+ */
+
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEquipos } from "@/hooks/useEquipos";
@@ -5,7 +18,7 @@ import { useFavoritos } from "@/hooks/useFavoritos";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { authedFetch } from "@/lib/authedFetch";
 import { clienteApi } from "@/lib/cliente/api";
-import { PublicLayout } from "@/components/rental/PublicLayout";
+import { TopBar } from "@/components/rental/TopBar";
 import { StatCard } from "@/components/rental/StatCard";
 import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import {
@@ -31,6 +44,9 @@ import {
   LogOut,
   CircleCheckBig,
   Lock,
+  Bell,
+  User,
+  Package,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -57,6 +73,7 @@ import { jornadasFromISO as jornadasEntre } from "@/lib/rental-dates";
 import { whatsappLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 import { GoogleIcon } from "@/components/ui/GoogleIcon";
+import { formatARS } from "@/lib/format";
 
 export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mis pedidos — Rambla Rental" }] }),
@@ -66,6 +83,8 @@ export const Route = createFileRoute("/cliente/portal")({
   },
   component: ClientePortal,
 });
+
+// ── Tipos (igual que el original) ────────────────────────────────────────────
 
 type Perfil = {
   id: number;
@@ -116,8 +135,6 @@ type Pedido = {
   pagos?: Pago[];
   solicitudes?: SolicitudPortal[];
   documentos_disponibles: { remito: boolean; contrato: boolean; albaran: boolean };
-  // Desglose canónico calculado por el backend (services/precios.calcular_total).
-  // Los lee el portal/admin sin reimplementar la fórmula — cierra #496.
   bruto?: number;
   descuento_monto?: number;
   monto_neto?: number;
@@ -128,31 +145,25 @@ type Pedido = {
   cantidad_jornadas?: number;
 };
 
+// ── Nuevo: tipo de tab del portal ─────────────────────────────────────────────
+type PortalTab = "pedidos" | "notificaciones" | "perfil";
+
 const ACTIVE_STATES = new Set(["borrador", "presupuesto", "confirmado", "retirado"]);
 const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
 const MODIFICABLE_STATES = new Set(["presupuesto", "confirmado"]);
 
-// ── Documentos: aclaraciones + notificación one-shot ─────────────────────
-
 type DocTipo = "remito" | "contrato" | "albaran";
-
 const DOC_LABEL: Record<DocTipo, string> = {
   remito: "Remito",
   contrato: "Contrato",
   albaran: "Albarán",
 };
-
 const DOC_DESCRIPTION: Partial<Record<DocTipo, string>> = {
   contrato: "Es el documento de alquiler firmado entre vos y nosotros.",
   albaran: "Te sirve para tener constancia ante tu aseguradora.",
 };
-
-// Sólo Contrato y Albarán disparan el popup one-shot. Remito se incluye en el
-// listado de docs pero no es trigger (mismo evento que Contrato).
 const DOC_NOTIFICABLE: DocTipo[] = ["contrato", "albaran"];
-
 const docSeenKey = (pedidoId: number, tipo: DocTipo) => `rambla.doc_seen.${pedidoId}.${tipo}`;
-
 function wasDocSeen(pedidoId: number, tipo: DocTipo): boolean {
   try {
     return localStorage.getItem(docSeenKey(pedidoId, tipo)) === "1";
@@ -160,7 +171,6 @@ function wasDocSeen(pedidoId: number, tipo: DocTipo): boolean {
     return false;
   }
 }
-
 function markDocSeen(pedidoId: number, tipo: DocTipo): void {
   try {
     localStorage.setItem(docSeenKey(pedidoId, tipo), "1");
@@ -170,24 +180,19 @@ function markDocSeen(pedidoId: number, tipo: DocTipo): void {
 }
 
 type Filtro = "todos" | "activos" | "historial";
-
 const TAB_OPTIONS: { value: Filtro; label: string }[] = [
   { value: "todos", label: "Todos" },
   { value: "activos", label: "Activos" },
   { value: "historial", label: "Historial" },
 ];
 
+// Reemplazar fmt() con formatARS() del sistema
 function fmt(n?: number) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(n);
+  return formatARS(n);
 }
 function fmtDate(s?: string) {
   if (!s) return "—";
-  // slice(0,10) normaliza "YYYY-MM-DD HH:MM:SS" y "YYYY-MM-DDTHH:MM:SS" a "YYYY-MM-DD"
   const d = new Date(s.slice(0, 10) + "T12:00:00");
   const dias = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
   const meses = [
@@ -208,9 +213,10 @@ function fmtDate(s?: string) {
 }
 function fmtTime(s?: string) {
   if (!s || s.length < 16) return null;
-  // "YYYY-MM-DD HH:MM:SS" → "HH:MM"
   return s.slice(11, 16);
 }
+
+// ── Componente principal ──────────────────────────────────────────────────────
 
 export default function ClientePortal() {
   const navigate = useNavigate();
@@ -222,6 +228,9 @@ export default function ClientePortal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [allEquipos, fav.items],
   );
+
+  // Estado del portal
+  const [activeTab, setActiveTab] = useState<PortalTab>("pedidos");
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
@@ -230,7 +239,6 @@ export default function ClientePortal() {
   const nuevoHandledRef = useRef(false);
   const [tab, setTab] = useState<Filtro>("todos");
   const [query, setQuery] = useState<string>("");
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [ventanaHoras, setVentanaHoras] = useState<number>(24);
   const [docsNuevos, setDocsNuevos] = useState<
     Array<{ pedidoId: number; numero: string; tipo: DocTipo }>
@@ -256,7 +264,6 @@ export default function ClientePortal() {
       })
       .catch(() => navigate({ to: "/cliente/login" }))
       .finally(() => alive && setLoading(false));
-
     clienteApi
       .modificacionConfig()
       .then((c) => {
@@ -265,23 +272,19 @@ export default function ClientePortal() {
       .catch(() => {
         /* default 24 */
       });
-
     return () => {
       alive = false;
     };
   }, [navigate]);
 
-  // Calculamos los documentos "nuevos" (disponibles + no vistos antes) cada
-  // vez que cambia la lista. Disparan el popup one-shot.
   useEffect(() => {
     const nuevos: Array<{ pedidoId: number; numero: string; tipo: DocTipo }> = [];
     for (const p of pedidos) {
       const docs = p.documentos_disponibles;
       if (!docs) continue;
       for (const tipo of DOC_NOTIFICABLE) {
-        if (docs[tipo] && !wasDocSeen(p.id, tipo)) {
+        if (docs[tipo] && !wasDocSeen(p.id, tipo))
           nuevos.push({ pedidoId: p.id, numero: String(p.numero_pedido ?? p.id), tipo });
-        }
       }
     }
     setDocsNuevos(nuevos);
@@ -293,18 +296,15 @@ export default function ClientePortal() {
   }
 
   function verPedido(pedidoId: number) {
+    setActiveTab("pedidos");
     setExpanded(pedidoId);
     dismissDocsPopup();
-    // Scroll a la card después de renderizar la expansión.
     setTimeout(() => {
       const el = document.getElementById(`pedido-${pedidoId}`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
   }
 
-  // Llegada desde "pedido recién creado" (?nuevo=<id>): expandir + scrollear +
-  // resaltar la card una sola vez, y limpiar la URL para que un refresh no la
-  // vuelva a disparar. Esperamos a que los pedidos estén cargados.
   useEffect(() => {
     if (loading || nuevo == null || nuevoHandledRef.current) return;
     if (!pedidos.some((p) => p.id === nuevo)) return;
@@ -312,12 +312,9 @@ export default function ClientePortal() {
     verPedido(nuevo);
     setHighlightId(nuevo);
     navigate({ to: "/cliente/portal", search: {}, replace: true });
-    // verPedido es estable a efectos prácticos; no lo incluimos para no re-disparar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, nuevo, pedidos, navigate]);
 
-  // El resaltado es transitorio (~3.5s). Effect propio para que un reload de
-  // pedidos no corte el timeout antes de tiempo.
   useEffect(() => {
     if (highlightId == null) return;
     const t = setTimeout(() => setHighlightId(null), 3500);
@@ -329,12 +326,6 @@ export default function ClientePortal() {
     navigate({ to: "/cliente/login" });
   }
 
-  // IMPORTANTE: hooks SIEMPRE antes de cualquier early return. Si los
-  // ponemos después del `if (loading) return ...`, React ve un set distinto
-  // de hooks en el render con `loading=true` vs el de `loading=false` y
-  // tira el error #310 ("Rendered more hooks than during the previous
-  // render"). Las dependencias usan `pedidos` que arranca como [] mientras
-  // loading=true, así que es seguro evaluarlas.
   const tabFiltered = useMemo(
     () =>
       tab === "activos"
@@ -370,33 +361,7 @@ export default function ClientePortal() {
     });
   }, [tabFiltered, q]);
 
-  if (loading) {
-    return (
-      <PublicLayout topBar={{ variant: "cliente" }}>
-        <div className="w-full px-5 lg:px-12 xl:px-[72px] pt-8 pb-20">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-9">
-            {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-[88px] rounded-md border hairline bg-muted/30 animate-pulse"
-              />
-            ))}
-          </div>
-          <div className="flex flex-col gap-2.5">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="h-14 rounded-xl border border-[var(--hairline)] bg-muted/20 animate-pulse"
-              />
-            ))}
-          </div>
-        </div>
-      </PublicLayout>
-    );
-  }
-
   const userName = perfil ? `${perfil.nombre} ${perfil.apellido}` : undefined;
-
   const activosPedidos = pedidos.filter((p) => ACTIVE_STATES.has(p.estado));
   const totalActivos = activosPedidos.reduce((sum, p) => sum + (p.monto_total ?? 0), 0);
   const pendientePago = activosPedidos.reduce(
@@ -404,8 +369,6 @@ export default function ClientePortal() {
     0,
   );
   const historico = pedidos.filter((p) => HIST_STATES.has(p.estado)).length;
-
-  // Próximo evento: el retiro o devolución futuro más cercano entre los activos.
   const ahora = Date.now();
   const proximo = activosPedidos
     .flatMap((p) => {
@@ -425,184 +388,553 @@ export default function ClientePortal() {
     historial: historico,
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-dvh bg-background flex flex-col">
+        <TopBar variant="cliente" userName={undefined} />
+        <div className="flex flex-1">
+          <aside className="hidden md:block w-[220px] shrink-0 border-r hairline" />
+          <main className="flex-1 px-5 lg:px-12 pt-8">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-9">
+              {[0, 1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="h-[88px] rounded-md border hairline bg-muted/30 animate-pulse"
+                />
+              ))}
+            </div>
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-14 rounded-xl border hairline bg-muted/20 animate-pulse mb-2.5"
+              />
+            ))}
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <PublicLayout
-      topBar={{
-        variant: "cliente",
-        userName,
-        onLogout: handleLogout,
-        onProfileClick: perfil ? () => setDrawerOpen(true) : undefined,
-      }}
-    >
-      <div className="bg-amber border-b border-[color-mix(in_oklch,var(--ink)_12%,transparent)] grain relative overflow-hidden">
-        <div className="w-full px-5 lg:px-12 xl:px-[72px] pt-9 pb-10">
-          <div className="font-mono text-[10px] uppercase tracking-[0.26em] text-ink/60">
-            Portal de clientes
+    <div className="min-h-dvh bg-background flex flex-col">
+      {/* TopBar — logo + nombre + avatar que abre tab Perfil */}
+      <TopBar
+        variant="cliente"
+        userName={userName}
+        onLogout={handleLogout}
+        onProfileClick={() => setActiveTab("perfil")}
+      />
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* ── Sidebar desktop ─────────────────────────────────────────── */}
+        <nav
+          className="hidden md:flex flex-col w-[220px] shrink-0 border-r hairline bg-background sticky top-16 h-[calc(100dvh-4rem)] overflow-y-auto py-4"
+          aria-label="Navegación del portal"
+        >
+          {/* Saludo */}
+          {perfil && (
+            <div className="px-4 mb-5">
+              <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
+                Portal · cliente
+              </div>
+              <div className="font-sans text-sm font-semibold text-ink mt-0.5 truncate">
+                {perfil.nombre} {perfil.apellido}
+              </div>
+            </div>
+          )}
+
+          {/* Nav items */}
+          <div className="flex flex-col gap-0.5 px-2">
+            <SidebarNavItem
+              icon={<Package className="h-4 w-4" />}
+              label="Pedidos"
+              count={pedidos.length}
+              active={activeTab === "pedidos"}
+              onClick={() => setActiveTab("pedidos")}
+            />
+            <SidebarNavItem
+              icon={<Bell className="h-4 w-4" />}
+              label="Notificaciones"
+              active={activeTab === "notificaciones"}
+              onClick={() => setActiveTab("notificaciones")}
+            />
+            <SidebarNavItem
+              icon={<User className="h-4 w-4" />}
+              label="Perfil"
+              active={activeTab === "perfil"}
+              onClick={() => setActiveTab("perfil")}
+            />
           </div>
-          <h1 className="font-display text-[48px] font-black text-ink leading-none tracking-[-0.025em] mt-1.5">
-            {perfil ? `Hola, ${perfil.nombre}` : "Mis pedidos"}
-          </h1>
-          <p className="font-sans text-sm text-ink/70 mt-3">
-            Mirá tus pedidos, descargá documentos y consultá pagos.
-          </p>
+
+          {/* Logout al fondo */}
+          <div className="mt-auto px-2 pt-4 border-t hairline mx-2">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full flex items-center gap-2.5 rounded-md px-3 py-2.5 font-sans text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/8 transition"
+            >
+              <LogOut className="h-4 w-4" />
+              Cerrar sesión
+            </button>
+          </div>
+        </nav>
+
+        {/* ── Contenido principal ──────────────────────────────────────── */}
+        <main className="flex-1 overflow-y-auto pb-24 md:pb-8">
+          {/* TAB: PEDIDOS */}
+          {activeTab === "pedidos" && (
+            <div className="px-5 lg:px-10 pt-8">
+              {/* Stats */}
+              {pedidos.length > 0 && (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-9">
+                  <StatCard
+                    label="Activos"
+                    value={String(activosPedidos.length)}
+                    meta={`${fmt(totalActivos)} en rentals`}
+                  />
+                  <StatCard
+                    label="Próximo"
+                    value={proximo ? fmtDate(proximo.iso) : "—"}
+                    meta={proximo ? proximo.tipo : "sin fechas próximas"}
+                  />
+                  <StatCard
+                    label="A pagar"
+                    value={pendientePago > 0 ? fmt(pendientePago) : "$ 0"}
+                    meta={pendientePago > 0 ? "saldo pendiente" : "todo al día"}
+                    valueClassName={pendientePago === 0 ? "text-verde" : undefined}
+                  />
+                  <StatCard
+                    label="Histórico"
+                    value={String(historico)}
+                    meta="pedidos completados"
+                  />
+                </div>
+              )}
+
+              {/* Favoritos */}
+              {favEquipos.length > 0 && (
+                <section className="mb-8">
+                  <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-4">
+                    Mis favoritos
+                  </h2>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+                    {favEquipos.map((item, i) => (
+                      <EquipmentCard key={item.id} item={item} index={i} />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Header pedidos */}
+              <div className="flex items-baseline justify-between gap-3 mb-4">
+                <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em]">
+                  mis pedidos.
+                </h2>
+                {pedidos.length > 0 && (
+                  <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                    {pedidos.length} {pedidos.length === 1 ? "pedido" : "pedidos"}
+                  </span>
+                )}
+              </div>
+
+              {/* Search */}
+              {pedidos.length > 0 && (
+                <div className="mb-3 relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Buscar por número, equipo, marca…"
+                    className="w-full rounded-full border hairline bg-surface px-9 py-2.5 font-sans text-[13px] text-ink outline-none transition placeholder:text-muted-foreground hover:border-ink/30 focus:border-ink focus:bg-card"
+                  />
+                  {query && (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 grid h-[22px] w-[22px] place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-ink"
+                      aria-label="Limpiar búsqueda"
+                    >
+                      <XIcon className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Filter chips */}
+              {pedidos.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  {TAB_OPTIONS.map(({ value, label }) => {
+                    const active = tab === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setTab(value)}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-full border px-3.5 py-1.5 font-sans text-xs font-semibold transition",
+                          active
+                            ? "bg-ink text-amber border-ink"
+                            : "border-hairline text-muted-foreground hover:text-ink hover:border-ink",
+                        )}
+                      >
+                        {label}
+                        <span
+                          className={cn(
+                            "font-mono text-[9px] tabular-nums",
+                            active ? "opacity-85" : "opacity-60",
+                          )}
+                        >
+                          {counts[value]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Lista */}
+              {pedidos.length === 0 ? (
+                <PedidoEmpty
+                  title="Sin pedidos aún"
+                  sub="Todavía no tenés pedidos registrados."
+                  cta
+                />
+              ) : filteredPedidos.length === 0 ? (
+                q ? (
+                  <PedidoEmpty
+                    title="Nada coincide con tu búsqueda"
+                    sub={`No encontramos pedidos para "${query}".`}
+                    actionLabel="Limpiar búsqueda"
+                    onAction={() => setQuery("")}
+                    icon="search"
+                  />
+                ) : (
+                  <PedidoEmpty
+                    title={tab === "activos" ? "Sin rentals activos" : "Sin pedidos por acá"}
+                    sub={
+                      tab === "activos"
+                        ? "No tenés rentals activos en este momento."
+                        : "No tenés pedidos en esta sección."
+                    }
+                    cta
+                  />
+                )
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  {filteredPedidos.map((p) => (
+                    <PedidoCard
+                      key={p.id}
+                      pedido={p}
+                      expanded={expanded === p.id}
+                      highlight={highlightId === p.id}
+                      onToggle={() => setExpanded(expanded === p.id ? null : p.id)}
+                      ventanaHoras={ventanaHoras}
+                      onChanged={reloadPedidos}
+                      perfilImpuestos={perfil?.perfil_impuestos ?? null}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: NOTIFICACIONES */}
+          {activeTab === "notificaciones" && <NotificacionesSection />}
+
+          {/* TAB: PERFIL */}
+          {activeTab === "perfil" && perfil && (
+            <PerfilSection
+              perfil={perfil}
+              pedidosCount={pedidos.length}
+              totalAlquilado={pedidos.reduce((s, p) => s + (p.monto_total ?? 0), 0)}
+              onLogout={handleLogout}
+            />
+          )}
+        </main>
+      </div>
+
+      {/* ── Bottom nav mobile ─────────────────────────────────────────── */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t hairline bg-background/95 backdrop-blur-md"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        aria-label="Navegación del portal"
+      >
+        <div className="grid grid-cols-3">
+          <BottomNavItem
+            icon={<Package className="h-5 w-5" />}
+            label="Pedidos"
+            active={activeTab === "pedidos"}
+            onClick={() => setActiveTab("pedidos")}
+          />
+          <BottomNavItem
+            icon={<Bell className="h-5 w-5" />}
+            label="Notificaciones"
+            active={activeTab === "notificaciones"}
+            onClick={() => setActiveTab("notificaciones")}
+          />
+          <BottomNavItem
+            icon={<User className="h-5 w-5" />}
+            label="Perfil"
+            active={activeTab === "perfil"}
+            onClick={() => setActiveTab("perfil")}
+          />
+        </div>
+      </nav>
+
+      <DocAvailablePopup nuevos={docsNuevos} onDismiss={dismissDocsPopup} onVerPedido={verPedido} />
+    </div>
+  );
+}
+
+// ── Navegación: sidebar item ──────────────────────────────────────────────────
+
+function SidebarNavItem({
+  icon,
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count?: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full flex items-center gap-2.5 rounded-md px-3 py-2.5 font-sans text-sm font-medium transition text-left",
+        active
+          ? "bg-amber-soft text-ink font-semibold"
+          : "text-muted-foreground hover:text-ink hover:bg-surface",
+      )}
+    >
+      <span className={cn("shrink-0", active ? "text-ink" : "text-muted-foreground")}>{icon}</span>
+      <span className="flex-1">{label}</span>
+      {count != null && count > 0 && (
+        <span
+          className={cn(
+            "font-mono text-[10px] tabular-nums rounded-full px-1.5 py-px",
+            active ? "bg-amber text-ink" : "bg-muted text-muted-foreground",
+          )}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
+// ── Navegación: bottom nav item ───────────────────────────────────────────────
+
+function BottomNavItem({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center justify-center gap-1 py-2.5 min-h-[56px] transition",
+        active ? "text-ink" : "text-muted-foreground",
+      )}
+    >
+      <span className={cn("transition", active && "text-ink")}>{icon}</span>
+      <span
+        className={cn(
+          "font-mono text-[9px] uppercase tracking-[0.12em] transition",
+          active ? "text-ink font-semibold" : "text-muted-foreground",
+        )}
+      >
+        {label}
+      </span>
+      {active && (
+        <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-amber rounded-b" />
+      )}
+    </button>
+  );
+}
+
+// ── Tab: Notificaciones ───────────────────────────────────────────────────────
+
+function NotificacionesSection() {
+  return (
+    <div className="px-5 lg:px-10 pt-8">
+      <div className="flex items-baseline justify-between gap-3 mb-8">
+        <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em]">
+          notificaciones.
+        </h2>
+      </div>
+      <div className="rounded-xl border border-dashed hairline px-6 py-[60px] text-center">
+        <div className="mx-auto mb-3.5 grid h-14 w-14 place-items-center rounded-full bg-amber-soft text-amber">
+          <Bell className="h-6 w-6" strokeWidth={1.5} />
+        </div>
+        <div className="font-display text-xl font-black text-ink mb-1.5">Sin notificaciones</div>
+        <div className="font-sans text-[13px] text-muted-foreground max-w-[30ch] mx-auto">
+          Cuando haya novedades sobre tus pedidos o documentos aparecerán acá.
+        </div>
+        {/* TODO: conectar a /api/cliente/notificaciones cuando el endpoint esté disponible */}
+      </div>
+    </div>
+  );
+}
+
+// ── Tab: Perfil ───────────────────────────────────────────────────────────────
+
+function PerfilSection({
+  perfil,
+  pedidosCount,
+  totalAlquilado,
+  onLogout,
+}: {
+  perfil: {
+    nombre: string;
+    apellido: string;
+    email: string;
+    telefono: string;
+    direccion: string;
+    cuit?: string | null;
+    perfil_impuestos?: string | null;
+    created_at?: string | null;
+  };
+  pedidosCount: number;
+  totalAlquilado: number;
+  onLogout: () => void;
+}) {
+  const initial = perfil.nombre?.[0]?.toUpperCase() ?? "?";
+  const fullName = `${perfil.nombre} ${perfil.apellido}`;
+
+  const memberSince = (() => {
+    if (!perfil.created_at) return null;
+    const d = new Date(perfil.created_at);
+    const meses = [
+      "ene",
+      "feb",
+      "mar",
+      "abr",
+      "may",
+      "jun",
+      "jul",
+      "ago",
+      "sep",
+      "oct",
+      "nov",
+      "dic",
+    ];
+    return `cliente desde ${meses[d.getMonth()]} ${d.getFullYear()}`;
+  })();
+
+  return (
+    <div className="px-5 lg:px-10 pt-8 max-w-xl">
+      <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-6">
+        mi perfil.
+      </h2>
+
+      {/* Avatar + nombre */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-amber">
+          <span className="font-display font-black text-[20px] text-ink leading-none">
+            {initial}
+          </span>
+        </div>
+        <div>
+          <div className="font-sans font-bold text-[17px] text-ink">{fullName}</div>
+          {memberSince && (
+            <div className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground mt-0.5">
+              {memberSince}
+            </div>
+          )}
+          {/* Badge Google (siempre OAuth) */}
+          <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border hairline px-2 py-0.5">
+            <GoogleIcon size={12} />
+            <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+              Google
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="w-full px-5 lg:px-12 xl:px-[72px] pt-8 pb-20">
-        {pedidos.length > 0 && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-9">
-            <StatCard
-              label="Activos"
-              value={String(activosPedidos.length)}
-              meta={`${fmt(totalActivos)} en rentals`}
-            />
-            <StatCard
-              label="Próximo"
-              value={proximo ? fmtDate(proximo.iso) : "—"}
-              meta={proximo ? proximo.tipo : "sin fechas próximas"}
-            />
-            <StatCard
-              label="A pagar"
-              value={pendientePago > 0 ? fmt(pendientePago) : "$ 0"}
-              meta={pendientePago > 0 ? "saldo pendiente" : "todo al día"}
-              valueClassName={pendientePago === 0 ? "text-verde" : undefined}
-            />
-            <StatCard label="Histórico" value={String(historico)} meta="pedidos completados" />
+      {/* Datos de contacto */}
+      <div className="rounded-lg border hairline bg-card divide-y divide-hairline mb-4">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="font-sans text-sm text-ink flex-1 min-w-0 truncate">{perfil.email}</span>
+          <span className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+            <Lock className="h-2.5 w-2.5" /> Verificado
+          </span>
+        </div>
+        {perfil.telefono && (
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="font-sans text-sm text-ink flex-1">{perfil.telefono}</span>
+            <span className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+              <Lock className="h-2.5 w-2.5" /> Verificado
+            </span>
           </div>
         )}
-
-        {/* Mis favoritos */}
-        {favEquipos.length > 0 && (
-          <section className="mb-8">
-            <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-4">
-              Mis favoritos
-            </h2>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
-              {favEquipos.map((item, i) => (
-                <EquipmentCard key={item.id} item={item} index={i} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-4">
-          Mis pedidos
-        </h2>
-
-        {pedidos.length > 0 && (
-          <div className="mb-3 relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por número, equipo, marca…"
-              className="w-full rounded-full border border-[var(--hairline)] bg-surface px-9 py-2.5 font-sans text-[13px] text-ink outline-none transition placeholder:text-muted-foreground hover:border-ink/30 focus:border-ink focus:bg-card"
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 grid h-[22px] w-[22px] place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-ink"
-                aria-label="Limpiar búsqueda"
-              >
-                <XIcon className="h-3 w-3" />
-              </button>
-            )}
+        {perfil.direccion && (
+          <div className="flex items-center gap-3 px-4 py-3">
+            <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="font-sans text-sm text-ink flex-1 min-w-0 truncate">
+              {perfil.direccion}
+            </span>
           </div>
         )}
-
-        {pedidos.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {TAB_OPTIONS.map(({ value, label }) => {
-              const active = tab === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setTab(value)}
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-3.5 py-1.5 font-sans text-xs font-semibold transition",
-                    active
-                      ? "bg-ink text-amber border-ink"
-                      : "border-[var(--hairline)] text-muted-foreground hover:text-ink hover:border-ink",
-                  )}
-                >
-                  {label}
-                  <span
-                    className={cn(
-                      "font-mono text-[9px] tabular-nums",
-                      active ? "opacity-85" : "opacity-60",
-                    )}
-                  >
-                    {counts[value]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {q && filteredPedidos.length > 0 && (
-          <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-            <strong className="text-ink font-bold">{filteredPedidos.length}</strong>{" "}
-            {filteredPedidos.length === 1 ? "pedido" : "pedidos"} para “{query}”
-          </div>
-        )}
-
-        {pedidos.length === 0 ? (
-          <PedidoEmpty title="Sin pedidos aún" sub="Todavía no tenés pedidos registrados." cta />
-        ) : filteredPedidos.length === 0 ? (
-          q ? (
-            <PedidoEmpty
-              title="Nada coincide con tu búsqueda"
-              sub={`No encontramos pedidos para “${query}”. Probá con otro término.`}
-              actionLabel="Limpiar búsqueda"
-              onAction={() => setQuery("")}
-              icon="search"
-            />
-          ) : (
-            <PedidoEmpty
-              title={tab === "activos" ? "Sin rentals activos" : "Sin pedidos por acá"}
-              sub={
-                tab === "activos"
-                  ? "No tenés rentals activos en este momento."
-                  : "No tenés pedidos en esta sección todavía."
-              }
-              cta
-            />
-          )
-        ) : (
-          <div className="flex flex-col gap-2.5">
-            {filteredPedidos.map((p) => (
-              <PedidoCard
-                key={p.id}
-                pedido={p}
-                expanded={expanded === p.id}
-                highlight={highlightId === p.id}
-                onToggle={() => setExpanded(expanded === p.id ? null : p.id)}
-                ventanaHoras={ventanaHoras}
-                onChanged={reloadPedidos}
-                perfilImpuestos={perfil?.perfil_impuestos ?? null}
-              />
-            ))}
+        {perfil.cuit && (
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="font-sans text-sm text-ink">CUIT {perfil.cuit}</span>
           </div>
         )}
       </div>
 
-      <DocAvailablePopup nuevos={docsNuevos} onDismiss={dismissDocsPopup} onVerPedido={verPedido} />
+      <p className="font-sans text-xs text-muted-foreground mb-6 leading-[1.5]">
+        Estos datos son los que usamos para los contratos y remitos. Si necesitás actualizarlos,
+        contactanos por WhatsApp.
+      </p>
 
-      {perfil && (
-        <ProfileDrawer
-          open={drawerOpen}
-          perfil={perfil}
-          pedidosCount={pedidos.length}
-          totalAlquilado={pedidos.reduce((s, p) => s + (p.monto_total ?? 0), 0)}
-          onClose={() => setDrawerOpen(false)}
-          onLogout={handleLogout}
-        />
-      )}
-    </PublicLayout>
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-2 mb-6">
+        <div className="rounded-lg border hairline bg-card px-4 py-3 text-center">
+          <div className="font-sans font-extrabold text-[26px] text-ink leading-none tabular-nums">
+            {pedidosCount}
+          </div>
+          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mt-1">
+            Pedidos
+          </div>
+        </div>
+        <div className="rounded-lg border hairline bg-card px-4 py-3 text-center">
+          <div className="font-sans font-extrabold text-[22px] text-ink leading-none tabular-nums">
+            {formatARS(totalAlquilado)}
+          </div>
+          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mt-1">
+            Total alquilado
+          </div>
+        </div>
+      </div>
+
+      {/* Logout */}
+      <button
+        type="button"
+        onClick={onLogout}
+        className="w-full flex items-center justify-center gap-2 rounded-[10px] border border-destructive/25 h-[42px] font-sans text-sm text-destructive hover:bg-destructive/5 transition"
+      >
+        <LogOut className="h-4 w-4" /> Cerrar sesión
+      </button>
+    </div>
   );
 }
 
@@ -1723,177 +2055,5 @@ function PedidoTimeline({ pedido }: { pedido: Pedido }) {
         );
       })}
     </div>
-  );
-}
-
-// ── ProfileDrawer v2: panel de perfil del cliente ────────────────────────────
-
-function fmtDesde(isoStr?: string | null): string {
-  if (!isoStr) return "";
-  const d = new Date(isoStr.slice(0, 10) + "T12:00:00");
-  const meses = [
-    "enero",
-    "febrero",
-    "marzo",
-    "abril",
-    "mayo",
-    "junio",
-    "julio",
-    "agosto",
-    "septiembre",
-    "octubre",
-    "noviembre",
-    "diciembre",
-  ];
-  return `${meses[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-function ProfileDrawer({
-  open,
-  perfil,
-  pedidosCount,
-  totalAlquilado,
-  onClose,
-  onLogout,
-}: {
-  open: boolean;
-  perfil: Perfil;
-  pedidosCount: number;
-  totalAlquilado: number;
-  onClose: () => void;
-  onLogout: () => void;
-}) {
-  if (!open) return null;
-
-  const desde = fmtDesde(perfil.created_at);
-  const inits = `${perfil.nombre[0] ?? ""}${perfil.apellido[0] ?? ""}`.toUpperCase();
-
-  return (
-    <>
-      {/* Scrim */}
-      <div
-        className="fixed inset-0 z-[60] bg-ink/40 backdrop-blur-[2px]"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Panel */}
-      <aside
-        className="fixed inset-y-0 right-0 z-[61] w-full max-w-[340px] bg-background border-l border-hairline flex flex-col overflow-y-auto animate-[slide-in-right_.22s_cubic-bezier(0.32,0.72,0,1)]"
-        role="dialog"
-        aria-label="Perfil"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-hairline shrink-0">
-          <span className="font-mono text-[10px] tracking-[.22em] uppercase text-muted-foreground">
-            Mi perfil
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full border border-hairline flex items-center justify-center text-muted-foreground hover:text-ink hover:border-ink transition-colors"
-            aria-label="Cerrar"
-          >
-            <XIcon className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex flex-col gap-4 p-5 flex-1">
-          {/* ── Avatar + nombre ── */}
-          <div className="border border-hairline rounded-2xl overflow-hidden bg-surface-elevated">
-            {/* Avatar row */}
-            <div className="px-5 py-4 border-b border-hairline flex items-center gap-3.5">
-              <div className="w-[52px] h-[52px] rounded-full bg-amber flex items-center justify-center font-display font-black text-[20px] text-ink shrink-0 select-none">
-                {inits}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-sans text-[17px] font-bold text-ink leading-tight truncate">
-                  {perfil.nombre} {perfil.apellido}
-                </p>
-                {desde && (
-                  <p className="font-mono text-[9px] tracking-[.15em] uppercase text-muted-foreground mt-1">
-                    cliente desde {desde}
-                  </p>
-                )}
-              </div>
-              {/* Google verified badge */}
-              <div className="flex items-center gap-1 bg-[color-mix(in_oklch,#4285F4_10%,transparent)] border border-[color-mix(in_oklch,#4285F4_22%,transparent)] rounded-full px-2 py-1 shrink-0">
-                <GoogleIcon size={12} />
-                <span className="font-mono text-[8px] tracking-[.1em] uppercase text-[#4285F4]">
-                  Google
-                </span>
-              </div>
-            </div>
-
-            {/* Email row */}
-            <div className="flex items-center gap-3 px-5 py-3 border-b border-hairline">
-              <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <span className="font-sans text-[13.5px] text-ink flex-1 min-w-0 truncate">
-                {perfil.email}
-              </span>
-              <div className="flex items-center gap-1 text-muted-foreground shrink-0">
-                <Lock className="w-2.5 h-2.5" />
-                <span className="font-mono text-[8px] tracking-[.1em] uppercase">Verificado</span>
-              </div>
-            </div>
-
-            {/* Teléfono row */}
-            {perfil.telefono && (
-              <div className="flex items-center gap-3 px-5 py-3 border-b border-hairline">
-                <Phone className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <span className="font-sans text-[13.5px] text-ink flex-1 min-w-0 truncate">
-                  {perfil.telefono}
-                </span>
-                <div className="flex items-center gap-1 text-muted-foreground shrink-0">
-                  <Lock className="w-2.5 h-2.5" />
-                  <span className="font-mono text-[8px] tracking-[.1em] uppercase">Verificado</span>
-                </div>
-              </div>
-            )}
-
-            {/* Nota de datos verificados */}
-            <div className="px-5 py-3">
-              <p className="font-sans text-[11.5px] text-muted-foreground leading-relaxed">
-                Datos verificados — no editables desde aquí. Para modificarlos contactá a Rambla.
-              </p>
-            </div>
-          </div>
-
-          {/* ── Stats ── */}
-          {/* font-sans en números/precios — Champ Black no va en UI funcional */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className="border border-hairline rounded-xl p-3.5 bg-surface-elevated">
-              <p className="font-sans font-extrabold text-[26px] text-ink leading-none tabular-nums">
-                {pedidosCount}
-              </p>
-              <p className="font-mono text-[9px] tracking-[.15em] uppercase text-muted-foreground mt-1.5">
-                Pedidos realizados
-              </p>
-            </div>
-            <div className="border border-hairline rounded-xl p-3.5 bg-surface-elevated">
-              <p className="font-sans font-extrabold text-[20px] text-ink leading-none tabular-nums pt-1">
-                {fmt(totalAlquilado)}
-              </p>
-              <p className="font-mono text-[9px] tracking-[.15em] uppercase text-muted-foreground mt-1.5">
-                Total alquilado
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer — cerrar sesión */}
-        <div className="px-5 pb-6 pt-2 border-t border-hairline shrink-0 safe-b">
-          <button
-            type="button"
-            onClick={onLogout}
-            className="flex items-center gap-2 font-sans text-[13px] text-destructive border border-destructive/25 rounded-[10px] h-[42px] px-[18px] hover:border-destructive/50 hover:bg-destructive/5 transition-colors w-full"
-          >
-            <LogOut className="w-3.5 h-3.5 shrink-0" />
-            Cerrar sesión
-          </button>
-        </div>
-      </aside>
-    </>
   );
 }
