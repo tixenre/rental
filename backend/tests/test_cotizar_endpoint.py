@@ -75,6 +75,7 @@ class TestAnonimo:
     """Sin sesión → consumidor_final, sin descuento de cliente, sin IVA."""
 
     def test_sin_fechas_una_jornada(self, patch_db):
+        # Sin fechas y sin cliente → estimado de UNA jornada, sin IVA/descuento.
         patch_db(FakeConn(precios={7: 10000}), session=None)
         out = cotizar(_req([(7, 1)]), request=None)
 
@@ -83,6 +84,22 @@ class TestAnonimo:
         assert out["neto"] == 10000
         assert out["con_iva"] is False
         assert out["iva_monto"] == 0
+        assert out["total_final"] == 10000
+        assert out["subtotal_por_jornada"] == 10000
+        assert out["descuento_origen"] == "ninguno"
+
+    def test_sin_fechas_cliente_ri_sigue_siendo_estimado(self, patch_db):
+        # Aunque haya cliente RI logueado, sin fechas NO se suma IVA (estimado).
+        patch_db(
+            FakeConn(precios={7: 10000}, perfil="responsable_inscripto", descuento=10),
+            session={"role": "cliente", "cliente_id": 42},
+        )
+        out = cotizar(_req([(7, 1)]), request=None)
+
+        assert out["jornadas"] == 1
+        assert out["con_iva"] is False
+        assert out["iva_monto"] == 0
+        assert out["descuento_monto"] == 0
         assert out["total_final"] == 10000
 
     def test_con_fechas_siete_jornadas(self, patch_db):
@@ -130,13 +147,58 @@ class TestResponsableInscripto:
             FakeConn(precios={7: 10000}, perfil="responsable_inscripto", descuento=10),
             session={"role": "cliente", "cliente_id": 42},
         )
-        out = cotizar(_req([(7, 1)]), request=None)
+        # Con fechas (1 jornada por ser mismo día +) → modo firme.
+        out = cotizar(
+            _req([(7, 1)], "2026-06-01T10:00:00", "2026-06-02T10:00:00"),
+            request=None,
+        )
 
         # 10000 bruto - 10% = 9000 neto; IVA 21% = 1890; total 10890
         assert out["descuento_monto"] == 1000
         assert out["neto"] == 9000
         assert out["iva_monto"] == 1890
         assert out["total_final"] == 10890
+        assert out["descuento_origen"] == "cliente"
+
+
+class TestAdmin:
+    """El builder admin cotiza para OTRO cliente vía `cliente_id`."""
+
+    def test_admin_usa_cliente_id(self, patch_db, monkeypatch):
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: True)
+        patch_db(
+            FakeConn(precios={7: 10000}, perfil="responsable_inscripto"),
+            session={"email": "admin@test.com"},  # sesión admin, sin cliente_id
+        )
+        data = CotizarRequest(
+            items=[CotizarItem(equipo_id=7, cantidad=1)],
+            fecha_desde="2026-06-01T10:00:00",
+            fecha_hasta="2026-06-08T10:00:00",
+            cliente_id=99,
+        )
+        out = cotizar(data, request=None)
+
+        # Aplicó el perfil RI del cliente 99 → IVA sobre 70000.
+        assert out["con_iva"] is True
+        assert out["total_final"] == 84700
+
+    def test_no_admin_ignora_cliente_id(self, patch_db, monkeypatch):
+        # Sesión NO admin no puede cotizar para terceros → sin perfil aplicado.
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: False)
+        patch_db(
+            FakeConn(precios={7: 10000}, perfil="responsable_inscripto"),
+            session={"email": "rando@test.com"},
+        )
+        data = CotizarRequest(
+            items=[CotizarItem(equipo_id=7, cantidad=1)],
+            fecha_desde="2026-06-01T10:00:00",
+            fecha_hasta="2026-06-08T10:00:00",
+            cliente_id=99,
+        )
+        out = cotizar(data, request=None)
+
+        assert out["con_iva"] is False
+        assert out["total_final"] == 70000
 
 
 class TestPreciosDesdeBackend:

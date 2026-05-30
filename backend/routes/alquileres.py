@@ -13,7 +13,7 @@ from pydantic import BaseModel, field_validator
 
 from database import get_db, row_to_dict, to_datetime, to_iso, now_ar
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
-from admin_guard import require_admin
+from admin_guard import require_admin, is_admin_email
 from routes.auth import get_session
 from services.email import send_email
 from services.email.service import get_admin_to
@@ -842,6 +842,9 @@ class CotizarRequest(BaseModel):
     items: list[CotizarItem] = []
     fecha_desde: Optional[str] = None
     fecha_hasta: Optional[str] = None
+    # Solo lo honra una sesión admin: cotizar para un cliente puntual (el
+    # builder de pedidos admin arma para OTRO cliente, no para la sesión).
+    cliente_id: Optional[int] = None
 
 
 @router.post("/cotizar")
@@ -852,22 +855,26 @@ def cotizar(data: CotizarRequest, request: Request):
     si las hay, las fechas. El backend pone TODO lo demás:
     - el `precio_jornada` de cada equipo (de la tabla `equipos`, no se confía
       en lo que mande el front),
-    - el perfil tributario y el descuento del cliente logueado (si hay sesión;
-      anónimo → `consumidor_final`, sin descuento de cliente),
+    - el perfil tributario y el descuento del cliente (cliente logueado → el
+      suyo; admin → el del `cliente_id` que pase; anónimo → `consumidor_final`),
     - el descuento por jornadas.
 
-    Devuelve el desglose de `services.precios.calcular_total` (bruto, descuento,
-    neto, iva_monto, total_con_iva, ...). El carrito muestra esos números tal
-    cual. Reemplaza el cálculo duplicado del front (`src/lib/cart-total.ts`).
-    Ver #617.
+    **Sin fechas = modo estimado:** jornadas=1, sin descuentos ni IVA (es solo
+    referencia de precio mientras el cliente no eligió período). Replica el
+    comportamiento histórico del carrito en armado.
+
+    Devuelve el desglose de `services.precios.calcular_total` + `descuento_origen`
+    y `subtotal_por_jornada` (para el UI), de modo que el front muestre los
+    números tal cual. Reemplaza el cálculo duplicado del front
+    (`src/lib/cart-total.ts`). Ver #617.
     """
     conn = get_db()
 
-    # Jornadas: misma fórmula única (ceil/24h). Sin fechas → 1 (igual que el
-    # carrito en armado, donde todavía no se eligió período).
+    # Jornadas: misma fórmula única (ceil/24h). Sin fechas → 1.
     d0 = to_datetime(data.fecha_desde) if data.fecha_desde else None
     d1 = to_datetime(data.fecha_hasta) if data.fecha_hasta else None
     jornadas = jornadas_periodo(d0, d1)
+    tiene_fechas = bool(d0 and d1)
 
     # Precios desde el backend. Equipos inexistentes/eliminados se ignoran
     # (cotización best-effort: el carrito puede tener algo que ya no está).
@@ -886,21 +893,35 @@ def cotizar(data: CotizarRequest, request: Request):
             "cantidad": it.cantidad,
             "precio_jornada": row["precio_jornada"] or 0,
         })
+    subtotal_por_jornada = sum(
+        it["precio_jornada"] * it["cantidad"] for it in items_para_total
+    )
 
-    # Perfil tributario + descuento del cliente logueado (si hay sesión).
+    # Perfil tributario + descuento del cliente. Solo en modo firme (con
+    # fechas): sin fechas es un estimado sin IVA ni descuentos.
     perfil = None
     descuento_cliente_pct = 0.0
-    session = get_session(request)
-    if session and session.get("role") == "cliente" and session.get("cliente_id"):
-        c = conn.execute(
-            "SELECT perfil_impuestos, descuento FROM clientes WHERE id=?",
-            (session["cliente_id"],),
-        ).fetchone()
-        if c:
-            perfil = c["perfil_impuestos"]
-            descuento_cliente_pct = c["descuento"] or 0.0
+    descuento_jornadas_pct = 0.0
+    if tiene_fechas:
+        # ¿Qué cliente? El logueado (sesión cliente) o, si es admin, el
+        # `cliente_id` pedido (el builder admin cotiza para terceros).
+        session = get_session(request)
+        target_cliente_id = None
+        if session:
+            if session.get("role") == "cliente" and session.get("cliente_id"):
+                target_cliente_id = session["cliente_id"]
+            elif is_admin_email(session.get("email")) and data.cliente_id:
+                target_cliente_id = data.cliente_id
+        if target_cliente_id:
+            c = conn.execute(
+                "SELECT perfil_impuestos, descuento FROM clientes WHERE id=?",
+                (target_cliente_id,),
+            ).fetchone()
+            if c:
+                perfil = c["perfil_impuestos"]
+                descuento_cliente_pct = c["descuento"] or 0.0
+        descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
 
-    descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
     desglose = calcular_total(
         items=items_para_total,
         jornadas=jornadas,
@@ -908,7 +929,22 @@ def cotizar(data: CotizarRequest, request: Request):
         descuento_jornadas_pct=descuento_jornadas_pct,
         perfil_impuestos=perfil,
     )
-    return {"jornadas": jornadas, **desglose}
+
+    # Cuál descuento ganó (para el label del UI), mismo criterio que
+    # `descuento_aplicable`: en empate gana el del cliente.
+    if descuento_cliente_pct == 0 and descuento_jornadas_pct == 0:
+        descuento_origen = "ninguno"
+    elif descuento_cliente_pct >= descuento_jornadas_pct:
+        descuento_origen = "cliente"
+    else:
+        descuento_origen = "jornadas"
+
+    return {
+        "jornadas": jornadas,
+        "subtotal_por_jornada": int(subtotal_por_jornada),
+        "descuento_origen": descuento_origen,
+        **desglose,
+    }
 
 
 @router.post("/alquileres", status_code=201)
