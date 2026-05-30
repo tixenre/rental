@@ -465,7 +465,7 @@ class TestNoRegresionTipo:
             centinela_id=20, stock=1,
             reservas=[("2026-06-01T00:00:00", "2026-06-05T00:00:00")],
         )
-        from routes.alquileres import _check_stock
+        from reservas import validar_stock as _check_stock
         problemas = _check_stock(conn, 2, "2026-06-02T00:00:00", "2026-06-03T00:00:00")
         assert len(problemas) == 1
         assert "disponible: 0" in problemas[0]

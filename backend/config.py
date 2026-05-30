@@ -1,0 +1,89 @@
+"""Configuración general de la app — fuente única, tipada y validada.
+
+`Settings` (pydantic-settings) declara las env vars con tipo y default en UN
+solo lugar, en vez de ~69 `os.getenv` dispersos. Se instancia una vez
+(`settings`) al importar este módulo, así la validación de tipos corre al boot
+(fail-fast) en vez de explotar a mitad de un request. Ver #511.
+
+Migración incremental (issue #511): por ahora viven acá las **críticas**
+(auth / CORS / DB / seguridad / observabilidad). El resto (OAuth, email, SMTP,
+storage, owner, etc.) se irá migrando desde sus `os.getenv` actuales.
+
+El parsing (listas, sets, bools derivados) vive en propiedades de `Settings`
+para que cada consumidor lea la forma ya cocida y no repita el split/lower.
+"""
+
+from pathlib import Path
+from typing import Optional
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BACKEND_DIR = Path(__file__).resolve().parent
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        # Carga los .env del backend acá mismo, sin depender de que otro módulo
+        # (database.py) haya corrido load_dotenv antes — así Settings ve los
+        # valores sin importar el orden de imports. `.env.local` pisa a `.env`
+        # (último gana); las env vars reales del proceso pisan a ambos.
+        env_file=(_BACKEND_DIR / ".env", _BACKEND_DIR / ".env.local"),
+        env_file_encoding="utf-8",
+        # Ignora env vars no declaradas (muchas aún sin migrar); matching de
+        # nombres case-insensitive (las env son MAYÚSCULAS).
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # ── URLs ────────────────────────────────────────────────────────────
+    # URL pública del sitio. Override con env var SITE_URL si cambia el dominio.
+    SITE_URL: str = "https://ramblarental.com"
+
+    # ── Auth / seguridad ────────────────────────────────────────────────
+    # Firma de la cookie de sesión. Sin esto la app no puede autenticar:
+    # `routes/auth.py` aborta el boot si queda vacía (con el comando para
+    # generarla).
+    SECRET_KEY: str = ""
+    # Emails con permiso de admin (coma-separados).
+    ADMIN_EMAILS: str = "tinchosantini@gmail.com"
+    # Fuerza `Secure` en la cookie (en Railway se infiere; ver `cookie_secure`).
+    COOKIE_SECURE: str = ""
+
+    # ── Infra / observabilidad ──────────────────────────────────────────
+    DATABASE_URL: Optional[str] = None
+    # Seteada por Railway en sus entornos; sirve para detectar "estamos en prod".
+    RAILWAY_ENVIRONMENT: Optional[str] = None
+    # Error tracking; opcional (dev/CI no lo necesitan).
+    SENTRY_DSN: Optional[str] = None
+    # Orígenes permitidos para CORS con credenciales (coma-separados).
+    FRONTEND_ORIGINS: str = "http://localhost:5173,http://localhost:8000"
+
+    @field_validator("SITE_URL")
+    @classmethod
+    def _strip_trailing_slash(cls, v: str) -> str:
+        return v.rstrip("/")
+
+    # ── Formas cocidas (parsing centralizado) ───────────────────────────
+    @property
+    def is_railway(self) -> bool:
+        """True si corremos en un entorno de Railway (proxy para 'es prod')."""
+        return self.RAILWAY_ENVIRONMENT is not None
+
+    @property
+    def admin_emails(self) -> set[str]:
+        return {e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip()}
+
+    @property
+    def cookie_secure(self) -> bool:
+        return self.is_railway or self.COOKIE_SECURE.strip().lower() == "true"
+
+    @property
+    def frontend_origins(self) -> list[str]:
+        return [o.strip() for o in self.FRONTEND_ORIGINS.split(",") if o.strip()]
+
+
+settings = Settings()
+
+# Back-compat: varios módulos hacen `from config import SITE_URL`.
+SITE_URL = settings.SITE_URL

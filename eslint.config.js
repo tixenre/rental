@@ -28,6 +28,11 @@ export default tseslint.config(
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
+    // Un `eslint-disable` que ya no silencia nada es deuda: lo tratamos como
+    // error para que no se acumulen disables stale (#476).
+    linterOptions: {
+      reportUnusedDisableDirectives: "error",
+    },
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,

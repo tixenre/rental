@@ -25,6 +25,14 @@ export function timeToMinutes(time: string): number {
 export const ymd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+/**
+ * Fecha local + "HH:MM" → string ISO-local `YYYY-MM-DDTHH:MM:00` (sin pasar a
+ * UTC). Es el formato que esperan los endpoints de pedidos/cotización para
+ * `fecha_desde`/`fecha_hasta`. Fuente única para no divergir entre el submit
+ * del pedido y la cotización del carrito.
+ */
+export const toLocalISO = (date: Date, time: string) => `${ymd(date)}T${time}:00`;
+
 /** Combina una fecha (se ignora su hora) con "HH:MM" en un Date local. */
 export function combineDateTime(date: Date, time: string): Date {
   const d = startOfDay(date);

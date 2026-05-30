@@ -200,7 +200,6 @@ function Index() {
     staleTime: 5 * 60 * 1000,
   });
   const taglines = taglinesData ?? HERO_TAGLINES_DEFAULT;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const taglineIdx = useMemo(() => Math.floor(Math.random() * 4), []);
   const tagline = taglines[taglineIdx % taglines.length];
 

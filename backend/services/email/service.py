@@ -80,7 +80,7 @@ def _wrap_email_html(body_html: str, conn) -> str:
     Las plantillas editables guardan solo el CONTENIDO; el chrome vive acá,
     en un único lugar. El body ya viene renderizado y escapado por Jinja.
     """
-    from routes.seo import SITE_URL
+    from config import SITE_URL
 
     logo = _setting(conn, "logo_url") or f"{SITE_URL}/email-logo.png"
     whatsapp = _setting(conn, "whatsapp_phone")

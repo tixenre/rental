@@ -1,19 +1,15 @@
 /**
- * iva.ts — Helpers de IVA para mostrar precios al cliente.
+ * iva.ts — Perfil tributario del cliente para el front.
  *
- * Asunción: los precios cargados (`precio_jornada` en backend) son NETOS
- * (sin IVA). Para Responsable Inscripto se discrimina IVA = 21%; el resto
- * de perfiles ve el precio tal cual sin sumar IVA (mantiene el
- * comportamiento histórico del catálogo público).
- *
- * Si en el futuro cambia el régimen, ajustar `IVA_RATE` y este archivo.
+ * El front NO calcula IVA: el monto del IVA lo computa el backend
+ * (`services/precios.calcular_total`, vía `/api/cotizar` y el desglose de cada
+ * pedido). Acá solo vive `aplicaIva()` — el predicado para decidir si mostrar
+ * la leyenda "+ IVA" — y el hook de sesión del cliente. La alícuota (21%) vive
+ * únicamente en el backend.
  */
 
 import { useEffect, useState } from "react";
 import { authedFetch } from "./authedFetch";
-
-export const IVA_RATE = 0.21;
-export const IVA_PCT = 21;
 
 export type PerfilImpuestos =
   | "consumidor_final"
