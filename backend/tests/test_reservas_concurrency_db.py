@@ -77,9 +77,9 @@ def db_setup():
         )
         for pid in (PED_A, PED_B):
             conn.execute(
-                "INSERT INTO alquileres (id, estado, fecha_desde, fecha_hasta) "
-                "VALUES (?, 'borrador', ?, ?)",
-                (pid, FD, FH),
+                "INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta) "
+                "VALUES (?, ?, 'borrador', ?, ?)",
+                (pid, "Cliente de test (concurrencia)", FD, FH),
             )
             conn.execute(
                 "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) "
