@@ -1,5 +1,4 @@
 // Configuración del Estudio (producto estrella).
-// TODO: completar precios reales — el resto del copy ya es producción-ready.
 
 export const STUDIO = {
   name: "El Estudio",
@@ -7,34 +6,38 @@ export const STUDIO = {
   description:
     "Un espacio para producciones audiovisuales con todos los equipos de " +
     "Rambla Rental a mano. Ideal para rodajes grandes — flexible para los chicos.",
-  pricePerHour: 0, // TODO: precio real $/hora
+  pricePerHour: 8500,
   minHours: 3,
   openHour: 8, // 08:00
   closeHour: 22, // 22:00 (último inicio razonable)
-  // Las medidas concretas (superficie, altura) y atributos del espacio viven
-  // acá — la descripción se mantiene corta y narrativa, sin duplicar specs.
-  // Lista canónica en admin: el dueño completa los `value` que faltan; las
-  // features con value vacío se OCULTAN en la página pública (filtro en
-  // /estudio.tsx) hasta que tengan dato real.
   features: [
-    { label: "Superficie", value: "" },
-    { label: "Altura", value: "" },
-    { label: "Ciclorama", value: "6×6 m" },
-    { label: "Climatización", value: "Sí" },
-    { label: "Living", value: "Sí" },
-    { label: "Área de trabajo", value: "Sí" },
-    { label: "Entrada para autos", value: "Sí" },
-    { label: "Cocina", value: "Sí" },
-    { label: "WiFi", value: "" },
-    { label: "Camarín / vestuario", value: "" },
-    { label: "Potencia eléctrica", value: "" },
-    { label: "Insonorización", value: "" },
-    { label: "Pet friendly", value: "" },
-    { label: "Acceso 24h", value: "" },
-    { label: "Estacionamiento", value: "" },
-    { label: "Rigging / tomas de techo", value: "" },
+    { label: "Ciclorama",          value: "6×6 m" },
+    { label: "Climatización",      value: "A/C" },
+    { label: "Living",             value: "Sofás + mesa" },
+    { label: "Área de trabajo",    value: "Mesa roja + sillas" },
+    { label: "Entrada para autos", value: "Descarga directa" },
+    { label: "Cocina",             value: "Equipada" },
+    { label: "Cortinas blackout",  value: "Sí" },
+    { label: "Baños + vestuario",  value: "2 cabinas" },
   ],
-  gallery: 6, // cantidad de placeholders hasta que haya fotos reales
+  // Fotos reales del espacio (public/estudio/)
+  photos: [
+    { src: "/estudio/Rambla_Estudio_S7V9519-HDR.jpg",       alt: "El Estudio — vista general", hero: true },
+    { src: "/estudio/Rambla_Estudio_S7V9483.jpg",           alt: "Vista general del espacio" },
+    { src: "/estudio/Rambla_Estudio_S7V9463.jpg",           alt: "Ciclorama 6×6 m", ciclorama: true },
+    { src: "/estudio/Rambla_Estudio_S7V9470.jpg",           alt: "Living — sofás y cocina" },
+    { src: "/estudio/Rambla_Estudio_S7V9475.jpg",           alt: "Mesa de producción" },
+    { src: "/estudio/Rambla_Estudio_S7V9489.jpg",           alt: "Pendiente oval — living" },
+    { src: "/estudio/Rambla_Estudio_S7V9497.jpg",           alt: "Living frontal" },
+    { src: "/estudio/Rambla_Estudio_S7V9499.jpg",           alt: "Pared blackout + cortinas" },
+    { src: "/estudio/Rambla_Estudio_S7V9516-HDR.jpg",       alt: "Rincón dark con cortinas negras" },
+    { src: "/estudio/Rambla_Estudio_S7V9490.jpg",           alt: "Sofá desde arriba" },
+    { src: "/estudio/Rambla_Estudio_S7V9491.jpg",           alt: "Living con cocina amarilla" },
+    { src: "/estudio/Rambla_Estudio_S7V9510-HDR-Edit.jpg",  alt: "Ángulo general con mesa" },
+    { src: "/estudio/Rambla_Estudio_S7V9472.jpg",           alt: "Living segundo ángulo" },
+    { src: "/estudio/Rambla_Estudio_S7V9523-Edit.jpg",      alt: "Baños — puertas rojas" },
+  ],
+  gallery: 6, // fallback si no hay fotos reales
   faq: [
     {
       q: "¿Cuál es el mínimo de reserva?",
@@ -66,7 +69,7 @@ export const STUDIO = {
     description:
       "Todas las luces y griperías del estudio sin pensar en sumar ítem por ítem. " +
       "Llegás con la cámara y filmás.",
-    pricePerDay: 0, // TODO: monto fijo por día
+    pricePerDay: 15000,
     includes: [
       "Set de luces continuas (LED COB) + flash de estudio",
       "Modificadores: softbox, beauty dish, paraguas, snoot",
