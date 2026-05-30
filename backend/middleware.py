@@ -26,6 +26,9 @@ PUBLIC_API = (
     "/api/categorias",
     "/api/etiquetas",
     "/api/disponibilidad",
+    "/api/cotizar",  # cotización del carrito: pública (catálogo anónimo cotiza
+    # como consumidor_final). No escribe; los descuentos/IVA de cliente requieren
+    # sesión adentro del handler (get_session), así que abrirla es seguro.
     "/api/public/",
     "/api/cliente/registro",  # registro-info y registro (sin sesión)
     # /api/estudio expone la config del espacio (incluyendo pack curado) y la

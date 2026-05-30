@@ -680,86 +680,88 @@ def cotizar(data: CotizarRequest, request: Request):
     (`src/lib/cart-total.ts`). Ver #617.
     """
     conn = get_db()
+    try:
+        # Jornadas: misma fórmula única (ceil/24h). Sin fechas → 1.
+        d0 = to_datetime(data.fecha_desde) if data.fecha_desde else None
+        d1 = to_datetime(data.fecha_hasta) if data.fecha_hasta else None
+        jornadas = jornadas_periodo(d0, d1)
+        tiene_fechas = bool(d0 and d1)
 
-    # Jornadas: misma fórmula única (ceil/24h). Sin fechas → 1.
-    d0 = to_datetime(data.fecha_desde) if data.fecha_desde else None
-    d1 = to_datetime(data.fecha_hasta) if data.fecha_hasta else None
-    jornadas = jornadas_periodo(d0, d1)
-    tiene_fechas = bool(d0 and d1)
-
-    # Precios desde el backend. Equipos inexistentes/eliminados se ignoran
-    # (cotización best-effort: el carrito puede tener algo que ya no está).
-    items_para_total = []
-    for it in data.items:
-        if it.cantidad <= 0:
-            continue
-        row = conn.execute(
-            "SELECT precio_jornada FROM equipos WHERE id=? AND eliminado_at IS NULL",
-            (it.equipo_id,),
-        ).fetchone()
-        if not row:
-            continue
-        items_para_total.append({
-            "equipo_id": it.equipo_id,
-            "cantidad": it.cantidad,
-            "precio_jornada": row["precio_jornada"] or 0,
-        })
-    subtotal_por_jornada = sum(
-        it["precio_jornada"] * it["cantidad"] for it in items_para_total
-    )
-
-    # Perfil tributario + descuento del cliente. Solo en modo firme (con
-    # fechas): sin fechas es un estimado sin IVA ni descuentos.
-    perfil = None
-    descuento_cliente_pct = 0.0
-    descuento_jornadas_pct = 0.0
-    if tiene_fechas:
-        # ¿Qué cliente? El logueado (sesión cliente) o, si es admin, el
-        # `cliente_id` pedido (el builder admin cotiza para terceros).
-        session = get_session(request)
-        es_admin = bool(session and is_admin_email(session.get("email")))
-        target_cliente_id = None
-        if session:
-            if session.get("role") == "cliente" and session.get("cliente_id"):
-                target_cliente_id = session["cliente_id"]
-            elif es_admin and data.cliente_id:
-                target_cliente_id = data.cliente_id
-        if target_cliente_id:
-            c = conn.execute(
-                "SELECT perfil_impuestos, descuento FROM clientes WHERE id=?",
-                (target_cliente_id,),
+        # Precios desde el backend. Equipos inexistentes/eliminados se ignoran
+        # (cotización best-effort: el carrito puede tener algo que ya no está).
+        items_para_total = []
+        for it in data.items:
+            if it.cantidad <= 0:
+                continue
+            row = conn.execute(
+                "SELECT precio_jornada FROM equipos WHERE id=? AND eliminado_at IS NULL",
+                (it.equipo_id,),
             ).fetchone()
-            if c:
-                perfil = c["perfil_impuestos"]
-                descuento_cliente_pct = c["descuento"] or 0.0
-        # Override de descuento del admin (lo edita en vivo en el builder).
-        if es_admin and data.descuento_pct is not None:
-            descuento_cliente_pct = data.descuento_pct
-        descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+            if not row:
+                continue
+            items_para_total.append({
+                "equipo_id": it.equipo_id,
+                "cantidad": it.cantidad,
+                "precio_jornada": row["precio_jornada"] or 0,
+            })
+        subtotal_por_jornada = sum(
+            it["precio_jornada"] * it["cantidad"] for it in items_para_total
+        )
 
-    desglose = calcular_total(
-        items=items_para_total,
-        jornadas=jornadas,
-        descuento_cliente_pct=descuento_cliente_pct,
-        descuento_jornadas_pct=descuento_jornadas_pct,
-        perfil_impuestos=perfil,
-    )
+        # Perfil tributario + descuento del cliente. Solo en modo firme (con
+        # fechas): sin fechas es un estimado sin IVA ni descuentos.
+        perfil = None
+        descuento_cliente_pct = 0.0
+        descuento_jornadas_pct = 0.0
+        if tiene_fechas:
+            # ¿Qué cliente? El logueado (sesión cliente) o, si es admin, el
+            # `cliente_id` pedido (el builder admin cotiza para terceros).
+            session = get_session(request)
+            es_admin = bool(session and is_admin_email(session.get("email")))
+            target_cliente_id = None
+            if session:
+                if session.get("role") == "cliente" and session.get("cliente_id"):
+                    target_cliente_id = session["cliente_id"]
+                elif es_admin and data.cliente_id:
+                    target_cliente_id = data.cliente_id
+            if target_cliente_id:
+                c = conn.execute(
+                    "SELECT perfil_impuestos, descuento FROM clientes WHERE id=?",
+                    (target_cliente_id,),
+                ).fetchone()
+                if c:
+                    perfil = c["perfil_impuestos"]
+                    descuento_cliente_pct = c["descuento"] or 0.0
+            # Override de descuento del admin (lo edita en vivo en el builder).
+            if es_admin and data.descuento_pct is not None:
+                descuento_cliente_pct = data.descuento_pct
+            descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
 
-    # Cuál descuento ganó (para el label del UI), mismo criterio que
-    # `descuento_aplicable`: en empate gana el del cliente.
-    if descuento_cliente_pct == 0 and descuento_jornadas_pct == 0:
-        descuento_origen = "ninguno"
-    elif descuento_cliente_pct >= descuento_jornadas_pct:
-        descuento_origen = "cliente"
-    else:
-        descuento_origen = "jornadas"
+        desglose = calcular_total(
+            items=items_para_total,
+            jornadas=jornadas,
+            descuento_cliente_pct=descuento_cliente_pct,
+            descuento_jornadas_pct=descuento_jornadas_pct,
+            perfil_impuestos=perfil,
+        )
 
-    return {
-        "jornadas": jornadas,
-        "subtotal_por_jornada": int(subtotal_por_jornada),
-        "descuento_origen": descuento_origen,
-        **desglose,
-    }
+        # Cuál descuento ganó (para el label del UI), mismo criterio que
+        # `descuento_aplicable`: en empate gana el del cliente.
+        if descuento_cliente_pct == 0 and descuento_jornadas_pct == 0:
+            descuento_origen = "ninguno"
+        elif descuento_cliente_pct >= descuento_jornadas_pct:
+            descuento_origen = "cliente"
+        else:
+            descuento_origen = "jornadas"
+
+        return {
+            "jornadas": jornadas,
+            "subtotal_por_jornada": int(subtotal_por_jornada),
+            "descuento_origen": descuento_origen,
+            **desglose,
+        }
+    finally:
+        conn.close()  # devuelve la conexión al pool (sin esto se agota: maxconn=10)
 
 
 @router.post("/alquileres", status_code=201)
