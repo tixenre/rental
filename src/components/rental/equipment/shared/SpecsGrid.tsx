@@ -16,8 +16,9 @@ interface SpecsGridProps {
 export function SpecsGrid({ item, max = 6 }: SpecsGridProps) {
   const specs = item.specs ?? [];
 
+  const specsRaw = (item.specsRaw ?? {}) as Record<string, { label?: string; destacado?: boolean }>;
   const destLabels = new Set(
-    Object.values((item.specsRaw ?? {}) as Record<string, { label?: string; destacado?: boolean }>)
+    Object.values(specsRaw)
       .filter((s) => s?.destacado)
       .map((s) => s.label),
   );
