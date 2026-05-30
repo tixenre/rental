@@ -16,7 +16,7 @@ import { FavButton } from "./equipment/shared/FavButton";
 /**
  * EquipmentCard — grid card del catálogo público.
  *
- * Foto 1:1; nombre `${brand} ${name}` en font-sans bold (no Champ); precio vía
+ * Foto 1:1; nombre público (`item.name`) en font-sans bold (no Champ); precio vía
  * PriceBlock (font-mono); stepper vía StepperPill hairline; favorito real
  * (useFavoritos) arriba-derecha de la foto; "ver ficha técnica" en overlay al
  * hover; badge no-disponible en rojo suave.
@@ -58,9 +58,12 @@ export function EquipmentCard({
 
   const selected = qty > 0;
 
-  // Nombre público: brand + name en un solo campo.
-  // TODO: cuando el backend entregue item.nombre_publico, usar ese campo.
-  const nombrePublico = `${item.brand} ${item.name}`;
+  // Nombre público: `item.name` ya es el nombre público canónico —
+  // `backendToEquipment` lo deriva vía `buildPublicName` (single source of
+  // truth: usa `nombre_publico` del backend, que ya incluye la marca, con
+  // fallback al nombre interno). No re-concatenar `item.brand` acá: duplicaba
+  // la marca en los equipos con template configurado.
+  const nombrePublico = item.name;
 
   // Incluye: texto inline de lo que viene con el equipo.
   const includesText = item.includes?.length

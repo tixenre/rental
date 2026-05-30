@@ -12,15 +12,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import {
-  ArrowLeft,
-  Plus,
-  Sparkles,
-  Share2,
-  Check,
-  ChevronDown,
-  Maximize2,
-} from "lucide-react";
+import { ArrowLeft, Plus, Sparkles, Share2, Check, ChevronDown, Maximize2 } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { EmptyImage } from "@/components/rental/EmptyImage";
@@ -32,7 +24,7 @@ import { Lightbox } from "@/components/rental/Lightbox";
 import { backendToEquipment } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { formatARS } from "@/lib/format";
-import { useClienteSession, aplicaIva, IVA_RATE } from "@/lib/iva";
+import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { priceBreakdown } from "@/lib/pricing";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { buildCategoriaSlug } from "@/lib/categoria-slug";
@@ -377,7 +369,6 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
       {/* Layout desktop: 2 columnas iguales — visual izquierda, técnica derecha.
        *  Mobile: columna única, técnica primero (el cliente quiere saber specs). */}
       <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-10 md:items-start">
-
         {/* ── Columna izquierda: foto + kit + descripción ── */}
         <div className="space-y-6">
           {/* Foto hero */}
@@ -511,7 +502,6 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   );
 }
 
-
 function PriceBlock({
   price,
   item,
@@ -525,7 +515,6 @@ function PriceBlock({
 }) {
   const { data: clienteSession } = useClienteSession();
   const conIva = aplicaIva(clienteSession?.perfil_impuestos);
-  const totalConIva = conIva ? Math.round(price.total * (1 + IVA_RATE)) : price.total;
   return (
     <div>
       <div className={`font-display ${large ? "text-3xl" : "text-xl"} tabular text-ink`}>
@@ -537,10 +526,10 @@ function PriceBlock({
       {showPeriodTotal && (
         <div className="mt-1 flex items-baseline gap-1.5">
           <span className={`font-display ${large ? "text-lg" : "text-sm"} tabular text-amber`}>
-            {formatARS(totalConIva)}
+            {formatARS(price.total)}
           </span>
           <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            · {price.jornadas} jornadas{conIva ? " · IVA incluído" : ""}
+            · {price.jornadas} jornadas{conIva ? " + IVA" : ""}
           </span>
         </div>
       )}
@@ -643,4 +632,3 @@ function YouTubeEmbed({ url }: { url: string }) {
     </section>
   );
 }
-

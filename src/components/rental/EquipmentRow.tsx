@@ -47,9 +47,12 @@ export function EquipmentRow({ item, disponible }: { item: Equipment; disponible
   const stockBajo = !sinStock && cap > 0 && cap <= 2;
   const reachedMax = qty >= cap;
 
-  // Nombre público: brand + name en un solo campo.
-  // TODO: cuando el backend entregue item.nombre_publico, usar ese campo.
-  const nombrePublico = `${item.brand} ${item.name}`;
+  // Nombre público: `item.name` ya es el nombre público canónico —
+  // `backendToEquipment` lo deriva vía `buildPublicName` (single source of
+  // truth: usa `nombre_publico` del backend, que ya incluye la marca, con
+  // fallback al nombre interno). No re-concatenar `item.brand` acá: duplicaba
+  // la marca en los equipos con template configurado.
+  const nombrePublico = item.name;
 
   // Quick facts para el expand: specs_destacados del template si las hay, si no
   // cae al conjunto fijo legacy.

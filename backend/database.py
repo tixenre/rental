@@ -10,6 +10,8 @@ import psycopg2.extras
 import psycopg2.pool
 from datetime import datetime
 
+from config import settings
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -49,7 +51,7 @@ MARCA_SUBQUERY = f"{MARCA_NOMBRE_EXPR} AS marca"
 
 # ── Config BD desde variables de entorno ─────────────────────────────────────
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = settings.DATABASE_URL
 
 if not DATABASE_URL:
     # Fallback local (para desarrollo sin Railway)

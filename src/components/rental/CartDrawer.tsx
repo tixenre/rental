@@ -12,19 +12,18 @@ import { EmptyState } from "./EmptyState";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
-import { useClienteSession, IVA_PCT } from "@/lib/iva";
+import { useClienteSession } from "@/lib/iva";
 import { EmptyImage } from "./EmptyImage";
 import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { RentalDateModal } from "./RentalDateModal";
-import { apiGetDescuentosJornada } from "@/lib/api";
-import { computeCartTotal, descuentoLabel } from "@/lib/cart-total";
+import { toLocalISO } from "@/lib/rental-dates";
+import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -77,37 +76,26 @@ export function CartDrawer({
     .filter(Boolean) as { it: Equipment; qty: number }[];
 
   const d = days();
-  // Sin fechas: mostramos un estimado por jornada (J=1) para que el
-  // cliente vea precios. En ese modo el helper devuelve sin descuento
-  // ni IVA (es solo referencia; el submit exige fechas válidas).
-  const hayFechas = d > 0;
-  const jornadasComputo = hayFechas ? d : 1;
-
-  const { data: descuentosPuntos = [] } = useQuery({
-    queryKey: ["descuentos-jornada"],
-    queryFn: apiGetDescuentosJornada,
-    staleTime: 60_000,
-  });
+  // Sin fechas: estimado por jornada (el backend devuelve 1 jornada sin
+  // descuento ni IVA — es solo referencia; el submit exige fechas válidas).
+  const hayFechas = !!(startDate && endDate);
 
   const { data: clienteSession } = useClienteSession();
 
-  const totales = computeCartTotal({
-    lines: list.map(({ it, qty }) => ({ pricePerDay: it.pricePerDay, qty })),
-    jornadas: jornadasComputo,
-    descuentosPuntos,
-    // Sin fechas: no aplicamos descuento ni IVA (modo estimado).
-    perfilImpuestos: hayFechas ? clienteSession?.perfil_impuestos : null,
-    descuentoClientePct: hayFechas ? clienteSession?.descuento : 0,
-  });
+  // Total calculado por el BACKEND (fuente única, /api/cotizar). El front no
+  // reimplementa la fórmula: manda ítems + fechas y muestra el desglose. #617.
+  const totales = useCotizacion({
+    items: list.map(({ it, qty }) => ({ equipoId: it._backendId ?? Number(it.id), cantidad: qty })),
+    fechaDesde: hayFechas ? toLocalISO(startDate!, startTime) : null,
+    fechaHasta: hayFechas ? toLocalISO(endDate!, endTime) : null,
+  }).data;
   const {
     subtotal: subtotalTotal,
     descuentoPct,
     descuentoOrigen,
     descuentoMonto,
     totalNeto,
-    iva,
     conIva,
-    total,
   } = totales;
 
   // Lock scroll del body + guardar foco al abrir, restaurar al cerrar
@@ -476,25 +464,19 @@ export function CartDrawer({
                     <span className="tabular">−{formatARS(descuentoMonto)}</span>
                   </div>
                 )}
-                {conIva && (
-                  <>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Subtotal neto</span>
-                      <span className="tabular">{formatARS(totalNeto)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>IVA {IVA_PCT}%</span>
-                      <span className="tabular">+{formatARS(iva)}</span>
-                    </div>
-                  </>
-                )}
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                    {hayFechas
-                      ? `Total${conIva ? " · IVA incluído" : ""}`
-                      : "Estimado · por jornada"}
+                    {hayFechas ? "Total" : "Estimado · por jornada"}
                   </span>
-                  <span className="font-display text-3xl tabular text-ink">{formatARS(total)}</span>
+                  <span className="font-display text-3xl tabular text-ink">
+                    {formatARS(totalNeto)}
+                    {conIva && (
+                      <span className="ml-1 align-baseline font-sans text-base text-muted-foreground">
+                        {" "}
+                        + IVA
+                      </span>
+                    )}
+                  </span>
                 </div>
 
                 {!showNotas && list.length > 0 && (

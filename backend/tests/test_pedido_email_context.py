@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from routes.alquileres import _pedido_email_context
-from routes.seo import SITE_URL
+from config import SITE_URL
 
 pytestmark = pytest.mark.unit
 
