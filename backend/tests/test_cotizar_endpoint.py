@@ -33,6 +33,10 @@ class FakeConn:
         self.perfiles_por_id = perfiles_por_id
         self._sql = ""
         self._params = ()
+        self.closed = 0  # cuántas veces se devolvió la conexión al pool
+
+    def close(self):
+        self.closed += 1
 
     def execute(self, sql, params=()):
         self._sql = sql
@@ -313,3 +317,30 @@ class TestDescuentoJornadas:
         assert out["descuento_pct"] == 10.0
         assert out["descuento_monto"] == 7000
         assert out["neto"] == 63000
+
+
+class TestConexion:
+    """El handler debe devolver SIEMPRE la conexión al pool (close()).
+
+    Regresión: la primera versión hacía `conn = get_db()` sin cerrarla nunca.
+    Como `get_db()` toma del ThreadedConnectionPool (maxconn=10) y el pool
+    retiene la referencia en `_used`, cada cotización filtraba una conexión de
+    forma permanente → tras ~10 llamadas el pool se agotaba y el endpoint colgaba
+    en producción. El fix envolvió el cuerpo en try/finally con `conn.close()`.
+    """
+
+    def test_devuelve_conexion_al_pool(self, patch_db):
+        conn = FakeConn(precios={7: 10000})
+        patch_db(conn, session=None)
+        cotizar(_req([(7, 1)]), request=None)
+        assert conn.closed == 1, "cotizar debe cerrar (devolver) la conexión exactamente una vez"
+
+    def test_devuelve_conexion_aunque_falle(self, patch_db):
+        # Si algo explota a mitad, la conexión igual se devuelve (finally).
+        conn = FakeConn(precios={7: 10000})
+        patch_db(conn, session=None)
+        # Forzamos un fallo dentro del handler: items None rompe la iteración.
+        bad = CotizarRequest.model_construct(items=None, fecha_desde=None, fecha_hasta=None)
+        with pytest.raises(Exception):
+            cotizar(bad, request=None)
+        assert conn.closed == 1, "aún ante error, cotizar debe devolver la conexión"
