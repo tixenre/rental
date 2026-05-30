@@ -154,10 +154,6 @@ export function apiGetDiasBloqueados(items: string, desde: string, hasta: string
 
 export type DescuentoJornada = { id: number; jornadas: number; pct: number };
 
-export function apiGetDescuentosJornada() {
-  return get<DescuentoJornada[]>("/api/descuentos-jornada");
-}
-
 export function interpolarDescuento(puntos: DescuentoJornada[], jornadas: number): number {
   if (!puntos.length) return 0;
   const sorted = [...puntos].sort((a, b) => a.jornadas - b.jornadas);

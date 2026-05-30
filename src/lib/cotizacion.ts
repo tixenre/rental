@@ -110,16 +110,19 @@ export function useCotizacion(args: {
     descuento_pct: descuentoPct ?? null,
   };
 
+  const hayItems = body.items.length > 0;
   const q = useQuery({
     queryKey: ["cotizar", body],
     queryFn: () => authedPostJson<CotizarResp>("/api/cotizar", body),
-    enabled: enabled && body.items.length > 0,
+    enabled: enabled && hayItems,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
 
+  // Carrito vacío → cero, sin arrastrar el último valor cacheado por
+  // `keepPreviousData` (si no, al vaciar el carrito quedaría el total viejo).
   return {
-    data: q.data ? adaptar(q.data) : COTIZACION_VACIA,
+    data: hayItems && q.data ? adaptar(q.data) : COTIZACION_VACIA,
     isFetching: q.isFetching,
   };
 }
