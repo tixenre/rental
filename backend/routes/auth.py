@@ -13,13 +13,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 from net_utils import get_client_ip
+from config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # ── Config ──────────────────────────────────────────────────────────────────
 
-SECRET_KEY = os.getenv("SECRET_KEY", "")
+SECRET_KEY = settings.SECRET_KEY
 if not SECRET_KEY:
     raise RuntimeError(
         "SECRET_KEY no configurada — generá una con: "
@@ -34,7 +35,7 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 # / CLIENTE_REDIRECT_URI tienen prioridad — si están seteadas se respetan
 # tal cual (útil para staging u otros entornos custom).
 def _default_oauth_base() -> str:
-    if os.getenv("RAILWAY_ENVIRONMENT"):
+    if settings.is_railway:
         return "https://ramblarental.up.railway.app"
     return "http://localhost:8000"
 
@@ -51,10 +52,7 @@ ALLOWED_EMAILS: set[str] = {
     if e.strip()
 }
 
-COOKIE_SECURE = (
-    os.getenv("RAILWAY_ENVIRONMENT") is not None
-    or os.getenv("COOKIE_SECURE", "").lower() == "true"
-)
+COOKIE_SECURE = settings.cookie_secure
 SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 días
 
 GOOGLE_AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth"

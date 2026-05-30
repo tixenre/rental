@@ -6,11 +6,9 @@ from typing import Optional
 from fastapi import HTTPException, Request
 
 from routes.auth import get_session
+from config import settings
 
-_ADMIN_EMAILS_ENV = os.getenv("ADMIN_EMAILS", "tinchosantini@gmail.com")
-ADMIN_EMAILS: set[str] = {
-    e.strip().lower() for e in _ADMIN_EMAILS_ENV.split(",") if e.strip()
-}
+ADMIN_EMAILS: set[str] = settings.admin_emails
 
 
 def is_admin_email(email: Optional[str]) -> bool:
@@ -24,7 +22,9 @@ def require_admin(request: Request) -> dict:
 
     ADMIN_BYPASS_AUTH=1 deja pasar (solo dev).
     """
-    if os.getenv("ADMIN_BYPASS_AUTH", "").strip() in ("1", "true", "yes"):
+    # Toggle de dev: se lee en runtime (no via Settings, que congela al boot)
+    # porque se prende/apaga dinámicamente (tests, sesión de dev).
+    if os.getenv("ADMIN_BYPASS_AUTH", "").strip().lower() in ("1", "true", "yes"):
         return {"kind": "bypass", "email": "bypass@local"}
 
     session = get_session(request)
