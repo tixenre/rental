@@ -3,8 +3,11 @@
 // a un PNG, usando el Chromium de Playwright que ya trae el repo. Imprime la ruta del PNG
 // para que Claude pueda leerlo con la tool de imágenes.
 //
+// Es el "motor visual" del skill importar-diseno: rasteriza el `.html` de referencia de un
+// bundle de Claude Design (o una ruta de la app real) para que Claude pueda VER el render.
+//
 // Uso:
-//   node .claude/skills/ver-html/render.mjs <target> [opciones]
+//   node .claude/skills/importar-diseno/render.mjs <target> [opciones]
 //
 //   <target>  Puede ser:
 //             - una ruta a un archivo .html      → se abre como file://
@@ -17,7 +20,7 @@
 //   --fold             Captura solo lo visible (above-the-fold). Default: página completa.
 //   --selector <sel>   Captura solo ese elemento CSS (recorta al componente).
 //   --wait <ms>        Espera extra tras cargar (fuentes/animaciones). Default: 300.
-//   --out <path>       Ruta de salida. Default: /tmp/ver-html-<ts>-<viewport>.png
+//   --out <path>       Ruta de salida. Default: /tmp/diseno-<ts>-<viewport>.png
 //
 // Salida: imprime "PNG: <ruta-absoluta>" en stdout (la última línea siempre es la ruta).
 
@@ -33,7 +36,8 @@ try {
   process.exit(2);
 }
 
-const BASE_URL = process.env.VER_HTML_BASE_URL || "http://localhost:3000";
+const BASE_URL =
+  process.env.DISENO_BASE_URL || process.env.VER_HTML_BASE_URL || "http://localhost:3000";
 
 // ── parse args ───────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
@@ -77,7 +81,7 @@ function toUrl(t) {
 
 const url = toUrl(target);
 const viewport = opts.mobile ? "mobile" : "desktop";
-const out = opts.out || `/tmp/ver-html-${Date.now()}-${viewport}.png`;
+const out = opts.out || `/tmp/diseno-${Date.now()}-${viewport}.png`;
 
 // ── render ─────────────────────────────────────────────────────────────────────
 let browser;
