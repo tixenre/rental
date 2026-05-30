@@ -20,7 +20,7 @@ from routes.alquileres import (
     _next_numero_pedido,
     get_disponibilidad,
 )
-from routes.equipos import (
+from services.image_upload import (
     _download_image_bytes,
     _ext_from_ctype,
     _optimize_image,
