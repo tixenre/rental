@@ -67,17 +67,23 @@ def test_params_van_como_bound_y_en_orden():
 
 
 def test_gate_e_hipotetico_comparten_el_helper():
-    """Guard estructural: ambos chequeos referencian `_reservado_directo` en vez
-    de re-copiar la subquery (evita que vuelvan a divergir)."""
+    """Guard estructural: el gate y el chequeo hipotético usan el helper de
+    reserva compartido (`reservado_directo`, con o sin alias `_`) en vez de
+    re-copiar la subquery (evita que vuelvan a divergir). El gate vive en
+    `reservas.gate.validar_stock` (usa el nombre del paquete); el hipotético en
+    `cliente_portal` lo importa con alias `_reservado_directo` — ambos cuentan."""
     from routes.alquileres import _check_stock
     from routes.cliente_portal import _check_stock_hipotetico
 
     for fn in (_check_stock, _check_stock_hipotetico):
-        names = {
-            n.id for n in ast.walk(ast.parse(inspect.getsource(fn)))
-            if isinstance(n, ast.Name)
-        }
-        assert "_reservado_directo" in names, f"{fn.__name__} no usa el helper compartido"
+        src = inspect.getsource(fn)
+        names = {n.id for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Name)}
+        usa_helper = "reservado_directo" in names or "_reservado_directo" in names
+        assert usa_helper, f"{fn.__name__} no usa el helper compartido de reserva"
+        # Y no re-inlinea la subquery cruda de reserva directa.
+        assert "FROM alquiler_items pi2" not in src, (
+            f"{fn.__name__} re-copia la subquery en vez de usar el helper"
+        )
 
 
 # ── _check_stock_hipotetico — conducta (cuenta directo + vía-kit) ────────────

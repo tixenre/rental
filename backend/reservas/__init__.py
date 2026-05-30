@@ -15,6 +15,7 @@ imports existentes (`routes.estudio`, `routes.cliente_portal`).
 """
 from reservas.estados import ESTADOS_RESERVADO
 from reservas.disponibilidad import calcular_disponibilidad, dias_no_disponibles
+from reservas.gate import validar_stock
 from reservas.semantics import (
     consolidar_items_por_equipo,
     get_buffer_horas,
@@ -34,4 +35,5 @@ __all__ = [
     "reservado_directo",
     "reservado_via_kit",
     "unidades_en_mantenimiento",
+    "validar_stock",
 ]
