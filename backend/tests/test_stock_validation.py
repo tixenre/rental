@@ -533,3 +533,67 @@ class TestCicloKit:
         # No es ciclo desde A — solo el grafo B/C ya está en ciclo, pero
         # el BFS protege con `visitados` y eventualmente termina.
         assert _crea_ciclo_kit(conn, 1, 2) is False
+
+
+# ── _calcular_disponibilidad (fuente única catálogo + endpoint) #619 ──────────
+
+
+class DispoFakeConn:
+    """Fake conn para `_calcular_disponibilidad`.
+
+    equipos:   {id: cantidad}
+    reservado: {id: reservas_directas}
+    kit:       [(componente_id, extra)]
+    mant:      {id: unidades_bloqueadas_por_mantenimiento}
+    """
+    def __init__(self, equipos, reservado=None, kit=None, mant=None, buffer_horas=0):
+        self.equipos = equipos
+        self.reservado = reservado or {}
+        self.kit = kit or []
+        self.mant = mant or {}
+        self.buffer_horas = buffer_horas
+
+    def execute(self, sql, params=()):
+        s = sql.lower()
+        if "app_settings" in s:
+            return FakeCursor([FakeRow(value=str(self.buffer_horas))])
+        if "from equipos e" in s:
+            return FakeCursor([
+                FakeRow(id=i, cantidad=c, reservado=self.reservado.get(i, 0))
+                for i, c in self.equipos.items()
+            ])
+        if "kit_componentes" in s:
+            return FakeCursor([FakeRow(componente_id=cid, extra=ex) for (cid, ex) in self.kit])
+        if "equipo_mantenimiento" in s:
+            return FakeCursor([FakeRow(equipo_id=i, bloqueado=b) for i, b in self.mant.items()])
+        return FakeCursor([])
+
+
+class TestCalcularDisponibilidad:
+    """El catálogo y el endpoint /disponibilidad comparten este helper:
+    debe restar reservas + kit + MANTENIMIENTO (el bug #619 era que el catálogo
+    ignoraba mantenimiento y buffer)."""
+
+    _DESDE = "2026-06-01T09:00:00"
+    _HASTA = "2026-06-03T09:00:00"
+
+    def test_resta_mantenimiento(self):
+        from routes.alquileres import _calcular_disponibilidad
+        conn = DispoFakeConn(equipos={1: 2}, mant={1: 1})  # stock 2, 1 en mant
+        assert _calcular_disponibilidad(conn, self._DESDE, self._HASTA)[1] == 1
+
+    def test_resta_reservas_kit_y_mantenimiento(self):
+        from routes.alquileres import _calcular_disponibilidad
+        conn = DispoFakeConn(equipos={1: 5}, reservado={1: 1}, kit=[(1, 1)], mant={1: 1})
+        assert _calcular_disponibilidad(conn, self._DESDE, self._HASTA)[1] == 2  # 5-1-1-1
+
+    def test_nunca_negativo(self):
+        from routes.alquileres import _calcular_disponibilidad
+        conn = DispoFakeConn(equipos={1: 1}, mant={1: 5})
+        assert _calcular_disponibilidad(conn, self._DESDE, self._HASTA)[1] == 0
+
+    def test_sin_bloqueos_devuelve_stock(self):
+        from routes.alquileres import _calcular_disponibilidad
+        conn = DispoFakeConn(equipos={1: 3, 2: 0})
+        disp = _calcular_disponibilidad(conn, self._DESDE, self._HASTA)
+        assert disp == {1: 3, 2: 0}

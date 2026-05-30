@@ -649,6 +649,80 @@ def get_disponibilidad_dias(
         conn.close()
 
 
+def _calcular_disponibilidad(
+    conn, fecha_desde, fecha_hasta, exclude_pedido_id=None
+) -> dict[int, int]:
+    """Disponibilidad real por equipo en [desde, hasta] — fuente ÚNICA de
+    LECTURA de disponibilidad (endpoint /disponibilidad, catálogo, calendario).
+
+    Resta reservas directas + reservas vía kit + mantenimiento que bloquea
+    stock, y aplica el buffer entre alquileres (expande el rango consultado).
+    Devuelve ``{equipo_id: unidades_libres}``.
+
+    NO es el gate de booking — eso es ``_check_stock`` (con FOR UPDATE). Acá
+    solo se LEE; reusar este helper evita que el catálogo/calendario muestren
+    disponible algo que el gate después rebota (#619: el catálogo ignoraba
+    mantenimiento + buffer).
+    """
+    excl = exclude_pedido_id  # None o int, ambos seguros como parámetro
+
+    # Buffer: expandimos el rango consultado para exigir gap entre alquileres.
+    buffer_horas = _get_buffer_horas(conn)
+    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
+
+    directas = conn.execute(f"""
+        SELECT e.id, e.cantidad,
+               COALESCE(SUM(CASE
+                 WHEN p.estado IN {ESTADOS_RESERVADO}
+                      AND p.fecha_desde < ?
+                      AND p.fecha_hasta > ?
+                      AND (? IS NULL OR p.id != ?)
+                 THEN pi.cantidad ELSE 0
+               END), 0) AS reservado
+        FROM equipos e
+        LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
+        LEFT JOIN alquileres p ON p.id = pi.pedido_id
+        GROUP BY e.id
+    """, (fh_buf, fd_buf, excl, excl)).fetchall()
+
+    reservado = {r["id"]: r["reservado"] for r in directas}
+    cantidad  = {r["id"]: r["cantidad"]  for r in directas}
+
+    via_kit = conn.execute(f"""
+        SELECT kc.componente_id,
+               SUM(pi.cantidad * kc.cantidad) AS extra
+        FROM kit_componentes kc
+        JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
+        JOIN alquileres p ON p.id = pi.pedido_id
+        WHERE p.estado IN {ESTADOS_RESERVADO}
+          AND p.fecha_desde < ?
+          AND p.fecha_hasta > ?
+          AND (? IS NULL OR p.id != ?)
+        GROUP BY kc.componente_id
+    """, (fh_buf, fd_buf, excl, excl)).fetchall()
+
+    for r in via_kit:
+        reservado[r["componente_id"]] = reservado.get(r["componente_id"], 0) + r["extra"]
+
+    # Mantenimiento que bloquea stock (sin buffer — ventana exacta).
+    mant = conn.execute("""
+        SELECT equipo_id, COALESCE(SUM(cantidad), 0) AS bloqueado
+        FROM equipo_mantenimiento
+        WHERE bloquea_stock = TRUE
+          AND fecha < ?
+          AND COALESCE(fecha_hasta, fecha) > ?
+        GROUP BY equipo_id
+    """, (fecha_hasta, fecha_desde)).fetchall()
+    en_mant = {r["equipo_id"]: r["bloqueado"] for r in mant}
+
+    return {
+        eid: max(0, cantidad.get(eid, 0)
+                 - reservado.get(eid, 0)
+                 - en_mant.get(eid, 0))
+        for eid in cantidad
+    }
+
+
 @router.get("/disponibilidad")
 def get_disponibilidad(
     fecha_desde: str = Query(...),
@@ -656,65 +730,9 @@ def get_disponibilidad(
     exclude_pedido_id: int = Query(None),
 ):
     conn = get_db()
-    # exclude_pedido_id como NULL en SQL → (NULL IS NULL) = TRUE → no filtra nada
-    excl = exclude_pedido_id  # None o int, ambos seguros como parámetro
-
     try:
-        # Buffer: expandimos el rango consultado para exigir gap entre alquileres.
-        buffer_horas = _get_buffer_horas(conn)
-        fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
-
-        directas = conn.execute(f"""
-            SELECT e.id, e.cantidad,
-                   COALESCE(SUM(CASE
-                     WHEN p.estado IN {ESTADOS_RESERVADO}
-                          AND p.fecha_desde < ?
-                          AND p.fecha_hasta > ?
-                          AND (? IS NULL OR p.id != ?)
-                     THEN pi.cantidad ELSE 0
-                   END), 0) AS reservado
-            FROM equipos e
-            LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
-            LEFT JOIN alquileres p ON p.id = pi.pedido_id
-            GROUP BY e.id
-        """, (fh_buf, fd_buf, excl, excl)).fetchall()
-
-        reservado = {r["id"]: r["reservado"] for r in directas}
-        cantidad  = {r["id"]: r["cantidad"]  for r in directas}
-
-        via_kit = conn.execute(f"""
-            SELECT kc.componente_id,
-                   SUM(pi.cantidad * kc.cantidad) AS extra
-            FROM kit_componentes kc
-            JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
-            JOIN alquileres p ON p.id = pi.pedido_id
-            WHERE p.estado IN {ESTADOS_RESERVADO}
-              AND p.fecha_desde < ?
-              AND p.fecha_hasta > ?
-              AND (? IS NULL OR p.id != ?)
-            GROUP BY kc.componente_id
-        """, (fh_buf, fd_buf, excl, excl)).fetchall()
-
-        for r in via_kit:
-            reservado[r["componente_id"]] = reservado.get(r["componente_id"], 0) + r["extra"]
-
-        # Mantenimiento que bloquea stock (sin buffer — ventana exacta).
-        mant = conn.execute("""
-            SELECT equipo_id, COALESCE(SUM(cantidad), 0) AS bloqueado
-            FROM equipo_mantenimiento
-            WHERE bloquea_stock = TRUE
-              AND fecha < ?
-              AND COALESCE(fecha_hasta, fecha) > ?
-            GROUP BY equipo_id
-        """, (fecha_hasta, fecha_desde)).fetchall()
-        en_mant = {r["equipo_id"]: r["bloqueado"] for r in mant}
-
-        return {
-            str(eid): max(0, cantidad.get(eid, 0)
-                          - reservado.get(eid, 0)
-                          - en_mant.get(eid, 0))
-            for eid in cantidad
-        }
+        disp = _calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id)
+        return {str(eid): v for eid, v in disp.items()}
     finally:
         conn.close()
 

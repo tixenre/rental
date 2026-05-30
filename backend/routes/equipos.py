@@ -530,47 +530,23 @@ def equipos_kpis(request: Request):
 
 # ── Rutas de equipos ─────────────────────────────────────────────────────────
 
-ESTADOS_RESERVADO = "('presupuesto','confirmado','retirado')"
-
-
 def _attach_disponibilidad(conn, equipos: list, desde: str, hasta: str) -> list:
-    """Calcula disponibilidad real por equipo e inyecta el campo `disponible`."""
-    directas = conn.execute(f"""
-        SELECT e.id, e.cantidad,
-               COALESCE(SUM(CASE
-                 WHEN p.estado IN {ESTADOS_RESERVADO}
-                      AND p.fecha_desde < ?
-                      AND p.fecha_hasta > ?
-                 THEN pi.cantidad ELSE 0
-               END), 0) AS reservado
-        FROM equipos e
-        LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
-        LEFT JOIN alquileres p ON p.id = pi.pedido_id
-        GROUP BY e.id
-    """, (hasta, desde)).fetchall()
+    """Inyecta el campo `disponible` por equipo usando la fuente ÚNICA de
+    disponibilidad de lectura (`_calcular_disponibilidad`): resta reservas
+    directas + vía kit + mantenimiento, con buffer entre alquileres.
 
-    reservado = {r["id"]: r["reservado"] for r in directas}
-    cantidad  = {r["id"]: r["cantidad"]  for r in directas}
+    Antes esta función tenía una copia paralela que ignoraba mantenimiento y
+    buffer → el catálogo mostraba disponible algo que el gate de booking
+    (`_check_stock`) después rebotaba (#619). Reusar el helper elimina esa
+    divergencia (no se duplica la lógica de disponibilidad).
+    """
+    # Import inline para no acoplar el módulo de equipos al de alquileres a
+    # nivel de import (la lógica de disponibilidad vive con el motor de reservas).
+    from routes.alquileres import _calcular_disponibilidad
 
-    via_kit = conn.execute(f"""
-        SELECT kc.componente_id,
-               SUM(pi.cantidad * kc.cantidad) AS extra
-        FROM kit_componentes kc
-        JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
-        JOIN alquileres p ON p.id = pi.pedido_id
-        WHERE p.estado IN {ESTADOS_RESERVADO}
-          AND p.fecha_desde < ?
-          AND p.fecha_hasta > ?
-        GROUP BY kc.componente_id
-    """, (hasta, desde)).fetchall()
-
-    for r in via_kit:
-        reservado[r["componente_id"]] = reservado.get(r["componente_id"], 0) + r["extra"]
-
+    disp = _calcular_disponibilidad(conn, desde, hasta)
     for eq in equipos:
-        eid = eq["id"]
-        eq["disponible"] = max(0, cantidad.get(eid, eq.get("cantidad", 0)) - reservado.get(eid, 0))
-
+        eq["disponible"] = disp.get(eq["id"], max(0, eq.get("cantidad", 0)))
     return equipos
 
 
