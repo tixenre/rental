@@ -37,9 +37,9 @@ import { authedFetch } from "@/lib/authedFetch";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
-import { apiGetDescuentosJornada } from "@/lib/api";
 import { useClienteSession, aplicaIva, IVA_PCT } from "@/lib/iva";
-import { computeCartTotal, descuentoLabel } from "@/lib/cart-total";
+import { toLocalISO } from "@/lib/rental-dates";
+import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
 import { RentalDateModal } from "@/components/rental/RentalDateModal";
 
 function fmtDate(d: Date | null): string {
@@ -321,22 +321,19 @@ function CartSheet({
     .map(([id, qty]) => ({ eq: equipos.find((e) => e.id === id)!, qty }))
     .filter((x) => x.eq);
 
-  // Total unificado con drawer desktop y minibar vía lib/cart-total.
-  // Sin fechas: estimado por jornada (J=1) sin descuento ni IVA.
+  // Total calculado por el BACKEND (fuente única, /api/cotizar) — mismo número
+  // que el drawer desktop y el minibar. Sin fechas → estimado de una jornada
+  // sin IVA ni descuento (lo decide el backend). #617.
   const hayFechas = !!fechaDesde;
-  const { data: descuentosPuntos = [] } = useQuery({
-    queryKey: ["descuentos-jornada"],
-    queryFn: apiGetDescuentosJornada,
-    staleTime: 60_000,
-  });
   const { data: clienteSession } = useClienteSession();
-  const totales = computeCartTotal({
-    lines: entries.map(({ eq, qty }) => ({ pricePerDay: eq.pricePerDay, qty })),
-    jornadas: hayFechas ? jornadas : 1,
-    descuentosPuntos,
-    perfilImpuestos: hayFechas ? clienteSession?.perfil_impuestos : null,
-    descuentoClientePct: hayFechas ? clienteSession?.descuento : 0,
-  });
+  const totales = useCotizacion({
+    items: entries.map(({ eq, qty }) => ({
+      equipoId: eq._backendId ?? Number(eq.id),
+      cantidad: qty,
+    })),
+    fechaDesde: hayFechas && fechaDesde ? toLocalISO(fechaDesde, horaDesde) : null,
+    fechaHasta: hayFechas && fechaHasta ? toLocalISO(fechaHasta, horaHasta) : null,
+  }).data;
   const {
     subtotal,
     descuentoPct,
