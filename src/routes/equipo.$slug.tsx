@@ -15,22 +15,20 @@ import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Plus,
-  Minus,
   Sparkles,
   Share2,
   Check,
   ChevronDown,
   Maximize2,
-  X as XIcon,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { EmptyImage } from "@/components/rental/EmptyImage";
-import { IncludedList } from "@/components/rental/IncludedList";
 import { KitSection } from "@/components/rental/KitSection";
 import { KeywordChips } from "@/components/rental/KeywordChips";
+import { StepperPill } from "@/components/rental/equipment/shared/StepperPill";
+import { SpecsGrid } from "@/components/rental/equipment/shared/SpecsGrid";
+import { Lightbox } from "@/components/rental/Lightbox";
 import { backendToEquipment } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { formatARS } from "@/lib/format";
@@ -242,7 +240,7 @@ function EquipoPage() {
 
   return (
     <PublicLayout>
-      <div className="max-w-4xl mx-auto w-full px-4 md:px-6 py-6 md:py-10">
+      <div className="max-w-7xl mx-auto w-full px-4 md:px-8 py-6 md:py-10">
         <EquipmentDetailBody item={equipo} />
       </div>
     </PublicLayout>
@@ -261,7 +259,8 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const price = priceBreakdown(item.pricePerDay, jornadas, 1);
   const showPeriodTotal = hasDateRange && jornadas > 1;
   // Ficha técnica: abierta por default si son pocas specs, colapsada si hay muchas.
-  const [specsOpen, setSpecsOpen] = useState(() => (item.specs?.length ?? 0) <= 12);
+  // La ficha técnica es el corazón de la página → visible por default.
+  const [specsOpen, setSpecsOpen] = useState(true);
   const [descExpanded, setDescExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -375,16 +374,18 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
         />
       </div>
 
-      {/* Layout: 2 columnas en desktop (60/40), una sola en mobile. */}
-      <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-5 md:gap-8 md:items-start">
-        {/* ── Columna izquierda (60%): foto, destacados, descripción, ficha ── */}
-        <div className="md:col-span-3 space-y-6">
-          {/* Foto — hero image: fetchPriority alta para LCP, abre lightbox al tap */}
+      {/* Layout desktop: 2 columnas iguales — visual izquierda, técnica derecha.
+       *  Mobile: columna única, técnica primero (el cliente quiere saber specs). */}
+      <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-10 md:items-start">
+
+        {/* ── Columna izquierda: foto + kit + descripción ── */}
+        <div className="space-y-6">
+          {/* Foto hero */}
           <button
             type="button"
             onClick={() => setLightboxOpen(true)}
             disabled={!item.fotoUrl}
-            className="relative aspect-[4/3] md:aspect-[16/9] w-full overflow-hidden rounded-lg bg-white border hairline group cursor-zoom-in disabled:cursor-default"
+            className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-white border hairline group cursor-zoom-in disabled:cursor-default"
             aria-label={item.fotoUrl ? `Ver foto ampliada de ${item.name}` : item.name}
           >
             {item.fotoUrl ? (
@@ -395,7 +396,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                   loading="eager"
                   decoding="async"
                   fetchPriority="high"
-                  className="h-full w-full object-contain p-6 transition group-hover:scale-[1.01]"
+                  className="h-full w-full object-contain p-4 transition group-hover:scale-[1.01]"
                 />
                 <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink/70 text-white text-[10px] font-medium px-2 py-1 opacity-0 group-hover:opacity-100 transition pointer-events-none">
                   <Maximize2 className="h-3 w-3" /> Ampliar
@@ -406,14 +407,20 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
             )}
           </button>
 
-          {/* Specs destacados — siempre visibles, antes de la descripción */}
-          <SpecsDestacadosRow item={item} />
+          {/* Precio + agregar (desktop — en la col visual) */}
+          <div className="hidden md:flex items-center justify-between gap-3 rounded-xl border hairline bg-surface px-4 py-3">
+            <PriceBlock price={price} item={item} showPeriodTotal={showPeriodTotal} large />
+            <CartButtons
+              qty={qty}
+              sinStock={sinStock}
+              canAddMore={canAddMore}
+              onAdd={() => add(item.id)}
+              onRemove={() => remove(item.id)}
+            />
+          </div>
 
-          {/* "Incluye" (kit): qué viene con el equipo, con fotos y cantidades. */}
+          {/* "Incluye" (kit) */}
           {item.includes && item.includes.length > 0 && <KitSection item={item} />}
-
-          {/* Keywords */}
-          {item.keywords && item.keywords.length > 0 && <KeywordChips keywords={item.keywords} />}
 
           {/* Descripción */}
           {desc && (
@@ -436,29 +443,42 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
             </section>
           )}
 
-          {/* Ficha técnica — colapsable. El botón siempre visible. */}
+          {item.videoUrl && <YouTubeEmbed url={item.videoUrl} />}
+
+          {/* Keywords — al final, son SEO más que UX */}
+          {item.keywords && item.keywords.length > 0 && (
+            <KeywordChips keywords={item.keywords} className="opacity-60" />
+          )}
+        </div>
+
+        {/* ── Columna derecha: especificaciones técnicas ── */}
+        <div className="space-y-6 md:sticky md:top-20 md:max-h-[calc(100dvh-6rem)] md:overflow-y-auto md:pr-1">
+          {/* Specs clave */}
+          <SpecsGrid item={item} />
+
+          {/* Ficha técnica — abierta por default */}
           {item.specs && item.specs.length > 0 && (
-            <section className="border-t border-b hairline">
+            <section className="space-y-1">
               <button
                 type="button"
                 onClick={() => setSpecsOpen((v) => !v)}
                 aria-expanded={specsOpen}
-                className="flex w-full items-center justify-between gap-3 py-4 text-left transition hover:text-ink"
+                className="flex w-full items-center justify-between gap-3 py-1 text-left transition hover:text-ink"
               >
-                <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
                   Ficha técnica
-                  <span className="ml-2 text-ink/60">({item.specs.length})</span>
-                </span>
+                  <span className="ml-2 text-ink/40">({item.specs.length})</span>
+                </h2>
                 <ChevronDown
                   className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${specsOpen ? "rotate-180" : ""}`}
                 />
               </button>
               {specsOpen && (
-                <dl className="grid grid-cols-1 gap-x-8 sm:grid-cols-2 pb-4">
+                <dl className="border-t hairline pt-2">
                   {item.specs.map((s, i) => (
-                    <div key={i} className="flex justify-between gap-3 border-b hairline py-2">
-                      <dt className="text-sm text-muted-foreground">{s.label}</dt>
-                      <dd className="text-sm font-medium text-ink text-right whitespace-pre-line">
+                    <div key={i} className="flex justify-between gap-4 border-b hairline py-2">
+                      <dt className="text-sm text-muted-foreground shrink-0">{s.label}</dt>
+                      <dd className="text-sm font-mono tabular-nums text-ink text-right">
                         {s.value}
                       </dd>
                     </div>
@@ -468,41 +488,16 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
             </section>
           )}
 
-          {item.videoUrl && <YouTubeEmbed url={item.videoUrl} />}
-
-          {/* IncludedList: keywords + specs highlights. El kit ya se rendereó
-           *  arriba via KitSection si hay items. */}
-          <IncludedList item={item} />
+          {item.incluye && item.incluye.length > 0 && (
+            <FichaPillSection title="Incluye en la caja" items={item.incluye} />
+          )}
+          {item.conectividad && item.conectividad.length > 0 && (
+            <FichaPillSection title="Conectividad" items={item.conectividad} />
+          )}
+          {item.compatibleCon && item.compatibleCon.length > 0 && (
+            <FichaPillSection title="Compatible con" items={item.compatibleCon} />
+          )}
         </div>
-
-        {/* ── Columna derecha (40%): sticky con precio, agregar, quick facts ── */}
-        <aside className="md:col-span-2">
-          <div className="md:sticky md:top-20 space-y-6">
-            {/* Precio + agregar al carrito (desktop) */}
-            <div className="hidden md:flex items-end justify-between gap-3">
-              <PriceBlock price={price} item={item} showPeriodTotal={showPeriodTotal} large />
-              <CartButtons
-                qty={qty}
-                sinStock={sinStock}
-                canAddMore={canAddMore}
-                onAdd={() => add(item.id)}
-                onRemove={() => remove(item.id)}
-              />
-            </div>
-
-            <QuickFactsRow item={item} />
-
-            {item.incluye && item.incluye.length > 0 && (
-              <FichaPillSection title="Incluye en la caja" items={item.incluye} />
-            )}
-            {item.conectividad && item.conectividad.length > 0 && (
-              <FichaPillSection title="Conectividad" items={item.conectividad} />
-            )}
-            {item.compatibleCon && item.compatibleCon.length > 0 && (
-              <FichaPillSection title="Compatible con" items={item.compatibleCon} />
-            )}
-          </div>
-        </aside>
       </div>
 
       <Lightbox
@@ -516,28 +511,6 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   );
 }
 
-/** Specs destacados (destacado=true en el registry) como fila de pills
- *  horizontales scrolleables. Siempre visibles, antes de la descripción.
- *  Si no hay destacados, no renderiza nada. */
-function SpecsDestacadosRow({ item }: { item: Equipment }) {
-  const destacados = item.specsDestacados ?? [];
-  if (destacados.length === 0) return null;
-  return (
-    <div className="flex gap-2 overflow-x-auto snap-x pb-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
-      {destacados.map((s, i) => (
-        <div
-          key={`${s.label}-${i}`}
-          className="snap-start shrink-0 bg-surface border hairline rounded-lg px-3 py-2"
-        >
-          <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-            {s.label}
-          </div>
-          <div className="font-medium text-ink text-sm">{s.value}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function PriceBlock({
   price,
@@ -599,51 +572,16 @@ function CartButtons({
       </button>
     );
   }
+  // Stepper canónico de la librería (equipment/shared) — el único de la web.
+  // No recrear una variante ad-hoc (MEMORIA 2026-05-29).
   return (
-    <div className="flex items-center gap-1 rounded-md border border-amber/40 bg-amber-soft p-1">
-      <button
-        onClick={onRemove}
-        className="grid h-9 w-9 place-items-center rounded text-amber hover:bg-amber/20"
-        aria-label="Quitar uno"
-      >
-        <Minus className="h-4 w-4" />
-      </button>
-      <span className="w-8 text-center text-base font-semibold tabular">{qty}</span>
-      <button
-        onClick={() => canAddMore && onAdd()}
-        disabled={!canAddMore}
-        className="grid h-9 w-9 place-items-center rounded text-amber hover:bg-amber/20 disabled:opacity-40"
-        aria-label="Sumar uno"
-      >
-        <Plus className="h-4 w-4" />
-      </button>
-    </div>
-  );
-}
-
-function QuickFactsRow({ item }: { item: Equipment }) {
-  // Dinámico: usa los specs destacados del registry si hay; sino, los
-  // primeros 4 specs (ya vienen ordenados por prioridad desde el backend).
-  const facts =
-    item.specsDestacados && item.specsDestacados.length > 0
-      ? item.specsDestacados
-      : (item.specs ?? []).slice(0, 4);
-  if (facts.length === 0) return null;
-
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {facts.map((f, i) => (
-        <span
-          key={`${f.label}-${i}`}
-          className="inline-flex items-center gap-1.5 rounded-full border hairline bg-muted/30 px-2.5 py-1 text-[11px]"
-        >
-          <span className="font-mono uppercase tracking-wider text-muted-foreground">
-            {f.label}
-          </span>
-          <span className="font-medium text-ink">{f.value}</span>
-        </span>
-      ))}
-    </div>
+    <StepperPill
+      qty={qty}
+      size="lg"
+      onIncrement={() => onAdd()}
+      onDecrement={() => onRemove()}
+      maxReached={!canAddMore}
+    />
   );
 }
 
@@ -706,143 +644,3 @@ function YouTubeEmbed({ url }: { url: string }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Lightbox — visor de fotos con zoom táctil y nav entre componentes del kit
-// ─────────────────────────────────────────────────────────────────────────
-
-function Lightbox({
-  open,
-  onClose,
-  photos,
-  index,
-  onIndexChange,
-}: {
-  open: boolean;
-  onClose: () => void;
-  photos: Array<{ url: string; alt: string }>;
-  index: number;
-  onIndexChange: (i: number) => void;
-}) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "ArrowLeft" && index > 0) onIndexChange(index - 1);
-      if (e.key === "ArrowRight" && index < photos.length - 1) onIndexChange(index + 1);
-    };
-    window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, index, photos.length, onClose, onIndexChange]);
-
-  if (!open || photos.length === 0) return null;
-  const current = photos[Math.min(index, photos.length - 1)];
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] bg-black/95 flex flex-col"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
-      <header className="flex items-center justify-between px-3 sm:px-4 py-3 shrink-0 text-white/90">
-        <span className="font-mono text-xs tabular-nums">
-          {photos.length > 1 ? `${index + 1} / ${photos.length}` : ""}
-        </span>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 transition"
-          aria-label="Cerrar"
-        >
-          <XIcon className="h-5 w-5" />
-        </button>
-      </header>
-
-      {/* Imagen — pinch-zoom nativo en mobile (touch-action: pinch-zoom). */}
-      <div
-        className="flex-1 flex items-center justify-center overflow-auto px-2"
-        onClick={(e) => e.stopPropagation()}
-        style={{ touchAction: "pinch-zoom" }}
-      >
-        <img
-          src={current.url}
-          alt={current.alt}
-          loading="eager"
-          decoding="async"
-          className="max-h-full max-w-full object-contain select-none"
-          draggable={false}
-        />
-      </div>
-
-      <div
-        className="px-4 py-2 text-center text-white/80 text-xs sm:text-sm shrink-0"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {current.alt}
-      </div>
-
-      {photos.length > 1 && (
-        <>
-          {index > 0 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onIndexChange(index - 1);
-              }}
-              className="hidden sm:grid absolute left-3 top-1/2 -translate-y-1/2 h-12 w-12 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
-              aria-label="Foto anterior"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
-          )}
-          {index < photos.length - 1 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onIndexChange(index + 1);
-              }}
-              className="hidden sm:grid absolute right-3 top-1/2 -translate-y-1/2 h-12 w-12 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
-              aria-label="Foto siguiente"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </button>
-          )}
-
-          <div
-            className="shrink-0 flex gap-1.5 overflow-x-auto px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {photos.map((p, i) => (
-              <button
-                key={`${p.url}-${i}`}
-                type="button"
-                onClick={() => onIndexChange(i)}
-                className={`h-14 w-14 shrink-0 rounded-md overflow-hidden border-2 transition ${
-                  i === index ? "border-amber" : "border-transparent opacity-60 hover:opacity-100"
-                }`}
-                aria-label={`Ver ${p.alt}`}
-              >
-                <img
-                  src={p.url}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  className="h-full w-full object-cover bg-white"
-                />
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
