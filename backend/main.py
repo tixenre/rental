@@ -4,6 +4,7 @@ Run: uvicorn main:app --reload --port 8000
 """
 
 import logging
+import os
 import threading
 import uuid
 from pathlib import Path
