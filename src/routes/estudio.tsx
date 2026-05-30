@@ -55,8 +55,7 @@ const Grain = ({ opacity = 12 }: { opacity?: number }) => (
   <div
     className="pointer-events-none absolute inset-0"
     style={{
-      backgroundImage:
-        "radial-gradient(circle, oklch(0.85 0 0 / 12%) 1px, transparent 1px)",
+      backgroundImage: "radial-gradient(circle, oklch(0.85 0 0 / 12%) 1px, transparent 1px)",
       backgroundSize: "5px 5px",
       opacity: opacity / 100,
     }}
@@ -149,7 +148,13 @@ function DragGallery({ photos }: { photos: Photo[] }) {
         onClick={() => scrollBy(-1)}
         disabled={!canPrev}
         aria-label="Foto anterior"
-        className={cn(arrowCls, "left-3", canPrev ? "hover:bg-ink hover:text-amber hover:border-ink" : "opacity-0 pointer-events-none")}
+        className={cn(
+          arrowCls,
+          "left-3",
+          canPrev
+            ? "hover:bg-ink hover:text-amber hover:border-ink"
+            : "opacity-0 pointer-events-none",
+        )}
       >
         <ArrowLeft className="h-4 w-4" />
       </button>
@@ -158,7 +163,13 @@ function DragGallery({ photos }: { photos: Photo[] }) {
         onClick={() => scrollBy(1)}
         disabled={!canNext}
         aria-label="Foto siguiente"
-        className={cn(arrowCls, "right-3", canNext ? "hover:bg-ink hover:text-amber hover:border-ink" : "opacity-0 pointer-events-none")}
+        className={cn(
+          arrowCls,
+          "right-3",
+          canNext
+            ? "hover:bg-ink hover:text-amber hover:border-ink"
+            : "opacity-0 pointer-events-none",
+        )}
       >
         <ArrowRight className="h-4 w-4" />
       </button>
@@ -172,10 +183,9 @@ function MobileBookBar({ priceLabel }: { priceLabel: string }) {
   useEffect(() => {
     const target = document.getElementById("reservar");
     if (!target) return;
-    const obs = new IntersectionObserver(
-      (entries) => setHidden(entries[0].isIntersecting),
-      { threshold: 0 },
-    );
+    const obs = new IntersectionObserver((entries) => setHidden(entries[0].isIntersecting), {
+      threshold: 0,
+    });
     obs.observe(target);
     return () => obs.disconnect();
   }, []);
@@ -261,7 +271,9 @@ function EstudioPage() {
   const heroPhoto = photos.find((p) => p.hero) ?? photos[0];
   const galleryPhotos = photos.filter((p) => !p.hero);
   const cicloramaPhoto =
-    photos.find((p) => p.ciclorama) ?? photos.find((p) => p.alt?.toLowerCase().includes("ciclo")) ?? photos[2];
+    photos.find((p) => p.ciclorama) ??
+    photos.find((p) => p.alt?.toLowerCase().includes("ciclo")) ??
+    photos[2];
 
   const [withPack, setWithPack] = useState(false);
 
@@ -277,7 +289,14 @@ function EstudioPage() {
         </Link>
         <div className="absolute left-1/2 -translate-x-1/2">
           <Link to="/" aria-label="Rambla Rental">
-            <img src="/wordmark.svg" alt="Rambla Rental" className="h-[17px] block" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            <img
+              src="/wordmark.svg"
+              alt="Rambla Rental"
+              className="h-[17px] block"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
             <span className="wordmark text-xl leading-none font-black sr-only">rambla</span>
           </Link>
         </div>
@@ -418,10 +437,7 @@ function EstudioPage() {
               </h2>
               <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {visibles.map((f) => (
-                  <div
-                    key={f.label}
-                    className="rounded-xl border hairline bg-background p-3.5"
-                  >
+                  <div key={f.label} className="rounded-xl border hairline bg-background p-3.5">
                     <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground mb-1">
                       {f.label}
                     </div>
