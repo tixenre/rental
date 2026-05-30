@@ -315,7 +315,7 @@ async def admin_upload_marca_logo(marca_id: int, request: Request):
     require_admin(request)
 
     # Import lazy para evitar ciclo entre marcas.py ↔ equipos.py
-    from routes.equipos import _optimize_image, _ext_from_ctype, _upload_to_r2
+    from services.image_upload import _optimize_image, _ext_from_ctype, _upload_to_r2
 
     conn = get_db()
     try:

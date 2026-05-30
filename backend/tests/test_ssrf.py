@@ -1,4 +1,7 @@
-"""Tests del allowlist anti-SSRF en routes/equipos.py.
+"""Tests del allowlist anti-SSRF — vive en services/image_upload.py.
+
+(Extraído de routes/equipos.py en #501 Fase 3; el modelo del endpoint
+`UploadFotoFromUrlInput` sigue en routes/equipos.)
 
 Cubre el fix de seguridad de PR #38 / issue #55 (BUGS.md):
 - Allowlist de hosts conocidos.
@@ -18,15 +21,15 @@ import socket
 import pytest
 from fastapi import HTTPException
 
-from routes import equipos
-from routes.equipos import (
+from services import image_upload
+from services.image_upload import (
     _is_photo_host_allowed,
     _validate_external_image_url,
     _validate_image_url_static,
     _resolve_to_public_ip,
     _download_with_redirects,
-    UploadFotoFromUrlInput,
 )
+from routes.equipos import UploadFotoFromUrlInput
 
 
 pytestmark = pytest.mark.unit
@@ -64,7 +67,7 @@ class TestValidateExternalImageUrl:
     def test_http_no_https_pasa(self, monkeypatch):
         # http es válido (allowlist + IP check)
         monkeypatch.setattr(
-            "routes.equipos._host_resolves_to_private", lambda h: False
+            "services.image_upload._host_resolves_to_private", lambda h: False
         )
         # No debería tirar
         _validate_external_image_url("https://www.bhphotovideo.com/imagen.jpg")
@@ -88,7 +91,7 @@ class TestValidateExternalImageUrl:
 
     def test_puerto_8080_rechaza(self, monkeypatch):
         monkeypatch.setattr(
-            "routes.equipos._host_resolves_to_private", lambda h: False
+            "services.image_upload._host_resolves_to_private", lambda h: False
         )
         with pytest.raises(HTTPException) as exc:
             _validate_external_image_url("https://www.bhphotovideo.com:8080/img.jpg")
@@ -97,13 +100,13 @@ class TestValidateExternalImageUrl:
 
     def test_puerto_443_pasa(self, monkeypatch):
         monkeypatch.setattr(
-            "routes.equipos._host_resolves_to_private", lambda h: False
+            "services.image_upload._host_resolves_to_private", lambda h: False
         )
         _validate_external_image_url("https://www.bhphotovideo.com:443/img.jpg")
 
     def test_host_no_allowlist_rechaza(self, monkeypatch):
         monkeypatch.setattr(
-            "routes.equipos._host_resolves_to_private", lambda h: False
+            "services.image_upload._host_resolves_to_private", lambda h: False
         )
         with pytest.raises(HTTPException) as exc:
             _validate_external_image_url("https://evil.attacker.com/exfil.jpg")
@@ -112,7 +115,7 @@ class TestValidateExternalImageUrl:
     def test_host_resuelve_a_ip_privada_rechaza(self, monkeypatch):
         # Aunque esté en allowlist (defense-in-depth), si resuelve a IP privada → 403
         monkeypatch.setattr(
-            "routes.equipos._host_resolves_to_private", lambda h: True
+            "services.image_upload._host_resolves_to_private", lambda h: True
         )
         with pytest.raises(HTTPException) as exc:
             _validate_external_image_url("https://www.bhphotovideo.com/img.jpg")
@@ -209,9 +212,9 @@ class TestDownloadWithRedirects:
     """El loop de redirects re-valida cada salto y pinea el DNS en cada uno."""
 
     def test_200_directo_devuelve_body(self, monkeypatch):
-        monkeypatch.setattr(equipos, "_resolve_to_public_ip", lambda h: "1.2.3.4")
+        monkeypatch.setattr(image_upload, "_resolve_to_public_ip", lambda h: "1.2.3.4")
         monkeypatch.setattr(
-            equipos, "_http_get_pinned",
+            image_upload, "_http_get_pinned",
             lambda url, ip, headers, timeout=20.0: (200, {"content-type": "image/jpeg"}, b"x" * 2000),
         )
         status, headers, body = _download_with_redirects("https://www.bhphotovideo.com/a.jpg", {})
@@ -221,9 +224,9 @@ class TestDownloadWithRedirects:
     def test_redirect_a_metadata_bloqueado(self, monkeypatch):
         # 1er salto: host OK → 302 hacia la IP de metadata. El 2do salto NO está
         # en allowlist → _validate_image_url_static rechaza con 403.
-        monkeypatch.setattr(equipos, "_resolve_to_public_ip", lambda h: "1.2.3.4")
+        monkeypatch.setattr(image_upload, "_resolve_to_public_ip", lambda h: "1.2.3.4")
         monkeypatch.setattr(
-            equipos, "_http_get_pinned",
+            image_upload, "_http_get_pinned",
             lambda url, ip, headers, timeout=20.0: (
                 302, {"location": "http://169.254.169.254/latest/meta-data/"}, b"",
             ),
@@ -248,14 +251,14 @@ class TestDownloadWithRedirects:
                 raise HTTPException(403, "Host resuelve a IP privada/interna")
             return "1.2.3.4"
 
-        monkeypatch.setattr(equipos, "_http_get_pinned", _get)
-        monkeypatch.setattr(equipos, "_resolve_to_public_ip", _resolve)
+        monkeypatch.setattr(image_upload, "_http_get_pinned", _get)
+        monkeypatch.setattr(image_upload, "_resolve_to_public_ip", _resolve)
         with pytest.raises(HTTPException) as exc:
             _download_with_redirects("https://www.bhphotovideo.com/a.jpg", {})
         assert exc.value.status_code == 403
 
     def test_redirect_chain_legitimo_pasa(self, monkeypatch):
-        monkeypatch.setattr(equipos, "_resolve_to_public_ip", lambda h: "1.2.3.4")
+        monkeypatch.setattr(image_upload, "_resolve_to_public_ip", lambda h: "1.2.3.4")
         calls = {"n": 0}
 
         def _get(url, ip, headers, timeout=20.0):
@@ -264,15 +267,15 @@ class TestDownloadWithRedirects:
                 return (302, {"location": "https://www.bhphotovideo.com/next.jpg"}, b"")
             return (200, {"content-type": "image/jpeg"}, b"x" * 2000)
 
-        monkeypatch.setattr(equipos, "_http_get_pinned", _get)
+        monkeypatch.setattr(image_upload, "_http_get_pinned", _get)
         status, _, body = _download_with_redirects("https://www.bhphotovideo.com/a.jpg", {})
         assert status == 200
         assert calls["n"] == 3
 
     def test_demasiados_redirects_corta(self, monkeypatch):
-        monkeypatch.setattr(equipos, "_resolve_to_public_ip", lambda h: "1.2.3.4")
+        monkeypatch.setattr(image_upload, "_resolve_to_public_ip", lambda h: "1.2.3.4")
         monkeypatch.setattr(
-            equipos, "_http_get_pinned",
+            image_upload, "_http_get_pinned",
             lambda url, ip, headers, timeout=20.0: (
                 302, {"location": "https://www.bhphotovideo.com/loop.jpg"}, b"",
             ),

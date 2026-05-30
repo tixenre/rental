@@ -560,7 +560,7 @@ async def upload_logo(request: Request):
     # Path FIJO — R2 sobreescribe.
     path = f"branding/logo.{ext}"
 
-    from routes.equipos import _upload_to_r2
+    from services.image_upload import _upload_to_r2
     public_url = _upload_to_r2(path, content, ctype)
 
     # Cache buster: cada upload genera un ?v=<timestamp> distinto. El
@@ -613,7 +613,7 @@ async def upload_og_image(request: Request):
 
     path = f"branding/og-image.{ext}"
 
-    from routes.equipos import _upload_to_r2
+    from services.image_upload import _upload_to_r2
     public_url = _upload_to_r2(path, content, ctype)
 
     import time as _time
