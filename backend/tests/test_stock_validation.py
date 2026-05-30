@@ -18,7 +18,7 @@ El bug de doble booking que motivó estos tests:
 
 import pytest
 
-from routes.alquileres import _check_stock, ESTADOS_RESERVADO
+from reservas import ESTADOS_RESERVADO, validar_stock as _check_stock
 from routes.equipos import _crea_ciclo_kit
 
 
@@ -280,34 +280,34 @@ class TestCheckStockMantenimiento:
 
 class TestBuffer:
     def test_rango_sin_buffer_no_cambia(self):
-        from routes.alquileres import _rango_con_buffer
+        from reservas import rango_con_buffer as _rango_con_buffer
         assert _rango_con_buffer("2026-06-01", "2026-06-05", 0) == ("2026-06-01", "2026-06-05")
 
     def test_rango_con_buffer_expande_por_horas(self):
-        from routes.alquileres import _rango_con_buffer
+        from reservas import rango_con_buffer as _rango_con_buffer
         # 48 horas = 2 días, sin truncar a día → datetime ISO completo.
         assert _rango_con_buffer("2026-06-10", "2026-06-15", 48) == (
             "2026-06-08T00:00:00", "2026-06-17T00:00:00",
         )
 
     def test_rango_con_buffer_respeta_la_hora(self):
-        from routes.alquileres import _rango_con_buffer
+        from reservas import rango_con_buffer as _rango_con_buffer
         # Con hora de retiro/devolución, el buffer expande hora-exacto.
         assert _rango_con_buffer("2026-06-10T10:00:00", "2026-06-15T18:00:00", 6) == (
             "2026-06-10T04:00:00", "2026-06-16T00:00:00",
         )
 
     def test_rango_buffer_fecha_invalida_devuelve_original(self):
-        from routes.alquileres import _rango_con_buffer
+        from reservas import rango_con_buffer as _rango_con_buffer
         assert _rango_con_buffer("", "", 3) == ("", "")
 
     def test_get_buffer_horas_default_cero(self):
-        from routes.alquileres import _get_buffer_horas
+        from reservas import get_buffer_horas as _get_buffer_horas
         conn = StockFakeConn(equipos={}, buffer_horas=0)
         assert _get_buffer_horas(conn) == 0
 
     def test_get_buffer_horas_lee_setting(self):
-        from routes.alquileres import _get_buffer_horas
+        from reservas import get_buffer_horas as _get_buffer_horas
         conn = StockFakeConn(equipos={}, buffer_horas=12)
         assert _get_buffer_horas(conn) == 12
 
@@ -428,12 +428,12 @@ class DiasFakeConn:
 
 class TestDiasNoDisponibles:
     def test_sin_reservas_nada_bloqueado(self):
-        from routes.alquileres import _dias_no_disponibles
+        from reservas import dias_no_disponibles as _dias_no_disponibles
         conn = DiasFakeConn(stock={1: 2})
         assert _dias_no_disponibles(conn, {1: 1}, "2026-06-01", "2026-06-05") == []
 
     def test_reserva_unica_bloquea_su_dia(self):
-        from routes.alquileres import _dias_no_disponibles
+        from reservas import dias_no_disponibles as _dias_no_disponibles
         # Stock 1, reservado 1 el 03 (03→04) → el 03 queda sin stock.
         conn = DiasFakeConn(
             stock={1: 1},
@@ -444,7 +444,7 @@ class TestDiasNoDisponibles:
         assert "2026-06-01" not in res
 
     def test_stock_suficiente_no_bloquea(self):
-        from routes.alquileres import _dias_no_disponibles
+        from reservas import dias_no_disponibles as _dias_no_disponibles
         # Stock 2, reservado 1 → queda 1 libre, alcanza para qty 1.
         conn = DiasFakeConn(
             stock={1: 2},
@@ -453,7 +453,7 @@ class TestDiasNoDisponibles:
         assert _dias_no_disponibles(conn, {1: 1}, "2026-06-01", "2026-06-05") == []
 
     def test_cantidad_pedida_mayor_a_libre_bloquea(self):
-        from routes.alquileres import _dias_no_disponibles
+        from reservas import dias_no_disponibles as _dias_no_disponibles
         # Stock 2, reservado 1, pido 2 → 1 libre < 2 → bloqueado el 03.
         conn = DiasFakeConn(
             stock={1: 2},
@@ -462,7 +462,7 @@ class TestDiasNoDisponibles:
         assert "2026-06-03" in _dias_no_disponibles(conn, {1: 2}, "2026-06-01", "2026-06-05")
 
     def test_buffer_expande_bloqueo_a_dias_adyacentes(self):
-        from routes.alquileres import _dias_no_disponibles
+        from reservas import dias_no_disponibles as _dias_no_disponibles
         # Buffer 24h: una reserva el 03 bloquea también 02 y 04.
         conn = DiasFakeConn(
             stock={1: 1},
@@ -473,7 +473,7 @@ class TestDiasNoDisponibles:
         assert "2026-06-02" in res and "2026-06-04" in res
 
     def test_mantenimiento_bloquea(self):
-        from routes.alquileres import _dias_no_disponibles
+        from reservas import dias_no_disponibles as _dias_no_disponibles
         conn = DiasFakeConn(
             stock={1: 1},
             mant=[(1, "2026-06-02T00:00:00", "2026-06-03T00:00:00", 1)],

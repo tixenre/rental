@@ -13,13 +13,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 from net_utils import get_client_ip
+from config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # ── Config ──────────────────────────────────────────────────────────────────
 
-SECRET_KEY = os.getenv("SECRET_KEY", "")
+SECRET_KEY = settings.SECRET_KEY
 if not SECRET_KEY:
     raise RuntimeError(
         "SECRET_KEY no configurada — generá una con: "
@@ -34,7 +35,7 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 # / CLIENTE_REDIRECT_URI tienen prioridad — si están seteadas se respetan
 # tal cual (útil para staging u otros entornos custom).
 def _default_oauth_base() -> str:
-    if os.getenv("RAILWAY_ENVIRONMENT"):
+    if settings.is_railway:
         return "https://ramblarental.up.railway.app"
     return "http://localhost:8000"
 
@@ -51,11 +52,22 @@ ALLOWED_EMAILS: set[str] = {
     if e.strip()
 }
 
-COOKIE_SECURE = (
-    os.getenv("RAILWAY_ENVIRONMENT") is not None
-    or os.getenv("COOKIE_SECURE", "").lower() == "true"
-)
+COOKIE_SECURE = settings.cookie_secure
 SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 días
+
+
+def dev_bypass_enabled() -> bool:
+    """¿Está activo el bypass de auth de dev (ADMIN_BYPASS_AUTH)?
+
+    Seguridad (#503): NUNCA en producción. Aunque `ADMIN_BYPASS_AUTH` quede
+    seteada por error en Railway, en un entorno Railway se ignora — el bypass
+    es imposible de cara al público (no depende de verificar la config a mano).
+    Fuente única usada por `require_admin`, `/auth/dev-login` y `/auth/config`.
+    """
+    if os.getenv("RAILWAY_ENVIRONMENT"):
+        return False
+    return os.getenv("ADMIN_BYPASS_AUTH", "").strip().lower() in ("1", "true", "yes")
+
 
 GOOGLE_AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -247,7 +259,7 @@ def auth_callback(request: Request):
 
 @router.get("/auth/config")
 def auth_config():
-    dev_mode = os.getenv("ADMIN_BYPASS_AUTH", "").strip() in ("1", "true", "yes")
+    dev_mode = dev_bypass_enabled()
     return {
         "google_enabled": bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET),
         "dev_mode": dev_mode,
@@ -256,8 +268,8 @@ def auth_config():
 
 @router.get("/auth/dev-login")
 def auth_dev_login():
-    """Login directo sin OAuth — solo funciona con ADMIN_BYPASS_AUTH=1."""
-    if os.getenv("ADMIN_BYPASS_AUTH", "").strip() not in ("1", "true", "yes"):
+    """Login directo sin OAuth — solo en dev (ADMIN_BYPASS_AUTH=1, nunca en prod)."""
+    if not dev_bypass_enabled():
         raise HTTPException(403, "Solo disponible en modo desarrollo.")
     return _make_session_response(
         email="dev@local",

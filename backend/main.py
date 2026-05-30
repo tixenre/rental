@@ -4,7 +4,6 @@ Run: uvicorn main:app --reload --port 8000
 """
 
 import logging
-import os
 import threading
 import uuid
 from pathlib import Path
@@ -23,9 +22,11 @@ from slowapi.errors import RateLimitExceeded
 from logging_config import setup_logging, request_id_var
 setup_logging()
 
+from config import settings
+
 # ── Sentry (error tracking) ──────────────────────────────────────────────────
 # Solo activo si SENTRY_DSN está seteado — dev/CI no lo necesitan.
-_sentry_dsn = os.environ.get("SENTRY_DSN")
+_sentry_dsn = settings.SENTRY_DSN
 if _sentry_dsn:
     import sentry_sdk
     from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -34,7 +35,7 @@ if _sentry_dsn:
         dsn=_sentry_dsn,
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=0.1,
-        environment=os.environ.get("RAILWAY_ENVIRONMENT", "production"),
+        environment=settings.RAILWAY_ENVIRONMENT or "production",
         send_default_pii=False,
     )
 
@@ -87,12 +88,19 @@ async def request_id_middleware(request: Request, call_next):
         request_id_var.reset(token)
 
 # Orígenes permitidos para CORS con credenciales (cookie de sesión).
-ALLOWED_ORIGINS = [
-    o.strip() for o in os.getenv(
-        "FRONTEND_ORIGINS",
-        "http://localhost:5173,http://localhost:8000",
-    ).split(",") if o.strip()
-]
+ALLOWED_ORIGINS = settings.frontend_origins
+
+# Hardening pre-launch (#503): CORS con credenciales + localhost/wildcard en
+# prod es peligroso. No rompemos el boot (puede haber un caso legítimo), pero
+# lo gritamos fuerte en los logs (lo levanta Sentry) para que no pase callado.
+if os.getenv("RAILWAY_ENVIRONMENT"):
+    _inseguros = [o for o in ALLOWED_ORIGINS if "localhost" in o or "127.0.0.1" in o or o == "*"]
+    if _inseguros:
+        logger.error(
+            "CORS inseguro en producción: FRONTEND_ORIGINS incluye %s. "
+            "Revisá la env var en Railway (no debe tener localhost ni '*').",
+            _inseguros,
+        )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)

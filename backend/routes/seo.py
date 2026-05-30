@@ -14,10 +14,11 @@ NO incluye:
 
 from __future__ import annotations
 
-import os
 import re
 import unicodedata
 from datetime import datetime
+
+from config import SITE_URL  # URL pública del sitio (fuente única)
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Response
@@ -54,10 +55,6 @@ def _build_categoria_slug(nombre: str | None) -> str:
     normalized = unicodedata.normalize("NFD", nombre)
     no_accents = normalized.encode("ascii", "ignore").decode("ascii")
     return re.sub(r"[^a-z0-9]+", "-", no_accents.lower()).strip("-")
-
-# URL pública del sitio. Override con env var SITE_URL si se cambia el dominio.
-SITE_URL = os.getenv("SITE_URL", "https://ramblarental.com").rstrip("/")
-
 
 @router.get("/sitemap.xml", include_in_schema=False)
 def sitemap():

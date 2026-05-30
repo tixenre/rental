@@ -12,15 +12,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import {
-  ArrowLeft,
-  Plus,
-  Sparkles,
-  Share2,
-  Check,
-  ChevronDown,
-  Maximize2,
-} from "lucide-react";
+import { ArrowLeft, Plus, Sparkles, Share2, Check, ChevronDown, Maximize2 } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { EmptyImage } from "@/components/rental/EmptyImage";
@@ -377,7 +369,6 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
       {/* Layout desktop: 2 columnas iguales — visual izquierda, técnica derecha.
        *  Mobile: columna única, técnica primero (el cliente quiere saber specs). */}
       <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-10 md:items-start">
-
         {/* ── Columna izquierda: foto + kit + descripción ── */}
         <div className="space-y-6">
           {/* Foto hero */}
@@ -511,7 +502,6 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   );
 }
 
-
 function PriceBlock({
   price,
   item,
@@ -642,4 +632,3 @@ function YouTubeEmbed({ url }: { url: string }) {
     </section>
   );
 }
-

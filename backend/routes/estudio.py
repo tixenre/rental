@@ -12,15 +12,14 @@ from pydantic import BaseModel
 
 from admin_guard import require_admin
 from database import MARCA_SUBQUERY, get_db, now_ar, to_datetime
+from reservas import ESTADOS_RESERVADO, validar_stock as _check_stock
 from routes.alquileres import (
-    ESTADOS_RESERVADO,
-    _check_stock,
     _dispatch_pedido_creado_emails,
     _get_alquiler_detail,
     _next_numero_pedido,
     get_disponibilidad,
 )
-from routes.equipos import (
+from services.image_upload import (
     _download_image_bytes,
     _ext_from_ctype,
     _optimize_image,
