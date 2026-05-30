@@ -29,9 +29,7 @@ let chromium, devices;
 try {
   ({ chromium, devices } = await import("@playwright/test"));
 } catch {
-  console.error(
-    "✗ No encuentro @playwright/test. Corré `npm install` en la raíz del repo.",
-  );
+  console.error("✗ No encuentro @playwright/test. Corré `npm install` en la raíz del repo.");
   process.exit(2);
 }
 
@@ -40,7 +38,9 @@ const BASE_URL = process.env.VER_HTML_BASE_URL || "http://localhost:3000";
 // ── parse args ───────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
 if (argv.length === 0 || argv[0].startsWith("--")) {
-  console.error("Uso: node render.mjs <target> [--mobile|--desktop] [--fold] [--selector <sel>] [--wait <ms>] [--out <path>]");
+  console.error(
+    "Uso: node render.mjs <target> [--mobile|--desktop] [--fold] [--selector <sel>] [--wait <ms>] [--out <path>]",
+  );
   process.exit(2);
 }
 const target = argv[0];
@@ -77,8 +77,7 @@ function toUrl(t) {
 
 const url = toUrl(target);
 const viewport = opts.mobile ? "mobile" : "desktop";
-const out =
-  opts.out || `/tmp/ver-html-${Date.now()}-${viewport}.png`;
+const out = opts.out || `/tmp/ver-html-${Date.now()}-${viewport}.png`;
 
 // ── render ─────────────────────────────────────────────────────────────────────
 let browser;
