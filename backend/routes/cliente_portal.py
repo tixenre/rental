@@ -616,9 +616,13 @@ def _check_stock_hipotetico(
     Excluye el pedido actual del cálculo de reservas existentes (sus items
     actuales no compiten con los propuestos para el mismo rango).
     """
-    from routes.alquileres import (
-        ESTADOS_RESERVADO, _consolidar_items_por_equipo,
-        _get_buffer_horas, _rango_con_buffer, _unidades_en_mantenimiento,
+    from reservas import (
+        consolidar_items_por_equipo as _consolidar_items_por_equipo,
+        get_buffer_horas as _get_buffer_horas,
+        rango_con_buffer as _rango_con_buffer,
+        reservado_directo as _reservado_directo,
+        reservado_via_kit as _reservado_via_kit,
+        unidades_en_mantenimiento as _unidades_en_mantenimiento,
     )
     if not items or not fecha_desde or not fecha_hasta:
         return []
@@ -656,16 +660,15 @@ def _check_stock_hipotetico(
             problemas.append(f"{it['nombre']} (no encontrado)")
             continue
         stock_total = lock["cantidad"]
-        reservado = conn.execute(f"""
-            SELECT COALESCE(SUM(pi2.cantidad), 0)
-            FROM alquiler_items pi2
-            JOIN alquileres p ON p.id = pi2.pedido_id
-            WHERE pi2.equipo_id = ?
-              AND p.id != ?
-              AND p.estado IN {ESTADOS_RESERVADO}
-              AND p.fecha_desde < ?
-              AND p.fecha_hasta > ?
-        """, (it["equipo_id"], pedido_id, fh_buf, fd_buf)).fetchone()[0]
+        # Reserva = directa + vía-kit (mismos helpers compartidos que el gate real
+        # `_check_stock`). Antes este chequeo hipotético solo contaba la directa y
+        # NO la vía-kit → undercount: podía aceptar una propuesta que el gate luego
+        # rechazaba. Ahora ambos cuentan lo mismo. El lock FOR UPDATE de arriba se
+        # mantiene (este chequeo corre dentro de la transacción del caller).
+        reservado = (
+            _reservado_directo(conn, it["equipo_id"], pedido_id, fh_buf, fd_buf)
+            + _reservado_via_kit(conn, it["equipo_id"], pedido_id, fh_buf, fd_buf)
+        )
         en_mantenimiento = _unidades_en_mantenimiento(
             conn, it["equipo_id"], fecha_desde, fecha_hasta
         )
@@ -740,8 +743,9 @@ def cliente_modificar_pedido(
     - En `confirmado`: guarda `solicitudes_modificacion` con `cambios_json`
       y dispara email al admin. El pedido no se toca.
     """
+    from reservas import validar_stock as _check_stock
     from routes.alquileres import (
-        PedidoDatos, _apply_pedido_datos, _apply_pedido_items, _check_stock,
+        PedidoDatos, _apply_pedido_datos, _apply_pedido_items,
         _get_alquiler_detail,
     )
 
@@ -1124,8 +1128,9 @@ def admin_responder_solicitud(
       aplica los cambios al pedido reusando los helpers de `routes/alquileres`.
     - Si `estado='rechazada'`, sólo marca y notifica.
     """
+    from reservas import validar_stock as _check_stock
     from routes.alquileres import (
-        PedidoDatos, _apply_pedido_datos, _apply_pedido_items, _check_stock,
+        PedidoDatos, _apply_pedido_datos, _apply_pedido_items,
     )
 
     admin = require_admin(request)

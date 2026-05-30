@@ -21,6 +21,7 @@ from database import (
     attach_ficha, attach_specs_destacados, attach_specs_estructuradas,
     regenerate_auto_tags, MARCA_SUBQUERY,
 )
+from reservas import ESTADOS_RESERVADO, calcular_disponibilidad
 from routes.auth import get_session
 from admin_guard import require_admin
 from services.nombre_service import actualizar_nombres_de
@@ -530,47 +531,21 @@ def equipos_kpis(request: Request):
 
 # ── Rutas de equipos ─────────────────────────────────────────────────────────
 
-ESTADOS_RESERVADO = "('presupuesto','confirmado','retirado')"
-
 
 def _attach_disponibilidad(conn, equipos: list, desde: str, hasta: str) -> list:
-    """Calcula disponibilidad real por equipo e inyecta el campo `disponible`."""
-    directas = conn.execute(f"""
-        SELECT e.id, e.cantidad,
-               COALESCE(SUM(CASE
-                 WHEN p.estado IN {ESTADOS_RESERVADO}
-                      AND p.fecha_desde < ?
-                      AND p.fecha_hasta > ?
-                 THEN pi.cantidad ELSE 0
-               END), 0) AS reservado
-        FROM equipos e
-        LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
-        LEFT JOIN alquileres p ON p.id = pi.pedido_id
-        GROUP BY e.id
-    """, (hasta, desde)).fetchall()
+    """Inyecta el campo `disponible` por equipo, usando la fuente única de
+    lectura del motor (`reservas.calcular_disponibilidad`).
 
-    reservado = {r["id"]: r["reservado"] for r in directas}
-    cantidad  = {r["id"]: r["cantidad"]  for r in directas}
-
-    via_kit = conn.execute(f"""
-        SELECT kc.componente_id,
-               SUM(pi.cantidad * kc.cantidad) AS extra
-        FROM kit_componentes kc
-        JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
-        JOIN alquileres p ON p.id = pi.pedido_id
-        WHERE p.estado IN {ESTADOS_RESERVADO}
-          AND p.fecha_desde < ?
-          AND p.fecha_hasta > ?
-        GROUP BY kc.componente_id
-    """, (hasta, desde)).fetchall()
-
-    for r in via_kit:
-        reservado[r["componente_id"]] = reservado.get(r["componente_id"], 0) + r["extra"]
-
+    Antes esta función tenía su propia query (directas + vía kit) que NO restaba
+    mantenimiento ni aplicaba buffer → mostraba disponibilidad inflada respecto
+    del gate real (bug #619). Ahora delega en el motor, así el catálogo refleja
+    exactamente lo mismo que el chequeo de confirmación."""
+    disp = calcular_disponibilidad(conn, desde, hasta)
     for eq in equipos:
         eid = eq["id"]
-        eq["disponible"] = max(0, cantidad.get(eid, eq.get("cantidad", 0)) - reservado.get(eid, 0))
-
+        # `calcular_disponibilidad` indexa por str(equipo_id); fallback al stock
+        # propio si el equipo no aparece (ej. equipo nuevo sin filas asociadas).
+        eq["disponible"] = disp.get(str(eid), eq.get("cantidad", 0))
     return equipos
 
 
@@ -2784,8 +2759,6 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
         first_day       = _date(year, month, 1).isoformat()
         last_day        = _date(year, month, days_in_month).isoformat()
 
-        ESTADOS = "('presupuesto','confirmado','retirado')"
-
         # Direct reservations that overlap this month
         directas = conn.execute(f"""
             SELECT to_char(p.fecha_desde, 'YYYY-MM-DD') AS desde,
@@ -2794,7 +2767,7 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
             FROM alquiler_items pi
             JOIN alquileres p ON p.id = pi.pedido_id
             WHERE pi.equipo_id = ?
-              AND p.estado IN {ESTADOS}
+              AND p.estado IN {ESTADOS_RESERVADO}
               AND p.fecha_desde::date <= ?
               AND p.fecha_hasta::date > ?
         """, (id, last_day, first_day)).fetchall()
@@ -2808,7 +2781,7 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
             JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
             JOIN alquileres p ON p.id = pi.pedido_id
             WHERE kc.componente_id = ?
-              AND p.estado IN {ESTADOS}
+              AND p.estado IN {ESTADOS_RESERVADO}
               AND p.fecha_desde::date <= ?
               AND p.fecha_hasta::date > ?
         """, (id, last_day, first_day)).fetchall()
