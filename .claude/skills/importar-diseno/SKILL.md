@@ -20,6 +20,10 @@ un entorno de proyecto con filesystem. Trabaja la UI en HTML y la traduce a TSX.
 > Le estás recibiendo una **especificación visual ejecutable + un borrador de implementación**.
 > Tu trabajo es completar el borrador y conectar la lógica real.
 
+> **Contraparte (lado Claude Design).** El formato exacto que Claude Design debe entregar está en
+> [`INSTRUCCIONES_CLAUDE_DESIGN.md`](./INSTRUCCIONES_CLAUDE_DESIGN.md) — es el contrato de entrega
+> que se le pasa a Claude Design. El bundle cae en `docs/handoffs/<feature>/`.
+
 ## Reglas de oro (no negociables)
 
 1. **El TSX manda.** Si el `.html` y el `.tsx` difieren, gana el **`.tsx`** — usa los componentes
