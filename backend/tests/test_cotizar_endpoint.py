@@ -23,11 +23,14 @@ class FakeConn:
     """Conn fake: precios por equipo, fila de cliente y puntos de descuento
     por jornadas, resueltos según el SQL que llega."""
 
-    def __init__(self, precios, perfil=None, descuento=0, descuentos_jornada=None):
+    def __init__(self, precios, perfil=None, descuento=0, descuentos_jornada=None,
+                 perfiles_por_id=None):
         self.precios = precios                       # {equipo_id: precio_jornada}
         self.perfil = perfil
         self.descuento = descuento
         self.descuentos_jornada = descuentos_jornada or []
+        # {cliente_id: (perfil, descuento)} — para verificar QUÉ cliente se usó.
+        self.perfiles_por_id = perfiles_por_id
         self._sql = ""
         self._params = ()
 
@@ -43,6 +46,9 @@ class FakeConn:
                 return {"precio_jornada": self.precios[eid]}
             return None
         if "FROM clientes" in self._sql:
+            if self.perfiles_por_id is not None:
+                row = self.perfiles_por_id.get(self._params[0])
+                return {"perfil_impuestos": row[0], "descuento": row[1]} if row else None
             return {"perfil_impuestos": self.perfil, "descuento": self.descuento}
         return None
 
@@ -220,6 +226,32 @@ class TestAdmin:
         # Cliente no puede auto-aplicarse descuento → 0%.
         assert out["descuento_monto"] == 0
         assert out["neto"] == 70000
+
+    def test_cliente_logueado_no_puede_cotizar_para_otro(self, patch_db, monkeypatch):
+        # Seguridad: un cliente logueado que manda el cliente_id de OTRO no
+        # cotiza con el perfil ajeno → se usa SIEMPRE el del logueado.
+        monkeypatch.setattr(alq, "is_admin_email", lambda email: False)
+        patch_db(
+            FakeConn(
+                precios={7: 10000},
+                perfiles_por_id={
+                    42: ("consumidor_final", 0),       # el logueado
+                    99: ("responsable_inscripto", 0),  # otro (RI)
+                },
+            ),
+            session={"role": "cliente", "cliente_id": 42},
+        )
+        data = CotizarRequest(
+            items=[CotizarItem(equipo_id=7, cantidad=1)],
+            fecha_desde="2026-06-01T10:00:00",
+            fecha_hasta="2026-06-08T10:00:00",
+            cliente_id=99,  # intenta cotizar como el cliente 99 (RI)
+        )
+        out = cotizar(data, request=None)
+
+        # Usó el perfil del 42 (consumidor_final) → sin IVA. Ignoró el 99.
+        assert out["con_iva"] is False
+        assert out["total_final"] == 70000
 
     def test_no_admin_ignora_cliente_id(self, patch_db, monkeypatch):
         # Sesión NO admin no puede cotizar para terceros → sin perfil aplicado.
