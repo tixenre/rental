@@ -909,7 +909,7 @@ function PerfilSection({
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2 mb-6">
         <div className="rounded-lg border hairline bg-card px-4 py-3 text-center">
-          <div className="font-display font-black text-[26px] text-ink leading-none">
+          <div className="font-sans font-extrabold text-[26px] text-ink leading-none tabular-nums">
             {pedidosCount}
           </div>
           <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mt-1">
@@ -917,7 +917,7 @@ function PerfilSection({
           </div>
         </div>
         <div className="rounded-lg border hairline bg-card px-4 py-3 text-center">
-          <div className="font-display font-black text-[22px] text-ink leading-none tabular-nums">
+          <div className="font-sans font-extrabold text-[22px] text-ink leading-none tabular-nums">
             {formatARS(totalAlquilado)}
           </div>
           <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mt-1">
