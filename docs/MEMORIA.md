@@ -111,8 +111,9 @@
 - **Decisión:** modelarlo **reusando el motor de reservas existente, sin tocarlo ni duplicarlo**. La
   reserva vive en `alquileres`/`alquiler_items` con una columna `tipo` (`DEFAULT 'diaria'` → cero
   impacto en lo existente); un **equipo "centinela"** invisible (stock=1, sin categorías/specs)
-  representa el espacio para que el overlap + buffer salgan de `_check_stock` (que ya es
-  hora-granular). El pack se materializa como `alquiler_items`; los slots fijos generan **pedidos
+  representa el espacio para que el overlap + buffer salgan de `_check_stock` (el gate vive en
+  `backend/reservas/gate.py` — ver decisión 2026-05-30; ya es hora-granular). El pack se materializa
+  como `alquiler_items`; los slots fijos generan **pedidos
   mensuales** que fluyen por estadísticas/pagos como cualquier alquiler. **El core de reservas es
   sagrado → no se modifica** (el buffer propio del estudio se aplica expandiendo el rango antes de
   llamar, nunca adentro del motor).
@@ -163,6 +164,19 @@
   reusar `RentalDateModal` y `useCart`. El supervisor marca como hallazgo cualquier UI de fechas
   ad-hoc o estado de fechas local que duplique la fuente única.
 
+### 2026-05-30 — `backend/reservas/` = motor único de reservas (fuente única; el core sagrado tiene dirección física)
+- **Contexto:** la lógica de disponibilidad y el gate `_check_stock` vivían dispersos y duplicados en
+  `routes/alquileres.py`. La iniciativa #501 (PR #623) los unificó en el paquete `backend/reservas/`
+  (`estados.py`, `semantics.py`, `disponibilidad.py`, `gate.py`).
+- **Decisión:** todo cálculo de disponibilidad / chequeo de stock / overlap pasa por
+  `backend/reservas/`. No se recrea ni se duplica lógica de reservas en los routes. Esto
+  **materializa** el principio "el core de reservas es sagrado" (barra de calidad, punto 6): ahora ese
+  core tiene **una dirección física única**.
+- **Consecuencias:** el supervisor marca como hallazgo cualquier chequeo de stock/overlap/disponibilidad
+  ad-hoc en un route que debería llamar al paquete. Cambios al paquete son de **alto radio de
+  explosión** → Opus (ver *Eficiencia de sesión: modelo según tarea*). El test de concurrencia con
+  Postgres real (`test_reservas_concurrency_db.py`, opt-in) es la prueba definitiva del `FOR UPDATE`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
@@ -194,7 +208,7 @@
      no estilo ad-hoc por pantalla. (La inconsistencia actual es en parte falta de modularización.)
   5. **Código prolijo aunque el dueño no lo lea.** Legibilidad y orden son requisito, no opcional.
   6. **El core de reservas es sagrado.** Cero overlap de pedidos; la disponibilidad tiene que ser
-     correcta siempre.
+     correcta siempre. (El core vive en `backend/reservas/` — ver decisión 2026-05-30.)
 - **Why:** el dueño está seteando las bases para un sistema robusto y de largo plazo, no un MVP
   descartable. La deuda y la inconsistencia se pagan caro después.
 - **How to apply:** el supervisor marca como hallazgo (no bloqueante salvo que sea grave) cuando un
@@ -213,18 +227,12 @@
   deja como issue, no lo descarta.
 
 ### 2026-05-25 — Minutos de GitHub Actions: cuota a cuidar SOLO si el repo vuelve a privado ⏰
-- **What:** en **público** (estado actual) Actions es **ilimitado** — no hay cuota que cuidar. Esta
-  regla aplica **solo si el repo vuelve a privado**: en plan Free, privado da **2.000 min/mes**, y
-  el CI corre 6 jobs por cada push a una PR, así que ahí sí hay que no quemar minutos al pedo.
-- **Why:** que el CI no se pause a fin de mes por consumir la cuota — pero eso es un riesgo solo en
-  privado.
-- **How to apply (vale siempre, buena higiene):** (1) **batch de commits** — pushear cuando el
-  cambio está listo, no por cada ajuste chico (cada push = una corrida completa). (2) Los cambios de
-  solo-docs/memoria **no deberían disparar los jobs pesados** (build, tests, mobile-smoke) — ver
-  issue #487 (path filters). (3) `concurrency: cancel-in-progress` ya cancela corridas viejas al
-  re-pushear.
-- **⏰ Disparador (activa la parte de cuota):** si el repo vuelve a privado, los 2.000 min/mes pasan
-  a valer; en público queda dormida.
+- **Estado:** en **público** (hoy) Actions es **ilimitado** — regla **dormida**. Buena higiene que
+  vale siempre igual: batch de commits (cada push = corrida completa), y los cambios solo-docs ya no
+  disparan CI (`paths-ignore` de `*.md`/`docs/**`) — afinado mayor pendiente en #487. `concurrency:
+  cancel-in-progress` ya cancela corridas viejas.
+- **⏰ Disparador:** si el repo vuelve a privado, el plan Free da 2.000 min/mes y el CI corre 6 jobs
+  por push → ahí sí hay que cuidar la cuota (sacar `compileall`, cachear `npm ci`, terminar #487).
 
 ### 2026-05-26 — Sesión local para trabajo visual/testeable; la sesión avisa ⏰
 - **What:** cuando una tarea se hace mejor en **local** —porque hay que correr y *ver* la app

@@ -159,11 +159,14 @@ Puntos de entrada para no grepear:
 | Form V2 de equipos | `src/components/admin/equipo-form-v2/` |
 | Lógica reusable / utilities UI | `src/lib/` |
 | Endpoints backend | `backend/routes/` (`equipos.py`, `clientes.py`, `dashboard.py`, etc.) |
+| **Motor de reservas (sagrado)** | `backend/reservas/` (`estados.py`, `semantics.py`, `disponibilidad.py`, `gate.py`) — disponibilidad + gate `_check_stock`. Ver MEMORIA 2026-05-30 |
+| Configuración (Settings) | `backend/config.py` (fuente de `ADMIN_EMAILS`, etc.) |
+| Procesamiento/upload de imágenes + anti-SSRF | `backend/services/image_upload.py` |
 | Schema base + pool DB | `backend/database.py` |
+| Schema de specs / categorías | `backend/specs/` (`__init__.py` define `REGISTRY`; una cat por archivo en `categorias/`) |
 | Migrations Alembic | `backend/migrations/versions/` |
 | Auth admin | `backend/admin_guard.py` |
 | Auth cliente | `backend/routes/auth.py` |
-| Storage R2 + scrape + optimize foto | dentro de `backend/routes/equipos.py` |
 
 ---
 
@@ -195,6 +198,7 @@ Puntos de entrada para no grepear:
 
 ### Storage de fotos
 
+- Vive en `backend/services/image_upload.py` (extraído de `routes/equipos.py` en #501 Fase 3; lo reusan equipos/marcas/estudio/settings).
 - R2 (S3-compatible). Cada foto se sube con upload server-side desde una URL externa o un archivo local.
 - Allowlist anti-SSRF para URLs externas (`_validate_external_image_url`). Hosts conocidos (B&H, Adorama, manufacturer domains, CDNs).
 - Las fotos se procesan con `_optimize_image`: auto-crop de whitespace, padding 6%, resize a 1200×1200, ratio cuadrado.
@@ -209,7 +213,7 @@ Puntos de entrada para no grepear:
 El detalle técnico de todo esto vive en **[`docs/SISTEMA_SPECS.md`](docs/SISTEMA_SPECS.md)**:
 autocompletar (admin, por equipo), carga de datasets por categoría (seed bulk), motor de
 compatibilidades cross-categoría, display templates de nombres, y los workflows para agregar
-specs / sub-categorías. La fuente de verdad del schema es `backend/specs/registry.py`.
+specs / sub-categorías. La fuente de verdad del schema es `backend/specs/__init__.py` (`REGISTRY`).
 
 ### Bulk actions en lista admin
 

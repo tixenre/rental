@@ -3,9 +3,9 @@
 > **Manual técnico vivo.** Reúne el detalle del sistema de specs y catálogo que antes vivía
 > en `MANIFIESTO.md` §6 (parte) y §7. El MANIFIESTO ahora solo orienta y apunta acá.
 >
-> **Fuente de verdad del schema:** [`backend/specs/registry.py`](../backend/specs/registry.py)
-> (modular: una categoría por archivo en `backend/specs/categorias/`). Para conteos exactos de
-> specs por categoría, mirá el registry — no los números fijos de un doc.
+> **Fuente de verdad del schema:** [`backend/specs/__init__.py`](../backend/specs/__init__.py)
+> (define `REGISTRY: Registry`; modular: una categoría por archivo en `backend/specs/categorias/`).
+> Para conteos exactos de specs por categoría, mirá el registry — no los números fijos de un doc.
 >
 > Reemplaza al borrador histórico `docs/archive/DISEÑO_SPECS.md` (diseño original ya implementado).
 
@@ -289,7 +289,7 @@ Cuando agregamos un spec_key nuevo a una categoría (en seed `backend/seeds/<cat
 > **Fecha**: 2026-05-17. Reemplaza el borrador histórico `docs/archive/DISEÑO_SPECS.md`.
 > Cuando hay duda, esto manda.
 
-### Single source of truth: `backend/specs/registry.py`
+### Single source of truth: `backend/specs/__init__.py`
 
 Pydantic v2 registry. Todas las cats, sub-cats y specs están declaradas
 en un solo lugar (modular: una categoría por archivo en `backend/specs/categorias/`).
@@ -308,7 +308,7 @@ from specs import REGISTRY, get_categoria, get_spec, validate_dataset
 ### El stack en una imagen
 
 ```
-backend/specs/registry.py  (REGISTRY: dict[str, CategoriaRegistry])
+backend/specs/__init__.py  (REGISTRY: Registry — objeto Pydantic v2)
     │
     ├──► seeds/registry_seeder.py  → DB (spec_definitions + categoria_spec_templates)
     │                                ↑ idempotente, walks REGISTRY
@@ -413,7 +413,7 @@ python -m backend.seeds.{camaras,lentes,adaptadores,filtros,iluminacion}
 
 ### Agregar specs / cats / sub-cats
 
-1. **Editar** `backend/specs/registry.py` — agregar al `CategoriaRegistry` correspondiente
+1. **Editar** la categoría en `backend/specs/categorias/<cat>.py` (la registra `backend/specs/__init__.py`)
 2. **Validar** localmente: `python -m pytest backend/tests/test_specs_registry.py`
 3. **Reseed** (o esperar al próximo deploy — el lifecycle DB corre `seed_all_categorias`):
    ```bash
