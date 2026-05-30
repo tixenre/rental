@@ -617,8 +617,8 @@ def _check_stock_hipotetico(
     actuales no compiten con los propuestos para el mismo rango).
     """
     from routes.alquileres import (
-        ESTADOS_RESERVADO, _consolidar_items_por_equipo,
-        _get_buffer_horas, _rango_con_buffer, _unidades_en_mantenimiento,
+        _consolidar_items_por_equipo, _get_buffer_horas, _rango_con_buffer,
+        _reservado_directo, _reservado_via_kit, _unidades_en_mantenimiento,
     )
     if not items or not fecha_desde or not fecha_hasta:
         return []
@@ -656,16 +656,15 @@ def _check_stock_hipotetico(
             problemas.append(f"{it['nombre']} (no encontrado)")
             continue
         stock_total = lock["cantidad"]
-        reservado = conn.execute(f"""
-            SELECT COALESCE(SUM(pi2.cantidad), 0)
-            FROM alquiler_items pi2
-            JOIN alquileres p ON p.id = pi2.pedido_id
-            WHERE pi2.equipo_id = ?
-              AND p.id != ?
-              AND p.estado IN {ESTADOS_RESERVADO}
-              AND p.fecha_desde < ?
-              AND p.fecha_hasta > ?
-        """, (it["equipo_id"], pedido_id, fh_buf, fd_buf)).fetchone()[0]
+        # Reserva = directa + vía-kit (mismos helpers compartidos que el gate real
+        # `_check_stock`). Antes este chequeo hipotético solo contaba la directa y
+        # NO la vía-kit → undercount: podía aceptar una propuesta que el gate luego
+        # rechazaba. Ahora ambos cuentan lo mismo. El lock FOR UPDATE de arriba se
+        # mantiene (este chequeo corre dentro de la transacción del caller).
+        reservado = (
+            _reservado_directo(conn, it["equipo_id"], pedido_id, fh_buf, fd_buf)
+            + _reservado_via_kit(conn, it["equipo_id"], pedido_id, fh_buf, fd_buf)
+        )
         en_mantenimiento = _unidades_en_mantenimiento(
             conn, it["equipo_id"], fecha_desde, fecha_hasta
         )
