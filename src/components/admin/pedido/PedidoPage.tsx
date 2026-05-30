@@ -1539,7 +1539,10 @@ function ClienteAutocomplete({
   const [open, setOpen] = useState(false);
   const [debouncedQ, setDebouncedQ] = useState("");
 
-  useMemo(() => {
+  // Debounce real: useEffect respeta el cleanup (clearTimeout), así cada
+  // tecla cancela el timer anterior y se dispara una sola búsqueda al frenar.
+  // (useMemo descartaba el return → no cancelaba nada → una query por tecla.)
+  useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
     return () => clearTimeout(t);
   }, [q]);
