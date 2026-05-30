@@ -14,6 +14,7 @@ from pydantic import BaseModel, field_validator
 from database import get_db, row_to_dict, to_datetime, to_iso, now_ar
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin
+from routes.auth import get_session
 from services.email import send_email
 from services.email.service import get_admin_to
 from services.precios import calcular_total, jornadas_periodo
@@ -830,6 +831,84 @@ def _dispatch_pedido_creado_emails(background: Optional[BackgroundTasks], pedido
             )
         else:
             send_email("pedido_creado_admin", admin_to, ctx, pedido_id)
+
+
+class CotizarItem(BaseModel):
+    equipo_id: int
+    cantidad: int
+
+
+class CotizarRequest(BaseModel):
+    items: list[CotizarItem] = []
+    fecha_desde: Optional[str] = None
+    fecha_hasta: Optional[str] = None
+
+
+@router.post("/cotizar")
+def cotizar(data: CotizarRequest, request: Request):
+    """Cotización canónica del carrito — fuente única, calculada en el backend.
+
+    El front NO calcula el total: manda solo `items` (equipo_id + cantidad) y,
+    si las hay, las fechas. El backend pone TODO lo demás:
+    - el `precio_jornada` de cada equipo (de la tabla `equipos`, no se confía
+      en lo que mande el front),
+    - el perfil tributario y el descuento del cliente logueado (si hay sesión;
+      anónimo → `consumidor_final`, sin descuento de cliente),
+    - el descuento por jornadas.
+
+    Devuelve el desglose de `services.precios.calcular_total` (bruto, descuento,
+    neto, iva_monto, total_con_iva, ...). El carrito muestra esos números tal
+    cual. Reemplaza el cálculo duplicado del front (`src/lib/cart-total.ts`).
+    Ver #617.
+    """
+    conn = get_db()
+
+    # Jornadas: misma fórmula única (ceil/24h). Sin fechas → 1 (igual que el
+    # carrito en armado, donde todavía no se eligió período).
+    d0 = to_datetime(data.fecha_desde) if data.fecha_desde else None
+    d1 = to_datetime(data.fecha_hasta) if data.fecha_hasta else None
+    jornadas = jornadas_periodo(d0, d1)
+
+    # Precios desde el backend. Equipos inexistentes/eliminados se ignoran
+    # (cotización best-effort: el carrito puede tener algo que ya no está).
+    items_para_total = []
+    for it in data.items:
+        if it.cantidad <= 0:
+            continue
+        row = conn.execute(
+            "SELECT precio_jornada FROM equipos WHERE id=? AND eliminado_at IS NULL",
+            (it.equipo_id,),
+        ).fetchone()
+        if not row:
+            continue
+        items_para_total.append({
+            "equipo_id": it.equipo_id,
+            "cantidad": it.cantidad,
+            "precio_jornada": row["precio_jornada"] or 0,
+        })
+
+    # Perfil tributario + descuento del cliente logueado (si hay sesión).
+    perfil = None
+    descuento_cliente_pct = 0.0
+    session = get_session(request)
+    if session and session.get("role") == "cliente" and session.get("cliente_id"):
+        c = conn.execute(
+            "SELECT perfil_impuestos, descuento FROM clientes WHERE id=?",
+            (session["cliente_id"],),
+        ).fetchone()
+        if c:
+            perfil = c["perfil_impuestos"]
+            descuento_cliente_pct = c["descuento"] or 0.0
+
+    descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+    desglose = calcular_total(
+        items=items_para_total,
+        jornadas=jornadas,
+        descuento_cliente_pct=descuento_cliente_pct,
+        descuento_jornadas_pct=descuento_jornadas_pct,
+        perfil_impuestos=perfil,
+    )
+    return {"jornadas": jornadas, **desglose}
 
 
 @router.post("/alquileres", status_code=201)
