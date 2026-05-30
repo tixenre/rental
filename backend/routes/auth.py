@@ -55,6 +55,20 @@ ALLOWED_EMAILS: set[str] = {
 COOKIE_SECURE = settings.cookie_secure
 SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 días
 
+
+def dev_bypass_enabled() -> bool:
+    """¿Está activo el bypass de auth de dev (ADMIN_BYPASS_AUTH)?
+
+    Seguridad (#503): NUNCA en producción. Aunque `ADMIN_BYPASS_AUTH` quede
+    seteada por error en Railway, en un entorno Railway se ignora — el bypass
+    es imposible de cara al público (no depende de verificar la config a mano).
+    Fuente única usada por `require_admin`, `/auth/dev-login` y `/auth/config`.
+    """
+    if os.getenv("RAILWAY_ENVIRONMENT"):
+        return False
+    return os.getenv("ADMIN_BYPASS_AUTH", "").strip().lower() in ("1", "true", "yes")
+
+
 GOOGLE_AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO  = "https://www.googleapis.com/oauth2/v3/userinfo"
@@ -245,7 +259,7 @@ def auth_callback(request: Request):
 
 @router.get("/auth/config")
 def auth_config():
-    dev_mode = os.getenv("ADMIN_BYPASS_AUTH", "").strip() in ("1", "true", "yes")
+    dev_mode = dev_bypass_enabled()
     return {
         "google_enabled": bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET),
         "dev_mode": dev_mode,
@@ -254,8 +268,8 @@ def auth_config():
 
 @router.get("/auth/dev-login")
 def auth_dev_login():
-    """Login directo sin OAuth — solo funciona con ADMIN_BYPASS_AUTH=1."""
-    if os.getenv("ADMIN_BYPASS_AUTH", "").strip() not in ("1", "true", "yes"):
+    """Login directo sin OAuth — solo en dev (ADMIN_BYPASS_AUTH=1, nunca en prod)."""
+    if not dev_bypass_enabled():
         raise HTTPException(403, "Solo disponible en modo desarrollo.")
     return _make_session_response(
         email="dev@local",

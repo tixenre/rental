@@ -82,9 +82,20 @@ class TestRequireAdmin:
 
     def test_bypass_env_var_skip_auth(self, monkeypatch):
         # ADMIN_BYPASS_AUTH=1 → no chequea sesión (modo dev)
+        monkeypatch.delenv("RAILWAY_ENVIRONMENT", raising=False)
         monkeypatch.setenv("ADMIN_BYPASS_AUTH", "1")
         result = require_admin(FakeRequest())
         assert result["kind"] == "bypass"
+
+    def test_bypass_ignorado_en_prod(self, monkeypatch):
+        # #503: en Railway/prod el bypass se ignora aunque ADMIN_BYPASS_AUTH=1
+        # esté seteada por error → no debe haber puerta abierta de cara al público.
+        monkeypatch.setenv("ADMIN_BYPASS_AUTH", "1")
+        monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
+        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        with pytest.raises(HTTPException) as exc:
+            require_admin(FakeRequest())
+        assert exc.value.status_code == 401  # sin bypass → exige sesión
 
     def test_bypass_solo_acepta_truthy_explicitos(self, monkeypatch):
         # "0", "false", "" → NO bypass
@@ -182,3 +193,43 @@ class TestSafeNextPath:
 
     def test_longitud_excesiva_rechaza(self):
         assert self._safe("/" + ("a" * 3000)) is None
+
+
+# ── dev_bypass_enabled + /auth/dev-login (#503) ───────────────────────────────
+
+
+class TestDevBypassEnabled:
+    """El bypass de dev NUNCA debe estar activo en producción (Railway)."""
+
+    def test_activo_en_dev(self, monkeypatch):
+        from routes.auth import dev_bypass_enabled
+
+        monkeypatch.delenv("RAILWAY_ENVIRONMENT", raising=False)
+        for v in ("1", "true", "TRUE", "yes"):
+            monkeypatch.setenv("ADMIN_BYPASS_AUTH", v)
+            assert dev_bypass_enabled() is True, v
+
+    def test_prod_gana_sobre_bypass(self, monkeypatch):
+        from routes.auth import dev_bypass_enabled
+
+        monkeypatch.setenv("ADMIN_BYPASS_AUTH", "1")
+        monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
+        assert dev_bypass_enabled() is False
+
+    def test_sin_bypass(self, monkeypatch):
+        from routes.auth import dev_bypass_enabled
+
+        monkeypatch.delenv("RAILWAY_ENVIRONMENT", raising=False)
+        for v in ("", "0", "no", "false"):
+            monkeypatch.setenv("ADMIN_BYPASS_AUTH", v)
+            assert dev_bypass_enabled() is False, v
+
+    def test_dev_login_403_en_prod(self, monkeypatch):
+        from fastapi import HTTPException
+        from routes.auth import auth_dev_login
+
+        monkeypatch.setenv("ADMIN_BYPASS_AUTH", "1")
+        monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
+        with pytest.raises(HTTPException) as exc:
+            auth_dev_login()
+        assert exc.value.status_code == 403
