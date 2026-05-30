@@ -1,84 +1,105 @@
 ---
 name: importar-diseno
-description: Importa un handoff de Claude Design (un bundle con HTML de referencia visual + TSX borrador de implementación + README de specs) y lo convierte en front-end real de este repo. Úsalo cuando el usuario pase una carpeta-bundle de Claude Design (o diga "importá este diseño / handoff / pantalla de Claude Design", "implementá este TSX", "conectá este diseño con datos reales"). El skill orienta TODO el recorrido: ver el render, leer el contrato, implementar con los componentes/tokens reales del repo, conectar endpoints y verificar contra la referencia. Incluye un motor visual (render.mjs) que rasteriza el HTML/ruta a PNG para que Claude pueda VER el resultado. Solo local (necesita el browser de Playwright).
+description: Importa un handoff de Claude Design (carpeta design_handoff_<feature>/ con un HTML de referencia visual + uno o más .tsx que espejan rutas/componentes reales del repo + README de specs) y lo convierte en front-end real de este repo. Úsalo cuando el usuario pase una carpeta de handoff de Claude Design (o diga "importá este diseño / handoff / pantalla de Claude Design", "implementá este TSX", "conectá este diseño con datos reales"). El skill orienta TODO el recorrido: ver el render, leer el README, reusar la librería de componentes del repo, implementar, conectar el backend y verificar contra la referencia. Incluye un motor visual (render.mjs) que rasteriza el HTML/ruta a PNG para que Claude pueda VER el resultado. Solo local (necesita el browser de Playwright).
 ---
 
 # importar-diseno — del handoff de Claude Design al front real del repo
 
-## Qué es Claude Design (contexto para Claude Code)
+## Qué es Claude Design
 
-**Claude Design** es una instancia de Claude especializada en diseño de interfaces, que corre en
-un entorno de proyecto con filesystem. Trabaja la UI en HTML y la traduce a TSX. Te entrega un
-**bundle** (handoff) con tres piezas:
+**Claude Design** es una instancia de Claude especializada en diseño de UI, en un proyecto aparte.
+Su flujo es **Leer el repo → Diseñar pensando en el backend → Exportar**. Te entrega un **handoff**:
+una carpeta `design_handoff_<feature>/` que **espeja los paths reales del repo**.
 
-| Archivo | Qué es | Cómo lo tratás |
+| Pieza | Qué es | Cómo la tratás |
 |---|---|---|
-| `*.html` | **Referencia visual.** Tailwind CDN + datos mock. **NO es código de producción.** | Lo **mirás** (rasterizado a PNG). Nunca lo portás tal cual. |
-| `*.tsx` | **Borrador de implementación.** Ya usa los componentes y tokens del repo real. | Es tu **base**. Lo completás, no lo reescribís de cero. |
-| `README.md` / `HANDOFF.md` | **Specs + checklist** de implementación. | Tu **lista de tareas**. Lo seguís paso a paso. |
+| `<Feature>.html` | **Referencia visual** (Tailwind CDN + mocks, todos los estados). | La **mirás** (rasterizada). Verdad de *cómo se ve*. |
+| `src/<path-real>.tsx` | **TSX base** (ruta o componente) que ya usa componentes/tokens del repo. | Tu **base de implementación**. Verdad de *cómo se construye*. |
+| `README.md` | Specs por pantalla: secciones, componentes a reusar, datos, checklist. | Tu **lista de tareas**. |
 
-> Le estás recibiendo una **especificación visual ejecutable + un borrador de implementación**.
-> Tu trabajo es completar el borrador y conectar la lógica real.
+> El contrato de entrega (lado Claude Design) y la fuente de verdad de este flujo viven en el repo:
+> [`INSTRUCCIONES_CLAUDE_DESIGN.md`](./INSTRUCCIONES_CLAUDE_DESIGN.md). El molde técnico para
+> implementar (librería de componentes, data layer, backend) está en
+> [`referencia-repo.md`](./referencia-repo.md).
 
-> **Contraparte (lado Claude Design).** El formato exacto que Claude Design debe entregar está en
-> [`INSTRUCCIONES_CLAUDE_DESIGN.md`](./INSTRUCCIONES_CLAUDE_DESIGN.md) — es el contrato de entrega
-> que se le pasa a Claude Design. El bundle cae en `docs/handoffs/<feature>/`.
+## Regla de verdad (una sola, por plano)
 
-## Reglas de oro (no negociables)
+- **El HTML manda para la fidelidad visual** — cómo se ve: layout, jerarquía, espaciados, estados,
+  mobile. Es la intención de diseño aprobada.
+- **El TSX manda para estructura / lógica / implementación** — cómo se construye: qué componentes y
+  tokens del repo se usan, props, comportamiento. (Coherente con MEMORIA *2026-05-28*.)
 
-1. **El TSX manda.** Si el `.html` y el `.tsx` difieren, gana el **`.tsx`** — usa los componentes
-   y tokens reales del repo; el HTML es una simulación que **puede estar desfasada**. (Decisión de
-   MEMORIA *2026-05-28 — el TSX manda, el HTML es solo para visualizar*.)
-2. **El HTML es solo referencia visual.** Tailwind CDN + mocks. **Nunca** copies su markup/clases a
-   producción; sirve para *ver* la intención de diseño (layout, jerarquía, espaciados, mobile).
-3. **`// TODO`** en el TSX marca **dónde conectar datos/endpoints reales** del repo.
-4. **`// KEEP`** marca sub-componentes/bloques del original que hay que **traer tal cual** del HTML
-   al TSX (no reinventarlos).
-5. **Componentes y tokens del repo, no ad-hoc.** La implementación usa el design system real
-   (`docs/DESIGN_SYSTEM.md`, `src/components/ui/*`, `src/components/kit/*`). Si el TSX trae un estilo
-   suelto que ya existe como componente/token, se reusa el del repo. (Barra de calidad de MEMORIA:
-   consistencia + modularidad.)
+No están en conflicto: son planos distintos. El markup/clases del HTML **no se copian** a producción
+(usa Tailwind CDN + mocks); se traduce a los componentes/tokens reales del repo.
 
-## Input: la carpeta-bundle
+## Marcadores en el TSX
 
-El usuario deja una **carpeta** con el bundle (los 3 archivos juntos) y te pasa la ruta:
+- **`TODO:`** → dónde conectar el dato/endpoint real (ver backend abajo).
+- **`// CAMBIO N:`** → en un handoff *patch*, el diff puntual a aplicar sobre el archivo existente.
+
+## Tipos de handoff (detectalo y actuá distinto)
+
+| Tipo | Señal | Qué hacés |
+|---|---|---|
+| **Ruta nueva** | `src/routes/<ruta>.tsx` completo, ruta que no existe | Crear la ruta usando el TSX como base. |
+| **Patch** | comentarios `// CAMBIO N:`, "reemplaza partes de…" | Aplicar cada cambio sobre el archivo existente, sin tocar la lógica. |
+| **Módulo** | `src/components/<path>/` con varios `.tsx` + README clase-por-clase | Reemplazar/crear los componentes; el README es muy preciso, seguilo al pie. |
+
+## Input: la carpeta del handoff
+
+El usuario descomprime el bundle de Claude Design y deja la carpeta del feature —la que Claude Design
+exporta como `design_handoff_<feature>/`— dentro de `docs/handoffs/` del repo (puede acortar el nombre
+a `<feature>/`). Le pasás esa ruta:
 
 ```
-/importar-diseno docs/handoffs/portal-pedidos/
+/importar-diseno docs/handoffs/portal/
 ```
 
-Detectás las piezas por extensión/nombre dentro de la carpeta (`*.html`, `*.tsx`, README/HANDOFF).
-Puede faltar el README, o haber varios `.html`/`.tsx` (una pantalla con sub-componentes) — armá el
-contexto con lo que haya y avisá si falta algo clave.
+(En estos ejemplos `docs/handoffs/portal/` es la carpeta `design_handoff_portal/` ya colocada en el
+repo.)
+
+**El bundle real puede venir obeso** (un export trae todo el proyecto de diseño: `fonts/`, `assets/`,
+`kit/`, `preview/`, HTML duplicados, copias de `colors_and_type.css`, etc.). **Ignorá todo eso** —
+solo te interesan las carpetas `design_handoff_<feature>/` (su `.html`, sus `src/**.tsx`, su README).
+Las **reglas del repo NO vienen del bundle**: vienen del repo (`docs/DESIGN_SYSTEM.md` + este skill +
+[`referencia-repo.md`](./referencia-repo.md)). Si el bundle trae su propio `HANDOFF.md`/`CONTEXT.md`,
+son referencia, pero el repo manda.
 
 ## Recorrido (lo que ejecuta Claude Code)
 
-1. **Inventariar el bundle.** Listá la carpeta y clasificá cada archivo (HTML ref / TSX base /
-   README spec). Reportá en una línea qué encontraste.
-2. **Leer el contrato.** Leé el README/HANDOFF de punta a punta → de ahí sale el **checklist** de
-   implementación y dónde van los datos reales. Leé el `.tsx` completo (es la base).
-3. **VER la referencia.** Rasterizá cada `.html` del bundle con el motor visual, en **desktop y
-   mobile**, y leé los PNG. Así *ves* el diseño en vez de adivinarlo del markup:
-
+1. **Inventariar.** Listá la carpeta, ignorá el peso muerto, identificá el/los `.tsx` (y su path real),
+   el `.html` y el `README.md`. Detectá el **tipo** (ruta / patch / módulo). Reportá en una línea.
+2. **Leer.** README del handoff de punta a punta + el/los `.tsx` completos. Si es patch, leé también el
+   archivo existente del repo que se va a tocar.
+3. **VER la referencia.** Rasterizá el `.html` en **desktop y mobile** y leé los PNG:
    ```bash
-   node .claude/skills/importar-diseno/render.mjs docs/handoffs/portal-pedidos/screen.html
-   node .claude/skills/importar-diseno/render.mjs docs/handoffs/portal-pedidos/screen.html --mobile
+   node .claude/skills/importar-diseno/render.mjs docs/handoffs/portal/*.html
+   node .claude/skills/importar-diseno/render.mjs docs/handoffs/portal/*.html --mobile
    ```
-
-4. **Implementar en el repo.** Partiendo del `.tsx`:
-   - Traé los bloques `// KEEP` del original.
-   - Reemplazá estilos sueltos por los componentes/tokens reales del repo donde corresponda.
-   - Conectá cada `// TODO` con el endpoint/estado real (hooks, queries, stores existentes).
-   - Seguí el checklist del README; mobile-first (la decisión de calidad lo exige).
-5. **Verificar contra la referencia.** Con `npm run dev` corriendo, rasterizá la **ruta real de la
-   app** (no el HTML) en desktop y mobile y compará contra la referencia visual:
-
+   El `.html` puede **no ser self-contained** (depende de hermanos como su css/js). Renderizalo
+   **dentro de su carpeta** (rutas relativas intactas), no lo copies suelto. Si sale en blanco, subí
+   la espera (`--wait 2500`) — algunos prototipos montan el DOM por JS.
+4. **Reuse-first (obligatorio).** Antes de escribir nada, mirá el **catálogo de componentes canónicos**
+   en [`referencia-repo.md`](./referencia-repo.md). Si el primitivo ya existe (`StepperPill`,
+   `PriceBlock`, `EstadoBadge`, `StatCard`, `Button`, `FavButton`…) → **reusalo**. Si el diseño trae un
+   primitivo nuevo reutilizable → **extraelo a la librería**, no lo inlinees. (Barra de calidad MEMORIA:
+   modularidad a prueba de balas.)
+5. **Implementar.** Partiendo del `.tsx`: traducí el markup a componentes/tokens reales, aplicá los
+   `// CAMBIO N:` si es patch, y conectá cada `TODO:` con el dato real (ver backend). Mobile-first.
+6. **Conectar el backend** (política híbrida — detalle en [`referencia-repo.md`](./referencia-repo.md)):
+   - **Existe el endpoint** → conectá con el molde del repo (`useQuery`+hook, `authedFetch`, tipos de
+     `src/lib/api.ts`, `formatARS`).
+   - **Falta un endpoint de SOLO LECTURA simple** → crealo full-stack (router en `backend/routes/*.py`
+     con `require_cliente`/`require_admin` → registrar en `main.py` con `prefix="/api"` → tipo+helper en
+     `src/lib/api.ts` → consumir con `useQuery`).
+   - **PARÁ y avisá en el PR** si requiere migración de schema, escribe datos sensibles
+     (pagos/estados/permisos) o toca disponibilidad/overlap (**core de reservas, sagrado**).
+7. **Verificar (render-compare).** Con `npm run dev` corriendo, rasterizá la **ruta real de la app** en
+   desktop y mobile y compará contra el HTML de referencia. Iterá hasta que matcheen (HTML = verdad
+   visual):
    ```bash
-   node .claude/skills/importar-diseno/render.mjs /cliente/pedidos --mobile
+   node .claude/skills/importar-diseno/render.mjs /cliente/portal --mobile
    ```
-
-   La ruta servida por la app es **la verdad** (tokens + componentes reales). Iterá hasta que el
-   render real matchee la intención del diseño.
 
 ## Motor visual (render.mjs)
 
@@ -99,24 +120,23 @@ Flags:
 - `--wait <ms>` espera extra para fuentes/animaciones (default 300).
 - `--out <path>` ruta de salida (default `/tmp/diseno-<ts>-<viewport>.png`).
 
-El script imprime `PNG: /tmp/...` en la última línea → Claude **lee ese PNG** con la tool de
-imágenes. Para revisar mobile-first, renderizá **las dos** vistas y compará.
-
-(`DISENO_BASE_URL` overridea el `http://localhost:3000` por defecto.)
+El script imprime `PNG: /tmp/...` en la última línea → Claude **lee ese PNG** con la tool de imágenes.
+Para revisar mobile-first, renderizá **las dos** vistas y compará. (`DISENO_BASE_URL` overridea el
+`http://localhost:3000` por defecto.)
 
 ## Requisitos / errores comunes
 
-- **Solo local.** En la nube el entorno es efímero y la red no deja bajar el browser. Encaja con la
-  decisión de MEMORIA *2026-05-26 — Sesión local para trabajo visual/testeable*. Si el browser no
-  está y no se puede instalar → **avisá y frená**, no inventes cómo se ve un render que no produjiste.
+- **Solo local.** En la nube el entorno es efímero y la red no deja bajar el browser (MEMORIA
+  *2026-05-26 — Sesión local para trabajo visual*). Si el browser no está y no se puede instalar →
+  **avisá y frená**, no inventes cómo se ve un render que no produjiste.
 - **`npm install`** hecho en la raíz (para `@playwright/test`).
 - **Browser:** si no puede lanzar Chromium → `npx playwright install chromium`.
 - **Para verificar la ruta real:** `npm run dev` corriendo (puerto 3000).
 
 ## Restricciones
 
-- El **render** es read-only de cara al proyecto (solo captura). La **implementación** sí escribe
-  código del front — pero usando los componentes/tokens del repo, nunca tocando BD ni el core de
-  reservas (sagrado).
-- Una iniciativa de import = una rama + PR (flujo del repo). El handoff se implementa, se verifica
-  contra la referencia, y recién ahí se propone merge.
+- El **render** es read-only de cara al proyecto. La **implementación** escribe front (y, en el caso
+  híbrido, un endpoint de lectura simple) — siempre reusando la librería del repo, nunca tocando el
+  core de reservas ni metiendo migraciones/escrituras sensibles sin avisar.
+- **Una iniciativa de import = una rama + PR.** El handoff se implementa, se verifica con render-compare,
+  pasa el supervisor, y recién ahí se propone merge.

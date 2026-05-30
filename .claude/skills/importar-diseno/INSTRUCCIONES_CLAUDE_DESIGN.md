@@ -1,157 +1,110 @@
-# Instrucciones para Claude Design — formato de handoff de Rambla Rental
+# Contrato Claude Design ↔ Claude Code — Rambla Rental
 
-> **Para qué es este doc.** Es el **contrato de entrega**: define exactamente cómo Claude Design
-> tiene que empaquetar un diseño para que el lado de Claude Code lo importe sin fricción con el
-> skill [`importar-diseno`](./SKILL.md). Si seguís este formato, la implementación es directa.
->
-> **Cómo usarlo:** pegale este documento entero a Claude Design al arrancar una pantalla/feature
-> (o referencialo si ya lo tiene en su proyecto). Las reglas de abajo son obligatorias.
+> **Fuente de verdad de este flujo.** Vive en el repo `tixenre/rental` y se versiona acá. El dueño lo
+> **sincroniza al proyecto de Claude Design** cuando cambia (Claude Design puede reemplazar con esto su
+> `CLAUDE_DESIGN_PROTOCOL.md`). Lado Claude Code: el skill [`SKILL.md`](./SKILL.md) lo consume; el molde
+> técnico para implementar está en [`referencia-repo.md`](./referencia-repo.md).
 
----
-
-## Tu rol y tu entregable
-
-Sos **Claude Design**: diseñás la UI, la maquetás en HTML y la traducís a un TSX que usa los
-componentes y tokens reales del repo. Tu entregable es un **bundle**: **una carpeta por
-pantalla/feature** con tres piezas, que el equipo deja caer en `docs/handoffs/<feature>/` del repo.
-
-Quien recibe el bundle (Claude Code) **completa el borrador y conecta la lógica real**. Tu trabajo
-es darle una especificación visual ejecutable + un borrador de implementación lo más cercano
-posible a lo que ya existe en el repo.
-
-## Estructura exacta del bundle
+Define cómo Claude Design empaqueta un diseño para que Claude Code lo implemente **sin desincronización
+y sin duplicar** componentes, tokens, fuentes ni reglas. Resumen del flujo:
 
 ```
-docs/handoffs/<feature-kebab>/
-├── <Feature>.html        # referencia visual (1 pantalla, self-contained)
-├── <Feature>.tsx         # borrador de implementación (la VERDAD del handoff)
-├── HANDOFF.md            # specs + checklist de implementación
-└── components/           # (opcional) sub-componentes TSX si la pantalla es grande
-    └── <SubComponente>.tsx
-```
-
-- **Una carpeta = una pantalla/feature.** Nombre en `kebab-case` (ej. `portal-pedidos`,
-  `catalogo-filtros`).
-- Los archivos comparten el **mismo nombre base** en `PascalCase` (ej. `PortalPedidos.html` +
-  `PortalPedidos.tsx`) para que el par HTML↔TSX sea evidente.
-- Si hay varios sub-componentes, dividí el `.tsx` y poné los hijos en `components/`. Igual entregá
-  **un** HTML que muestre la pantalla completa armada.
-
----
-
-## 1. El HTML — referencia visual
-
-Es la **maqueta que se mira**, no código de producción. Reglas:
-
-- **Self-contained:** abre con doble click (`file://`). **Tailwind por CDN** + estilos inline.
-  Nada de imports a `node_modules` ni build.
-- **Datos mock realistas** (nombres, precios en formato local `$ 24.500`, fechas, estados reales
-  del dominio — ver glosario abajo). No "lorem ipsum".
-- **Una sola pantalla** por archivo, armada y completa (con sus estados visibles si aplica:
-  vacío, error, cargando — podés mostrarlos apilados o anotados).
-- **Responsive de verdad — mobile-first.** Tiene que verse bien **tanto en 375px (mobile) como en
-  1280px (desktop)**. Nada de grillas de columnas fijas que no reflowean: usá
-  `grid-template-columns: repeat(auto-fit, minmax(...))` o breakpoints. (El skill renderiza el HTML
-  en **ambos** viewports y compara — un layout que se rompe en mobile se detecta enseguida.)
-- **Refleja la intención visual** (jerarquía, espaciados, tokens de color/tipografía). Replicá los
-  tokens del design system (ver `docs/DESIGN_SYSTEM.md` y `docs/design-kit/`).
-
-> El HTML **puede quedar desfasado** del TSX y está bien: es aproximación. Pero hacé el esfuerzo
-> de que sea fiel, porque es lo que se usa para *ver* la intención.
-
-## 2. El TSX — borrador de implementación (la VERDAD)
-
-Es tu entregable más importante: **si el HTML y el TSX difieren, gana el TSX**. Reglas:
-
-- **Importá los componentes reales del repo**, no recrees primitivas:
-  - UI base: `src/components/ui/*` — `button`, `card`, `dialog`, `alert`, `badge`, `input`,
-    `dropdown-menu`, `accordion`, `calendar`, etc. (estilo shadcn).
-  - Kit del catálogo: `src/components/kit/*` — `AddonPills`, `EstadoBadge`, `PriceBlock`,
-    `StatCard`, `ViewToggle`, `EmptyState`, `Input`. Tipos en `kit/types.ts`.
-  - **Tokens, nunca valores sueltos:** usá las clases/variables del design system (definidas en
-    `src/styles.css` y documentadas en `docs/DESIGN_SYSTEM.md`). Nada de hex/px ad-hoc si ya hay
-    token. Ej.: `text-destructive`, no `text-red-600`.
-  - Si necesitás un componente que **no existe**, marcalo en el HANDOFF como "componente nuevo
-    propuesto" — no lo des por hecho.
-- **Marcá los dos tipos de hueco** para que Claude Code sepa qué hacer:
-  - `// KEEP` — bloques/sub-componentes que hay que **traer tal cual** del HTML/diseño (markup que
-    ya está bien, no reinventarlo).
-  - `// TODO` — **dónde se conecta el dato/endpoint real**, con una nota de QUÉ dato va ahí.
-    Ej.: `// TODO: pedidos del cliente — GET /api/cliente/pedidos (lista de Pedido)`.
-- **No inventes data fetching.** Dejá los datos como **props tipadas** o un mock claramente
-  marcado con `// TODO`. La conexión real (hooks, queries, stores) la hace Claude Code.
-- **Tipá las props** (TypeScript real). Si el dominio ya tiene un tipo (`Pedido`, `Equipo`,
-  `EstadoPedido`…), referencialo en el HANDOFF para que Claude Code lo importe del repo.
-- **Mobile-first** también en el TSX (clases responsive de Tailwind).
-- El TSX es un **componente** (no un archivo de ruta). Claude Code lo monta en la ruta que digas en
-  el HANDOFF (las rutas viven en `src/routes/`, file-based de TanStack Router).
-
-## 3. HANDOFF.md — specs + checklist
-
-El contrato escrito. Incluí, como mínimo:
-
-```markdown
-# <Feature> — handoff
-
-## Qué es
-1-2 líneas: qué pantalla/feature es y para quién (catálogo público / portal cliente / admin).
-
-## Dónde va
-- Ruta destino en la app: ej. `/cliente/portal` (archivo `src/routes/cliente.portal.tsx`).
-  Las rutas son file-based de TanStack Router; confirmá el archivo real con Claude Code.
-- Componente principal: `<Feature>.tsx`.
-
-## Datos / endpoints (los // TODO del TSX)
-Por cada // TODO: qué dato es, de qué endpoint/store sale, y qué tipo del repo usar.
-| Marca en el TSX | Dato | Fuente | Tipo |
-|---|---|---|---|
-| `// TODO: lista` | pedidos del cliente | `GET /api/cliente/pedidos` | `Pedido[]` |
-
-## Estados
-Vacío / cargando / error / con datos — cuáles aplican y cómo se ven (referencia al HTML).
-
-## Componentes usados
-- Del repo: `Button`, `EstadoBadge`, `PriceBlock`, …
-- Nuevos propuestos (si los hay): nombre + por qué no alcanza con lo existente.
-
-## Responsive
-Cómo cambia mobile (375) vs desktop (1280): qué reflowea, qué se oculta, breakpoints.
-
-## Checklist de implementación
-- [ ] Montar `<Feature>.tsx` en la ruta `...`
-- [ ] Traer bloques `// KEEP`
-- [ ] Conectar cada `// TODO` con su endpoint/tipo real
-- [ ] Verificar mobile + desktop contra el HTML de referencia
-- [ ] (lo que aplique)
+Claude Design (diseño)  →  handoff slim  →  Claude Code (implementación en el repo)
+   "¿cómo debería verse?"                      "así lo construyo, reusando la librería"
 ```
 
 ---
 
-## Reglas de oro (resumen)
+## Regla de verdad (una sola, por plano)
 
-1. **El TSX manda.** El HTML es solo referencia visual; si difieren, gana el TSX.
-2. **Componentes y tokens del repo**, no primitivas ni estilos ad-hoc. Consultá
-   `docs/DESIGN_SYSTEM.md`.
-3. **`// KEEP`** = traer tal cual · **`// TODO`** = conectar dato real (con nota de qué dato).
-4. **Mobile-first y responsive real** — el handoff se revisa en 375px y 1280px.
-5. **Una carpeta por pantalla**, los 3 archivos con el mismo nombre base.
+- **El HTML manda para la fidelidad visual** — cómo se ve (layout, jerarquía, espaciados, estados, mobile).
+- **El TSX manda para estructura / lógica / implementación** — cómo se construye (componentes y tokens
+  del repo, props, comportamiento).
 
-## Glosario de dominio (para mocks realistas)
+No se contradicen: son planos distintos. El markup del HTML es Tailwind CDN + mocks → **no se copia** a
+producción; se traduce a los componentes/tokens reales del repo.
 
-- **Estados de pedido** (los 9 reales, ver `src/components/kit/types.ts` → `EstadoPedido`):
-  Borrador · Presupuesto · Solicitado · Confirmado · Retirado · Entregado · Devuelto · Finalizado ·
-  Cancelado. (Ojo: el kit portable de `docs/design-kit/` muestra estados viejos como "Atrasado"/
-  "Perdido" que **ya no existen** — `DESIGN_SYSTEM.md` y el tipo real mandan.)
-- **Superficies:** catálogo público (`/`), portal cliente (`/cliente/*`), back-office admin
-  (`/admin/*`).
-- **Moneda:** formato local `$ 24.500`. **Período:** "por jornada" (día de alquiler).
-- Equipos audiovisuales (cámaras, luces, audio, etc.), con add-ons (batería, cargador, tarjetas).
+---
 
-## Auto-QA antes de entregar
+## Fase 1 — Leer el repo antes de diseñar
 
-- [ ] La carpeta tiene HTML + TSX + HANDOFF.md con el mismo nombre base.
-- [ ] El HTML abre solo (file://) y se ve bien en mobile **y** desktop.
-- [ ] El TSX importa de `src/components/ui/*` y `src/components/kit/*`, sin primitivas recreadas.
-- [ ] Todo dato real está marcado con `// TODO` + nota; nada de fetching inventado.
-- [ ] Los `// KEEP` señalan los bloques a portar tal cual.
-- [ ] El HANDOFF lista ruta destino, datos/endpoints, estados, componentes y checklist.
+Antes de trazar un píxel, explorar `tixenre/rental` (con GitHub MCP):
+- `src/routes/` → ¿la ruta existe? Si existe, el diseño es un **patch**, no una pantalla nueva.
+- `src/components/` (`ui/`, `kit/`, `rental/`, `rental/equipment/shared/`) → **qué reusar** (ver
+  abajo: reuse-first).
+- `docs/DESIGN_SYSTEM.md` y `src/styles.css` → tokens canónicos (la **verdad** de tokens vive acá).
+- `backend/routes/` → qué endpoints existen antes de diseñar flujos con datos.
+
+---
+
+## Fase 2 — Diseñar pensando en el backend y en la librería
+
+### Reuse-first (innegociable)
+- **Reusar antes que crear.** Si el primitivo ya existe en el repo (`Button`, `EstadoBadge`,
+  `StatCard`, `PriceBlock`, `StepperPill`, `FavButton`, `formatARS()`, `cn()`…) → usarlo.
+- Si el diseño necesita un primitivo **nuevo reutilizable** → diseñarlo como **componente de librería**
+  (no inline en la página) y documentarlo en el README del handoff.
+
+### Datos
+- Usar solo campos que **ya existen** en los tipos del repo.
+- Si falta un dato/endpoint → marcar `TODO:` en el TSX y documentarlo en el README, indicando si es
+  **lectura simple** (Claude Code lo crea full-stack) o **sensible** (migración de schema, escritura de
+  pagos/estados/permisos, o disponibilidad/reservas) → en ese caso **el diseño se entrega marcado para
+  PARAR y validar**, no se asume.
+
+### Tokens / tipografía / copy (reglas duras del repo)
+- **Solo tokens del sistema**, nunca hex (`bg-amber`, `text-ink`, `border-hairline`, …). El guardrail
+  ESLint rompe el CI con colores fuera del sistema.
+- **Champ Black (`font-display`) solo display/wordmark** — nunca UI funcional, IDs, labels, precios.
+  Precios/IDs/fechas/eyebrows en `font-mono`; body/UI en `font-sans`.
+- Precios vía `formatARS()` (nunca `.toLocaleString()`). Iconos `lucide-react` import individual.
+  `dvh` no `vh` + `.safe-*` en sticky bars. Targets táctiles ≥ 44px. Voz **"vos"** (reservá, elegí,
+  confirmá). Precios `$ 24.500`. Fechas `lun 2 jun.`.
+
+---
+
+## Fase 3 — Exportar: handoff **slim**
+
+Una carpeta por feature. **Solo el diseño** — el repo ya tiene reglas, tokens, fuentes y componentes.
+
+```
+design_handoff_<feature>/
+├── <Feature>.html          ← referencia visual (interactiva, todos los estados)
+├── src/<path-real>.tsx     ← TSX base; espeja el path real del repo
+│                              (varios .tsx si es módulo de componentes)
+└── README.md               ← qué es · secciones+tokens · componentes a reusar (tabla)
+                              · datos/TODO (tabla: marca → dato → endpoint → tipo) · checklist
+```
+
+`MASTER_HANDOFF.md` (orden de implementación + dependencias entre handoffs) va **una sola vez** en el
+root del export cuando se manda más de un handoff.
+
+### Tipos de handoff
+- **Ruta nueva:** `src/routes/<ruta>.tsx` completo, con todos los `TODO:` marcados.
+- **Patch:** comentarios `// CAMBIO N:` con el diff exacto sobre el archivo existente (no reemplaza la
+  lógica).
+- **Módulo:** `src/components/<path>/` con los `.tsx` + README **clase-por-clase** (mapa de tokens,
+  anatomía por componente, tabla de errores comunes, checklist de 15-20 ítems).
+
+### NO embarcar (peso muerto / fuente de drift)
+- ❌ Reglas del repo duplicadas: **no** copiar `HANDOFF.md`/`CONTEXT.md` por carpeta — viven en el repo.
+- ❌ Snapshots de tokens: **no** mandar `colors_and_type.css` ni `CLAUDE_DESIGN_SYSTEM.md` — Claude Code
+  lee `src/styles.css` / `docs/DESIGN_SYSTEM.md` del repo.
+- ❌ `fonts/`, `assets/`, `kit/`, `preview/`, HTML duplicados del root, screenshots.
+- Objetivo: un export de **<1 MB / decenas de archivos**, no cientos de MB.
+
+---
+
+## Marcadores
+
+- **`TODO:`** → dónde conectar el dato/endpoint real (con nota de QUÉ dato y de qué endpoint).
+- **`// CAMBIO N:`** → en un patch, el diff puntual a aplicar.
+
+## Checklist pre-handoff
+- [ ] Leí el código de la ruta/componente existente (si existe) y `src/styles.css`.
+- [ ] Apliqué reuse-first: identifiqué qué componentes del repo reuso; los nuevos son de librería.
+- [ ] Verifiqué que los datos ya los da la API; marqué `TODO:` lo que falta (lectura simple vs sensible).
+- [ ] El HTML está completo (todos los estados) y se ve bien en **mobile (375) y desktop**.
+- [ ] El README tiene tabla de componentes a reusar + tabla de datos/TODO + checklist.
+- [ ] **NO embarqué** reglas del repo, snapshots de tokens, fuentes, assets, kit ni preview.
+- [ ] grep en los `.tsx`: `font-display` solo en display/wordmark · `toLocaleString` → 0 · hex → 0.
