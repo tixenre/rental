@@ -56,7 +56,8 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
     fechaDesde: hayFechas ? toLocalISO(startDate!, startTime) : null,
     fechaHasta: hayFechas ? toLocalISO(endDate!, endTime) : null,
   });
-  const total = totales.total;
+  const totalNeto = totales.totalNeto;
+  const conIva = totales.conIva;
 
   return (
     <div className="group/cart fixed inset-x-0 bottom-0 z-40 border-t-2 border-amber/60 bg-background/98 shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.15)] backdrop-blur-xl">
@@ -109,7 +110,10 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
           <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             {hayFechas ? "Total" : "/ jornada"}
           </div>
-          <div className="text-base font-semibold tabular sm:text-lg">{formatARS(total)}</div>
+          <div className="text-base font-semibold tabular sm:text-lg">
+            {formatARS(totalNeto)}
+            {conIva && <span className="text-xs font-normal text-muted-foreground"> + IVA</span>}
+          </div>
         </div>
 
         <button

@@ -37,7 +37,7 @@ import { authedFetch } from "@/lib/authedFetch";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
-import { useClienteSession, aplicaIva, IVA_PCT } from "@/lib/iva";
+import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
 import { RentalDateModal } from "@/components/rental/RentalDateModal";
@@ -334,16 +334,7 @@ function CartSheet({
     fechaDesde: hayFechas && fechaDesde ? toLocalISO(fechaDesde, horaDesde) : null,
     fechaHasta: hayFechas && fechaHasta ? toLocalISO(fechaHasta, horaHasta) : null,
   }).data;
-  const {
-    subtotal,
-    descuentoPct,
-    descuentoOrigen,
-    descuentoMonto,
-    totalNeto,
-    iva,
-    conIva,
-    total: totalFinal,
-  } = totales;
+  const { subtotal, descuentoPct, descuentoOrigen, descuentoMonto, totalNeto, conIva } = totales;
 
   async function handleSubmit() {
     if (entries.length === 0) return;
@@ -398,7 +389,7 @@ function CartSheet({
     "¡Hola! Acabo de solicitar un rental en Rambla:",
     ...entries.map(({ eq, qty }) => `• ${qty}× ${eq.brand} ${eq.name}`),
     fechaDesde ? `Fechas: ${fmtDate(fechaDesde)} → ${fmtDate(fechaHasta)} (${jornadas} jorn.)` : "",
-    `Total estimado: ${formatARS(totalFinal)}`,
+    `Total estimado: ${formatARS(totalNeto)}${conIva ? " + IVA" : ""}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -556,27 +547,6 @@ function CartSheet({
                 </div>
               )}
 
-              {conIva && (
-                <>
-                  <div className="flex justify-between items-baseline">
-                    <span className="font-sans text-[13px] text-muted-foreground">
-                      Subtotal neto
-                    </span>
-                    <span className="font-mono text-[13px] text-muted-foreground tabular-nums">
-                      {formatARS(totalNeto)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-baseline">
-                    <span className="font-sans text-[13px] text-muted-foreground">
-                      IVA {IVA_PCT}%
-                    </span>
-                    <span className="font-mono text-[13px] text-muted-foreground tabular-nums">
-                      +{formatARS(iva)}
-                    </span>
-                  </div>
-                </>
-              )}
-
               <div className="flex justify-between items-baseline opacity-45">
                 <span className="font-sans text-[13px] text-muted-foreground">
                   Depósito de seguridad
@@ -586,7 +556,7 @@ function CartSheet({
 
               <div className="flex justify-between items-baseline pt-2 border-t border-hairline mt-1">
                 <span className="font-sans text-[15px] font-bold text-ink">
-                  {hayFechas ? `Total${conIva ? " · IVA incluído" : ""}` : "Estimado / jornada"}
+                  {hayFechas ? "Total" : "Estimado / jornada"}
                 </span>
                 <span
                   style={{
@@ -597,7 +567,13 @@ function CartSheet({
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {formatARS(totalFinal)}
+                  {formatARS(totalNeto)}
+                  {conIva && (
+                    <span className="font-sans text-sm font-normal text-muted-foreground">
+                      {" "}
+                      + IVA
+                    </span>
+                  )}
                 </span>
               </div>
             </div>

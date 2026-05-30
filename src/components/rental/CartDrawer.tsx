@@ -15,7 +15,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
-import { useClienteSession, IVA_PCT } from "@/lib/iva";
+import { useClienteSession } from "@/lib/iva";
 import { EmptyImage } from "./EmptyImage";
 import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
@@ -95,9 +95,7 @@ export function CartDrawer({
     descuentoOrigen,
     descuentoMonto,
     totalNeto,
-    iva,
     conIva,
-    total,
   } = totales;
 
   // Lock scroll del body + guardar foco al abrir, restaurar al cerrar
@@ -466,25 +464,19 @@ export function CartDrawer({
                     <span className="tabular">−{formatARS(descuentoMonto)}</span>
                   </div>
                 )}
-                {conIva && (
-                  <>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Subtotal neto</span>
-                      <span className="tabular">{formatARS(totalNeto)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>IVA {IVA_PCT}%</span>
-                      <span className="tabular">+{formatARS(iva)}</span>
-                    </div>
-                  </>
-                )}
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                    {hayFechas
-                      ? `Total${conIva ? " · IVA incluído" : ""}`
-                      : "Estimado · por jornada"}
+                    {hayFechas ? "Total" : "Estimado · por jornada"}
                   </span>
-                  <span className="font-display text-3xl tabular text-ink">{formatARS(total)}</span>
+                  <span className="font-display text-3xl tabular text-ink">
+                    {formatARS(totalNeto)}
+                    {conIva && (
+                      <span className="ml-1 align-baseline font-sans text-base text-muted-foreground">
+                        {" "}
+                        + IVA
+                      </span>
+                    )}
+                  </span>
                 </div>
 
                 {!showNotas && list.length > 0 && (
