@@ -17,7 +17,7 @@ from admin_guard import require_admin
 from services.email import send_email
 from services.email.service import get_admin_to
 from services.precios import calcular_total, jornadas_periodo
-from routes.seo import SITE_URL
+from config import SITE_URL
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
