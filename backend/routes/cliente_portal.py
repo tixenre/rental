@@ -616,9 +616,13 @@ def _check_stock_hipotetico(
     Excluye el pedido actual del cálculo de reservas existentes (sus items
     actuales no compiten con los propuestos para el mismo rango).
     """
-    from routes.alquileres import (
-        _consolidar_items_por_equipo, _get_buffer_horas, _rango_con_buffer,
-        _reservado_directo, _reservado_via_kit, _unidades_en_mantenimiento,
+    from reservas import (
+        consolidar_items_por_equipo as _consolidar_items_por_equipo,
+        get_buffer_horas as _get_buffer_horas,
+        rango_con_buffer as _rango_con_buffer,
+        reservado_directo as _reservado_directo,
+        reservado_via_kit as _reservado_via_kit,
+        unidades_en_mantenimiento as _unidades_en_mantenimiento,
     )
     if not items or not fecha_desde or not fecha_hasta:
         return []
@@ -739,8 +743,9 @@ def cliente_modificar_pedido(
     - En `confirmado`: guarda `solicitudes_modificacion` con `cambios_json`
       y dispara email al admin. El pedido no se toca.
     """
+    from reservas import validar_stock as _check_stock
     from routes.alquileres import (
-        PedidoDatos, _apply_pedido_datos, _apply_pedido_items, _check_stock,
+        PedidoDatos, _apply_pedido_datos, _apply_pedido_items,
         _get_alquiler_detail,
     )
 
@@ -1123,8 +1128,9 @@ def admin_responder_solicitud(
       aplica los cambios al pedido reusando los helpers de `routes/alquileres`.
     - Si `estado='rechazada'`, sólo marca y notifica.
     """
+    from reservas import validar_stock as _check_stock
     from routes.alquileres import (
-        PedidoDatos, _apply_pedido_datos, _apply_pedido_items, _check_stock,
+        PedidoDatos, _apply_pedido_datos, _apply_pedido_items,
     )
 
     admin = require_admin(request)

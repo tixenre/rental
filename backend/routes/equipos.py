@@ -21,6 +21,7 @@ from database import (
     attach_ficha, attach_specs_destacados, attach_specs_estructuradas,
     regenerate_auto_tags, MARCA_SUBQUERY,
 )
+from reservas import ESTADOS_RESERVADO
 from routes.auth import get_session
 from admin_guard import require_admin
 from services.nombre_service import actualizar_nombres_de
@@ -529,8 +530,6 @@ def equipos_kpis(request: Request):
 
 
 # ── Rutas de equipos ─────────────────────────────────────────────────────────
-
-ESTADOS_RESERVADO = "('presupuesto','confirmado','retirado')"
 
 
 def _attach_disponibilidad(conn, equipos: list, desde: str, hasta: str) -> list:
@@ -2784,8 +2783,6 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
         first_day       = _date(year, month, 1).isoformat()
         last_day        = _date(year, month, days_in_month).isoformat()
 
-        ESTADOS = "('presupuesto','confirmado','retirado')"
-
         # Direct reservations that overlap this month
         directas = conn.execute(f"""
             SELECT to_char(p.fecha_desde, 'YYYY-MM-DD') AS desde,
@@ -2794,7 +2791,7 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
             FROM alquiler_items pi
             JOIN alquileres p ON p.id = pi.pedido_id
             WHERE pi.equipo_id = ?
-              AND p.estado IN {ESTADOS}
+              AND p.estado IN {ESTADOS_RESERVADO}
               AND p.fecha_desde::date <= ?
               AND p.fecha_hasta::date > ?
         """, (id, last_day, first_day)).fetchall()
@@ -2808,7 +2805,7 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
             JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
             JOIN alquileres p ON p.id = pi.pedido_id
             WHERE kc.componente_id = ?
-              AND p.estado IN {ESTADOS}
+              AND p.estado IN {ESTADOS_RESERVADO}
               AND p.fecha_desde::date <= ?
               AND p.fecha_hasta::date > ?
         """, (id, last_day, first_day)).fetchall()

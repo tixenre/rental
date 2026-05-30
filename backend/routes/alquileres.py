@@ -19,20 +19,17 @@ from services.email.service import get_admin_to
 from services.precios import calcular_total, jornadas_periodo
 from routes.seo import SITE_URL
 
-# Semántica del motor de reservas (fuente única en el paquete `reservas`).
-# Se re-exporta acá como alias para no romper los imports existentes
-# (`routes.estudio`, `routes.cliente_portal` importan estos nombres desde
-# `routes.alquileres`). Ver issue #501, Fase 1, Paso 2.
+# Motor de reservas: la fuente única vive en el paquete `reservas`. Acá se
+# importan solo los nombres que este módulo usa internamente (el endpoint
+# /disponibilidad delega en `calcular_disponibilidad`; las transiciones de
+# estado validan con `validar_stock`). `ESTADOS_RESERVADO` se re-exporta porque
+# es la constante canónica del dominio. El resto de las primitivas se importan
+# directo de `reservas` donde se usan (routes.estudio, routes.cliente_portal).
+# Ver issue #501, Fase 1.
 from reservas import ESTADOS_RESERVADO
 from reservas import (
     calcular_disponibilidad as _calcular_disponibilidad,
-    consolidar_items_por_equipo as _consolidar_items_por_equipo,
     dias_no_disponibles as _dias_no_disponibles,
-    get_buffer_horas as _get_buffer_horas,
-    rango_con_buffer as _rango_con_buffer,
-    reservado_directo as _reservado_directo,
-    reservado_via_kit as _reservado_via_kit,
-    unidades_en_mantenimiento as _unidades_en_mantenimiento,
     validar_stock as _check_stock,
 )
 

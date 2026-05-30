@@ -72,29 +72,29 @@ def _interpolaciones_sql(func) -> set[str]:
 def _funciones_motor():
     """Importadas adentro para que un fallo de import sea un fallo de test claro
     (y para no pagar el import si se colectan solo otros tests)."""
-    from routes.alquileres import (
-        _check_stock,
-        _dias_no_disponibles,
-        _get_buffer_horas,
-        _rango_con_buffer,
-        _reservado_directo,
-        _reservado_via_kit,
-        _unidades_en_mantenimiento,
-        get_disponibilidad,
+    from reservas import (
+        calcular_disponibilidad,
+        dias_no_disponibles,
+        get_buffer_horas,
+        rango_con_buffer,
+        reservado_directo,
+        reservado_via_kit,
+        unidades_en_mantenimiento,
+        validar_stock,
     )
     from routes.cliente_portal import _check_stock_hipotetico
     from routes.estudio import _centinela_libre
 
     return [
-        _check_stock,
+        validar_stock,
         _check_stock_hipotetico,
-        _dias_no_disponibles,
-        _get_buffer_horas,
-        _rango_con_buffer,
-        _reservado_directo,
-        _reservado_via_kit,
-        _unidades_en_mantenimiento,
-        get_disponibilidad,
+        calcular_disponibilidad,
+        dias_no_disponibles,
+        get_buffer_horas,
+        rango_con_buffer,
+        reservado_directo,
+        reservado_via_kit,
+        unidades_en_mantenimiento,
         _centinela_libre,
     ]
 
@@ -102,7 +102,7 @@ def _funciones_motor():
 # ── Tests ───────────────────────────────────────────────────────────────────
 
 def test_estados_reservado_es_literal_seguro():
-    from routes.alquileres import ESTADOS_RESERVADO
+    from reservas import ESTADOS_RESERVADO
 
     assert ESTADOS_RESERVADO == CANON
     for veneno in ("?", "%s", "%", "{", "}", ";", "--", " OR ", "UNION"):
@@ -111,13 +111,17 @@ def test_estados_reservado_es_literal_seguro():
     assert set(re.findall(r"'([^']+)'", ESTADOS_RESERVADO)) == ESTADOS_CANONICOS
 
 
-def test_copias_de_estados_reservado_son_identicas():
-    """alquileres y equipos definen cada uno su propia copia de la constante.
-    Si una deriva, el IN clause de ese módulo quedaría desincronizado (drift)."""
+def test_estados_reservado_es_fuente_unica():
+    """Tras la modularización, `reservas.ESTADOS_RESERVADO` es la fuente única:
+    los módulos que la usan la importan del paquete (no re-definen una copia).
+    Si alguien reintroduce una copia divergente, este guard la caza."""
+    from reservas import ESTADOS_RESERVADO as PKG
     from routes.alquileres import ESTADOS_RESERVADO as A
     from routes.equipos import ESTADOS_RESERVADO as E
 
-    assert A == E == CANON
+    assert A is PKG, "routes.alquileres debe reusar reservas.ESTADOS_RESERVADO, no copiarla"
+    assert E is PKG, "routes.equipos debe reusar reservas.ESTADOS_RESERVADO, no copiarla"
+    assert PKG == CANON
 
 
 @pytest.mark.parametrize(

@@ -12,7 +12,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from routes.alquileres import _reservado_directo, _reservado_via_kit
+from reservas import reservado_directo as _reservado_directo
+from reservas import reservado_via_kit as _reservado_via_kit
 
 pytestmark = pytest.mark.unit
 
@@ -72,10 +73,10 @@ def test_gate_e_hipotetico_comparten_el_helper():
     re-copiar la subquery (evita que vuelvan a divergir). El gate vive en
     `reservas.gate.validar_stock` (usa el nombre del paquete); el hipotético en
     `cliente_portal` lo importa con alias `_reservado_directo` — ambos cuentan."""
-    from routes.alquileres import _check_stock
+    from reservas import validar_stock
     from routes.cliente_portal import _check_stock_hipotetico
 
-    for fn in (_check_stock, _check_stock_hipotetico):
+    for fn in (validar_stock, _check_stock_hipotetico):
         src = inspect.getsource(fn)
         names = {n.id for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Name)}
         usa_helper = "reservado_directo" in names or "_reservado_directo" in names

@@ -16,7 +16,7 @@ import threading
 
 import pytest
 
-from routes.alquileres import _check_stock
+from reservas import validar_stock as _check_stock
 
 pytestmark = pytest.mark.unit
 
