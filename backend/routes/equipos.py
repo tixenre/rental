@@ -3246,6 +3246,7 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
 from services.image_upload import (
     _download_image_bytes,
     _ext_from_ctype,
+    _get_r2_client,
     _optimize_image,
     _r2_config,
     _upload_to_r2,
