@@ -1568,7 +1568,9 @@ export function EquipoFormDialogV2({
           ════════════════════════════════════════════════════════════════ */}
       {isEdit && initial && (
         <CollapsibleSection
-          title={form.watch("tipo") === "combo" ? "Componentes del combo" : "Kit (componentes incluidos)"}
+          title={
+            form.watch("tipo") === "combo" ? "Componentes del combo" : "Kit (componentes incluidos)"
+          }
         >
           {form.watch("tipo") === "combo" ? (
             <ComboEditor equipoId={initial.id} />
@@ -1636,7 +1638,7 @@ ${fotoTag}
 <thead><tr><th></th><th>Ítem</th><th style="text-align:center">Cant.</th><th style="text-align:center">✓</th></tr></thead>
 <tbody>${itemsHtml}</tbody>
 </table>
-<script>window.onload = function(){ window.print(); };<\/script>
+<script>window.onload = function(){ window.print(); };</script>
 </body></html>`;
                   const w = window.open("", "_blank", "width=700,height=600");
                   if (w) {

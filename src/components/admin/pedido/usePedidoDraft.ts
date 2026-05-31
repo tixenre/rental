@@ -248,7 +248,6 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
     if (!itemsMut.isPending) {
       setItems((cur) => (cur && shallowItemsEq(cur, it) ? cur : it));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedido, datosMut.isPending, itemsMut.isPending]);
 
   // ── Autosave debounced ─────────────────────────────────────────────────
