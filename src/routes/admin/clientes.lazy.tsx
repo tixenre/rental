@@ -30,17 +30,17 @@ import { adminApi, ESTADO_LABEL, type Cliente } from "@/lib/admin/api";
 import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { formatARS, formatFechaDisplay } from "@/lib/format";
 
 export const Route = createLazyFileRoute("/admin/clientes")({
   component: ClientesPage,
 });
 
-const fmtArs = (n: number | null | undefined) =>
-  n ? `$${Math.round(Number(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : "$0";
+const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
 
 const estadoLabel = (e: string) =>
   e === "presupuesto" ? "Solicitado" : (ESTADO_LABEL[e as keyof typeof ESTADO_LABEL] ?? e);
-const fmtFecha = (s: string | null) => (s ? s.slice(0, 10) : "—");
+const fmtFecha = (s: string | null) => formatFechaDisplay(s);
 
 function ClientesPage() {
   useDocumentTitle("Clientes · Back Office");

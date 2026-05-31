@@ -7,6 +7,8 @@
  * `/admin/settings` sin tocar código.
  */
 
+import { formatARS } from "@/lib/format";
+
 const fmtFecha = (s: string | null | undefined): string => {
   if (!s) return "—";
   try {
@@ -20,10 +22,7 @@ const fmtFecha = (s: string | null | undefined): string => {
   }
 };
 
-const fmtMonto = (n: number | null | undefined): string => {
-  if (n == null) return "$0";
-  return "$" + Math.round(n).toLocaleString("es-AR");
-};
+const fmtMonto = (n: number | null | undefined): string => formatARS(n ?? 0);
 
 export type PedidoMinimal = {
   numero_pedido?: number | null;

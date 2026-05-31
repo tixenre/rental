@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/table";
 
 import { adminApi, type Equipo } from "@/lib/admin/api";
+import { formatARS } from "@/lib/format";
 
 const fmtFecha = (iso: string) => {
   try {
@@ -46,12 +47,7 @@ const fmtFecha = (iso: string) => {
   }
 };
 
-const fmtMoneda = (n: number) =>
-  new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(n);
+const fmtMoneda = (n: number) => formatARS(n);
 
 export function HistorialEquipoDialog({
   equipo,

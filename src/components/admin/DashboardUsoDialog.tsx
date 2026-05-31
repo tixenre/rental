@@ -28,14 +28,11 @@ import {
 } from "@/components/ui/table";
 
 import { adminApi } from "@/lib/admin/api";
+import { formatARS } from "@/lib/format";
 
 const fmtMoneda = (n: number | null | undefined) => {
   if (n == null) return "—";
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(n);
+  return formatARS(n);
 };
 
 const fmtFecha = (iso: string | null) => {

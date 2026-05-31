@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, descuentosJornadaApi } from "@/lib/admin/api";
+import { formatARS } from "@/lib/format";
 import { interpolarDescuento } from "@/lib/api";
 import { FAQ_GROUPS, parseFaq, type FaqGroup } from "@/data/faq";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -946,8 +947,7 @@ function PreciosManualesPanel({ onRecalcSelected }: { onRecalcSelected: (ids: nu
     });
   };
 
-  const fmtPrecio = (n: number | null) =>
-    n == null ? "—" : `$${Math.round(n).toLocaleString("es-AR", { maximumFractionDigits: 0 })}`;
+  const fmtPrecio = (n: number | null) => (n == null ? "—" : formatARS(n));
 
   return (
     <div className="border-t hairline pt-3 space-y-2">

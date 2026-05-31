@@ -428,5 +428,4 @@ export const categories: Category[] = [
 
 export const brands = Array.from(new Set(equipment.map((x) => x.brand))).sort();
 
-export const formatPrice = (n: number) =>
-  new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(n);
+export { formatARS as formatPrice } from "@/lib/format";
