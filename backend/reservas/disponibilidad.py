@@ -1,12 +1,14 @@
 """Camino de LECTURA del motor de reservas: disponibilidad (catálogo/calendario).
 
-Funciones puras (reciben `conn`, sin abrir/cerrar transacción y SIN `FOR UPDATE`)
-movidas verbatim desde `routes/alquileres.py` (issue #501, Fase 1, Paso 3). SQL
-byte-idéntico → move sin cambio de conducta.
+Funciones puras (reciben `conn`, sin abrir/cerrar transacción y SIN `FOR UPDATE`).
+Originadas como move verbatim desde `routes/alquileres.py` (issue #501, Fase 1,
+Paso 3). C4 (#635) hizo recursiva la derivación de compuestos y el conteo de
+consumo (expandiendo hasta las hojas, vía `reservas.semantics`), para que un combo
+anidado muestre disponibilidad correcta — antes, a 1 nivel, era optimista.
 
 Comparten la MISMA semántica que el gate de escritura (reservas directas + vía
-kit + mantenimiento + buffer), pero la lectura NUNCA toma locks: es para mostrar
-disponibilidad, no para reservar. El gate (`_check_stock`) vive aparte.
+compuestos + mantenimiento + buffer), pero la lectura NUNCA toma locks: es para
+mostrar disponibilidad, no para reservar. El gate (`_check_stock`) vive aparte.
 """
 import datetime
 
@@ -14,6 +16,7 @@ from database import to_datetime
 
 from reservas.estados import ESTADOS_RESERVADO
 from reservas.semantics import (
+    _expandir_mult,
     componentes_de,
     expandir_demanda,
     get_buffer_horas,
@@ -35,39 +38,32 @@ def calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id=No
     buffer_horas = get_buffer_horas(conn)
     fd_buf, fh_buf = rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
 
-    directas = conn.execute(f"""
-        SELECT e.id, e.cantidad,
-               COALESCE(SUM(CASE
-                 WHEN p.estado IN {ESTADOS_RESERVADO}
-                      AND p.fecha_desde < ?
-                      AND p.fecha_hasta > ?
-                      AND (? IS NULL OR p.id != ?)
-                 THEN pi.cantidad ELSE 0
-               END), 0) AS reservado
-        FROM equipos e
-        LEFT JOIN alquiler_items pi ON pi.equipo_id = e.id
-        LEFT JOIN alquileres p ON p.id = pi.pedido_id
-        GROUP BY e.id
-    """, (fh_buf, fd_buf, excl, excl)).fetchall()
+    # Stock propio de cada equipo (correcto para hojas; los compuestos se derivan).
+    cantidad = {
+        r["id"]: r["cantidad"]
+        for r in conn.execute("SELECT id, cantidad FROM equipos").fetchall()
+    }
 
-    reservado = {r["id"]: r["reservado"] for r in directas}
-    cantidad  = {r["id"]: r["cantidad"]  for r in directas}
-
-    via_kit = conn.execute(f"""
-        SELECT kc.componente_id,
-               SUM(pi.cantidad * kc.cantidad) AS extra
-        FROM kit_componentes kc
-        JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
+    # Items reservados (directos) por pedidos activos que se pisan con el rango
+    # bufferizado, agregados por equipo. Excluye el propio pedido al editar.
+    res_rows = conn.execute(f"""
+        SELECT pi.equipo_id AS eid, COALESCE(SUM(pi.cantidad), 0) AS cant
+        FROM alquiler_items pi
         JOIN alquileres p ON p.id = pi.pedido_id
         WHERE p.estado IN {ESTADOS_RESERVADO}
           AND p.fecha_desde < ?
           AND p.fecha_hasta > ?
           AND (? IS NULL OR p.id != ?)
-        GROUP BY kc.componente_id
+        GROUP BY pi.equipo_id
     """, (fh_buf, fd_buf, excl, excl)).fetchall()
+    reservados = {r["eid"]: r["cant"] for r in res_rows}
 
-    for r in via_kit:
-        reservado[r["componente_id"]] = reservado.get(r["componente_id"], 0) + r["extra"]
+    # C4 #635: el consumo de cada item reservado se expande RECURSIVAMENTE hasta
+    # las hojas (todos los componentes) → cuánto consume realmente cada equipo,
+    # contando combos anidados. A 1 nivel un combo→kit→hoja no descontaba la hoja
+    # (disponibilidad optimista falsa). Para datos NO anidados da exactamente
+    # `directas + vía-kit`.
+    consumo = expandir_demanda(conn, reservados, solo_esenciales=False)
 
     # Mantenimiento que bloquea stock (sin buffer — ventana exacta).
     mant = conn.execute("""
@@ -82,22 +78,25 @@ def calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id=No
 
     # Disponibilidad "cruda" de cada equipo como ítem suelto (correcta para hojas).
     raw = {
-        eid: max(0, cantidad.get(eid, 0) - reservado.get(eid, 0) - en_mant.get(eid, 0))
+        eid: max(0, cantidad.get(eid, 0) - consumo.get(eid, 0) - en_mant.get(eid, 0))
         for eid in cantidad
     }
     return _derivar_compuestos(raw, componentes_de(conn))
 
 
 def _derivar_compuestos(raw: dict, comps_by: dict) -> dict:
-    """C1 #635 — derivación PURA de los equipos compuestos a partir de sus
-    componentes. Dado `raw[eid]` (disponibilidad cruda de cada equipo como ítem
-    suelto) y `comps_by[eid] = [(componente_id, cantidad), ...]`, devuelve
+    """C1+C4 #635 — derivación PURA de los equipos compuestos a partir de sus
+    componentes, RECURSIVA (bottom-up / orden topológico). Dado `raw[eid]`
+    (disponibilidad cruda de cada equipo como ítem suelto) y
+    `comps_by[eid] = [(componente_id, cantidad, esencial), ...]`, devuelve
     `{str(eid): disponibilidad}`.
 
     Un compuesto está disponible tantas veces como permitan su stock propio Y sus
-    componentes ESENCIALES: `min(raw[propio], min_i ⌊raw[comp_i] / qty_i⌋)` sobre
-    los componentes con `esencial=True`. Espeja la lógica del gate (propio +
-    componentes, 1 nivel). Para hojas (sin componentes), devuelve `raw` sin cambio.
+    componentes ESENCIALES: `min(raw[propio], min_i ⌊derivado[comp_i] / qty_i⌋)`
+    sobre los componentes con `esencial=True`. C4: usa el valor DERIVADO de cada
+    componente compuesto (no su `raw`), bajando hasta las hojas — un combo que
+    contiene un kit hereda la (in)disponibilidad real del kit. Para hojas (sin
+    componentes), devuelve `raw` sin cambio.
 
       · Kit: el stock propio (unidades primarias) limita junto a los componentes.
       · Combo: su `cantidad` propia es un sentinel alto (lo setea el builder en A2),
@@ -106,17 +105,31 @@ def _derivar_compuestos(raw: dict, comps_by: dict) -> dict:
 
     C2: los componentes **best-effort** (`esencial=False`) NO entran en el min — un
     alargue escaso no esconde el combo (el faltante se refleja como "parcial" en
-    A2). `comps_by[eid] = [(componente_id, cantidad, esencial), ...]`. Recursión = C4.
+    A2). El memo da orden topológico natural; `path` corta ciclos (defensa en
+    profundidad — los ciclos ya se previenen al escribir vía `_crea_ciclo_kit`).
     """
-    result: dict[str, int] = {}
-    for eid, r in raw.items():
+    memo: dict[int, int] = {}
+
+    def derivar(eid, path):
+        if eid in memo:
+            return memo[eid]
+        if eid in path:
+            return raw.get(eid, 0)  # ciclo (defensa): no memoiza para no envenenar
         comps = comps_by.get(eid)
-        if comps:
-            limites = [raw.get(cid, 0) // q for (cid, q, esencial) in comps if esencial and q > 0]
-            result[str(eid)] = min([r, *limites]) if limites else r
+        if not comps:
+            val = raw.get(eid, 0)
         else:
-            result[str(eid)] = r
-    return result
+            sub = path | {eid}
+            limites = [
+                derivar(cid, sub) // q
+                for (cid, q, esencial) in comps
+                if esencial and q > 0
+            ]
+            val = min([raw.get(eid, 0), *limites]) if limites else raw.get(eid, 0)
+        memo[eid] = val
+        return val
+
+    return {str(eid): derivar(eid, frozenset()) for eid in raw}
 
 
 def dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> list[str]:
@@ -157,37 +170,37 @@ def dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> 
         ).fetchall()
     }
 
-    # Segmentos de reserva (directos + vía kit), con su cantidad por equipo.
+    # C4 #635: segmentos de reserva expandidos RECURSIVAMENTE. Cada item reservado
+    # (apunte a la hoja, a un kit o a un combo anidado) aporta su segmento a TODAS
+    # las hojas/nodos que consume, multiplicado por la receta y bajando hasta el
+    # fondo. A 1 nivel un combo→kit→hoja no descontaba la hoja → el calendario
+    # mostraba disponible un día que el gate después rechazaba. Solo guardamos lo
+    # que cae en `ids` (la demanda del carrito). Para datos NO anidados es idéntico
+    # a `directas + vía-kit`.
+    id_set = set(ids)
     segs: dict[int, list[tuple]] = {eid: [] for eid in ids}
-    directas = conn.execute(
+    graph = componentes_de(conn)
+    exp_cache: dict[int, dict] = {}
+    res_segs = conn.execute(
         f"""
         SELECT pi.equipo_id AS eid, p.fecha_desde AS fd, p.fecha_hasta AS fh, pi.cantidad AS cant
         FROM alquiler_items pi
         JOIN alquileres p ON p.id = pi.pedido_id
         WHERE p.estado IN {ESTADOS_RESERVADO}
-          AND pi.equipo_id IN ({ph})
           AND p.fecha_hasta > ? AND p.fecha_desde < ?
         """,
-        (*ids, win_lo, win_hi),
+        (win_lo, win_hi),
     ).fetchall()
-    for r in directas:
-        segs[r["eid"]].append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
-
-    via_kit = conn.execute(
-        f"""
-        SELECT kc.componente_id AS eid, p.fecha_desde AS fd, p.fecha_hasta AS fh,
-               pi.cantidad * kc.cantidad AS cant
-        FROM kit_componentes kc
-        JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
-        JOIN alquileres p ON p.id = pi.pedido_id
-        WHERE p.estado IN {ESTADOS_RESERVADO}
-          AND kc.componente_id IN ({ph})
-          AND p.fecha_hasta > ? AND p.fecha_desde < ?
-        """,
-        (*ids, win_lo, win_hi),
-    ).fetchall()
-    for r in via_kit:
-        segs.setdefault(r["eid"], []).append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
+    for r in res_segs:
+        e = r["eid"]
+        consumo = exp_cache.get(e)
+        if consumo is None:
+            consumo = _expandir_mult({e: 1}, graph, solo_esenciales=False)
+            exp_cache[e] = consumo
+        fd, fh, cant = to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]
+        for (node, mult) in consumo.items():
+            if node in id_set:
+                segs[node].append((fd, fh, cant * mult))
 
     # Mantenimiento (sin buffer).
     mant: dict[int, list[tuple]] = {eid: [] for eid in ids}

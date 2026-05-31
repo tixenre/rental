@@ -76,9 +76,10 @@ def _funciones_motor():
         calcular_disponibilidad,
         dias_no_disponibles,
         get_buffer_horas,
+        parientes_de,
         rango_con_buffer,
         reservado_directo,
-        reservado_via_kit,
+        reservado_total,
         unidades_en_mantenimiento,
         validar_stock,
     )
@@ -91,9 +92,10 @@ def _funciones_motor():
         calcular_disponibilidad,
         dias_no_disponibles,
         get_buffer_horas,
+        parientes_de,
         rango_con_buffer,
         reservado_directo,
-        reservado_via_kit,
+        reservado_total,
         unidades_en_mantenimiento,
         _centinela_libre,
     ]

@@ -1,11 +1,14 @@
 """Primitivas semánticas del motor de reservas (compartidas lectura + gate).
 
-Movidas verbatim desde `routes/alquileres.py` (issue #501, Fase 1, Paso 2). El
-SQL es byte-idéntico al original: este paso es un MOVE puro, sin cambio de
-conducta. El lock `FOR UPDATE` y la transacción NO viven acá — son del gate.
+Originadas como move verbatim desde `routes/alquileres.py` (issue #501, Fase 1,
+Paso 2). C4 (#635) agregó acá el NÚCLEO de la expansión recursiva — una sola pieza
+(`_expandir_mult`) que recorre el DAG de composición en cualquier dirección, más
+el grafo inverso (`parientes_de`) y el conteo de consumo recursivo
+(`reservado_total`) — para que lectura y gate cuenten los combos anidados sin
+divergir. El lock `FOR UPDATE` y la transacción NO viven acá — son del gate.
 
-Todos los valores van como bound params (`?`); el único token interpolado en SQL
-es la constante interna `ESTADOS_RESERVADO`.
+Todos los valores van como bound params (`?`); los únicos tokens interpolados en
+SQL son la constante interna `ESTADOS_RESERVADO` y el placeholder `ph` de los IN.
 """
 import datetime
 import threading
@@ -140,14 +143,14 @@ def consolidar_items_por_equipo(items) -> dict:
 
 
 def componentes_de(conn, equipo_ids=None) -> dict:
-    """Componentes (1 nivel) de cada equipo compuesto:
+    """Componentes DIRECTOS (1 nivel) de cada equipo compuesto:
     `{equipo_id: [(componente_id, cantidad, esencial), ...]}`.
 
-    Si `equipo_ids` se pasa, filtra a esos equipos; si no, trae todos. `esencial`
-    (bool) viene de `kit_componentes.esencial` (default TRUE): un componente
-    best-effort (esencial=false) NO constriñe la disponibilidad ni bloquea días
-    (C2) — solo los esenciales. La recursión (componente que es a su vez
-    compuesto), C4.
+    Si `equipo_ids` se pasa, filtra a esos equipos; si no, trae todo el grafo de
+    una. `esencial` (bool) viene de `kit_componentes.esencial` (default TRUE): un
+    componente best-effort (esencial=false) NO constriñe la disponibilidad ni
+    bloquea días (C2) — solo los esenciales. Es la adyacencia HACIA ABAJO; la
+    expansión recursiva hasta las hojas (C4) la hace `_expandir_mult`.
     """
     if equipo_ids is not None:
         ids = list(equipo_ids)
@@ -173,26 +176,100 @@ def componentes_de(conn, equipo_ids=None) -> dict:
     return out
 
 
-def expandir_demanda(conn, items: dict) -> dict:
-    """Expande `items` ({equipo_id: cantidad}) a demanda consolidada por equipo
-    ({equipo_id: demanda}), 1 nivel. SOLO los componentes ESENCIALES aportan
-    demanda (C2): un best-effort faltante no bloquea — el día/combo sigue
-    disponible (estado "parcial", que afina C2/A2).
+def parientes_de(conn, componente_ids=None) -> dict:
+    """Padres DIRECTOS (1 nivel) de cada equipo — el grafo de composición INVERSO:
+    `{componente_id: [(equipo_id, cantidad, esencial), ...]}`.
 
-    Espeja la expansión del gate (cada item aporta su demanda propia + la de cada
-    componente esencial, ponderada, consolidando equipos repetidos). Fuente única
-    para que la LECTURA exija la misma demanda esencial que el gate post-C4 — así
-    no divergen. (Hoy todos los componentes son esencial=TRUE, así que no cambia
-    nada para los datos actuales.) La unificación física con el gate se hace en C4.
+    Espejo HACIA ARRIBA de `componentes_de`. Lo usa el conteo de consumo recursivo
+    (`reservado_total`): para saber cuánto se reservó de una hoja hay que subir por
+    todos los compuestos que la contienen (a cualquier profundidad). `esencial` es
+    el flag de la arista padre→hijo. Si `componente_ids` se pasa, filtra; si no,
+    trae todo el grafo inverso de una.
     """
-    comps_by = componentes_de(conn, items.keys())
-    demanda: dict[int, int] = {}
-    for eid, qty in items.items():
-        demanda[eid] = demanda.get(eid, 0) + qty
-        for (cid, cqty, esencial) in comps_by.get(eid, []):
-            if esencial:
-                demanda[cid] = demanda.get(cid, 0) + qty * cqty
+    if componente_ids is not None:
+        ids = list(componente_ids)
+        if not ids:
+            return {}
+        ph = ",".join("?" for _ in ids)
+        rows = conn.execute(
+            f"SELECT equipo_id, componente_id, cantidad, "
+            f"COALESCE(esencial, TRUE) AS esencial FROM kit_componentes "
+            f"WHERE componente_id IN ({ph})",
+            tuple(ids),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT equipo_id, componente_id, cantidad, "
+            "COALESCE(esencial, TRUE) AS esencial FROM kit_componentes"
+        ).fetchall()
+    out: dict[int, list] = {}
+    for r in rows:
+        out.setdefault(r["componente_id"], []).append(
+            (r["equipo_id"], r["cantidad"], bool(r["esencial"]))
+        )
+    return out
+
+
+def _expandir_mult(roots: dict, graph: dict, solo_esenciales: bool, max_depth: int = 64) -> dict:
+    """Expansión recursiva de multiplicidades sobre el DAG de composición (C4 #635).
+
+    NÚCLEO compartido de TODA la expansión del motor (lectura + gate). Dado un
+    conjunto de `roots` ({nodo: cantidad}) y un grafo de adyacencia
+    `graph[nodo] = [(vecino, cantidad_arista, esencial), ...]`, acumula la demanda
+    total sobre CADA nodo alcanzable multiplicando las cantidades a lo largo de
+    cada camino y SUMANDO los caminos (un diamante A→B→D y A→C→D suma las dos
+    contribuciones a D). Es agnóstico de la dirección: con `componentes_de` expande
+    hacia las HOJAS (demanda hacia abajo); con `parientes_de` expande hacia las
+    RAÍCES (consumo hacia arriba). Una sola pieza recursiva → lectura y gate nunca
+    divergen.
+
+    `esencial` se propaga de forma CONJUNTIVA (AND a lo largo del camino): con
+    `solo_esenciales=True`, una arista best-effort corta el descenso → toda su
+    subrama queda fuera de la demanda dura (decisión C4: un sub-kit best-effort
+    arrastra a toda su subrama como best-effort, coherente con C2 a 1 nivel). Con
+    `solo_esenciales=False` se cuentan todas las aristas (semántica del gate y del
+    conteo de consumo — el gate sigue estricto, igual que hoy).
+
+    Guardas (defensa en profundidad; los ciclos ya se previenen al ESCRIBIR vía
+    `_crea_ciclo_kit`): `path` corta back-edges (ciclo en el camino actual, sin
+    impedir diamantes legítimos) y `max_depth` acota la profundidad. Aristas con
+    cantidad <= 0 no aportan demanda.
+    """
+    demanda: dict = {}
+
+    def visit(node, mult, depth, path):
+        demanda[node] = demanda.get(node, 0) + mult
+        if depth >= max_depth:
+            return
+        for (vecino, cant, esencial) in graph.get(node, ()):
+            if (solo_esenciales and not esencial) or cant <= 0 or vecino in path:
+                continue
+            visit(vecino, mult * cant, depth + 1, path | {node})
+
+    for (node, qty) in roots.items():
+        if qty and qty > 0:
+            visit(node, qty, 0, frozenset())
     return demanda
+
+
+def expandir_demanda(conn, items: dict, solo_esenciales: bool = True) -> dict:
+    """Expande `items` ({equipo_id: cantidad}) a demanda consolidada por equipo
+    ({equipo_id: demanda}), RECURSIVAMENTE hasta las hojas (C4 #635).
+
+    Cada compuesto aporta su propia demanda + la de cada componente (ponderada por
+    la cantidad de la receta), bajando por TODO el árbol — un combo que contiene un
+    kit que contiene hojas suma la demanda de las hojas (a 1 nivel se contaban de
+    menos → overbooking en anidados). Espeja exactamente la expansión del gate
+    (misma multiplicación, mismos componentes) → fuente única para que LECTURA y
+    GATE exijan la misma demanda y no diverjan.
+
+    `solo_esenciales=True` (default, camino de LECTURA): solo los componentes
+    ESENCIALES aportan demanda — un best-effort faltante no bloquea (C2) y su
+    subrama entera queda fuera (AND a lo largo del camino). `solo_esenciales=False`
+    (gate / conteo de consumo): cuentan todos los componentes (gate estricto, igual
+    que hoy; la lógica blanda de best-effort se resuelve afuera del gate).
+    """
+    return _expandir_mult(items, componentes_de(conn), solo_esenciales)
 
 
 def reservado_directo(conn, equipo_id: int, excl_pedido_id: int, fh_buf, fd_buf) -> int:
@@ -216,22 +293,39 @@ def reservado_directo(conn, equipo_id: int, excl_pedido_id: int, fh_buf, fd_buf)
     """, (equipo_id, excl_pedido_id, fh_buf, fd_buf)).fetchone()[0]
 
 
-def reservado_via_kit(conn, equipo_id: int, excl_pedido_id: int, fh_buf, fd_buf) -> int:
-    """Unidades de `equipo_id` reservadas INDIRECTAMENTE: otros pedidos activos
-    reservan un kit que tiene a `equipo_id` como componente (cantidad ponderada
-    por kc.cantidad), pisándose con el rango bufferizado [fd_buf, fh_buf].
+def reservado_total(conn, equipo_id: int, excl_pedido_id: int, fh_buf, fd_buf,
+                    solo_esenciales: bool = False, rev_graph=None, cache=None) -> int:
+    """Unidades de `equipo_id` reservadas por OTROS pedidos activos que se pisan con
+    el rango bufferizado [fd_buf, fh_buf], contando la reserva DIRECTA y la que
+    llega a través de CUALQUIER compuesto que lo contenga, a CUALQUIER profundidad
+    (C4 #635 — conteo de consumo recursivo).
 
-    Sin esto, dos pedidos podrían confirmarse sobre la misma unidad — uno vía kit
-    y otro directo. Mismas garantías de parametrización que `reservado_directo`.
+    Reemplaza al par `reservado_directo + reservado_via_kit`, que solo veía 1 nivel
+    y dejaba pasar overbooking en combos anidados: un combo→kit→hoja reservado por
+    otro pedido NO sumaba a la hoja (el kit no es padre DIRECTO de la hoja). Acá se
+    sube por el grafo inverso de composición (`parientes_de`) acumulando la
+    multiplicidad de cada camino, y se suma
+    `reservado_directo(antecesor) * multiplicidad` sobre el propio equipo y todos
+    sus antecesores. Para datos NO anidados da EXACTAMENTE
+    `reservado_directo + reservado_via_kit` (caracterización: el término de
+    profundidad-1 es justo la vieja subquery vía-kit).
+
+    `solo_esenciales=False` (default, gate + chequeo hipotético): cuenta TODOS los
+    caminos, igual que hoy el gate. `rev_graph`/`cache` son opcionales para reusar
+    el grafo inverso y memoizar las sub-consultas a lo largo de un mismo chequeo
+    (el gate lockea N nodos): no cambian el resultado, solo evitan repetir lecturas.
+    NO toma locks — el `SELECT ... FOR UPDATE` lo toma el caller sobre la fila del
+    equipo, antes de llamar a esta función.
     """
-    return conn.execute(f"""
-        SELECT COALESCE(SUM(pi2.cantidad * kc.cantidad), 0)
-        FROM alquiler_items pi2
-        JOIN alquileres p ON p.id = pi2.pedido_id
-        JOIN kit_componentes kc ON kc.equipo_id = pi2.equipo_id
-        WHERE kc.componente_id = ?
-          AND p.id != ?
-          AND p.estado IN {ESTADOS_RESERVADO}
-          AND p.fecha_desde < ?
-          AND p.fecha_hasta > ?
-    """, (equipo_id, excl_pedido_id, fh_buf, fd_buf)).fetchone()[0]
+    rev = rev_graph if rev_graph is not None else parientes_de(conn)
+    multiplicidades = _expandir_mult({equipo_id: 1}, rev, solo_esenciales)
+    total = 0
+    for (antecesor, mult) in multiplicidades.items():
+        if cache is not None and antecesor in cache:
+            rd = cache[antecesor]
+        else:
+            rd = reservado_directo(conn, antecesor, excl_pedido_id, fh_buf, fd_buf)
+            if cache is not None:
+                cache[antecesor] = rd
+        total += mult * rd
+    return total

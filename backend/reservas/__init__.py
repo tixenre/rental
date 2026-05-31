@@ -22,9 +22,10 @@ from reservas.semantics import (
     expandir_demanda,
     get_buffer_horas,
     invalidate_buffer_cache,
+    parientes_de,
     rango_con_buffer,
     reservado_directo,
-    reservado_via_kit,
+    reservado_total,
     unidades_en_mantenimiento,
 )
 
@@ -37,9 +38,10 @@ __all__ = [
     "expandir_demanda",
     "get_buffer_horas",
     "invalidate_buffer_cache",
+    "parientes_de",
     "rango_con_buffer",
     "reservado_directo",
-    "reservado_via_kit",
+    "reservado_total",
     "unidades_en_mantenimiento",
     "validar_stock",
 ]

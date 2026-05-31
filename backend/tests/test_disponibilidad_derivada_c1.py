@@ -49,13 +49,23 @@ def test_componente_inexistente_da_cero():
     assert _derivar_compuestos({10: 5}, {10: [(99, 2, True)]})["10"] == 0
 
 
-def test_es_un_solo_nivel_no_recursivo():
-    """C1 es 1 nivel: al derivar un compuesto usa el `raw` de sus componentes,
-    NO su valor derivado. La recursión (combo que contiene un kit) es C4."""
+def test_recursivo_usa_el_derivado_del_componente():
+    """C4: al derivar un compuesto usa el valor DERIVADO de sus componentes
+    (bottom-up), NO su `raw`. Un combo que contiene un kit hereda la
+    indisponibilidad real del kit, bajando hasta las hojas."""
     raw = {1: 9999, 2: 10, 3: 1}
     out = _derivar_compuestos(raw, {1: [(2, 1, True)], 2: [(3, 5, True)]})
-    assert out["2"] == 0   # el kit 2 SÍ se deriva: min(10, 1//5=0) = 0
-    assert out["1"] == 10  # el combo 1 usa raw[2]=10 (NO el derivado 0) → 1 nivel. C4 daría 0.
+    assert out["2"] == 0   # kit 2: min(10, 1//5=0) = 0
+    assert out["1"] == 0   # combo 1 usa el DERIVADO de 2 (=0), no su raw (=10) → 0
+
+
+def test_recursivo_multiplica_cantidades_por_nivel():
+    """La demanda baja multiplicando las cantidades de cada arista: combo 1 lleva
+    2× kit 2, y el kit 2 lleva 3× hoja 3 → cada combo necesita 6 hojas."""
+    raw = {1: 9999, 2: 9999, 3: 12}
+    out = _derivar_compuestos(raw, {1: [(2, 2, True)], 2: [(3, 3, True)]})
+    assert out["2"] == 4   # kit 2: min(9999, 12//3=4) = 4
+    assert out["1"] == 2   # combo 1: min(9999, derivado[2]=4 // 2 = 2) = 2
 
 
 # ── C2 — best-effort NO constriñe ────────────────────────────────────────────
@@ -95,19 +105,22 @@ class _FakeCursor:
 
 
 class _FakeConn:
-    """Stub: responde la query de `componentes_de` con los kits dados.
-    `kits = {equipo_id: [(componente_id, cantidad, esencial), ...]}`."""
+    """Stub: responde la query de `componentes_de` (grafo completo) con los kits
+    dados. `kits = {equipo_id: [(componente_id, cantidad, esencial), ...]}`.
+
+    C4: `expandir_demanda` ahora trae TODO el grafo de una (`componentes_de(conn)`
+    sin filtro) y recursa en memoria — la query no lleva `WHERE equipo_id IN`."""
 
     def __init__(self, kits):
         self.kits = kits
 
     def execute(self, sql, params=()):
         s = " ".join(sql.split()).upper()
-        if "FROM KIT_COMPONENTES WHERE EQUIPO_ID IN" in s:
+        if s.startswith("SELECT EQUIPO_ID, COMPONENTE_ID, CANTIDAD") and "FROM KIT_COMPONENTES" in s:
             rows = [
                 _FakeRow(equipo_id=eid, componente_id=cid, cantidad=q, esencial=ese)
-                for eid in params
-                for (cid, q, ese) in self.kits.get(eid, [])
+                for eid, comps in self.kits.items()
+                for (cid, q, ese) in comps
             ]
             return _FakeCursor(rows)
         return _FakeCursor([])
@@ -137,3 +150,25 @@ def test_expandir_demanda_excluye_best_effort():
     # componente 4 esencial (cuenta), componente 9 best-effort (NO bloquea días)
     conn = _FakeConn({10: [(4, 2, True), (9, 3, False)]})
     assert expandir_demanda(conn, {10: 1}) == {10: 1, 4: 2}
+
+
+# ── expandir_demanda — recursión hasta las hojas (C4) ────────────────────────
+def test_expandir_demanda_recursivo_anidado():
+    # combo 100 → kit 10 (q1) → hoja 4 (q2): la demanda baja hasta la hoja.
+    conn = _FakeConn({100: [(10, 1, True)], 10: [(4, 2, True)]})
+    assert expandir_demanda(conn, {100: 1}) == {100: 1, 10: 1, 4: 2}
+
+
+def test_expandir_demanda_recursivo_multiplica_por_nivel():
+    # combo 100 lleva 2× kit 10, el kit 10 lleva 3× hoja 4 → 2 combos = 12 hojas.
+    conn = _FakeConn({100: [(10, 2, True)], 10: [(4, 3, True)]})
+    assert expandir_demanda(conn, {100: 2}) == {100: 2, 10: 4, 4: 12}
+
+
+def test_expandir_demanda_best_effort_corta_toda_la_subrama():
+    """Decisión C4: una arista best-effort corta el descenso → toda su subrama
+    queda fuera de la demanda dura (AND a lo largo del camino). Con
+    `solo_esenciales=False` (gate) se cuenta todo."""
+    conn = _FakeConn({100: [(10, 1, False)], 10: [(4, 2, True)]})
+    assert expandir_demanda(conn, {100: 1}) == {100: 1}  # subrama best-effort fuera
+    assert expandir_demanda(conn, {100: 1}, solo_esenciales=False) == {100: 1, 10: 1, 4: 2}

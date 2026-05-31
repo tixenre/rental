@@ -80,14 +80,22 @@ class LockingFakeConn:
             self.log.append(("mant", params[0]))
             return FakeCursor([FakeRow({0: 0})])
 
-        if s_up.startswith("SELECT PI.EQUIPO_ID, PI.CANTIDAD, E.NOMBRE"):
+        if s_up.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = ?"):
             self.log.append("items")
             pid = params[0]
             return FakeCursor([FakeRow(r) for r in self.pedido_items.get(pid, [])])
 
-        if s_up.startswith("SELECT KC.COMPONENTE_ID, KC.CANTIDAD AS KC_CANT"):
+        # Grafo de composición (componentes_de / parientes_de) — sin kits en estos tests.
+        if s_up.startswith("SELECT EQUIPO_ID, COMPONENTE_ID, CANTIDAD") and "FROM KIT_COMPONENTES" in s_up:
             self.log.append("kit_expand")
-            return FakeCursor([])  # sin kits en estos tests
+            return FakeCursor([])
+
+        # Nombres para los mensajes.
+        if s_up.startswith("SELECT ID, NOMBRE FROM EQUIPOS WHERE ID IN"):
+            self.log.append("nombres")
+            return FakeCursor([
+                FakeRow(id=i, nombre=e["nombre"]) for i, e in self.world.equipos.items()
+            ])
 
         # ── El lock: emula SELECT ... FOR UPDATE ──
         if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s_up:
@@ -101,6 +109,7 @@ class LockingFakeConn:
             return FakeCursor([FakeRow(cantidad=eq["cantidad"])])
 
         # Reservas directas — se leen del estado COMMITEADO (bajo el lock ya tomado).
+        # `reservado_total` (sin kits) se reduce a `reservado_directo` del propio equipo.
         if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s_up:
             eq_id, excl = params[0], params[1]
             self.log.append(("reservado_directo", eq_id))
@@ -109,10 +118,6 @@ class LockingFakeConn:
                 if e == eq_id and p != excl
             )
             return FakeCursor([FakeRow({0: total})])
-
-        if "JOIN KIT_COMPONENTES KC ON KC.EQUIPO_ID = PI2.EQUIPO_ID WHERE KC.COMPONENTE_ID = ?" in s_up:
-            self.log.append(("via_kit", params[0]))
-            return FakeCursor([FakeRow({0: 0})])
 
         return FakeCursor([])
 

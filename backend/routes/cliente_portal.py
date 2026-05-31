@@ -620,8 +620,7 @@ def _check_stock_hipotetico(
         consolidar_items_por_equipo as _consolidar_items_por_equipo,
         get_buffer_horas as _get_buffer_horas,
         rango_con_buffer as _rango_con_buffer,
-        reservado_directo as _reservado_directo,
-        reservado_via_kit as _reservado_via_kit,
+        reservado_total as _reservado_total,
         unidades_en_mantenimiento as _unidades_en_mantenimiento,
     )
     if not items or not fecha_desde or not fecha_hasta:
@@ -660,15 +659,13 @@ def _check_stock_hipotetico(
             problemas.append(f"{it['nombre']} (no encontrado)")
             continue
         stock_total = lock["cantidad"]
-        # Reserva = directa + vía-kit (mismos helpers compartidos que el gate real
-        # `_check_stock`). Antes este chequeo hipotético solo contaba la directa y
-        # NO la vía-kit → undercount: podía aceptar una propuesta que el gate luego
-        # rechazaba. Ahora ambos cuentan lo mismo. El lock FOR UPDATE de arriba se
+        # Reserva = consumo recursivo (directo + vía cualquier compuesto que lo
+        # contenga, a cualquier profundidad) — MISMO helper que el gate real
+        # (`_check_stock` → `reservado_total`), para que no diverjan. Antes contaba
+        # solo 1 nivel (directa + vía-kit) y podía aceptar una propuesta sobre una
+        # hoja que un combo anidado ya tenía tomada. El lock FOR UPDATE de arriba se
         # mantiene (este chequeo corre dentro de la transacción del caller).
-        reservado = (
-            _reservado_directo(conn, it["equipo_id"], pedido_id, fh_buf, fd_buf)
-            + _reservado_via_kit(conn, it["equipo_id"], pedido_id, fh_buf, fd_buf)
-        )
+        reservado = _reservado_total(conn, it["equipo_id"], pedido_id, fh_buf, fd_buf)
         en_mantenimiento = _unidades_en_mantenimiento(
             conn, it["equipo_id"], fecha_desde, fecha_hasta
         )

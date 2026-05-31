@@ -270,18 +270,17 @@ class EstudioConflictoFakeConn:
         if "FROM EQUIPO_MANTENIMIENTO" in s:
             return _Cur([{0: 0}])
 
-        # Items del pedido (1ra query de _check_stock): el centinela.
-        if s.startswith("SELECT PI.EQUIPO_ID, PI.CANTIDAD, E.NOMBRE, E.CANTIDAD AS STOCK_TOTAL"):
-            return _Cur([{
-                "equipo_id": self.centinela_id,
-                "cantidad": 1,
-                "nombre": "Estudio (espacio)",
-                "stock_total": self.stock,
-            }])
+        # Items del pedido (1ra query del gate): el centinela.
+        if s.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = ?"):
+            return _Cur([{"equipo_id": self.centinela_id, "cantidad": 1}])
 
-        # Componentes del centinela — ninguno (no es kit).
-        if s.startswith("SELECT KC.COMPONENTE_ID, KC.CANTIDAD AS KC_CANT"):
+        # Grafo de composición (componentes_de / parientes_de) — el centinela no es kit.
+        if s.startswith("SELECT EQUIPO_ID, COMPONENTE_ID, CANTIDAD") and "FROM KIT_COMPONENTES" in s:
             return _Cur([])
+
+        # Nombres para los mensajes.
+        if s.startswith("SELECT ID, NOMBRE FROM EQUIPOS WHERE ID IN"):
+            return _Cur([{"id": self.centinela_id, "nombre": "Estudio (espacio)"}])
 
         # Lock + stock del centinela.
         if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s:
@@ -297,10 +296,6 @@ class EstudioConflictoFakeConn:
                 if self._parse(fd_e) < fh_c and self._parse(fh_e) > fd_c:
                     total += 1
             return _Cur([{0: total}])
-
-        # Reservas vía kit — ninguna.
-        if "JOIN KIT_COMPONENTES KC ON KC.EQUIPO_ID = PI2.EQUIPO_ID WHERE KC.COMPONENTE_ID = ?" in s:
-            return _Cur([{0: 0}])
 
         return _Cur([])
 
