@@ -101,6 +101,7 @@ type Perfil = {
 };
 
 type Item = {
+  id?: number;
   nombre: string;
   marca: string;
   modelo?: string | null;
@@ -111,7 +112,7 @@ type Item = {
   nombre_publico?: string | null;
   nombre_publico_largo?: string | null;
 };
-type Pago = { monto: number; concepto?: string | null; fecha: string };
+type Pago = { id?: number; monto: number; concepto?: string | null; fecha: string };
 type SolicitudPortal = {
   id: number;
   estado: "pendiente" | "aprobada" | "rechazada" | "cancelada";
@@ -1297,7 +1298,7 @@ function PedidoCard({
                   const display = item.nombre_publico || item.nombre;
                   return (
                     <li
-                      key={i}
+                      key={item.id ?? i}
                       className="flex items-center gap-2.5 py-2 border-b border-[var(--hairline)] last:border-b-0"
                     >
                       {item.foto_url ? (
@@ -1502,7 +1503,7 @@ function PedidoCard({
                 <ul className="flex flex-col gap-1">
                   {pedido.pagos.map((pg, i) => (
                     <li
-                      key={i}
+                      key={pg.id ?? i}
                       className="flex items-center justify-between gap-2 font-sans text-xs text-muted-foreground"
                     >
                       <span className="truncate">

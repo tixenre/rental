@@ -25,6 +25,7 @@ export function EtiquetasSection() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["admin", "etiquetas"] });
     qc.invalidateQueries({ queryKey: ["etiquetas"] });
+    qc.invalidateQueries({ queryKey: ["equipos"] });
   };
 
   const createMut = useMutation({

@@ -12,6 +12,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 
 from database import get_db, row_to_dict, to_datetime, to_iso, now_ar
+from rate_limit import limiter
 from pdf import _pedido_html, _albaran_html, _contrato_html, _packing_list_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin, is_admin_email
 from routes.auth import get_session
@@ -659,6 +660,7 @@ class CotizarRequest(BaseModel):
 
 
 @router.post("/cotizar")
+@limiter.limit("30/minute")
 def cotizar(data: CotizarRequest, request: Request):
     """Cotización canónica del carrito — fuente única, calculada en el backend.
 

@@ -270,7 +270,7 @@ def auth_config():
 def auth_dev_login():
     """Login directo sin OAuth — solo en dev (ADMIN_BYPASS_AUTH=1, nunca en prod)."""
     if not dev_bypass_enabled():
-        raise HTTPException(403, "Solo disponible en modo desarrollo.")
+        raise HTTPException(404, "No encontrado.")
     return _make_session_response(
         email="dev@local",
         name="Dev Admin",

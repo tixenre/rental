@@ -232,4 +232,4 @@ class TestDevBypassEnabled:
         monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
         with pytest.raises(HTTPException) as exc:
             auth_dev_login()
-        assert exc.value.status_code == 403
+        assert exc.value.status_code == 404

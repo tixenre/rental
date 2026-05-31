@@ -86,6 +86,7 @@ export function BrandingSection() {
     onSuccess: (data) => {
       toast.success("Teléfono actualizado");
       qc.setQueryData(["settings", "whatsapp_phone"], data.value);
+      qc.invalidateQueries({ queryKey: ["settings", "list"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -108,6 +109,7 @@ export function BrandingSection() {
     onSuccess: (data) => {
       toast.success("Taglines guardados");
       qc.setQueryData(["settings", "hero_taglines"], data.value);
+      qc.invalidateQueries({ queryKey: ["settings", "list"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

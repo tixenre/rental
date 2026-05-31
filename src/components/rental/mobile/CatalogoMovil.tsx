@@ -1302,6 +1302,7 @@ export function CatalogoMovil() {
             <input
               className="w-full rounded-[var(--radius-lg)] border-[1.5px] border-hairline bg-surface font-sans text-sm py-[11px] pl-[38px] pr-9 text-ink placeholder:text-muted-foreground outline-none transition-all focus:border-amber"
               style={{ fontFamily: "var(--font-sans)" }}
+              aria-label="Buscar equipos"
               placeholder="Buscar equipo, marca, pack…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
