@@ -48,3 +48,31 @@ export function countJornadas(start?: Date, end?: Date): number {
  *   jornadaLabel(3) // → "3 jornadas"
  */
 export const jornadaLabel = (n: number) => `${n} ${n === 1 ? "jornada" : "jornadas"}`;
+
+/**
+ * Formatea una fecha ISO string como "31 may" — para tablas del admin y
+ * listas cortas donde el contexto ya provee el año.
+ * El sufijo T12:00:00 evita el timezone shift en todos los browsers.
+ *
+ * @example formatFechaCorta("2026-05-31") // → "31 may"
+ */
+export function formatFechaCorta(s?: string | null): string {
+  if (!s) return "—";
+  const d = new Date(s.slice(0, 10) + "T12:00:00");
+  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${d.getDate()} ${meses[d.getMonth()]}`;
+}
+
+/**
+ * Formatea una fecha ISO string como "31-05-2026" — para detalle de pedidos
+ * y documentos donde se necesita la fecha completa sin ambigüedad.
+ *
+ * @example formatFechaDisplay("2026-05-31") // → "31-05-2026"
+ */
+export function formatFechaDisplay(s?: string | null): string {
+  if (!s) return "—";
+  const d = new Date(s.slice(0, 10) + "T12:00:00");
+  return [d.getDate(), d.getMonth() + 1, d.getFullYear()]
+    .map((n) => String(n).padStart(2, "0"))
+    .join("-");
+}

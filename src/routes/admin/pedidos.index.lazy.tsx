@@ -42,6 +42,7 @@ import {
   FAB,
 } from "@/components/mobile";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { formatARS, formatFechaCorta, formatFechaDisplay } from "@/lib/format";
 
 export const Route = createLazyFileRoute("/admin/pedidos/")({
   component: PedidosPage,
@@ -59,17 +60,11 @@ const ESTADO_FILTERS: { id: EstadoFilter; label: string }[] = [
   { id: "todos", label: "Todos" },
 ];
 
-const fmtArs = (n: number | null | undefined) =>
-  n ? `$${Math.round(Number(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : "$0";
+const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
 
-const fmtFecha = (s: string | null) => (s ? s.slice(0, 10) : "—");
+const fmtFecha = (s: string | null) => formatFechaDisplay(s);
 
-const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-const fmtFechaMobile = (s: string | null) => {
-  if (!s) return "—";
-  const [, m, d] = s.slice(0, 10).split("-");
-  return `${parseInt(d)} ${MESES[parseInt(m) - 1]}`;
-};
+const fmtFechaMobile = (s: string | null) => formatFechaCorta(s);
 
 function MobileCardSkeleton() {
   return (

@@ -79,17 +79,13 @@ import {
   type SaveStatus,
   type PedidoMode,
 } from "./usePedidoDraft";
+import { formatARS, formatFechaDisplay } from "@/lib/format";
 
 // ── Formatters ────────────────────────────────────────────────────────────
 
-const fmtArs = (n: number | null | undefined) =>
-  n ? `$${Math.round(Number(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 })}` : "$0";
+const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
 
-const fmtFecha = (s: string) => {
-  if (!s) return "—";
-  const [y, m, d] = s.slice(0, 10).split("-");
-  return `${d}-${m}-${y}`;
-};
+const fmtFecha = (s: string) => formatFechaDisplay(s);
 
 // ── Avatar ────────────────────────────────────────────────────────────────
 

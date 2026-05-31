@@ -14,13 +14,13 @@ import {
 
 import { adminApi } from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { formatARS } from "@/lib/format";
 
 export const Route = createLazyFileRoute("/admin/estadisticas")({
   component: EstadisticasPage,
 });
 
-const fmtArs = (n: number | null | undefined) =>
-  n != null ? `$${Math.round(Number(n)).toLocaleString("es-AR")}` : "$0";
+const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
 
 function EstadisticasPage() {
   useDocumentTitle("Estadísticas · Back Office");

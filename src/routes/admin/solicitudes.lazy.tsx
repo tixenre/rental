@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 
 import { authedFetch, authedJson } from "@/lib/authedFetch";
+import { formatARS, formatFechaDisplay } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -72,15 +73,10 @@ type PedidoLite = {
 };
 
 function fmtFecha(s?: string | null) {
-  if (!s) return "—";
-  return s.slice(0, 10).split("-").reverse().join("-");
+  return formatFechaDisplay(s);
 }
 function fmtArs(n: number) {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(n);
+  return formatARS(n);
 }
 
 function SolicitudesPage() {

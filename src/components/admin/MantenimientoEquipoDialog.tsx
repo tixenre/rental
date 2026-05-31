@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 
 import { adminApi, type Equipo, type MantenimientoInput } from "@/lib/admin/api";
+import { formatARS } from "@/lib/format";
 
 const TIPOS = [
   { value: "revision", label: "Revisión" },
@@ -53,12 +54,7 @@ const fmtFecha = (iso: string) => {
   }
 };
 
-const fmtMoneda = (n: number) =>
-  new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(n);
+const fmtMoneda = (n: number) => formatARS(n);
 
 /**
  * Devuelve la fecha de HOY en formato YYYY-MM-DD según la zona horaria local.
