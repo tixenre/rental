@@ -957,6 +957,10 @@ def init_db():
     conn.execute("""
         ALTER TABLE kit_componentes ADD COLUMN IF NOT EXISTS orden INTEGER NOT NULL DEFAULT 0
     """)
+    # A1 #635: columnas para combos (descuento por línea + esencial/best-effort).
+    # Schema en init_db (idempotente); el backfill del tipo vive en la migración a1c3b5f7e9d2.
+    conn.execute("ALTER TABLE kit_componentes ADD COLUMN IF NOT EXISTS descuento_pct FLOAT NOT NULL DEFAULT 0.0")
+    conn.execute("ALTER TABLE kit_componentes ADD COLUMN IF NOT EXISTS esencial BOOLEAN NOT NULL DEFAULT TRUE")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquiler_pagos (
@@ -1102,6 +1106,9 @@ def init_db():
     # equipos.slug (migraciones e4a7c1f8d6b2 + f5b8d2e4a9c1): columna + UNIQUE
     # constraint completo (no partial index — ese era transicional).
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS slug VARCHAR(80)")
+    # A1 #635: tipo de producto (simple/kit/combo). DEFAULT 'simple'; el backfill
+    # (kits con componentes → 'kit') y el CHECK viven en la migración a1c3b5f7e9d2.
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'simple'")
     conn.execute("""
         DO $$
         BEGIN
