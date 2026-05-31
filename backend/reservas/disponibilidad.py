@@ -13,7 +13,12 @@ import datetime
 from database import to_datetime
 
 from reservas.estados import ESTADOS_RESERVADO
-from reservas.semantics import get_buffer_horas, rango_con_buffer
+from reservas.semantics import (
+    componentes_de,
+    expandir_demanda,
+    get_buffer_horas,
+    rango_con_buffer,
+)
 
 
 def calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id=None) -> dict:
@@ -75,12 +80,41 @@ def calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id=No
     """, (fecha_hasta, fecha_desde)).fetchall()
     en_mant = {r["equipo_id"]: r["bloqueado"] for r in mant}
 
-    return {
-        str(eid): max(0, cantidad.get(eid, 0)
-                      - reservado.get(eid, 0)
-                      - en_mant.get(eid, 0))
+    # Disponibilidad "cruda" de cada equipo como ítem suelto (correcta para hojas).
+    raw = {
+        eid: max(0, cantidad.get(eid, 0) - reservado.get(eid, 0) - en_mant.get(eid, 0))
         for eid in cantidad
     }
+    return _derivar_compuestos(raw, componentes_de(conn))
+
+
+def _derivar_compuestos(raw: dict, comps_by: dict) -> dict:
+    """C1 #635 — derivación PURA de los equipos compuestos a partir de sus
+    componentes. Dado `raw[eid]` (disponibilidad cruda de cada equipo como ítem
+    suelto) y `comps_by[eid] = [(componente_id, cantidad), ...]`, devuelve
+    `{str(eid): disponibilidad}`.
+
+    Un compuesto está disponible tantas veces como permitan su stock propio Y
+    cada componente: `min(raw[propio], min_i ⌊raw[comp_i] / qty_i⌋)`. Espeja la
+    lógica del gate (propio + componentes, 1 nivel, TODOS los componentes). Para
+    hojas (sin componentes), devuelve `raw` sin cambio.
+
+      · Kit: el stock propio (unidades primarias) limita junto a los componentes.
+      · Combo: su `cantidad` propia es un sentinel alto (lo setea el builder en A2),
+        así el min lo gobiernan los componentes — MISMO código, sin special-case
+        de tipo. El motor es tipo-agnóstico, igual que el gate.
+
+    Estricto: todos los componentes cuentan (best-effort = C2). Recursión = C4.
+    """
+    result: dict[str, int] = {}
+    for eid, r in raw.items():
+        comps = comps_by.get(eid)
+        if comps:
+            limites = [raw.get(cid, 0) // q for (cid, q) in comps if q > 0]
+            result[str(eid)] = min([r, *limites]) if limites else r
+        else:
+            result[str(eid)] = r
+    return result
 
 
 def dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> list[str]:
@@ -94,13 +128,20 @@ def dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> 
     """
     if not items:
         return []
-    ids = list(items.keys())
-    ph = ",".join("?" for _ in ids)
-
     d_desde = to_datetime(desde)
     d_hasta = to_datetime(hasta)
     if d_desde is None or d_hasta is None or d_hasta < d_desde:
         return []
+
+    # C1 #635: expandir los compuestos del carrito a demanda por equipo (stock
+    # propio + componentes, espejando el gate). Un día se bloquea si CUALQUIER
+    # equipo de la demanda expandida no la cubre.
+    demanda = expandir_demanda(conn, items)
+    if not demanda:
+        return []
+    ids = list(demanda.keys())
+    ph = ",".join("?" for _ in ids)
+
     buffer_horas = get_buffer_horas(conn)
     buf = datetime.timedelta(hours=buffer_horas)
     # Ventana amplia para traer segmentos relevantes (incluye buffer).
@@ -161,7 +202,7 @@ def dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> 
     for r in mrows:
         mant.setdefault(r["eid"], []).append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
 
-    return _dias_bloqueados(stock, segs, mant, items, d_desde, d_hasta, buf)
+    return _dias_bloqueados(stock, segs, mant, demanda, d_desde, d_hasta, buf)
 
 
 def _dias_bloqueados(stock, segs, mant, items, d_desde, d_hasta, buf) -> list[str]:

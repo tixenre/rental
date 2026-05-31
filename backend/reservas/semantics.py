@@ -139,6 +139,54 @@ def consolidar_items_por_equipo(items) -> dict:
     return out
 
 
+def componentes_de(conn, equipo_ids=None) -> dict:
+    """Componentes (1 nivel) de cada equipo compuesto:
+    `{equipo_id: [(componente_id, cantidad), ...]}`.
+
+    Si `equipo_ids` se pasa, filtra a esos equipos; si no, trae todos. NO filtra
+    por tipo ni por `esencial` — espeja la expansión del gate (`validar_stock`),
+    que toma todos los `kit_componentes`. El best-effort (esencial=false) lo
+    introduce C2; la recursión (componente que es a su vez compuesto), C4.
+    """
+    if equipo_ids is not None:
+        ids = list(equipo_ids)
+        if not ids:
+            return {}
+        ph = ",".join("?" for _ in ids)
+        rows = conn.execute(
+            f"SELECT equipo_id, componente_id, cantidad FROM kit_componentes "
+            f"WHERE equipo_id IN ({ph})",
+            tuple(ids),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT equipo_id, componente_id, cantidad FROM kit_componentes"
+        ).fetchall()
+    out: dict[int, list] = {}
+    for r in rows:
+        out.setdefault(r["equipo_id"], []).append((r["componente_id"], r["cantidad"]))
+    return out
+
+
+def expandir_demanda(conn, items: dict) -> dict:
+    """Expande `items` ({equipo_id: cantidad}) a demanda consolidada por equipo
+    ({equipo_id: demanda}), 1 nivel.
+
+    Espeja EXACTAMENTE la expansión del gate (`validar_stock`): cada item aporta
+    su demanda propia + la de cada componente (cantidad ponderada por la del kit),
+    sumando si varios items comparten un equipo. Fuente única para que la LECTURA
+    (catálogo/calendario) exija la misma demanda que el gate de escritura — así no
+    pueden divergir. La unificación física con el gate se hace en C4.
+    """
+    comps_by = componentes_de(conn, items.keys())
+    demanda: dict[int, int] = {}
+    for eid, qty in items.items():
+        demanda[eid] = demanda.get(eid, 0) + qty
+        for (cid, cqty) in comps_by.get(eid, []):
+            demanda[cid] = demanda.get(cid, 0) + qty * cqty
+    return demanda
+
+
 def reservado_directo(conn, equipo_id: int, excl_pedido_id: int, fh_buf, fd_buf) -> int:
     """Unidades de `equipo_id` reservadas DIRECTAMENTE (items que lo apuntan) por
     otros pedidos activos que se pisan con el rango ya bufferizado [fd_buf, fh_buf].
