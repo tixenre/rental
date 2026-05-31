@@ -659,11 +659,15 @@ def _check_stock_hipotetico(
             problemas.append(f"{it['nombre']} (no encontrado)")
             continue
         stock_total = lock["cantidad"]
-        # Reserva = consumo recursivo (directo + vía cualquier compuesto que lo
-        # contenga, a cualquier profundidad) — MISMO helper que el gate real
-        # (`_check_stock` → `reservado_total`), para que no diverjan. Antes contaba
-        # solo 1 nivel (directa + vía-kit) y podía aceptar una propuesta sobre una
-        # hoja que un combo anidado ya tenía tomada. El lock FOR UPDATE de arriba se
+        # CONSUMO (backward) = recursivo: directo + vía cualquier compuesto que lo
+        # contenga, a cualquier profundidad — MISMO helper que el gate real
+        # (`reservado_total`), así no subcuenta lo que un combo anidado ya tiene
+        # tomado (antes era 1 nivel). NOTA: este es un pre-chequeo "amistoso" que
+        # solo decide si guardar la PROPUESTA del cliente; NO expande la demanda
+        # forward de la propuesta a sus componentes (preexistente). El control
+        # AUTORITATIVO al aprobar la solicitud es `validar_stock`, que sí expande
+        # forward recursivo → no hay overbooking. (Follow-up: unificar también el
+        # forward acá vía `expandir_demanda`.) El lock FOR UPDATE de arriba se
         # mantiene (este chequeo corre dentro de la transacción del caller).
         reservado = _reservado_total(conn, it["equipo_id"], pedido_id, fh_buf, fd_buf)
         en_mantenimiento = _unidades_en_mantenimiento(
