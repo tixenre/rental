@@ -468,9 +468,11 @@ class FichaUpdate(BaseModel):
 
 class KitItem(BaseModel):
     componente_id: int
-    cantidad:      int = 1
-    descuento_pct: float | None = None
-    esencial:      bool = True
+    cantidad:      int   = Field(default=1, ge=1, le=9999)
+    # default 0.0 (NO None): la columna kit_componentes.descuento_pct es NOT NULL,
+    # un NULL explícito la viola. Rango 0..100 (% de descuento por línea de combo).
+    descuento_pct: float = Field(default=0.0, ge=0, le=100)
+    esencial:      bool  = True
 
 
 class KitReorder(BaseModel):
