@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Loader2,
   Upload,
@@ -156,6 +156,7 @@ export function EquipoFormDialogV2({
   onCreatedWithMissingRecommended?: (equipo: Equipo, missing: RecommendedField[]) => void;
 }) {
   const isEdit = !!initial;
+  const qc = useQueryClient();
   const { rate: usdRate } = useUsdRate();
   const roiDefault = useRoiPctDefault();
 
@@ -863,7 +864,8 @@ export function EquipoFormDialogV2({
           isEdit || !!descripcion || !!notas || tags.length > 0 || !!nombrePublico.trim();
         if (tieneFicha) {
           try {
-            await adminApi.setFicha(equipoId, {
+            const validos = contenidoIncluido.filter((ci) => ci.nombre.trim().length > 0);
+            const fichaGuardada = await adminApi.setFicha(equipoId, {
               descripcion: descripcion || null,
               notas: notas || null,
               keywords_json: tags.length ? JSON.stringify(tags) : null,
@@ -880,11 +882,15 @@ export function EquipoFormDialogV2({
               // (el usuario puede tener una fila vacía sin completar; no la
               // enviamos para no fallar la validación del backend y perder
               // los ítems válidos en la misma operación).
-              contenido_incluido_json: (() => {
-                const validos = contenidoIncluido.filter((ci) => ci.nombre.trim().length > 0);
-                return validos.length > 0 ? JSON.stringify(validos) : null;
-              })(),
+              contenido_incluido_json: validos.length > 0 ? JSON.stringify(validos) : null,
             });
+            // Actualizar el cache de ficha inmediatamente con la respuesta del
+            // servidor. Sin esto, al usar "Aplicar" (no cierra el form), la
+            // invalidación del equipo dispara el effect [fichaQ.data, initial]
+            // con la ficha VIEJA (no invalidada) → setContenidoIncluido(viejos)
+            // pisa lo recién guardado. Con setQueryData el effect re-corre con
+            // la ficha fresca y el contenido queda correcto en pantalla.
+            qc.setQueryData(["admin", "equipo-ficha", equipoId], fichaGuardada);
           } catch (e) {
             fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
           }
