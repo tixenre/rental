@@ -134,6 +134,9 @@ export type Equipo = {
    *  y el nombre público. Independiente del árbol de categorías de catálogo
    *  (`categorias`), que es solo agrupación para el front-office. */
   categoria_specs?: string | null;
+  /** Tipo de producto. Gobierna precio, stock y disponibilidad.
+   *  'simple' = equipo suelto · 'kit' = con accesorios compartidos · 'combo' = agrupación derivada. */
+  tipo?: "simple" | "kit" | "combo";
   /** URL pública del HTML de producto guardado en R2 (para re-extracción futura). */
   html_source_url?: string | null;
   /** Timestamp ISO si el equipo está soft-deleted. null = activo (#206). */
@@ -159,6 +162,10 @@ export type KitComponente = {
   nombre: string;
   marca?: string | null;
   foto_url?: string | null;
+  /** Descuento % por línea (para combos — fase C3). */
+  descuento_pct?: number | null;
+  /** True = esencial (falta → combo no disponible); False = best-effort (fase C2). */
+  esencial?: boolean | null;
 };
 
 export type EquiposListResp = {

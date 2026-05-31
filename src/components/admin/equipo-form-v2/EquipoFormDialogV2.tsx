@@ -112,6 +112,7 @@ function buildSchema(isEdit: boolean) {
     estado: z.enum(["operativo", "en_mantenimiento", "fuera_servicio"]).default("operativo"),
     visible_catalogo: z.boolean().default(true),
     ficha_completa: z.boolean().default(false),
+    tipo: z.enum(["simple", "kit", "combo"]).default("simple"),
   });
 }
 
@@ -185,6 +186,7 @@ export function EquipoFormDialogV2({
       estado: (initial?.estado as FormValues["estado"]) ?? "operativo",
       visible_catalogo: initial ? Boolean(initial.visible_catalogo) : true,
       ficha_completa: initial ? Boolean(initial.ficha_completa) : false,
+      tipo: (initial?.tipo as FormValues["tipo"]) ?? "simple",
     },
   });
 
@@ -792,7 +794,7 @@ export function EquipoFormDialogV2({
       // Tags unificadas (chip UI) → se envían a ambos backends: etiquetas (top-level
       // equipo, para filtros/categorización) y keywords_json (ficha, para chips públicos).
       const etiquetas = uniq(tags.map((t) => t.trim()).filter(Boolean));
-      const { visible_catalogo, ficha_completa, ...rest } = values;
+      const { visible_catalogo, ficha_completa, tipo, ...rest } = values;
 
       const fotoUrlForm = rest.foto_url || null;
       const fotoExternaPendiente =
@@ -817,6 +819,7 @@ export function EquipoFormDialogV2({
         visible_catalogo: visible_catalogo ? 1 : 0,
         ficha_completa: ficha_completa,
         categoria_specs: categoriaSpecs || null,
+        tipo,
       };
 
       const fallidos: string[] = [];
@@ -1318,6 +1321,27 @@ export function EquipoFormDialogV2({
               )}
             </div>
           </Field>
+        </div>
+
+        <div className="space-y-2">
+          <Field label="Tipo de producto">
+            <Select
+              value={form.watch("tipo")}
+              onValueChange={(v) =>
+                form.setValue("tipo", v as FormValues["tipo"], { shouldDirty: true })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="simple">Equipo</SelectItem>
+                <SelectItem value="kit">Kit</SelectItem>
+                <SelectItem value="combo">Combo</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <TipoGlosario tipo={form.watch("tipo")} />
         </div>
 
         <Field label="Dueño">
@@ -2084,6 +2108,57 @@ function CategoriasPicker({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Glosario de tipos — panel de ayuda junto al selector de tipo
+// ════════════════════════════════════════════════════════════════════
+
+const TIPO_INFO: Record<
+  "simple" | "kit" | "combo",
+  { titulo: string; stock: string; precio: string; web: string; extra?: string }
+> = {
+  simple: {
+    titulo: "Equipo",
+    stock: "Propio",
+    precio: "Propio (manual)",
+    web: "Su categoría",
+    extra: "Puede tener contenido de caja (reflector, cables…) solo informativo.",
+  },
+  kit: {
+    titulo: "Kit",
+    stock: "Propio + pools compartidos de accesorios (kit_componentes)",
+    precio: "Manual (bundle cerrado; los componentes no suman)",
+    web: "Su categoría — el cliente no sabe que es Kit",
+    extra:
+      "Diferencia con Equipo: consume accesorios de un pool compartido. El precio es el del bundle.",
+  },
+  combo: {
+    titulo: "Combo",
+    stock: "Derivado: mín. de los componentes esenciales",
+    precio: "Σ (componente × cant × (1 − descuento_línea)), dinámico",
+    web: "Categoría Combos",
+    extra:
+      "Esencial falta → no disponible. Best-effort falta → parcialmente disponible, mismo precio.",
+  },
+};
+
+function TipoGlosario({ tipo }: { tipo: "simple" | "kit" | "combo" }) {
+  const info = TIPO_INFO[tipo];
+  return (
+    <div className="rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs space-y-1">
+      <p className="font-medium text-ink/90">{info.titulo}</p>
+      <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-muted-foreground">
+        <span className="font-medium">Stock</span>
+        <span>{info.stock}</span>
+        <span className="font-medium">Precio</span>
+        <span>{info.precio}</span>
+        <span className="font-medium">Web</span>
+        <span>{info.web}</span>
+      </div>
+      {info.extra && <p className="text-muted-foreground/80 italic pt-0.5">{info.extra}</p>}
     </div>
   );
 }

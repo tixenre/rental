@@ -305,6 +305,15 @@ def _validar_categoria_specs(v: Optional[str]) -> Optional[str]:
     return v
 
 
+_TIPOS_EQUIPO = frozenset({"simple", "kit", "combo"})
+
+
+def _validar_tipo(v: Optional[str]) -> Optional[str]:
+    if v is not None and v not in _TIPOS_EQUIPO:
+        raise ValueError(f"tipo inválido: '{v}'. Opciones: simple, kit, combo")
+    return v
+
+
 class EquipoCreate(BaseModel):
     from pydantic import field_validator
     nombre:           str
@@ -325,6 +334,9 @@ class EquipoCreate(BaseModel):
     ficha_completa:   Optional[bool]  = False
     # Categoría de specs (1 de las 5 del registry): define qué specs aplican.
     categoria_specs: Optional[str] = None
+    # Tipo de producto: 'simple' = equipo suelto, 'kit' = con accesorios compartidos,
+    # 'combo' = agrupación derivada. Gobierna precio, stock y disponibilidad.
+    tipo:            Optional[str]   = "simple"
 
     @field_validator("precio_jornada")
     @classmethod
@@ -344,6 +356,11 @@ class EquipoCreate(BaseModel):
     @classmethod
     def validate_categoria_specs(cls, v):
         return _validar_categoria_specs(v)
+
+    @field_validator("tipo")
+    @classmethod
+    def validate_tipo(cls, v):
+        return _validar_tipo(v)
 
 
 class EquipoUpdate(BaseModel):
@@ -371,6 +388,8 @@ class EquipoUpdate(BaseModel):
     ficha_completa:   Optional[bool]  = None
     # Categoría de specs (1 de las 5 del registry): define qué specs aplican.
     categoria_specs: Optional[str] = None
+    # Tipo de producto: 'simple' / 'kit' / 'combo'.
+    tipo:            Optional[str]   = None
 
     @field_validator("precio_jornada")
     @classmethod
@@ -390,6 +409,11 @@ class EquipoUpdate(BaseModel):
     @classmethod
     def validate_categoria_specs(cls, v):
         return _validar_categoria_specs(v)
+
+    @field_validator("tipo")
+    @classmethod
+    def validate_tipo(cls, v):
+        return _validar_tipo(v)
 
 
 class FichaUpdate(BaseModel):
@@ -949,13 +973,13 @@ def create_equipo(data: EquipoCreate):
                                  precio_jornada, precio_usd, roi_pct,
                                  valor_reposicion, foto_url, fecha_compra,
                                  serie, bh_url, dueno, visible_catalogo, estado,
-                                 ficha_completa, categoria_specs)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                 ficha_completa, categoria_specs, tipo)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (data.nombre, brand_id, data.modelo, data.cantidad,
               data.precio_jornada, data.precio_usd, data.roi_pct,
               data.valor_reposicion, data.foto_url, _normalize_fecha_compra(data.fecha_compra),
               data.serie, data.bh_url, data.dueno, data.visible_catalogo, data.estado,
-              bool(data.ficha_completa), data.categoria_specs))
+              bool(data.ficha_completa), data.categoria_specs, data.tipo or "simple"))
         new_id = cur.lastrowid
         # Hook: calcular nombre_publico inicial. No falla el create si esto
         # rompe (ej. si los servicios no están disponibles).
@@ -1078,8 +1102,8 @@ def duplicate_equipo(id: int):
                 precio_jornada, precio_usd, roi_pct,
                 valor_reposicion, foto_url, fecha_compra,
                 serie, bh_url, dueno, visible_catalogo, estado,
-                ficha_completa
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ficha_completa, tipo
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             f"{src_d['nombre']} (copia)",
             src_d.get("brand_id"), src_d.get("modelo"), 1,
@@ -1088,6 +1112,7 @@ def duplicate_equipo(id: int):
             None,  # serie vacía
             src_d.get("bh_url"), src_d.get("dueno"), src_d.get("visible_catalogo", 1), src_d.get("estado", "operativo"),
             False,  # ficha_completa false para que el admin la revise
+            src_d.get("tipo", "simple"),  # hereda el tipo del original
         ))
         new_id = cur.lastrowid
 
@@ -1599,6 +1624,7 @@ def get_kit(id: int):
             raise HTTPException(404, "Equipo no encontrado")
         rows = conn.execute("""
             SELECT kc.id, kc.componente_id, kc.cantidad, kc.orden,
+                   kc.descuento_pct, kc.esencial,
                    e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url, e.visible_catalogo
             FROM kit_componentes kc
             JOIN equipos e ON e.id = kc.componente_id
