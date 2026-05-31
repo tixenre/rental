@@ -161,26 +161,77 @@ def dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> 
     for r in mrows:
         mant.setdefault(r["eid"], []).append((to_datetime(r["fd"]), to_datetime(r["fh"]), r["cant"]))
 
+    return _dias_bloqueados(stock, segs, mant, items, d_desde, d_hasta, buf)
+
+
+def _dias_bloqueados(stock, segs, mant, items, d_desde, d_hasta, buf) -> list[str]:
+    """Cómputo puro: días bloqueados dado stock, segmentos de reserva (con
+    buffer) y de mantenimiento (sin buffer) por equipo, ya traídos de la DB.
+
+    Event-based (diff-array) en vez de re-escanear todos los segmentos por cada
+    día: O(días + segmentos) por equipo en vez de O(días × segmentos). La
+    semántica es IDÉNTICA al loop original — cada segmento aporta su `cantidad`
+    a los días que pisa, con el MISMO predicado de overlap half-open:
+
+        día i (= [dia_i, dia_i+1)) lo cubre el segmento si  dia_i < sh' ∧ dia_i+1 > sd'
+
+    donde [sd', sh') es el segmento, expandido por el buffer para reservas
+    (sd-buf, sh+buf) y exacto para mantenimiento. Reordenar `sd<hi ∧ sh>lo` con
+    `lo=dia_i-buf, hi=dia_i+1+buf` da exactamente esa forma. Los índices de día
+    se calculan con aritmética ENTERA de timedelta (`.days`) — nada de división
+    float — para que los bordes de medianoche no sufran off-by-one.
+
+    El test diferencial `test_dias_no_disponibles_caracterizacion.py` fija que
+    coincide con la implementación vieja sobre cientos de casos aleatorios.
+    """
+    one = datetime.timedelta(days=1)
+    micro = datetime.timedelta(microseconds=1)
+    dia0 = d_desde.replace(hour=0, minute=0, second=0, microsecond=0)
+    fin0 = d_hasta.replace(hour=0, minute=0, second=0, microsecond=0)
+    n = (fin0 - dia0).days + 1
+    if n <= 0:
+        return []
+
+    def _acumular(diff, sd, sh, c, expandir):
+        """Suma `c` al rango de días [i_lo, i_hi] que el segmento cubre, vía
+        diff-array (incrementa en i_lo, decrementa en i_hi+1)."""
+        if sd is None or sh is None:
+            return
+        sd2 = sd - buf if expandir else sd
+        sh2 = sh + buf if expandir else sh
+        # i_lo: menor i con dia_{i+1} > sd2  ⟺ i ≥ floor((sd2-dia0)/día) = .days
+        # i_hi: mayor i con dia_i < sh2  ⟺ i = ceil((sh2-dia0)/día)-1 = (sh2-dia0-1µs).days
+        i_lo = max(0, (sd2 - dia0).days)
+        i_hi = min(n - 1, (sh2 - micro - dia0).days)
+        if i_lo <= i_hi:
+            diff[i_lo] += c
+            diff[i_hi + 1] -= c
+
     bloqueados: list[str] = []
-    dia = d_desde.replace(hour=0, minute=0, second=0, microsecond=0)
-    fin = d_hasta.replace(hour=0, minute=0, second=0, microsecond=0)
-    while dia <= fin:
-        dia_next = dia + datetime.timedelta(days=1)
-        # Buffer expande la ventana del día (mismo criterio que rango_con_buffer).
-        lo = dia - buf
-        hi = dia_next + buf
+    # Por equipo: prefix-sum de reservas + mantenimiento por día.
+    reservado_por_dia: dict = {}
+    for eid in items:
+        d_res = [0] * (n + 1)
+        d_man = [0] * (n + 1)
+        for (sd, sh, c) in segs.get(eid, []):
+            _acumular(d_res, sd, sh, c, expandir=True)
+        for (sd, sh, c) in mant.get(eid, []):
+            _acumular(d_man, sd, sh, c, expandir=False)
+        res = [0] * n
+        man = [0] * n
+        acc_r = acc_m = 0
+        for i in range(n):
+            acc_r += d_res[i]
+            acc_m += d_man[i]
+            res[i] = acc_r
+            man[i] = acc_m
+        reservado_por_dia[eid] = (res, man)
+
+    for i in range(n):
         for eid, qty in items.items():
-            reservado = sum(
-                c for (sd, sh, c) in segs.get(eid, [])
-                if sd is not None and sh is not None and sd < hi and sh > lo
-            )
-            en_mant = sum(
-                c for (sd, sh, c) in mant.get(eid, [])
-                if sd is not None and sh is not None and sd < dia_next and sh > dia
-            )
-            disp = stock.get(eid, 0) - reservado - en_mant
+            res, man = reservado_por_dia[eid]
+            disp = stock.get(eid, 0) - res[i] - man[i]
             if disp < max(1, qty):
-                bloqueados.append(dia.date().isoformat())
+                bloqueados.append((dia0 + i * one).date().isoformat())
                 break
-        dia = dia_next
     return bloqueados
