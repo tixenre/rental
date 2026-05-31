@@ -156,13 +156,20 @@ def test_gate_e_hipotetico_comparten_el_helper():
 # ── _check_stock_hipotetico — conducta (cuenta consumo recursivo) ────────────
 
 class _HipoteticoConn:
-    """FakeConn para `_check_stock_hipotetico`: stubea el lookup de equipo, el lock
-    FOR UPDATE, el buffer, el grafo inverso y la subquery de reserva directa."""
+    """FakeConn para `_check_stock_hipotetico` (espeja el gate: forward + backward).
 
-    def __init__(self, stock, parents=None, directas=None, buffer_horas=0):
+    stock:    dict[id, cantidad]
+    kit:      list[(equipo_id, componente_id, cantidad, esencial)]  (filas crudas de
+              kit_componentes — sirven a la vez para componentes_de y parientes_de)
+    directas: dict[equipo_id, int]   (lo que devuelve reservado_directo por equipo)
+    nombres:  dict[id, nombre]       (opcional; default f"eq{id}")
+    """
+
+    def __init__(self, stock, kit=None, directas=None, nombres=None, buffer_horas=0):
         self.stock = stock
-        self.parents = parents or {}
+        self.kit = kit or []
         self.directas = directas or {}
+        self.nombres = nombres or {}
         self.buffer_horas = buffer_horas
 
     def execute(self, sql, params=()):
@@ -171,17 +178,18 @@ class _HipoteticoConn:
             return FakeCursor([FakeRow(value=str(self.buffer_horas))])
         if "FROM EQUIPO_MANTENIMIENTO" in s:
             return FakeCursor([FakeRow({0: 0})])
-        if "SELECT NOMBRE, CANTIDAD FROM EQUIPOS WHERE ID = ?" in s:
-            return FakeCursor([FakeRow(nombre="Cámara", cantidad=self.stock)])
-        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s:
-            return FakeCursor([FakeRow(cantidad=self.stock)])
         if s.startswith("SELECT EQUIPO_ID, COMPONENTE_ID, CANTIDAD") and "FROM KIT_COMPONENTES" in s:
-            rows = [
-                FakeRow(equipo_id=eq, componente_id=cid, cantidad=cant, esencial=ese)
-                for cid, plist in self.parents.items()
-                for (eq, cant, ese) in plist
-            ]
-            return FakeCursor(rows)
+            return FakeCursor([
+                FakeRow(equipo_id=e, componente_id=c, cantidad=q, esencial=es)
+                for (e, c, q, es) in self.kit
+            ])
+        if s.startswith("SELECT ID, NOMBRE FROM EQUIPOS WHERE ID IN"):
+            return FakeCursor([
+                FakeRow(id=i, nombre=self.nombres.get(i, f"eq{i}")) for i in self.stock
+            ])
+        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s:
+            i = params[0]
+            return FakeCursor([FakeRow(cantidad=self.stock[i])] if i in self.stock else [])
         if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s:
             return FakeCursor([FakeRow({0: self.directas.get(params[0], 0)})])
         return FakeCursor([])
@@ -201,11 +209,16 @@ def _item(equipo_id, cantidad):
 
 
 def test_hipotetico_cuenta_reserva_via_compuesto():
-    """Si la única unidad de la hoja está tomada por un compuesto reservado, una
-    propuesta directa por esa hoja se rechaza — igual que el gate real."""
+    """Backward: si la única unidad de la hoja está tomada por un compuesto
+    reservado, una propuesta directa por esa hoja se rechaza — igual que el gate."""
     from routes.cliente_portal import _check_stock_hipotetico
 
-    conn = _HipoteticoConn(stock=1, parents={20: [(10, 1, True)]}, directas={10: 1})
+    conn = _HipoteticoConn(
+        stock={20: 1},
+        kit=[(10, 20, 1, True)],   # kit 10 contiene hoja 20
+        directas={10: 1},          # kit 10 reservado
+        nombres={20: "Cámara"},
+    )
     problemas = _check_stock_hipotetico(conn, 99, "2026-06-01", "2026-06-05", [_item(20, 1)])
     assert len(problemas) == 1
     assert "Cámara" in problemas[0]
@@ -215,6 +228,24 @@ def test_hipotetico_con_stock_libre_acepta():
     """Caso normal con stock de sobra: la propuesta pasa (no regresión)."""
     from routes.cliente_portal import _check_stock_hipotetico
 
-    conn = _HipoteticoConn(stock=3)
+    conn = _HipoteticoConn(stock={20: 3})
     problemas = _check_stock_hipotetico(conn, 99, "2026-06-01", "2026-06-05", [_item(20, 1)])
     assert problemas == []
+
+
+def test_hipotetico_rechaza_combo_anidado_con_hoja_escasa():
+    """FORWARD: una propuesta de un COMBO ANIDADO (combo→kit→hoja, hoja stock 1 ya
+    tomada) se rechaza ANTES de guardarla — el pre-chequeo expande la demanda hasta
+    la hoja, igual que `validar_stock`. Antes solo miraba el stock del combo (alto)
+    y aceptaba; el gate real después la rechazaba (mala UX)."""
+    from routes.cliente_portal import _check_stock_hipotetico
+
+    conn = _HipoteticoConn(
+        stock={30: 9, 10: 9, 20: 1},
+        kit=[(30, 10, 1, True), (10, 20, 1, True)],  # combo 30 → kit 10 → hoja 20
+        directas={20: 1},                            # la hoja ya está tomada
+        nombres={30: "Combo", 10: "Kit", 20: "Foco Z"},
+    )
+    problemas = _check_stock_hipotetico(conn, 99, "2026-06-01", "2026-06-05", [_item(30, 1)])
+    assert len(problemas) == 1
+    assert "Foco Z" in problemas[0]
