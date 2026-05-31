@@ -14,7 +14,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TerminosRouteImport } from './routes/terminos'
 import { Route as PrivacidadRouteImport } from './routes/privacidad'
 import { Route as PreguntasFrecuentesRouteImport } from './routes/preguntas-frecuentes'
-import { Route as KitPreviewRouteImport } from './routes/kit-preview'
 import { Route as EstudioRouteImport } from './routes/estudio'
 import { Route as ClienteRouteImport } from './routes/cliente'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
@@ -89,11 +88,6 @@ const PrivacidadRoute = PrivacidadRouteImport.update({
 const PreguntasFrecuentesRoute = PreguntasFrecuentesRouteImport.update({
   id: '/preguntas-frecuentes',
   path: '/preguntas-frecuentes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KitPreviewRoute = KitPreviewRouteImport.update({
-  id: '/kit-preview',
-  path: '/kit-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EstudioRoute = EstudioRouteImport.update({
@@ -337,7 +331,6 @@ export interface FileRoutesByFullPath {
   '/catalogo': typeof CatalogoRoute
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
-  '/kit-preview': typeof KitPreviewRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/privacidad': typeof PrivacidadRoute
   '/terminos': typeof TerminosRoute
@@ -380,7 +373,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/catalogo': typeof CatalogoRoute
   '/estudio': typeof EstudioRoute
-  '/kit-preview': typeof KitPreviewRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/privacidad': typeof PrivacidadRoute
   '/terminos': typeof TerminosRoute
@@ -424,7 +416,6 @@ export interface FileRoutesById {
   '/catalogo': typeof CatalogoRoute
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
-  '/kit-preview': typeof KitPreviewRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/privacidad': typeof PrivacidadRoute
   '/terminos': typeof TerminosRoute
@@ -471,7 +462,6 @@ export interface FileRouteTypes {
     | '/catalogo'
     | '/cliente'
     | '/estudio'
-    | '/kit-preview'
     | '/preguntas-frecuentes'
     | '/privacidad'
     | '/terminos'
@@ -514,7 +504,6 @@ export interface FileRouteTypes {
     | '/'
     | '/catalogo'
     | '/estudio'
-    | '/kit-preview'
     | '/preguntas-frecuentes'
     | '/privacidad'
     | '/terminos'
@@ -557,7 +546,6 @@ export interface FileRouteTypes {
     | '/catalogo'
     | '/cliente'
     | '/estudio'
-    | '/kit-preview'
     | '/preguntas-frecuentes'
     | '/privacidad'
     | '/terminos'
@@ -603,7 +591,6 @@ export interface RootRouteChildren {
   CatalogoRoute: typeof CatalogoRoute
   ClienteRoute: typeof ClienteRouteWithChildren
   EstudioRoute: typeof EstudioRoute
-  KitPreviewRoute: typeof KitPreviewRoute
   PreguntasFrecuentesRoute: typeof PreguntasFrecuentesRoute
   PrivacidadRoute: typeof PrivacidadRoute
   TerminosRoute: typeof TerminosRoute
@@ -632,13 +619,6 @@ declare module '@tanstack/react-router' {
       path: '/preguntas-frecuentes'
       fullPath: '/preguntas-frecuentes'
       preLoaderRoute: typeof PreguntasFrecuentesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/kit-preview': {
-      id: '/kit-preview'
-      path: '/kit-preview'
-      fullPath: '/kit-preview'
-      preLoaderRoute: typeof KitPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/estudio': {
@@ -1034,7 +1014,6 @@ const rootRouteChildren: RootRouteChildren = {
   CatalogoRoute: CatalogoRoute,
   ClienteRoute: ClienteRouteWithChildren,
   EstudioRoute: EstudioRoute,
-  KitPreviewRoute: KitPreviewRoute,
   PreguntasFrecuentesRoute: PreguntasFrecuentesRoute,
   PrivacidadRoute: PrivacidadRoute,
   TerminosRoute: TerminosRoute,

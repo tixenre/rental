@@ -827,37 +827,6 @@ def list_equipos(
         conn.close()
 
 
-def _load_tabla_defs_by_label(conn) -> dict[str, dict]:
-    """Carga TODAS las spec_definitions tipo 'tabla' y las indexa por label
-    normalizado. Devuelve {} si no hay specs tabla en el catálogo."""
-    import json as _json
-    defs_rows = conn.execute(
-        "SELECT label, tipo, tabla_columnas, output_config "
-        "FROM spec_definitions WHERE tipo = 'tabla'"
-    ).fetchall()
-    out: dict[str, dict] = {}
-    for r in defs_rows:
-        d = row_to_dict(r) if not isinstance(r, dict) else r
-        cols = d.get("tabla_columnas")
-        if isinstance(cols, str):
-            try:
-                cols = _json.loads(cols)
-            except Exception:
-                cols = None
-        oc = d.get("output_config")
-        if isinstance(oc, str):
-            try:
-                oc = _json.loads(oc)
-            except Exception:
-                oc = None
-        out[norm_spec_label(d.get("label") or "")] = {
-            "tipo": d.get("tipo"),
-            "tabla_columnas": cols,
-            "output_config": oc,
-        }
-    return out
-
-
 @router.get("/equipos/{id_or_slug}")
 def get_equipo(id_or_slug: str):
     """Devuelve el detalle de un equipo.
