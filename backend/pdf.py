@@ -5,6 +5,7 @@ Contiene los templates HTML y el renderer compartido.
 
 import asyncio
 import html
+import json
 import os
 import re
 from datetime import datetime
@@ -1328,6 +1329,253 @@ def _contrato_html(pedido: dict) -> str:
   Rambla Rental · ramblarental.com
 </div>
 
+</div>
+
+</body>
+</html>"""
+
+
+def _packing_list_html(pedido: dict) -> str:
+    """Packing list: checklist de salida/retorno, sin precios.
+
+    Estructura por ítem:
+      - Equipo (principal)
+        ↳ Componentes de kit (si aplica)
+        ↳ Contenido incluido de la caja (equipo_fichas.contenido_incluido_json)
+    """
+    fmt_date = _fmt_date_short
+    items = pedido.get("items", [])
+
+    rows = ""
+    n = 1
+    for it in items:
+        cant = it.get("cantidad", 1)
+        descripcion = html.escape(_nombre_para_pdf(it))
+        foto_abs = _abs_image_url(it.get("foto_url"))
+        foto_html = (
+            f'<img src="{html.escape(foto_abs)}" class="pl-img" alt="foto">'
+            if foto_abs
+            else '<div class="pl-img pl-img-empty">—</div>'
+        )
+
+        rows += f"""
+        <tr class="row-main">
+          <td class="num center">{n}</td>
+          <td class="foto-cell">{foto_html}</td>
+          <td class="desc">{descripcion}</td>
+          <td class="center">{cant}</td>
+          <td class="center check-cell"><span class="checkbox"></span></td>
+          <td class="center check-cell"><span class="checkbox"></span></td>
+        </tr>"""
+        n += 1
+
+        # Componentes de kit
+        for comp in it.get("componentes", []):
+            comp_cant = comp.get("cantidad", 1) * cant
+            comp_desc = html.escape(_nombre_para_pdf(comp))
+            comp_foto_abs = _abs_image_url(comp.get("foto_url"))
+            comp_foto = (
+                f'<img src="{html.escape(comp_foto_abs)}" class="pl-img pl-img-sm" alt="foto">'
+                if comp_foto_abs
+                else '<div class="pl-img pl-img-sm pl-img-empty">—</div>'
+            )
+            rows += f"""
+        <tr class="row-sub">
+          <td class="center" style="color:#bbb;font-size:9pt">↳</td>
+          <td class="foto-cell" style="padding-left:16px">{comp_foto}</td>
+          <td class="desc sub-desc">Kit: {comp_desc}</td>
+          <td class="center">{comp_cant}</td>
+          <td class="center check-cell"><span class="checkbox"></span></td>
+          <td class="center check-cell"><span class="checkbox"></span></td>
+        </tr>"""
+            n += 1
+
+        # Contenido incluido (de equipo_fichas.contenido_incluido_json)
+        contenido_raw = it.get("contenido_incluido_json")
+        if contenido_raw:
+            try:
+                contenido_items = json.loads(contenido_raw)
+            except (json.JSONDecodeError, TypeError):
+                contenido_items = []
+            for ci in contenido_items:
+                ci_nombre = html.escape(str(ci.get("nombre") or "—"))
+                ci_cant = ci.get("cantidad", 1)
+                ci_foto_abs = _abs_image_url(ci.get("foto_url"))
+                ci_foto = (
+                    f'<img src="{html.escape(ci_foto_abs)}" class="pl-img pl-img-sm" alt="foto">'
+                    if ci_foto_abs
+                    else '<div class="pl-img pl-img-sm pl-img-empty">—</div>'
+                )
+                rows += f"""
+        <tr class="row-contenido">
+          <td class="center" style="color:#bbb;font-size:9pt">↳</td>
+          <td class="foto-cell" style="padding-left:16px">{ci_foto}</td>
+          <td class="desc sub-desc caja-item">&#128230; {ci_nombre}</td>
+          <td class="center">{ci_cant}</td>
+          <td class="center check-cell"><span class="checkbox"></span></td>
+          <td class="center check-cell"><span class="checkbox"></span></td>
+        </tr>"""
+                n += 1
+
+    if pedido.get("numero_pedido"):
+        ref = f"R-{int(pedido['numero_pedido']):04d}"
+    else:
+        ref = f"#{pedido['id']}"
+
+    fecha_doc = datetime.now().strftime("%d/%m/%Y")
+
+    return f"""
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page {{ size: A4; margin: 18mm 14mm; }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    color: #111; font-size: 11pt; line-height: 1.45;
+  }}
+  .header {{
+    display: flex; justify-content: space-between; align-items: flex-start;
+    border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 18px;
+  }}
+  .logo {{
+    font-family: 'Helvetica Neue', sans-serif; font-weight: 900; font-size: 22pt;
+    letter-spacing: -.5px;
+  }}
+  .logo em {{ color: #F9B92E; font-style: normal; }}
+  .doc-tipo {{
+    text-align: right; font-size: 10pt; color: #444;
+  }}
+  .doc-tipo h1 {{
+    font-size: 18pt; font-weight: 800; margin: 0; color: #111;
+    text-transform: uppercase; letter-spacing: 1px;
+  }}
+  .meta {{
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    background: #f6f6f6; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px;
+  }}
+  .meta-item {{ display: flex; flex-direction: column; gap: 3px; }}
+  .meta-label {{
+    font-size: 8pt; color: #666; text-transform: uppercase;
+    letter-spacing: 1px; font-weight: 700;
+  }}
+  .meta-val {{ font-size: 11pt; font-weight: 600; }}
+  .nota {{
+    background: #fffbe6; border-left: 3px solid #F9B92E;
+    padding: 10px 14px; font-size: 9.5pt; color: #555; margin-bottom: 16px;
+  }}
+  table {{
+    width: 100%; border-collapse: collapse; margin-bottom: 18px;
+  }}
+  th {{
+    background: #111; color: #fff; text-align: left;
+    padding: 8px 10px; font-size: 9pt; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .5px;
+  }}
+  th.center {{ text-align: center; }}
+  td {{
+    padding: 7px 10px; border-bottom: 1px solid #e5e5e5; font-size: 10pt;
+    vertical-align: middle;
+  }}
+  td.center {{ text-align: center; }}
+  .num {{ width: 28px; color: #999; font-size: 9pt; }}
+  .foto-cell {{ width: 44px; padding: 4px 6px; }}
+  .pl-img {{
+    width: 36px; height: 36px; object-fit: cover;
+    border-radius: 3px; background: #f0f0f0; display: block;
+  }}
+  .pl-img-sm {{ width: 28px; height: 28px; }}
+  .pl-img-empty {{
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: #bbb;
+  }}
+  .desc {{ min-width: 200px; }}
+  .sub-desc {{ font-size: 9.5pt; color: #555; padding-left: 8px; }}
+  .caja-item {{ color: #3b60c4; }}
+  .check-cell {{ width: 70px; }}
+  .checkbox {{
+    display: inline-block; width: 20px; height: 20px;
+    border: 1.5px solid #555; border-radius: 3px;
+  }}
+  .row-main {{ background: #fff; }}
+  .row-sub {{ background: #fafafa; }}
+  .row-contenido {{ background: #f5f8ff; }}
+  .firmas {{
+    display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
+    margin-top: 40px;
+  }}
+  .firma {{
+    border-top: 1px solid #111; padding-top: 6px; text-align: center;
+    font-size: 9pt; color: #555;
+  }}
+  .footer {{
+    position: fixed; bottom: 8mm; left: 14mm; right: 14mm;
+    text-align: center; font-size: 8pt; color: #999;
+    border-top: 1px solid #ddd; padding-top: 6px;
+  }}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">Rambla <em>Rental</em></div>
+    <div style="font-size:9pt;color:#666;margin-top:4px">Alquiler de equipos audiovisuales</div>
+  </div>
+  <div class="doc-tipo">
+    <h1>Packing List</h1>
+    <div style="margin-top:4px">Ref. {ref}</div>
+    <div>Emitido: {fecha_doc}</div>
+  </div>
+</div>
+
+<div class="meta">
+  <div class="meta-item">
+    <div class="meta-label">Cliente</div>
+    <div class="meta-val">{html.escape(pedido.get("cliente_nombre") or "—")}</div>
+  </div>
+  <div class="meta-item">
+    <div class="meta-label">Contacto</div>
+    <div class="meta-val" style="font-size:10pt">{html.escape(pedido.get("cliente_email") or pedido.get("cliente_telefono") or "—")}</div>
+  </div>
+  <div class="meta-item">
+    <div class="meta-label">Retiro</div>
+    <div class="meta-val">{fmt_date(pedido.get("fecha_desde"))}</div>
+  </div>
+  <div class="meta-item">
+    <div class="meta-label">Devolución prevista</div>
+    <div class="meta-val">{fmt_date(pedido.get("fecha_hasta"))}</div>
+  </div>
+</div>
+
+<div class="nota">
+  Checklist de salida y retorno. Tildar cada ítem al entregar y al recibir.
+  Las filas azules (&#128230;) son accesorios de la caja — incluirlos en la entrega.
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th class="center" style="width:28px">#</th>
+      <th style="width:44px"></th>
+      <th>Equipo / Accesorio</th>
+      <th class="center" style="width:50px">Cant.</th>
+      <th class="center" style="width:70px">&#9744; Salida</th>
+      <th class="center" style="width:70px">&#9744; Retorno</th>
+    </tr>
+  </thead>
+  <tbody>{rows}</tbody>
+</table>
+
+<div class="firmas">
+  <div class="firma">Firma cliente — aclaración / DNI</div>
+  <div class="firma">Firma Rambla Rental</div>
+</div>
+
+<div class="footer">
+  Rambla Rental · ramblarental.com · Documento generado el {fecha_doc}
 </div>
 
 </body>

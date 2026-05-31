@@ -1616,8 +1616,10 @@ export type PedidoDatosInput = {
 
 // URL absoluta para abrir PDFs en nueva pestaña (FastAPI sirve directo).
 const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
-export const pedidoPdfUrl = (id: number, kind: "pdf" | "albaran" | "contrato" = "pdf") =>
-  `${API_BASE}/api/alquileres/${id}/${kind}`;
+export const pedidoPdfUrl = (
+  id: number,
+  kind: "pdf" | "albaran" | "contrato" | "packing-list" = "pdf",
+) => `${API_BASE}/api/alquileres/${id}/${kind}`;
 
 export const ESTADO_LABEL: Record<PedidoEstado, string> = {
   borrador: "Borrador",
