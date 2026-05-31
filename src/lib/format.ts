@@ -59,7 +59,20 @@ export const jornadaLabel = (n: number) => `${n} ${n === 1 ? "jornada" : "jornad
 export function formatFechaCorta(s?: string | null): string {
   if (!s) return "—";
   const d = new Date(s.slice(0, 10) + "T12:00:00");
-  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const meses = [
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
   return `${d.getDate()} ${meses[d.getMonth()]}`;
 }
 
