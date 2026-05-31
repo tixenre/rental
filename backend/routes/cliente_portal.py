@@ -617,65 +617,76 @@ def _check_stock_hipotetico(
     actuales no compiten con los propuestos para el mismo rango).
     """
     from reservas import (
-        consolidar_items_por_equipo as _consolidar_items_por_equipo,
+        expandir_demanda as _expandir_demanda,
         get_buffer_horas as _get_buffer_horas,
+        parientes_de as _parientes_de,
         rango_con_buffer as _rango_con_buffer,
-        reservado_directo as _reservado_directo,
-        reservado_via_kit as _reservado_via_kit,
+        reservado_total as _reservado_total,
         unidades_en_mantenimiento as _unidades_en_mantenimiento,
     )
     if not items or not fecha_desde or not fecha_hasta:
+        return []
+
+    # Consolidar la propuesta sumando duplicados del mismo equipo (issue #102).
+    roots: dict[int, int] = {}
+    for it in items:
+        roots[it.equipo_id] = roots.get(it.equipo_id, 0) + it.cantidad
+
+    # FORWARD: expandir la propuesta RECURSIVAMENTE hasta las hojas (C4 #635) —
+    # MISMA expansión que el gate real (`validar_stock`), así el pre-chequeo no
+    # acepta una propuesta con un combo anidado que el gate después rechaza. Estricto
+    # (`solo_esenciales=False`), igual que el gate.
+    demanda = _expandir_demanda(conn, roots, solo_esenciales=False)
+    if not demanda:
         return []
 
     # Buffer entre alquileres (mantenimiento usa rango original).
     buffer_horas = _get_buffer_horas(conn)
     fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
 
-    # Resolver nombre + stock total + agrupar por equipo_id.
-    enriched = []
-    for it in items:
-        row = conn.execute(
-            "SELECT nombre, cantidad FROM equipos WHERE id = ?", (it.equipo_id,)
-        ).fetchone()
-        if not row:
-            enriched.append({
-                "equipo_id": it.equipo_id, "cantidad": it.cantidad,
-                "nombre": f"equipo #{it.equipo_id}", "stock_total": 0,
-            })
-        else:
-            enriched.append({
-                "equipo_id": it.equipo_id, "cantidad": it.cantidad,
-                "nombre": row["nombre"], "stock_total": row["cantidad"],
-            })
+    # Nombres para los mensajes (el stock AUTORITATIVO sale del lock de abajo).
+    # Orden ascendente de id → locking determinístico, sin deadlock (igual que el gate).
+    ids = sorted(demanda)
+    ph = ",".join("?" for _ in ids)
+    nombres = {
+        r["id"]: r["nombre"]
+        for r in conn.execute(
+            f"SELECT id, nombre FROM equipos WHERE id IN ({ph})", tuple(ids)
+        ).fetchall()
+    }
 
-    consolidated = _consolidar_items_por_equipo(enriched)
+    # Grafo inverso (una sola lectura) + memo de reserva directa, igual que el gate.
+    rev_graph = _parientes_de(conn)
+    rd_cache: dict[int, int] = {}
 
     problemas: list[str] = []
-    for it in consolidated.values():
+    for eid in ids:  # ascendente por id (ORDER BY id)
+        nombre = nombres.get(eid, f"equipo #{eid}")
         lock = conn.execute(
             "SELECT cantidad FROM equipos WHERE id = ? FOR UPDATE",
-            (it["equipo_id"],)
+            (eid,)
         ).fetchone()
         if not lock:
-            problemas.append(f"{it['nombre']} (no encontrado)")
+            problemas.append(f"{nombre} (no encontrado)")
             continue
         stock_total = lock["cantidad"]
-        # Reserva = directa + vía-kit (mismos helpers compartidos que el gate real
-        # `_check_stock`). Antes este chequeo hipotético solo contaba la directa y
-        # NO la vía-kit → undercount: podía aceptar una propuesta que el gate luego
-        # rechazaba. Ahora ambos cuentan lo mismo. El lock FOR UPDATE de arriba se
-        # mantiene (este chequeo corre dentro de la transacción del caller).
-        reservado = (
-            _reservado_directo(conn, it["equipo_id"], pedido_id, fh_buf, fd_buf)
-            + _reservado_via_kit(conn, it["equipo_id"], pedido_id, fh_buf, fd_buf)
+        # CONSUMO (backward) recursivo: directo + vía cualquier compuesto que lo
+        # contenga, a cualquier profundidad — MISMO helper que el gate real
+        # (`reservado_total`). Con el forward de arriba, este pre-chequeo "amistoso"
+        # ahora espeja completo a `validar_stock` (forward + backward recursivos),
+        # así rechaza temprano lo que el control autoritativo (al aprobar) rechazaría.
+        # El lock FOR UPDATE se mantiene (corre dentro de la transacción del caller).
+        reservado = _reservado_total(
+            conn, eid, pedido_id, fh_buf, fd_buf,
+            rev_graph=rev_graph, cache=rd_cache,
         )
         en_mantenimiento = _unidades_en_mantenimiento(
-            conn, it["equipo_id"], fecha_desde, fecha_hasta
+            conn, eid, fecha_desde, fecha_hasta
         )
         disponible = stock_total - reservado - en_mantenimiento
-        if disponible < it["cantidad"]:
+        if disponible < demanda[eid]:
             problemas.append(
-                f"{it['nombre']} (necesitás {it['cantidad']}, disponible: {max(0, disponible)})"
+                f"{nombre} (necesitás {demanda[eid]}, disponible: {max(0, disponible)})"
             )
     return problemas
 

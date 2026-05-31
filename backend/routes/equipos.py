@@ -305,6 +305,15 @@ def _validar_categoria_specs(v: Optional[str]) -> Optional[str]:
     return v
 
 
+_TIPOS_EQUIPO = frozenset({"simple", "kit", "combo"})
+
+
+def _validar_tipo(v: Optional[str]) -> Optional[str]:
+    if v is not None and v not in _TIPOS_EQUIPO:
+        raise ValueError(f"tipo inválido: '{v}'. Opciones: simple, kit, combo")
+    return v
+
+
 class EquipoCreate(BaseModel):
     from pydantic import field_validator
     nombre:           str
@@ -325,6 +334,9 @@ class EquipoCreate(BaseModel):
     ficha_completa:   Optional[bool]  = False
     # Categoría de specs (1 de las 5 del registry): define qué specs aplican.
     categoria_specs: Optional[str] = None
+    # Tipo de producto: 'simple' = equipo suelto, 'kit' = con accesorios compartidos,
+    # 'combo' = agrupación derivada. Gobierna precio, stock y disponibilidad.
+    tipo:            Optional[str]   = "simple"
 
     @field_validator("precio_jornada")
     @classmethod
@@ -344,6 +356,11 @@ class EquipoCreate(BaseModel):
     @classmethod
     def validate_categoria_specs(cls, v):
         return _validar_categoria_specs(v)
+
+    @field_validator("tipo")
+    @classmethod
+    def validate_tipo(cls, v):
+        return _validar_tipo(v)
 
 
 class EquipoUpdate(BaseModel):
@@ -371,6 +388,8 @@ class EquipoUpdate(BaseModel):
     ficha_completa:   Optional[bool]  = None
     # Categoría de specs (1 de las 5 del registry): define qué specs aplican.
     categoria_specs: Optional[str] = None
+    # Tipo de producto: 'simple' / 'kit' / 'combo'.
+    tipo:            Optional[str]   = None
 
     @field_validator("precio_jornada")
     @classmethod
@@ -391,6 +410,11 @@ class EquipoUpdate(BaseModel):
     def validate_categoria_specs(cls, v):
         return _validar_categoria_specs(v)
 
+    @field_validator("tipo")
+    @classmethod
+    def validate_tipo(cls, v):
+        return _validar_tipo(v)
+
 
 class FichaUpdate(BaseModel):
     """Update parcial de equipo_fichas. Las specs físicas (montura/
@@ -410,11 +434,45 @@ class FichaUpdate(BaseModel):
     fuente_url:          Optional[str]   = None
     fuente_titulo:       Optional[str]   = None
     enriquecido_fuente:  Optional[str]   = None
+    # B1 #635: contenido incluido (dim. 3) — JSON de [{nombre, cantidad, foto_url?}]
+    contenido_incluido_json: Optional[str] = None
+
+    from pydantic import field_validator as _fv
+    import json as _json
+
+    @_fv("contenido_incluido_json")
+    @classmethod
+    def _validar_contenido_incluido(cls, v):
+        import json as _j
+        if v is None:
+            return v
+        try:
+            items = _j.loads(v)
+        except Exception:
+            raise ValueError("contenido_incluido_json: JSON inválido")
+        if not isinstance(items, list):
+            raise ValueError("contenido_incluido_json: debe ser una lista")
+        if len(items) > 100:
+            raise ValueError("contenido_incluido_json: máximo 100 ítems")
+        for idx, item in enumerate(items):
+            if not isinstance(item, dict):
+                raise ValueError(f"ítem {idx}: debe ser un objeto")
+            nombre = item.get("nombre", "")
+            if not isinstance(nombre, str) or not nombre.strip():
+                raise ValueError(f"ítem {idx}: 'nombre' no puede estar vacío")
+            cantidad = item.get("cantidad", 1)
+            if not isinstance(cantidad, int) or not (1 <= cantidad <= 999):
+                raise ValueError(f"ítem {idx}: 'cantidad' debe ser un entero entre 1 y 999")
+        return v
 
 
 class KitItem(BaseModel):
     componente_id: int
-    cantidad:      int = 1
+    cantidad:      int   = Field(default=1, ge=1, le=9999)
+    # default 0.0 (NO None): la columna kit_componentes.descuento_pct es NOT NULL,
+    # un NULL explícito la viola. Rango 0..100 (% de descuento por línea de combo).
+    descuento_pct: float = Field(default=0.0, ge=0, le=100)
+    esencial:      bool  = True
 
 
 class KitReorder(BaseModel):
@@ -837,9 +895,10 @@ def get_equipo(id_or_slug: str):
         # legacy de equipo_fichas. Mantenemos `ficha` para back-compat.
         equipo = attach_specs_estructuradas(conn, [equipo])[0]
         kit = conn.execute("""
-            SELECT kc.componente_id, kc.cantidad, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
+            SELECT kc.componente_id, kc.cantidad, kc.descuento_pct, kc.esencial,
+                   e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
             FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id
-            WHERE kc.equipo_id = ?  ORDER BY e.nombre
+            WHERE kc.equipo_id = ?  ORDER BY kc.orden ASC, e.nombre ASC
         """, (actual_id,)).fetchall()
         equipo["kit"] = [row_to_dict(r) for r in kit]
         return equipo
@@ -919,13 +978,13 @@ def create_equipo(data: EquipoCreate):
                                  precio_jornada, precio_usd, roi_pct,
                                  valor_reposicion, foto_url, fecha_compra,
                                  serie, bh_url, dueno, visible_catalogo, estado,
-                                 ficha_completa, categoria_specs)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                 ficha_completa, categoria_specs, tipo)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (data.nombre, brand_id, data.modelo, data.cantidad,
               data.precio_jornada, data.precio_usd, data.roi_pct,
               data.valor_reposicion, data.foto_url, _normalize_fecha_compra(data.fecha_compra),
               data.serie, data.bh_url, data.dueno, data.visible_catalogo, data.estado,
-              bool(data.ficha_completa), data.categoria_specs))
+              bool(data.ficha_completa), data.categoria_specs, data.tipo or "simple"))
         new_id = cur.lastrowid
         # Hook: calcular nombre_publico inicial. No falla el create si esto
         # rompe (ej. si los servicios no están disponibles).
@@ -1048,8 +1107,8 @@ def duplicate_equipo(id: int):
                 precio_jornada, precio_usd, roi_pct,
                 valor_reposicion, foto_url, fecha_compra,
                 serie, bh_url, dueno, visible_catalogo, estado,
-                ficha_completa
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ficha_completa, tipo
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             f"{src_d['nombre']} (copia)",
             src_d.get("brand_id"), src_d.get("modelo"), 1,
@@ -1058,6 +1117,7 @@ def duplicate_equipo(id: int):
             None,  # serie vacía
             src_d.get("bh_url"), src_d.get("dueno"), src_d.get("visible_catalogo", 1), src_d.get("estado", "operativo"),
             False,  # ficha_completa false para que el admin la revise
+            src_d.get("tipo", "simple"),  # hereda el tipo del original
         ))
         new_id = cur.lastrowid
 
@@ -1569,6 +1629,7 @@ def get_kit(id: int):
             raise HTTPException(404, "Equipo no encontrado")
         rows = conn.execute("""
             SELECT kc.id, kc.componente_id, kc.cantidad, kc.orden,
+                   kc.descuento_pct, kc.esencial,
                    e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url, e.visible_catalogo
             FROM kit_componentes kc
             JOIN equipos e ON e.id = kc.componente_id
@@ -1629,10 +1690,13 @@ def add_kit_item(id: int, data: KitItem):
             )
         try:
             conn.execute("""
-                INSERT INTO kit_componentes (equipo_id, componente_id, cantidad)
-                VALUES (?,?,?)
-                ON CONFLICT(equipo_id, componente_id) DO UPDATE SET cantidad=excluded.cantidad
-            """, (id, data.componente_id, data.cantidad))
+                INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, descuento_pct, esencial)
+                VALUES (?,?,?,?,?)
+                ON CONFLICT(equipo_id, componente_id) DO UPDATE SET
+                    cantidad=excluded.cantidad,
+                    descuento_pct=excluded.descuento_pct,
+                    esencial=excluded.esencial
+            """, (id, data.componente_id, data.cantidad, data.descuento_pct, data.esencial))
             conn.commit()
         except Exception as e:
             raise HTTPException(400, str(e))

@@ -17,25 +17,31 @@ from reservas.estados import ESTADOS_RESERVADO
 from reservas.disponibilidad import calcular_disponibilidad, dias_no_disponibles
 from reservas.gate import validar_stock
 from reservas.semantics import (
+    componentes_de,
     consolidar_items_por_equipo,
+    expandir_demanda,
     get_buffer_horas,
     invalidate_buffer_cache,
+    parientes_de,
     rango_con_buffer,
     reservado_directo,
-    reservado_via_kit,
+    reservado_total,
     unidades_en_mantenimiento,
 )
 
 __all__ = [
     "ESTADOS_RESERVADO",
     "calcular_disponibilidad",
+    "componentes_de",
     "consolidar_items_por_equipo",
     "dias_no_disponibles",
+    "expandir_demanda",
     "get_buffer_horas",
     "invalidate_buffer_cache",
+    "parientes_de",
     "rango_con_buffer",
     "reservado_directo",
-    "reservado_via_kit",
+    "reservado_total",
     "unidades_en_mantenimiento",
     "validar_stock",
 ]

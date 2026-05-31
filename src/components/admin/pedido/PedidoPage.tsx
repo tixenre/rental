@@ -22,6 +22,7 @@ import {
   FileText,
   FileSignature,
   Truck,
+  ClipboardList,
   MoreHorizontal,
   Loader2,
   CloudOff,
@@ -1344,10 +1345,15 @@ function PagosSidebar({
 // ─────────────────────────────────────────────────────────────────────────
 
 function DocumentosSidebar({ pedidoId }: { pedidoId: number }) {
-  const docs: { kind: "pdf" | "albaran" | "contrato"; label: string; icon: React.ReactNode }[] = [
+  const docs: {
+    kind: "pdf" | "albaran" | "contrato" | "packing-list";
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
     { kind: "contrato", label: "Contrato", icon: <FileSignature className="h-4 w-4" /> },
     { kind: "pdf", label: "Presupuesto", icon: <FileText className="h-4 w-4" /> },
     { kind: "albaran", label: "Albarán", icon: <Truck className="h-4 w-4" /> },
+    { kind: "packing-list", label: "Packing List", icon: <ClipboardList className="h-4 w-4" /> },
   ];
 
   return (

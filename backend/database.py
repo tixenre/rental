@@ -451,6 +451,8 @@ def init_db():
     # raw_json eliminada en Fase E (migration d7e9b3c5a8f2).
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS enriquecido_at TIMESTAMP")
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS enriquecido_fuente TEXT")    # 'firecrawl-bh' | 'firecrawl-oficial' | 'manual'
+    # B1 #635: contenido incluido (dim. 3) — [{nombre, cantidad, foto_url?}] editado a mano
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS contenido_incluido_json TEXT")
 
     # ── Etiquetas (bolsa libre / índice de búsqueda) ─────────────────────
     # Las etiquetas son strings libres: incluyen marca, modelo, palabras del
@@ -955,6 +957,10 @@ def init_db():
     conn.execute("""
         ALTER TABLE kit_componentes ADD COLUMN IF NOT EXISTS orden INTEGER NOT NULL DEFAULT 0
     """)
+    # A1 #635: columnas para combos (descuento por línea + esencial/best-effort).
+    # Schema en init_db (idempotente); el backfill del tipo vive en la migración a1c3b5f7e9d2.
+    conn.execute("ALTER TABLE kit_componentes ADD COLUMN IF NOT EXISTS descuento_pct FLOAT NOT NULL DEFAULT 0.0")
+    conn.execute("ALTER TABLE kit_componentes ADD COLUMN IF NOT EXISTS esencial BOOLEAN NOT NULL DEFAULT TRUE")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquiler_pagos (
@@ -1100,6 +1106,9 @@ def init_db():
     # equipos.slug (migraciones e4a7c1f8d6b2 + f5b8d2e4a9c1): columna + UNIQUE
     # constraint completo (no partial index — ese era transicional).
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS slug VARCHAR(80)")
+    # A1 #635: tipo de producto (simple/kit/combo). DEFAULT 'simple'; el backfill
+    # (kits con componentes → 'kit') y el CHECK viven en la migración a1c3b5f7e9d2.
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'simple'")
     conn.execute("""
         DO $$
         BEGIN
@@ -1429,11 +1438,12 @@ def attach_kit(conn, equipos: list[dict]) -> list[dict]:
     cur = conn.cursor()
     cur.execute(f"""
         SELECT kc.equipo_id, kc.componente_id, kc.cantidad,
+               kc.descuento_pct, kc.esencial,
                e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
         FROM kit_componentes kc
         JOIN equipos e ON e.id = kc.componente_id
         WHERE kc.equipo_id IN ({placeholders})
-        ORDER BY kc.equipo_id, e.nombre
+        ORDER BY kc.equipo_id, kc.orden ASC, e.nombre ASC
     """, ids)
 
     rows = cur.fetchall()
@@ -1446,6 +1456,8 @@ def attach_kit(conn, equipos: list[dict]) -> list[dict]:
             "marca":         r["marca"],
             "foto_url":      r["foto_url"],
             "cantidad":      r["cantidad"],
+            "descuento_pct": r["descuento_pct"],
+            "esencial":      r["esencial"],
         })
 
     for e in equipos:
@@ -1500,7 +1512,8 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
                keywords_json, nombre_publico_template,
                incluye_json, conectividad_json, compatible_con_json,
                video_url, precio_bh_usd, fuente_url, fuente_titulo,
-               enriquecido_at, enriquecido_fuente
+               enriquecido_at, enriquecido_fuente,
+               contenido_incluido_json
         FROM equipo_fichas
         WHERE equipo_id IN ({placeholders})
     """, ids)
@@ -1511,6 +1524,7 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
         "incluye_json", "conectividad_json", "compatible_con_json",
         "video_url", "precio_bh_usd", "fuente_url", "fuente_titulo",
         "enriquecido_at", "enriquecido_fuente",
+        "contenido_incluido_json",
     )
     f_map: dict[int, dict] = {}
     for r in rows:

@@ -18,7 +18,7 @@ El bug de doble booking que motivó estos tests:
 
 import pytest
 
-from reservas import ESTADOS_RESERVADO, validar_stock as _check_stock
+from reservas import validar_stock as _check_stock
 from routes.equipos import _crea_ciclo_kit
 
 
@@ -43,32 +43,31 @@ class FakeCursor:
 
 
 class StockFakeConn:
-    """Conn que stubea las queries de _check_stock.
+    """Conn que stubea las queries de `validar_stock` (gate, C4).
 
     Se le pasa el "estado del mundo":
       - equipos: dict[id, {nombre, cantidad}]
-      - kit_componentes: dict[equipo_id, list[{componente_id, kc_cant, nombre, stock_total}]]
-      - reservas_directas: dict[(equipo_id, excl_pedido_id), int]
-      - reservas_via_kit:  dict[(componente_id, excl_pedido_id), int]
-      - pedido_items: dict[pedido_id, list[{equipo_id, cantidad, nombre, stock_total}]]
+      - kit: dict[equipo_id, [(componente_id, cantidad, esencial), ...]]  (grafo
+        de composición — lo usan tanto la expansión forward como el grafo inverso)
+      - reservas_directas: dict[equipo_id, int]   (reserva DIRECTA por equipo, ya
+        excluyendo el pedido en chequeo)
+      - pedido_items: dict[pedido_id, [{equipo_id, cantidad}, ...]]
+      - mantenimiento: dict[equipo_id, unidades_bloqueadas]
     """
 
     def __init__(
         self,
         equipos,
-        kit_componentes=None,
+        kit=None,
         reservas_directas=None,
-        reservas_via_kit=None,
         pedido_items=None,
         mantenimiento=None,
         buffer_horas=0,
     ):
         self.equipos = equipos
-        self.kit_componentes = kit_componentes or {}
+        self.kit = kit or {}
         self.reservas_directas = reservas_directas or {}
-        self.reservas_via_kit = reservas_via_kit or {}
         self.pedido_items = pedido_items or {}
-        # mantenimiento: dict[equipo_id, unidades_bloqueadas]
         self.mantenimiento = mantenimiento or {}
         self.buffer_horas = buffer_horas
 
@@ -80,20 +79,29 @@ class StockFakeConn:
         if "FROM APP_SETTINGS WHERE KEY = ?" in s_up:
             return FakeCursor([FakeRow(value=str(self.buffer_horas))])
 
-        # Unidades en mantenimiento que bloquean stock.
+        # Unidades en mantenimiento que bloquean stock (por equipo, escalar).
         if "FROM EQUIPO_MANTENIMIENTO" in s_up:
             eq_id = params[0]
             return FakeCursor([FakeRow({0: self.mantenimiento.get(eq_id, 0)})])
 
-        # Items del pedido (primera query de _check_stock).
-        if s_up.startswith("SELECT PI.EQUIPO_ID, PI.CANTIDAD, E.NOMBRE, E.CANTIDAD AS STOCK_TOTAL"):
+        # Items del pedido (primera query del gate).
+        if s_up.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = ?"):
             pid = params[0]
             return FakeCursor([FakeRow(r) for r in self.pedido_items.get(pid, [])])
 
-        # Componentes de un equipo (expansión de kits en _check_stock).
-        if s_up.startswith("SELECT KC.COMPONENTE_ID, KC.CANTIDAD AS KC_CANT"):
-            eq_id = params[0]
-            return FakeCursor([FakeRow(r) for r in self.kit_componentes.get(eq_id, [])])
+        # Grafo de composición (componentes_de / parientes_de, completo).
+        if s_up.startswith("SELECT EQUIPO_ID, COMPONENTE_ID, CANTIDAD") and "FROM KIT_COMPONENTES" in s_up:
+            return FakeCursor([
+                FakeRow(equipo_id=eid, componente_id=cid, cantidad=q, esencial=ese)
+                for eid, comps in self.kit.items()
+                for (cid, q, ese) in comps
+            ])
+
+        # Nombres para los mensajes.
+        if s_up.startswith("SELECT ID, NOMBRE FROM EQUIPOS WHERE ID IN"):
+            return FakeCursor([
+                FakeRow(id=eid, nombre=e["nombre"]) for eid, e in self.equipos.items()
+            ])
 
         # Lock + cantidad del equipo.
         if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s_up:
@@ -104,16 +112,8 @@ class StockFakeConn:
 
         # Reservas directas (suma de alquiler_items donde equipo_id == X).
         if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s_up:
-            eq_id, excl, _fh, _fd = params
-            total = self.reservas_directas.get((eq_id, excl), 0)
-            return FakeCursor([FakeRow({0: total})])
-
-        # Reservas vía kit (suma de alquiler_items que reservan un kit con
-        # componente_id = X).
-        if "JOIN KIT_COMPONENTES KC ON KC.EQUIPO_ID = PI2.EQUIPO_ID WHERE KC.COMPONENTE_ID = ?" in s_up:
-            comp_id, excl, _fh, _fd = params
-            total = self.reservas_via_kit.get((comp_id, excl), 0)
-            return FakeCursor([FakeRow({0: total})])
+            eq_id = params[0]
+            return FakeCursor([FakeRow({0: self.reservas_directas.get(eq_id, 0)})])
 
         # Fallback: vacío.
         return FakeCursor([])
@@ -131,7 +131,7 @@ class StockFakeConn:
 # ── _check_stock — kits ───────────────────────────────────────────────────
 
 class TestCheckStockKits:
-    """Bug fix: doble booking vía kit + componente directo."""
+    """Bug fix: doble booking vía kit + componente directo (y combos anidados, C4)."""
 
     def test_kit_reserva_componente(self):
         """Pedido que reserva un kit debe consumir stock de sus componentes."""
@@ -141,12 +141,8 @@ class TestCheckStockKits:
                 10: {"nombre": "Kit Cine", "cantidad": 5},
                 20: {"nombre": "Cámara FX3", "cantidad": 1},
             },
-            kit_componentes={
-                10: [{"componente_id": 20, "kc_cant": 1, "nombre": "Cámara FX3", "stock_total": 1}],
-            },
-            pedido_items={
-                1: [{"equipo_id": 10, "cantidad": 1, "nombre": "Kit Cine", "stock_total": 5}],
-            },
+            kit={10: [(20, 1, True)]},
+            pedido_items={1: [{"equipo_id": 10, "cantidad": 1}]},
         )
         # Sin otras reservas, el pedido cabe.
         problemas = _check_stock(conn, 1, "2026-06-01", "2026-06-05")
@@ -161,23 +157,34 @@ class TestCheckStockKits:
                 10: {"nombre": "Kit Cine", "cantidad": 5},
                 20: {"nombre": "Cámara FX3", "cantidad": 1},
             },
-            kit_componentes={
-                10: [{"componente_id": 20, "kc_cant": 1, "nombre": "Cámara FX3", "stock_total": 1}],
-                # Componentes del equipo 20 (FX3) — ninguno.
-            },
-            # Pedido A=1 ya reservó el Kit (id=10) en las mismas fechas.
-            # No hay reservas directas de FX3.
-            reservas_directas={},
-            # Pero sí hay reserva vía kit: 1 unidad de FX3 consumida por A.
-            reservas_via_kit={(20, 2): 1},  # (componente=FX3, excl=pedido B)
-            pedido_items={
-                2: [{"equipo_id": 20, "cantidad": 1, "nombre": "Cámara FX3", "stock_total": 1}],
-            },
+            kit={10: [(20, 1, True)]},
+            # Pedido A reservó el Kit (id=10): 1 reserva directa del kit.
+            reservas_directas={10: 1},
+            pedido_items={2: [{"equipo_id": 20, "cantidad": 1}]},
         )
         problemas = _check_stock(conn, 2, "2026-06-01", "2026-06-05")
         # Stock FX3 = 1, reservado vía kit = 1, disponible = 0 < 1 → BLOQUEA
         assert len(problemas) == 1
         assert "Cámara FX3" in problemas[0]
+        assert "disponible: 0" in problemas[0]
+
+    def test_doble_booking_via_combo_anidado_y_directo(self):
+        """C4: Pedido A reserva un COMBO ANIDADO (combo→kit→hoja), Pedido B reserva
+        la hoja directo. El gate debe ver que A ya consumió la única hoja a través
+        del combo. A 1 nivel esto pasaba (overbooking)."""
+        conn = StockFakeConn(
+            equipos={
+                30: {"nombre": "Combo", "cantidad": 9},
+                10: {"nombre": "Kit", "cantidad": 9},
+                20: {"nombre": "Hoja FX3", "cantidad": 1},
+            },
+            kit={30: [(10, 1, True)], 10: [(20, 1, True)]},  # combo→kit→hoja
+            reservas_directas={30: 1},                        # A reservó 1 combo
+            pedido_items={2: [{"equipo_id": 20, "cantidad": 1}]},
+        )
+        problemas = _check_stock(conn, 2, "2026-06-01", "2026-06-05")
+        assert len(problemas) == 1
+        assert "Hoja FX3" in problemas[0]
         assert "disponible: 0" in problemas[0]
 
     def test_kit_consume_componente_que_otro_kit_tambien_necesita(self):
@@ -189,17 +196,10 @@ class TestCheckStockKits:
                 11: {"nombre": "Kit B", "cantidad": 5},
                 20: {"nombre": "Trípode", "cantidad": 1},
             },
-            kit_componentes={
-                10: [{"componente_id": 20, "kc_cant": 1, "nombre": "Trípode", "stock_total": 1}],
-                11: [{"componente_id": 20, "kc_cant": 1, "nombre": "Trípode", "stock_total": 1}],
-            },
-            # Pedido 1 (Kit A) ya reservó. _check_stock(2) calcula para Kit B.
-            reservas_directas={},
-            # Reserva vía kit del Trípode: 1 unidad consumida por pedido 1.
-            reservas_via_kit={(20, 2): 1},
-            pedido_items={
-                2: [{"equipo_id": 11, "cantidad": 1, "nombre": "Kit B", "stock_total": 5}],
-            },
+            kit={10: [(20, 1, True)], 11: [(20, 1, True)]},
+            # Pedido 1 (Kit A=10) ya reservó. _check_stock(2) calcula para Kit B=11.
+            reservas_directas={10: 1},
+            pedido_items={2: [{"equipo_id": 11, "cantidad": 1}]},
         )
         problemas = _check_stock(conn, 2, "2026-06-01", "2026-06-05")
         assert len(problemas) == 1
@@ -212,12 +212,8 @@ class TestCheckStockKits:
                 10: {"nombre": "Kit", "cantidad": 5},
                 20: {"nombre": "Pila AA", "cantidad": 4},
             },
-            kit_componentes={
-                10: [{"componente_id": 20, "kc_cant": 3, "nombre": "Pila AA", "stock_total": 4}],
-            },
-            pedido_items={
-                1: [{"equipo_id": 10, "cantidad": 2, "nombre": "Kit", "stock_total": 5}],
-            },
+            kit={10: [(20, 3, True)]},
+            pedido_items={1: [{"equipo_id": 10, "cantidad": 2}]},
         )
         problemas = _check_stock(conn, 1, "2026-06-01", "2026-06-05")
         # 2 kits × 3 pilas = 6, pero hay solo 4 → falla
@@ -229,9 +225,7 @@ class TestCheckStockKits:
         """Caso simple — sin kits — debe seguir funcionando."""
         conn = StockFakeConn(
             equipos={20: {"nombre": "Cámara", "cantidad": 2}},
-            pedido_items={
-                1: [{"equipo_id": 20, "cantidad": 1, "nombre": "Cámara", "stock_total": 2}],
-            },
+            pedido_items={1: [{"equipo_id": 20, "cantidad": 1}]},
         )
         assert _check_stock(conn, 1, "2026-06-01", "2026-06-05") == []
 
@@ -243,9 +237,7 @@ class TestCheckStockMantenimiento:
         """Equipo con stock=1 y 1 unidad en mantenimiento → no hay disponible."""
         conn = StockFakeConn(
             equipos={20: {"nombre": "Cámara FX3", "cantidad": 1}},
-            pedido_items={
-                1: [{"equipo_id": 20, "cantidad": 1, "nombre": "Cámara FX3", "stock_total": 1}],
-            },
+            pedido_items={1: [{"equipo_id": 20, "cantidad": 1}]},
             mantenimiento={20: 1},  # 1 unidad fuera de servicio en el rango
         )
         problemas = _check_stock(conn, 1, "2026-06-01", "2026-06-05")
@@ -257,9 +249,7 @@ class TestCheckStockMantenimiento:
         """Stock=3, 2 en mantenimiento, pedido pide 1 → OK (queda 1)."""
         conn = StockFakeConn(
             equipos={20: {"nombre": "Trípode", "cantidad": 3}},
-            pedido_items={
-                1: [{"equipo_id": 20, "cantidad": 1, "nombre": "Trípode", "stock_total": 3}],
-            },
+            pedido_items={1: [{"equipo_id": 20, "cantidad": 1}]},
             mantenimiento={20: 2},
         )
         assert _check_stock(conn, 1, "2026-06-01", "2026-06-05") == []
@@ -268,9 +258,7 @@ class TestCheckStockMantenimiento:
         """Sin entradas de mantenimiento bloqueante → comportamiento normal."""
         conn = StockFakeConn(
             equipos={20: {"nombre": "Cámara", "cantidad": 1}},
-            pedido_items={
-                1: [{"equipo_id": 20, "cantidad": 1, "nombre": "Cámara", "stock_total": 1}],
-            },
+            pedido_items={1: [{"equipo_id": 20, "cantidad": 1}]},
             mantenimiento={},  # nada bloqueado
         )
         assert _check_stock(conn, 1, "2026-06-01", "2026-06-05") == []
@@ -396,18 +384,19 @@ class TestValidarFechaIso:
 # ── Disponibilidad por día (calendario del cliente) ─────────────────────────
 
 class DiasFakeConn:
-    """Fake conn para _dias_no_disponibles.
+    """Fake conn para _dias_no_disponibles (C4).
 
     stock: {equipo_id: cantidad}
-    reservas: [(equipo_id, fd, fh, cant)]  (directas)
-    kit_reservas: [(componente_id, fd, fh, cant)]
+    reservas: [(equipo_id, fd, fh, cant)]   (items reservados — apuntan a hoja,
+        kit o combo; la expansión recursiva los baja a las hojas)
+    kit: {equipo_id: [(componente_id, cantidad, esencial)]}  (grafo de composición)
     mant: [(equipo_id, fd, fh, cant)]
     buffer_horas: int
     """
-    def __init__(self, stock, reservas=None, kit_reservas=None, mant=None, buffer_horas=0):
+    def __init__(self, stock, reservas=None, kit=None, mant=None, buffer_horas=0):
         self.stock = stock
         self.reservas = reservas or []
-        self.kit_reservas = kit_reservas or []
+        self.kit = kit or {}
         self.mant = mant or []
         self.buffer_horas = buffer_horas
 
@@ -418,7 +407,11 @@ class DiasFakeConn:
         if "from equipos where id in" in s:
             return FakeCursor([FakeRow(id=i, cantidad=c) for i, c in self.stock.items()])
         if "kit_componentes" in s:
-            return FakeCursor([FakeRow(eid=e, fd=fd, fh=fh, cant=c) for (e, fd, fh, c) in self.kit_reservas])
+            return FakeCursor([
+                FakeRow(equipo_id=eid, componente_id=cid, cantidad=q, esencial=ese)
+                for eid, comps in self.kit.items()
+                for (cid, q, ese) in comps
+            ])
         if "from alquiler_items" in s:
             return FakeCursor([FakeRow(eid=e, fd=fd, fh=fh, cant=c) for (e, fd, fh, c) in self.reservas])
         if "equipo_mantenimiento" in s:
@@ -479,6 +472,31 @@ class TestDiasNoDisponibles:
             mant=[(1, "2026-06-02T00:00:00", "2026-06-03T00:00:00", 1)],
         )
         assert "2026-06-02" in _dias_no_disponibles(conn, {1: 1}, "2026-06-01", "2026-06-05")
+
+    def test_combo_anidado_bloquea_por_hoja_escasa(self):
+        """C4: el carrito pide un combo anidado (combo→kit→hoja, hoja stock 1) y
+        otro pedido reservó la hoja directo el 03 → el calendario bloquea el 03."""
+        from reservas import dias_no_disponibles as _dias_no_disponibles
+        conn = DiasFakeConn(
+            stock={30: 9, 10: 9, 20: 1},
+            kit={30: [(10, 1, True)], 10: [(20, 1, True)]},
+            reservas=[(20, "2026-06-03T09:00:00", "2026-06-04T09:00:00", 1)],
+        )
+        res = _dias_no_disponibles(conn, {30: 1}, "2026-06-01", "2026-06-05")
+        assert "2026-06-03" in res
+        assert "2026-06-01" not in res
+
+    def test_combo_anidado_reservado_bloquea_hoja_directa(self):
+        """C4 (backward): el carrito pide la hoja directa; otro pedido reservó un
+        COMBO ANIDADO que la contiene → el día se bloquea (a 1 nivel no se veía)."""
+        from reservas import dias_no_disponibles as _dias_no_disponibles
+        conn = DiasFakeConn(
+            stock={30: 9, 10: 9, 20: 1},
+            kit={30: [(10, 1, True)], 10: [(20, 1, True)]},
+            reservas=[(30, "2026-06-03T09:00:00", "2026-06-04T09:00:00", 1)],  # combo reservado
+        )
+        res = _dias_no_disponibles(conn, {20: 1}, "2026-06-01", "2026-06-05")
+        assert "2026-06-03" in res
 
 
 # ── _crea_ciclo_kit — detección de ciclos ────────────────────────────────

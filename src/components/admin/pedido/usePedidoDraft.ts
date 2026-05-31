@@ -133,16 +133,6 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
   const [datos, setDatos] = useState<DraftDatos | null>(null);
   const [items, setItems] = useState<DraftItem[] | null>(null);
 
-  // Sincronizar cuando llega o cambia el pedido del server
-  useEffect(() => {
-    if (!pedido) return;
-    const d = pedidoToDatos(pedido);
-    const it = pedidoToItems(pedido);
-    serverRef.current = { datos: d, items: it };
-    setDatos((cur) => (cur && shallowDatosEq(cur, d) ? cur : d));
-    setItems((cur) => (cur && shallowItemsEq(cur, it) ? cur : it));
-  }, [pedido]);
-
   // ── Mutations (admin) ──────────────────────────────────────────────────
   const datosMut = useMutation({
     mutationFn: (d: DraftDatos) =>
@@ -231,6 +221,34 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  // ── Sincronizar cuando llega o cambia el pedido del server ───────────────
+  // Guard anti-race: si la mutación correspondiente está en vuelo, NO pisamos
+  // el estado local con datos del server que pueden ser "viejos".
+  //
+  // Caso típico: el usuario agrega un ítem (itemsMut en vuelo) y a la vez
+  // tiene un cambio de datos pendiente (datosMut en vuelo). Si datosMut
+  // completa primero, su onSuccess llama setQueryData con el pedido del
+  // server que todavía tiene los ítems VIEJOS. Sin el guard, el sync effect
+  // llamaría setItems(old items) y el nuevo ítem desaparecería del UI —
+  // aunque SÍ se guarda después cuando itemsMut completa. (#bug "se agrega
+  // pero no se ve guardado hasta reentrar").
+  useEffect(() => {
+    if (!pedido) return;
+    const d = pedidoToDatos(pedido);
+    const it = pedidoToItems(pedido);
+    serverRef.current = { datos: d, items: it };
+    // Solo sincronizamos el estado local si la mutación correspondiente no
+    // está en vuelo. Cuando la mutación complete, su isPending pasa a false,
+    // este effect se re-ejecuta con el pedido fresco de onSuccess, y entonces
+    // sí actualizamos.
+    if (!datosMut.isPending) {
+      setDatos((cur) => (cur && shallowDatosEq(cur, d) ? cur : d));
+    }
+    if (!itemsMut.isPending) {
+      setItems((cur) => (cur && shallowItemsEq(cur, it) ? cur : it));
+    }
+  }, [pedido, datosMut.isPending, itemsMut.isPending]);
 
   // ── Autosave debounced ─────────────────────────────────────────────────
   // Admin: dos efectos separados (datos / items) que dispatchean a sus mutations.

@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Loader2,
   Upload,
@@ -31,6 +31,7 @@ import {
   Copy,
   ExternalLink,
   ChevronDown,
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -69,10 +70,13 @@ import { DUENOS, isCanonicalDueno } from "@/lib/admin/duenos";
 import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
 
 import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin } from "@/lib/admin/api";
+import type { ContenidoIncluidoItem } from "@/data/equipment";
 import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
 import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
 import { KitEditor } from "./KitEditor";
+import { ComboEditor } from "./ComboEditor";
+import { ContenidoIncluidoEditor } from "./ContenidoIncluidoEditor";
 import { SpecsDiffEditor } from "./SpecsDiffEditor";
 import { type Spec, newSpec, withIds, sameLabel, findSpecValue, uniq } from "./spec-helpers";
 import { generarNombrePublico, categoriaSoportaAutoGen } from "./nombre-publico";
@@ -110,6 +114,7 @@ function buildSchema(isEdit: boolean) {
     estado: z.enum(["operativo", "en_mantenimiento", "fuera_servicio"]).default("operativo"),
     visible_catalogo: z.boolean().default(true),
     ficha_completa: z.boolean().default(false),
+    tipo: z.enum(["simple", "kit", "combo"]).default("simple"),
   });
 }
 
@@ -152,6 +157,7 @@ export function EquipoFormDialogV2({
   onCreatedWithMissingRecommended?: (equipo: Equipo, missing: RecommendedField[]) => void;
 }) {
   const isEdit = !!initial;
+  const qc = useQueryClient();
   const { rate: usdRate } = useUsdRate();
   const roiDefault = useRoiPctDefault();
 
@@ -183,6 +189,7 @@ export function EquipoFormDialogV2({
       estado: (initial?.estado as FormValues["estado"]) ?? "operativo",
       visible_catalogo: initial ? Boolean(initial.visible_catalogo) : true,
       ficha_completa: initial ? Boolean(initial.ficha_completa) : false,
+      tipo: (initial?.tipo as FormValues["tipo"]) ?? "simple",
     },
   });
 
@@ -194,6 +201,8 @@ export function EquipoFormDialogV2({
   const [descripcion, setDescripcion] = useState("");
   const [notas, setNotas] = useState("");
   const [specs, setSpecs] = useState<Spec[]>([]);
+  // B1 #635: contenido incluido (dim. 3)
+  const [contenidoIncluido, setContenidoIncluido] = useState<ContenidoIncluidoItem[]>([]);
   // Etiquetas unificadas: en V2 keywords y etiquetas son lo mismo. En save se
   // envían a los dos backends (etiquetas vía onSubmit, keywords_json vía setFicha).
   const [tags, setTags] = useState<string[]>([]);
@@ -236,6 +245,14 @@ export function EquipoFormDialogV2({
     },
     [pendingFilePreview],
   );
+
+  // ── Sentinel de stock para combos: cantidad = 9999 ─────────────────
+  const watchedTipo = form.watch("tipo");
+  useEffect(() => {
+    if (watchedTipo === "combo") {
+      form.setValue("cantidad", 9999, { shouldDirty: true });
+    }
+  }, [watchedTipo, form]);
 
   // ── Manual override del precio/día ─────────────────────────────────
   const [precioJornadaManual, setPrecioJornadaManual] = useState(false);
@@ -291,11 +308,27 @@ export function EquipoFormDialogV2({
         kws = [];
       }
       setTags(uniq([...(initial?.etiquetas ?? []), ...kws]));
+
+      // Contenido incluido (B1 #635)
+      try {
+        const arr = f.contenido_incluido_json ? JSON.parse(f.contenido_incluido_json) : [];
+        setContenidoIncluido(
+          Array.isArray(arr)
+            ? arr.filter(
+                (v): v is ContenidoIncluidoItem =>
+                  v != null && typeof v === "object" && typeof v.nombre === "string",
+              )
+            : [],
+        );
+      } catch {
+        setContenidoIncluido([]);
+      }
     } else if (!initial) {
       setDescripcion("");
       setNotas("");
       setTags([]);
       setNombrePublico("");
+      setContenidoIncluido([]);
     }
   }, [fichaQ.data, initial]);
 
@@ -772,7 +805,7 @@ export function EquipoFormDialogV2({
       // Tags unificadas (chip UI) → se envían a ambos backends: etiquetas (top-level
       // equipo, para filtros/categorización) y keywords_json (ficha, para chips públicos).
       const etiquetas = uniq(tags.map((t) => t.trim()).filter(Boolean));
-      const { visible_catalogo, ficha_completa, ...rest } = values;
+      const { visible_catalogo, ficha_completa, tipo, ...rest } = values;
 
       const fotoUrlForm = rest.foto_url || null;
       const fotoExternaPendiente =
@@ -797,6 +830,7 @@ export function EquipoFormDialogV2({
         visible_catalogo: visible_catalogo ? 1 : 0,
         ficha_completa: ficha_completa,
         categoria_specs: categoriaSpecs || null,
+        tipo,
       };
 
       const fallidos: string[] = [];
@@ -839,7 +873,8 @@ export function EquipoFormDialogV2({
           isEdit || !!descripcion || !!notas || tags.length > 0 || !!nombrePublico.trim();
         if (tieneFicha) {
           try {
-            await adminApi.setFicha(equipoId, {
+            const validos = contenidoIncluido.filter((ci) => ci.nombre.trim().length > 0);
+            const fichaGuardada = await adminApi.setFicha(equipoId, {
               descripcion: descripcion || null,
               notas: notas || null,
               keywords_json: tags.length ? JSON.stringify(tags) : null,
@@ -852,7 +887,19 @@ export function EquipoFormDialogV2({
                 nombrePublicoAuto && categoriaTemplate
                   ? categoriaTemplate
                   : nombrePublico.trim() || null,
+              // B1 #635: contenido incluido — filtramos los ítems sin nombre
+              // (el usuario puede tener una fila vacía sin completar; no la
+              // enviamos para no fallar la validación del backend y perder
+              // los ítems válidos en la misma operación).
+              contenido_incluido_json: validos.length > 0 ? JSON.stringify(validos) : null,
             });
+            // Actualizar el cache de ficha inmediatamente con la respuesta del
+            // servidor. Sin esto, al usar "Aplicar" (no cierra el form), la
+            // invalidación del equipo dispara el effect [fichaQ.data, initial]
+            // con la ficha VIEJA (no invalidada) → setContenidoIncluido(viejos)
+            // pisa lo recién guardado. Con setQueryData el effect re-corre con
+            // la ficha fresca y el contenido queda correcto en pantalla.
+            qc.setQueryData(["admin", "equipo-ficha", equipoId], fichaGuardada);
           } catch (e) {
             fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
           }
@@ -1236,37 +1283,48 @@ export function EquipoFormDialogV2({
       <section className="space-y-3 pt-2 border-t hairline">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <Field label="Stock">
-            <div className="flex gap-1">
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                className="h-9 w-9 shrink-0"
-                onClick={() => {
-                  const raw = Number(form.getValues("cantidad") ?? 0);
-                  const current = Number.isFinite(raw) ? raw : 0;
-                  form.setValue("cantidad", Math.max(0, current - 1), { shouldDirty: true });
-                }}
-                aria-label="Restar 1 al stock"
-              >
-                −
-              </Button>
-              <Input type="number" min={0} className="text-center" {...form.register("cantidad")} />
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                className="h-9 w-9 shrink-0"
-                onClick={() => {
-                  const raw = Number(form.getValues("cantidad") ?? 0);
-                  const current = Number.isFinite(raw) ? raw : 0;
-                  form.setValue("cantidad", current + 1, { shouldDirty: true });
-                }}
-                aria-label="Sumar 1 al stock"
-              >
-                +
-              </Button>
-            </div>
+            {form.watch("tipo") === "combo" ? (
+              <div className="flex items-center h-9 px-3 rounded-md border hairline bg-muted/30 text-sm text-muted-foreground">
+                Sentinel (9999) — derivado de componentes
+              </div>
+            ) : (
+              <div className="flex gap-1">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => {
+                    const raw = Number(form.getValues("cantidad") ?? 0);
+                    const current = Number.isFinite(raw) ? raw : 0;
+                    form.setValue("cantidad", Math.max(0, current - 1), { shouldDirty: true });
+                  }}
+                  aria-label="Restar 1 al stock"
+                >
+                  −
+                </Button>
+                <Input
+                  type="number"
+                  min={0}
+                  className="text-center"
+                  {...form.register("cantidad")}
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => {
+                    const raw = Number(form.getValues("cantidad") ?? 0);
+                    const current = Number.isFinite(raw) ? raw : 0;
+                    form.setValue("cantidad", current + 1, { shouldDirty: true });
+                  }}
+                  aria-label="Sumar 1 al stock"
+                >
+                  +
+                </Button>
+              </div>
+            )}
           </Field>
           <Field label="Valor USD">
             <Input type="number" step="0.01" {...form.register("precio_usd")} />
@@ -1295,6 +1353,27 @@ export function EquipoFormDialogV2({
               )}
             </div>
           </Field>
+        </div>
+
+        <div className="space-y-2">
+          <Field label="Tipo de producto">
+            <Select
+              value={form.watch("tipo")}
+              onValueChange={(v) =>
+                form.setValue("tipo", v as FormValues["tipo"], { shouldDirty: true })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="simple">Equipo</SelectItem>
+                <SelectItem value="kit">Kit</SelectItem>
+                <SelectItem value="combo">Combo</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <TipoGlosario tipo={form.watch("tipo")} />
         </div>
 
         <Field label="Dueño">
@@ -1488,8 +1567,97 @@ export function EquipoFormDialogV2({
               KIT — colapsable, solo en EDIT (necesita id del equipo)
           ════════════════════════════════════════════════════════════════ */}
       {isEdit && initial && (
-        <CollapsibleSection title="Kit (componentes incluidos)">
-          <KitEditor equipoId={initial.id} />
+        <CollapsibleSection
+          title={
+            form.watch("tipo") === "combo" ? "Componentes del combo" : "Kit (componentes incluidos)"
+          }
+        >
+          {form.watch("tipo") === "combo" ? (
+            <ComboEditor equipoId={initial.id} />
+          ) : (
+            <KitEditor equipoId={initial.id} />
+          )}
+        </CollapsibleSection>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════
+              CONTENIDO INCLUIDO — B1 #635 (solo en EDIT)
+          ════════════════════════════════════════════════════════════════ */}
+      {isEdit && initial && (
+        <CollapsibleSection title="Contenido de la caja" defaultOpen={contenidoIncluido.length > 0}>
+          <div className="flex items-start justify-between mb-2 gap-2">
+            <p className="text-xs text-muted-foreground">
+              Qué viene en la caja (reflector, fuente, cables, estuche). Solo informativo — no
+              afecta reservas ni stock.
+            </p>
+            {contenidoIncluido.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const nombre = initial.nombre ?? "Equipo";
+                  const marca = initial.marca ?? "";
+                  const fotoUrl = initial.foto_url ?? "";
+                  const fotoAbs =
+                    fotoUrl.startsWith("http://") || fotoUrl.startsWith("https://") ? fotoUrl : "";
+                  const fotoTag = fotoAbs
+                    ? `<img src="${fotoAbs}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;display:block;margin:0 0 16px">`
+                    : "";
+                  const itemsHtml = contenidoIncluido
+                    .map((ci) => {
+                      const ciNombre = ci.nombre.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                      const ciFoto =
+                        ci.foto_url &&
+                        (ci.foto_url.startsWith("http://") || ci.foto_url.startsWith("https://"))
+                          ? `<img src="${ci.foto_url}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px">`
+                          : `<span style="display:inline-block;width:40px;height:40px;background:#eee;border-radius:4px;vertical-align:middle;margin-right:8px"></span>`;
+                      return `<tr>
+                        <td style="padding:6px 8px">${ciFoto}</td>
+                        <td style="padding:6px 8px;font-size:13px">${ciNombre}</td>
+                        <td style="padding:6px 8px;text-align:center;font-weight:600">${ci.cantidad}</td>
+                        <td style="padding:6px 8px;text-align:center"><span style="display:inline-block;width:18px;height:18px;border:1.5px solid #555;border-radius:3px"></span></td>
+                      </tr>`;
+                    })
+                    .join("\n");
+                  const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<title>Contenido: ${nombre.replace(/</g, "&lt;")}</title>
+<style>
+  body { font-family: -apple-system, Helvetica, sans-serif; color: #111; padding: 24px 32px; max-width: 600px; margin: 0 auto; }
+  h2 { margin: 0 0 4px; font-size: 20px; }
+  .marca { color: #666; font-size: 13px; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #666; padding: 6px 8px; border-bottom: 2px solid #111; }
+  td { border-bottom: 1px solid #eee; vertical-align: middle; }
+  @media print { @page { margin: 16mm; } }
+</style>
+</head><body>
+${fotoTag}
+<h2>${nombre.replace(/</g, "&lt;")}</h2>
+<div class="marca">${marca.replace(/</g, "&lt;")}</div>
+<table>
+<thead><tr><th></th><th>Ítem</th><th style="text-align:center">Cant.</th><th style="text-align:center">✓</th></tr></thead>
+<tbody>${itemsHtml}</tbody>
+</table>
+<script>window.onload = function(){ window.print(); };</script>
+</body></html>`;
+                  const w = window.open("", "_blank", "width=700,height=600");
+                  if (w) {
+                    w.document.write(html);
+                    w.document.close();
+                  }
+                }}
+                className="shrink-0 inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground border hairline hover:text-ink hover:bg-muted/50 transition"
+              >
+                <Printer className="h-3 w-3" />
+                Imprimir contenido
+              </button>
+            )}
+          </div>
+          <ContenidoIncluidoEditor
+            equipoId={initial.id}
+            items={contenidoIncluido}
+            onChange={setContenidoIncluido}
+          />
         </CollapsibleSection>
       )}
 
@@ -2044,6 +2212,57 @@ function CategoriasPicker({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Glosario de tipos — panel de ayuda junto al selector de tipo
+// ════════════════════════════════════════════════════════════════════
+
+const TIPO_INFO: Record<
+  "simple" | "kit" | "combo",
+  { titulo: string; stock: string; precio: string; web: string; extra?: string }
+> = {
+  simple: {
+    titulo: "Equipo",
+    stock: "Propio",
+    precio: "Propio (manual)",
+    web: "Su categoría",
+    extra: "Puede tener contenido de caja (reflector, cables…) solo informativo.",
+  },
+  kit: {
+    titulo: "Kit",
+    stock: "Propio + pools compartidos de accesorios (kit_componentes)",
+    precio: "Manual (bundle cerrado; los componentes no suman)",
+    web: "Su categoría — el cliente no sabe que es Kit",
+    extra:
+      "Diferencia con Equipo: consume accesorios de un pool compartido. El precio es el del bundle.",
+  },
+  combo: {
+    titulo: "Combo",
+    stock: "Derivado: mín. de los componentes esenciales",
+    precio: "Σ (componente × cant × (1 − descuento_línea)), dinámico",
+    web: "Categoría Combos",
+    extra:
+      "Esencial falta → no disponible. Best-effort falta → parcialmente disponible, mismo precio.",
+  },
+};
+
+function TipoGlosario({ tipo }: { tipo: "simple" | "kit" | "combo" }) {
+  const info = TIPO_INFO[tipo];
+  return (
+    <div className="rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs space-y-1">
+      <p className="font-medium text-ink/90">{info.titulo}</p>
+      <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-muted-foreground">
+        <span className="font-medium">Stock</span>
+        <span>{info.stock}</span>
+        <span className="font-medium">Precio</span>
+        <span>{info.precio}</span>
+        <span className="font-medium">Web</span>
+        <span>{info.web}</span>
+      </div>
+      {info.extra && <p className="text-muted-foreground/80 italic pt-0.5">{info.extra}</p>}
     </div>
   );
 }

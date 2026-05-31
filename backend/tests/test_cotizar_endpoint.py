@@ -47,7 +47,7 @@ class FakeConn:
         if "FROM equipos" in self._sql:
             eid = self._params[0]
             if eid in self.precios:
-                return {"precio_jornada": self.precios[eid]}
+                return {"precio_jornada": self.precios[eid], "tipo": "simple"}
             return None
         if "FROM clientes" in self._sql:
             if self.perfiles_por_id is not None:

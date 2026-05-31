@@ -101,6 +101,39 @@ def es_responsable_inscripto(perfil_impuestos: Optional[str]) -> bool:
     return (perfil_impuestos or "") == PERFIL_RI
 
 
+def _precio_combo_calc(componentes) -> int:
+    """Precio NETO por jornada de un combo: Σ(precio_componente × cantidad ×
+    (1 − descuento_línea/100)), redondeado. PURO (testeable sin DB).
+
+    `componentes`: iterable de filas con `precio_jornada`, `cantidad`,
+    `descuento_pct` (el descuento por línea del combo, de `kit_componentes`)."""
+    total = 0.0
+    for c in componentes:
+        precio = c["precio_jornada"] or 0
+        cant = c["cantidad"] or 0
+        desc = (c["descuento_pct"] or 0) / 100.0
+        total += precio * cant * (1.0 - desc)
+    return int(round(total))
+
+
+def precio_combo(conn, equipo_id: int) -> int:
+    """C3 #635 — precio por jornada derivado de un COMBO: DINÁMICO (sigue el
+    precio actual de cada componente) con el descuento por línea de cada uno.
+
+    Lo usa `cotizar` para los equipos `tipo='combo'` en vez de su `precio_jornada`
+    propio. Los kits y simples siguen con su precio propio (manual). Cómo compone
+    este precio con los descuentos de cliente/jornada es decisión de negocio
+    abierta (ver #635) — hoy se aplica como base y los demás descuentos stackean.
+    """
+    rows = conn.execute(
+        "SELECT e.precio_jornada, kc.cantidad, kc.descuento_pct "
+        "FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id "
+        "WHERE kc.equipo_id = ? AND e.eliminado_at IS NULL",
+        (equipo_id,),
+    ).fetchall()
+    return _precio_combo_calc(rows)
+
+
 def calcular_total(
     items: list[ItemPrecio],
     jornadas: int,

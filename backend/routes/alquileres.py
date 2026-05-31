@@ -12,12 +12,12 @@ from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 
 from database import get_db, row_to_dict, to_datetime, to_iso, now_ar
-from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
+from pdf import _pedido_html, _albaran_html, _contrato_html, _packing_list_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin, is_admin_email
 from routes.auth import get_session
 from services.email import send_email
 from services.email.service import get_admin_to
-from services.precios import calcular_total, jornadas_periodo
+from services.precios import calcular_total, jornadas_periodo, precio_combo
 from config import SITE_URL
 
 # Motor de reservas: la fuente única vive en el paquete `reservas`. Acá se
@@ -694,15 +694,21 @@ def cotizar(data: CotizarRequest, request: Request):
             if it.cantidad <= 0:
                 continue
             row = conn.execute(
-                "SELECT precio_jornada FROM equipos WHERE id=? AND eliminado_at IS NULL",
+                "SELECT precio_jornada, tipo FROM equipos WHERE id=? AND eliminado_at IS NULL",
                 (it.equipo_id,),
             ).fetchone()
             if not row:
                 continue
+            # C3 #635: el precio de un COMBO se deriva en vivo de sus componentes
+            # (Σ × descuento por línea); kits y simples usan su precio propio.
+            if row["tipo"] == "combo":
+                precio = precio_combo(conn, it.equipo_id)
+            else:
+                precio = row["precio_jornada"] or 0
             items_para_total.append({
                 "equipo_id": it.equipo_id,
                 "cantidad": it.cantidad,
-                "precio_jornada": row["precio_jornada"] or 0,
+                "precio_jornada": precio,
             })
         subtotal_por_jornada = sum(
             it["precio_jornada"] * it["cantidad"] for it in items_para_total
@@ -1505,6 +1511,58 @@ async def pedido_albaran(id: int, request: Request, format: str = "pdf"):
         content    = pdf_bytes,
         media_type = "application/pdf",
         headers    = {"Content-Disposition": f'attachment; filename="{filename}"', **_DOC_NO_CACHE},
+    )
+
+
+@router.get("/alquileres/{id}/packing-list")
+async def pedido_packing_list(id: int, request: Request, format: str = "pdf"):
+    """`format=html` devuelve el preview HTML sin pasar por el renderer."""
+    require_admin(request)
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Pedido no encontrado")
+        pedido = row_to_dict(row)
+        _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
+
+        items = conn.execute("""
+            SELECT pi.cantidad, e.nombre,
+                   (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
+                   e.modelo, e.foto_url,
+                   e.nombre_publico, e.nombre_publico_largo, pi.equipo_id,
+                   ef.contenido_incluido_json
+            FROM alquiler_items pi
+            JOIN equipos e ON e.id = pi.equipo_id
+            LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
+            WHERE pi.pedido_id = ?
+            ORDER BY e.nombre
+        """, (id,)).fetchall()
+        pedido["items"] = [row_to_dict(i) for i in items]
+
+        for item in pedido["items"]:
+            comp_rows = conn.execute("""
+                SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca,
+                       ec.modelo, ec.foto_url,
+                       ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
+                FROM kit_componentes kc
+                JOIN equipos ec ON ec.id = kc.componente_id
+                WHERE kc.equipo_id = ?
+            """, (item["equipo_id"],)).fetchall()
+            item["componentes"] = [row_to_dict(c) for c in comp_rows]
+    finally:
+        conn.close()
+
+    html_content = _packing_list_html(pedido)
+    if format == "html":
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html_content, headers=_DOC_NO_CACHE)
+    pdf_bytes = await _render_pdf(html_content)
+    filename = _pedido_filename(pedido, suffix="packing-list")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"', **_DOC_NO_CACHE},
     )
 
 
