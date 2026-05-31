@@ -10,6 +10,8 @@ export type IncludedItem = {
   qty?: number;
   note?: string;
   fotoUrl?: string | null;
+  /** A2 #635: solo para combos. True = esencial; false = best-effort. */
+  esencial?: boolean | null;
 };
 
 /** B1 #635 — ítem de contenido incluido (dim. 3): qué trae la caja. */
@@ -79,6 +81,8 @@ export type Equipment = {
   precioBhUsd?: number | null;
   /** Unidades disponibles para el rango de fechas pedido. Solo presente cuando se consulta con fechas. */
   disponible?: number;
+  /** A1 #635: tipo de producto. */
+  tipo?: "simple" | "kit" | "combo";
   /** Dict raw de specs estructuradas keyed por spec_key (Fase H: filtros
    *  públicos dinámicos). Cada entry tiene la metadata del template
    *  necesaria para construir UI de filtros: {value, label, tipo,

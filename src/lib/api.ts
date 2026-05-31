@@ -90,7 +90,14 @@ export type BackendEquipo = {
   visible_catalogo: number;
   relevancia_manual?: number;
   etiquetas: string[];
-  kit: unknown[];
+  kit: Array<{
+    componente_id: number;
+    nombre: string;
+    cantidad: number;
+    foto_url?: string | null;
+    esencial?: boolean | null;
+    descuento_pct?: number | null;
+  }>;
   categorias?: BackendCategoriaRef[];
   ficha?: BackendFicha;
   specs_destacados?: { label: string; value: string }[];
@@ -114,6 +121,8 @@ export type BackendEquipo = {
   >;
   /** Unidades disponibles para el rango desde/hasta. Solo presente si se pasan fechas. */
   disponible?: number;
+  /** A1 #635: tipo de producto. */
+  tipo?: "simple" | "kit" | "combo";
 };
 
 export type BackendCategoria = {

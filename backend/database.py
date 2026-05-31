@@ -1438,11 +1438,12 @@ def attach_kit(conn, equipos: list[dict]) -> list[dict]:
     cur = conn.cursor()
     cur.execute(f"""
         SELECT kc.equipo_id, kc.componente_id, kc.cantidad,
+               kc.descuento_pct, kc.esencial,
                e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
         FROM kit_componentes kc
         JOIN equipos e ON e.id = kc.componente_id
         WHERE kc.equipo_id IN ({placeholders})
-        ORDER BY kc.equipo_id, e.nombre
+        ORDER BY kc.equipo_id, kc.orden ASC, e.nombre ASC
     """, ids)
 
     rows = cur.fetchall()
@@ -1455,6 +1456,8 @@ def attach_kit(conn, equipos: list[dict]) -> list[dict]:
             "marca":         r["marca"],
             "foto_url":      r["foto_url"],
             "cantidad":      r["cantidad"],
+            "descuento_pct": r["descuento_pct"],
+            "esencial":      r["esencial"],
         })
 
     for e in equipos:

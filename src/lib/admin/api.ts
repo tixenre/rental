@@ -741,10 +741,18 @@ export const adminApi = {
     }),
   // kit / componentes
   getKit: (id: number) => authedJson<KitComponente[]>(`/api/equipos/${id}/kit`),
-  addKitItem: (id: number, componente_id: number, cantidad = 1) =>
+  addKitItem: (
+    id: number,
+    componente_id: number,
+    cantidad = 1,
+    descuento_pct?: number | null,
+    esencial?: boolean,
+  ) =>
     authedPostJson<KitComponente[]>(`/api/equipos/${id}/kit`, {
       componente_id,
       cantidad,
+      descuento_pct: descuento_pct ?? null,
+      esencial: esencial ?? true,
     }),
   removeKitItem: async (id: number, componente_id: number) => {
     const res = await authedFetch(`/api/equipos/${id}/kit/${componente_id}`, { method: "DELETE" });

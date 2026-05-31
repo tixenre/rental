@@ -55,6 +55,7 @@ import { ActionMenu } from "@/components/mobile";
 import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquipoDialog";
 import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
 import { DashboardUsoDialog } from "@/components/admin/DashboardUsoDialog";
+import { ComboBuilderDialog } from "@/components/admin/ComboBuilderDialog";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/equipos/")({
@@ -124,6 +125,7 @@ function EquiposPage() {
   const [mantenimientoEquipo, setMantenimientoEquipo] = useState<Equipo | null>(null);
   const [historialEquipo, setHistorialEquipo] = useState<Equipo | null>(null);
   const [openDashboard, setOpenDashboard] = useState(false);
+  const [openComboBuilder, setOpenComboBuilder] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [tab, setTab] = useState<"todos" | "destacados" | "nuevos" | "sin-foto">("todos");
 
@@ -319,6 +321,9 @@ function EquiposPage() {
             title="Dashboard de uso (top alquilados, sin movimiento, revenue por categoría)"
           >
             <BarChart3 className="h-4 w-4 mr-1" /> Uso
+          </Button>
+          <Button variant="outline" onClick={() => setOpenComboBuilder(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Nuevo combo
           </Button>
           <Button
             onClick={() => {
@@ -936,6 +941,8 @@ function EquiposPage() {
       )}
 
       {openDashboard && <DashboardUsoDialog open={openDashboard} onOpenChange={setOpenDashboard} />}
+
+      <ComboBuilderDialog open={openComboBuilder} onOpenChange={setOpenComboBuilder} />
 
       <AlertDialog
         open={!!deleting}

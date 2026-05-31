@@ -420,6 +420,8 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
         nombre: string;
         cantidad: number;
         foto_url?: string | null;
+        esencial?: boolean | null;
+        descuento_pct?: number | null;
       }>)
     : [];
   const includes = kit.map((k) => ({
@@ -427,6 +429,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     name: k.nombre,
     qty: k.cantidad,
     fotoUrl: k.foto_url ?? null,
+    esencial: k.esencial ?? true,
   }));
 
   return {
@@ -466,6 +469,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     videoUrl: ficha?.video_url ?? null,
     precioBhUsd: ficha?.precio_bh_usd ?? null,
     disponible: e.disponible,
+    tipo: e.tipo,
     // Dict raw de specs estructuradas (Fase H: filtros públicos).
     // Cada entry tiene {value, label, tipo, prioridad, en_filtros, ...}
     // para que el catálogo arme filtros dinámicos.

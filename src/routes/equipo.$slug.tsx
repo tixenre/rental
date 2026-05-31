@@ -11,8 +11,17 @@
 
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { ArrowLeft, Plus, Sparkles, Share2, Check, ChevronDown, Maximize2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  Plus,
+  Sparkles,
+  Share2,
+  Check,
+  ChevronDown,
+  Maximize2,
+  AlertTriangle,
+} from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { EmptyImage } from "@/components/rental/EmptyImage";
@@ -278,6 +287,40 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const sinStock = cap <= 0;
   const canAddMore = qty < cap;
 
+  // Parcialmente disponible: solo para combos con componentes best-effort.
+  // Cuando hay fechas seleccionadas y algún componente best-effort no tiene stock,
+  // mostramos el badge "sin [nombre]" (C2 + A2 #635).
+  const startDate = useCart((s) => s.startDate);
+  const endDate = useCart((s) => s.endDate);
+  const bestEffortComponents = useMemo(
+    () =>
+      item.tipo === "combo" ? (item.includes ?? []).filter((inc) => inc.esencial === false) : [],
+    [item.tipo, item.includes],
+  );
+  const bestEffortIds = useMemo(
+    () => bestEffortComponents.map((inc) => Number(inc.id)).filter(Boolean),
+    [bestEffortComponents],
+  );
+  const disponibilidadQ = useQuery({
+    queryKey: ["disponibilidad", startDate, endDate, bestEffortIds],
+    queryFn: async () => {
+      if (!startDate || !endDate || bestEffortIds.length === 0) return {};
+      const res = await fetch(
+        `/api/disponibilidad?fecha_desde=${startDate}&fecha_hasta=${endDate}`,
+      );
+      if (!res.ok) return {};
+      return res.json() as Promise<Record<string, number>>;
+    },
+    enabled: !!startDate && !!endDate && bestEffortIds.length > 0,
+  });
+  const faltantes = useMemo(() => {
+    if (!disponibilidadQ.data || bestEffortComponents.length === 0) return [];
+    return bestEffortComponents.filter((inc) => {
+      const avail = disponibilidadQ.data[String(inc.id)] ?? 0;
+      return avail <= 0;
+    });
+  }, [disponibilidadQ.data, bestEffortComponents]);
+
   const handleShare = async () => {
     if (typeof window === "undefined") return;
     const url = `${window.location.origin}/equipo/${item.id}`;
@@ -337,6 +380,12 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           {item.destacado && (
             <span className="inline-flex items-center gap-0.5 rounded-full bg-amber/15 text-ink px-1.5 py-0.5">
               ★ destacado
+            </span>
+          )}
+          {faltantes.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/30 text-amber px-2 py-0.5 text-[10px] font-medium">
+              <AlertTriangle className="h-2.5 w-2.5" />
+              parcialmente disponible
             </span>
           )}
         </div>
@@ -410,8 +459,30 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
             />
           </div>
 
-          {/* "Incluye" (kit) */}
+          {/* "Incluye" (kit / componentes del combo) */}
           {item.includes && item.includes.length > 0 && <KitSection item={item} />}
+
+          {/* Badge de faltantes best-effort para combos */}
+          {faltantes.length > 0 && (
+            <div className="rounded-lg border border-amber/30 bg-amber/5 px-3 py-2.5 space-y-1">
+              <p className="text-xs font-medium text-amber flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Combo parcialmente disponible para las fechas seleccionadas
+              </p>
+              <ul className="text-xs text-foreground/70 space-y-0.5 pl-5 list-disc">
+                {faltantes.map((f) => (
+                  <li key={f.id}>
+                    {f.name}
+                    {(f.qty ?? 1) > 1 && ` (×${f.qty})`} — sin stock
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[11px] text-muted-foreground">
+                Podés reservar igual. Confirmaremos la disponibilidad de estos items al momento del
+                pedido.
+              </p>
+            </div>
+          )}
 
           {/* Descripción */}
           {desc && (

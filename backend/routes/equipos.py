@@ -469,6 +469,8 @@ class FichaUpdate(BaseModel):
 class KitItem(BaseModel):
     componente_id: int
     cantidad:      int = 1
+    descuento_pct: float | None = None
+    esencial:      bool = True
 
 
 class KitReorder(BaseModel):
@@ -891,9 +893,10 @@ def get_equipo(id_or_slug: str):
         # legacy de equipo_fichas. Mantenemos `ficha` para back-compat.
         equipo = attach_specs_estructuradas(conn, [equipo])[0]
         kit = conn.execute("""
-            SELECT kc.componente_id, kc.cantidad, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
+            SELECT kc.componente_id, kc.cantidad, kc.descuento_pct, kc.esencial,
+                   e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
             FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id
-            WHERE kc.equipo_id = ?  ORDER BY e.nombre
+            WHERE kc.equipo_id = ?  ORDER BY kc.orden ASC, e.nombre ASC
         """, (actual_id,)).fetchall()
         equipo["kit"] = [row_to_dict(r) for r in kit]
         return equipo
@@ -1685,10 +1688,13 @@ def add_kit_item(id: int, data: KitItem):
             )
         try:
             conn.execute("""
-                INSERT INTO kit_componentes (equipo_id, componente_id, cantidad)
-                VALUES (?,?,?)
-                ON CONFLICT(equipo_id, componente_id) DO UPDATE SET cantidad=excluded.cantidad
-            """, (id, data.componente_id, data.cantidad))
+                INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, descuento_pct, esencial)
+                VALUES (?,?,?,?,?)
+                ON CONFLICT(equipo_id, componente_id) DO UPDATE SET
+                    cantidad=excluded.cantidad,
+                    descuento_pct=excluded.descuento_pct,
+                    esencial=excluded.esencial
+            """, (id, data.componente_id, data.cantidad, data.descuento_pct, data.esencial))
             conn.commit()
         except Exception as e:
             raise HTTPException(400, str(e))

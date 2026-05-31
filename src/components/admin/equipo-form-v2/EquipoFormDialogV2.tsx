@@ -75,6 +75,7 @@ import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/li
 import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
 import { KitEditor } from "./KitEditor";
+import { ComboEditor } from "./ComboEditor";
 import { ContenidoIncluidoEditor } from "./ContenidoIncluidoEditor";
 import { SpecsDiffEditor } from "./SpecsDiffEditor";
 import { type Spec, newSpec, withIds, sameLabel, findSpecValue, uniq } from "./spec-helpers";
@@ -244,6 +245,14 @@ export function EquipoFormDialogV2({
     },
     [pendingFilePreview],
   );
+
+  // ── Sentinel de stock para combos: cantidad = 9999 ─────────────────
+  const watchedTipo = form.watch("tipo");
+  useEffect(() => {
+    if (watchedTipo === "combo") {
+      form.setValue("cantidad", 9999, { shouldDirty: true });
+    }
+  }, [watchedTipo, form]);
 
   // ── Manual override del precio/día ─────────────────────────────────
   const [precioJornadaManual, setPrecioJornadaManual] = useState(false);
@@ -1274,37 +1283,48 @@ export function EquipoFormDialogV2({
       <section className="space-y-3 pt-2 border-t hairline">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <Field label="Stock">
-            <div className="flex gap-1">
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                className="h-9 w-9 shrink-0"
-                onClick={() => {
-                  const raw = Number(form.getValues("cantidad") ?? 0);
-                  const current = Number.isFinite(raw) ? raw : 0;
-                  form.setValue("cantidad", Math.max(0, current - 1), { shouldDirty: true });
-                }}
-                aria-label="Restar 1 al stock"
-              >
-                −
-              </Button>
-              <Input type="number" min={0} className="text-center" {...form.register("cantidad")} />
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                className="h-9 w-9 shrink-0"
-                onClick={() => {
-                  const raw = Number(form.getValues("cantidad") ?? 0);
-                  const current = Number.isFinite(raw) ? raw : 0;
-                  form.setValue("cantidad", current + 1, { shouldDirty: true });
-                }}
-                aria-label="Sumar 1 al stock"
-              >
-                +
-              </Button>
-            </div>
+            {form.watch("tipo") === "combo" ? (
+              <div className="flex items-center h-9 px-3 rounded-md border hairline bg-muted/30 text-sm text-muted-foreground">
+                Sentinel (9999) — derivado de componentes
+              </div>
+            ) : (
+              <div className="flex gap-1">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => {
+                    const raw = Number(form.getValues("cantidad") ?? 0);
+                    const current = Number.isFinite(raw) ? raw : 0;
+                    form.setValue("cantidad", Math.max(0, current - 1), { shouldDirty: true });
+                  }}
+                  aria-label="Restar 1 al stock"
+                >
+                  −
+                </Button>
+                <Input
+                  type="number"
+                  min={0}
+                  className="text-center"
+                  {...form.register("cantidad")}
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => {
+                    const raw = Number(form.getValues("cantidad") ?? 0);
+                    const current = Number.isFinite(raw) ? raw : 0;
+                    form.setValue("cantidad", current + 1, { shouldDirty: true });
+                  }}
+                  aria-label="Sumar 1 al stock"
+                >
+                  +
+                </Button>
+              </div>
+            )}
           </Field>
           <Field label="Valor USD">
             <Input type="number" step="0.01" {...form.register("precio_usd")} />
@@ -1547,8 +1567,14 @@ export function EquipoFormDialogV2({
               KIT — colapsable, solo en EDIT (necesita id del equipo)
           ════════════════════════════════════════════════════════════════ */}
       {isEdit && initial && (
-        <CollapsibleSection title="Kit (componentes incluidos)">
-          <KitEditor equipoId={initial.id} />
+        <CollapsibleSection
+          title={form.watch("tipo") === "combo" ? "Componentes del combo" : "Kit (componentes incluidos)"}
+        >
+          {form.watch("tipo") === "combo" ? (
+            <ComboEditor equipoId={initial.id} />
+          ) : (
+            <KitEditor equipoId={initial.id} />
+          )}
         </CollapsibleSection>
       )}
 
