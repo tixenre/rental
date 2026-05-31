@@ -259,9 +259,7 @@ function resolveCategory(etiquetas: string[], nombre: string, marca: string): Ca
 export function buildPublicName(e: BackendEquipo): string {
   // El backend es single source of truth: si calculó el nombre_publico
   // (via el template configurado en /admin/specs), usamos eso.
-  const backendNombre = (
-    (e as unknown as { nombre_publico?: string | null }).nombre_publico ?? ""
-  ).trim();
+  const backendNombre = (e.nombre_publico ?? "").trim();
   if (backendNombre) return backendNombre;
 
   // Sin template configurado (o template que rindió vacío) → fallback al

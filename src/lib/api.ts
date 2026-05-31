@@ -123,6 +123,9 @@ export type BackendEquipo = {
   disponible?: number;
   /** A1 #635: tipo de producto. */
   tipo?: "simple" | "kit" | "combo";
+  /** Nombre público calculado por el backend a partir del template de la categoría.
+   *  Presente en la respuesta del catálogo cuando hay template configurado. */
+  nombre_publico?: string | null;
 };
 
 export type BackendCategoria = {

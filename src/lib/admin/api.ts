@@ -7,6 +7,8 @@
  */
 
 import { authedFetch, authedJson, authedPostJson } from "@/lib/authedFetch";
+import type { EstadoPedido } from "@/lib/pedido-estados";
+export type { EstadoPedido };
 
 // ── Dashboard ────────────────────────────────────────────────────────────
 
@@ -1511,14 +1513,8 @@ export type PedidoCreateInput = {
 
 // ── Tipos pedidos ────────────────────────────────────────────────────────
 
-export type PedidoEstado =
-  | "borrador"
-  | "presupuesto"
-  | "confirmado"
-  | "retirado"
-  | "devuelto"
-  | "finalizado"
-  | "cancelado";
+/** @deprecated Usar EstadoPedido importado de @/lib/pedido-estados */
+export type PedidoEstado = EstadoPedido;
 
 export type PedidoItem = {
   id: number;
@@ -1629,11 +1625,13 @@ export const pedidoPdfUrl = (
   kind: "pdf" | "albaran" | "contrato" | "packing-list" = "pdf",
 ) => `${API_BASE}/api/alquileres/${id}/${kind}`;
 
-export const ESTADO_LABEL: Record<PedidoEstado, string> = {
+export const ESTADO_LABEL: Record<EstadoPedido, string> = {
   borrador: "Borrador",
   presupuesto: "Presupuesto",
+  solicitado: "Solicitado",
   confirmado: "Confirmado",
   retirado: "Retirado",
+  entregado: "Entregado",
   devuelto: "Devuelto",
   finalizado: "Finalizado",
   cancelado: "Cancelado",
