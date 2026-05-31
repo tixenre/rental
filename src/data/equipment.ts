@@ -12,6 +12,13 @@ export type IncludedItem = {
   fotoUrl?: string | null;
 };
 
+/** B1 #635 — ítem de contenido incluido (dim. 3): qué trae la caja. */
+export type ContenidoIncluidoItem = {
+  nombre: string;
+  cantidad: number;
+  foto_url?: string | null;
+};
+
 /** Ref a una categoría asignada al equipo via M2M `equipo_categorias`.
  *  El backend devuelve la lista completa — el frontend usa `category`
  *  (singular, root) como fallback y `categorias` para filtrar por sub-cats. */
@@ -66,6 +73,8 @@ export type Equipment = {
   incluye?: string[];
   conectividad?: string[];
   compatibleCon?: string[];
+  /** B1 #635 — contenido incluido (dim. 3): lista estructurada de lo que trae la caja. */
+  contenidoIncluido?: ContenidoIncluidoItem[];
   videoUrl?: string | null;
   precioBhUsd?: number | null;
   /** Unidades disponibles para el rango de fechas pedido. Solo presente cuando se consulta con fechas. */

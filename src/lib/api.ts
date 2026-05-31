@@ -54,6 +54,8 @@ export type BackendFicha = {
   // Columnas legacy montura/formato/resolucion/peso/dimensiones/alimentacion
   // se droppearon en Fase F — las specs viven en equipo_specs.
   // specs_json y raw_json se droppearon en Fase E.
+  // B1 #635: contenido incluido (dim. 3) — [{nombre, cantidad, foto_url?}]
+  contenido_incluido_json?: string | null;
 };
 
 export type BackendCategoriaRef = {

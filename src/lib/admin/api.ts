@@ -98,6 +98,8 @@ export type Ficha = {
   enriquecido_fuente?: string | null;
   // Fase F: montura/formato/resolucion/peso/dimensiones/alimentacion
   // se droppearon de equipo_fichas. Las specs viven en equipo_specs.
+  // B1 #635: contenido incluido (dim. 3) — [{nombre, cantidad, foto_url?}]
+  contenido_incluido_json?: string | null;
 };
 
 export type CategoriaRef = {

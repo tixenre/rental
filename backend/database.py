@@ -451,6 +451,8 @@ def init_db():
     # raw_json eliminada en Fase E (migration d7e9b3c5a8f2).
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS enriquecido_at TIMESTAMP")
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS enriquecido_fuente TEXT")    # 'firecrawl-bh' | 'firecrawl-oficial' | 'manual'
+    # B1 #635: contenido incluido (dim. 3) — [{nombre, cantidad, foto_url?}] editado a mano
+    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS contenido_incluido_json TEXT")
 
     # ── Etiquetas (bolsa libre / índice de búsqueda) ─────────────────────
     # Las etiquetas son strings libres: incluyen marca, modelo, palabras del
@@ -1500,7 +1502,8 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
                keywords_json, nombre_publico_template,
                incluye_json, conectividad_json, compatible_con_json,
                video_url, precio_bh_usd, fuente_url, fuente_titulo,
-               enriquecido_at, enriquecido_fuente
+               enriquecido_at, enriquecido_fuente,
+               contenido_incluido_json
         FROM equipo_fichas
         WHERE equipo_id IN ({placeholders})
     """, ids)
@@ -1511,6 +1514,7 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
         "incluye_json", "conectividad_json", "compatible_con_json",
         "video_url", "precio_bh_usd", "fuente_url", "fuente_titulo",
         "enriquecido_at", "enriquecido_fuente",
+        "contenido_incluido_json",
     )
     f_map: dict[int, dict] = {}
     for r in rows:

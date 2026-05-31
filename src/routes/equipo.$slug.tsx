@@ -479,8 +479,8 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
             </section>
           )}
 
-          {item.incluye && item.incluye.length > 0 && (
-            <FichaPillSection title="Incluye en la caja" items={item.incluye} />
+          {item.contenidoIncluido && item.contenidoIncluido.length > 0 && (
+            <ContenidoIncluidoSection items={item.contenidoIncluido} />
           )}
           {item.conectividad && item.conectividad.length > 0 && (
             <FichaPillSection title="Conectividad" items={item.conectividad} />
@@ -590,6 +590,59 @@ function FichaPillSection({ title, items }: { title: string; items: string[] }) 
           </span>
         ))}
       </div>
+    </section>
+  );
+}
+
+function ContenidoIncluidoSection({
+  items,
+}: {
+  items: NonNullable<import("@/data/equipment").Equipment["contenidoIncluido"]>;
+}) {
+  return (
+    <section className="space-y-2">
+      <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        Contenido de la caja
+        <span className="ml-2 text-ink/40">({items.length})</span>
+      </h2>
+      <ul className="grid gap-1.5 sm:grid-cols-2">
+        {items.map((it, i) => {
+          const qty = it.cantidad ?? 1;
+          return (
+            <li
+              key={i}
+              className="flex items-center gap-2.5 rounded-md border hairline bg-background/60 p-2"
+            >
+              <span
+                className={`shrink-0 grid h-9 min-w-9 place-items-center rounded-md px-1.5 font-mono text-xs tabular ${
+                  qty > 1 ? "bg-ink text-amber font-bold" : "bg-muted text-ink/70 sm:hidden"
+                }`}
+                aria-label={`Cantidad: ${qty}`}
+              >
+                ×{qty}
+              </span>
+              <div className="relative aspect-square w-12 sm:w-10 shrink-0 overflow-hidden rounded bg-muted/40">
+                {it.foto_url ? (
+                  <img
+                    src={it.foto_url}
+                    alt={it.nombre}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.opacity = "0";
+                    }}
+                  />
+                ) : (
+                  <div className="grid h-full w-full place-items-center">
+                    <span className="text-[18px] text-muted-foreground/40">□</span>
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1 text-sm leading-snug text-ink">{it.nombre}</div>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }

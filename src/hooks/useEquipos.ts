@@ -6,7 +6,12 @@ import {
   type BackendEquipo,
   type BackendMarca,
 } from "@/lib/api";
-import { type Equipment, type Category, equipment as MOCK_EQUIPMENT } from "@/data/equipment";
+import {
+  type Equipment,
+  type Category,
+  type ContenidoIncluidoItem,
+  equipment as MOCK_EQUIPMENT,
+} from "@/data/equipment";
 import { format } from "date-fns";
 
 /* ─── Inferencia de categoría desde nombre/marca/etiquetas ────────────── */
@@ -391,6 +396,24 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
   const parsedConectividad = parseStringList(ficha?.conectividad_json);
   const parsedCompatibleCon = parseStringList(ficha?.compatible_con_json);
 
+  let parsedContenidoIncluido: ContenidoIncluidoItem[] = [];
+  if (ficha?.contenido_incluido_json) {
+    try {
+      const arr = JSON.parse(ficha.contenido_incluido_json);
+      if (Array.isArray(arr)) {
+        parsedContenidoIncluido = arr.filter(
+          (v): v is ContenidoIncluidoItem =>
+            v != null &&
+            typeof v === "object" &&
+            typeof v.nombre === "string" &&
+            typeof v.cantidad === "number",
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   const kit = Array.isArray(e.kit)
     ? (e.kit as Array<{
         componente_id: number;
@@ -439,6 +462,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     incluye: parsedIncluye,
     conectividad: parsedConectividad,
     compatibleCon: parsedCompatibleCon,
+    contenidoIncluido: parsedContenidoIncluido,
     videoUrl: ficha?.video_url ?? null,
     precioBhUsd: ficha?.precio_bh_usd ?? null,
     disponible: e.disponible,

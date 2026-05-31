@@ -69,10 +69,12 @@ import { DUENOS, isCanonicalDueno } from "@/lib/admin/duenos";
 import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
 
 import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin } from "@/lib/admin/api";
+import type { ContenidoIncluidoItem } from "@/data/equipment";
 import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
 import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
 import { KitEditor } from "./KitEditor";
+import { ContenidoIncluidoEditor } from "./ContenidoIncluidoEditor";
 import { SpecsDiffEditor } from "./SpecsDiffEditor";
 import { type Spec, newSpec, withIds, sameLabel, findSpecValue, uniq } from "./spec-helpers";
 import { generarNombrePublico, categoriaSoportaAutoGen } from "./nombre-publico";
@@ -194,6 +196,8 @@ export function EquipoFormDialogV2({
   const [descripcion, setDescripcion] = useState("");
   const [notas, setNotas] = useState("");
   const [specs, setSpecs] = useState<Spec[]>([]);
+  // B1 #635: contenido incluido (dim. 3)
+  const [contenidoIncluido, setContenidoIncluido] = useState<ContenidoIncluidoItem[]>([]);
   // Etiquetas unificadas: en V2 keywords y etiquetas son lo mismo. En save se
   // envían a los dos backends (etiquetas vía onSubmit, keywords_json vía setFicha).
   const [tags, setTags] = useState<string[]>([]);
@@ -291,11 +295,27 @@ export function EquipoFormDialogV2({
         kws = [];
       }
       setTags(uniq([...(initial?.etiquetas ?? []), ...kws]));
+
+      // Contenido incluido (B1 #635)
+      try {
+        const arr = f.contenido_incluido_json ? JSON.parse(f.contenido_incluido_json) : [];
+        setContenidoIncluido(
+          Array.isArray(arr)
+            ? arr.filter(
+                (v): v is ContenidoIncluidoItem =>
+                  v != null && typeof v === "object" && typeof v.nombre === "string",
+              )
+            : [],
+        );
+      } catch {
+        setContenidoIncluido([]);
+      }
     } else if (!initial) {
       setDescripcion("");
       setNotas("");
       setTags([]);
       setNombrePublico("");
+      setContenidoIncluido([]);
     }
   }, [fichaQ.data, initial]);
 
@@ -852,6 +872,9 @@ export function EquipoFormDialogV2({
                 nombrePublicoAuto && categoriaTemplate
                   ? categoriaTemplate
                   : nombrePublico.trim() || null,
+              // B1 #635: contenido incluido
+              contenido_incluido_json:
+                contenidoIncluido.length > 0 ? JSON.stringify(contenidoIncluido) : null,
             });
           } catch (e) {
             fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
@@ -1490,6 +1513,23 @@ export function EquipoFormDialogV2({
       {isEdit && initial && (
         <CollapsibleSection title="Kit (componentes incluidos)">
           <KitEditor equipoId={initial.id} />
+        </CollapsibleSection>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════
+              CONTENIDO INCLUIDO — B1 #635 (solo en EDIT)
+          ════════════════════════════════════════════════════════════════ */}
+      {isEdit && initial && (
+        <CollapsibleSection title="Contenido de la caja" defaultOpen={contenidoIncluido.length > 0}>
+          <p className="text-xs text-muted-foreground mb-2">
+            Qué viene en la caja (reflector, fuente, cables, estuche). Solo informativo — no afecta
+            reservas ni stock.
+          </p>
+          <ContenidoIncluidoEditor
+            equipoId={initial.id}
+            items={contenidoIncluido}
+            onChange={setContenidoIncluido}
+          />
         </CollapsibleSection>
       )}
 

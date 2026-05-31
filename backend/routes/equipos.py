@@ -410,6 +410,8 @@ class FichaUpdate(BaseModel):
     fuente_url:          Optional[str]   = None
     fuente_titulo:       Optional[str]   = None
     enriquecido_fuente:  Optional[str]   = None
+    # B1 #635: contenido incluido (dim. 3) — JSON de [{nombre, cantidad, foto_url?}]
+    contenido_incluido_json: Optional[str] = None
 
 
 class KitItem(BaseModel):
