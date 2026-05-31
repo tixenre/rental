@@ -537,6 +537,7 @@ function Index() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar equipo, marca o categoría…"
+                aria-label="Buscar equipos"
                 className="w-full rounded-full border border-ink/15 bg-surface-elevated py-2.5 pl-11 pr-9 text-sm font-medium shadow-sm placeholder:font-normal placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
               />
               {query && (
@@ -1148,8 +1149,8 @@ function ListMode({
                   }
                 }}
               >
-                {visibleItems.map((item) => (
-                  <EquipmentRow key={item.id} item={item} disponible={getDisponible(item)} />
+                {visibleItems.map((item, idx) => (
+                  <EquipmentRow key={item.id} item={item} disponible={getDisponible(item)} index={idx} />
                 ))}
               </div>
               {hasMore && (

@@ -14,9 +14,12 @@ NO incluye:
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 from config import SITE_URL  # URL pública del sitio (fuente única)
 from xml.sax.saxutils import escape
@@ -128,7 +131,7 @@ def sitemap():
                 "priority": "0.8",
             })
     except Exception:
-        pass
+        logger.error("sitemap: error al generar URLs de equipos y categorías desde BD", exc_info=True)
 
     # Construir XML.
     body = ['<?xml version="1.0" encoding="UTF-8"?>']

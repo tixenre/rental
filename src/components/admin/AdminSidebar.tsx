@@ -220,7 +220,7 @@ export function AdminSidebar({ email }: { email: string }) {
                       </SidebarMenuButton>
                       {isOpen && (
                         <SidebarMenuSub>
-                          {item.children!.map((child) => {
+                          {(item.children ?? []).map((child) => {
                             const childActive =
                               child.url === item.url
                                 ? isActive(child.url, true)

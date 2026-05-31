@@ -92,16 +92,22 @@ async def request_id_middleware(request: Request, call_next):
 ALLOWED_ORIGINS = settings.frontend_origins
 
 # Hardening pre-launch (#503): CORS con credenciales + localhost/wildcard en
-# prod es peligroso. No rompemos el boot (puede haber un caso legítimo), pero
-# lo gritamos fuerte en los logs (lo levanta Sentry) para que no pase callado.
+# prod es peligroso. Rompemos el boot explícitamente para que no pase callado.
 if os.getenv("RAILWAY_ENVIRONMENT"):
     _inseguros = [o for o in ALLOWED_ORIGINS if "localhost" in o or "127.0.0.1" in o or o == "*"]
     if _inseguros:
-        logger.error(
-            "CORS inseguro en producción: FRONTEND_ORIGINS incluye %s. "
-            "Revisá la env var en Railway (no debe tener localhost ni '*').",
-            _inseguros,
+        raise RuntimeError(
+            f"CORS inseguro en producción: FRONTEND_ORIGINS incluye {_inseguros}. "
+            "Revisá la env var en Railway (no debe tener localhost ni '*')."
         )
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
@@ -260,7 +266,7 @@ def _seed_registry() -> None:
             try:
                 conn.rollback()
             except Exception:
-                pass
+                logger.warning("cleanup: error en rollback de conexión del seeder", exc_info=True)
             raise
         finally:
             conn.close()

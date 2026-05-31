@@ -26,7 +26,7 @@ import { FavButton } from "./equipment/shared/FavButton";
  * Reusa la librería de assets compartidos `equipment/shared` (StepperPill,
  * PriceBlock, FavButton) — no recrear variantes (docs/MEMORIA.md 2026-05-29).
  */
-export function EquipmentRow({ item, disponible }: { item: Equipment; disponible?: number }) {
+export function EquipmentRow({ item, disponible, index = 99 }: { item: Equipment; disponible?: number; index?: number }) {
   const qty = useCart((s) => s.items[item.id] ?? 0);
   const add = useCart((s) => s.add);
   const remove = useCart((s) => s.remove);
@@ -97,7 +97,7 @@ export function EquipmentRow({ item, disponible }: { item: Equipment; disponible
                 src={item.fotoUrl}
                 alt={nombrePublico}
                 className="h-full w-full object-contain p-1.5"
-                loading="lazy"
+                loading={index < 4 ? "eager" : "lazy"}
                 decoding="async"
                 onError={() => setImgFailed(true)}
               />
