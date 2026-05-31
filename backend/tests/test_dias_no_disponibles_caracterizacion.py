@@ -139,6 +139,34 @@ def test_rango_de_un_solo_dia():
     assert obtenido == esperado == ["2026-06-02"]
 
 
+@pytest.mark.parametrize("semilla", range(30))
+def test_segmentos_degenerados_igual_al_oraculo(semilla):
+    """Blindaje extra: aunque las reservas reales siempre tienen sd<sh (la DB lo
+    garantiza), confirmamos que ante segmentos degenerados (sd>=sh) o invertidos
+    la versión optimizada sigue coincidiendo con el oráculo — cero divergencia
+    incluso fuera del dominio esperado."""
+    rng = random.Random(1000 + semilla)
+    base = datetime.datetime(2026, 6, 1)
+    items = {1: rng.randint(1, 2)}
+    stock = {1: rng.randint(0, 3)}
+
+    def _seg_degenerado():
+        a = _rand_dt(rng, base, 15)
+        # sh <= sd (igual o invertido).
+        b = a - datetime.timedelta(seconds=rng.randint(0, 3 * 86400))
+        return (a, b, rng.randint(1, 2))
+
+    segs = {1: [_seg_degenerado() for _ in range(rng.randint(1, 4))]}
+    mant = {1: [_seg_degenerado() for _ in range(rng.randint(0, 2))]}
+    buf = datetime.timedelta(hours=rng.choice([0, 6, 24]))
+    d_desde = _rand_dt(rng, base, 15)
+    d_hasta = d_desde + datetime.timedelta(days=rng.randint(0, 10))
+
+    esperado = _oraculo(stock, segs, mant, items, d_desde, d_hasta, buf)
+    obtenido = _dias_bloqueados(stock, segs, mant, items, d_desde, d_hasta, buf)
+    assert obtenido == esperado, f"semilla={semilla}\nesperado={esperado}\nobtenido={obtenido}"
+
+
 def test_sin_segmentos_no_bloquea_nada():
     stock = {1: 2}
     items = {1: 1}
