@@ -1338,6 +1338,9 @@ def _contrato_html(pedido: dict) -> str:
 def _packing_list_html(pedido: dict) -> str:
     """Packing list: checklist de salida/retorno, sin precios.
 
+    La vista HTML (?format=html) usa checkboxes reales interactivos con barra
+    de progreso. El PDF (Playwright) renderiza los checkboxes como cajas vacías.
+
     Estructura por ítem:
       - Equipo (principal)
         ↳ Componentes de kit (si aplica)
@@ -1359,13 +1362,13 @@ def _packing_list_html(pedido: dict) -> str:
         )
 
         rows += f"""
-        <tr class="row-main">
+        <tr class="row-main" data-row="{n}">
           <td class="num center">{n}</td>
           <td class="foto-cell">{foto_html}</td>
           <td class="desc">{descripcion}</td>
           <td class="center">{cant}</td>
-          <td class="center check-cell"><span class="checkbox"></span></td>
-          <td class="center check-cell"><span class="checkbox"></span></td>
+          <td class="center check-cell"><input type="checkbox" class="chk" data-row="{n}" data-col="s" aria-label="Salida"></td>
+          <td class="center check-cell"><input type="checkbox" class="chk" data-row="{n}" data-col="r" aria-label="Retorno"></td>
         </tr>"""
         n += 1
 
@@ -1380,13 +1383,13 @@ def _packing_list_html(pedido: dict) -> str:
                 else '<div class="pl-img pl-img-sm pl-img-empty">—</div>'
             )
             rows += f"""
-        <tr class="row-sub">
+        <tr class="row-sub" data-row="{n}">
           <td class="center" style="color:#bbb;font-size:9pt">↳</td>
           <td class="foto-cell" style="padding-left:16px">{comp_foto}</td>
           <td class="desc sub-desc">Kit: {comp_desc}</td>
           <td class="center">{comp_cant}</td>
-          <td class="center check-cell"><span class="checkbox"></span></td>
-          <td class="center check-cell"><span class="checkbox"></span></td>
+          <td class="center check-cell"><input type="checkbox" class="chk" data-row="{n}" data-col="s" aria-label="Salida"></td>
+          <td class="center check-cell"><input type="checkbox" class="chk" data-row="{n}" data-col="r" aria-label="Retorno"></td>
         </tr>"""
             n += 1
 
@@ -1407,15 +1410,17 @@ def _packing_list_html(pedido: dict) -> str:
                     else '<div class="pl-img pl-img-sm pl-img-empty">—</div>'
                 )
                 rows += f"""
-        <tr class="row-contenido">
+        <tr class="row-contenido" data-row="{n}">
           <td class="center" style="color:#bbb;font-size:9pt">↳</td>
           <td class="foto-cell" style="padding-left:16px">{ci_foto}</td>
           <td class="desc sub-desc caja-item">&#128230; {ci_nombre}</td>
           <td class="center">{ci_cant}</td>
-          <td class="center check-cell"><span class="checkbox"></span></td>
-          <td class="center check-cell"><span class="checkbox"></span></td>
+          <td class="center check-cell"><input type="checkbox" class="chk" data-row="{n}" data-col="s" aria-label="Salida"></td>
+          <td class="center check-cell"><input type="checkbox" class="chk" data-row="{n}" data-col="r" aria-label="Retorno"></td>
         </tr>"""
                 n += 1
+
+    total_rows = n - 1  # para el contador JS
 
     if pedido.get("numero_pedido"):
         ref = f"R-{int(pedido['numero_pedido']):04d}"
@@ -1429,13 +1434,40 @@ def _packing_list_html(pedido: dict) -> str:
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   @page {{ size: A4; margin: 18mm 14mm; }}
   * {{ box-sizing: border-box; }}
   body {{
     font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
     color: #111; font-size: 11pt; line-height: 1.45;
+    margin: 0; padding: 0;
   }}
+
+  /* ── Barra de progreso — solo pantalla ──────────────────── */
+  #progress-bar {{
+    position: sticky; top: 0; z-index: 10;
+    background: #fff; border-bottom: 1px solid #e5e5e5;
+    padding: 10px 20px; display: flex; align-items: center; gap: 12px;
+    font-size: 10pt;
+  }}
+  #progress-track {{
+    flex: 1; height: 8px; background: #eee; border-radius: 4px; overflow: hidden;
+  }}
+  #progress-fill {{
+    height: 100%; width: 0%; background: #22c55e;
+    border-radius: 4px; transition: width .3s ease;
+  }}
+  #progress-text {{ font-weight: 600; white-space: nowrap; min-width: 90px; text-align: right; }}
+  #progress-all-done {{
+    display: none; color: #16a34a; font-weight: 700; font-size: 10pt;
+  }}
+  @media print {{ #progress-bar {{ display: none; }} }}
+
+  /* ── Documento ──────────────────────────────────────────── */
+  .doc {{ padding: 20px 24px; max-width: 900px; margin: 0 auto; }}
+  @media print {{ .doc {{ padding: 0; }} }}
+
   .header {{
     display: flex; justify-content: space-between; align-items: flex-start;
     border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 18px;
@@ -1445,9 +1477,7 @@ def _packing_list_html(pedido: dict) -> str:
     letter-spacing: -.5px;
   }}
   .logo em {{ color: #F9B92E; font-style: normal; }}
-  .doc-tipo {{
-    text-align: right; font-size: 10pt; color: #444;
-  }}
+  .doc-tipo {{ text-align: right; font-size: 10pt; color: #444; }}
   .doc-tipo h1 {{
     font-size: 18pt; font-weight: 800; margin: 0; color: #111;
     text-transform: uppercase; letter-spacing: 1px;
@@ -1466,9 +1496,7 @@ def _packing_list_html(pedido: dict) -> str:
     background: #fffbe6; border-left: 3px solid #F9B92E;
     padding: 10px 14px; font-size: 9.5pt; color: #555; margin-bottom: 16px;
   }}
-  table {{
-    width: 100%; border-collapse: collapse; margin-bottom: 18px;
-  }}
+  table {{ width: 100%; border-collapse: collapse; margin-bottom: 18px; }}
   th {{
     background: #111; color: #fff; text-align: left;
     padding: 8px 10px; font-size: 9pt; font-weight: 700;
@@ -1477,7 +1505,7 @@ def _packing_list_html(pedido: dict) -> str:
   th.center {{ text-align: center; }}
   td {{
     padding: 7px 10px; border-bottom: 1px solid #e5e5e5; font-size: 10pt;
-    vertical-align: middle;
+    vertical-align: middle; transition: background .2s, opacity .2s;
   }}
   td.center {{ text-align: center; }}
   .num {{ width: 28px; color: #999; font-size: 9pt; }}
@@ -1495,29 +1523,58 @@ def _packing_list_html(pedido: dict) -> str:
   .sub-desc {{ font-size: 9.5pt; color: #555; padding-left: 8px; }}
   .caja-item {{ color: #3b60c4; }}
   .check-cell {{ width: 70px; }}
-  .checkbox {{
-    display: inline-block; width: 20px; height: 20px;
-    border: 1.5px solid #555; border-radius: 3px;
+
+  /* ── Checkboxes ─────────────────────────────────────────── */
+  input[type="checkbox"].chk {{
+    width: 22px; height: 22px; cursor: pointer;
+    accent-color: #16a34a; border-radius: 4px;
+    vertical-align: middle;
   }}
+  @media print {{
+    /* En PDF los checkboxes se imprimen como cajas vacías/marcadas por el browser */
+    input[type="checkbox"].chk {{ width: 18px; height: 18px; cursor: default; }}
+  }}
+
+  /* ── Estados de fila ────────────────────────────────────── */
   .row-main {{ background: #fff; }}
   .row-sub {{ background: #fafafa; }}
   .row-contenido {{ background: #f5f8ff; }}
+
+  /* Salida marcada → fondo suave */
+  tr.salida-ok td {{ background: #fefce8 !important; }}
+  /* Ambos marcados → tachado + verde pálido */
+  tr.done td {{ background: #f0fdf4 !important; opacity: .65; }}
+  tr.done td.desc, tr.done td.sub-desc {{ text-decoration: line-through; }}
+
   .firmas {{
-    display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
-    margin-top: 40px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px;
   }}
   .firma {{
     border-top: 1px solid #111; padding-top: 6px; text-align: center;
     font-size: 9pt; color: #555;
   }}
   .footer {{
-    position: fixed; bottom: 8mm; left: 14mm; right: 14mm;
-    text-align: center; font-size: 8pt; color: #999;
+    margin-top: 18px; text-align: center; font-size: 8pt; color: #999;
     border-top: 1px solid #ddd; padding-top: 6px;
+  }}
+  @media print {{
+    .footer {{
+      position: fixed; bottom: 8mm; left: 0; right: 0;
+    }}
   }}
 </style>
 </head>
 <body>
+
+<!-- Barra de progreso (solo HTML) -->
+<div id="progress-bar">
+  <span style="font-size:9.5pt;color:#555">Progreso:</span>
+  <div id="progress-track"><div id="progress-fill"></div></div>
+  <span id="progress-text">0 / {total_rows}</span>
+  <span id="progress-all-done">&#10003; Todo completo</span>
+</div>
+
+<div class="doc">
 
 <div class="header">
   <div>
@@ -1551,7 +1608,7 @@ def _packing_list_html(pedido: dict) -> str:
 </div>
 
 <div class="nota">
-  Checklist de salida y retorno. Tildar cada ítem al entregar y al recibir.
+  Tildá cada ítem al entregar (Salida) y al recibir (Retorno).
   Las filas azules (&#128230;) son accesorios de la caja — incluirlos en la entrega.
 </div>
 
@@ -1562,8 +1619,8 @@ def _packing_list_html(pedido: dict) -> str:
       <th style="width:44px"></th>
       <th>Equipo / Accesorio</th>
       <th class="center" style="width:50px">Cant.</th>
-      <th class="center" style="width:70px">&#9744; Salida</th>
-      <th class="center" style="width:70px">&#9744; Retorno</th>
+      <th class="center" style="width:70px">Salida</th>
+      <th class="center" style="width:70px">Retorno</th>
     </tr>
   </thead>
   <tbody>{rows}</tbody>
@@ -1577,6 +1634,47 @@ def _packing_list_html(pedido: dict) -> str:
 <div class="footer">
   Rambla Rental · ramblarental.com · Documento generado el {fecha_doc}
 </div>
+
+</div><!-- /.doc -->
+
+<script>
+(function() {{
+  var total = {total_rows};
+  var fill  = document.getElementById('progress-fill');
+  var text  = document.getElementById('progress-text');
+  var done  = document.getElementById('progress-all-done');
+
+  function updateRow(rowId) {{
+    var tr = document.querySelector('tr[data-row="' + rowId + '"]');
+    if (!tr) return;
+    var s = document.querySelector('input.chk[data-row="' + rowId + '"][data-col="s"]');
+    var r = document.querySelector('input.chk[data-row="' + rowId + '"][data-col="r"]');
+    if (!s || !r) return;
+    tr.classList.toggle('salida-ok', s.checked && !r.checked);
+    tr.classList.toggle('done',      s.checked && r.checked);
+    updateCounter();
+  }}
+
+  function updateCounter() {{
+    var completados = document.querySelectorAll('tr.done').length;
+    var pct = total > 0 ? Math.round(completados / total * 100) : 0;
+    fill.style.width = pct + '%';
+    text.textContent = completados + ' / ' + total;
+    var allDone = completados === total && total > 0;
+    done.style.display  = allDone ? 'inline' : 'none';
+    text.style.display  = allDone ? 'none'   : 'inline';
+    fill.style.background = allDone ? '#16a34a' : '#22c55e';
+  }}
+
+  document.querySelectorAll('input.chk').forEach(function(chk) {{
+    chk.addEventListener('change', function() {{
+      updateRow(this.dataset.row);
+    }});
+  }});
+
+  updateCounter();
+}})();
+</script>
 
 </body>
 </html>"""
