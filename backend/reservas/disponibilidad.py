@@ -94,23 +94,25 @@ def _derivar_compuestos(raw: dict, comps_by: dict) -> dict:
     suelto) y `comps_by[eid] = [(componente_id, cantidad), ...]`, devuelve
     `{str(eid): disponibilidad}`.
 
-    Un compuesto está disponible tantas veces como permitan su stock propio Y
-    cada componente: `min(raw[propio], min_i ⌊raw[comp_i] / qty_i⌋)`. Espeja la
-    lógica del gate (propio + componentes, 1 nivel, TODOS los componentes). Para
-    hojas (sin componentes), devuelve `raw` sin cambio.
+    Un compuesto está disponible tantas veces como permitan su stock propio Y sus
+    componentes ESENCIALES: `min(raw[propio], min_i ⌊raw[comp_i] / qty_i⌋)` sobre
+    los componentes con `esencial=True`. Espeja la lógica del gate (propio +
+    componentes, 1 nivel). Para hojas (sin componentes), devuelve `raw` sin cambio.
 
       · Kit: el stock propio (unidades primarias) limita junto a los componentes.
       · Combo: su `cantidad` propia es un sentinel alto (lo setea el builder en A2),
         así el min lo gobiernan los componentes — MISMO código, sin special-case
         de tipo. El motor es tipo-agnóstico, igual que el gate.
 
-    Estricto: todos los componentes cuentan (best-effort = C2). Recursión = C4.
+    C2: los componentes **best-effort** (`esencial=False`) NO entran en el min — un
+    alargue escaso no esconde el combo (el faltante se refleja como "parcial" en
+    A2). `comps_by[eid] = [(componente_id, cantidad, esencial), ...]`. Recursión = C4.
     """
     result: dict[str, int] = {}
     for eid, r in raw.items():
         comps = comps_by.get(eid)
         if comps:
-            limites = [raw.get(cid, 0) // q for (cid, q) in comps if q > 0]
+            limites = [raw.get(cid, 0) // q for (cid, q, esencial) in comps if esencial and q > 0]
             result[str(eid)] = min([r, *limites]) if limites else r
         else:
             result[str(eid)] = r
