@@ -876,9 +876,14 @@ export function EquipoFormDialogV2({
                 nombrePublicoAuto && categoriaTemplate
                   ? categoriaTemplate
                   : nombrePublico.trim() || null,
-              // B1 #635: contenido incluido
-              contenido_incluido_json:
-                contenidoIncluido.length > 0 ? JSON.stringify(contenidoIncluido) : null,
+              // B1 #635: contenido incluido — filtramos los ítems sin nombre
+              // (el usuario puede tener una fila vacía sin completar; no la
+              // enviamos para no fallar la validación del backend y perder
+              // los ítems válidos en la misma operación).
+              contenido_incluido_json: (() => {
+                const validos = contenidoIncluido.filter((ci) => ci.nombre.trim().length > 0);
+                return validos.length > 0 ? JSON.stringify(validos) : null;
+              })(),
             });
           } catch (e) {
             fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
