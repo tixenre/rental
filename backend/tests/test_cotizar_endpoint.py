@@ -16,8 +16,7 @@ from starlette.requests import Request as StarletteRequest
 import routes.alquileres as alq
 from routes.alquileres import cotizar, CotizarRequest, CotizarItem
 
-# Request mínimo para satisfacer @limiter.limit — slowapi exige una instancia
-# real de starlette.requests.Request (valida con isinstance).
+# slowapi valida con isinstance(request, StarletteRequest) → necesita una instancia real.
 _TEST_SCOPE = {
     "type": "http",
     "method": "POST",

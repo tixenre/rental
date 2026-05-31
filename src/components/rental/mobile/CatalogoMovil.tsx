@@ -26,6 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useEquipos, useMarcas, useCategorias } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
+import { useShallow } from "zustand/react/shallow";
 import { formatARS } from "@/lib/format";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
@@ -1047,17 +1048,19 @@ export function CatalogoMovil() {
 
   // Cart store — selector granular para evitar re-render del catálogo completo
   // ante cualquier cambio en el store (abrir drawer, cambiar fechas, etc.).
-  const cart = useCart((s) => ({
-    items: s.items,
-    add: s.add,
-    remove: s.remove,
-    startDate: s.startDate,
-    endDate: s.endDate,
-    startTime: s.startTime,
-    endTime: s.endTime,
-    days: s.days,
-    clear: s.clear,
-  }));
+  const cart = useCart(
+    useShallow((s) => ({
+      items: s.items,
+      add: s.add,
+      remove: s.remove,
+      startDate: s.startDate,
+      endDate: s.endDate,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      days: s.days,
+      clear: s.clear,
+    })),
+  );
 
   // Catalog state
   const [activeTab, setActiveTab] = useState("Todo");
