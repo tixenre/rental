@@ -2,8 +2,8 @@
 
 Verifica:
 - FichaUpdate acepta el campo y lo serializa bien.
+- FichaUpdate valida nombre no vacío, cantidad en rango y máx ítems.
 - attach_ficha incluye contenido_incluido_json en el resultado.
-- upsert_ficha (vía mocks) escribe solo el campo, sin tocar los demás.
 """
 import json
 import pytest
@@ -44,6 +44,65 @@ def test_ficha_update_permite_lista_vacia():
     data = FichaUpdate(contenido_incluido_json=json.dumps([]))
     patch = data.model_dump(exclude_unset=True)
     assert patch["contenido_incluido_json"] == "[]"
+
+
+# ── Validación server-side ───────────────────────────────────────────────────
+
+def test_ficha_update_rechaza_nombre_vacio():
+    from pydantic import ValidationError
+    from routes.equipos import FichaUpdate
+
+    with pytest.raises(ValidationError, match="nombre"):
+        FichaUpdate(contenido_incluido_json=json.dumps([{"nombre": "", "cantidad": 1}]))
+
+
+def test_ficha_update_rechaza_nombre_solo_espacios():
+    from pydantic import ValidationError
+    from routes.equipos import FichaUpdate
+
+    with pytest.raises(ValidationError, match="nombre"):
+        FichaUpdate(contenido_incluido_json=json.dumps([{"nombre": "   ", "cantidad": 1}]))
+
+
+def test_ficha_update_rechaza_cantidad_cero():
+    from pydantic import ValidationError
+    from routes.equipos import FichaUpdate
+
+    with pytest.raises(ValidationError, match="cantidad"):
+        FichaUpdate(contenido_incluido_json=json.dumps([{"nombre": "Cable", "cantidad": 0}]))
+
+
+def test_ficha_update_rechaza_cantidad_fuera_de_rango():
+    from pydantic import ValidationError
+    from routes.equipos import FichaUpdate
+
+    with pytest.raises(ValidationError, match="cantidad"):
+        FichaUpdate(contenido_incluido_json=json.dumps([{"nombre": "Cable", "cantidad": 1000}]))
+
+
+def test_ficha_update_rechaza_json_invalido():
+    from pydantic import ValidationError
+    from routes.equipos import FichaUpdate
+
+    with pytest.raises(ValidationError):
+        FichaUpdate(contenido_incluido_json="no es json")
+
+
+def test_ficha_update_rechaza_mas_de_100_items():
+    from pydantic import ValidationError
+    from routes.equipos import FichaUpdate
+
+    items = [{"nombre": f"Item {i}", "cantidad": 1} for i in range(101)]
+    with pytest.raises(ValidationError, match="100"):
+        FichaUpdate(contenido_incluido_json=json.dumps(items))
+
+
+def test_ficha_update_acepta_exactamente_100_items():
+    from routes.equipos import FichaUpdate
+
+    items = [{"nombre": f"Item {i}", "cantidad": 1} for i in range(100)]
+    data = FichaUpdate(contenido_incluido_json=json.dumps(items))
+    assert data.contenido_incluido_json is not None
 
 
 # ── attach_ficha ─────────────────────────────────────────────────────────────

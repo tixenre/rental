@@ -164,24 +164,6 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
             </div>
           )}
 
-          {item.incluye && item.incluye.length > 0 && (
-            <div>
-              <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
-                Incluye
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {item.incluye.slice(0, 8).map((label, i) => (
-                  <span
-                    key={i}
-                    className="rounded-full border border-[var(--hairline)] bg-surface px-2.5 py-1 text-[11px] text-ink"
-                  >
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
           {disponible !== undefined && (
             <div
               className={cn(

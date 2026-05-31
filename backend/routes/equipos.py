@@ -413,6 +413,34 @@ class FichaUpdate(BaseModel):
     # B1 #635: contenido incluido (dim. 3) — JSON de [{nombre, cantidad, foto_url?}]
     contenido_incluido_json: Optional[str] = None
 
+    from pydantic import field_validator as _fv
+    import json as _json
+
+    @_fv("contenido_incluido_json")
+    @classmethod
+    def _validar_contenido_incluido(cls, v):
+        import json as _j
+        if v is None:
+            return v
+        try:
+            items = _j.loads(v)
+        except Exception:
+            raise ValueError("contenido_incluido_json: JSON inválido")
+        if not isinstance(items, list):
+            raise ValueError("contenido_incluido_json: debe ser una lista")
+        if len(items) > 100:
+            raise ValueError("contenido_incluido_json: máximo 100 ítems")
+        for idx, item in enumerate(items):
+            if not isinstance(item, dict):
+                raise ValueError(f"ítem {idx}: debe ser un objeto")
+            nombre = item.get("nombre", "")
+            if not isinstance(nombre, str) or not nombre.strip():
+                raise ValueError(f"ítem {idx}: 'nombre' no puede estar vacío")
+            cantidad = item.get("cantidad", 1)
+            if not isinstance(cantidad, int) or not (1 <= cantidad <= 999):
+                raise ValueError(f"ítem {idx}: 'cantidad' debe ser un entero entre 1 y 999")
+        return v
+
 
 class KitItem(BaseModel):
     componente_id: int
