@@ -177,6 +177,27 @@
   explosión** → Opus (ver *Eficiencia de sesión: modelo según tarea*). El test de concurrencia con
   Postgres real (`test_reservas_concurrency_db.py`, opt-in) es la prueba definitiva del `FOR UPDATE`.
 
+### 2026-05-31 — Expansión recursiva del motor de reservas (C4 #635)
+- **Contexto:** la lectura y el gate expandían la composición a **1 nivel**. Un combo **anidado**
+  (combo→kit→hoja) se contaba de menos en AMBAS direcciones → overbooking (reproducido contra
+  Postgres real antes de tocar nada). El conteo *backward* (`reservado_via_kit`, 1 nivel) era tan
+  culpable como el *forward*: no alcanzaba con recursar solo la expansión del pedido.
+- **Decisión:** toda expansión de composición del motor —demanda hacia abajo y consumo hacia
+  arriba— es **recursiva hasta las hojas**, vía una pieza ÚNICA `_expandir_mult` en
+  `backend/reservas/semantics.py` (agnóstica de dirección: `componentes_de` baja, `parientes_de`
+  sube). `reservado_total` reemplazó al par `reservado_directo + reservado_via_kit`. El gate
+  (`validar_stock`) expande forward + backward recursivo y lockea en **`ORDER BY id`**
+  (determinístico, sin deadlock). El `FOR UPDATE`/transacción/commit quedaron **byte-idénticos**
+  (núcleo sagrado intacto). `esencial` propaga **conjuntivo** (una arista best-effort corta su
+  subrama): lectura con `solo_esenciales=True`, gate estricto con `False` (lógica blanda afuera).
+- **Consecuencias:** lectura y gate **no pueden divergir** (misma pieza recursiva). No re-introducir
+  expansión inline de 1 nivel en routes ni "otra función parecida" — todo pasa por `_expandir_mult`.
+  El supervisor marca como hallazgo cualquier conteo de stock/expansión/overlap ad-hoc. El **batch
+  O(N)→1** (perf, no correctitud) queda **diferido** a #626. Materializa y extiende la decisión
+  *2026-05-30* (`backend/reservas/` = motor único). Red de seguridad: caracterización diferencial
+  (`test_gate_caracterizacion_c4.py`) + correctitud/concurrencia anidada real
+  (`test_reservas_nested_db.py`, opt-in).
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
