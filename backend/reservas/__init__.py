@@ -19,6 +19,7 @@ from reservas.gate import validar_stock
 from reservas.semantics import (
     consolidar_items_por_equipo,
     get_buffer_horas,
+    invalidate_buffer_cache,
     rango_con_buffer,
     reservado_directo,
     reservado_via_kit,
@@ -31,6 +32,7 @@ __all__ = [
     "consolidar_items_por_equipo",
     "dias_no_disponibles",
     "get_buffer_horas",
+    "invalidate_buffer_cache",
     "rango_con_buffer",
     "reservado_directo",
     "reservado_via_kit",

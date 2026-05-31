@@ -11,6 +11,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
@@ -18,3 +20,15 @@ if str(BACKEND_ROOT) not in sys.path:
 # Setear ANTES de cualquier import de módulos del proyecto.
 os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production-use-only-in-tests")
 os.environ.setdefault("ADMIN_EMAILS", "admin@test.com")
+
+
+@pytest.fixture(autouse=True)
+def _reset_buffer_cache():
+    """El motor de reservas cachea `buffer_horas_alquiler` a nivel proceso. Los
+    tests usan FakeConns con distintos buffers en el mismo proceso → reseteamos
+    el cache antes y después de cada test para que no se arrastre un valor."""
+    from reservas import invalidate_buffer_cache
+
+    invalidate_buffer_cache()
+    yield
+    invalidate_buffer_cache()

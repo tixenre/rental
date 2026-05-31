@@ -268,6 +268,11 @@ def update_setting(key: str, payload: dict, request: Request):
                 updated_by = EXCLUDED.updated_by
         """, (key, value, actor))
         conn.commit()
+        # El motor de reservas cachea el buffer global → invalidar al cambiarlo
+        # para que la próxima cotización/confirmación use el valor nuevo.
+        if key == "buffer_horas_alquiler":
+            from reservas import invalidate_buffer_cache
+            invalidate_buffer_cache()
         return {"key": key, "value": value, "updated_by": actor}
     except Exception:
         conn.rollback()

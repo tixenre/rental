@@ -8,14 +8,33 @@ Todos los valores van como bound params (`?`); el único token interpolado en SQ
 es la constante interna `ESTADOS_RESERVADO`.
 """
 import datetime
+import threading
+import time
 
 from database import to_datetime
 
 from reservas.estados import ESTADOS_RESERVADO
 
 
-def get_buffer_horas(conn) -> int:
-    """Horas de prep/revisión exigidas entre alquileres (setting global)."""
+# ── Cache del buffer global ──────────────────────────────────────────────────
+# `buffer_horas_alquiler` (gap de prep entre alquileres) se lee en CADA chequeo
+# de disponibilidad y en CADA confirmación, pero cambia rarísimo (lo setea el
+# admin, ~1 vez/mes). Lo cacheamos a nivel proceso para no pegarle a
+# `app_settings` en cada request:
+#   · Invalidación explícita: el writer de settings llama
+#     `invalidate_buffer_cache()` al cambiarlo → reflejo INSTANTÁNEO. Prod corre
+#     un solo worker uvicorn → la invalidación es 100% efectiva, cero staleness.
+#   · TTL de red de seguridad: si algún día hay multi-worker/réplica, cada
+#     proceso recarga solo a los `_BUFFER_TTL_SEG`. El buffer es un gap de prep,
+#     NO entra en el conteo de stock → un valor viejo por segundos nunca puede
+#     causar overbooking (a lo sumo un gap de prep levemente distinto).
+_BUFFER_TTL_SEG = 60.0
+_buffer_lock = threading.Lock()
+_buffer_valor: int | None = None
+_buffer_expira_en: float = 0.0
+
+
+def _leer_buffer_db(conn) -> int:
     row = conn.execute(
         "SELECT value FROM app_settings WHERE key = ?", ("buffer_horas_alquiler",)
     ).fetchone()
@@ -25,6 +44,35 @@ def get_buffer_horas(conn) -> int:
         return max(0, int(row["value"]))
     except (ValueError, TypeError):
         return 0
+
+
+def get_buffer_horas(conn) -> int:
+    """Horas de prep/revisión exigidas entre alquileres (setting global, cacheado).
+
+    Devuelve el valor cacheado mientras esté fresco; recarga de `app_settings`
+    en el primer acceso, tras un cambio (vía `invalidate_buffer_cache`) o cuando
+    vence el TTL. Doble-check con lock: aunque varios threads colisionen en el
+    miss, solo uno pega a la DB."""
+    global _buffer_valor, _buffer_expira_en
+    valor = _buffer_valor
+    if valor is not None and time.monotonic() < _buffer_expira_en:
+        return valor
+    with _buffer_lock:
+        if _buffer_valor is not None and time.monotonic() < _buffer_expira_en:
+            return _buffer_valor
+        _buffer_valor = _leer_buffer_db(conn)
+        _buffer_expira_en = time.monotonic() + _BUFFER_TTL_SEG
+        return _buffer_valor
+
+
+def invalidate_buffer_cache() -> None:
+    """Descarta el buffer cacheado → la próxima lectura va a la DB. La llama el
+    writer de settings al cambiar `buffer_horas_alquiler`; los tests la corren
+    entre casos (fixture autouse) para no arrastrar valores entre escenarios."""
+    global _buffer_valor, _buffer_expira_en
+    with _buffer_lock:
+        _buffer_valor = None
+        _buffer_expira_en = 0.0
 
 
 def rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas: int):
