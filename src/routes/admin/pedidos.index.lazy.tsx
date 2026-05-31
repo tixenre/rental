@@ -104,10 +104,7 @@ function PedidosPage() {
   const [conSaldo, setConSaldo] = useState(false);
   const [deleting, setDeleting] = useState<Pedido | null>(null);
 
-  // El mock muestra "Solicitado" para el estado interno 'presupuesto'
-  // (RUTAS §4.2 del handoff: label visible distinto del estado de la DB).
-  const estadoLabel = (e: Pedido["estado"]) =>
-    e === "presupuesto" ? "Solicitado" : ESTADO_LABEL[e];
+  const estadoLabel = (e: Pedido["estado"]) => ESTADO_LABEL[e] ?? e;
 
   // Chips "Activos" y "Cerrados" agrupan varios estados → filtramos client-side
   // sobre la lista que devuelve el backend (per_page=200 cubre el volumen real).

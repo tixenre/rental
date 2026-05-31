@@ -22,15 +22,6 @@ export interface AddonItem {
   qty?: number;
 }
 
-export type EstadoPedido =
-  | "borrador"
-  | "presupuesto"
-  | "solicitado"
-  | "confirmado"
-  | "retirado"
-  | "entregado"
-  | "devuelto"
-  | "finalizado"
-  | "cancelado";
+export type { EstadoPedido } from "@/lib/pedido-estados";
 
 export type CatalogView = "grid" | "list";
