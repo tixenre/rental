@@ -17,7 +17,7 @@ from admin_guard import require_admin, is_admin_email
 from routes.auth import get_session
 from services.email import send_email
 from services.email.service import get_admin_to
-from services.precios import calcular_total, jornadas_periodo
+from services.precios import calcular_total, jornadas_periodo, precio_combo
 from config import SITE_URL
 
 # Motor de reservas: la fuente única vive en el paquete `reservas`. Acá se
@@ -694,15 +694,21 @@ def cotizar(data: CotizarRequest, request: Request):
             if it.cantidad <= 0:
                 continue
             row = conn.execute(
-                "SELECT precio_jornada FROM equipos WHERE id=? AND eliminado_at IS NULL",
+                "SELECT precio_jornada, tipo FROM equipos WHERE id=? AND eliminado_at IS NULL",
                 (it.equipo_id,),
             ).fetchone()
             if not row:
                 continue
+            # C3 #635: el precio de un COMBO se deriva en vivo de sus componentes
+            # (Σ × descuento por línea); kits y simples usan su precio propio.
+            if row["tipo"] == "combo":
+                precio = precio_combo(conn, it.equipo_id)
+            else:
+                precio = row["precio_jornada"] or 0
             items_para_total.append({
                 "equipo_id": it.equipo_id,
                 "cantidad": it.cantidad,
-                "precio_jornada": row["precio_jornada"] or 0,
+                "precio_jornada": precio,
             })
         subtotal_por_jornada = sum(
             it["precio_jornada"] * it["cantidad"] for it in items_para_total
