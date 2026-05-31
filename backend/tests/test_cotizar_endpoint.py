@@ -76,6 +76,13 @@ class FakeConn:
     def fetchall(self):
         if "FROM descuentos_jornada" in self._sql:
             return [{"jornadas": j, "pct": p} for j, p in self.descuentos_jornada]
+        # Batch query para equipos: SELECT id, precio_jornada, tipo FROM equipos WHERE id IN (...)
+        if "FROM equipos" in self._sql and "IN" in self._sql:
+            return [
+                {"id": eid, "precio_jornada": precio, "tipo": "simple"}
+                for eid, precio in self.precios.items()
+                if eid in self._params
+            ]
         return []
 
 

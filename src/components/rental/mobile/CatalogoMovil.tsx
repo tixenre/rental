@@ -1045,8 +1045,19 @@ export function CatalogoMovil() {
   // aparecían cuando derivábamos del e.category del equipo.
   const { data: categoriasCanonicas = [] } = useCategorias();
 
-  // Cart store
-  const cart = useCart();
+  // Cart store — selector granular para evitar re-render del catálogo completo
+  // ante cualquier cambio en el store (abrir drawer, cambiar fechas, etc.).
+  const cart = useCart((s) => ({
+    items: s.items,
+    add: s.add,
+    remove: s.remove,
+    startDate: s.startDate,
+    endDate: s.endDate,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    days: s.days,
+    clear: s.clear,
+  }));
 
   // Catalog state
   const [activeTab, setActiveTab] = useState("Todo");
