@@ -13,6 +13,15 @@ Estilo unitario (sin TestClient): se llama a la función con un FakeConn y
 import pytest
 
 import routes.alquileres as alq
+
+# Fake request mínimo para satisfacer el decorador @limiter.limit.
+# El limiter necesita request.headers y request.client para calcular la IP.
+class _FakeClient:
+    host = "127.0.0.1"
+
+class FakeReq:
+    headers = {}
+    client = _FakeClient()
 from routes.alquileres import cotizar, CotizarRequest, CotizarItem
 
 
@@ -87,7 +96,7 @@ class TestAnonimo:
     def test_sin_fechas_una_jornada(self, patch_db):
         # Sin fechas y sin cliente → estimado de UNA jornada, sin IVA/descuento.
         patch_db(FakeConn(precios={7: 10000}), session=None)
-        out = cotizar(_req([(7, 1)]), request=None)
+        out = cotizar(_req([(7, 1)]), request=FakeReq())
 
         assert out["jornadas"] == 1
         assert out["bruto"] == 10000
@@ -104,7 +113,7 @@ class TestAnonimo:
             FakeConn(precios={7: 10000}, perfil="responsable_inscripto", descuento=10),
             session={"role": "cliente", "cliente_id": 42},
         )
-        out = cotizar(_req([(7, 1)]), request=None)
+        out = cotizar(_req([(7, 1)]), request=FakeReq())
 
         assert out["jornadas"] == 1
         assert out["con_iva"] is False
@@ -116,7 +125,7 @@ class TestAnonimo:
         patch_db(FakeConn(precios={7: 10000}), session=None)
         out = cotizar(
             _req([(7, 1)], "2026-06-01T10:00:00", "2026-06-08T10:00:00"),
-            request=None,
+            request=FakeReq(),
         )
 
         assert out["jornadas"] == 7
@@ -125,7 +134,7 @@ class TestAnonimo:
 
     def test_varios_items(self, patch_db):
         patch_db(FakeConn(precios={1: 5000, 2: 3000}), session=None)
-        out = cotizar(_req([(1, 2), (2, 1)]), request=None)
+        out = cotizar(_req([(1, 2), (2, 1)]), request=FakeReq())
 
         # (5000×2 + 3000×1) × 1 jornada = 13000
         assert out["bruto"] == 13000
@@ -142,7 +151,7 @@ class TestResponsableInscripto:
         )
         out = cotizar(
             _req([(7, 1)], "2026-06-01T10:00:00", "2026-06-08T10:00:00"),
-            request=None,
+            request=FakeReq(),
         )
 
         # 70000 neto + 21% = 84700
@@ -160,7 +169,7 @@ class TestResponsableInscripto:
         # Con fechas (1 jornada por ser mismo día +) → modo firme.
         out = cotizar(
             _req([(7, 1)], "2026-06-01T10:00:00", "2026-06-02T10:00:00"),
-            request=None,
+            request=FakeReq(),
         )
 
         # 10000 bruto - 10% = 9000 neto; IVA 21% = 1890; total 10890
@@ -186,7 +195,7 @@ class TestAdmin:
             fecha_hasta="2026-06-08T10:00:00",
             cliente_id=99,
         )
-        out = cotizar(data, request=None)
+        out = cotizar(data, request=FakeReq())
 
         # Aplicó el perfil RI del cliente 99 → IVA sobre 70000.
         assert out["con_iva"] is True
@@ -206,7 +215,7 @@ class TestAdmin:
             cliente_id=99,
             descuento_pct=20,
         )
-        out = cotizar(data, request=None)
+        out = cotizar(data, request=FakeReq())
 
         # 70000 - 20% = 56000 (cliente tenía 0% guardado; ganó el override).
         assert out["descuento_pct"] == 20.0
@@ -225,7 +234,7 @@ class TestAdmin:
             fecha_hasta="2026-06-08T10:00:00",
             descuento_pct=50,
         )
-        out = cotizar(data, request=None)
+        out = cotizar(data, request=FakeReq())
 
         # Cliente no puede auto-aplicarse descuento → 0%.
         assert out["descuento_monto"] == 0
@@ -251,7 +260,7 @@ class TestAdmin:
             fecha_hasta="2026-06-08T10:00:00",
             cliente_id=99,  # intenta cotizar como el cliente 99 (RI)
         )
-        out = cotizar(data, request=None)
+        out = cotizar(data, request=FakeReq())
 
         # Usó el perfil del 42 (consumidor_final) → sin IVA. Ignoró el 99.
         assert out["con_iva"] is False
@@ -270,7 +279,7 @@ class TestAdmin:
             fecha_hasta="2026-06-08T10:00:00",
             cliente_id=99,
         )
-        out = cotizar(data, request=None)
+        out = cotizar(data, request=FakeReq())
 
         assert out["con_iva"] is False
         assert out["total_final"] == 70000
@@ -282,20 +291,20 @@ class TestPreciosDesdeBackend:
     def test_equipo_inexistente_se_ignora(self, patch_db):
         # equipo 99 no está en precios → se excluye (best-effort).
         patch_db(FakeConn(precios={7: 10000}), session=None)
-        out = cotizar(_req([(7, 1), (99, 5)]), request=None)
+        out = cotizar(_req([(7, 1), (99, 5)]), request=FakeReq())
 
         assert out["bruto"] == 10000  # solo el 7, el 99 ignorado
 
     def test_cantidad_no_positiva_se_ignora(self, patch_db):
         patch_db(FakeConn(precios={7: 10000}), session=None)
-        out = cotizar(_req([(7, 0), (7, -3)]), request=None)
+        out = cotizar(_req([(7, 0), (7, -3)]), request=FakeReq())
 
         assert out["bruto"] == 0
         assert out["total_final"] == 0
 
     def test_carrito_vacio(self, patch_db):
         patch_db(FakeConn(precios={}), session=None)
-        out = cotizar(_req([]), request=None)
+        out = cotizar(_req([]), request=FakeReq())
 
         assert out["bruto"] == 0
         assert out["total_final"] == 0
@@ -310,7 +319,7 @@ class TestDescuentoJornadas:
         )
         out = cotizar(
             _req([(7, 1)], "2026-06-01T10:00:00", "2026-06-08T10:00:00"),
-            request=None,
+            request=FakeReq(),
         )
 
         # 70000 - 10% = 63000
@@ -332,7 +341,7 @@ class TestConexion:
     def test_devuelve_conexion_al_pool(self, patch_db):
         conn = FakeConn(precios={7: 10000})
         patch_db(conn, session=None)
-        cotizar(_req([(7, 1)]), request=None)
+        cotizar(_req([(7, 1)]), request=FakeReq())
         assert conn.closed == 1, "cotizar debe cerrar (devolver) la conexión exactamente una vez"
 
     def test_devuelve_conexion_aunque_falle(self, patch_db):
@@ -342,5 +351,5 @@ class TestConexion:
         # Forzamos un fallo dentro del handler: items None rompe la iteración.
         bad = CotizarRequest.model_construct(items=None, fecha_desde=None, fecha_hasta=None)
         with pytest.raises(Exception):
-            cotizar(bad, request=None)
+            cotizar(bad, request=FakeReq())
         assert conn.closed == 1, "aún ante error, cotizar debe devolver la conexión"

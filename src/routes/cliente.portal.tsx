@@ -101,6 +101,7 @@ type Perfil = {
 };
 
 type Item = {
+  id?: number;
   nombre: string;
   marca: string;
   modelo?: string | null;
@@ -111,7 +112,7 @@ type Item = {
   nombre_publico?: string | null;
   nombre_publico_largo?: string | null;
 };
-type Pago = { monto: number; concepto?: string | null; fecha: string };
+type Pago = { id?: number; monto: number; concepto?: string | null; fecha: string };
 type SolicitudPortal = {
   id: number;
   estado: "pendiente" | "aprobada" | "rechazada" | "cancelada";

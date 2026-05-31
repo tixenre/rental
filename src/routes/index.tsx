@@ -1150,7 +1150,12 @@ function ListMode({
                 }}
               >
                 {visibleItems.map((item, idx) => (
-                  <EquipmentRow key={item.id} item={item} disponible={getDisponible(item)} index={idx} />
+                  <EquipmentRow
+                    key={item.id}
+                    item={item}
+                    disponible={getDisponible(item)}
+                    index={idx}
+                  />
                 ))}
               </div>
               {hasMore && (
