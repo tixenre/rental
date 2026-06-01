@@ -16,5 +16,11 @@ from net_utils import get_client_ip
 limiter = Limiter(
     key_func=get_client_ip,
     default_limits=["200/minute"],
-    headers_enabled=True,  # devuelve X-RateLimit-* en cada response
+    # headers_enabled=False a propósito: con True, slowapi corre _inject_headers
+    # después de cada endpoint @limiter.limit y EXIGE que el handler devuelva un
+    # starlette Response. Los handlers que devuelven un dict (ej. /cotizar) lo
+    # rompen → 500 → el front cae a $0. Las versiones nuevas de slowapi
+    # endurecieron esto (antes ignoraban el dict). El rate-limit sigue activo;
+    # solo se omiten los headers informativos X-RateLimit-*.
+    headers_enabled=False,
 )
