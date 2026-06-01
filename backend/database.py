@@ -137,6 +137,11 @@ class PGCursor:
             return None
         return PGRow(row, self.raw_cursor.description)
 
+    def scalar(self):
+        """Retorna el primer valor de la primera fila (o None si no hay filas)."""
+        row = self.raw_cursor.fetchone()
+        return row[0] if row is not None else None
+
     def fetchall(self):
         """Retorna lista de Rows."""
         rows = self.raw_cursor.fetchall()
