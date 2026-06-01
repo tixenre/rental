@@ -166,17 +166,28 @@ def get_estadisticas(request: Request):
         }
 
         # ── Equipos más favoriteados (analytics de comportamiento de clientes) ──
-        favoritos_equipo = conn.execute("""
-            SELECT
-                e.nombre                       AS equipo,
-                COUNT(*)                       AS total_favoritos,
-                COUNT(DISTINCT cf.cliente_id)  AS clientes_unicos
-            FROM cliente_favoritos cf
-            JOIN equipos e ON e.id = cf.equipo_id
-            GROUP BY cf.equipo_id, e.nombre
-            ORDER BY total_favoritos DESC
-            LIMIT 15
-        """).fetchall()
+        # Tabla creada en migración e1f2a3b4c5d6 — guard por si la migración
+        # aún no corrió en este ambiente.
+        table_exists = conn.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = 'cliente_favoritos'
+            )
+        """).scalar()
+        if table_exists:
+            favoritos_equipo = conn.execute("""
+                SELECT
+                    e.nombre                       AS equipo,
+                    COUNT(*)                       AS total_favoritos,
+                    COUNT(DISTINCT cf.cliente_id)  AS clientes_unicos
+                FROM cliente_favoritos cf
+                JOIN equipos e ON e.id = cf.equipo_id
+                GROUP BY cf.equipo_id, e.nombre
+                ORDER BY total_favoritos DESC
+                LIMIT 15
+            """).fetchall()
+        else:
+            favoritos_equipo = []
 
         return {
             "totales":              row_to_dict(totales),
