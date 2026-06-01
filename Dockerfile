@@ -18,13 +18,17 @@ ENV VITE_SUPABASE_PROJECT_ID=$VITE_SUPABASE_PROJECT_ID
 ENV VITE_API_URL=$VITE_API_URL
 
 # Deps primero — capa cacheada mientras no cambien package.json/bun.lock.
+# packages/design-system/package.json se copia acá (no el src/) para que
+# bun resuelva el workspace sin invalidar la capa en cada cambio del DS.
 COPY package.json bun.lock ./
+COPY packages/design-system/package.json ./packages/design-system/package.json
 RUN bun install --frozen-lockfile
 
 # Después código y config — capa que se invalida en cada cambio de UI.
 COPY vite.config.ts tsconfig.json index.html ./
 COPY public/ ./public/
 COPY src/ ./src/
+COPY packages/design-system/src/ ./packages/design-system/src/
 RUN bun run build
 
 # ── Stage 2: runtime (Python + Chromium) ─────────────────────────────────
