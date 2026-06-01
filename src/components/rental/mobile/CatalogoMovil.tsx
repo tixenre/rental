@@ -172,16 +172,17 @@ function HeroBanner({
   const tagline = taglines[taglineIdx % taglines.length];
 
   return (
-    <div ref={heroRef} className="relative bg-amber">
-      {/* Foto rotante — crossfade. Las imgs se apilan en la misma celda de
-          grid (gridArea "1/1") y se cruzan por opacidad. */}
+    <div ref={heroRef}>
+      {/* Foto rotante — crossfade con position:absolute + inset:0.
+          transform:translateZ(0) en el contenedor fuerza GPU compositing,
+          necesario para que overflow:hidden funcione bien en Safari iOS
+          (known bug con imgs absolutas en contenedores de altura fija). */}
       <div
         className="relative overflow-hidden bg-ink"
         style={{
+          width: "100%",
           height: "clamp(240px, 58vw, 340px)",
-          display: "grid",
-          gridTemplateColumns: "1fr",
-          gridTemplateRows: "1fr",
+          transform: "translateZ(0)",
         }}
       >
         {photos.map((src, i) => (
@@ -189,31 +190,31 @@ function HeroBanner({
             key={src}
             src={src}
             alt="El Estudio — Rambla Rental"
-            className="w-full h-full object-cover transition-opacity"
             style={{
-              gridArea: "1 / 1",
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
               opacity: i === photoIdx ? 1 : 0,
-              transitionDuration: "900ms",
+              transition: "opacity 900ms",
             }}
             loading="eager"
           />
         ))}
-        {/* Overlay + "Conocé el estudio" — posicionados relativos al grid */}
-        <div
-          className="pointer-events-none bg-gradient-to-b from-transparent via-transparent to-ink/30"
-          style={{ gridArea: "1 / 1", zIndex: 1 }}
-        />
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-ink/30" />
         <button
           type="button"
           onClick={() => navigate({ to: "/estudio" })}
           className="absolute left-4 bottom-4 inline-flex items-center gap-1.5 bg-ink text-amber font-bold text-[13px] tracking-[-0.01em] px-4 py-2.5 rounded-full"
-          style={{ zIndex: 2 }}
+          style={{ zIndex: 1 }}
         >
           Conocé el estudio
           <ChevronRight size={13} strokeWidth={2.5} />
         </button>
         {/* Navigation dots */}
-        <div className="absolute right-4 bottom-5 flex gap-[5px]" style={{ zIndex: 2 }}>
+        <div className="absolute right-4 bottom-5 flex gap-[5px]" style={{ zIndex: 1 }}>
           {photos.map((_, i) => (
             <i
               key={i}
@@ -227,9 +228,8 @@ function HeroBanner({
         </div>
       </div>
 
-      {/* Copy section — amber. Alto = su contenido (sin estirar): el botón
-          queda justo después del texto, sin amarillo sobrante. */}
-      <div style={{ padding: "24px 20px 32px" }}>
+      {/* Copy section — amber. */}
+      <div className="bg-amber" style={{ padding: "24px 20px 32px" }}>
         <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-3">
           Catálogo · {equipCount} equipos · Mar del Plata
         </div>
