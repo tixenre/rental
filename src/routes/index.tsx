@@ -197,7 +197,7 @@ function Index() {
     Object.keys(items).forEach((id) => {
       if (!validIds.has(id)) setQty(id, 0);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allEquipos, isLoading]);
   const { data: backendCats = [] } = useCategorias();
   const { data: marcasData } = useMarcas();
