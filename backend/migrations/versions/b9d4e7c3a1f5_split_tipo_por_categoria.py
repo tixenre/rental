@@ -125,7 +125,7 @@ def upgrade() -> None:
                    compatibilidad_modo, validado)
                 VALUES (:key, :label, 'enum', CAST(:options AS JSONB),
                         FALSE, 'exacta', FALSE)
-                ON CONFLICT (spec_key) DO NOTHING
+                ON CONFLICT DO NOTHING
             """),
             {
                 "key": cat["new_spec_key"],
