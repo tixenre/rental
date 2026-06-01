@@ -47,6 +47,7 @@ import { useFavoritos } from "@/hooks/useFavoritos";
 import type { BackendMarca, BackendCategoria } from "@/lib/api";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { useCart } from "@/lib/cart-store";
+import { toast } from "sonner";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -194,8 +195,11 @@ function Index() {
   useEffect(() => {
     if (isLoading || allEquipos.length === 0) return;
     const validIds = new Set(allEquipos.map((e) => String(e.id)));
-    Object.keys(items).forEach((id) => {
-      if (!validIds.has(id)) setQty(id, 0);
+    const fantasmas = Object.keys(items).filter((id) => !validIds.has(id));
+    if (fantasmas.length === 0) return;
+    fantasmas.forEach((id) => setQty(id, 0));
+    toast("Actualizamos tu carrito: algunos equipos ya no están disponibles.", {
+      duration: 5000,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allEquipos, isLoading]);
