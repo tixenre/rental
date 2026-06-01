@@ -488,9 +488,6 @@ function Index() {
         />
       </div>
 
-      {/* Cómo funciona — solo para usuarios no logueados */}
-      {!isLogged && <ComoFunciona onDateOpen={() => setDateModalOpen(true)} />}
-
       <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
 
       {/* Toggle Modo + búsqueda sticky. Al scrollear >65% (mismo umbral que
@@ -526,47 +523,13 @@ function Index() {
           />
         </div>
 
-        {/* Desktop: cat-bar 2 filas (toggle+buscador / cat-tabs+disponibles)
-              siguiendo design handoff. Popular chips en su propia fila debajo
-              (solo en modo lista). */}
+        {/* Desktop: cat-bar 2 filas (cat-pills+filtros+toggle / buscador
+              full-width) siguiendo el handoff de Claude Design. Popular chips
+              en su propia fila debajo (solo en modo lista). */}
         <div className="hidden sm:block">
-          {/* Fila 1: ViewToggle (izq) + Buscador (der) */}
-          <div className="flex items-center gap-4 px-6 py-2.5 border-b hairline">
-            <ViewToggle
-              options={[
-                { value: "grid" as Mode, label: "Grid", icon: <LayoutGrid className="h-3 w-3" /> },
-                { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
-              ]}
-              value={mode}
-              onChange={setMode}
-            />
-
-            {/* Buscador protagonista — crece hasta 520px y se alinea a la
-                  derecha (design handoff §3.1). */}
-            <div className="relative ml-auto w-full max-w-[520px]">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar equipo, marca o categoría…"
-                aria-label="Buscar equipos"
-                className="w-full rounded-full border border-ink/15 bg-surface-elevated py-2.5 pl-11 pr-9 text-sm font-medium shadow-sm placeholder:font-normal placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
-              />
-              {query && (
-                <button
-                  onClick={() => setQuery("")}
-                  aria-label="Limpiar"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Fila 2: Cat-tabs (izq, scroll horizontal) + Disponibles (der) */}
-          <div className="flex items-center gap-3 pl-4 pr-6 overflow-x-auto scrollbar-none">
-            <div className="flex shrink-0">
+          {/* Fila 1: Cat-pills (izq, scroll) + Favoritos/Disponibles + ViewToggle (der) */}
+          <div className="flex items-center gap-3 px-6 py-2.5 border-b hairline">
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-none min-w-0">
               {["Todo", ...apiCategories].map((cat) => {
                 // En browse mode el highlight sigue al scroll-spy (spyCat),
                 // sin filtrar; al filtrar/buscar vuelve a basarse en selectedCats.
@@ -584,19 +547,19 @@ function Index() {
                       else setSelectedCats(new Set([cat]));
                     }}
                     className={cn(
-                      "flex items-baseline gap-1.5 px-3.5 pt-2.5 pb-2 whitespace-nowrap shrink-0 border-b-[2.5px] transition",
-                      isActive ? "border-amber" : "border-transparent hover:border-hairline",
+                      "inline-flex items-baseline gap-1.5 rounded-full border px-3.5 py-1.5 whitespace-nowrap shrink-0 text-sm transition",
+                      isActive
+                        ? "border-transparent bg-amber font-bold text-ink"
+                        : "border-hairline font-medium text-muted-foreground hover:border-ink hover:text-ink",
                     )}
                   >
+                    {cat}
                     <span
                       className={cn(
-                        "font-sans text-sm",
-                        isActive ? "font-bold text-ink" : "font-medium text-muted-foreground",
+                        "font-mono text-[9px] tracking-[0.1em] tabular",
+                        isActive ? "text-ink/70" : "text-muted-foreground",
                       )}
                     >
-                      {cat}
-                    </span>
-                    <span className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground tabular">
                       {count}
                     </span>
                   </button>
@@ -604,47 +567,78 @@ function Index() {
               })}
             </div>
 
-            <div className="flex-1 min-w-2" />
+            <div className="flex items-center gap-2 ml-auto shrink-0">
+              {/* Filtro Favoritos */}
+              {fav.count > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFavoritosOnly((v) => !v)}
+                  className={cn(
+                    "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
+                    favoritosOnly
+                      ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
+                      : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
+                  )}
+                  aria-pressed={favoritosOnly}
+                >
+                  <Heart className={cn("h-3 w-3", favoritosOnly && "fill-current")} />
+                  Favoritos
+                  <span className="font-mono text-[9px] tabular">{fav.count}</span>
+                </button>
+              )}
 
-            {/* Filtro Favoritos */}
-            {fav.count > 0 && (
+              {/* Filtro Disponibles — solo tiene efecto con fechas pickeadas */}
               <button
                 type="button"
-                onClick={() => setFavoritosOnly((v) => !v)}
+                onClick={() => setDisponiblesOnly((v) => !v)}
                 className={cn(
                   "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
-                  favoritosOnly
+                  disponiblesOnly
                     ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
                     : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
                 )}
-                aria-pressed={favoritosOnly}
+                aria-pressed={disponiblesOnly}
+                title="Mostrar solo equipos disponibles para las fechas elegidas"
               >
-                <Heart className={cn("h-3 w-3", favoritosOnly && "fill-current")} />
-                Favoritos
-                <span className="font-mono text-[9px] tabular">{fav.count}</span>
+                <Check className="h-3 w-3" />
+                Disponibles
               </button>
-            )}
 
-            {/* Filtro Disponibles — solo tiene efecto con fechas pickeadas */}
-            <button
-              type="button"
-              onClick={() => setDisponiblesOnly((v) => !v)}
-              className={cn(
-                "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
-                disponiblesOnly
-                  ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
-                  : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
+              <ViewToggle
+                options={[
+                  {
+                    value: "grid" as Mode,
+                    label: "Grid",
+                    icon: <LayoutGrid className="h-3 w-3" />,
+                  },
+                  { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
+                ]}
+                value={mode}
+                onChange={setMode}
+              />
+            </div>
+          </div>
+
+          {/* Fila 2: Buscador full-width */}
+          <div className="px-6 py-2.5">
+            <div className="relative w-full">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar equipo, marca o categoría…"
+                aria-label="Buscar equipos"
+                className="w-full rounded-full border border-ink/15 bg-surface-elevated py-2.5 pl-11 pr-9 text-sm font-medium shadow-sm placeholder:font-normal placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  aria-label="Limpiar"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               )}
-              aria-pressed={disponiblesOnly}
-              title="Mostrar solo equipos disponibles para las fechas elegidas"
-            >
-              <Check className="h-3 w-3" />
-              Disponibles
-            </button>
-
-            {/* Contador */}
-            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular shrink-0 pl-1">
-              {query.trim() || mode === "list" ? `${filtered.length}` : `${allEquipos.length}`}
             </div>
           </div>
         </div>
@@ -675,6 +669,9 @@ function Index() {
           ))}
         </div>
       )}
+
+      {/* Cómo funciona — bajo las barras, solo para usuarios no logueados */}
+      {!isLogged && <ComoFunciona onDateOpen={() => setDateModalOpen(true)} />}
 
       {/* Loading / Error states */}
       {isLoading ? (
