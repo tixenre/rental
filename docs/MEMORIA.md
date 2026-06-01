@@ -200,6 +200,21 @@
   (`test_gate_caracterizacion_c4.py`) + correctitud/concurrencia anidada real
   (`test_reservas_nested_db.py`, opt-in).
 
+### 2026-06-01 — Método de merge según etapa del flujo (squash a `dev`, merge-commit a `main`)
+- **Contexto:** el flujo es de dos etapas (`rama → dev → main`, decisión 2026-06-01 Staging→Prod).
+  Las ramas de feature suelen tener commits de ruido ("wip", "fix lint") que no aportan al historial.
+- **Decisión:** el método de merge depende de la etapa:
+  - **`rama → dev` = squash.** Cada PR queda como **un commit limpio** en staging (1 PR = 1 unidad de
+    cambio entendible, con su `#PR`). El detalle commit-por-commit no se pierde: vive en la PR.
+  - **`dev → main` = merge commit** (NO squash). Así cada PR ya squasheada en `dev` fluye a `main`
+    como **su propio commit**, preservando la trazabilidad PR-por-PR en prod.
+- **Why:** el *registro de cambios vive en el commit history* (decisión Memoria en capas) y *prod es
+  sagrado*. Squashear `dev → main` aplastaría N PRs en un commit gigante → se pierde poder revertir
+  **una PR puntual** en prod. El patrón (squash en feature, merge en promoción) mantiene `dev`
+  prolijo **y** `main` con revert quirúrgico.
+- **How to apply:** al mergear una rama a `dev`, usar squash con título `tipo: desc (#PR)`. Al promover
+  `dev → main`, usar merge commit. No squashear nunca la PR de promoción a prod.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
