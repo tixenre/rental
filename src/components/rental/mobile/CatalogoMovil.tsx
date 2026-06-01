@@ -36,6 +36,7 @@ import { FavButton } from "@/components/rental/equipment/shared/FavButton";
 import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
+import { useHeroPhotos } from "@/lib/studio/hero-photos";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
@@ -129,14 +130,8 @@ function RamblaSeal() {
 
 /* ── HeroBanner ──────────────────────────────────────────────────── */
 // Hero amber del catálogo móvil. Foto rotante + eyebrow + headline + CTA "Elegir fechas".
-// El heroRef ancla el amber-on-scroll del topbar.
-const HERO_PHOTOS = [
-  "/estudio/Rambla_Estudio_S7V9470.jpg",
-  "/estudio/Rambla_Estudio_S7V9483.jpg",
-  "/estudio/Rambla_Estudio_S7V9510-HDR-Edit.jpg",
-  "/estudio/Rambla_Estudio_S7V9519-HDR.jpg",
-];
-
+// El heroRef ancla el amber-on-scroll del topbar. Las fotos salen de R2 (admin)
+// vía useHeroPhotos — misma fuente que el hero desktop y la página /estudio.
 function HeroBanner({
   heroRef,
   equipCount,
@@ -147,12 +142,15 @@ function HeroBanner({
   onDateOpen: () => void;
 }) {
   const navigate = useNavigate();
+  const photos = useHeroPhotos();
   const [photoIdx, setPhotoIdx] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setPhotoIdx((i) => (i + 1) % HERO_PHOTOS.length), 4500);
+    setPhotoIdx(0);
+    if (photos.length <= 1) return;
+    const id = setInterval(() => setPhotoIdx((i) => (i + 1) % photos.length), 4500);
     return () => clearInterval(id);
-  }, []);
+  }, [photos.length]);
 
   const { data: taglinesData } = useQuery({
     queryKey: ["settings", "hero_taglines"],
@@ -186,9 +184,9 @@ function HeroBanner({
           gridTemplateRows: "1fr",
         }}
       >
-        {HERO_PHOTOS.map((src, i) => (
+        {photos.map((src, i) => (
           <img
-            key={i}
+            key={src}
             src={src}
             alt="El Estudio — Rambla Rental"
             className="w-full h-full object-cover transition-opacity"
@@ -216,7 +214,7 @@ function HeroBanner({
         </button>
         {/* Navigation dots */}
         <div className="absolute right-4 bottom-5 flex gap-[5px]" style={{ zIndex: 2 }}>
-          {HERO_PHOTOS.map((_, i) => (
+          {photos.map((_, i) => (
             <i
               key={i}
               className="block h-[5px] rounded-full transition-[width,background] duration-[250ms]"

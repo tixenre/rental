@@ -2,13 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { Calendar, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const HERO_PHOTOS = [
-  "/estudio/Rambla_Estudio_S7V9470.jpg",
-  "/estudio/Rambla_Estudio_S7V9483.jpg",
-  "/estudio/Rambla_Estudio_S7V9510-HDR-Edit.jpg",
-  "/estudio/Rambla_Estudio_S7V9519-HDR.jpg",
-];
+import { useHeroPhotos } from "@/lib/studio/hero-photos";
 
 interface HeroSectionProps {
   tagline: [string, string];
@@ -17,12 +11,15 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSectionProps) {
+  const photos = useHeroPhotos();
   const [photoIdx, setPhotoIdx] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setPhotoIdx((i) => (i + 1) % HERO_PHOTOS.length), 4500);
+    setPhotoIdx(0);
+    if (photos.length <= 1) return;
+    const id = setInterval(() => setPhotoIdx((i) => (i + 1) % photos.length), 4500);
     return () => clearInterval(id);
-  }, []);
+  }, [photos.length]);
 
   return (
     <>
@@ -80,9 +77,9 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
             className="relative overflow-hidden block bg-ink min-h-[clamp(300px,52vw,460px)] md:min-h-0 border-l border-ink/14 group"
             aria-label="Conocé el estudio"
           >
-            {HERO_PHOTOS.map((src, i) => (
+            {photos.map((src, i) => (
               <img
-                key={i}
+                key={src}
                 src={src}
                 alt="El Estudio — Rambla Rental"
                 className={cn(
@@ -107,7 +104,7 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
 
             {/* Navigation dots */}
             <div className="absolute right-4 bottom-6 z-[2] flex gap-[5px]">
-              {HERO_PHOTOS.map((_, i) => (
+              {photos.map((_, i) => (
                 <i
                   key={i}
                   className={cn(
