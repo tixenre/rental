@@ -321,6 +321,7 @@ def init_db():
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS cant_pedidos INT NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS ingreso_total_ars BIGINT NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS ranking_actualizado TIMESTAMP")
+    conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS destacada BOOLEAN NOT NULL DEFAULT FALSE")
 
     # FK a marcas. brand_id es la fuente única del nombre de marca
     # (vía marcas.nombre). El backfill desde la columna legacy `marca` y su
