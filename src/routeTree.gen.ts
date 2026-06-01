@@ -94,7 +94,7 @@ const EstudioRoute = EstudioRouteImport.update({
   id: '/estudio',
   path: '/estudio',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/estudio.lazy').then((d) => d.Route))
 const ClienteRoute = ClienteRouteImport.update({
   id: '/cliente',
   path: '/cliente',
