@@ -731,6 +731,18 @@ def cotizar(data: CotizarRequest, request: Request):
             it["precio_jornada"] * it["cantidad"] for it in items_para_total
         )
 
+        # DIAGNÓSTICO temporal (#totales-cero): por qué el subtotal sale 0 con
+        # ítems que en el catálogo tienen precio. Loguea ids pedidos, ids
+        # encontrados en la DB y los precios resueltos. Quitar cuando se cierre.
+        logger.info(
+            "COTIZAR_DEBUG ids_pedidos=%s ids_en_db=%s precios=%s subtotal_pj=%s jornadas=%s",
+            ids_validos,
+            list(precios_map.keys()),
+            [(i["equipo_id"], i["precio_jornada"]) for i in items_para_total],
+            subtotal_por_jornada,
+            jornadas,
+        )
+
         # Perfil tributario + descuento del cliente. Solo en modo firme (con
         # fechas): sin fechas es un estimado sin IVA ni descuentos.
         perfil = None
