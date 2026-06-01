@@ -173,7 +173,7 @@ def get_estadisticas(request: Request):
                 SELECT FROM information_schema.tables
                 WHERE table_name = 'cliente_favoritos'
             )
-        """).scalar()
+        """).fetchone()[0]
         if table_exists:
             favoritos_equipo = conn.execute("""
                 SELECT
