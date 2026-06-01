@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { startOfDay } from "date-fns";
 import { snapTo30 } from "@/components/rental/time-utils";
 import { computeJornadas } from "@/lib/rental-dates";
 
@@ -86,6 +87,17 @@ export const useCart = create<CartState>()(
         startTime: state.startTime,
         endTime: state.endTime,
       }),
+      // Descarta fechas vencidas al rehidratar: si startDate quedó guardada en
+      // el pasado (visita anterior al lanzamiento, o carrito olvidado), el
+      // backend las trata como rango vacío y el calendario queda todo bloqueado.
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const today = startOfDay(new Date());
+        if (state.startDate && state.startDate < today) {
+          state.startDate = undefined;
+          state.endDate = undefined;
+        }
+      },
     },
   ),
 );

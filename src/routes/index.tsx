@@ -185,8 +185,20 @@ type Mode = "grid" | "list";
 
 function Index() {
   // Datos de la API
-  const { startDate, endDate } = useCart();
+  const { startDate, endDate, items, setQty } = useCart();
   const { data: allEquipos = [], isLoading, isError } = useEquipos(startDate, endDate);
+
+  // Reconciliación: elimina del carrito items cuyo ID ya no existe en el catálogo
+  // (equipo borrado, ocultado o archivado después de que el cliente lo agregó).
+  // Se corre solo cuando el catálogo cargó exitosamente y tiene datos.
+  useEffect(() => {
+    if (isLoading || allEquipos.length === 0) return;
+    const validIds = new Set(allEquipos.map((e) => String(e.id)));
+    Object.keys(items).forEach((id) => {
+      if (!validIds.has(id)) setQty(id, 0);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allEquipos, isLoading]);
   const { data: backendCats = [] } = useCategorias();
   const { data: marcasData } = useMarcas();
 
