@@ -113,16 +113,21 @@ def test_backfill_ejecuta_cuando_columna_existe(monkeypatch):
 # ── Cadena de Alembic sin huecos ──────────────────────────────────────────────
 
 
-def _parse_all_revisions() -> dict[str, str | None]:
-    """Devuelve {revision_id: down_revision} para todas las migraciones.
+def _parse_all_revisions() -> dict[str, list[str]]:
+    """Devuelve {revision_id: [parent_ids]} para todas las migraciones.
 
     Parsea los archivos como texto con regex en vez de importarlos para
     evitar dependencias en sqlalchemy/alembic/psycopg2 en el entorno de test.
+
+    Los revision IDs de Alembic no son estrictamente hex — pueden contener
+    cualquier caracter alfanumérico. down_revision puede ser None, una cadena
+    simple o una tupla de IDs (en migraciones de merge).
     """
     import re
     result = {}
-    rev_re = re.compile(r'^revision\s*(?::\s*\w+\s*)?\=\s*["\']([a-f0-9]+)["\']', re.M)
-    down_re = re.compile(r'^down_revision\s*(?::[^=]+)?\=\s*(?:["\']([a-f0-9]+)["\']|None)', re.M)
+    rev_re = re.compile(r'^revision\s*(?::\s*\w+\s*)?\=\s*["\']([a-z0-9]+)["\']', re.M)
+    down_line_re = re.compile(r'^down_revision\s*(?::[^=]+)?\=\s*(.+)', re.M)
+    id_re = re.compile(r'["\']([a-z0-9]+)["\']')
 
     for path in VERSIONS_DIR.glob("*.py"):
         if path.name == "__init__.py":
@@ -132,12 +137,9 @@ def _parse_all_revisions() -> dict[str, str | None]:
         if not rev_m:
             continue
         rev = rev_m.group(1)
-        down_m = down_re.search(text)
-        if down_m:
-            down = down_m.group(1)  # None if matched "None"
-        else:
-            down = None
-        result[rev] = down
+        down_m = down_line_re.search(text)
+        parents = id_re.findall(down_m.group(1)) if down_m else []
+        result[rev] = parents
     return result
 
 
@@ -145,7 +147,7 @@ def test_cadena_alembic_sin_head_divergentes():
     """No debe haber branches divergentes: exactamente una head."""
     revisions = _parse_all_revisions()
     all_revs = set(revisions.keys())
-    parents = {v for v in revisions.values() if v is not None}
+    parents = {p for ps in revisions.values() for p in ps}
     # Las heads son las revisiones que no son parent de nadie.
     heads = all_revs - parents
     assert len(heads) == 1, (
@@ -168,7 +170,8 @@ def test_b3d5e7f9a1c2_alcanzable_desde_baseline():
         if current in visited:
             pytest.fail(f"Ciclo detectado en la cadena de migraciones en {current}")
         visited.add(current)
-        current = revisions.get(current)
+        parents = revisions.get(current, [])
+        current = parents[0] if parents else None
 
     # Si llegamos hasta None sin errores, la cadena es válida desde TARGET.
     assert TARGET in visited
@@ -177,9 +180,8 @@ def test_b3d5e7f9a1c2_alcanzable_desde_baseline():
 def test_cadena_no_tiene_huecos():
     """Cada down_revision referencia una revision que existe."""
     revisions = _parse_all_revisions()
-    for rev, parent in revisions.items():
-        if parent is None:
-            continue  # baseline
-        assert parent in revisions, (
-            f"Migración {rev} referencia parent {parent} que no existe en versions/"
-        )
+    for rev, parents in revisions.items():
+        for parent in parents:
+            assert parent in revisions, (
+                f"Migración {rev} referencia parent {parent} que no existe en versions/"
+            )
