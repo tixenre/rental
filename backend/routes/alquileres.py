@@ -122,7 +122,12 @@ def _get_descuento_jornadas(conn, jornadas: int) -> float:
     ).fetchall()
     if not rows:
         return 0.0
-    puntos = [(r["jornadas"], r["pct"]) for r in rows]
+    # `pct` es NUMERIC en la DB (migración g1a2b3c4d5e6) → psycopg lo devuelve
+    # como Decimal. Se coerce a float acá para que la interpolación
+    # (`t * (p1 - p0)` con t float) no rompa con `float * Decimal` → TypeError
+    # → cotizar 500 → totales en $0. Pasaba en alquileres de jornadas
+    # intermedias (las que interpolan entre puntos ancla).
+    puntos = [(int(r["jornadas"]), float(r["pct"])) for r in rows]
     if jornadas <= puntos[0][0]:
         return float(puntos[0][1])
     if jornadas >= puntos[-1][0]:

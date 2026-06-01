@@ -364,14 +364,18 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
   const numero = pedido.numero_pedido ? `#${pedido.numero_pedido}` : `(borrador #${pedido.id})`;
   const clienteNombre = draft.datos.cliente_nombre || "Sin cliente";
 
-  const stockMap: Record<string, { cantidad: number; reservado: number }> = isCliente
-    ? Object.fromEntries(
-        Object.entries(clienteDispoQ.data ?? {}).map(([k, v]) => [
-          k,
-          { cantidad: Number(v) || 0, reservado: 0 },
-        ]),
-      )
-    : (adminDispoQ.data ?? {});
+  // `/api/disponibilidad` (admin y cliente) devuelve `{ equipo_id: libres }` —
+  // un número neto ya descontados reservas + mantenimiento (fuente única
+  // `reservas.calcular_disponibilidad`). Se adapta a `{cantidad, reservado}`
+  // (reservado=0 porque ya viene neto) para el UI. Antes el branch admin usaba
+  // la respuesta cruda como si fueran objetos → `stock.cantidad` undefined →
+  // "NaN libres" (bug de la modularización de reservas).
+  const stockMap: Record<string, { cantidad: number; reservado: number }> = Object.fromEntries(
+    Object.entries((isCliente ? clienteDispoQ.data : adminDispoQ.data) ?? {}).map(([k, v]) => [
+      k,
+      { cantidad: Number(v) || 0, reservado: 0 },
+    ]),
+  );
 
   const hasOverstock = draft.items.some((it) => {
     const s = stockMap[String(it.equipo_id)];
