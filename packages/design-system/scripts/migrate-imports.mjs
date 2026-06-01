@@ -28,11 +28,11 @@ const PKG = "@rambla/design-system";
 /* Mapeo de import specifiers: prefijo viejo → nuevo.
    El orden importa: los más específicos primero. */
 const MAP = [
-  ["@/components/ui",     `${PKG}/components/ui`],
-  ["@/components/kit",    `${PKG}/components/kit`],
+  ["@/components/ui", `${PKG}/components/ui`],
+  ["@/components/kit", `${PKG}/components/kit`],
   ["@/components/rental", `${PKG}/components/rental`],
-  ["@/lib/format",        `${PKG}/lib/format`],
-  ["@/assets/brand",      `${PKG}/brand`],
+  ["@/lib/format", `${PKG}/lib/format`],
+  ["@/assets/brand", `${PKG}/brand`],
   // NOTA: @/lib/utils NO se reescribe por defecto — el repo puede tener
   // helpers extra ahí además de cn(). Si tu utils.ts es sólo cn(), descomentá:
   // ["@/lib/utils",      `${PKG}/lib/utils`],
@@ -68,18 +68,15 @@ function walk(dir, out = []) {
    Matchea `from "X"`, `from 'X'`, `import("X")`. */
 function rewrite(src) {
   let count = 0;
-  const out = src.replace(
-    /(from\s*|import\s*\(\s*)(['"])([^'"]+)\2/g,
-    (full, lead, q, spec) => {
-      for (const [oldP, newP] of MAP) {
-        if (spec === oldP || spec.startsWith(oldP + "/")) {
-          count++;
-          return `${lead}${q}${newP + spec.slice(oldP.length)}${q}`;
-        }
+  const out = src.replace(/(from\s*|import\s*\(\s*)(['"])([^'"]+)\2/g, (full, lead, q, spec) => {
+    for (const [oldP, newP] of MAP) {
+      if (spec === oldP || spec.startsWith(oldP + "/")) {
+        count++;
+        return `${lead}${q}${newP + spec.slice(oldP.length)}${q}`;
       }
-      return full;
-    },
-  );
+    }
+    return full;
+  });
   return { out, count };
 }
 
@@ -91,12 +88,14 @@ try {
   process.exit(1);
 }
 
-let touched = 0, total = 0;
+let touched = 0,
+  total = 0;
 for (const file of root) {
   const src = readFileSync(file, "utf8");
   const { out, count } = rewrite(src);
   if (count > 0) {
-    touched++; total += count;
+    touched++;
+    total += count;
     console.log(`${APPLY ? "✎" : "·"} ${file}  (${count} import${count > 1 ? "s" : ""})`);
     if (APPLY) writeFileSync(file, out, "utf8");
   }
@@ -108,5 +107,7 @@ if (!APPLY) console.log("Volvé a correr con --apply para escribir los cambios."
 
 console.log("\nDuplicados a borrar tras verificar el build (revisá uno por uno):");
 for (const d of DUPLICATES) console.log(`  ${join(APP_DIR, d)}`);
-console.log("\nManual: cambiá en tu entry  import \"./styles.css\"  →  import \"" + PKG + "/styles.css\"");
+console.log(
+  '\nManual: cambiá en tu entry  import "./styles.css"  →  import "' + PKG + '/styles.css"',
+);
 console.log("Manual: @/lib/utils — repointá a mano sólo si tu utils.ts es únicamente cn().");

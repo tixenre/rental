@@ -81,9 +81,7 @@ export function TopBar({
         "sticky top-0 z-[var(--z-topbar)]",
         "flex h-16 items-center gap-3 border-b px-5",
         "backdrop-blur-md transition-colors duration-300",
-        isAmber
-          ? "border-transparent bg-amber"
-          : "border-hairline bg-background/95",
+        isAmber ? "border-transparent bg-amber" : "border-hairline bg-background/95",
         className,
       )}
     >
@@ -97,11 +95,7 @@ export function TopBar({
             isAmber && "[filter:brightness(0)_invert(1)]",
           )}
         />
-        <img
-          src="/assets/rambla-badge.png"
-          alt="Rambla"
-          className="h-8 w-8 md:hidden"
-        />
+        <img src="/assets/rambla-badge.png" alt="Rambla" className="h-8 w-8 md:hidden" />
       </a>
 
       {/* ── VARIANTE DEFAULT ── */}
@@ -128,7 +122,9 @@ export function TopBar({
               className="h-3.5 w-3.5 flex-shrink-0"
               viewBox="0 0 24 24"
               fill="none"
-              stroke={dateLabel ? (isAmber ? "oklch(0.14 0.01 60)" : "var(--amber)") : "currentColor"}
+              stroke={
+                dateLabel ? (isAmber ? "oklch(0.14 0.01 60)" : "var(--amber)") : "currentColor"
+              }
               strokeWidth={2}
             >
               <rect x="3" y="4" width="18" height="18" rx="2" />

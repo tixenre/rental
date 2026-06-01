@@ -25,17 +25,17 @@ export const isologo = isologoSvg;
 
 /** Assets raster de marca (merch, mobile topbar, ilustración). */
 export const brand = {
-  badge: badgePng,        // seal circular
-  seal: sealPng,          // sello detallado
-  iconR: iconRPng,        // ícono "R" isologo
-  iconChair: iconChairPng // ícono silla branded
+  badge: badgePng, // seal circular
+  seal: sealPng, // sello detallado
+  iconR: iconRPng, // ícono "R" isologo
+  iconChair: iconChairPng, // ícono silla branded
 } as const;
 
 export const brandManifest = {
   wordmark: { svg: wordmarkSvg, png: wordmarkPng, webp: wordmarkWebp, themable: true },
-  isologo:  { svg: isologoSvg, themable: true },
-  badge:    { png: badgePng },
-  seal:     { png: sealPng },
-  iconR:    { png: iconRPng },
-  iconChair:{ png: iconChairPng }
+  isologo: { svg: isologoSvg, themable: true },
+  badge: { png: badgePng },
+  seal: { png: sealPng },
+  iconR: { png: iconRPng },
+  iconChair: { png: iconChairPng },
 } as const;

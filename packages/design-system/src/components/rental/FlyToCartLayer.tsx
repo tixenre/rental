@@ -73,8 +73,8 @@ export function FlyToCartLayer({ items, onComplete }: FlyToCartLayerProps) {
               initial={{
                 position: "fixed" as const,
                 left: item.from.left,
-                top:  item.from.top,
-                width:  item.from.width,
+                top: item.from.top,
+                width: item.from.width,
                 height: item.from.height,
                 borderRadius: 8,
                 opacity: 1,
@@ -93,20 +93,16 @@ export function FlyToCartLayer({ items, onComplete }: FlyToCartLayerProps) {
               }}
               exit={{ opacity: 0 }}
               transition={{
-                duration: 0.55,                      // --duration-xslow
-                ease: [0.22, 1, 0.36, 1],            // ease-out expo
+                duration: 0.55, // --duration-xslow
+                ease: [0.22, 1, 0.36, 1], // ease-out expo
               }}
               onAnimationComplete={() => onComplete(item.id)}
               style={{
                 overflow: "hidden",
-                backgroundImage: item.photoUrl
-                  ? `url(${item.photoUrl})`
-                  : undefined,
+                backgroundImage: item.photoUrl ? `url(${item.photoUrl})` : undefined,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
-                backgroundColor: item.photoUrl
-                  ? undefined
-                  : "var(--amber)",
+                backgroundColor: item.photoUrl ? undefined : "var(--amber)",
               }}
             />
           );

@@ -24,12 +24,7 @@ export interface FavButtonProps {
   className?: string;
 }
 
-export function FavButton({
-  isFav,
-  onToggle,
-  size = "sm",
-  className,
-}: FavButtonProps) {
+export function FavButton({ isFav, onToggle, size = "sm", className }: FavButtonProps) {
   return (
     <button
       type="button"

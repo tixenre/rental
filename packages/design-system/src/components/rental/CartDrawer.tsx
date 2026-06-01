@@ -54,10 +54,7 @@ export function CartDrawer({
   onRemove,
   onCheckout,
 }: CartDrawerProps) {
-  const subtotal = items.reduce(
-    (sum, i) => sum + i.pricePerDay * i.qty * (jornadas ?? 1),
-    0,
-  );
+  const subtotal = items.reduce((sum, i) => sum + i.pricePerDay * i.qty * (jornadas ?? 1), 0);
 
   return (
     <AnimatePresence>
@@ -127,9 +124,7 @@ export function CartDrawer({
               {items.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-8 py-12 text-center">
                   <ShoppingBag className="h-10 w-10 text-muted-foreground/20" />
-                  <p className="text-sm text-muted-foreground">
-                    Todavía no agregaste equipos.
-                  </p>
+                  <p className="text-sm text-muted-foreground">Todavía no agregaste equipos.</p>
                 </div>
               ) : (
                 <ul className="divide-y divide-hairline">

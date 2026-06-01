@@ -47,10 +47,7 @@ export function RentalDateModal({
 }: RentalDateModalProps) {
   const [range, setRange] = useState<DateRange | undefined>(initialRange);
 
-  const jornadas =
-    range?.from && range?.to
-      ? differenceInCalendarDays(range.to, range.from)
-      : 0;
+  const jornadas = range?.from && range?.to ? differenceInCalendarDays(range.to, range.from) : 0;
 
   const rangeLabel =
     range?.from && range?.to
@@ -124,18 +121,14 @@ export function RentalDateModal({
                 onSelect={setRange}
                 locale={es}
                 numberOfMonths={1}
-                disabled={[
-                  { before: new Date() },
-                  ...closedDates,
-                  ...noStockDates,
-                ]}
+                disabled={[{ before: new Date() }, ...closedDates, ...noStockDates]}
                 modifiers={{
                   nostock: noStockDates,
                   closed: closedDates,
                 }}
                 modifiersClassNames={{
                   nostock: "rdp-day-nostock",
-                  closed:  "rdp-day-closed",
+                  closed: "rdp-day-closed",
                 }}
                 showOutsideDays={false}
                 fixedWeeks
@@ -146,11 +139,15 @@ export function RentalDateModal({
             <div className="flex items-center gap-4 px-5 pb-2">
               <div className="flex items-center gap-1.5">
                 <div className="h-3 w-3 rounded-full bg-destructive/15 border border-destructive/30" />
-                <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">Sin stock</span>
+                <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+                  Sin stock
+                </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="h-3 w-3 rounded-full bg-surface border border-hairline opacity-50" />
-                <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">Cerrado</span>
+                <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+                  Cerrado
+                </span>
               </div>
             </div>
 
@@ -165,9 +162,7 @@ export function RentalDateModal({
                     </p>
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Seleccioná inicio y fin.
-                  </p>
+                  <p className="text-sm text-muted-foreground">Seleccioná inicio y fin.</p>
                 )}
               </div>
               <button

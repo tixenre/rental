@@ -80,9 +80,7 @@ export function CartMiniBar({
           <p className="font-sans text-sm font-semibold text-background leading-tight">
             {count} {count === 1 ? "ítem" : "ítems"}
             {dateLabel && (
-              <span className="ml-2 font-normal text-background/60 text-xs">
-                {dateLabel}
-              </span>
+              <span className="ml-2 font-normal text-background/60 text-xs">{dateLabel}</span>
             )}
           </p>
           {jornadas != null && (
@@ -97,9 +95,7 @@ export function CartMiniBar({
           <p className="font-mono text-sm font-semibold tabular-nums text-amber">
             {formatARS(total)}
           </p>
-          <p className="font-mono text-[9px] uppercase tracking-wider text-background/50">
-            + IVA
-          </p>
+          <p className="font-mono text-[9px] uppercase tracking-wider text-background/50">+ IVA</p>
         </div>
       </button>
     </div>

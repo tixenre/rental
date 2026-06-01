@@ -136,9 +136,7 @@ export function EquipmentCard({
           <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
             {item.brand}
           </p>
-          <p className="mt-0.5 text-sm font-semibold leading-tight text-ink">
-            {item.name}
-          </p>
+          <p className="mt-0.5 text-sm font-semibold leading-tight text-ink">{item.name}</p>
         </div>
 
         <div className="mt-auto flex items-end justify-between gap-2">

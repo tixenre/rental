@@ -29,7 +29,6 @@ export function Footer({ className }: { className?: string }) {
       <div className="mx-auto max-w-5xl">
         {/* Grid */}
         <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
-
           {/* Col 1 — Brand */}
           <div className="flex flex-col gap-4">
             <img
@@ -55,11 +54,11 @@ export function Footer({ className }: { className?: string }) {
             </p>
             <nav className="flex flex-col gap-2" aria-label="Footer navigation">
               {[
-                { href: "/",                        label: "Catálogo" },
-                { href: "/estudio",                 label: "Estudio" },
-                { href: "/preguntas-frecuentes",    label: "Preguntas frecuentes" },
-                { href: "/privacidad",              label: "Privacidad" },
-                { href: "/terminos",                label: "Términos y condiciones" },
+                { href: "/", label: "Catálogo" },
+                { href: "/estudio", label: "Estudio" },
+                { href: "/preguntas-frecuentes", label: "Preguntas frecuentes" },
+                { href: "/privacidad", label: "Privacidad" },
+                { href: "/terminos", label: "Términos y condiciones" },
               ].map(({ href, label }) => (
                 <a
                   key={href}
@@ -110,10 +109,10 @@ export function Footer({ className }: { className?: string }) {
           aria-label="Footer navigation mobile"
         >
           {[
-            { href: "/estudio",              label: "Estudio" },
+            { href: "/estudio", label: "Estudio" },
             { href: "/preguntas-frecuentes", label: "FAQ" },
-            { href: "/privacidad",           label: "Privacidad" },
-            { href: "/terminos",             label: "Términos" },
+            { href: "/privacidad", label: "Privacidad" },
+            { href: "/terminos", label: "Términos" },
           ].map(({ href, label }) => (
             <a
               key={href}

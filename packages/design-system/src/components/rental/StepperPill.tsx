@@ -22,9 +22,9 @@ import { cn } from "@/lib/utils";
 type StepperSize = "sm" | "md" | "lg";
 
 const SIZE = {
-  sm: { pill: "h-7 gap-0.5 px-0.5",  btn: "h-5 w-5",   count: "text-xs min-w-[18px]"  },
-  md: { pill: "h-9 gap-1   px-1",    btn: "h-6 w-6",   count: "text-sm min-w-[22px]"  },
-  lg: { pill: "h-11 gap-1.5 px-1.5", btn: "h-7 w-7",   count: "text-base min-w-[26px]" },
+  sm: { pill: "h-7 gap-0.5 px-0.5", btn: "h-5 w-5", count: "text-xs min-w-[18px]" },
+  md: { pill: "h-9 gap-1   px-1", btn: "h-6 w-6", count: "text-sm min-w-[22px]" },
+  lg: { pill: "h-11 gap-1.5 px-1.5", btn: "h-7 w-7", count: "text-base min-w-[26px]" },
 } satisfies Record<StepperSize, { pill: string; btn: string; count: string }>;
 
 export interface StepperPillProps {
