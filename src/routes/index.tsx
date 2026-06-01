@@ -6,7 +6,6 @@ import {
   LayoutGrid,
   List,
   ArrowRight,
-  Sparkles,
   Loader2,
   Search,
   X,
@@ -17,6 +16,12 @@ import {
 import { ViewToggle } from "@/components/rental/ViewToggle";
 import { Link } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/rental/PublicLayout";
+import { HeroSection } from "@/components/rental/HeroSection";
+import { ComoFunciona } from "@/components/rental/ComoFunciona";
+import { EstudioBand } from "@/components/rental/EstudioBand";
+import { FaqTeaser } from "@/components/rental/FaqTeaser";
+import { RentalDateModal } from "@/components/rental/RentalDateModal";
+import { useClienteSession } from "@/lib/iva";
 import { MobileStickyBar } from "@/components/rental/MobileStickyBar";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
@@ -276,6 +281,9 @@ function Index() {
   const [disponiblesOnly, setDisponiblesOnly] = useState(false);
   const [favoritosOnly, setFavoritosOnly] = useState(false);
   const fav = useFavoritos();
+  const [dateModalOpen, setDateModalOpen] = useState(false);
+  const { data: clienteSession } = useClienteSession();
+  const isLogged = !!clienteSession;
   // Scroll-feel: `scrolled` se activa cuando el hero se tiñó >65% (mismo
   // umbral que el snap del topbar) → retinta el cat-bar para que combine con
   // el topbar amber. `spyCat` resalta el tab de la categoría en viewport
@@ -393,7 +401,7 @@ function Index() {
   const getDisponible = (item: Equipment) => item.disponible;
 
   // Hero scroll-amber: calcula --amber-pct para que el TopBar se tiña
-  const heroRef = useRef<HTMLElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const hero = heroRef.current;
     if (!hero) return;
@@ -438,48 +446,19 @@ function Index() {
   return (
     <PublicLayout topBar={{ amberOnScroll: true }}>
       <ViewIntroDialog onPick={(m) => setMode(m)} />
-      {/* Hero amarillo brand */}
-      <section
-        ref={heroRef}
-        className="relative overflow-hidden border-b hairline bg-amber text-ink"
-      >
-        <div className="absolute inset-0 grain opacity-40" />
-        <div className="relative px-6 py-12 lg:px-12 lg:py-16">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] sm:tracking-[0.3em] text-ink/70 break-words">
-            Catálogo · {isLoading ? "…" : allEquipos.length} equipos · Mar del Plata
-          </div>
-          <h1 className="mt-4 wordmark text-5xl sm:text-7xl md:text-[7rem] lg:text-[8.5rem] leading-[0.9] md:leading-[0.85] text-balance break-words">
-            {tagline[0]}
-            <br />
-            {tagline[1]}
-          </h1>
-          <p className="mt-6 max-w-xl text-base text-ink/80">
-            Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales. Elegí fechas
-            y armá tu pedido — te lo dejamos listo para retirar.
-          </p>
+      {/* Hero amber hifi */}
+      <div ref={heroRef}>
+        <HeroSection
+          tagline={tagline}
+          equipmentCount={isLoading ? undefined : allEquipos.length}
+          onDateOpen={() => setDateModalOpen(true)}
+        />
+      </div>
 
-          {/* CTA Estudio — protagonista del banner */}
-          <div className="mt-10 inline-flex max-w-2xl flex-col gap-4 rounded-3xl border-2 border-ink bg-ink p-6 sm:flex-row sm:items-center sm:gap-6 sm:p-7 shadow-lg">
-            <div className="flex-1">
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-amber px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.25em] text-ink">
-                <Sparkles className="h-3 w-3" /> Espacio Rambla
-              </div>
-              <div className="mt-3 font-display text-2xl sm:text-3xl text-amber">
-                Conocé el Estudio
-              </div>
-              <div className="text-sm text-amber/80 mt-1">
-                Foto y video · reservá por hora · pack de luces y grips opcional
-              </div>
-            </div>
-            <Link
-              to="/estudio"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-amber px-6 py-3 text-sm font-semibold text-ink transition hover:brightness-110"
-            >
-              Ver estudio <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* Cómo funciona — solo para usuarios no logueados */}
+      {!isLogged && <ComoFunciona onDateOpen={() => setDateModalOpen(true)} />}
+
+      <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
 
       {/* Toggle Modo + búsqueda sticky. Al scrollear >65% (mismo umbral que
             el snap del topbar) se retinta de amber soft para combinar con el
@@ -749,6 +728,9 @@ function Index() {
           setSpecFilters={setSpecFilters}
         />
       )}
+
+      <EstudioBand />
+      <FaqTeaser />
 
       <CartDrawer allEquipos={allEquipos} getDisponible={getDisponible} />
     </PublicLayout>
