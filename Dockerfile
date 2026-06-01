@@ -4,7 +4,7 @@
 # Versión PINEADA a propósito: `oven/bun:1` flota a la última 1.x y una bun
 # nueva puede recalcular el lockfile distinto y romper `--frozen-lockfile`.
 # Debe coincidir con la bun que generó bun.lock; bumpear = regenerar el lock.
-FROM oven/bun:1.3.11 AS frontend
+FROM oven/bun:1.3.13 AS frontend
 WORKDIR /app
 
 # Variables públicas que Vite inlinea en el bundle.
