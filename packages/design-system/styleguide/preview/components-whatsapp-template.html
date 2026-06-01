@@ -1,0 +1,295 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 20px; }
+.section-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+.sub-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; }
+.note { font-family: var(--font-sans); font-size: 11px; line-height: 1.65; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; max-width: 640px; }
+.note b { color: var(--foreground); font-weight: 600; }
+.note code { font-family: var(--font-mono); font-size: 10px; background: var(--surface); padding: 1px 4px; border-radius: 4px; }
+hr { border: none; border-top: 1px solid var(--hairline); }
+.row { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+
+/* ══════════════════════
+   WHATSAPP BUBBLE PREVIEW
+   ══════════════════════ */
+.wa-phone {
+  width: 300px;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-md);
+}
+.wa-header {
+  background: #128C7E;
+  padding: 10px 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.wa-avatar {
+  width: 34px; height: 34px; border-radius: 9999px;
+  background: #FAB428;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; color: oklch(0.14 0.01 60);
+  flex-shrink: 0;
+}
+.wa-contact { flex: 1; }
+.wa-contact-name { font-size: 13px; font-weight: 700; color: white; line-height: 1.2; }
+.wa-contact-status { font-size: 10px; color: rgba(255,255,255,0.7); }
+.wa-body {
+  background: #ECE5DD;
+  padding: 14px 10px;
+  display: flex; flex-direction: column; gap: 8px;
+  min-height: 180px;
+}
+.wa-bubble {
+  max-width: 90%;
+  background: white;
+  border-radius: 0 10px 10px 10px;
+  padding: 8px 10px 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  position: relative;
+  align-self: flex-start;
+}
+.wa-bubble::before {
+  content: "";
+  position: absolute; top: 0; left: -6px;
+  border: 6px solid transparent;
+  border-right-color: white;
+  border-top-color: white;
+}
+.wa-text {
+  font-size: 13px; line-height: 1.5; color: #111;
+}
+.wa-text .var {
+  background: rgba(250,180,40,0.25);
+  border-radius: 3px;
+  padding: 0 3px;
+  font-weight: 600;
+}
+.wa-time {
+  font-size: 10px; color: #999;
+  text-align: right; margin-top: 3px;
+}
+.wa-input {
+  background: white;
+  padding: 8px 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.wa-input input {
+  flex: 1; border: none; outline: none;
+  font-size: 13px; background: transparent;
+  color: #333;
+}
+.wa-send {
+  width: 34px; height: 34px; border-radius: 9999px;
+  background: #128C7E;
+  display: grid; place-items: center; cursor: pointer;
+}
+
+/* ══════════════════════
+   ADMIN SEND PANEL
+   ══════════════════════ */
+.send-panel {
+  width: 380px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.send-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--hairline);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.send-title { font-size: 13px; font-weight: 700; color: var(--ink); }
+.send-pedido { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
+
+/* template selector */
+.template-tabs {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--hairline);
+  overflow-x: auto;
+}
+.tmpl-tab {
+  padding: 8px 14px;
+  font-family: var(--font-mono); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+  cursor: pointer; white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: color 140ms, border-color 140ms;
+}
+.tmpl-tab.active { color: var(--ink); border-bottom-color: var(--amber); font-weight: 700; }
+.tmpl-tab:hover:not(.active) { color: var(--ink); }
+
+/* preview area */
+.tmpl-preview {
+  padding: 14px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+}
+.tmpl-preview-label { font-family: var(--font-mono); font-size: 8px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground); margin-bottom: 8px; }
+.tmpl-text {
+  font-size: 12px; line-height: 1.6; color: var(--ink);
+  background: var(--surface-elevated);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+.tmpl-text .var {
+  background: color-mix(in oklch, var(--amber) 20%, transparent);
+  border-radius: 3px; padding: 0 3px; font-weight: 600;
+  color: oklch(0.5 0.12 70);
+}
+
+/* variables */
+.tmpl-vars {
+  padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 8px;
+  border-bottom: 1px solid var(--hairline);
+}
+.var-row { display: flex; align-items: center; gap: 10px; }
+.var-label {
+  font-family: var(--font-mono); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted-foreground); width: 80px; flex-shrink: 0;
+}
+.var-value {
+  font-size: 12px; font-weight: 600; color: var(--ink);
+  background: color-mix(in oklch, var(--amber) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--amber) 35%, transparent);
+  border-radius: var(--radius-sm); padding: 3px 8px;
+}
+
+/* actions */
+.send-actions {
+  padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.wa-recipient { font-size: 12px; color: var(--muted-foreground); }
+.wa-recipient b { color: var(--ink); font-weight: 600; }
+.send-btn {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 18px; border-radius: 9999px;
+  background: #128C7E; color: white;
+  font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: background 140ms;
+  white-space: nowrap;
+}
+.send-btn:hover { background: #0a7063; }
+</style>
+</head>
+<body>
+
+<!-- ══ WA PREVIEW ══ -->
+<div class="section-label">WhatsApp — Preview de burbuja (vista del destinatario)</div>
+<div class="row">
+
+  <!-- Confirmación de reserva -->
+  <div>
+    <div class="sub-label">Template: Confirmación de reserva</div>
+    <div class="wa-phone">
+      <div class="wa-header">
+        <div class="wa-avatar">R</div>
+        <div class="wa-contact">
+          <div class="wa-contact-name">Rambla Rental</div>
+          <div class="wa-contact-status">en línea</div>
+        </div>
+      </div>
+      <div class="wa-body">
+        <div class="wa-bubble">
+          <div class="wa-text">
+            ¡Hola <span class="var">Martín</span>! 👋<br><br>
+            Tu rental está <strong>confirmado</strong>.<br><br>
+            📅 <span class="var">lun 2 → jue 5 jun.</span><br>
+            🎥 <span class="var">Sony FX3 + Aputure 600d</span><br>
+            💰 <span class="var">$ 78.500 + IVA</span><br><br>
+            Te esperamos el <span class="var">lunes 2</span> a partir de las 9 hs en el local. Llevá el DNI.<br><br>
+            Cualquier duda, escribinos acá.
+          </div>
+          <div class="wa-time">16:42 ✓✓</div>
+        </div>
+      </div>
+      <div class="wa-input">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        <input type="text" placeholder="Escribí un mensaje…" disabled>
+        <div class="wa-send">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel de envío admin -->
+  <div>
+    <div class="sub-label">Panel admin — Enviar template</div>
+    <div class="send-panel">
+      <div class="send-header">
+        <div class="send-title">Enviar WhatsApp</div>
+        <div class="send-pedido">R-0041</div>
+      </div>
+      <!-- Template tabs -->
+      <div class="template-tabs">
+        <div class="tmpl-tab active">Confirmación</div>
+        <div class="tmpl-tab">Recordatorio</div>
+        <div class="tmpl-tab">Devolución</div>
+        <div class="tmpl-tab">Presupuesto</div>
+      </div>
+      <!-- Preview -->
+      <div class="tmpl-preview">
+        <div class="tmpl-preview-label">Vista previa del mensaje</div>
+        <div class="tmpl-text">
+          ¡Hola <span class="var">{{nombre}}</span>! 👋<br><br>
+          Tu rental está <strong>confirmado</strong>.<br><br>
+          📅 <span class="var">{{fechas}}</span><br>
+          🎥 <span class="var">{{equipos}}</span><br>
+          💰 <span class="var">{{total}}</span><br><br>
+          Te esperamos el <span class="var">{{fecha_retiro}}</span> a partir de las 9 hs. Llevá el DNI.
+        </div>
+      </div>
+      <!-- Variables resolved -->
+      <div class="tmpl-vars">
+        <div class="var-row">
+          <div class="var-label">nombre</div>
+          <div class="var-value">Martín García</div>
+        </div>
+        <div class="var-row">
+          <div class="var-label">fechas</div>
+          <div class="var-value">lun 2 → jue 5 jun.</div>
+        </div>
+        <div class="var-row">
+          <div class="var-label">total</div>
+          <div class="var-value">$ 78.500 + IVA</div>
+        </div>
+      </div>
+      <!-- Send -->
+      <div class="send-actions">
+        <div class="wa-recipient">Para: <b>+54 9 223 400-0000</b></div>
+        <div class="send-btn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Enviar
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>Templates disponibles:</b> Confirmación · Recordatorio de retiro (24 h antes) · Devolución completada · Presupuesto listo.<br><br>
+  <b>Implementación:</b> WhatsApp Business API via Twilio o Meta Direct. El admin elige el template y las variables se resuelven automáticamente desde el pedido.
+  El envío es <code>POST /api/admin/pedidos/:id/whatsapp</code> con <code>{ template, variables }</code>.<br><br>
+  <b>Variables:</b> se extraen del pedido — nombre cliente, fechas formateadas con <code>formatRentalRange()</code>, total con <code>formatARS()</code>.
+  Los templates están precargados en la BD y no se editan en la app (se gestionan en Meta Business Manager).
+</div>
+
+</body>
+</html>

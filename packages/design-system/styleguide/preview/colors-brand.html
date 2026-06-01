@@ -1,0 +1,77 @@
+<!-- @dsCard group="Colors" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .swatch { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 90px; }
+  .chip { height: 64px; border-radius: var(--radius-md); border: 1px solid var(--hairline); }
+  .label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+  .value { font-family: var(--font-mono); font-size: 11px; color: var(--foreground); }
+  .section-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+  <div class="section-label">Brand palette</div>
+  <div class="row">
+    <div class="swatch">
+      <div class="chip" style="background:#FAB428;"></div>
+      <div class="label">amber</div>
+      <div class="value">#FAB428</div>
+    </div>
+    <div class="swatch">
+      <div class="chip" style="background:color-mix(in oklch,#FAB428 18%,transparent); border: 1px solid #FAB42840;"></div>
+      <div class="label">amber-soft</div>
+      <div class="value">amber/18%</div>
+    </div>
+    <div class="swatch">
+      <div class="chip" style="background:#FFCC55;"></div>
+      <div class="label">amber-hot</div>
+      <div class="value">#FFCC55</div>
+    </div>
+    <div class="swatch">
+      <div class="chip" style="background:oklch(0.14 0.01 60);"></div>
+      <div class="label">ink</div>
+      <div class="value">oklch(0.14…)</div>
+    </div>
+    <div class="swatch">
+      <div class="chip" style="background:#000;"></div>
+      <div class="label">ink-pure</div>
+      <div class="value">#000000</div>
+    </div>
+  </div>
+  <div class="section-label">Surfaces</div>
+  <div class="row">
+    <div class="swatch">
+      <div class="chip" style="background:oklch(0.985 0.005 90); border:1px solid var(--hairline);"></div>
+      <div class="label">background</div>
+      <div class="value">bone</div>
+    </div>
+    <div class="swatch">
+      <div class="chip" style="background:oklch(0.97 0.008 85);border:1px solid var(--hairline);"></div>
+      <div class="label">surface</div>
+      <div class="value">oklch(0.97…)</div>
+    </div>
+    <div class="swatch">
+      <div class="chip" style="background:#fff;border:1px solid var(--hairline);"></div>
+      <div class="label">surface-elevated</div>
+      <div class="value">white</div>
+    </div>
+    <div class="swatch">
+      <div class="chip" style="background:oklch(0.42 0.01 70);"></div>
+      <div class="label">muted-foreground</div>
+      <div class="value">oklch(0.42…)</div>
+    </div>
+    <div class="swatch">
+      <div class="chip" style="background:oklch(0.62 0.22 27);"></div>
+      <div class="label">destructive</div>
+      <div class="value">oklch(0.62…)</div>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .state { display: flex; flex-direction: column; gap: 8px; }
+  .state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+  .state-tag .d { width: 7px; height: 7px; border-radius: 50%; background: var(--muted-foreground); flex-shrink: 0; }
+  .frame { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface); padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .frame-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); }
+
+  /* shimmer skeleton */
+  .sk { position: relative; overflow: hidden; background: var(--surface-elevated); border-radius: var(--radius-sm); }
+  .sk::after { content:""; position:absolute; inset:0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, oklch(0.18 0.01 60 / 0.05), transparent); animation: shimmer 1.4s infinite; }
+  @keyframes shimmer { 100% { transform: translateX(100%); } }
+  .sk-line { height: 11px; border-radius: 9999px; }
+  .sk-line.w70 { width: 70%; } .sk-line.w50 { width: 50%; } .sk-line.w40 { width: 40%; } .sk-line.w90 { width: 90%; }
+  .sk-pill { height: 28px; width: 90px; border-radius: 9999px; }
+  .sk-circle { width: 40px; height: 40px; border-radius: 50%; }
+
+  /* equipment card skeleton */
+  .sk-card { width: 100%; border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface-elevated); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .sk-photo { aspect-ratio: 1; }
+  .sk-card-body { padding: 12px; display: flex; flex-direction: column; gap: 9px; }
+  .sk-card-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 3px; }
+  .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* row skeleton */
+  .sk-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--hairline); }
+  .sk-row:last-child { border-bottom: none; }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Components · Skeletons · Loading</div>
+<div class="sub-eye">Shimmer skeleton · surface-elevated · 1.4s sweep · sin spinners en listas</div>
+
+<div class="gallery">
+
+  <!-- equipment grid -->
+  <div class="state">
+    <span class="state-tag"><span class="d"></span>EquipmentCard grid — loading</span>
+    <div class="frame">
+      <div class="card-grid">
+        <div class="sk-card">
+          <div class="sk sk-photo"></div>
+          <div class="sk-card-body">
+            <div class="sk sk-line w70"></div>
+            <div class="sk-card-foot"><div class="sk sk-line w40" style="height:16px;"></div><div class="sk sk-circle" style="width:34px;height:34px;"></div></div>
+          </div>
+        </div>
+        <div class="sk-card">
+          <div class="sk sk-photo"></div>
+          <div class="sk-card-body">
+            <div class="sk sk-line w90"></div>
+            <div class="sk-card-foot"><div class="sk sk-line w40" style="height:16px;"></div><div class="sk sk-circle" style="width:34px;height:34px;"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="frame-label">Mantener el mismo aspect-ratio que la card real para evitar layout shift</div>
+    </div>
+  </div>
+
+  <!-- list rows -->
+  <div class="state">
+    <span class="state-tag"><span class="d"></span>Lista / CartDrawer rows</span>
+    <div class="frame">
+      <div>
+        <div class="sk-row">
+          <div class="sk" style="width:44px;height:44px;border-radius:8px;flex-shrink:0;"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:7px;"><div class="sk sk-line w70"></div><div class="sk sk-line w40"></div></div>
+          <div class="sk sk-pill" style="width:70px;height:30px;"></div>
+        </div>
+        <div class="sk-row">
+          <div class="sk" style="width:44px;height:44px;border-radius:8px;flex-shrink:0;"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:7px;"><div class="sk sk-line w90"></div><div class="sk sk-line w50"></div></div>
+          <div class="sk sk-pill" style="width:70px;height:30px;"></div>
+        </div>
+        <div class="sk-row">
+          <div class="sk" style="width:44px;height:44px;border-radius:8px;flex-shrink:0;"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:7px;"><div class="sk sk-line w50"></div><div class="sk sk-line w40"></div></div>
+          <div class="sk sk-pill" style="width:70px;height:30px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- topbar / detail -->
+  <div class="state">
+    <span class="state-tag"><span class="d"></span>TopBar logo · skeleton</span>
+    <div class="frame">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-elevated);border-radius:var(--radius-md);border:1px solid var(--hairline);">
+        <div class="sk sk-line" style="width:96px;height:20px;border-radius:6px;"></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="sk sk-circle" style="width:32px;height:32px;"></div>
+          <div class="sk sk-circle" style="width:32px;height:32px;"></div>
+        </div>
+      </div>
+      <div class="frame-label">Logo fetcha <code>/api/settings/logo_url</code> — skeleton mientras resuelve</div>
+    </div>
+  </div>
+
+  <!-- spinner -->
+  <div class="state">
+    <span class="state-tag"><span class="d"></span>Spinner — solo acciones puntuales</span>
+    <div class="frame" style="align-items:center;justify-content:center;min-height:120px;">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="2.5" style="animation:spin 0.7s linear infinite;transform-origin:center;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+      <div class="frame-label" style="text-align:center;">Loader2 lucide · botón en submit · NUNCA para listas (usar skeleton)</div>
+    </div>
+  </div>
+
+</div>
+
+<pre class="code"><span class="c">// Skeleton — primitivo shadcn con shimmer de marca</span>
+{isLoading
+  ? &lt;<span class="k">EquipmentCardSkeleton</span> count={8} /&gt;     <span class="c">// grid: 8 cards fantasma</span>
+  : items.map(i =&gt; &lt;<span class="k">EquipmentCard</span> item={i} /&gt;)}
+
+<span class="c">// shimmer: linear-gradient sweep 1.4s, color = ink @ 5% alpha</span>
+<span class="c">// match aspect-ratio del componente real → cero layout shift (CLS)</span></pre>
+
+<div class="note">
+  <b>Skeletons</b> para cualquier carga de lista o grid — nunca un spinner centrado que tape el layout. ·
+  Fondo <code>surface-elevated</code>, barrido shimmer de 1.4s con <code>ink @ 5%</code>. ·
+  <b>Loader2</b> (spinner) solo para acciones puntuales: submit de form, toggle de favorito, agregar al carrito. · Match del aspect-ratio real evita el layout shift.
+</div>
+
+<style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+
+</body>
+</html>

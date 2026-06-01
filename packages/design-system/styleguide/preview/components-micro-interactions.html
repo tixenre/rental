@@ -1,0 +1,185 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .state { display: flex; flex-direction: column; gap: 8px; }
+  .state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: oklch(0.5 0.1 70); }
+  .state-tag .d { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
+  .frame { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface); padding: 18px; display: flex; flex-direction: column; gap: 14px; min-height: 150px; }
+  .frame-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+  .hint { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber); opacity: 0.85; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+
+  /* reverse ink<->amber */
+  .btn-rev { padding: 11px 22px; border-radius: 9999px; font-weight: 700; font-size: 14px; border: 2px solid var(--ink); background: var(--ink); color: var(--amber); cursor: pointer; transition: background var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out); }
+  .btn-rev:hover { background: var(--amber); color: var(--ink); }
+  .btn-rev:active { transform: scale(0.97); transition-duration: var(--duration-fast); }
+
+  /* press scale */
+  .press-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn-press { padding: 10px 18px; border-radius: var(--radius-md); font-weight: 700; font-size: 13px; border: none; cursor: pointer; transition: transform var(--duration-fast) var(--ease-out); }
+  .btn-press:active { transform: scale(0.97); }
+  .btn-press.amber { background: var(--amber); color: oklch(0.14 0.01 60); }
+  .btn-press.ink { background: var(--ink); color: var(--amber); }
+  .btn-press.outline { background: transparent; border: 1.5px solid var(--hairline); color: var(--ink); }
+
+  /* cart badge pop */
+  .cart-wrap { position: relative; display: inline-grid; place-items: center; width: 46px; height: 46px; border-radius: var(--radius-md); background: var(--surface-elevated); border: 1px solid var(--hairline); color: var(--ink); cursor: pointer; }
+  .cart-badge { position: absolute; top: -6px; right: -6px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 9999px; background: var(--amber); color: oklch(0.14 0.01 60); font-family: var(--font-mono); font-size: 10px; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+  .cart-badge.pop { animation: badgepop var(--duration-base) var(--ease-bounce); }
+  @keyframes badgepop { 0%{transform:scale(1);} 30%{transform:scale(1.25);} 65%{transform:scale(0.95);} 100%{transform:scale(1);} }
+
+  /* fly to cart */
+  .fly-stage { position: relative; display: flex; align-items: center; justify-content: space-between; width: 100%; }
+  .fly-src { width: 56px; height: 56px; border-radius: var(--radius-sm); background: var(--surface-elevated); border: 1px solid var(--hairline); display: grid; place-items: center; color: var(--ink); }
+  .fly-src svg { opacity: 0.4; }
+  .fly-dot { position: absolute; width: 18px; height: 18px; border-radius: 9999px; background: var(--amber); opacity: 0; pointer-events: none; z-index: 5; }
+  .btn-go { padding: 8px 14px; border-radius: 9999px; background: var(--ink); color: var(--amber); border: none; font-weight: 700; font-size: 12px; cursor: pointer; transition: transform var(--duration-fast); }
+  .btn-go:active { transform: scale(0.97); }
+
+  /* amber-on-scroll mini */
+  .scroll-demo { border: 1px solid var(--hairline); border-radius: var(--radius-md); overflow: hidden; background: var(--surface-elevated); }
+  .sd-bar { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; transition: background var(--duration-base) var(--ease-out); }
+  .sd-bar .logo { font-family: var(--font-display); font-weight: 900; font-size: 16px; text-transform: lowercase; transition: color var(--duration-base); }
+  .sd-bar .pills { display: flex; gap: 6px; }
+  .sd-bar .pill { padding: 4px 10px; border-radius: 9999px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; transition: background var(--duration-base), color var(--duration-base); }
+  .sd-bar.off { background: var(--surface-elevated); }
+  .sd-bar.off .logo { color: var(--ink); }
+  .sd-bar.off .pill { background: var(--surface); color: var(--muted-foreground); }
+  .sd-bar.on { background: var(--amber); }
+  .sd-bar.on .logo { color: oklch(0.14 0.01 60); }
+  .sd-bar.on .pill { background: oklch(0.14 0.01 60); color: var(--amber); }
+  .slider { width: 100%; accent-color: var(--amber); margin-top: 4px; }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Components · Micro-interactions · Signature motion</div>
+<div class="sub-eye">Probá cada uno · reverse ink↔amber · press · badge pop · fly-to-cart · amber-on-scroll</div>
+
+<div class="gallery">
+
+  <!-- reverse -->
+  <div class="state">
+    <span class="state-tag"><span class="d"></span>Reverse ink↔amber · "se prende"</span>
+    <div class="frame" style="align-items:flex-start;justify-content:center;">
+      <div class="row">
+        <button class="btn-rev">Reservar</button>
+        <button class="btn-rev">Solicitar rental</button>
+      </div>
+      <span class="hint">↑ pasá el mouse — invierte fondo↔texto</span>
+    </div>
+  </div>
+
+  <!-- press -->
+  <div class="state">
+    <span class="state-tag"><span class="d"></span>Press · scale(0.97) · 120ms</span>
+    <div class="frame" style="justify-content:center;">
+      <div class="press-grid">
+        <button class="btn-press amber">amber</button>
+        <button class="btn-press ink">ink</button>
+        <button class="btn-press outline">outline</button>
+      </div>
+      <span class="hint">↑ mantené presionado — todos los botones se hunden</span>
+    </div>
+  </div>
+
+  <!-- badge pop -->
+  <div class="state">
+    <span class="state-tag"><span class="d"></span>Cart badge pop · ease-bounce</span>
+    <div class="frame" style="align-items:center;justify-content:center;">
+      <div class="row" style="gap:16px;">
+        <div class="cart-wrap" onclick="bump()">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg>
+          <span class="cart-badge" id="badge">1</span>
+        </div>
+        <button class="btn-press amber" onclick="bump()">Agregar ítem</button>
+      </div>
+      <span class="hint">↑ agregá — badge hace scale [1, 1.25, 0.95, 1]</span>
+    </div>
+  </div>
+
+  <!-- fly to cart -->
+  <div class="state">
+    <span class="state-tag"><span class="d"></span>Fly-to-cart · 550ms cubic(0.22,1,0.36,1)</span>
+    <div class="frame" style="justify-content:center;">
+      <div class="fly-stage" id="flyStage">
+        <div class="fly-src" id="flySrc"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="3.5"/></svg></div>
+        <button class="btn-go" onclick="fly()">Agregar →</button>
+        <div class="cart-wrap" id="flyDst" style="width:42px;height:42px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg>
+          <span class="cart-badge" id="flyBadge">0</span>
+        </div>
+        <div class="fly-dot" id="flyDot"></div>
+      </div>
+      <span class="hint">↑ el ítem vuela en arco al carrito</span>
+    </div>
+  </div>
+
+  <!-- amber on scroll -->
+  <div class="state" style="grid-column: span 2;">
+    <span class="state-tag"><span class="d"></span>TopBar amber-on-scroll · snap a 65%</span>
+    <div class="frame">
+      <div class="scroll-demo">
+        <div class="sd-bar off" id="sdBar">
+          <span class="logo">rambla</span>
+          <div class="pills"><span class="pill">cámaras</span><span class="pill">luces</span><span class="pill">audio</span></div>
+        </div>
+      </div>
+      <input type="range" min="0" max="100" value="0" class="slider" id="scrollSlider" oninput="onScroll(this.value)">
+      <span class="frame-label">Arrastrá ↑ simulando scroll — al pasar <b style="color:var(--amber);">65%</b> el topbar invierte a amber y prende el logo en ink (<code>--amber-pct</code> 0→100).</span>
+    </div>
+  </div>
+
+</div>
+
+<pre class="code"><span class="c">// Signature motion · tokens de duración + easing</span>
+--ease-default: cubic-bezier(0.32, 0.72, 0, 1);   <span class="c">// drawer settle</span>
+--ease-bounce:  cubic-bezier(0.34, 1.56, 0.64, 1); <span class="c">// badge pop</span>
+
+<span class="c">// reverse: hover invierte bg↔text 200ms · press: scale(0.97) 120ms</span>
+<span class="c">// badge: keyframes [1, 1.25, 0.95, 1] ease-bounce 200ms al addToCart</span>
+<span class="c">// fly-to-cart: clon del thumb vuela en arco 550ms → badge pop al aterrizar</span></pre>
+
+<div class="note">
+  <b>Reverse ink↔amber</b> es la firma — "pasás el mouse y se prende". · <b>Press</b> scale(0.97) en todo botón, 120ms. ·
+  <b>Badge pop</b> con <code>ease-bounce</code> cada vez que cambia el contador. · <b>Fly-to-cart</b> 550ms en arco, dispara el pop al aterrizar. ·
+  <b>Amber-on-scroll</b>: la var <code>--amber-pct</code> sube con el scroll y hace snap a 65% para invertir el topbar de una.
+</div>
+
+<script>
+  function bump(){ const b=document.getElementById('badge'); b.textContent=(+b.textContent)+1; b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
+  function fly(){
+    const stage=document.getElementById('flyStage'), src=document.getElementById('flySrc'), dst=document.getElementById('flyDst'), dot=document.getElementById('flyDot'), badge=document.getElementById('flyBadge');
+    const sr=src.getBoundingClientRect(), dr=dst.getBoundingClientRect(), st=stage.getBoundingClientRect();
+    const x0=sr.left-st.left+sr.width/2-9, y0=sr.top-st.top+sr.height/2-9;
+    const x1=dr.left-st.left+dr.width/2-9, y1=dr.top-st.top+dr.height/2-9;
+    dot.style.transition='none'; dot.style.transform=`translate(${x0}px,${y0}px) scale(1)`; dot.style.opacity='1';
+    void dot.offsetWidth;
+    dot.style.transition='transform 550ms cubic-bezier(0.22,1,0.36,1), opacity 550ms ease';
+    dot.style.transform=`translate(${x1}px,${y1}px) scale(0.4)`; dot.style.opacity='0.2';
+    setTimeout(()=>{ dot.style.opacity='0'; badge.textContent=(+badge.textContent)+1; badge.classList.remove('pop'); void badge.offsetWidth; badge.classList.add('pop'); }, 540);
+  }
+  function onScroll(v){ const bar=document.getElementById('sdBar'); const on=v>=65; bar.classList.toggle('on',on); bar.classList.toggle('off',!on); }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .gallery { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 16px; align-items: start; }
+  .state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; }
+  .state-tag .d { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
+
+  .card { border: 1px solid var(--hairline); border-radius: var(--radius-xl); background: var(--surface-elevated); box-shadow: var(--shadow-md); padding: 22px; }
+  .card-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px; }
+  .wordmark { font-family: var(--font-display); font-weight: 900; font-size: 26px; text-transform: lowercase; color: var(--ink); line-height: 0.9; }
+  .card-sub { font-size: 13px; color: var(--muted-foreground); }
+
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .field label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+  .input { padding: 11px 13px; border-radius: var(--radius-sm); border: 1px solid var(--input); background: var(--surface); font-size: 15px; color: var(--ink); font-family: var(--font-sans); width: 100%; transition: border-color 150ms, box-shadow 150ms; }
+  .input::placeholder { color: oklch(0.42 0.01 70 / 0.55); }
+  .input.focus { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); outline: none; background: var(--surface-elevated); }
+  .input.err { border-color: var(--destructive); }
+  .err-msg { font-size: 12px; color: var(--destructive); display: flex; align-items: center; gap: 5px; margin-top: 5px; }
+  .help { font-size: 11px; color: var(--muted-foreground); margin-top: 4px; }
+
+  .btn-full { width: 100%; padding: 13px; border-radius: 9999px; background: var(--ink); color: var(--amber); border: none; font-weight: 700; font-size: 15px; cursor: pointer; transition: background 200ms, color 200ms; }
+  .btn-full:hover { background: var(--amber); color: var(--ink); }
+  .alt { text-align: center; font-size: 13px; color: var(--muted-foreground); margin-top: 14px; }
+  .alt a { color: var(--ink); font-weight: 600; text-decoration: none; border-bottom: 1.5px solid var(--amber); }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .two .field { margin-bottom: 0; }
+
+  /* select + checkbox + textarea */
+  .sel { position: relative; }
+  .sel svg { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--muted-foreground); }
+  textarea.input { resize: none; min-height: 64px; font-family: var(--font-sans); }
+  .check { display: flex; align-items: flex-start; gap: 9px; }
+  .check .box { width: 19px; height: 19px; border-radius: 5px; border: 1.5px solid var(--amber); background: var(--amber); display: grid; place-items: center; flex-shrink: 0; margin-top: 1px; }
+  .check .box svg { color: oklch(0.14 0.01 60); }
+  .check .box.empty { background: transparent; border-color: var(--input); }
+  .check label { font-size: 13px; color: var(--ink); line-height: 1.45; }
+  .summary { background: var(--surface); border-radius: var(--radius-md); padding: 13px 15px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .sum-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .sum-row .l { font-size: 13px; color: var(--muted-foreground); }
+  .sum-row .v { font-family: var(--font-mono); font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .sum-row .v small { font-size: 10px; color: var(--muted-foreground); font-weight: 500; letter-spacing: 0.02em; }
+  .sum-row.tot .l { font-weight: 700; color: var(--ink); }
+  .sum-row.tot .v { font-weight: 700; font-size: 17px; }
+  .sum-div { height: 1px; background: var(--hairline); }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Components · Form patterns</div>
+<div class="sub-eye">Login · datos de reserva · checkout summary · voz "vos"</div>
+
+<div class="gallery">
+
+  <!-- login -->
+  <div>
+    <div class="state-tag"><span class="d"></span>Login / acceso cliente</div>
+    <div class="card">
+      <div class="card-head">
+        <span class="wordmark">rambla</span>
+        <span class="card-sub">Entrá a tu portal para ver tus reservas.</span>
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input class="input" placeholder="vos@correo.com">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input class="input focus" type="password" value="········">
+      </div>
+      <button class="btn-full">Entrar</button>
+      <div class="alt">¿Primera vez? <a href="#">Creá tu cuenta</a></div>
+    </div>
+  </div>
+
+  <!-- checkout / reserva -->
+  <div>
+    <div class="state-tag"><span class="d"></span>Datos de reserva + checkout</div>
+    <div class="card">
+      <div class="summary">
+        <div class="sum-row"><span class="l">Sony A7S III · 3 J</span><span class="v">$ 73.500</span></div>
+        <div class="sum-row"><span class="l">Aputure 600D ×2 · 3 J</span><span class="v">$ 72.000</span></div>
+        <div class="sum-div"></div>
+        <div class="sum-row tot"><span class="l">Total neto</span><span class="v">$ 145.500 <small>+ IVA</small></span></div>
+      </div>
+      <div class="two" style="margin-bottom:14px;">
+        <div class="field"><label>Nombre</label><input class="input" placeholder="Tu nombre"></div>
+        <div class="field"><label>Teléfono</label><input class="input" placeholder="223 ..."></div>
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input class="input err" value="hola@">
+        <span class="err-msg"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>Ingresá un correo válido.</span>
+      </div>
+      <div class="field">
+        <label>Tipo de proyecto</label>
+        <div class="sel">
+          <input class="input" value="Producción audiovisual" readonly>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="field">
+        <label>Comentarios <span style="text-transform:none;letter-spacing:0;opacity:0.6;">(opcional)</span></label>
+        <textarea class="input" placeholder="Contanos del rodaje, fechas flexibles, etc."></textarea>
+      </div>
+      <div class="check" style="margin-bottom:16px;">
+        <div class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12 5 5L20 7"/></svg></div>
+        <label>Acepto los <a href="#" style="color:var(--ink);border-bottom:1.5px solid var(--amber);text-decoration:none;">términos de alquiler</a> y la política de depósito.</label>
+      </div>
+      <button class="btn-full">Confirmar reserva</button>
+    </div>
+  </div>
+
+</div>
+
+<pre class="code"><span class="c">// Inputs branded · focus amber · errores en 1ª persona, voz vos</span>
+&lt;<span class="k">FieldLabel</span>&gt;Email&lt;/<span class="k">FieldLabel</span>&gt;
+&lt;<span class="k">Input</span> type=<span class="s">"email"</span> error={!valid && <span class="s">"Ingresá un correo válido."</span>} /&gt;
+
+<span class="c">// Reglas de copy de error: específico, primera persona, sin "Error:"</span>
+<span class="c">// ✗ "Error: email inválido"   ✓ "Ingresá un correo válido."</span></pre>
+
+<div class="note">
+  <b>Voz "vos"</b> en todo: <i>Entrá, Creá, Confirmá</i>. · <b>Errores</b> en primera persona del usuario, específicos, sin prefijo "Error:". ·
+  Inputs ≥ 16px en mobile (no zoom iOS), foco amber + ring. · Campos opcionales marcados explícitamente. · Los precios con IVA se muestran como <b>neto + IVA</b> (ej. <code>$ 145.500 + IVA</code>), nunca con el IVA ya sumado al total.
+</div>
+
+</body>
+</html>
