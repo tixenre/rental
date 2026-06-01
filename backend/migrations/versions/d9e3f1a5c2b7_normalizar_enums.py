@@ -78,7 +78,7 @@ def upgrade() -> None:
     # 3. color_modes (multi_enum JSON): Daylight+Tungsten → Bicolor; HSI eliminar;
     #    Bicolor variable → Bicolor.
     rows = conn.execute(sa.text("""
-        SELECT es.id, es.value
+        SELECT es.equipo_id, es.spec_def_id, es.value
         FROM equipo_specs es
         JOIN spec_definitions sd ON sd.id = es.spec_def_id
         WHERE sd.spec_key = 'color_modes'
@@ -113,13 +113,16 @@ def upgrade() -> None:
         new_val = [x for x in mapped if not (x in seen or seen.add(x))]
         if new_val != val:
             conn.execute(
-                sa.text("UPDATE equipo_specs SET value = :v WHERE id = :id"),
-                {"v": json.dumps(new_val), "id": row.id},
+                sa.text(
+                    "UPDATE equipo_specs SET value = :v "
+                    "WHERE equipo_id = :equipo_id AND spec_def_id = :spec_def_id"
+                ),
+                {"v": json.dumps(new_val), "equipo_id": row.equipo_id, "spec_def_id": row.spec_def_id},
             )
 
     # 4. wireless (multi_enum JSON): Wi-Fi 2.4 GHz / Wi-Fi 5 GHz → Wi-Fi
     rows = conn.execute(sa.text("""
-        SELECT es.id, es.value
+        SELECT es.equipo_id, es.spec_def_id, es.value
         FROM equipo_specs es
         JOIN spec_definitions sd ON sd.id = es.spec_def_id
         WHERE sd.spec_key = 'wireless'
@@ -146,8 +149,11 @@ def upgrade() -> None:
         new_val = [x for x in mapped if not (x in seen or seen.add(x))]
         if new_val != val:
             conn.execute(
-                sa.text("UPDATE equipo_specs SET value = :v WHERE id = :id"),
-                {"v": json.dumps(new_val), "id": row.id},
+                sa.text(
+                    "UPDATE equipo_specs SET value = :v "
+                    "WHERE equipo_id = :equipo_id AND spec_def_id = :spec_def_id"
+                ),
+                {"v": json.dumps(new_val), "equipo_id": row.equipo_id, "spec_def_id": row.spec_def_id},
             )
 
     # 5. Sincronizar enum_options en spec_definitions desde el registry.
