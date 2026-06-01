@@ -22,6 +22,8 @@ from database import (
     regenerate_auto_tags, MARCA_SUBQUERY,
 )
 from reservas import ESTADOS_RESERVADO, calcular_disponibilidad
+from reservas.disponibilidad import _derivar_compuestos
+from reservas.semantics import componentes_de
 from routes.auth import get_session
 from admin_guard import require_admin
 from services.nombre_service import actualizar_nombres_de
@@ -590,6 +592,19 @@ def equipos_kpis(request: Request):
 # ── Rutas de equipos ─────────────────────────────────────────────────────────
 
 
+def _stock_sin_reservas(conn) -> dict[int, int]:
+    """Stock teórico de kits/combos derivado solo del stock de componentes, sin
+    descontar ninguna reserva. Detecta kits imposibles de armar (components <
+    cantidad requerida) independientemente de las fechas seleccionadas."""
+    raw = {
+        r["id"]: r["cantidad"]
+        for r in conn.execute(
+            "SELECT id, cantidad FROM equipos WHERE eliminado_at IS NULL"
+        ).fetchall()
+    }
+    return _derivar_compuestos(raw, componentes_de(conn))
+
+
 def _attach_disponibilidad(conn, equipos: list, desde: str, hasta: str) -> list:
     """Inyecta el campo `disponible` por equipo, usando la fuente única de
     lectura del motor (`reservas.calcular_disponibilidad`).
@@ -818,6 +833,15 @@ def list_equipos(
         # equipo_specs JOIN spec_definitions JOIN template.
         equipos = attach_specs_estructuradas(conn, equipos)
         equipos = attach_specs_destacados(conn, equipos)
+
+        # Filtrar kits/combos que no pueden armarse ni una vez (stock de
+        # componentes insuficiente, sin considerar reservas). Solo para catálogo
+        # público — el admin los sigue viendo para poder corregirlos.
+        if not is_admin:
+            stock_teo = _stock_sin_reservas(conn)
+            # Es "kit" cualquier equipo que tenga componentes esenciales; para
+            # hojas, _derivar_compuestos devuelve su propio stock → no filtra.
+            equipos = [e for e in equipos if stock_teo.get(e["id"], e.get("cantidad", 0)) > 0]
 
         if desde and hasta:
             equipos = _attach_disponibilidad(conn, equipos, desde, hasta)

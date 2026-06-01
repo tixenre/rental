@@ -104,8 +104,10 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   const sumaJornadaPorHora =
     !!startDate && !!endDate && timeToMinutes(endTime) > timeToMinutes(startTime);
 
-  // Bloqueo que impide confirmar
-  const blocked = devolucionCerrada || rangoCruzaBloqueado;
+  // Solo bloquea "Aplicar" si el día de devolución está cerrado (error real).
+  // El stock insuficiente es una advertencia — el usuario elige fechas y ve
+  // en el carrito qué ítems no están disponibles para ese período.
+  const blocked = devolucionCerrada;
 
   // ── Clamp hora a franja cuando el día cambia ──────────────────────────
   useEffect(() => {
@@ -179,11 +181,7 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
     ? "sin fechas"
     : devolucionCerrada
       ? "día cerrado"
-      : rangoCruzaBloqueado
-        ? primerDiaBloqueado
-          ? `sin stock · ${format(primerDiaBloqueado, "d MMM", { locale: es })}`
-          : "sin stock"
-        : `${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"}`;
+      : `${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"}`;
 
   const footerLabelMuted = !hasStart || blocked;
 
@@ -361,22 +359,13 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
               Ajustá las jornadas o la fecha de retiro.
             </p>
           ) : rangoCruzaBloqueado ? (
-            /* ERROR: sin stock en el rango → bloquea Aplicar */
-            <p className="flex items-start gap-1.5 text-[11px] text-destructive">
-              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              {primerDiaBloqueado ? (
-                <>
-                  El <strong>{format(primerDiaBloqueado, "d MMM", { locale: es })}</strong> no hay
-                  stock para algún equipo de tu carrito. Acortá a {jornadas - 1}{" "}
-                  {jornadas - 1 === 1 ? "jornada" : "jornadas"} o probá otras fechas.
-                  {/*
-                    TODO: cuando /api/dias-bloqueados devuelva qué equipo tiene el conflicto,
-                    reemplazar "algún equipo de tu carrito" por item.nombre (ej: "RØDE NTG5").
-                  */}
-                </>
-              ) : (
-                "El período incluye días sin disponibilidad. Probá con otras fechas o menos jornadas."
-              )}
+            /* WARN: sin stock en el rango — no bloquea Aplicar, advierte para revisar el carrito */
+            <p className="flex items-start gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-[11px] text-ink">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber" />
+              <span>
+                Algunos equipos del carrito no tienen stock en estas fechas —{" "}
+                <strong>revisá el carrito</strong> antes de solicitar.
+              </span>
             </p>
           ) : sumaJornadaPorHora ? (
             /* WARN: jornada extra por hora → Aplicar habilitado (avisa, no bloquea) */
@@ -407,9 +396,7 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
             onSelect={handleStartSelect}
             numberOfMonths={isMobile ? 1 : 2}
             locale={es}
-            disabled={(date: Date) =>
-              date < today || !diaAbierto(horarios, date) || diasBloqueados.has(ymd(date))
-            }
+            disabled={(date: Date) => date < today || !diaAbierto(horarios, date)}
             modifiers={calModifiers}
             modifiersClassNames={calModifiersClassNames}
             showOutsideDays={false}
