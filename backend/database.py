@@ -222,6 +222,17 @@ class PGConnection:
 
     def close(self):
         if self._pool:
+            # Limpiar la transacción pendiente ANTES de devolver la conexión al
+            # pool. Sin esto, una query que falló deja la conexión en estado
+            # "transacción abortada"; al reusarla, el próximo request (no
+            # relacionado) falla con "current transaction is aborted, commands
+            # ignored until end of transaction block" → 500 en cascada. El
+            # rollback es inocuo tras un commit (no-op) y en reads cierra la
+            # transacción implícita.
+            try:
+                self.raw_conn.rollback()
+            except Exception:
+                pass
             self._pool.putconn(self.raw_conn)   # devuelve al pool en lugar de cerrar
         else:
             self.raw_conn.close()
