@@ -1,0 +1,46 @@
+/* ============================================================
+   Rambla Rental — Design System  ·  ENTRY (CANONICAL src/styles.css)
+   ------------------------------------------------------------
+   Fuente de verdad de tokens, tipografía y utilities de marca.
+   El repo `tixenre/rental` consume ESTE archivo como su src/styles.css.
+
+   Orden de carga (importa para Tailwind v4):
+     1. tailwindcss        → preflight + engine
+     2. fonts              → @font-face (antes que cualquier uso)
+     3. tokens/*           → @theme blocks (Tailwind los mergea) + :root
+     4. utilities          → recetas .t-* y utilities de marca
+
+   Modular a propósito: editá un token en su archivo, no acá.
+   ============================================================ */
+
+@import "tailwindcss";
+
+/* Modo oscuro por clase .dark en <html> (no media-query) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Fonts ─────────────────────────────────────────────────── */
+@import "./styles/fonts.css";
+
+/* ── Tokens (@theme + :root) ───────────────────────────────── */
+@import "./styles/tokens/colors.css";
+@import "./styles/tokens/typography.css";
+@import "./styles/tokens/shadows.css";
+@import "./styles/tokens/motion.css";
+@import "./styles/tokens/z-index.css";
+
+/* ── Utilities & type recipes ──────────────────────────────── */
+@import "./styles/utilities.css";
+
+/* ── Base ──────────────────────────────────────────────────── */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+}

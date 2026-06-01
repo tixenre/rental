@@ -1,0 +1,144 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .split { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 16px; align-items: start; }
+  .section-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 9px; }
+  .frame { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface-elevated); padding: 20px; }
+
+  /* vertical timeline */
+  .tl { display: flex; flex-direction: column; }
+  .ev { display: grid; grid-template-columns: 30px 1fr; gap: 13px; }
+  .rail { display: flex; flex-direction: column; align-items: center; }
+  .node { width: 16px; height: 16px; border-radius: 9999px; flex-shrink: 0; border: 2px solid; z-index: 1; margin-top: 2px; }
+  .line { width: 2px; flex: 1; min-height: 26px; }
+  .ev .body { padding-bottom: 20px; }
+  .ev:last-child .body { padding-bottom: 0; }
+  .ev .row1 { display: flex; align-items: center; gap: 8px; }
+  .ev .est { font-size: 14px; font-weight: 700; color: var(--ink); }
+  .ev .when { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); letter-spacing: 0.04em; margin-top: 3px; }
+  .ev .desc { font-size: 12.5px; color: var(--muted-foreground); line-height: 1.5; margin-top: 5px; }
+
+  /* colored per status */
+  .azul   .node { background:#1097DB; border-color:#1097DB; } .azul   .line { background:#1097DB; }
+  .verde  .node { background:#009971; border-color:#009971; } .verde  .line { background:#009971; }
+  .amber  .node { background:var(--amber); border-color:var(--amber); } .amber .line { background:var(--amber); }
+  .rosa   .node { background:#ED7BAD; border-color:#ED7BAD; }
+  .future .node { background:var(--surface); border-color:var(--hairline); } .future .line { background:var(--hairline); }
+  .future .est { color: var(--muted-foreground); }
+  .line.dashed { background: none; border-left: 2px dashed var(--hairline); width: 0; }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 9999px; font-family: var(--font-mono); font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  .badge .dot { width: 5px; height: 5px; border-radius: 50%; }
+
+  /* compact horizontal flow */
+  .flow { display: flex; flex-direction: column; gap: 14px; }
+  .flow-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .fchip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 9999px; font-family: var(--font-mono); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .fchip .d { width: 6px; height: 6px; border-radius: 50%; }
+  .farrow { color: var(--hairline); }
+  .fnote { font-size: 11.5px; color: var(--muted-foreground); line-height: 1.5; }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Components · Order status timeline</div>
+<div class="sub-eye">Portal cliente · presupuesto → confirmado → en curso → devuelto · EstadoBadge</div>
+
+<div class="split">
+  <div>
+    <div class="section-label">Timeline vertical · pedido #RB-1042</div>
+    <div class="frame">
+      <div class="tl">
+        <div class="ev azul">
+          <div class="rail"><div class="node"></div><div class="line"></div></div>
+          <div class="body">
+            <div class="row1"><span class="est">Presupuesto enviado</span></div>
+            <div class="when">vie 23 may. · 14:20</div>
+            <div class="desc">Te mandamos el detalle con el total y la seña.</div>
+          </div>
+        </div>
+        <div class="ev verde">
+          <div class="rail"><div class="node"></div><div class="line"></div></div>
+          <div class="body">
+            <div class="row1"><span class="est">Confirmado</span><span class="badge" style="background:color-mix(in oklch,#009971 12%,transparent);color:#00765a;"><span class="dot" style="background:#009971;"></span>Seña paga</span></div>
+            <div class="when">sáb 24 may. · 10:05</div>
+            <div class="desc">Recibimos la seña. La fecha quedó reservada.</div>
+          </div>
+        </div>
+        <div class="ev amber">
+          <div class="rail"><div class="node" style="box-shadow:0 0 0 4px var(--amber-soft);"></div><div class="line future"></div></div>
+          <div class="body">
+            <div class="row1"><span class="est">En curso</span><span class="badge" style="background:color-mix(in oklch,#FAB428 16%,transparent);color:oklch(0.5 0.12 70);"><span class="dot" style="background:#FAB428;"></span>Ahora</span></div>
+            <div class="when">lun 2 jun. · retirado</div>
+            <div class="desc">El equipo está con vos hasta el jue 5 jun.</div>
+          </div>
+        </div>
+        <div class="ev future">
+          <div class="rail"><div class="node"></div></div>
+          <div class="body">
+            <div class="row1"><span class="est">Devolución</span></div>
+            <div class="when">jue 5 jun. · 19:00 (estimado)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-label">Flujo de estados · referencia</div>
+    <div class="frame">
+      <div class="flow">
+        <div class="flow-row">
+          <span class="fchip" style="background:color-mix(in oklch,#1097DB 12%,transparent);color:#0c6e9e;"><span class="d" style="background:#1097DB;"></span>Presupuesto</span>
+          <span class="farrow">→</span>
+          <span class="fchip" style="background:color-mix(in oklch,#009971 12%,transparent);color:#00765a;"><span class="d" style="background:#009971;"></span>Confirmado</span>
+          <span class="farrow">→</span>
+          <span class="fchip" style="background:color-mix(in oklch,#FAB428 16%,transparent);color:oklch(0.5 0.12 70);"><span class="d" style="background:#FAB428;"></span>En curso</span>
+          <span class="farrow">→</span>
+          <span class="fchip" style="background:color-mix(in oklch,#ED7BAD 14%,transparent);color:#c45589;"><span class="d" style="background:#ED7BAD;"></span>Devuelto</span>
+        </div>
+        <div class="fnote">Camino feliz. Cada nodo del timeline usa el color del <b style="color:var(--ink);">EstadoBadge</b> de ese estado.</div>
+        <div style="height:1px;background:var(--hairline);"></div>
+        <div class="flow-row">
+          <span class="fchip" style="background:var(--surface);color:var(--muted-foreground);border:1px solid var(--hairline);">cualquier estado</span>
+          <span class="farrow">→</span>
+          <span class="fchip" style="background:color-mix(in oklch,oklch(0.62 0.22 27) 12%,transparent);color:oklch(0.55 0.2 27);"><span class="d" style="background:oklch(0.62 0.22 27);"></span>Cancelado</span>
+        </div>
+        <div class="fnote"><b style="color:var(--ink);">Cancelado</b> corta el flujo en cualquier punto · nodo en destructive, eventos siguientes en future (gris).</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<pre class="code"><span class="c">// Timeline — eventos del pedido, color = EstadoBadge del estado</span>
+&lt;<span class="k">OrderTimeline</span> events={pedido.historial} current={pedido.estado} /&gt;
+
+<span class="c">// orden canónico: presupuesto → confirmado → en_curso → devuelto</span>
+<span class="c">// nodo lleno hasta "current" (con ring amber si es en_curso) · resto future/gris</span>
+<span class="c">// cancelado = nodo destructive, trunca lo que sigue</span></pre>
+
+<div class="note">
+  <b>Timeline</b> del portal cliente: cada nodo toma el <b>color del EstadoBadge</b> de ese estado, así el sistema de color de status se mantiene consistente. ·
+  El estado actual lleva <b>ring amber</b> y badge "Ahora". · Eventos futuros en gris (future). · <b>Cancelado</b> es destructive y corta el resto. · Fechas con <code>format()</code> + locale <code>es</code>.
+</div>
+
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!-- @dsCard group="Spacing" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .split { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 16px; align-items: start; }
+  .section-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; }
+
+  /* isometric stack */
+  .stage { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface); padding: 30px 24px; height: 360px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .stack { position: relative; width: 230px; height: 230px; transform: rotateX(54deg) rotateZ(45deg); transform-style: preserve-3d; }
+  .layer { position: absolute; width: 200px; height: 130px; border-radius: 10px; border: 1.5px solid; display: flex; align-items: flex-start; padding: 9px 11px; }
+  .layer .lz { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+  .layer .ln { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; position: absolute; bottom: 8px; left: 11px; }
+
+  .lt { display: flex; flex-direction: column; }
+  /* z-table */
+  .ztable { display: flex; flex-direction: column; gap: 5px; }
+  .zrow { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: var(--radius-sm); border: 1px solid var(--hairline); background: var(--surface-elevated); }
+  .zrow .sw { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  .zrow .var { font-family: var(--font-mono); font-size: 11px; color: var(--ink); flex: 1; }
+  .zrow .val { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .zrow .desc { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground); width: 100%; flex-basis: 100%; margin-top: 3px; }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Spacing · Z-index · Layering</div>
+<div class="sub-eye">Escala project-specific · topbar 50 → scrim 60 → drawer 61</div>
+
+<div class="split">
+  <div>
+    <div class="section-label">Stack de capas (isométrico)</div>
+    <div class="stage">
+      <div class="stack">
+        <div class="layer" style="transform:translateZ(0px);   background:color-mix(in oklch,#1097DB 10%,var(--surface-elevated));border-color:color-mix(in oklch,#1097DB 40%,transparent);color:#0c6e9e;">
+          <span class="lz">30</span><span class="ln">sub-toolbar</span>
+        </div>
+        <div class="layer" style="transform:translateZ(22px);  background:color-mix(in oklch,#009971 10%,var(--surface-elevated));border-color:color-mix(in oklch,#009971 40%,transparent);color:#00765a;">
+          <span class="lz">40</span><span class="ln">cat-bar</span>
+        </div>
+        <div class="layer" style="transform:translateZ(44px);  background:color-mix(in oklch,#E9552F 10%,var(--surface-elevated));border-color:color-mix(in oklch,#E9552F 40%,transparent);color:#c23d1c;">
+          <span class="lz">45</span><span class="ln">cart-strip</span>
+        </div>
+        <div class="layer" style="transform:translateZ(66px);  background:color-mix(in oklch,#FAB428 18%,var(--surface-elevated));border-color:color-mix(in oklch,#FAB428 60%,transparent);color:oklch(0.45 0.11 70);">
+          <span class="lz">49 · 50</span><span class="ln">topbar (+ amber)</span>
+        </div>
+        <div class="layer" style="transform:translateZ(92px);  background:oklch(0.18 0.01 60 / 0.82);border-color:oklch(0.18 0.01 60);color:#fff;">
+          <span class="lz">60</span><span class="ln">scrim</span>
+        </div>
+        <div class="layer" style="transform:translateZ(118px); background:var(--surface-elevated);border-color:var(--amber);color:var(--ink);box-shadow:var(--shadow-lg);">
+          <span class="lz">61</span><span class="ln">drawer · modal</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="section-label">Tokens · de menor a mayor</div>
+    <div class="ztable">
+      <div class="zrow"><div class="sw" style="background:#1097DB;"></div><span class="var">--z-sub-toolbar</span><span class="val">30</span><span class="desc">filtros sticky bajo el cat-bar</span></div>
+      <div class="zrow"><div class="sw" style="background:#009971;"></div><span class="var">--z-cat-bar</span><span class="val">40</span><span class="desc">barra de categorías sticky</span></div>
+      <div class="zrow"><div class="sw" style="background:#E9552F;"></div><span class="var">--z-cart-strip</span><span class="val">45</span><span class="desc">CartMiniBar bottom-fixed</span></div>
+      <div class="zrow"><div class="sw" style="background:#FAB428;"></div><span class="var">--z-topbar-amber</span><span class="val">49</span><span class="desc">capa amber-on-scroll detrás del topbar</span></div>
+      <div class="zrow"><div class="sw" style="background:oklch(0.45 0.11 70);"></div><span class="var">--z-topbar</span><span class="val">50</span><span class="desc">TopBar principal</span></div>
+      <div class="zrow"><div class="sw" style="background:oklch(0.18 0.01 60);"></div><span class="var">--z-scrim</span><span class="val">60</span><span class="desc">backdrop oscuro de drawer/modal</span></div>
+      <div class="zrow"><div class="sw" style="background:var(--amber);border:1px solid var(--ink);"></div><span class="var">--z-drawer</span><span class="val">61</span><span class="desc">CartDrawer · dialogs sobre el scrim</span></div>
+    </div>
+  </div>
+</div>
+
+<pre class="code"><span class="c">// styles.css — escala project-specific (NO Tailwind z-50 genérico)</span>
+:root {
+  --z-sub-toolbar: 30;  --z-cat-bar: 40;   --z-cart-strip: 45;
+  --z-topbar-amber: 49; --z-topbar: 50;
+  --z-scrim: 60;        --z-drawer: 61;    <span class="c">// drawer SIEMPRE sobre scrim</span>
+}
+<span class="c">// uso: className="z-[var(--z-drawer)]" · nunca z-index hardcodeado</span></pre>
+
+<div class="note">
+  <b>Escala propia</b> — no usar <code>z-50</code> de Tailwind sueltos; cada capa tiene su token. ·
+  La capa <b>amber-on-scroll (49)</b> vive justo debajo del topbar (50) para invertirlo sin taparlo. ·
+  <b>Regla dura:</b> <code>scrim (60) &lt; drawer/modal (61)</code> — siempre. Nada de la app supera 61 salvo toasts efímeros que van por portal aparte.
+</div>
+
+</body>
+</html>

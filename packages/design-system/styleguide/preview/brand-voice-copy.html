@@ -1,0 +1,64 @@
+<!-- @dsCard group="Brand" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .section-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .copy-block { display: flex; flex-direction: column; gap: 4px; max-width: 280px; padding: 12px; border-radius: 10px; border: 1px solid var(--hairline); background: var(--surface-elevated); }
+  .copy-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); }
+  .copy-text  { font-family: var(--font-sans); font-size: 14px; color: var(--ink); line-height: 1.5; }
+  .copy-bad   { text-decoration: line-through; color: oklch(0.62 0.22 27); }
+  .copy-good  { color: var(--ink); }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+  th { text-transform: uppercase; color: var(--muted-foreground); }
+  td { color: var(--ink); }
+  td.bad { color: oklch(0.62 0.22 27); text-decoration: line-through; }
+</style>
+</head>
+<body>
+  <div class="section-label">Voz y tono — copy rules</div>
+  <div class="row">
+    <div class="copy-block">
+      <div class="copy-label">Voseo rioplatense — siempre</div>
+      <div class="copy-text copy-bad">Seleccione sus fechas / Confirme su pedido</div>
+      <div class="copy-text copy-good">Elegí tus fechas · Confirmá tu pedido</div>
+    </div>
+    <div class="copy-block" style="max-width:320px;">
+      <div class="copy-label">Taglines — rotan · siempre lowercase · punto final</div>
+      <div class="copy-text copy-bad">Rambla Rental — Un Lugar Donde Pasan Cosas</div>
+      <div style="display:flex;flex-direction:column;gap:3px;margin-top:2px;">
+        <div class="copy-text copy-good" style="font-family:var(--font-display);font-size:13px;font-weight:900;letter-spacing:0.01em;">rental, estudio, rambla.</div>
+        <div class="copy-text copy-good" style="font-family:var(--font-display);font-size:13px;font-weight:900;letter-spacing:0.01em;">con rambla, en mardel.</div>
+        <div class="copy-text copy-good" style="font-family:var(--font-display);font-size:13px;font-weight:900;letter-spacing:0.01em;">en rambla, tu proyecto.</div>
+        <div class="copy-text copy-good" style="font-family:var(--font-display);font-size:13px;font-weight:900;letter-spacing:0.01em;">con rambla, tu rodaje.</div>
+      </div>
+    </div>
+    <div class="copy-block">
+      <div class="copy-label">Errores — específicos, primera persona</div>
+      <div class="copy-text copy-bad">Error: email inválido.</div>
+      <div class="copy-text copy-good">Ingresá un correo válido.</div>
+    </div>
+    <div class="copy-block">
+      <div class="copy-label">Empty states — accionables</div>
+      <div class="copy-text copy-bad">No se encontraron resultados.</div>
+      <div class="copy-text copy-good">No hay equipos para estas fechas.</div>
+    </div>
+  </div>
+  <div class="section-label" style="margin-top:4px;">Formatos de datos</div>
+  <table>
+    <tr><th>Tipo</th><th>Formato</th><th>Ejemplo</th><th>Función</th></tr>
+    <tr><td>Precio ARS</td><td>$ con espacio · punto miles</td><td>$ 24.500</td><td>formatARS()</td></tr>
+    <tr><td>Fecha corta</td><td>día d mes.</td><td>lun 2 jun.</td><td>format() + es locale</td></tr>
+    <tr><td>Rango fechas</td><td>día d → día d mes.</td><td>lun 2 → jue 5 jun.</td><td>formatRentalRange()</td></tr>
+    <tr><td>Jornadas compact</td><td>N J</td><td>3 J</td><td>en cards chicas</td></tr>
+    <tr><td>Jornadas full</td><td>N jornadas</td><td>3 jornadas</td><td>jornadaLabel()</td></tr>
+    <tr><td>Sin emoji</td><td>—</td><td>Usar Lucide icons</td><td>lucide-react import individual</td></tr>
+  </table>
+</body>
+</html>

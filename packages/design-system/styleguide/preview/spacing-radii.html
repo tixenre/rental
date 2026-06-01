@@ -1,0 +1,48 @@
+<!-- @dsCard group="Spacing" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .section-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .radii-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .radius-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .radius-box { width: 48px; height: 48px; background: var(--amber); opacity: 0.85; }
+  .rlabel { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); text-align: center; }
+  .rvalue { font-family: var(--font-mono); font-size: 10px; color: var(--foreground); text-align: center; }
+  .spacing-row { display: flex; gap: 6px; align-items: flex-end; }
+  .sp-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .sp-bar { background: var(--ink); opacity: 0.15; width: 100%; }
+  .sp-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-foreground); white-space: nowrap; }
+</style>
+</head>
+<body>
+  <div class="section-label">Border radii</div>
+  <div class="radii-row">
+    <div class="radius-item"><div class="radius-box" style="border-radius:0px;"></div><div class="rlabel">—</div><div class="rvalue">0</div></div>
+    <div class="radius-item"><div class="radius-box" style="border-radius:8px;"></div><div class="rlabel">sm</div><div class="rvalue">8px</div></div>
+    <div class="radius-item"><div class="radius-box" style="border-radius:10px;"></div><div class="rlabel">md</div><div class="rvalue">10px</div></div>
+    <div class="radius-item"><div class="radius-box" style="border-radius:12px;"></div><div class="rlabel">lg</div><div class="rvalue">12px</div></div>
+    <div class="radius-item"><div class="radius-box" style="border-radius:16px;"></div><div class="rlabel">xl</div><div class="rvalue">16px</div></div>
+    <div class="radius-item"><div class="radius-box" style="border-radius:20px;"></div><div class="rlabel">2xl</div><div class="rvalue">20px</div></div>
+    <div class="radius-item"><div class="radius-box" style="border-radius:24px;"></div><div class="rlabel">3xl</div><div class="rvalue">24px</div></div>
+    <div class="radius-item"><div class="radius-box" style="border-radius:28px;"></div><div class="rlabel">4xl</div><div class="rvalue">28px</div></div>
+    <div class="radius-item"><div class="radius-box" style="border-radius:9999px;width:64px;height:32px;"></div><div class="rlabel">pill</div><div class="rvalue">9999px</div></div>
+  </div>
+  <div class="section-label" style="margin-top:4px;">Spacing scale (Tailwind base 4px)</div>
+  <div class="spacing-row">
+    <div class="sp-item"><div class="sp-bar" style="width:24px;height:4px;opacity:1;background:#FAB428;"></div><div class="sp-label">p-1<br>4px</div></div>
+    <div class="sp-item"><div class="sp-bar" style="width:24px;height:8px;opacity:1;background:#FAB428;"></div><div class="sp-label">p-2<br>8px</div></div>
+    <div class="sp-item"><div class="sp-bar" style="width:24px;height:12px;opacity:1;background:#FAB428;"></div><div class="sp-label">p-3<br>12px</div></div>
+    <div class="sp-item"><div class="sp-bar" style="width:24px;height:16px;opacity:1;background:#FAB428;"></div><div class="sp-label">p-4<br>16px</div></div>
+    <div class="sp-item"><div class="sp-bar" style="width:24px;height:20px;opacity:1;background:#FAB428;"></div><div class="sp-label">p-5<br>20px</div></div>
+    <div class="sp-item"><div class="sp-bar" style="width:24px;height:24px;opacity:1;background:#FAB428;"></div><div class="sp-label">p-6<br>24px</div></div>
+    <div class="sp-item"><div class="sp-bar" style="width:24px;height:32px;opacity:1;background:#FAB428;"></div><div class="sp-label">p-8<br>32px</div></div>
+    <div class="sp-item"><div class="sp-bar" style="width:24px;height:48px;opacity:1;background:#FAB428;"></div><div class="sp-label">p-12<br>48px</div></div>
+  </div>
+  <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);letter-spacing:0.1em;">No custom --space-* tokens. Use Tailwind's built-in p-1…p-96 scale.</div>
+</body>
+</html>

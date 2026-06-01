@@ -1,0 +1,152 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .panel { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface-elevated); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--hairline); }
+  .panel-title { font-size: 15px; font-weight: 700; color: var(--ink); }
+  .panel-tools { display: flex; gap: 8px; align-items: center; }
+  .search { display: flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 9999px; border: 1px solid var(--input); background: var(--surface); color: var(--muted-foreground); font-size: 12px; }
+  .filter-btn { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9999px; border: 1px solid var(--input); background: var(--surface); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); cursor: pointer; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; padding: 10px 16px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+  thead th .sort { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+  thead th.num, tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody td { padding: 12px 16px; border-bottom: 1px solid var(--hairline); font-size: 13px; color: var(--ink); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { transition: background 120ms; }
+  tbody tr:hover { background: var(--surface); }
+  .id { font-family: var(--font-mono); font-size: 12px; color: var(--muted-foreground); }
+  .cust { font-weight: 600; }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 9999px; font-family: var(--font-mono); font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .b-azul   { background: color-mix(in oklch,#1097DB 12%,transparent); color:#0c6e9e; }
+  .b-verde  { background: color-mix(in oklch,#009971 12%,transparent); color:#00765a; }
+  .b-amber  { background: color-mix(in oklch,#FAB428 16%,transparent); color: oklch(0.5 0.12 70); }
+  .b-rosa   { background: color-mix(in oklch,#ED7BAD 14%,transparent); color:#c45589; }
+  .b-dest   { background: color-mix(in oklch,oklch(0.62 0.22 27) 12%,transparent); color: oklch(0.55 0.2 27); }
+
+  .actions { display: flex; gap: 4px; justify-content: flex-end; }
+  .icon-btn { display: grid; place-items: center; width: 30px; height: 30px; border-radius: var(--radius-sm); border: none; background: transparent; color: var(--muted-foreground); cursor: pointer; transition: background 120ms, color 120ms; }
+  .icon-btn:hover { background: var(--surface); color: var(--ink); }
+
+  .foot { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; border-top: 1px solid var(--hairline); }
+  .foot .info { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); letter-spacing: 0.04em; }
+  .pager { display: flex; gap: 4px; }
+  .pg { min-width: 28px; height: 28px; padding: 0 7px; border-radius: var(--radius-sm); border: 1px solid var(--hairline); background: var(--surface-elevated); font-family: var(--font-mono); font-size: 11px; color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+  .pg.active { background: var(--ink); color: var(--amber); border-color: var(--ink); }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Components · Admin data table</div>
+<div class="sub-eye">Back-office · sticky head · EstadoBadge · sort · pagination</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <span class="panel-title">Pedidos</span>
+    <div class="panel-tools">
+      <div class="search"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Buscar pedido…</div>
+      <button class="filter-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9.46V19l4 2v-8.54Z"/></svg>Estado</button>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th><span class="sort">Cliente</span></th>
+        <th>Fechas</th>
+        <th>Estado</th>
+        <th class="num"><span class="sort" style="justify-content:flex-end;">Total <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span></th>
+        <th class="num"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="id">#RB-1042</td>
+        <td class="cust">Lucía Fernández</td>
+        <td class="mono" style="font-size:12px;color:var(--muted-foreground);">lun 2 → jue 5 jun.</td>
+        <td><span class="badge b-verde"><span class="dot" style="background:#009971;"></span>Confirmado</span></td>
+        <td class="num mono">$ 176.055</td>
+        <td class="num"><div class="actions"><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div></td>
+      </tr>
+      <tr>
+        <td class="id">#RB-1041</td>
+        <td class="cust">Estudio Norte</td>
+        <td class="mono" style="font-size:12px;color:var(--muted-foreground);">sáb 31 → dom 1 jun.</td>
+        <td><span class="badge b-azul"><span class="dot" style="background:#1097DB;"></span>Presupuesto</span></td>
+        <td class="num mono">$ 94.380</td>
+        <td class="num"><div class="actions"><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div></td>
+      </tr>
+      <tr>
+        <td class="id">#RB-1040</td>
+        <td class="cust">Mateo Ruiz</td>
+        <td class="mono" style="font-size:12px;color:var(--muted-foreground);">vie 30 jun.</td>
+        <td><span class="badge b-amber"><span class="dot" style="background:#FAB428;"></span>En curso</span></td>
+        <td class="num mono">$ 24.500</td>
+        <td class="num"><div class="actions"><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div></td>
+      </tr>
+      <tr>
+        <td class="id">#RB-1039</td>
+        <td class="cust">Caro Méndez</td>
+        <td class="mono" style="font-size:12px;color:var(--muted-foreground);">mar 27 → mié 28 may.</td>
+        <td><span class="badge b-rosa"><span class="dot" style="background:#ED7BAD;"></span>Devuelto</span></td>
+        <td class="num mono">$ 48.000</td>
+        <td class="num"><div class="actions"><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div></td>
+      </tr>
+      <tr>
+        <td class="id">#RB-1038</td>
+        <td class="cust">Productora Sur</td>
+        <td class="mono" style="font-size:12px;color:var(--muted-foreground);">jue 22 may.</td>
+        <td><span class="badge b-dest"><span class="dot" style="background:oklch(0.62 0.22 27);"></span>Cancelado</span></td>
+        <td class="num mono" style="color:var(--muted-foreground);">$ 12.000</td>
+        <td class="num"><div class="actions"><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button><button class="icon-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button></div></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="foot">
+    <span class="info">42 pedidos · página 1 de 9</span>
+    <div class="pager">
+      <span class="pg"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></span>
+      <span class="pg active">1</span><span class="pg">2</span><span class="pg">3</span>
+      <span class="pg"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span>
+    </div>
+  </div>
+</div>
+
+<pre class="code"><span class="c">// Data table admin — head sticky, EstadoBadge en columna de estado</span>
+&lt;<span class="k">DataTable</span>
+  columns={[id, cliente, fechas, estado, total, acciones]}
+  data={pedidos}
+  sortable={[<span class="s">"cliente"</span>, <span class="s">"total"</span>, <span class="s">"fechas"</span>]} /&gt;
+
+<span class="c">// total → font-mono tabular · fechas → formatRentalRange() · estado → EstadoBadge</span>
+<span class="c">// row hover → bg surface · acciones reveladas al hover en desktop</span></pre>
+
+<div class="note">
+  <b>Numéricos</b> (total) alineados a la derecha en <code>font-mono tabular-nums</code>. · <b>Fechas</b> con <code>formatRentalRange()</code> en muted. ·
+  La columna de estado usa el <b>EstadoBadge</b> oficial — misma paleta de status, nunca colores ad-hoc. · Head sticky, paginación de 28px, server-side sort por las columnas marcadas.
+</div>
+
+</body>
+</html>

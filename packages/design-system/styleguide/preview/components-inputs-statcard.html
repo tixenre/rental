@@ -1,0 +1,225 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  hr { border: none; border-top: 1px solid var(--hairline); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .state { display: flex; flex-direction: column; gap: 8px; }
+  .state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+  .state-tag .d { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .state-tag.default { color: var(--muted-foreground); } .state-tag.default .d { background: var(--muted-foreground); }
+  .state-tag.focus  { color: oklch(0.5 0.1 70); }  .state-tag.focus .d  { background: var(--amber); }
+  .state-tag.err    { color: var(--destructive); }  .state-tag.err .d    { background: var(--destructive); }
+  .state-tag.ok     { color: var(--verde); }         .state-tag.ok .d     { background: var(--verde); }
+
+  .frame { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .frame-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 5px; }
+
+  /* Field */
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field-lbl { font-family: var(--font-mono); font-size: 9px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink); }
+  .input {
+    height: 38px; border-radius: var(--radius-md);
+    border: 1px solid var(--input);
+    background: var(--surface-elevated);
+    font-family: var(--font-sans); font-size: 14px; color: var(--ink);
+    padding: 0 12px; outline: none; width: 100%;
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+  .input::placeholder { color: var(--muted-foreground); }
+  .input.focus  { border-color: var(--amber); box-shadow: 0 0 0 3px color-mix(in oklch, var(--amber) 18%, transparent); }
+  .input.error  { border-color: var(--destructive); box-shadow: 0 0 0 3px color-mix(in oklch, var(--destructive) 15%, transparent); }
+  .input.filled { border-color: var(--hairline); }
+  .hint { font-family: var(--font-sans); font-size: 11px; color: var(--muted-foreground); }
+  .hint.err { color: var(--destructive); }
+
+  /* Search */
+  .search-wrap { position: relative; }
+  .search-wrap .input { padding-left: 34px; border-radius: 9999px; }
+  .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted-foreground); pointer-events: none; }
+  .search-wrap .input.focus + .search-icon,
+  .search-wrap .search-icon.active { color: oklch(0.5 0.1 70); }
+
+  /* Textarea */
+  .textarea {
+    border-radius: var(--radius-md); border: 1px solid var(--input);
+    background: var(--surface-elevated);
+    font-family: var(--font-sans); font-size: 14px; color: var(--ink);
+    padding: 10px 12px; outline: none; width: 100%; resize: vertical; min-height: 72px;
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+  .textarea::placeholder { color: var(--muted-foreground); }
+  .textarea.focus { border-color: var(--amber); box-shadow: 0 0 0 3px color-mix(in oklch, var(--amber) 18%, transparent); }
+
+  /* StatCard */
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { background: var(--surface-elevated); border: 1px solid var(--hairline); border-radius: var(--radius-lg); padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 2px; box-shadow: var(--shadow-sm); }
+  .stat-eye { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .stat-val { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--ink); line-height: 1.1; font-variant-numeric: tabular-nums; margin-top: 3px; }
+  .stat-delta { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 9px; font-weight: 600; letter-spacing: 0.1em; margin-top: 4px; }
+  .stat-delta.up   { color: var(--verde); }
+  .stat-delta.down { color: var(--destructive); }
+  .stat-delta.neu  { color: var(--muted-foreground); }
+  .stat.amber-accent { border-top: 3px solid var(--amber); }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; margin: 0; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Components · Input · StatCard</div>
+<div class="sub-eye">estados · focus · error · filled · search · textarea · stat</div>
+
+<div class="gallery">
+
+  <!-- Input estados -->
+  <div class="state">
+    <span class="state-tag default"><span class="d"></span>Input — default · focus · error · filled</span>
+    <div class="frame">
+      <div class="field">
+        <div class="field-lbl">Default</div>
+        <input class="input" placeholder="Nombre completo">
+        <div class="hint">Hint text opcional</div>
+      </div>
+      <div class="field">
+        <div class="field-lbl">Focus</div>
+        <input class="input focus" value="Sony a7S III">
+      </div>
+      <div class="field">
+        <div class="field-lbl">Error</div>
+        <input class="input error" value="correo@">
+        <div class="hint err">Ingresá un correo válido.</div>
+      </div>
+      <div class="field">
+        <div class="field-lbl">Filled · disabled</div>
+        <input class="input filled" value="lun 2 jun." style="opacity:0.55;cursor:not-allowed;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Search + Textarea -->
+  <div class="state">
+    <span class="state-tag focus"><span class="d"></span>Search · Textarea · estados</span>
+    <div class="frame">
+      <div class="field">
+        <div class="field-lbl">Search — default</div>
+        <div class="search-wrap">
+          <input class="input" placeholder="Buscar equipo…">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-lbl">Search — focus + texto</div>
+        <div class="search-wrap">
+          <input class="input focus" value="sony a7">
+          <svg class="search-icon active" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-lbl">Textarea — focus</div>
+        <textarea class="textarea focus" placeholder="Comentario adicional…">Necesito el trípode pesado también.</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- StatCard variantes -->
+  <div class="state">
+    <span class="state-tag ok"><span class="d"></span>StatCard — admin · portal dashboard</span>
+    <div class="frame">
+      <div class="stat-grid">
+        <div class="stat amber-accent">
+          <div class="stat-eye">Pedidos activos</div>
+          <div class="stat-val">12</div>
+          <div class="stat-delta up">↑ 3 esta semana</div>
+        </div>
+        <div class="stat amber-accent">
+          <div class="stat-eye">Facturación jun</div>
+          <div class="stat-val">$ 284k</div>
+          <div class="stat-delta up">↑ 18%</div>
+        </div>
+        <div class="stat">
+          <div class="stat-eye">Equipo en campo</div>
+          <div class="stat-val">34</div>
+          <div class="stat-delta neu">= igual que ayer</div>
+        </div>
+        <div class="stat">
+          <div class="stat-eye">Devoluciones hoy</div>
+          <div class="stat-val">5</div>
+          <div class="stat-delta down">↓ 2 con retraso</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Select + Checkbox -->
+  <div class="state">
+    <span class="state-tag default"><span class="d"></span>Select · Checkbox · Radio</span>
+    <div class="frame">
+      <div class="field">
+        <div class="field-lbl">Select</div>
+        <select class="input" style="appearance:none;background-image:url('data:image/svg+xml,%3Csvg width%3D%2212%22 height%3D%2212%22 viewBox%3D%220 0 24 24%22 fill%3D%22none%22 stroke%3D%22%23666%22 stroke-width%3D%222%22 xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath d%3D%22m6 9 6 6 6-6%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;">
+          <option>Cámaras</option>
+          <option>Iluminación</option>
+          <option>Audio</option>
+        </select>
+      </div>
+      <div class="field" style="gap:8px;">
+        <div class="field-lbl">Checkbox</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" checked="" style="accent-color:var(--ink);width:15px;height:15px;">
+            Incluir sin stock
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" style="accent-color:var(--ink);width:15px;height:15px;">
+            Solo favoritos
+          </label>
+        </div>
+      </div>
+      <div class="field" style="gap:8px;">
+        <div class="field-lbl">Radio</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="radio" name="r" checked="" style="accent-color:var(--ink);width:15px;height:15px;">Grid</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="radio" name="r" style="accent-color:var(--ink);width:15px;height:15px;">Lista</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<pre class="code"><span class="c">// Focus ring — siempre amber</span>
+border-color: var(--amber);
+box-shadow: 0 0 0 3px color-mix(in oklch, var(--amber) 18%, transparent);
+
+<span class="c">// Error — destructive</span>
+border-color: var(--destructive);
+box-shadow: 0 0 0 3px color-mix(in oklch, var(--destructive) 15%, transparent);
+
+<span class="c">// StatCard delta colors</span>
+up   → var(--verde)       ↑ positivo
+down → var(--destructive) ↓ negativo / retraso
+neu  → var(--muted-foreground) = sin cambio</pre>
+
+<div class="note">
+  <b>Labels siempre en mono uppercase.</b> Hint text en sans 11px muted. Error reemplaza hint. ·
+  <b>StatCard amber-accent</b> (border-top 3px amber) solo para las métricas más importantes del dashboard — máximo 2 por vista.
+</div>
+
+</body>
+</html>

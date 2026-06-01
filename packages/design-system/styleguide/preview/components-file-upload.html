@@ -1,0 +1,305 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 20px; }
+.section-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+.sub-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; }
+.note { font-family: var(--font-sans); font-size: 11px; line-height: 1.65; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; max-width: 640px; }
+.note b { color: var(--foreground); font-weight: 600; }
+.note code { font-family: var(--font-mono); font-size: 10px; background: var(--surface); padding: 1px 4px; border-radius: 4px; }
+hr { border: none; border-top: 1px solid var(--hairline); }
+.row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+
+/* ══════════════════════
+   DROPZONE
+   ══════════════════════ */
+.dropzone {
+  width: 320px;
+  border: 2px dashed var(--hairline);
+  border-radius: var(--radius-lg);
+  padding: 32px 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 150ms, background 150ms;
+  text-align: center;
+}
+.dropzone:hover {
+  border-color: color-mix(in oklch, var(--amber) 50%, transparent);
+  background: color-mix(in oklch, var(--amber) 5%, transparent);
+}
+.dropzone.drag-over {
+  border-color: var(--amber);
+  background: color-mix(in oklch, var(--amber) 10%, transparent);
+}
+.dropzone .dz-icon {
+  width: 48px; height: 48px; border-radius: var(--radius-lg);
+  background: var(--surface-elevated);
+  border: 1px solid var(--hairline);
+  display: grid; place-items: center;
+  color: var(--muted-foreground);
+  transition: color 150ms, border-color 150ms;
+}
+.dropzone:hover .dz-icon,
+.dropzone.drag-over .dz-icon { color: var(--amber); border-color: color-mix(in oklch, var(--amber) 40%, transparent); }
+.dropzone .dz-title { font-size: 13px; font-weight: 700; color: var(--ink); }
+.dropzone .dz-sub { font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+.dropzone .dz-formats { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted-foreground); margin-top: 2px; }
+.dropzone .dz-btn {
+  margin-top: 4px; padding: 6px 16px; border-radius: 9999px;
+  border: 1px solid var(--hairline); background: var(--surface-elevated);
+  font-size: 12px; font-weight: 600; color: var(--ink);
+  cursor: pointer; transition: background 150ms;
+}
+.dropzone .dz-btn:hover { background: var(--ink); color: var(--background); }
+.dropzone.drag-over .dz-btn { display: none; }
+.dropzone.drag-over .dz-title { color: oklch(0.5 0.12 70); }
+
+/* ── uploading ── */
+.upload-item {
+  width: 320px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-elevated);
+  padding: 12px 14px;
+  display: flex; align-items: center; gap: 12px;
+}
+.thumb-preview {
+  width: 44px; height: 44px; border-radius: 6px;
+  background: var(--surface);
+  overflow: hidden; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.thumb-preview img { width: 100%; height: 100%; object-fit: cover; }
+.thumb-preview .icon { color: var(--muted-foreground); }
+.upload-info { flex: 1; min-width: 0; }
+.upload-name { font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.upload-size { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); margin-top: 1px; }
+.prog-bar { height: 3px; border-radius: 9999px; background: var(--hairline); margin-top: 7px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 9999px; background: var(--amber); transition: width 300ms; }
+.upload-pct { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); margin-top: 3px; }
+
+.remove-btn {
+  width: 28px; height: 28px; border-radius: 9999px;
+  border: 1px solid var(--hairline); background: var(--surface);
+  display: grid; place-items: center;
+  color: var(--muted-foreground); flex-shrink: 0;
+  cursor: pointer; transition: color 140ms, border-color 140ms;
+}
+.remove-btn:hover { color: var(--destructive); border-color: color-mix(in oklch, var(--destructive) 30%, transparent); }
+
+/* success: checkmark overlay */
+.upload-item.success { border-color: color-mix(in oklch, #009971 30%, transparent); }
+.upload-item.success .prog-fill { background: #009971; width: 100% !important; }
+.check-icon { color: #009971; }
+
+/* error */
+.upload-item.error { border-color: color-mix(in oklch, var(--destructive) 30%, transparent); }
+.upload-item.error .prog-fill { background: var(--destructive); width: 35%; }
+.upload-item.error .upload-size { color: var(--destructive); }
+
+/* ══════════════════════
+   MULTI-PHOTO GRID (admin carga de equipo)
+   ══════════════════════ */
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 320px;
+}
+.photo-slot {
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  position: relative;
+}
+.photo-slot .img {
+  width: 100%; height: 100%;
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  background-image: repeating-linear-gradient(-45deg, transparent 0 4px, oklch(0.18 0.01 60 / 4%) 4px 6px);
+}
+.photo-slot .remove-overlay {
+  position: absolute; top: 4px; right: 4px;
+  width: 22px; height: 22px; border-radius: 9999px;
+  background: oklch(0.14 0.01 60 / 70%);
+  display: grid; place-items: center;
+  color: white; cursor: pointer;
+  opacity: 0; transition: opacity 150ms;
+}
+.photo-slot:hover .remove-overlay { opacity: 1; }
+.photo-slot.primary .img::after {
+  content: "Principal";
+  position: absolute; bottom: 4px; left: 4px;
+  font-family: var(--font-mono); font-size: 7px;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  background: var(--amber); color: var(--ink);
+  padding: 2px 6px; border-radius: 9999px;
+}
+.photo-slot.add {
+  border: 2px dashed var(--hairline);
+  cursor: pointer;
+  transition: border-color 150ms, background 150ms;
+}
+.photo-slot.add:hover { border-color: color-mix(in oklch, var(--amber) 50%, transparent); background: color-mix(in oklch, var(--amber) 5%, transparent); }
+.photo-slot.add .img { background: transparent; }
+</style>
+</head>
+<body>
+
+<!-- ══ DROPZONE STATES ══ -->
+<div class="section-label">File Upload — Dropzone · Estados</div>
+<div class="row">
+  <!-- Idle -->
+  <div>
+    <div class="sub-label">Idle</div>
+    <div class="dropzone">
+      <div class="dz-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      </div>
+      <div>
+        <div class="dz-title">Subí las fotos del equipo</div>
+        <div class="dz-sub">Arrastrá imágenes acá o elegí desde tu dispositivo.</div>
+        <div class="dz-formats">JPG · PNG · WEBP · máx. 8 MB c/u</div>
+      </div>
+      <div class="dz-btn">Elegir archivos</div>
+    </div>
+  </div>
+
+  <!-- Drag over -->
+  <div>
+    <div class="sub-label">Drag over</div>
+    <div class="dropzone drag-over">
+      <div class="dz-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <div>
+        <div class="dz-title" style="color:oklch(0.5 0.12 70);">Soltá para subir</div>
+        <div class="dz-sub">Archivos listos para cargarse.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<!-- ══ UPLOAD ITEMS ══ -->
+<div class="section-label">Ítems de carga — Estados individuales</div>
+<div style="display:flex;flex-direction:column;gap:8px;">
+  <!-- Uploading 60% -->
+  <div>
+    <div class="sub-label">Subiendo</div>
+    <div class="upload-item">
+      <div class="thumb-preview">
+        <div class="icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+      </div>
+      <div class="upload-info">
+        <div class="upload-name">sony-fx3-frente.jpg</div>
+        <div class="upload-size">2.4 MB</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:60%;"></div></div>
+        <div class="upload-pct">60%</div>
+      </div>
+      <div class="remove-btn">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success -->
+  <div>
+    <div class="sub-label">Listo</div>
+    <div class="upload-item success">
+      <div class="thumb-preview" style="background:var(--surface);">
+        <div style="width:100%;height:100%;background:repeating-linear-gradient(-45deg,transparent 0 4px,oklch(0.18 0.01 60 / 4%) 4px 6px);"></div>
+      </div>
+      <div class="upload-info">
+        <div class="upload-name">sony-fx3-lateral.jpg</div>
+        <div class="upload-size" style="color:#009971;">Subido correctamente</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:100%;background:#009971;"></div></div>
+      </div>
+      <div class="remove-btn">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div>
+    <div class="sub-label">Error</div>
+    <div class="upload-item error">
+      <div class="thumb-preview">
+        <div class="icon" style="color:var(--destructive);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+      </div>
+      <div class="upload-info">
+        <div class="upload-name">foto-grande.png</div>
+        <div class="upload-size" style="color:var(--destructive);">El archivo supera 8 MB.</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:35%;background:var(--destructive);"></div></div>
+      </div>
+      <div class="remove-btn">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<!-- ══ MULTI-PHOTO GRID — ADMIN ══ -->
+<div class="section-label">Grid de fotos — Admin carga de equipo (reordenable)</div>
+<div>
+  <div class="sub-label">3 fotos cargadas + slot vacío + drop zone</div>
+  <div class="photo-grid">
+    <!-- foto 1 principal -->
+    <div class="photo-slot primary">
+      <div class="img" style="position:relative;">
+        <div style="width:100%;height:100%;background:repeating-linear-gradient(-45deg,transparent 0 4px,oklch(0.18 0.01 60 / 5%) 4px 6px);"></div>
+        <div style="position:absolute;bottom:4px;left:4px;font-family:var(--font-mono);font-size:7px;text-transform:uppercase;letter-spacing:0.1em;background:var(--amber);color:var(--ink);padding:2px 6px;border-radius:9999px;">Principal</div>
+      </div>
+      <div class="remove-overlay">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
+    </div>
+    <!-- foto 2 -->
+    <div class="photo-slot">
+      <div class="img"></div>
+      <div class="remove-overlay">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
+    </div>
+    <!-- foto 3 -->
+    <div class="photo-slot">
+      <div class="img"></div>
+      <div class="remove-overlay">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
+    </div>
+    <!-- Add slot -->
+    <div class="photo-slot add">
+      <div class="img" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span style="font-family:var(--font-mono);font-size:8px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted-foreground);">Agregar</span>
+      </div>
+    </div>
+  </div>
+  <p style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);margin-top:8px;letter-spacing:0.06em;">Arrastrá para reordenar · La primera foto es la principal</p>
+</div>
+
+<div class="note">
+  <b>Implementación:</b> <code>react-dropzone</code> para la zona de drop. Reordenamiento con <code>@dnd-kit/sortable</code>.
+  La foto en posición [0] se usa como <code>foto_principal</code> en la API.<br><br>
+  <b>Restricciones:</b> formatos <code>image/jpeg, image/png, image/webp</code>. Máximo 8 MB por archivo. Máximo 8 fotos por equipo.
+  El resize/compresión se hace en el cliente con <code>browser-image-compression</code> antes de subir.<br><br>
+  <b>Upload:</b> presigned URL de S3 via <code>POST /api/upload/presigned</code>. El progreso viene del XMLHttpRequest <code>upload.onprogress</code>.
+</div>
+
+</body>
+</html>

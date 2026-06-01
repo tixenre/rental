@@ -215,6 +215,28 @@
 - **How to apply:** al mergear una rama a `dev`, usar squash con título `tipo: desc (#PR)`. Al promover
   `dev → main`, usar merge commit. No squashear nunca la PR de promoción a prod.
 
+### 2026-06-01 — Gotcha de Railway: fork de ambiente desincroniza la contraseña del Postgres
+- **Contexto:** el backend de staging (`dev`) tiraba 500 en cascada con
+  `psycopg2.OperationalError: FATAL: password authentication failed for user "postgres"`.
+  No era bug de código: al **forkear** el ambiente `dev` desde prod, el **volumen** del Postgres
+  quedó con una contraseña, pero la variable `POSTGRES_PASSWORD` se **regeneró sin correr el
+  `ALTER USER`** correspondiente → la variable mentía. Ni la variable de staging, ni la de prod,
+  abrían la BD (la contraseña real del volumen no coincidía con ninguna).
+- **Decisión / cómo arreglar:** la contraseña real vive **dentro del Postgres** (en disco), no en
+  una variable de entorno → **ninguna** edición de variables (ni Shared Variables) lo arregla. Hay
+  que **resetear la contraseña en la BD** para que matchee la variable, entrando por el socket local
+  (auth `peer`, sin contraseña) vía SSH al contenedor:
+  ```
+  railway ssh --service Postgres --environment dev \
+    "psql -U postgres -d railway -h /var/run/postgresql \
+     -c \"ALTER USER postgres WITH PASSWORD '<POSTGRES_PASSWORD de ese ambiente>';\""
+  ```
+  Después, alinear `DATABASE_URL` del backend a esa misma contraseña y redeploy.
+- **How to apply:** ante `password authentication failed` en un ambiente recién forkeado, es **esto**
+  — no perseguir variables. Reset por SSH + socket local. **Prod es sagrado**: no se leen sus
+  credenciales ni se prueba contra su BD para diagnosticar staging.
+- **Consecuencias:** receta directa para la próxima sesión que forkee un ambiente con DB.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

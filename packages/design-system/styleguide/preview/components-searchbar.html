@@ -1,0 +1,196 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .state { display: flex; flex-direction: column; gap: 8px; }
+  .state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+  .state-tag .d { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .state-tag.default { color: var(--muted-foreground); } .state-tag.default .d { background: var(--muted-foreground); }
+  .state-tag.focus   { color: oklch(0.5 0.1 70); }      .state-tag.focus .d   { background: var(--amber); }
+  .state-tag.typing  { color: var(--ink); }              .state-tag.typing .d  { background: var(--ink); }
+  .state-tag.results { color: var(--azul); }             .state-tag.results .d { background: var(--azul); }
+
+  .frame { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface); padding: 16px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .frame-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 6px; }
+
+  /* ── SearchBar ── */
+  .search { display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--hairline); border-radius: 9999px; background: var(--surface-elevated); padding: 0 12px; height: 38px; transition: border-color 150ms, box-shadow 150ms; }
+  .search svg.lead { flex-shrink: 0; color: var(--muted-foreground); }
+  .search input { flex: 1; border: none; background: transparent; outline: none; font-family: var(--font-sans); font-size: 14px; color: var(--ink); min-width: 0; }
+  .search input::placeholder { color: var(--muted-foreground); }
+  .search .clear { width: 18px; height: 18px; border-radius: 50%; background: var(--muted-foreground); color: var(--surface-elevated); border: none; cursor: pointer; display: grid; place-items: center; font-size: 10px; flex-shrink: 0; }
+
+  /* focus */
+  .search.focus { border-color: var(--ink); background: var(--surface-elevated); box-shadow: 0 0 0 3px color-mix(in oklch, var(--amber) 18%, transparent); }
+  .search.focus svg.lead { color: oklch(0.5 0.1 70); }
+  /* typing (has value) */
+  .search.typing { border-color: var(--ink); }
+
+  /* ── Suggestions dropdown ── */
+  .search-stack { position: relative; }
+  .suggestions { border: 1px solid var(--hairline); border-radius: var(--radius-md); background: var(--surface-elevated); box-shadow: var(--shadow-lg); overflow: hidden; margin-top: 6px; }
+  .sug-section { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); padding: 8px 12px 4px; }
+  .sug-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; }
+  .sug-item:hover, .sug-item.active { background: var(--surface); }
+  .sug-thumb { width: 30px; height: 30px; border-radius: 5px; background: var(--surface); border: 1px solid var(--hairline); display: grid; place-items: center; flex-shrink: 0; color: var(--muted-foreground); }
+  .sug-text { flex: 1; min-width: 0; }
+  .sug-name { font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--ink); }
+  .sug-name b { color: oklch(0.5 0.1 70); font-weight: 700; }
+  .sug-cat { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted-foreground); margin-top: 1px; }
+  .sug-recent { display: flex; align-items: center; gap: 9px; padding: 7px 12px; cursor: pointer; font-family: var(--font-sans); font-size: 13px; color: var(--foreground); }
+  .sug-recent:hover { background: var(--surface); }
+  .sug-recent svg { color: var(--muted-foreground); flex-shrink: 0; }
+
+  /* mobile frame */
+  .phone { border: 2px solid var(--ink); border-radius: 14px; overflow: hidden; max-width: 300px; }
+  .phone .search { border-radius: 9999px; }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Component · SearchBar</div>
+<div class="sub-eye">default · focus · con texto · sugerencias · mobile</div>
+
+<div class="gallery">
+
+  <!-- Estados base -->
+  <div class="state">
+    <span class="state-tag default"><span class="d"></span>Estados · default · focus · con texto</span>
+    <div class="frame">
+      <div>
+        <div class="frame-label">Default</div>
+        <div class="search">
+          <svg class="lead" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input placeholder="Buscar equipo…" readonly="">
+        </div>
+      </div>
+      <div>
+        <div class="frame-label">Focus (vacío)</div>
+        <div class="search focus">
+          <svg class="lead" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input placeholder="Buscar equipo…" readonly="">
+        </div>
+      </div>
+      <div>
+        <div class="frame-label">Con texto · botón limpiar</div>
+        <div class="search typing">
+          <svg class="lead" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input value="sony a7" readonly="">
+          <button class="clear">✕</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sugerencias -->
+  <div class="state">
+    <span class="state-tag focus"><span class="d"></span>Sugerencias · autocomplete con match resaltado</span>
+    <div class="frame">
+      <div class="search-stack">
+        <div class="search typing">
+          <svg class="lead" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input value="son" readonly="">
+          <button class="clear">✕</button>
+        </div>
+        <div class="suggestions">
+          <div class="sug-section">Equipos</div>
+          <div class="sug-item active">
+            <div class="sug-thumb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/></svg></div>
+            <div class="sug-text"><div class="sug-name"><b>Son</b>y a7S III</div><div class="sug-cat">Cámaras</div></div>
+          </div>
+          <div class="sug-item">
+            <div class="sug-thumb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/></svg></div>
+            <div class="sug-text"><div class="sug-name"><b>Son</b>y FX3 Cinema</div><div class="sug-cat">Cámaras</div></div>
+          </div>
+          <div class="sug-item">
+            <div class="sug-thumb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+            <div class="sug-text"><div class="sug-name"><b>Son</b>y 24-70 GM II</div><div class="sug-cat">Óptica</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recientes / vacío al focus -->
+  <div class="state">
+    <span class="state-tag typing"><span class="d"></span>Focus vacío · búsquedas recientes</span>
+    <div class="frame">
+      <div class="search-stack">
+        <div class="search focus">
+          <svg class="lead" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input placeholder="Buscar equipo…" readonly="">
+        </div>
+        <div class="suggestions">
+          <div class="sug-section">Recientes</div>
+          <div class="sug-recent"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>aputure 600d</div>
+          <div class="sug-recent"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>dji ronin</div>
+          <div class="sug-recent"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>trípode</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile -->
+  <div class="state">
+    <span class="state-tag results"><span class="d"></span>Mobile · full-width en el stack sticky</span>
+    <div class="phone">
+      <div style="height:44px;border-bottom:1px solid var(--hairline);display:flex;align-items:center;padding:0 14px;background:var(--background);">
+        <span style="font-family:var(--font-display);font-weight:900;font-size:16px;text-transform:lowercase;color:var(--ink);">rambla</span>
+      </div>
+      <div style="padding:8px 12px;background:var(--background);border-bottom:1px solid var(--hairline);">
+        <div class="search typing" style="height:34px;">
+          <svg class="lead" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input value="sony" style="font-size:13px;" readonly="">
+          <button class="clear">✕</button>
+        </div>
+      </div>
+      <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;">
+        <div style="height:48px;border-radius:8px;background:var(--surface);border:1px solid var(--hairline);"></div>
+        <div style="height:48px;border-radius:8px;background:var(--surface);border:1px solid var(--hairline);"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<pre class="code"><span class="c">// Búsqueda en tiempo real — debounce 200ms</span>
+&lt;<span class="k">SearchBar</span>
+  value={query}
+  placeholder=<span class="s">"Buscar equipo…"</span>
+  onChange={debounce(setQuery, <span class="k">200</span>)}
+  onClear={() =&gt; setQuery(<span class="s">""</span>)}
+/&gt;
+
+<span class="c">// Sugerencias: equipos (match resaltado) + recientes (localStorage)</span>
+focus + vacío  → muestra recientes
+focus + texto  → autocomplete equipos, match en &lt;b&gt; amber
+Esc            → limpia y cierra
+Enter          → busca y navega al catálogo filtrado</pre>
+
+<div class="note">
+  <b>Siempre visible</b> en el stack del catálogo — no escondida detrás de un ícono, especialmente en vista lista. ·
+  <b>Match resaltado</b> en <code>&lt;b&gt;</code> amber dentro de la sugerencia. ·
+  <b>Recientes</b> desde localStorage al hacer focus en vacío. ·
+  Se usa dentro del <b>stack sticky con el CatBar</b> — ver el asset CatBar para el layout completo.
+</div>
+
+</body>
+</html>

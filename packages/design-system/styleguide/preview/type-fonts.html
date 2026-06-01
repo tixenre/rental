@@ -1,0 +1,45 @@
+<!-- @dsCard group="Type" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+  .family { display: flex; flex-direction: column; gap: 4px; }
+  .name { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .usage { font-family: var(--font-mono); font-size: 9px; color: var(--muted-foreground); letter-spacing: 0.05em; }
+  .specimen { font-size: 22px; color: var(--ink); line-height: 1.2; }
+  .weights { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px; }
+  .w { font-family: "TT Commons", sans-serif; font-size: 15px; color: var(--ink); display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+  .wlabel { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted-foreground); }
+  hr { border: none; border-top: 1px solid var(--hairline); }
+</style>
+</head>
+<body>
+  <div class="family">
+    <div class="name">font-display — Champ Black</div>
+    <div class="specimen" style="font-family:'Champ Black',sans-serif;font-weight:900;text-transform:lowercase;letter-spacing:0.01em;">rambla rental</div>
+    <div class="usage">Display / wordmark ONLY · always lowercase · never body, UI, labels, prices</div>
+  </div>
+  <hr>
+  <div class="family">
+    <div class="name">font-sans — TT Commons · 400–900</div>
+    <div class="specimen" style="font-family:'TT Commons',sans-serif;">Body, headings, UI, labels</div>
+    <div class="weights">
+      <div class="w" style="font-weight:400;"><span>Regular</span><span class="wlabel">400 · body</span></div>
+      <div class="w" style="font-weight:500;"><span>Medium</span><span class="wlabel">500 · ui</span></div>
+      <div class="w" style="font-weight:600;"><span>DemiBold</span><span class="wlabel">600 · t-h3</span></div>
+      <div class="w" style="font-weight:700;"><span>Bold</span><span class="wlabel">700 · t-h1/h2</span></div>
+      <div class="w" style="font-weight:900;"><span>Black</span><span class="wlabel">900 · heavy</span></div>
+    </div>
+  </div>
+  <hr>
+  <div class="family">
+    <div class="name">font-mono — JetBrains Mono (Google Fonts)</div>
+    <div class="specimen" style="font-family:'JetBrains Mono',monospace;font-size:18px;">$ 24.500 · lun 2 jun. · #R-0041</div>
+    <div class="usage">Prices · dates · IDs · eyebrows · counters · tabular numbers</div>
+  </div>
+</body>
+</html>

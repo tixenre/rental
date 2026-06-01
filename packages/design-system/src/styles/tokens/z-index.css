@@ -1,0 +1,15 @@
+/* ============================================================
+   Rambla Rental — Z-index scale  (CANONICAL, project-specific)
+   :root plano — índices de layering, no generan utilities.
+   Consumir con z-[var(--z-topbar)] o en CSS.
+   ============================================================ */
+
+:root {
+  --z-topbar:       50;
+  --z-topbar-amber: 49;
+  --z-cart-strip:   45;
+  --z-cat-bar:      40;
+  --z-sub-toolbar:  30;
+  --z-scrim:        60;
+  --z-drawer:       61;
+}

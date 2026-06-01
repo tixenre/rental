@@ -1,0 +1,148 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .state { display: flex; flex-direction: column; gap: 8px; }
+  .state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+  .state-tag .d { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .state-tag.search { color: var(--ink); }              .state-tag.search .d { background: var(--ink); }
+  .state-tag.cart   { color: oklch(0.5 0.1 70); }       .state-tag.cart .d   { background: var(--amber); }
+  .state-tag.stock  { color: var(--destructive); }      .state-tag.stock .d  { background: var(--destructive); }
+  .state-tag.fav    { color: var(--rosa); }             .state-tag.fav .d    { background: var(--rosa); }
+
+  /* ── Empty state ── */
+  .empty {
+    border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+    background: var(--surface-elevated);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; padding: 40px 28px; text-align: center; min-height: 280px;
+    position: relative; overflow: hidden;
+  }
+  /* subtle striped bg */
+  .empty::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, oklch(0.14 0.01 60 / 2%) 0 1px, transparent 1px 22px); pointer-events: none; }
+  .empty > * { position: relative; z-index: 1; }
+
+  .empty-icon { width: 64px; height: 64px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; color: var(--muted-foreground); }
+  .empty-icon.amber { background: color-mix(in oklch, var(--amber) 14%, transparent); color: oklch(0.5 0.1 70); }
+  .empty-icon.err { background: color-mix(in oklch, var(--destructive) 10%, transparent); color: var(--destructive); }
+  .empty-icon.rosa { background: color-mix(in oklch, var(--rosa) 14%, transparent); color: #c45589; }
+  .empty-title { font-family: var(--font-display); font-weight: 900; font-size: 22px; color: var(--ink); text-transform: lowercase; line-height: 1; }
+  .empty-sub { font-family: var(--font-sans); font-size: 13px; color: var(--muted-foreground); line-height: 1.5; max-width: 260px; }
+  .empty-cta { margin-top: 4px; display: inline-flex; align-items: center; gap: 7px; border-radius: 9999px; background: var(--ink); color: var(--amber); border: none; padding: 10px 20px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .empty-cta.amber { background: var(--amber); color: var(--ink); }
+  .empty-cta.ghost { background: transparent; color: var(--ink); border: 1px solid var(--hairline); }
+  .empty-meta { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted-foreground); }
+  .empty-chips { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
+  .empty-chip { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 10px; border-radius: 9999px; border: 1px solid var(--hairline); background: var(--background); color: var(--muted-foreground); cursor: pointer; }
+  .empty-chip:hover { border-color: var(--amber); color: var(--ink); }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Pattern · Empty States</div>
+<div class="sub-eye">búsqueda sin resultados · carrito vacío · sin stock en fechas · sin favoritos</div>
+
+<div class="gallery">
+
+  <!-- Búsqueda sin resultados -->
+  <div class="state">
+    <span class="state-tag search"><span class="d"></span>Búsqueda sin resultados</span>
+    <div class="empty">
+      <div class="empty-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </div>
+      <div class="empty-title">nada para "réflex"</div>
+      <div class="empty-sub">No encontramos equipos con ese nombre. Probá con otro término o explorá por categoría.</div>
+      <div class="empty-chips">
+        <span class="empty-chip">Cámaras</span>
+        <span class="empty-chip">Óptica</span>
+        <span class="empty-chip">Audio</span>
+      </div>
+      <button class="empty-cta ghost" style="margin-top:10px;">Limpiar búsqueda</button>
+    </div>
+  </div>
+
+  <!-- Carrito vacío -->
+  <div class="state">
+    <span class="state-tag cart"><span class="d"></span>Carrito vacío</span>
+    <div class="empty">
+      <div class="empty-icon amber">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      </div>
+      <div class="empty-title">todavía no hay nada</div>
+      <div class="empty-sub">Agregá equipos del catálogo y armá tu pedido. Elegí fechas para ver disponibilidad y precios.</div>
+      <button class="empty-cta">Ver catálogo
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Sin stock en fechas -->
+  <div class="state">
+    <span class="state-tag stock"><span class="d"></span>Categoría sin stock en las fechas</span>
+    <div class="empty">
+      <div class="empty-icon err">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><path d="m9 16 6-6M15 16l-6-6"/></svg>
+      </div>
+      <div class="empty-title">sin disponibilidad</div>
+      <div class="empty-sub">Ningún equipo de <b>Estabilización</b> está libre del 14 al 17 jun. Probá otras fechas o categoría.</div>
+      <div class="empty-meta" style="margin-top:2px;">14 jun → 17 jun · 3 jornadas</div>
+      <button class="empty-cta amber" style="margin-top:8px;">Cambiar fechas</button>
+    </div>
+  </div>
+
+  <!-- Sin favoritos -->
+  <div class="state">
+    <span class="state-tag fav"><span class="d"></span>Sin favoritos (portal cliente)</span>
+    <div class="empty">
+      <div class="empty-icon rosa">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/></svg>
+      </div>
+      <div class="empty-title">sin favoritos aún</div>
+      <div class="empty-sub">Marcá equipos con el corazón para tenerlos a mano en tu próximo proyecto.</div>
+      <button class="empty-cta ghost" style="margin-top:8px;">Explorar catálogo</button>
+    </div>
+  </div>
+
+</div>
+
+<pre class="code"><span class="c">// Anatomía compartida — todos los empty states</span>
+&lt;<span class="k">EmptyState</span>
+  icon={<span class="s">&lt;Icon /&gt;</span>}        <span class="c">// círculo 64px, bg tint según contexto</span>
+  title=<span class="s">"todavía no hay nada"</span>  <span class="c">// Champ Black lowercase</span>
+  sub=<span class="s">"Agregá equipos…"</span>      <span class="c">// TT Commons, max 260px</span>
+  cta={{ label, onClick }}    <span class="c">// 1 acción principal que resuelve el vacío</span>
+/&gt;
+
+<span class="c">// La CTA SIEMPRE ofrece la salida:</span>
+búsqueda vacía  → "Limpiar búsqueda" + chips de categorías
+carrito vacío   → "Ver catálogo"
+sin stock       → "Cambiar fechas" (no "Volver")
+sin favoritos   → "Explorar catálogo"</pre>
+
+<div class="note">
+  <b>Cada empty state ofrece una salida.</b> Nunca un callejón sin acción. La CTA resuelve la causa del vacío: sin stock → cambiar fechas, no "volver atrás". ·
+  <b>Título Champ Black lowercase</b> — mismo tono cálido del resto del sistema, nunca un "Oops" o "404". ·
+  <b>Fondo rayado sutil</b> (<code>repeating-linear-gradient</code> 2% ink) para diferenciar del contenido cargado.
+</div>
+
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 20px; }
+.section-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+.sub-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; }
+.note { font-family: var(--font-sans); font-size: 11px; line-height: 1.65; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; max-width: 640px; }
+.note b { color: var(--foreground); font-weight: 600; }
+.note code { font-family: var(--font-mono); font-size: 10px; background: var(--surface); padding: 1px 4px; border-radius: 4px; }
+hr { border: none; border-top: 1px solid var(--hairline); }
+.row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+
+/* ══ ERROR PAGE SHELL ══ */
+.error-page {
+  width: 380px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+
+/* mini topbar for context */
+.mini-topbar {
+  height: 52px; background: var(--surface-elevated);
+  border-bottom: 1px solid var(--hairline);
+  display: flex; align-items: center; padding: 0 16px; gap: 10px;
+}
+.mini-topbar img { height: 24px; width: auto; }
+
+/* error body */
+.err-body {
+  flex: 1; padding: 48px 32px 40px;
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  text-align: center;
+}
+.err-code {
+  font-family: var(--font-display);
+  font-size: 4.5rem; line-height: 1; text-transform: lowercase;
+  letter-spacing: -0.02em;
+}
+.err-code.c404 { color: var(--ink); }
+.err-code.c500 { color: var(--destructive); }
+.err-code.cnet { color: var(--muted-foreground); }
+
+.err-title { font-size: 16px; font-weight: 700; color: var(--ink); margin-top: 10px; }
+.err-desc { font-size: 13px; color: var(--muted-foreground); line-height: 1.55; margin-top: 6px; max-width: 260px; }
+
+.err-actions { display: flex; gap: 8px; margin-top: 24px; flex-wrap: wrap; justify-content: center; }
+.btn-primary {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 20px; border-radius: 9999px;
+  background: var(--ink); color: var(--background);
+  font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: background 150ms;
+  white-space: nowrap;
+}
+.btn-primary:hover { background: var(--amber); color: var(--ink); }
+.btn-outline {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 18px; border-radius: 9999px;
+  border: 1px solid var(--hairline); background: var(--surface);
+  font-size: 13px; font-weight: 600; color: var(--muted-foreground);
+  cursor: pointer; transition: border-color 150ms, color 150ms;
+  white-space: nowrap;
+}
+.btn-outline:hover { color: var(--ink); border-color: var(--ink); }
+
+/* ══ INLINE ERROR STATES ══ */
+.inline-errors {
+  display: flex; flex-direction: column; gap: 10px; max-width: 460px;
+}
+.inline-err {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid;
+}
+.inline-err.network { background: color-mix(in oklch, var(--muted-foreground) 6%, transparent); border-color: var(--hairline); }
+.inline-err.server  { background: color-mix(in oklch, var(--destructive) 7%, transparent); border-color: color-mix(in oklch, var(--destructive) 25%, transparent); }
+.inline-err.empty   { background: var(--surface); border-color: var(--hairline); }
+.inline-err.auth    { background: color-mix(in oklch, #1097DB 8%, transparent); border-color: color-mix(in oklch, #1097DB 25%, transparent); }
+
+.err-icon { width: 32px; height: 32px; border-radius: var(--radius-sm); display: grid; place-items: center; flex-shrink: 0; margin-top: 1px; }
+.inline-err.network .err-icon { background: var(--surface); color: var(--muted-foreground); }
+.inline-err.server  .err-icon { background: color-mix(in oklch, var(--destructive) 12%, transparent); color: var(--destructive); }
+.inline-err.empty   .err-icon { background: var(--surface-elevated); color: var(--muted-foreground); }
+.inline-err.auth    .err-icon { background: color-mix(in oklch, #1097DB 12%, transparent); color: #0c6e9e; }
+
+.err-content { flex: 1; min-width: 0; }
+.err-label { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+.inline-err.server  .err-label { color: var(--destructive); }
+.inline-err.auth    .err-label { color: #0c6e9e; }
+.err-text { font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+.err-action { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; font-weight: 700; color: var(--ink); cursor: pointer; text-decoration: none; transition: color 120ms; }
+.err-action:hover { color: color-mix(in oklch, var(--amber) 80%, var(--ink)); }
+</style>
+</head>
+<body>
+
+<!-- ══ FULL PAGE ERRORS ══ -->
+<div class="section-label">Error pages — Pantallas completas</div>
+<div class="row">
+
+  <!-- 404 -->
+  <div>
+    <div class="sub-label">404 — No encontrado</div>
+    <div class="error-page">
+      <div class="mini-topbar">
+        <img src="../assets/rambla-wordmark.svg" alt="Rambla">
+      </div>
+      <div class="err-body">
+        <div class="err-code c404">404.</div>
+        <div class="err-title">Esta página no existe.</div>
+        <div class="err-desc">Puede que el link esté roto o que la página fue movida. Probá desde el catálogo.</div>
+        <div class="err-actions">
+          <div class="btn-primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+            Ver catálogo
+          </div>
+          <div class="btn-outline">Volver</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 500 -->
+  <div>
+    <div class="sub-label">500 — Error de servidor</div>
+    <div class="error-page">
+      <div class="mini-topbar">
+        <img src="../assets/rambla-wordmark.svg" alt="Rambla">
+      </div>
+      <div class="err-body">
+        <div class="err-code c500">500.</div>
+        <div class="err-title">Algo salió mal de nuestro lado.</div>
+        <div class="err-desc">El equipo ya fue notificado. Intentá de nuevo en unos minutos.</div>
+        <div class="err-actions">
+          <div class="btn-primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.71"/></svg>
+            Intentar de nuevo
+          </div>
+          <div class="btn-outline">Ir al inicio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sin conexión -->
+  <div>
+    <div class="sub-label">Sin conexión a internet</div>
+    <div class="error-page">
+      <div class="mini-topbar">
+        <img src="../assets/rambla-wordmark.svg" alt="Rambla">
+      </div>
+      <div class="err-body">
+        <div class="err-code cnet">sin<br>red.</div>
+        <div class="err-title">Sin conexión.</div>
+        <div class="err-desc">Revisá tu conexión a internet e intentá de nuevo.</div>
+        <div class="err-actions">
+          <div class="btn-primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.71"/></svg>
+            Reintentar
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<hr>
+
+<!-- ══ INLINE ERROR STATES ══ -->
+<div class="section-label">Estados de error inline — Dentro de la UI</div>
+<div class="inline-errors">
+
+  <!-- Sin conexión inline -->
+  <div class="inline-err network">
+    <div class="err-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+    </div>
+    <div class="err-content">
+      <div class="err-label">Sin conexión</div>
+      <div class="err-text">No pudimos cargar el catálogo. Revisá tu conexión a internet.</div>
+      <a class="err-action" href="#">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.71"/></svg>
+        Reintentar
+      </a>
+    </div>
+  </div>
+
+  <!-- Error de servidor inline -->
+  <div class="inline-err server">
+    <div class="err-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <div class="err-content">
+      <div class="err-label">Error al guardar</div>
+      <div class="err-text">No pudimos guardar tu reserva. Intentá de nuevo o contactanos por WhatsApp.</div>
+      <a class="err-action" href="#" style="color:var(--destructive);">Reintentar</a>
+    </div>
+  </div>
+
+  <!-- Empty state inline -->
+  <div class="inline-err empty">
+    <div class="err-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+    </div>
+    <div class="err-content">
+      <div class="err-label">No hay equipos disponibles</div>
+      <div class="err-text">No hay equipos para las fechas seleccionadas. Probá con otras fechas.</div>
+      <a class="err-action" href="#">Cambiar fechas</a>
+    </div>
+  </div>
+
+  <!-- Auth error inline -->
+  <div class="inline-err auth">
+    <div class="err-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    <div class="err-content">
+      <div class="err-label">Sesión vencida</div>
+      <div class="err-text">Tu sesión expiró. Ingresá de nuevo para continuar.</div>
+      <a class="err-action" href="#" style="color:#0c6e9e;">Iniciar sesión</a>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>Páginas completas:</b> las error pages usan <code>font-display</code> (Champ Black) para el código de error en lowercase — es uno de los pocos casos en que el display font aparece fuera del hero, para darle carácter. El copy es empático y accionable.<br><br>
+  <b>404:</b> CTA primario siempre al catálogo. <b>500:</b> CTA a reintentar + ir al inicio. <b>Sin red:</b> solo reintentar.<br><br>
+  <b>Inline errors:</b> usan el componente <code>Banner</code> (ver <code>components-banners.html</code>) como base, con un ícono contextual y un link de acción. No usar toast para errores persistentes — usar banner inline o estado de error en el mismo lugar donde ocurrió.
+</div>
+
+</body>
+</html>

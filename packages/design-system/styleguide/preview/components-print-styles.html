@@ -1,0 +1,240 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 20px; }
+.section-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+.sub-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; }
+.note { font-family: var(--font-sans); font-size: 11px; line-height: 1.65; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; max-width: 640px; }
+.note b { color: var(--foreground); font-weight: 600; }
+.note code { font-family: var(--font-mono); font-size: 10px; background: var(--surface); padding: 1px 4px; border-radius: 4px; }
+hr { border: none; border-top: 1px solid var(--hairline); }
+.row { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+
+/* ══ DOCUMENT PREVIEW ══ */
+.doc-preview {
+  width: 420px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: white;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: #111;
+}
+
+/* Header marca */
+.doc-header {
+  background: oklch(0.14 0.01 60);
+  padding: 18px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.doc-header-left { display: flex; flex-direction: column; gap: 4px; }
+.doc-wordmark { font-family: var(--font-display); font-size: 1.6rem; color: var(--amber); text-transform: lowercase; line-height: 0.9; }
+.doc-tagline { font-family: var(--font-mono); font-size: 8px; color: oklch(0.72 0.01 70); letter-spacing: 0.16em; text-transform: uppercase; }
+.doc-type-badge {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 5px 14px; border-radius: 9999px;
+}
+.badge-cot { background: color-mix(in oklch, #1097DB 20%, transparent); color: #1097DB; }
+.badge-cont { background: color-mix(in oklch, #009971 20%, transparent); color: #009971; }
+
+/* Doc body */
+.doc-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+
+/* Meta info row */
+.doc-meta-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #f9f8f6;
+  border-radius: 8px;
+  border: 1px solid #e8e5e0;
+}
+.doc-meta-item {}
+.doc-meta-label { font-family: var(--font-mono); font-size: 8px; text-transform: uppercase; letter-spacing: 0.14em; color: #888; margin-bottom: 2px; }
+.doc-meta-value { font-size: 12px; font-weight: 700; color: #111; }
+.doc-meta-value.mono { font-family: var(--font-mono); }
+
+/* Cliente section */
+.doc-section-label { font-family: var(--font-mono); font-size: 8px; text-transform: uppercase; letter-spacing: 0.16em; color: #888; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #e8e5e0; }
+.cliente-row { display: flex; gap: 10px; align-items: baseline; font-size: 12px; }
+.cliente-label { color: #888; min-width: 60px; }
+.cliente-value { color: #111; font-weight: 600; }
+
+/* Items table */
+.items-table { width: 100%; border-collapse: collapse; }
+.items-table th { font-family: var(--font-mono); font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; text-align: left; padding: 5px 6px; border-bottom: 1px solid #e8e5e0; }
+.items-table th.r, .items-table td.r { text-align: right; }
+.items-table td { padding: 8px 6px; border-bottom: 1px solid #f0ede8; font-size: 11px; color: #111; }
+.items-table tr:last-child td { border-bottom: none; }
+.item-name { font-weight: 600; }
+.item-brand { color: #888; font-size: 10px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Totals */
+.doc-totals { background: #f9f8f6; border-radius: 8px; border: 1px solid #e8e5e0; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; }
+.total-row { display: flex; justify-content: space-between; font-size: 11.5px; }
+.total-row.main { font-weight: 700; font-size: 13px; border-top: 1px solid #e8e5e0; padding-top: 6px; margin-top: 2px; }
+.total-row.sub { color: #888; }
+.amber-val { color: oklch(0.5 0.12 70); }
+
+/* Footer */
+.doc-footer { background: #f9f8f6; border-top: 1px solid #e8e5e0; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+.doc-footer-text { font-family: var(--font-mono); font-size: 8px; color: #aaa; letter-spacing: 0.1em; text-transform: uppercase; }
+.doc-page { font-family: var(--font-mono); font-size: 8px; color: #ccc; }
+
+/* ══ CSS SNIPPET ══ */
+pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+.k { color: var(--amber-hot); }
+.s { color: var(--rosa); }
+.c { color: oklch(0.6 0.01 70); font-style: italic; }
+.p { color: oklch(0.75 0.01 70); }
+</style>
+</head>
+<body>
+
+<!-- ══ DOCUMENT PREVIEW ══ -->
+<div class="section-label">Documento de cotización — Preview de impresión</div>
+<div class="row">
+
+  <div class="doc-preview">
+    <!-- Header -->
+    <div class="doc-header">
+      <div class="doc-header-left">
+        <div class="doc-wordmark">rambla.</div>
+        <div class="doc-tagline">Mar del Plata · Rental audiovisual</div>
+      </div>
+      <div class="doc-type-badge badge-cot">Cotización</div>
+    </div>
+
+    <div class="doc-body">
+      <!-- Meta -->
+      <div class="doc-meta-row" style="grid-template-columns:1fr 1fr;">
+        <div class="doc-meta-item">
+          <div class="doc-meta-label">N° pedido</div>
+          <div class="doc-meta-value mono">R-0041</div>
+        </div>
+        <div class="doc-meta-item">
+          <div class="doc-meta-label">Jornadas</div>
+          <div class="doc-meta-value mono">3 J</div>
+        </div>
+        <div class="doc-meta-item" style="grid-column:1/3;border-top:1px solid #e8e5e0;padding-top:8px;margin-top:2px;">
+          <div class="doc-meta-label">Retiro</div>
+          <div class="doc-meta-value">lun 2 jun. 2026 · 9:00 hs</div>
+        </div>
+        <div class="doc-meta-item" style="grid-column:1/3;">
+          <div class="doc-meta-label">Devolución</div>
+          <div class="doc-meta-value">jue 5 jun. 2026 · 19:00 hs</div>
+        </div>
+      </div>
+
+      <!-- Cliente -->
+      <div>
+        <div class="doc-section-label">Datos del cliente</div>
+        <div class="cliente-row"><span class="cliente-label">Nombre</span><span class="cliente-value">Martín García</span></div>
+        <div class="cliente-row"><span class="cliente-label">DNI</span><span class="cliente-value mono">28.450.123</span></div>
+        <div class="cliente-row"><span class="cliente-label">Email</span><span class="cliente-value">martin@email.com</span></div>
+      </div>
+
+      <!-- Items -->
+      <div>
+        <div class="doc-section-label">Equipos</div>
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Equipo</th>
+              <th class="r">Cant.</th>
+              <th class="r">Precio/J</th>
+              <th class="r">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div class="item-name">FX3 Cinema Line</div>
+                <div class="item-brand">Sony</div>
+              </td>
+              <td class="r mono">1</td>
+              <td class="r mono">$ 24.500</td>
+              <td class="r mono">$ 73.500</td>
+            </tr>
+            <tr>
+              <td>
+                <div class="item-name">600d Pro Kit</div>
+                <div class="item-brand">Aputure</div>
+              </td>
+              <td class="r mono">1</td>
+              <td class="r mono">$ 18.000</td>
+              <td class="r mono">$ 54.000</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Totals -->
+      <div class="doc-totals">
+        <div class="total-row main"><span>Total</span><span class="mono amber-val">$ 127.500 + IVA</span></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="doc-footer">
+      <div class="doc-footer-text">ramblarental.com.ar · hola@ramblarental.com.ar</div>
+      <div class="doc-page" style="color:#bbb;">Emitido lun 2 jun. 2026 · Pág. 1 / 1</div>
+    </div>
+  </div>
+
+  <!-- CSS Snippet -->
+  <div style="max-width:340px;">
+    <div class="sub-label">@media print — CSS base</div>
+    <pre class="code"><span class="c">/* Aplicar en src/styles/print.css */</span>
+<span class="k">@media</span> <span class="p">print</span> {
+  <span class="c">/* Ocultar UI chrome */</span>
+  <span class="p">nav, .topbar, .cart-bar,
+  .sidebar, .no-print</span> {
+    <span class="k">display</span>: <span class="s">none</span> !important;
+  }
+
+  <span class="p">body</span> {
+    <span class="k">font-size</span>: <span class="s">12pt</span>;
+    <span class="k">color</span>: <span class="s">#000</span>;
+    <span class="k">background</span>: <span class="s">white</span>;
+  }
+
+  <span class="c">/* Forzar color-scheme en print */</span>
+  <span class="p">:root</span> {
+    <span class="k">--amber</span>: <span class="s">#FAB428</span>;
+    <span class="k">--ink</span>: <span class="s">#111</span>;
+  }
+
+  <span class="c">/* Evitar cortes en items */</span>
+  <span class="p">.doc-item, .doc-section</span> {
+    <span class="k">break-inside</span>: <span class="s">avoid</span>;
+  }
+
+  <span class="c">/* Tamaño de página A4 */</span>
+  <span class="k">@page</span> {
+    <span class="k">size</span>: <span class="s">A4 portrait</span>;
+    <span class="k">margin</span>: <span class="s">20mm 20mm 20mm 20mm</span>;
+  }
+}</pre>
+  </div>
+</div>
+
+<div class="note">
+  <b>Generación PDF:</b> los documentos (cotización, contrato, remito, albarán) se generan server-side con <code>@react-pdf/renderer</code> o <code>puppeteer</code> en el backend FastAPI. El frontend no genera PDFs — consume la URL firmada del archivo pre-generado.<br><br>
+  <b>Print CSS:</b> la hoja <code>src/styles/print.css</code> se importa globalmente. Oculta toda la UI de navegación. El documento HTML de la cotización tiene clase <code>.printable-doc</code> para targeting específico.<br><br>
+  <b>Tipografía en print:</b> mínimo <b>12pt</b>. Usar <code>font-sans</code> (TT Commons) que está embebida. <code>font-mono</code> (JetBrains) para precios y números. Champ Black para el wordmark del header.
+</div>
+
+</body>
+</html>

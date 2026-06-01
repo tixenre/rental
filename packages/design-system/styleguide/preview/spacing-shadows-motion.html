@@ -1,0 +1,56 @@
+<!-- @dsCard group="Spacing" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .section-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .shadow-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .shadow-item { display: flex; flex-direction: column; gap: 8px; }
+  .shadow-box { width: 80px; height: 56px; background: var(--surface-elevated); border-radius: var(--radius-lg); }
+  .slabel { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+  .motion-table { display: flex; flex-direction: column; gap: 6px; }
+  .motion-row { display: flex; align-items: center; gap: 12px; }
+  .m-key { font-family: var(--font-mono); font-size: 10px; color: var(--ink); min-width: 120px; }
+  .m-val { font-family: var(--font-mono); font-size: 9px; color: var(--muted-foreground); }
+  .m-bar { height: 4px; background: var(--amber); border-radius: 2px; }
+</style>
+</head>
+<body>
+  <div class="section-label">Brand-tinted shadows (opt-in via var())</div>
+  <div class="shadow-row">
+    <div class="shadow-item">
+      <div class="shadow-box" style="box-shadow: var(--shadow-sm);"></div>
+      <div class="slabel">shadow-sm</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);">cards at rest</div>
+    </div>
+    <div class="shadow-item">
+      <div class="shadow-box" style="box-shadow: var(--shadow-md);"></div>
+      <div class="slabel">shadow-md</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);">dropdowns, hover</div>
+    </div>
+    <div class="shadow-item">
+      <div class="shadow-box" style="box-shadow: var(--shadow-lg);"></div>
+      <div class="slabel">shadow-lg</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);">toasts, FABs</div>
+    </div>
+    <div class="shadow-item">
+      <div class="shadow-box" style="box-shadow: var(--shadow-xl);"></div>
+      <div class="slabel">shadow-xl</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);">modals, dialogs</div>
+    </div>
+  </div>
+  <div class="section-label" style="margin-top:2px;">Motion tokens</div>
+  <div class="motion-table">
+    <div class="motion-row"><div class="m-key">duration-fast</div><div class="m-bar" style="width:12px;"></div><div class="m-val">120ms — press states, bumps</div></div>
+    <div class="motion-row"><div class="m-key">duration-base</div><div class="m-bar" style="width:20px;"></div><div class="m-val">200ms — hover, color</div></div>
+    <div class="motion-row"><div class="m-key">duration-slow</div><div class="m-bar" style="width:35px;"></div><div class="m-val">350ms — entry, slide-up</div></div>
+    <div class="motion-row"><div class="m-key">duration-xslow</div><div class="m-bar" style="width:55px;"></div><div class="m-val">550ms — fly-to-cart, hero</div></div>
+    <div class="motion-row"><div class="m-key">ease-default</div><div class="m-val" style="font-size:8px;">cubic(0.32,0.72,0,1) — drawer settle</div></div>
+    <div class="motion-row"><div class="m-key">ease-bounce</div><div class="m-val" style="font-size:8px;">cubic(0.34,1.56,0.64,1) — badge pop</div></div>
+  </div>
+</body>
+</html>

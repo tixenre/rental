@@ -1,0 +1,208 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 20px; }
+.section-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+.sub-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; }
+.note { font-family: var(--font-sans); font-size: 11px; line-height: 1.65; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; max-width: 640px; }
+.note b { color: var(--foreground); font-weight: 600; }
+.note code { font-family: var(--font-mono); font-size: 10px; background: var(--surface); padding: 1px 4px; border-radius: 4px; }
+hr { border: none; border-top: 1px solid var(--hairline); }
+.row { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+
+/* ══ FAQ LAYOUT ══ */
+.faq-page {
+  width: 560px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.page-hero {
+  background: var(--ink);
+  padding: 28px 32px;
+}
+.page-hero-label { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.22em; color: oklch(0.72 0.01 70); margin-bottom: 6px; }
+.page-hero-title { font-family: var(--font-display); font-size: 2rem; color: var(--amber); line-height: 0.95; text-transform: lowercase; }
+.page-hero-sub { font-size: 13px; color: oklch(0.72 0.01 70); margin-top: 8px; line-height: 1.5; }
+
+.page-body { padding: 24px 32px; display: flex; flex-direction: column; gap: 12px; }
+
+/* Category filter chips */
+.cat-chips { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 4px; }
+.cat-chip {
+  padding: 5px 14px; border-radius: 9999px;
+  font-family: var(--font-mono); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  cursor: pointer; transition: background 140ms, color 140ms;
+}
+.cat-chip.active { background: var(--ink); color: var(--amber); }
+.cat-chip:not(.active) { background: var(--surface); color: var(--muted-foreground); border: 1px solid var(--hairline); }
+.cat-chip:not(.active):hover { background: var(--surface-elevated); color: var(--ink); }
+
+/* FAQ accordion item */
+.faq-section-label { font-family: var(--font-mono); font-size: 8px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted-foreground); padding: 8px 0 4px; }
+.faq-item {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  overflow: hidden;
+}
+.faq-item + .faq-item { margin-top: 4px; }
+.faq-q {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  transition: background 140ms;
+  gap: 10px;
+}
+.faq-q:hover { background: var(--surface); }
+.faq-q.open { background: var(--surface); }
+.faq-chevron { color: var(--muted-foreground); flex-shrink: 0; transition: transform 200ms; }
+.faq-q.open .faq-chevron { transform: rotate(180deg); color: var(--ink); }
+.faq-a {
+  padding: 0 14px 14px;
+  font-size: 12px; color: var(--muted-foreground); line-height: 1.65;
+  display: none;
+}
+.faq-item.open .faq-a { display: block; }
+
+/* ══ LEGAL / PROSE LAYOUT ══ */
+.legal-page {
+  width: 480px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.legal-toc {
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+  padding: 14px 20px;
+}
+.legal-toc-label { font-family: var(--font-mono); font-size: 8px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted-foreground); margin-bottom: 8px; }
+.toc-list { display: flex; flex-direction: column; gap: 4px; }
+.toc-item { font-size: 11.5px; color: var(--muted-foreground); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: color 120ms; text-decoration: none; }
+.toc-item:hover { color: var(--ink); }
+.toc-num { font-family: var(--font-mono); font-size: 9px; color: var(--muted-foreground); min-width: 20px; }
+
+.legal-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.legal-section-head { font-size: 14px; font-weight: 700; color: var(--ink); padding-bottom: 6px; border-bottom: 1px solid var(--hairline); display: flex; align-items: baseline; gap: 8px; }
+.legal-section-num { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
+.legal-p { font-size: 12px; color: var(--muted-foreground); line-height: 1.7; }
+.legal-p b { color: var(--ink); font-weight: 600; }
+.legal-updated { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted-foreground); padding-top: 8px; border-top: 1px dashed var(--hairline); }
+</style>
+</head>
+<body>
+
+<!-- ══ FAQ ══ -->
+<div class="section-label">Preguntas frecuentes — /preguntas-frecuentes</div>
+<div class="faq-page">
+  <div class="page-hero">
+    <div class="page-hero-label">Ayuda</div>
+    <div class="page-hero-title">preguntas<br>frecuentes.</div>
+    <div class="page-hero-sub">Todo lo que necesitás saber antes de tu primer rental.</div>
+  </div>
+  <div class="page-body">
+    <!-- Category chips -->
+    <div class="cat-chips">
+      <div class="cat-chip active">Todo</div>
+      <div class="cat-chip">Reservas</div>
+      <div class="cat-chip">Pagos</div>
+      <div class="cat-chip">Retiro</div>
+      <div class="cat-chip">Equipos</div>
+    </div>
+
+    <!-- Section: Reservas -->
+    <div class="faq-section-label">Reservas</div>
+
+    <div class="faq-item open">
+      <div class="faq-q open">
+        ¿Cómo hago una reserva?
+        <svg class="faq-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="faq-a" style="display:block;">
+        Elegí tus fechas desde la barra de búsqueda, agregá los equipos que necesitás y completá el proceso de pago. Recibís un email de confirmación automático.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">
+        ¿Puedo cancelar una reserva?
+        <svg class="faq-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="faq-a">Podés cancelar desde el portal cliente hasta 48 hs antes del retiro sin costo adicional.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">
+        ¿Con cuánta anticipación reservo?
+        <svg class="faq-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="faq-a">Recomendamos al menos 48 hs de anticipación. Para proyectos grandes o fines de semana largo, con una semana o más.</div>
+    </div>
+
+    <!-- Section: Retiro -->
+    <div class="faq-section-label">Retiro y devolución</div>
+
+    <div class="faq-item">
+      <div class="faq-q">
+        ¿Qué necesito para retirar el equipo?
+        <svg class="faq-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="faq-a">DNI y el número de pedido (te lo mandamos por email). No hace falta nada más.</div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<!-- ══ LEGAL / PROSE ══ -->
+<div class="section-label">Páginas legales — /privacidad · /terminos</div>
+<div class="legal-page">
+  <!-- TOC -->
+  <div class="legal-toc">
+    <div class="legal-toc-label">Contenido</div>
+    <div class="toc-list">
+      <a class="toc-item" href="#"><span class="toc-num">1.</span>Información recopilada</a>
+      <a class="toc-item" href="#"><span class="toc-num">2.</span>Uso de la información</a>
+      <a class="toc-item" href="#"><span class="toc-num">3.</span>Compartir datos</a>
+      <a class="toc-item" href="#"><span class="toc-num">4.</span>Tus derechos</a>
+      <a class="toc-item" href="#"><span class="toc-num">5.</span>Contacto</a>
+    </div>
+  </div>
+  <!-- Prose -->
+  <div class="legal-body">
+    <div>
+      <div class="legal-section-head"><span class="legal-section-num">1.</span>Información que recopilamos</div>
+      <div class="legal-p" style="margin-top:8px;">
+        Al crear una cuenta en Rambla Rental, recopilamos tu <b>nombre</b>, <b>dirección de correo electrónico</b> (a través de Google OAuth), <b>DNI</b> y <b>número de teléfono</b>. Esta información es necesaria para procesar tus reservas y emitir los documentos legales correspondientes.
+      </div>
+    </div>
+    <div>
+      <div class="legal-section-head"><span class="legal-section-num">2.</span>Uso de la información</div>
+      <div class="legal-p" style="margin-top:8px;">
+        Usamos tus datos exclusivamente para <b>gestionar reservas</b>, emitir cotizaciones y contratos, y comunicarnos receptos a tu pedido. No usamos tus datos para publicidad de terceros.
+      </div>
+    </div>
+    <div class="legal-updated">Última actualización: mayo de 2026</div>
+  </div>
+</div>
+
+<div class="note">
+  <b>FAQ:</b> usa <code>Accordion</code> (Radix) con múltiple apertura simultánea. Las categorías son filter chips que filtran client-side. El hero usa <code>--ink</code> como fondo + <code>--amber</code> para el display title, igual que el hero del catálogo en dark.<br><br>
+  <b>Legal / Prose:</b> el TOC es sticky en desktop (<code>sticky top-20</code> en la columna lateral). En mobile se colapsa. La tipografía es <code>font-sans</code> size 14px / line-height 1.8 para legibilidad legal. Sin <code>font-display</code> en páginas de contenido.
+</div>
+
+</body>
+</html>

@@ -696,24 +696,16 @@ def cotizar(data: CotizarRequest, request: Request):
 
         # Precios desde el backend. Equipos inexistentes/eliminados se ignoran
         # (cotización best-effort: el carrito puede tener algo que ya no está).
-        # Batch: 1 query para todos los ítems en vez de N (una por ítem).
-        ids_validos = [it.equipo_id for it in data.items if it.cantidad > 0]
-        precios_map: dict = {}
-        if ids_validos:
-            ph = ",".join("?" * len(ids_validos))
-            precios_map = {
-                r["id"]: r
-                for r in conn.execute(
-                    f"SELECT id, precio_jornada, tipo FROM equipos"
-                    f" WHERE id IN ({ph}) AND eliminado_at IS NULL",
-                    ids_validos,
-                ).fetchall()
-            }
+        # Fetch por-ítem (lookup por PK indexada): se revirtió el batch `IN (...)`
+        # de #643 que devolvía precios_map vacío en prod → total $0 (regresión).
         items_para_total = []
         for it in data.items:
             if it.cantidad <= 0:
                 continue
-            row = precios_map.get(it.equipo_id)
+            row = conn.execute(
+                "SELECT precio_jornada, tipo FROM equipos WHERE id=? AND eliminado_at IS NULL",
+                (it.equipo_id,),
+            ).fetchone()
             if not row:
                 continue
             # C3 #635: el precio de un COMBO se deriva en vivo de sus componentes

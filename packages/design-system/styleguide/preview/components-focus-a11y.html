@@ -1,0 +1,149 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .state { display: flex; flex-direction: column; gap: 8px; }
+  .state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); }
+  .state-tag .d { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
+  .frame { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface); padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+  .frame-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+
+  /* focus ring demos (always-on for display) */
+  .btn { padding: 9px 18px; border-radius: var(--radius-md); font-weight: 700; font-size: 13px; border: none; cursor: pointer; }
+  .btn.ink { background: var(--ink); color: var(--amber); }
+  .btn.amber { background: var(--amber); color: oklch(0.14 0.01 60); }
+  .ring { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+  .field label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+  .input { padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--input); background: var(--surface-elevated); font-size: 14px; color: var(--ink); font-family: var(--font-sans); }
+  .input.focus { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); outline: none; }
+  .input.err { border-color: var(--destructive); box-shadow: 0 0 0 3px color-mix(in oklch, oklch(0.62 0.22 27) 18%, transparent); }
+  .err-msg { font-size: 12px; color: var(--destructive); display: flex; align-items: center; gap: 5px; }
+
+  /* contrast cards */
+  .contrast { display: flex; flex-direction: column; gap: 10px; }
+  .ct { display: flex; align-items: center; gap: 12px; }
+  .ct .chip { display: grid; place-items: center; width: 88px; height: 46px; border-radius: var(--radius-sm); font-weight: 700; font-size: 13px; flex-shrink: 0; }
+  .ct .meta { font-family: var(--font-mono); font-size: 10px; color: var(--ink); }
+  .ct .meta small { color: var(--muted-foreground); display: block; font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+  .aaa { display: inline-block; padding: 2px 7px; border-radius: 9999px; background: color-mix(in oklch, #009971 14%, transparent); color: #009971; font-family: var(--font-mono); font-size: 8px; font-weight: 700; letter-spacing: 0.1em; }
+
+  /* touch target */
+  .tt-row { display: flex; align-items: center; gap: 18px; }
+  .tt { position: relative; display: grid; place-items: center; }
+  .tt .hit { position: absolute; width: 44px; height: 44px; border: 1px dashed var(--amber); border-radius: 8px; }
+  .tt .real { width: 28px; height: 28px; border-radius: 9999px; background: var(--ink); display: grid; place-items: center; color: var(--amber); }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Components · Focus · Accessibility</div>
+<div class="sub-eye">:focus-visible amber · 3px outline · contraste AAA · touch ≥ 44px</div>
+
+<div class="gallery">
+
+  <!-- focus rings -->
+  <div class="state">
+    <span class="state-tag"><span class="d"></span>Focus ring · botones · :focus-visible</span>
+    <div class="frame">
+      <div class="row">
+        <button class="btn ink ring">Reservar</button>
+        <button class="btn amber ring">Solicitar</button>
+      </div>
+      <div class="frame-label">outline: 3px solid amber · outline-offset: 2px · solo teclado (:focus-visible)</div>
+    </div>
+  </div>
+
+  <!-- input focus + error -->
+  <div class="state">
+    <span class="state-tag"><span class="d"></span>Inputs · foco amber · error</span>
+    <div class="frame">
+      <div class="field">
+        <label>Email · foco</label>
+        <input class="input focus" value="hola@rambla.com.ar" readonly>
+      </div>
+      <div class="field">
+        <label>Email · error</label>
+        <input class="input err" value="hola@" readonly>
+        <span class="err-msg"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>Ingresá un correo válido.</span>
+      </div>
+      <div class="frame-label">foco → border amber + ring amber-soft · error → border + ring destructive</div>
+    </div>
+  </div>
+
+  <!-- contrast -->
+  <div class="state">
+    <span class="state-tag"><span class="d"></span>Contraste · ratios reales</span>
+    <div class="frame">
+      <div class="contrast">
+        <div class="ct">
+          <div class="chip" style="background:var(--amber);color:oklch(0.14 0.01 60);">ink/amber</div>
+          <div class="meta">7.2:1 <span class="aaa">AAA</span><small>texto ink sobre amber</small></div>
+        </div>
+        <div class="ct">
+          <div class="chip" style="background:oklch(0.985 0.005 90);color:oklch(0.18 0.01 60);border:1px solid var(--hairline);">ink/bone</div>
+          <div class="meta">16.4:1 <span class="aaa">AAA</span><small>texto ink sobre fondo bone</small></div>
+        </div>
+        <div class="ct">
+          <div class="chip" style="background:oklch(0.985 0.005 90);color:oklch(0.42 0.01 70);border:1px solid var(--hairline);">muted/bone</div>
+          <div class="meta">5.1:1 <span class="aaa" style="background:color-mix(in oklch,#1097DB 14%,transparent);color:#1097DB;">AA</span><small>texto secundario · solo ≥14px</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- touch -->
+  <div class="state">
+    <span class="state-tag"><span class="d"></span>Touch targets ≥ 44×44</span>
+    <div class="frame">
+      <div class="tt-row">
+        <div class="tt"><div class="hit"></div><div class="real"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></div></div>
+        <div class="tt"><div class="hit"></div><div class="real"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></div></div>
+        <div class="tt"><div class="hit"></div><div class="real"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/></svg></div></div>
+        <div class="frame-label" style="margin-left:auto;">ícono 28px · hit-area 44px (dashed)</div>
+      </div>
+      <div class="frame-label">inputs ≥ 16px en mobile → evita zoom iOS</div>
+    </div>
+  </div>
+
+</div>
+
+<pre class="code">:focus-visible {                       <span class="c">// solo navegación por teclado</span>
+  outline: 3px solid <span class="k">var</span>(--amber);
+  outline-offset: 2px;
+}
+input:focus-visible {
+  border-color: <span class="k">var</span>(--amber);
+  box-shadow: 0 0 0 3px <span class="k">var</span>(--amber-soft);
+}
+<span class="c">// touch ≥ 44×44 · input font-size ≥ 16px (no zoom iOS)</span>
+<span class="c">// aria-label en icon-buttons · role/aria-live en toasts</span></pre>
+
+<div class="note">
+  <b>Foco</b> siempre con anillo <b>amber</b> de 3px y <code>outline-offset: 2px</code>, vía <code>:focus-visible</code> (no aparece al click de mouse). ·
+  <b>Contraste:</b> ink/amber 7.2:1 y ink/bone 16.4:1 — ambos AAA. Texto muted solo a ≥14px (AA). ·
+  Hit-areas ≥ 44×44px aunque el ícono sea de 28. · Todo icon-button lleva <code>aria-label</code>; toasts con <code>aria-live</code>.
+</div>
+
+</body>
+</html>
