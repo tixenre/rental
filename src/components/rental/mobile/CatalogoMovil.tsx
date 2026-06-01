@@ -128,8 +128,7 @@ function RamblaSeal() {
 }
 
 /* ── HeroBanner ──────────────────────────────────────────────────── */
-// Hero amber del catálogo móvil. Foto rotante (igual que el desktop hero) +
-// eyebrow + headline + CTA "Elegir fechas" + card Estudio.
+// Hero amber del catálogo móvil. Foto rotante + eyebrow + headline + CTA "Elegir fechas".
 // El heroRef ancla el amber-on-scroll del topbar.
 const HERO_PHOTOS = [
   "/estudio/Rambla_Estudio_S7V9470.jpg",
@@ -175,11 +174,11 @@ function HeroBanner({
   const tagline = taglines[taglineIdx % taglines.length];
 
   return (
-    <div ref={heroRef} className="relative bg-amber">
+    <div ref={heroRef} className="relative bg-amber flex flex-col min-h-[88dvh]">
       {/* Foto rotante — igual que el desktop hero */}
       <div
-        className="relative w-full overflow-hidden bg-ink"
-        style={{ height: "clamp(220px, 56vw, 320px)" }}
+        className="relative w-full overflow-hidden bg-ink flex-shrink-0"
+        style={{ height: "clamp(240px, 58vw, 340px)" }}
       >
         {HERO_PHOTOS.map((src, i) => (
           <img
@@ -216,22 +215,24 @@ function HeroBanner({
         </div>
       </div>
 
-      {/* Copy section — amber */}
-      <div style={{ padding: "24px 20px 28px" }}>
-        <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-3">
-          Catálogo · {equipCount} equipos · Mar del Plata
-        </div>
+      {/* Copy section — amber, flex-1 para llenar el alto restante */}
+      <div className="flex-1 flex flex-col justify-between" style={{ padding: "24px 20px 32px" }}>
+        <div>
+          <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-3">
+            Catálogo · {equipCount} equipos · Mar del Plata
+          </div>
 
-        <div className="font-display text-[42px] font-black text-ink leading-[1] tracking-[-0.02em] mb-4">
-          {tagline[0]}
-          <br />
-          {tagline[1]}
-        </div>
+          <div className="font-display text-[42px] font-black text-ink leading-[1] tracking-[-0.02em] mb-4">
+            {tagline[0]}
+            <br />
+            {tagline[1]}
+          </div>
 
-        <p className="font-sans text-[14px] leading-[1.55] text-ink/72 mb-6">
-          Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales en Mar del
-          Plata.
-        </p>
+          <p className="font-sans text-[14px] leading-[1.55] text-ink/72">
+            Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales en Mar del
+            Plata.
+          </p>
+        </div>
 
         {/* CTA principal */}
         <button
@@ -241,43 +242,6 @@ function HeroBanner({
         >
           <Calendar size={16} />
           Elegir fechas
-        </button>
-      </div>
-
-      {/* Card Estudio — ink bg con CTA amber */}
-      <div className="mx-5 mb-7 rounded-2xl bg-ink p-5">
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_oklch,var(--amber)_35%,transparent)] bg-[color-mix(in_oklch,var(--amber)_12%,transparent)] px-3 py-1 mb-3">
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--amber)"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          >
-            <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
-          </svg>
-          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-amber">
-            Espacio Rambla
-          </span>
-        </div>
-
-        <div className="font-display text-[26px] font-black text-amber leading-[1.1] mb-2">
-          Conocé el Estudio
-        </div>
-
-        <p className="font-sans text-[13px] leading-[1.55] text-[color-mix(in_oklch,var(--amber)_65%,white)] mb-5">
-          Foto y video · reservá por hora · pack de luces y grips opcional
-        </p>
-
-        <button
-          type="button"
-          onClick={() => navigate({ to: "/estudio" })}
-          className="w-full flex items-center justify-center gap-1.5 py-3.5 rounded-full bg-amber text-ink font-sans text-[15px] font-bold transition hover:opacity-90"
-        >
-          Ver estudio
-          <ChevronRight className="h-4 w-4" />
         </button>
       </div>
     </div>
@@ -1364,7 +1328,7 @@ export function CatalogoMovil() {
           </button>
         </header>
 
-        {/* Hero banner amber — eyebrow + headline brand + Estudio card.
+        {/* Hero banner amber — eyebrow + headline brand + CTA.
             Anclado al heroRef del amber-on-scroll del topbar. */}
         <HeroBanner
           heroRef={heroRef}
