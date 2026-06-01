@@ -1,0 +1,43 @@
+{
+  "name": "@rambla/design-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Design system canónico de Rambla Rental — tokens, tipografía, brand assets, helpers y componentes. Fuente de verdad consumida por la app.",
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./styles.css": "./src/styles.css",
+    "./tokens.json": "./tokens.json",
+    "./components/ui": "./src/components/ui/index.ts",
+    "./components/kit": "./src/components/kit/index.ts",
+    "./components/rental": "./src/components/rental/index.ts",
+    "./lib/format": "./src/lib/format.ts",
+    "./lib/utils": "./src/lib/utils.ts",
+    "./brand": "./src/assets/brand/index.ts"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "tailwindcss": "^4",
+    "lucide-react": "*",
+    "class-variance-authority": "*",
+    "@radix-ui/react-slot": "*",
+    "clsx": "*",
+    "tailwind-merge": "*",
+    "date-fns": "*",
+    "framer-motion": "*",
+    "react-day-picker": "*"
+  },
+  "files": [
+    "src",
+    "tokens.json",
+    "README.md",
+    "ADOPT.md"
+  ]
+}

@@ -1,0 +1,17 @@
+/* ============================================================
+   Rambla Rental — Radii tokens  (CANONICAL)
+   Tailwind v4 @theme → rounded-sm / rounded-md / … / rounded-4xl.
+   Patrones: inputs/chips → sm · buttons → md · cards → lg ·
+             feature blocks → xl · hero CTA → pill (rounded-full).
+   ============================================================ */
+
+@theme {
+  --radius-sm:  8px;
+  --radius-md:  10px;
+  --radius-lg:  12px;   /* base — cards */
+  --radius-xl:  16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+  --radius-4xl: 28px;
+  /* pill = rounded-full (9999px) — provisto por Tailwind */
+}
