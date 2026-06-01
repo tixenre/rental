@@ -175,33 +175,48 @@ function HeroBanner({
 
   return (
     <div ref={heroRef} className="relative bg-amber flex flex-col min-h-[88dvh]">
-      {/* Foto rotante — igual que el desktop hero */}
+      {/* Foto rotante — grid stacking en lugar de absolute/inset-0 para
+          evitar el bug de Safari iOS con imgs absolutos en contenedor
+          overflow-hidden de altura fija. */}
       <div
-        className="relative w-full overflow-hidden bg-ink flex-shrink-0"
-        style={{ height: "clamp(240px, 58vw, 340px)" }}
+        className="relative flex-shrink-0 overflow-hidden bg-ink"
+        style={{
+          height: "clamp(240px, 58vw, 340px)",
+          display: "grid",
+          gridTemplateColumns: "1fr",
+          gridTemplateRows: "1fr",
+        }}
       >
         {HERO_PHOTOS.map((src, i) => (
           <img
             key={i}
             src={src}
             alt="El Estudio — Rambla Rental"
-            className="absolute inset-0 w-full h-full object-cover transition-opacity"
-            style={{ opacity: i === photoIdx ? 1 : 0, transitionDuration: "900ms" }}
-            loading={i === 0 ? "eager" : "lazy"}
+            className="w-full h-full object-cover transition-opacity"
+            style={{
+              gridArea: "1 / 1",
+              opacity: i === photoIdx ? 1 : 0,
+              transitionDuration: "900ms",
+            }}
+            loading="eager"
           />
         ))}
-        {/* Overlay + "Conocé el estudio" */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-ink/30 pointer-events-none" />
+        {/* Overlay + "Conocé el estudio" — posicionados relativos al grid */}
+        <div
+          className="pointer-events-none bg-gradient-to-b from-transparent via-transparent to-ink/30"
+          style={{ gridArea: "1 / 1", zIndex: 1 }}
+        />
         <button
           type="button"
           onClick={() => navigate({ to: "/estudio" })}
           className="absolute left-4 bottom-4 inline-flex items-center gap-1.5 bg-ink text-amber font-bold text-[13px] tracking-[-0.01em] px-4 py-2.5 rounded-full"
+          style={{ zIndex: 2 }}
         >
           Conocé el estudio
           <ChevronRight size={13} strokeWidth={2.5} />
         </button>
         {/* Navigation dots */}
-        <div className="absolute right-4 bottom-5 flex gap-[5px]">
+        <div className="absolute right-4 bottom-5 flex gap-[5px]" style={{ zIndex: 2 }}>
           {HERO_PHOTOS.map((_, i) => (
             <i
               key={i}
