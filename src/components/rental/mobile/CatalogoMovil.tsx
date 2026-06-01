@@ -175,33 +175,48 @@ function HeroBanner({
 
   return (
     <div ref={heroRef} className="relative bg-amber flex flex-col min-h-[88dvh]">
-      {/* Foto rotante — igual que el desktop hero */}
+      {/* Foto rotante — grid stacking en lugar de absolute/inset-0 para
+          evitar el bug de Safari iOS con imgs absolutos en contenedor
+          overflow-hidden de altura fija. */}
       <div
-        className="relative w-full overflow-hidden bg-ink flex-shrink-0"
-        style={{ height: "clamp(240px, 58vw, 340px)" }}
+        className="relative flex-shrink-0 overflow-hidden bg-ink"
+        style={{
+          height: "clamp(240px, 58vw, 340px)",
+          display: "grid",
+          gridTemplateColumns: "1fr",
+          gridTemplateRows: "1fr",
+        }}
       >
         {HERO_PHOTOS.map((src, i) => (
           <img
             key={i}
             src={src}
             alt="El Estudio — Rambla Rental"
-            className="absolute inset-0 w-full h-full object-cover transition-opacity"
-            style={{ opacity: i === photoIdx ? 1 : 0, transitionDuration: "900ms" }}
-            loading={i === 0 ? "eager" : "lazy"}
+            className="w-full h-full object-cover transition-opacity"
+            style={{
+              gridArea: "1 / 1",
+              opacity: i === photoIdx ? 1 : 0,
+              transitionDuration: "900ms",
+            }}
+            loading="eager"
           />
         ))}
-        {/* Overlay + "Conocé el estudio" */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-ink/30 pointer-events-none" />
+        {/* Overlay + "Conocé el estudio" — posicionados relativos al grid */}
+        <div
+          className="pointer-events-none bg-gradient-to-b from-transparent via-transparent to-ink/30"
+          style={{ gridArea: "1 / 1", zIndex: 1 }}
+        />
         <button
           type="button"
           onClick={() => navigate({ to: "/estudio" })}
           className="absolute left-4 bottom-4 inline-flex items-center gap-1.5 bg-ink text-amber font-bold text-[13px] tracking-[-0.01em] px-4 py-2.5 rounded-full"
+          style={{ zIndex: 2 }}
         >
           Conocé el estudio
           <ChevronRight size={13} strokeWidth={2.5} />
         </button>
         {/* Navigation dots */}
-        <div className="absolute right-4 bottom-5 flex gap-[5px]">
+        <div className="absolute right-4 bottom-5 flex gap-[5px]" style={{ zIndex: 2 }}>
           {HERO_PHOTOS.map((_, i) => (
             <i
               key={i}
@@ -216,23 +231,21 @@ function HeroBanner({
       </div>
 
       {/* Copy section — amber, flex-1 para llenar el alto restante */}
-      <div className="flex-1 flex flex-col justify-between" style={{ padding: "24px 20px 32px" }}>
-        <div>
-          <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-3">
-            Catálogo · {equipCount} equipos · Mar del Plata
-          </div>
-
-          <div className="font-display text-[42px] font-black text-ink leading-[1] tracking-[-0.02em] mb-4">
-            {tagline[0]}
-            <br />
-            {tagline[1]}
-          </div>
-
-          <p className="font-sans text-[14px] leading-[1.55] text-ink/72">
-            Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales en Mar del
-            Plata.
-          </p>
+      <div className="flex-1 flex flex-col" style={{ padding: "24px 20px 32px" }}>
+        <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-3">
+          Catálogo · {equipCount} equipos · Mar del Plata
         </div>
+
+        <div className="font-display text-[42px] font-black text-ink leading-[1] tracking-[-0.02em] mb-4">
+          {tagline[0]}
+          <br />
+          {tagline[1]}
+        </div>
+
+        <p className="font-sans text-[14px] leading-[1.55] text-ink/72 mb-8">
+          Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales en Mar del
+          Plata.
+        </p>
 
         {/* CTA principal */}
         <button
