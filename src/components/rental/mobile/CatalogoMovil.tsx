@@ -174,12 +174,11 @@ function HeroBanner({
   const tagline = taglines[taglineIdx % taglines.length];
 
   return (
-    <div ref={heroRef} className="relative bg-amber flex flex-col min-h-[88dvh]">
-      {/* Foto rotante — grid stacking en lugar de absolute/inset-0 para
-          evitar el bug de Safari iOS con imgs absolutos en contenedor
-          overflow-hidden de altura fija. */}
+    <div ref={heroRef} className="relative bg-amber">
+      {/* Foto rotante — crossfade. Las imgs se apilan en la misma celda de
+          grid (gridArea "1/1") y se cruzan por opacidad. */}
       <div
-        className="relative flex-shrink-0 overflow-hidden bg-ink"
+        className="relative overflow-hidden bg-ink"
         style={{
           height: "clamp(240px, 58vw, 340px)",
           display: "grid",
@@ -230,8 +229,9 @@ function HeroBanner({
         </div>
       </div>
 
-      {/* Copy section — amber, flex-1 para llenar el alto restante */}
-      <div className="flex-1 flex flex-col" style={{ padding: "24px 20px 32px" }}>
+      {/* Copy section — amber. Alto = su contenido (sin estirar): el botón
+          queda justo después del texto, sin amarillo sobrante. */}
+      <div style={{ padding: "24px 20px 32px" }}>
         <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-3">
           Catálogo · {equipCount} equipos · Mar del Plata
         </div>
