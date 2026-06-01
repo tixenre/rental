@@ -216,23 +216,21 @@ function HeroBanner({
       </div>
 
       {/* Copy section — amber, flex-1 para llenar el alto restante */}
-      <div className="flex-1 flex flex-col justify-between" style={{ padding: "24px 20px 32px" }}>
-        <div>
-          <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-3">
-            Catálogo · {equipCount} equipos · Mar del Plata
-          </div>
-
-          <div className="font-display text-[42px] font-black text-ink leading-[1] tracking-[-0.02em] mb-4">
-            {tagline[0]}
-            <br />
-            {tagline[1]}
-          </div>
-
-          <p className="font-sans text-[14px] leading-[1.55] text-ink/72">
-            Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales en Mar del
-            Plata.
-          </p>
+      <div className="flex-1 flex flex-col" style={{ padding: "24px 20px 32px" }}>
+        <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-3">
+          Catálogo · {equipCount} equipos · Mar del Plata
         </div>
+
+        <div className="font-display text-[42px] font-black text-ink leading-[1] tracking-[-0.02em] mb-4">
+          {tagline[0]}
+          <br />
+          {tagline[1]}
+        </div>
+
+        <p className="font-sans text-[14px] leading-[1.55] text-ink/72 mb-8">
+          Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales en Mar del
+          Plata.
+        </p>
 
         {/* CTA principal */}
         <button
