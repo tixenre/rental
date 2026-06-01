@@ -1304,9 +1304,10 @@ export const adminApi = {
   getDisponibilidad: (fechaDesde: string, fechaHasta: string, excludePedidoId?: number) => {
     const sp = new URLSearchParams({ fecha_desde: fechaDesde, fecha_hasta: fechaHasta });
     if (excludePedidoId) sp.set("exclude_pedido_id", String(excludePedidoId));
-    return authedJson<Record<string, { cantidad: number; reservado: number }>>(
-      `/api/disponibilidad?${sp.toString()}`,
-    );
+    // El backend devuelve `{ equipo_id: libres }` — número neto (ya descontadas
+    // reservas + mantenimiento), no `{cantidad, reservado}`. El consumidor lo
+    // adapta. Ver `reservas.calcular_disponibilidad`.
+    return authedJson<Record<string, number>>(`/api/disponibilidad?${sp.toString()}`);
   },
 
   // crear pedido nuevo (wizard / página /nuevo)
