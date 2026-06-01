@@ -36,6 +36,7 @@ import { FavButton } from "@/components/rental/equipment/shared/FavButton";
 import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
+import { useHeroPhotos } from "@/lib/studio/hero-photos";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
@@ -129,14 +130,8 @@ function RamblaSeal() {
 
 /* ── HeroBanner ──────────────────────────────────────────────────── */
 // Hero amber del catálogo móvil. Foto rotante + eyebrow + headline + CTA "Elegir fechas".
-// El heroRef ancla el amber-on-scroll del topbar.
-const HERO_PHOTOS = [
-  "/estudio/Rambla_Estudio_S7V9470.jpg",
-  "/estudio/Rambla_Estudio_S7V9483.jpg",
-  "/estudio/Rambla_Estudio_S7V9510-HDR-Edit.jpg",
-  "/estudio/Rambla_Estudio_S7V9519-HDR.jpg",
-];
-
+// El heroRef ancla el amber-on-scroll del topbar. Las fotos salen de R2 (admin)
+// vía useHeroPhotos — misma fuente que el hero desktop y la página /estudio.
 function HeroBanner({
   heroRef,
   equipCount,
@@ -147,12 +142,15 @@ function HeroBanner({
   onDateOpen: () => void;
 }) {
   const navigate = useNavigate();
+  const photos = useHeroPhotos();
   const [photoIdx, setPhotoIdx] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setPhotoIdx((i) => (i + 1) % HERO_PHOTOS.length), 4500);
+    setPhotoIdx(0);
+    if (photos.length <= 1) return;
+    const id = setInterval(() => setPhotoIdx((i) => (i + 1) % photos.length), 4500);
     return () => clearInterval(id);
-  }, []);
+  }, [photos.length]);
 
   const { data: taglinesData } = useQuery({
     queryKey: ["settings", "hero_taglines"],
@@ -174,12 +172,11 @@ function HeroBanner({
   const tagline = taglines[taglineIdx % taglines.length];
 
   return (
-    <div ref={heroRef} className="relative bg-amber flex flex-col min-h-[88dvh]">
-      {/* Foto rotante — grid stacking en lugar de absolute/inset-0 para
-          evitar el bug de Safari iOS con imgs absolutos en contenedor
-          overflow-hidden de altura fija. */}
+    <div ref={heroRef} className="relative bg-amber">
+      {/* Foto rotante — crossfade. Las imgs se apilan en la misma celda de
+          grid (gridArea "1/1") y se cruzan por opacidad. */}
       <div
-        className="relative flex-shrink-0 overflow-hidden bg-ink"
+        className="relative overflow-hidden bg-ink"
         style={{
           height: "clamp(240px, 58vw, 340px)",
           display: "grid",
@@ -187,9 +184,9 @@ function HeroBanner({
           gridTemplateRows: "1fr",
         }}
       >
-        {HERO_PHOTOS.map((src, i) => (
+        {photos.map((src, i) => (
           <img
-            key={i}
+            key={src}
             src={src}
             alt="El Estudio — Rambla Rental"
             className="w-full h-full object-cover transition-opacity"
@@ -217,7 +214,7 @@ function HeroBanner({
         </button>
         {/* Navigation dots */}
         <div className="absolute right-4 bottom-5 flex gap-[5px]" style={{ zIndex: 2 }}>
-          {HERO_PHOTOS.map((_, i) => (
+          {photos.map((_, i) => (
             <i
               key={i}
               className="block h-[5px] rounded-full transition-[width,background] duration-[250ms]"
@@ -230,8 +227,9 @@ function HeroBanner({
         </div>
       </div>
 
-      {/* Copy section — amber, flex-1 para llenar el alto restante */}
-      <div className="flex-1 flex flex-col" style={{ padding: "24px 20px 32px" }}>
+      {/* Copy section — amber. Alto = su contenido (sin estirar): el botón
+          queda justo después del texto, sin amarillo sobrante. */}
+      <div style={{ padding: "24px 20px 32px" }}>
         <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-3">
           Catálogo · {equipCount} equipos · Mar del Plata
         </div>
