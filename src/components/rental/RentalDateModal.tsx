@@ -78,6 +78,12 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
     [diasBloqueadosQ.data],
   );
 
+  // Ventana de consulta = 121 días (today … today+120). Si prácticamente todos
+  // están bloqueados, hay al menos un item del carrito sin stock para ningún
+  // período (ej.: un kit cuyo componente tiene stock < cantidad requerida).
+  const sinStockTotal =
+    diasBloqueadosQ.isSuccess && itemsParam !== "" && diasBloqueados.size >= 100;
+
   // ── Validaciones del rango ────────────────────────────────────────────
   const rangoCruzaBloqueado = useMemo(() => {
     if (!startDate || !endDate || diasBloqueados.size === 0) return false;
@@ -378,6 +384,17 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
             </p>
           )}
         </div>
+
+        {/* ── Sin stock total (kit con componentes insuficientes) ─────── */}
+        {sinStockTotal && (
+          <div className="mx-5 sm:mx-6 mb-4 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/8 px-3.5 py-3 text-[11px] text-destructive">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              Hay equipos en tu carrito sin disponibilidad para ninguna fecha del próximo período.
+              Revisá las cantidades o sacá el equipo que no podés reservar.
+            </span>
+          </div>
+        )}
 
         {/* ── Calendario ────────────────────────────────────────────── */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex justify-center px-2 sm:px-4 pb-2 border-t hairline">
