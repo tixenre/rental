@@ -31,11 +31,10 @@ rambla-design-system/
    ├─ styles.css                # ★ ENTRY — reemplaza al src/styles.css del repo
    ├─ styles/
    │  ├─ fonts.css              # @font-face (TT Commons, Champ Black)
-   │  ├─ utilities.css          # recetas .t-* + amber-tape, grain, focus, safe-*
+   │  ├─ utilities.css          # recetas .t-* + amber-tape, grain, wordmark, safe-*, keyframes
    │  └─ tokens/                # ← editá un token en SU archivo, no en el entry
    │     ├─ colors.css          # @theme --color-*  → bg-amber, text-ink, border-hairline
-   │     ├─ typography.css      # @theme --font-*   → font-display/sans/mono
-   │     ├─ radii.css           # @theme --radius-* → rounded-sm…4xl
+   │     ├─ typography.css      # @theme --font-* + --radius-* → font-display/sans/mono, rounded-sm…4xl
    │     ├─ shadows.css         # @theme --shadow-* → shadow-sm…xl (brand-tinted)
    │     ├─ motion.css          # @theme --ease-*  + :root --duration-*
    │     └─ z-index.css         # :root --z-* (topbar→scrim→drawer)

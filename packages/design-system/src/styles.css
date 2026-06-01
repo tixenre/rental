@@ -24,7 +24,6 @@
 /* ── Tokens (@theme + :root) ───────────────────────────────── */
 @import "./styles/tokens/colors.css";
 @import "./styles/tokens/typography.css";
-@import "./styles/tokens/radii.css";
 @import "./styles/tokens/shadows.css";
 @import "./styles/tokens/motion.css";
 @import "./styles/tokens/z-index.css";

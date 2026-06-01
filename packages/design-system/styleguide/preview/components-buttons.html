@@ -1,0 +1,241 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  hr { border: none; border-top: 1px solid var(--hairline); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  /* Gallery */
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .state { display: flex; flex-direction: column; gap: 8px; }
+  .state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+  .state-tag .d { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .state-tag.default { color: var(--muted-foreground); } .state-tag.default .d { background: var(--muted-foreground); }
+  .state-tag.primary { color: var(--ink); } .state-tag.primary .d { background: var(--ink); }
+  .state-tag.accent  { color: oklch(0.5 0.1 70); } .state-tag.accent .d { background: var(--amber); }
+  .state-tag.ghost   { color: var(--muted-foreground); } .state-tag.ghost .d { background: var(--hairline); border: 1px solid var(--muted-foreground); }
+
+  /* Frame */
+  .frame { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface); padding: 16px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .frame-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .frame-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    font-family: var(--font-sans); font-weight: 600; cursor: pointer;
+    border: 1px solid transparent; transition: background 150ms, border-color 150ms, transform 100ms; white-space: nowrap; }
+
+  /* Variants */
+  .btn-ink     { background: var(--ink); color: var(--background); border-color: var(--ink); }
+  .btn-amber   { background: var(--amber); color: var(--ink); border-color: var(--amber); }
+  .btn-outline { background: transparent; color: var(--ink); border-color: var(--hairline); }
+  .btn-ghost   { background: transparent; color: var(--ink); border-color: transparent; }
+  .btn-destructive { background: var(--destructive); color: white; border-color: var(--destructive); }
+
+  /* Hover states */
+  .btn-ink.hover     { background: oklch(0.1 0.01 60); }
+  .btn-amber.hover   { filter: brightness(1.05); }
+  .btn-outline.hover { background: var(--surface); border-color: var(--ink); }
+  .btn-ghost.hover   { background: var(--surface); }
+
+  /* Pressed */
+  .btn.pressed { transform: scale(0.96); }
+
+  /* Disabled */
+  .btn.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+  /* Sizes */
+  .btn-sm  { height: 30px; font-size: 12px; padding: 0 12px; border-radius: 8px; }
+  .btn-md  { height: 36px; font-size: 14px; padding: 0 16px; border-radius: 10px; }
+  .btn-lg  { height: 44px; font-size: 15px; padding: 0 22px; border-radius: 12px; }
+  .btn-pill { border-radius: 9999px !important; }
+
+  /* Icon button */
+  .btn-icon { padding: 0; aspect-ratio: 1; border-radius: 10px; background: var(--surface); border: 1px solid var(--hairline); color: var(--ink); }
+  .btn-icon.btn-sm { border-radius: 8px; }
+  .btn-icon.btn-lg { border-radius: 12px; }
+
+  /* Code block */
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; margin: 0; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Components · Button</div>
+<div class="sub-eye">variantes · tamaños · hover · pressed · disabled · icon</div>
+
+<div class="gallery">
+
+  <!-- Variantes -->
+  <div class="state">
+    <span class="state-tag default"><span class="d"></span>Variantes · default · outline · ghost · destructive</span>
+    <div class="frame">
+      <div>
+        <div class="frame-label">Ink (primary)</div>
+        <div class="frame-row" style="margin-top:6px;">
+          <button class="btn btn-ink btn-md">Confirmar</button>
+          <button class="btn btn-ink btn-md hover">hover</button>
+          <button class="btn btn-ink btn-md pressed">pressed</button>
+          <button class="btn btn-ink btn-md disabled">disabled</button>
+        </div>
+      </div>
+      <div>
+        <div class="frame-label">Outline</div>
+        <div class="frame-row" style="margin-top:6px;">
+          <button class="btn btn-outline btn-md">Ver catálogo</button>
+          <button class="btn btn-outline btn-md hover">hover</button>
+          <button class="btn btn-outline btn-md disabled">disabled</button>
+        </div>
+      </div>
+      <div>
+        <div class="frame-label">Ghost</div>
+        <div class="frame-row" style="margin-top:6px;">
+          <button class="btn btn-ghost btn-md">Cancelar</button>
+          <button class="btn btn-ghost btn-md hover">hover</button>
+        </div>
+      </div>
+      <div>
+        <div class="frame-label">Destructive</div>
+        <div class="frame-row" style="margin-top:6px;">
+          <button class="btn btn-destructive btn-md">Eliminar</button>
+          <button class="btn btn-destructive btn-md disabled">disabled</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Amber + pill CTAs -->
+  <div class="state">
+    <span class="state-tag accent"><span class="d"></span>Amber · CTAs principales · pill shape</span>
+    <div class="frame">
+      <div>
+        <div class="frame-label">Amber pill — CTA hero / cart</div>
+        <div class="frame-row" style="margin-top:6px;">
+          <button class="btn btn-amber btn-lg btn-pill">Reservar el estudio
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+        <div class="frame-row" style="margin-top:6px;">
+          <button class="btn btn-amber btn-md btn-pill">Ver carrito</button>
+          <button class="btn btn-amber btn-md btn-pill hover">hover</button>
+          <button class="btn btn-amber btn-md btn-pill pressed">pressed</button>
+        </div>
+      </div>
+      <div>
+        <div class="frame-label">Ink pill — confirmación</div>
+        <div class="frame-row" style="margin-top:6px;">
+          <button class="btn btn-ink btn-lg btn-pill">Confirmar pedido</button>
+        </div>
+        <div class="frame-row" style="margin-top:6px;">
+          <button class="btn btn-ink btn-md btn-pill">Aplicar fechas</button>
+          <button class="btn btn-outline btn-md btn-pill">Limpiar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tamaños -->
+  <div class="state">
+    <span class="state-tag default"><span class="d"></span>Tamaños · sm / md / lg · icon buttons</span>
+    <div class="frame">
+      <div>
+        <div class="frame-label">Scale</div>
+        <div class="frame-row" style="margin-top:6px;align-items:flex-end;">
+          <button class="btn btn-ink btn-sm">sm · 30px</button>
+          <button class="btn btn-ink btn-md">md · 36px</button>
+          <button class="btn btn-ink btn-lg">lg · 44px</button>
+        </div>
+      </div>
+      <div>
+        <div class="frame-label">Icon buttons</div>
+        <div class="frame-row" style="margin-top:6px;align-items:flex-end;">
+          <button class="btn btn-icon btn-sm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button class="btn btn-icon btn-md">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button class="btn btn-icon btn-lg">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button class="btn btn-icon btn-md btn-pill">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Con icono + loading -->
+  <div class="state">
+    <span class="state-tag primary"><span class="d"></span>Con ícono · loading · full-width</span>
+    <div class="frame">
+      <div>
+        <div class="frame-label">Leading / trailing icon</div>
+        <div class="frame-row" style="margin-top:6px;">
+          <button class="btn btn-ink btn-md">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Agregar
+          </button>
+          <button class="btn btn-outline btn-md">
+            Ver ficha
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+      <div>
+        <div class="frame-label">Loading state</div>
+        <div class="frame-row" style="margin-top:6px;">
+          <button class="btn btn-amber btn-md btn-pill disabled" style="gap:8px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin 0.9s linear infinite;">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+            </svg>
+            Enviando…
+          </button>
+        </div>
+      </div>
+      <div>
+        <div class="frame-label">Full width</div>
+        <div style="margin-top:6px;">
+          <button class="btn btn-amber btn-lg btn-pill" style="width:100%;justify-content:center;">Confirmar pedido</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<pre class="code"><span class="c">// Variante principal para CTAs de conversión</span>
+&lt;<span class="k">Button</span> variant=<span class="s">"amber"</span> size=<span class="s">"lg"</span> shape=<span class="s">"pill"</span>&gt;Reservar el estudio&lt;/&gt;
+
+<span class="c">// Confirmación en modales / drawers</span>
+&lt;<span class="k">Button</span> variant=<span class="s">"ink"</span> shape=<span class="s">"pill"</span>&gt;Aplicar fechas&lt;/&gt;
+
+<span class="c">// Hover: ink → amber bg. Amber → brightness(1.05). Outline → bg-surface + border-ink</span>
+<span class="c">// Press: scale(0.96) 100ms. Focus: ring amber/30 3px</span>
+<span class="c">// Disabled: opacity 0.4, pointer-events none — NUNCA ocultar</span></pre>
+
+<div class="note">
+  <b>Jerarquía en pantalla:</b> máximo 1 amber por vista. El CTA primario es amber pill; el secundario es ink pill o outline pill. Ghost solo para acciones destructivas suaves (Cancelar, Limpiar). ·
+  <b>Border-radius:</b> sm=8px · md=10px · lg=12px. Pill=9999px para CTAs hero/cart.
+</div>
+
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+</body>
+</html>

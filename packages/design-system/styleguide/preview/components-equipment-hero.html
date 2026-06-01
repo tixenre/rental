@@ -1,0 +1,170 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
+  .section-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 9px; }
+
+  /* hero equipment card */
+  .hero { width: 320px; border: 1px solid var(--hairline); border-radius: var(--radius-xl); background: var(--surface-elevated); box-shadow: var(--shadow-sm); overflow: hidden; transition: transform 200ms var(--ease-out), box-shadow 200ms; }
+  .hero:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .hero.featured { border-color: color-mix(in oklch, var(--amber) 45%, transparent); }
+
+  .hero-photo { position: relative; aspect-ratio: 4/3; background: repeating-linear-gradient(45deg, var(--surface) 0 11px, color-mix(in oklch, var(--surface) 60%, var(--surface-elevated)) 11px 22px); display: grid; place-items: center; overflow: hidden; }
+  .hero-photo .ph { color: var(--ink); opacity: 0.16; }
+  .hero-badges { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 7px; align-items: flex-start; }
+  .chip-cat { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); background: color-mix(in oklch, var(--surface-elevated) 82%, transparent); backdrop-filter: blur(4px); padding: 4px 10px; border-radius: 9999px; }
+  .chip-dest { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: oklch(0.14 0.01 60); background: var(--amber); padding: 4px 11px; border-radius: 9999px; }
+  .hero-fav { position: absolute; top: 12px; right: 12px; width: 38px; height: 38px; border-radius: 9999px; border: 0; background: color-mix(in oklch, var(--surface-elevated) 82%, transparent); backdrop-filter: blur(6px); color: var(--muted-foreground); display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow-sm); transition: color 200ms, transform 120ms var(--ease-bounce); }
+  .hero-fav:hover { color: #E9552F; transform: scale(1.08); }
+
+  .hero-body { padding: 16px 18px 4px; }
+  .hero-name { font-family: var(--font-sans); font-weight: 700; font-size: 22px; line-height: 1.12; color: var(--ink); letter-spacing: -0.01em; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; transition: text-decoration-color 150ms; }
+  .hero-name:hover { text-decoration-color: var(--amber); }
+  .hero-incl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--muted-foreground); margin-top: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hero-incl::before { content: "incluye"; font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase; font-weight: 700; color: var(--ink); margin-right: 8px; }
+
+  .hero-foot { padding: 14px 18px 18px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .hero-price { display: flex; flex-direction: column; }
+  .hero-amount { font-family: var(--font-mono); font-weight: 600; font-size: 28px; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .hero-jornadas { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); margin-top: 7px; }
+  .hero-perday { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); margin-top: 2px; }
+
+  .stepper { display: inline-flex; align-items: center; border: 1.5px solid var(--hairline); border-radius: 9999px; background: var(--background); flex-shrink: 0; }
+  .stepper button { width: 34px; height: 34px; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; color: var(--ink); border-radius: 9999px; }
+  .stepper button:hover { color: var(--amber); }
+  .stepper span { font-family: var(--font-mono); font-size: 14px; font-weight: 600; color: var(--ink); min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
+  .add-btn { width: 40px; height: 40px; border-radius: 9999px; border: 1.5px solid var(--hairline); background: var(--background); color: var(--ink); cursor: pointer; display: grid; place-items: center; flex-shrink: 0; transition: background 120ms, border-color 120ms; }
+  .add-btn:hover { background: var(--amber); border-color: var(--amber); }
+
+  /* in-cart variant */
+  .hero.in-cart { border-color: color-mix(in oklch, var(--amber) 60%, transparent); background: color-mix(in oklch, var(--amber) 7%, var(--surface-elevated)); }
+  .hero.in-cart .stepper { background: var(--amber); border-color: var(--amber); }
+  .hero.in-cart .stepper button { color: oklch(0.14 0.01 60); }
+  .hero.in-cart .stepper span { color: oklch(0.14 0.01 60); }
+  .qty-label { font-family: var(--font-mono); font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: oklch(0.14 0.01 60); padding: 0 4px 0 12px; white-space: nowrap; }
+
+  /* anatomy */
+  .anat { display: flex; flex-direction: column; gap: 11px; }
+  .anat-item { display: flex; gap: 10px; align-items: flex-start; }
+  .anat-num { flex-shrink: 0; width: 19px; height: 19px; border-radius: 9999px; background: var(--ink); color: var(--amber); font-family: var(--font-mono); font-size: 10px; font-weight: 700; display: grid; place-items: center; margin-top: 1px; }
+  .anat-txt { font-size: 12px; line-height: 1.5; color: var(--muted-foreground); }
+  .anat-txt b { color: var(--ink); font-weight: 600; }
+  .anat-txt code { font-family: var(--font-mono); font-size: 10px; }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Components · EquipmentCard — destacada / hero</div>
+<div class="sub-eye">Variante featured · card clickeable · nombre subraya en amber · foto limpia</div>
+
+<div class="layout">
+
+  <!-- hero card -->
+  <div>
+    <div class="section-label">Default · destacada</div>
+    <div class="hero featured">
+      <div class="hero-photo">
+        <svg class="ph" width="76" height="76" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="6" width="20" height="14" rx="2"/><circle cx="12" cy="13" r="4"/><path d="M7 6l1.5-2.5h7L17 6"/></svg>
+        <div class="hero-badges">
+          <span class="chip-cat">Cámara</span>
+          <span class="chip-dest">★ destacado</span>
+        </div>
+        <button class="hero-fav"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/></svg></button>
+        
+      </div>
+      <div class="hero-body">
+        <div class="hero-name">Sony FX3 Cinema Line</div>
+        <div class="hero-incl">batería · cargador · case</div>
+      </div>
+      <div class="hero-foot">
+        <div class="hero-price">
+          <span class="hero-amount">$ 73.500</span>
+          <span class="hero-jornadas">3 jornadas</span>
+          <span class="hero-perday">$ 24.500 / jornada</span>
+        </div>
+        <button class="add-btn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- anatomy -->
+  <div>
+    <div class="section-label">Anatomía</div>
+    <div class="anat">
+      <div class="anat-item"><span class="anat-num">1</span><span class="anat-txt"><b>Categoría + destacado</b> — chips apilados arriba-izq. <code>★ destacado</code> solo si <code>item.destacado</code>; el resto sin badge amber.</span></div>
+      <div class="anat-item"><span class="anat-num">2</span><span class="anat-txt"><b>Favorito</b> — círculo glass arriba-der, <code>FavButton</code>. Activo → fill rojo de marca.</span></div>
+      <div class="anat-item"><span class="anat-num">3</span><span class="anat-txt"><b>Placeholder</b> — fondo rayado + ícono lucide muted hasta que carga la foto real (1:1 o 4:3).</span></div>
+      <div class="anat-item"><span class="anat-num">4</span><span class="anat-txt"><b>Navegación</b> — <b>solo el nombre</b> es clickeable y lleva a <code>/equipo/$slug</code> (subraya en amber al hover). Foto y footer no navegan — el gesto principal es agregar al carrito.</span></div>
+      <div class="anat-item"><span class="anat-num">5</span><span class="anat-txt"><b>Nombre</b> — TT Commons 700, 22px, <code>nombre_publico</code>. Más grande que la card de grilla.</span></div>
+      <div class="anat-item"><span class="anat-num">6</span><span class="anat-txt"><b>Incluye</b> — etiqueta «incluye» + accesorios en mono muted, una línea con ellipsis.</span></div>
+      <div class="anat-item"><span class="anat-num">7</span><span class="anat-txt"><b>Price block</b> — total grande mono + jornadas + por jornada. <b>Sin IVA</b> en catálogo (neto + IVA solo en carrito/checkout).</span></div>
+      <div class="anat-item"><span class="anat-num">8</span><span class="anat-txt"><b>Acción</b> — <code>+</code> circular; al agregar se reemplaza por el QtyStepper.</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- in-cart variant -->
+<div>
+  <div class="section-label">En carrito · stepper amber + wash</div>
+  <div class="hero in-cart" style="width:320px;">
+    <div class="hero-photo">
+      <svg class="ph" width="76" height="76" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="6" width="20" height="14" rx="2"/><circle cx="12" cy="13" r="4"/><path d="M7 6l1.5-2.5h7L17 6"/></svg>
+      <div class="hero-badges"><span class="chip-cat">Cámara</span><span class="chip-dest">★ destacado</span></div>
+      <button class="hero-fav" style="color:#E9552F;"><svg width="18" height="18" viewBox="0 0 24 24" fill="#E9552F" stroke="#E9552F" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/></svg></button>
+      
+    </div>
+    <div class="hero-body">
+      <div class="hero-name">Sony FX3 Cinema Line</div>
+      <div class="hero-incl">batería · cargador · case</div>
+    </div>
+    <div class="hero-foot">
+      <div class="hero-price">
+        <span class="hero-amount">$ 73.500</span>
+        <span class="hero-jornadas">3 jornadas</span>
+        <span class="hero-perday">$ 24.500 / jornada</span>
+      </div>
+      <div class="stepper">
+        <span class="qty-label">en carrito</span>
+        <button><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+        <span>1</span>
+        <button><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<pre class="code"><span class="c">// EquipmentCard variant="hero" — destacada / página, no grilla</span>
+&lt;<span class="k">EquipmentCard</span>
+  variant=<span class="s">"hero"</span>            <span class="c">// 4:3, nombre 22px, ficha bar fija</span>
+  item={equipo}              <span class="c">// destacado, nombre_publico, incluye[], precio</span>
+  inCart={qty &gt; 0} qty={qty}
+  onFicha={() =&gt; navigate(`/equipo/${equipo.slug}`)} /&gt;
+
+<span class="c">// destacado → chip amber ★ · sin IVA en catálogo · + → QtyStepper al agregar</span></pre>
+
+<div class="note">
+  <b>Variante hero</b> de la EquipmentCard para destacados y cabeceras de sección — misma data y tokens que la card de grilla, pero foto 4:3, nombre 22px y barra de ficha fija (no hover). ·
+  <b>★ destacado</b> solo con <code>item.destacado</code>. · Precio <b>sin IVA</b> (regla de catálogo). · El estado <b>en carrito</b> usa el mismo lenguaje que la grilla: stepper amber con «en carrito» + wash. · Reusa <code>FavButton</code> y <code>QtyStepper</code> — no reinventar.
+</div>
+
+</body>
+</html>

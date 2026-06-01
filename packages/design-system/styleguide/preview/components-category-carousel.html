@@ -1,0 +1,467 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 24px; }
+.section-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+.sub-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; }
+.note { font-family: var(--font-sans); font-size: 11px; line-height: 1.65; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; max-width: 680px; }
+.note b { color: var(--foreground); font-weight: 600; }
+.note code { font-family: var(--font-mono); font-size: 10px; background: var(--surface); padding: 1px 4px; border-radius: 4px; }
+hr { border: none; border-top: 1px solid var(--hairline); }
+
+/* ══ SECTION HEADER ══ */
+.cat-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 0 0 14px;
+}
+.cat-title {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  text-transform: lowercase;
+  color: var(--ink);
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+}
+.cat-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-bottom: 2px; /* baseline align tweak */
+}
+.cat-header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cat-link {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 140ms;
+  white-space: nowrap;
+}
+.cat-link:hover { color: var(--ink); }
+
+/* Prev/Next arrows */
+.arrow-btn {
+  width: 34px; height: 34px;
+  border-radius: 9999px;
+  border: 1px solid var(--hairline);
+  background: var(--surface-elevated);
+  display: grid; place-items: center;
+  color: var(--ink); cursor: pointer;
+  transition: background 140ms, color 140ms, border-color 140ms;
+  flex-shrink: 0;
+}
+.arrow-btn:hover { background: var(--ink); color: var(--amber); border-color: var(--ink); }
+.arrow-btn:disabled, .arrow-btn.disabled {
+  opacity: 0.3; cursor: default; pointer-events: none;
+}
+
+/* ══ CARD TRACK ══ */
+.card-track-wrap {
+  position: relative;
+  /* Negative margin trick to let cards bleed to page edge */
+  margin: 0 -22px;
+  padding: 0 22px;
+  overflow: hidden;
+}
+.card-track {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 4px; /* room for shadow */
+  cursor: grab;
+}
+.card-track::-webkit-scrollbar { display: none; }
+/* fade edge right */
+.card-track-wrap::after {
+  content: "";
+  position: absolute; top: 0; right: 0; bottom: 4px;
+  width: 48px;
+  background: linear-gradient(to right, transparent, var(--background));
+  pointer-events: none;
+}
+
+/* ══ EQUIPMENT CARD STUB ══ */
+.eq-card {
+  width: 256px;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow 200ms, transform 200ms, border-color 200ms;
+  cursor: pointer;
+}
+.eq-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.eq-card.in-cart { border-color: rgba(250,180,40,0.55); box-shadow: var(--shadow-md); }
+
+.eq-photo {
+  aspect-ratio: 1;
+  background: var(--surface);
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.eq-photo::before {
+  content: ""; position: absolute; inset: 0;
+  background: repeating-linear-gradient(-45deg, transparent 0 5px, oklch(0.18 0.01 60 / 3%) 5px 7px);
+}
+.eq-photo .eq-cat-badge {
+  position: absolute; top: 8px; left: 8px;
+  font-family: var(--font-mono); font-size: 8px;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 9999px;
+  background: rgba(255,255,255,0.88); backdrop-filter: blur(4px);
+  color: var(--muted-foreground);
+}
+.eq-photo .eq-fav {
+  position: absolute; top: 8px; right: 8px;
+  width: 26px; height: 26px; border-radius: 9999px;
+  border: 1px solid var(--hairline);
+  background: rgba(255,255,255,0.88); backdrop-filter: blur(4px);
+  display: grid; place-items: center;
+  color: var(--muted-foreground);
+}
+/* hover overlay */
+.eq-photo .hover-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: oklch(0.14 0.01 60 / 72%);
+  padding: 9px 12px;
+  font-family: var(--font-mono); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.16em;
+  color: white; text-align: center;
+  opacity: 0; transition: opacity 180ms;
+}
+.eq-card:hover .hover-overlay { opacity: 1; }
+
+.eq-body { padding: 10px 12px 12px; }
+.eq-name { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.25; margin-bottom: 3px; }
+.eq-includes { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 8px; }
+.eq-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 6px; }
+.eq-price-big { font-family: var(--font-mono); font-size: 16px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1; }
+.eq-price-sub { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted-foreground); margin-top: 3px; }
+.eq-add-btn {
+  width: 32px; height: 32px; border-radius: 9999px;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  display: grid; place-items: center;
+  color: var(--ink); cursor: pointer;
+  transition: background 140ms, border-color 140ms;
+  flex-shrink: 0;
+}
+.eq-add-btn:hover { background: var(--amber); border-color: var(--amber); }
+/* stepper inline for in-cart */
+.stepper {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: 9999px; border: 1px solid var(--hairline);
+  background: var(--surface-elevated); padding: 2px;
+}
+.stepper button {
+  width: 24px; height: 24px; border-radius: 9999px;
+  border: none; background: var(--surface);
+  display: grid; place-items: center; cursor: pointer;
+  color: var(--ink); transition: background 120ms;
+}
+.stepper button:hover { background: var(--ink); color: var(--background); }
+.stepper span { min-width: 16px; text-align: center; font-family: var(--font-mono); font-size: 11px; font-weight: 700; }
+
+/* ══ STATES TABLE ══ */
+.states-row { display: flex; gap: 12px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<!-- ══ FULL CAROUSEL ══ -->
+<div class="section-label">CategoryCarousel — Sección completa</div>
+
+<div>
+  <!-- Header -->
+  <div class="cat-header">
+    <div class="cat-title">cámaras</div>
+    <div class="cat-count">15 ítems</div>
+    <div class="cat-header-right">
+      <a class="cat-link" href="#">
+        Ver sólo cámaras
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+      <button class="arrow-btn disabled" aria-label="Anterior">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button class="arrow-btn" aria-label="Siguiente">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Cards track -->
+  <div class="card-track-wrap">
+    <div class="card-track" id="track-camaras">
+
+      <!-- Card 1: default -->
+      <article class="eq-card">
+        <div class="eq-photo">
+          <svg width="56" height="42" viewBox="0 0 80 60" opacity="0.25"><rect x="5" y="15" width="70" height="40" rx="5" fill="currentColor"/><circle cx="40" cy="35" r="12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="40" cy="35" r="5" fill="currentColor"/><rect x="28" y="8" width="12" height="9" rx="2" fill="currentColor"/></svg>
+          <div class="eq-cat-badge">Cámaras</div>
+          <div class="eq-fav"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+          <div class="hover-overlay">— ver ficha técnica</div>
+        </div>
+        <div class="eq-body">
+          <div class="eq-name">FX3 Cinema Line</div>
+          <div class="eq-includes">Batería · Cargador · Case</div>
+          <div class="eq-footer">
+            <div>
+              <div class="eq-price-big">$ 24.500</div>
+              <div class="eq-price-sub">5 jornadas · $ 4.900/J</div>
+            </div>
+            <div class="eq-add-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Card 2: in cart -->
+      <article class="eq-card in-cart">
+        <div class="eq-photo">
+          <svg width="56" height="42" viewBox="0 0 80 60" opacity="0.25"><rect x="5" y="15" width="70" height="40" rx="5" fill="currentColor"/><circle cx="40" cy="35" r="12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="40" cy="35" r="5" fill="currentColor"/><rect x="28" y="8" width="12" height="9" rx="2" fill="currentColor"/></svg>
+          <div class="eq-cat-badge">Cámaras</div>
+          <div class="eq-fav"><svg width="12" height="12" viewBox="0 0 24 24" fill="rgba(250,180,40,1)" stroke="rgba(250,180,40,1)" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+          <div style="position:absolute;inset:0;border-radius:var(--radius-lg) var(--radius-lg) 0 0;box-shadow:inset 0 0 0 2px rgba(250,180,40,0.6);pointer-events:none;"></div>
+        </div>
+        <div class="eq-body">
+          <div class="eq-name">EOS R5 C Cinema</div>
+          <div class="eq-includes">Batería ×2 · Cargador · Grip</div>
+          <div class="eq-footer">
+            <div>
+              <div class="eq-price-big">$ 66.000</div>
+              <div class="eq-price-sub">3 J · $ 22.000/J</div>
+            </div>
+            <div class="stepper">
+              <button><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+              <span>1</span>
+              <button><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Card 3 -->
+      <article class="eq-card">
+        <div class="eq-photo">
+          <svg width="56" height="42" viewBox="0 0 80 60" opacity="0.25"><rect x="5" y="15" width="70" height="40" rx="5" fill="currentColor"/><circle cx="40" cy="35" r="12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="40" cy="35" r="5" fill="currentColor"/><rect x="28" y="8" width="12" height="9" rx="2" fill="currentColor"/></svg>
+          <div class="eq-cat-badge">Cámaras</div>
+          <div class="eq-fav"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+          <div class="hover-overlay">— ver ficha técnica</div>
+        </div>
+        <div class="eq-body">
+          <div class="eq-name">Ronin 4D 6K</div>
+          <div class="eq-includes">Baterías ×3 · Cargador rápido</div>
+          <div class="eq-footer">
+            <div>
+              <div class="eq-price-big">$ 32.000</div>
+              <div class="eq-price-sub">/ jornada</div>
+            </div>
+            <div class="eq-add-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Card 4 -->
+      <article class="eq-card">
+        <div class="eq-photo">
+          <svg width="56" height="42" viewBox="0 0 80 60" opacity="0.25"><rect x="5" y="15" width="70" height="40" rx="5" fill="currentColor"/><circle cx="40" cy="35" r="12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="40" cy="35" r="5" fill="currentColor"/><rect x="28" y="8" width="12" height="9" rx="2" fill="currentColor"/></svg>
+          <div class="eq-cat-badge">Cámaras</div>
+          <div class="eq-fav"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+          <div class="hover-overlay">— ver ficha técnica</div>
+        </div>
+        <div class="eq-body">
+          <div class="eq-name">ATEM Mini Extreme ISO</div>
+          <div class="eq-includes">Cable HDMI ×4 · Fuente</div>
+          <div class="eq-footer">
+            <div>
+              <div class="eq-price-big">$ 9.500</div>
+              <div class="eq-price-sub">/ jornada</div>
+            </div>
+            <div class="eq-add-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Card 5 (parcialmente visible) -->
+      <article class="eq-card">
+        <div class="eq-photo">
+          <svg width="56" height="42" viewBox="0 0 80 60" opacity="0.25"><rect x="5" y="15" width="70" height="40" rx="5" fill="currentColor"/><circle cx="40" cy="35" r="12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="40" cy="35" r="5" fill="currentColor"/><rect x="28" y="8" width="12" height="9" rx="2" fill="currentColor"/></svg>
+          <div class="eq-cat-badge">Audio</div>
+          <div class="eq-fav"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+          <div class="hover-overlay">— ver ficha técnica</div>
+        </div>
+        <div class="eq-body">
+          <div class="eq-name">NTG-5 Shotgun</div>
+          <div class="eq-includes">Rycote · Cable XLR · Pistola</div>
+          <div class="eq-footer">
+            <div>
+              <div class="eq-price-big">$ 4.800</div>
+              <div class="eq-price-sub">/ jornada</div>
+            </div>
+            <div class="eq-add-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<!-- ══ HEADER STATES ══ -->
+<div class="section-label">Header — Estados de las flechas</div>
+<div style="display:flex;flex-direction:column;gap:12px;max-width:700px;">
+
+  <div>
+    <div class="sub-label">Inicio del track — anterior deshabilitada</div>
+    <div class="cat-header" style="padding-bottom:0;">
+      <div class="cat-title">lentes</div>
+      <div class="cat-count">21 ítems</div>
+      <div class="cat-header-right">
+        <a class="cat-link" href="#">Ver sólo lentes <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+        <button class="arrow-btn disabled"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <button class="arrow-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="sub-label">Mitad del track — ambas activas</div>
+    <div class="cat-header" style="padding-bottom:0;">
+      <div class="cat-title">luces</div>
+      <div class="cat-count">8 ítems</div>
+      <div class="cat-header-right">
+        <a class="cat-link" href="#">Ver sólo luces <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+        <button class="arrow-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <button class="arrow-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="sub-label">Final del track — siguiente deshabilitada</div>
+    <div class="cat-header" style="padding-bottom:0;">
+      <div class="cat-title">audio</div>
+      <div class="cat-count">6 ítems</div>
+      <div class="cat-header-right">
+        <a class="cat-link" href="#">Ver sólo audio <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+        <button class="arrow-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <button class="arrow-btn disabled"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<!-- ══ CARD STATES ══ -->
+<div class="section-label">Card — Estados dentro del track</div>
+<div class="states-row">
+
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <div class="sub-label">Default</div>
+    <article class="eq-card" style="width:220px;">
+      <div class="eq-photo" style="aspect-ratio:1;">
+        <svg width="44" height="33" viewBox="0 0 80 60" opacity="0.25"><rect x="5" y="15" width="70" height="40" rx="5" fill="currentColor"/><circle cx="40" cy="35" r="12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="40" cy="35" r="5" fill="currentColor"/><rect x="28" y="8" width="12" height="9" rx="2" fill="currentColor"/></svg>
+        <div class="eq-cat-badge">Cámaras</div>
+        <div class="eq-fav"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+      </div>
+      <div class="eq-body">
+        <div class="eq-name">Sony FX3</div>
+        <div class="eq-includes">Batería · Cargador</div>
+        <div class="eq-footer">
+          <div><div class="eq-price-big">$ 24.500</div><div class="eq-price-sub">/ jornada</div></div>
+          <div class="eq-add-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <div class="sub-label">In-cart</div>
+    <article class="eq-card in-cart" style="width:220px;">
+      <div class="eq-photo" style="aspect-ratio:1;">
+        <svg width="44" height="33" viewBox="0 0 80 60" opacity="0.25"><rect x="5" y="15" width="70" height="40" rx="5" fill="currentColor"/><circle cx="40" cy="35" r="12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="40" cy="35" r="5" fill="currentColor"/><rect x="28" y="8" width="12" height="9" rx="2" fill="currentColor"/></svg>
+        <div class="eq-cat-badge">Cámaras</div>
+        <div class="eq-fav"><svg width="12" height="12" viewBox="0 0 24 24" fill="rgba(250,180,40,1)" stroke="rgba(250,180,40,1)" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+        <div style="position:absolute;inset:0;box-shadow:inset 0 0 0 2px rgba(250,180,40,0.6);pointer-events:none;border-radius:var(--radius-lg) var(--radius-lg) 0 0;"></div>
+      </div>
+      <div class="eq-body">
+        <div class="eq-name">Canon R5 C</div>
+        <div class="eq-includes">Batería ×2 · Grip</div>
+        <div class="eq-footer">
+          <div><div class="eq-price-big">$ 66.000</div><div class="eq-price-sub">3 J · $ 22.000/J</div></div>
+          <div class="stepper">
+            <button><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+            <span>1</span>
+            <button><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <div class="sub-label">Sin stock</div>
+    <article class="eq-card" style="width:220px;opacity:0.45;pointer-events:none;">
+      <div class="eq-photo" style="aspect-ratio:1;">
+        <svg width="44" height="33" viewBox="0 0 80 60" opacity="0.25"><rect x="5" y="15" width="70" height="40" rx="5" fill="currentColor"/><circle cx="40" cy="35" r="12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="40" cy="35" r="5" fill="currentColor"/><rect x="28" y="8" width="12" height="9" rx="2" fill="currentColor"/></svg>
+        <div class="eq-cat-badge">Gimbal</div>
+        <div style="position:absolute;inset:0;background:color-mix(in oklch,var(--destructive) 12%,transparent);display:flex;align-items:center;justify-content:center;">
+          <span style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.14em;background:color-mix(in oklch,var(--destructive) 85%,transparent);color:white;padding:3px 10px;border-radius:9999px;">Sin stock</span>
+        </div>
+      </div>
+      <div class="eq-body">
+        <div class="eq-name">DJI Ronin 4D</div>
+        <div class="eq-includes">Baterías ×3</div>
+        <div class="eq-footer">
+          <div><div class="eq-price-big">$ 32.000</div><div class="eq-price-sub">/ jornada</div></div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>Nombre en repo:</b> probablemente <code>CategorySection</code> o <code>EquipmentCarousel</code> en <code>src/components/rental/</code>.<br><br>
+  <b>Scroll:</b> <code>overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none</code>. Cada card: <code>scroll-snap-align: start</code>. El track usa <code>gap-3</code> entre cards.<br><br>
+  <b>Arrows:</b> al llegar al inicio/fin del track, el botón correspondiente se deshabilita (<code>disabled</code> = opacity 30% + pointer-events none). Se calculan via <code>scrollLeft === 0</code> y <code>scrollLeft + offsetWidth >= scrollWidth</code>.<br><br>
+  <b>Implementación:</b> usar <code>embla-carousel-react</code> (ya en el stack). El botón "Ver sólo X →" linkea al catálogo filtrado por categoría (<code>/?cat=camaras</code>).<br><br>
+  <b>Card width:</b> fija en <code>256px</code> (sin <code>flex-grow</code>). Última card parcialmente visible = visual cue de scroll.
+  <b>Price format:</b> con jornadas seleccionadas → muestra total + "N J · $X/J". Sin fechas → muestra precio por jornada.
+</div>
+
+</body>
+</html>

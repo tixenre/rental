@@ -1,0 +1,222 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .state { display: flex; flex-direction: column; gap: 8px; }
+  .state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+  .state-tag .d { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .state-tag.underline { color: var(--ink); }          .state-tag.underline .d { background: var(--ink); }
+  .state-tag.pill      { color: oklch(0.5 0.1 70); }   .state-tag.pill .d      { background: var(--amber); }
+  .state-tag.count     { color: var(--azul); }          .state-tag.count .d     { background: var(--azul); }
+  .state-tag.vertical  { color: var(--muted-foreground); } .state-tag.vertical .d { background: var(--muted-foreground); }
+
+  .frame { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface-elevated); overflow: hidden; }
+
+  /* ── Underline tabs (default) ── */
+  .tabs-underline { display: flex; border-bottom: 1px solid var(--hairline); padding: 0 14px; gap: 2px; }
+  .tab-u { display: inline-flex; align-items: center; gap: 6px; height: 42px; padding: 0 10px; font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--muted-foreground); cursor: pointer; border-bottom: 2px solid transparent; transition: color 150ms, border-color 150ms; white-space: nowrap; }
+  .tab-u:hover { color: var(--ink); }
+  .tab-u.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--amber); }
+  .tab-u .badge { font-family: var(--font-mono); font-size: 9px; font-weight: 600; color: var(--muted-foreground); background: var(--surface); border: 1px solid var(--hairline); border-radius: 9999px; padding: 1px 5px; }
+  .tab-u.active .badge { background: color-mix(in oklch, var(--amber) 18%, transparent); color: oklch(0.45 0.1 70); border-color: color-mix(in oklch, var(--amber) 40%, transparent); }
+
+  /* panel */
+  .tab-panel { padding: 16px 18px; }
+  .tab-panel-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; }
+  .spec-line { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--hairline); font-size: 13px; }
+  .spec-line:last-child { border-bottom: none; }
+  .spec-line .lbl { color: var(--muted-foreground); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .spec-line .val { color: var(--ink); font-weight: 600; }
+
+  /* ── Pill / segmented tabs ── */
+  .tabs-pill { display: inline-flex; background: var(--surface); border-radius: 9999px; padding: 3px; border: 1px solid var(--hairline); }
+  .tab-p { display: inline-flex; align-items: center; gap: 5px; padding: 5px 14px; border-radius: 9999px; font-family: var(--font-sans); font-size: 12px; font-weight: 600; color: var(--muted-foreground); cursor: pointer; transition: color 150ms; white-space: nowrap; }
+  .tab-p.active { background: var(--surface-elevated); box-shadow: var(--shadow-sm); color: var(--ink); }
+
+  /* amber segmented (active fill amber) */
+  .tabs-pill.amber .tab-p { color: var(--muted-foreground); }
+  .tabs-pill.amber .tab-p.active { background: var(--amber); color: var(--ink); box-shadow: none; }
+
+  /* ── Vertical tabs ── */
+  .tabs-vert { display: grid; grid-template-columns: 130px 1fr; }
+  .tabs-vert-rail { display: flex; flex-direction: column; border-right: 1px solid var(--hairline); padding: 8px; gap: 1px; }
+  .tab-v { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: var(--muted-foreground); cursor: pointer; transition: background 150ms, color 150ms; }
+  .tab-v:hover { background: var(--surface); color: var(--ink); }
+  .tab-v.active { background: color-mix(in oklch, var(--amber) 14%, transparent); color: var(--ink); font-weight: 600; }
+  .tab-v svg { flex-shrink: 0; opacity: 0.6; }
+  .tab-v.active svg { opacity: 1; color: oklch(0.5 0.1 70); }
+
+  /* ── Mobile frame ── */
+  .mobile-outer { border: 2px solid var(--ink); border-radius: 14px; overflow: hidden; max-width: 320px; box-shadow: 0 4px 16px -4px oklch(0.14 0.01 60 / 12%); }
+  .mobile-outer .tabs-underline { padding: 0 8px; overflow-x: auto; scrollbar-width: none; position: relative; }
+  .mobile-outer .tabs-underline::-webkit-scrollbar { display: none; }
+  .mobile-outer .tab-u { font-size: 12px; height: 40px; padding: 0 8px; }
+  .mobile-outer .tabs-pill { width: 100%; }
+  .mobile-outer .tabs-pill .tab-p { flex: 1; justify-content: center; }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Component · Tabs</div>
+<div class="sub-eye">underline · pill segmented · con counts · vertical</div>
+
+<div class="gallery">
+
+  <!-- Underline (default) — ficha técnica -->
+  <div class="state">
+    <span class="state-tag underline"><span class="d"></span>Underline (default) · ficha técnica</span>
+    <div class="frame">
+      <div class="tabs-underline">
+        <div class="tab-u active">Specs</div>
+        <div class="tab-u">Incluye</div>
+        <div class="tab-u">Disponibilidad</div>
+      </div>
+      <div class="tab-panel">
+        <div class="tab-panel-label">Especificaciones · Sony a7S III</div>
+        <div class="spec-line"><span class="lbl">Sensor</span><span class="val">Full frame 12.1 MP</span></div>
+        <div class="spec-line"><span class="lbl">ISO</span><span class="val">80 – 102.400</span></div>
+        <div class="spec-line"><span class="lbl">Video</span><span class="val">4K 120fps</span></div>
+        <div class="spec-line"><span class="lbl">Montura</span><span class="val">Sony E</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Con counts — detalle de pedido -->
+  <div class="state">
+    <span class="state-tag count"><span class="d"></span>Con counts · detalle de pedido</span>
+    <div class="frame">
+      <div class="tabs-underline">
+        <div class="tab-u active">Items <span class="badge">5</span></div>
+        <div class="tab-u">Timeline <span class="badge">3</span></div>
+        <div class="tab-u">Factura</div>
+      </div>
+      <div class="tab-panel">
+        <div class="tab-panel-label">Items del pedido · #RBL-0428</div>
+        <div class="spec-line"><span class="lbl">Sony a7S III</span><span class="val">$ 73.500</span></div>
+        <div class="spec-line"><span class="lbl">Aputure 600D ×2</span><span class="val">$ 72.000</span></div>
+        <div class="spec-line"><span class="lbl">DJI RS4 Pro</span><span class="val">$ 45.000</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pill segmented -->
+  <div class="state">
+    <span class="state-tag pill"><span class="d"></span>Pill segmented · surface + ink</span>
+    <div class="frame" style="padding:18px;display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <div class="tab-panel-label">Sobre surface (default)</div>
+        <div class="tabs-pill">
+          <div class="tab-p active">Mes</div>
+          <div class="tab-p">Trimestre</div>
+          <div class="tab-p">Año</div>
+        </div>
+      </div>
+      <div>
+        <div class="tab-panel-label">Active amber (énfasis)</div>
+        <div class="tabs-pill amber">
+          <div class="tab-p active">Grid</div>
+          <div class="tab-p">Lista</div>
+          <div class="tab-p">Mapa</div>
+        </div>
+      </div>
+      <div>
+        <div class="tab-panel-label">Con ícono</div>
+        <div class="tabs-pill">
+          <div class="tab-p active"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Grid</div>
+          <div class="tab-p"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>Lista</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vertical -->
+  <div class="state">
+    <span class="state-tag vertical"><span class="d"></span>Vertical · settings / admin</span>
+    <div class="frame">
+      <div class="tabs-vert">
+        <div class="tabs-vert-rail">
+          <div class="tab-v active"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9"/></svg>General</div>
+          <div class="tab-v"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Horarios</div>
+          <div class="tab-v"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>Estados</div>
+          <div class="tab-v"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg>Precios</div>
+        </div>
+        <div class="tab-panel">
+          <div class="tab-panel-label">General · ajustes del rental</div>
+          <div class="spec-line"><span class="lbl">Nombre</span><span class="val">Rambla Rental</span></div>
+          <div class="spec-line"><span class="lbl">Ciudad</span><span class="val">Mar del Plata</span></div>
+          <div class="spec-line"><span class="lbl">Moneda</span><span class="val">ARS</span></div>
+        </div>
+      </div>
+    </div>
+  </div>  <!-- Mobile -->
+  <div class="state">
+    <span class="state-tag count"><span class="d"></span>Mobile (320px) · underline scroll + pill full-width</span>
+    <div class="mobile-outer">
+      <div class="tabs-underline">
+        <div class="tab-u active">Specs</div>
+        <div class="tab-u">Incluye</div>
+        <div class="tab-u">Disponibilidad</div>
+        <div class="tab-u">Reseñas</div>
+      </div>
+      <div class="tab-panel">
+        <div class="tab-panel-label">Specs · scroll horizontal →</div>
+        <div class="spec-line"><span class="lbl">Sensor</span><span class="val">Full frame</span></div>
+        <div class="spec-line"><span class="lbl">Video</span><span class="val">4K 120fps</span></div>
+      </div>
+      <div style="padding:0 12px 14px;">
+        <div class="tabs-pill amber">
+          <div class="tab-p active">Mes</div>
+          <div class="tab-p">Trim.</div>
+          <div class="tab-p">Año</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<pre class="code"><span class="c">// Underline — default para ficha técnica + detalle de pedido</span>
+&lt;<span class="k">Tabs</span> defaultValue=<span class="s">"specs"</span>&gt;
+  &lt;<span class="k">TabsList</span> variant=<span class="s">"underline"</span>&gt;
+    &lt;<span class="k">Tab</span> value=<span class="s">"specs"</span>&gt;Specs&lt;/&gt;
+    &lt;<span class="k">Tab</span> value=<span class="s">"items"</span>&gt;Items &lt;<span class="k">Badge</span>&gt;5&lt;/&gt;&lt;/&gt;
+  &lt;/&gt;
+&lt;/&gt;
+
+<span class="c">// Activo en URL — deep-link a una pestaña</span>
+?tab=disponibilidad  → abre la pestaña de disponibilidad
+
+<span class="c">// Variantes</span>
+underline  <span class="c">// navegación de contenido (ficha, pedido) — amber underline</span>
+pill       <span class="c">// filtros cortos 2-4 opciones (mes/trimestre/año, grid/lista)</span>
+           <span class="c">// active: surface elevado (default) o fill amber (énfasis)</span>
+vertical   <span class="c">// settings / admin con muchas secciones</span></pre>
+
+<div class="note">
+  <b>Underline para contenido</b> (ficha técnica, detalle de pedido) — el indicador amber marca la pestaña activa. ·
+  <b>Pill segmented para filtros cortos</b> (2–4 opciones). Active surface elevado por defecto, o fill amber para dar énfasis. ·
+  <b>Counts</b> en badge mono — mismo estilo que el CatBar. ·
+  <b>Deep-linkeable</b>: la pestaña activa persiste en la URL como <code>?tab=</code>. ·
+  <b>Mobile:</b> underline scrollea horizontal (sin scrollbar); pill segmented pasa a full-width con tabs <code>flex:1</code>.
+</div>
+
+</body>
+</html>

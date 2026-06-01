@@ -1,0 +1,214 @@
+<!-- @dsCard group="Brand" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); padding: 20px; display: flex; flex-direction: column; gap: 18px; -webkit-font-smoothing: antialiased; }
+  .section-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+  /* Wordmark containers */
+  .wm-swatch { display: flex; flex-direction: column; gap: 8px; }
+  .wm-bg { padding: 16px 24px; border-radius: 10px; display: flex; align-items: center; justify-content: flex-start; }
+  .wm-bg img, .wm-bg object { display: block; height: 32px; width: auto; }
+  .wm-label { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted-foreground); }
+
+  /* Asset grid */
+  .asset-grid { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .asset-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .asset-bg { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid var(--hairline); }
+  .asset-label { font-family: var(--font-mono); font-size: 8px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted-foreground); text-align: center; }
+
+  hr { border: none; border-top: 1px solid var(--hairline); }
+
+  /* Seal states */
+  .seal-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .seal-state { display: flex; flex-direction: column; gap: 6px; }
+  .seal-chip { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--hairline); }
+</style>
+</head>
+<body>
+
+  <div class="section-label">Wordmark — usos válidos</div>
+  <div class="row">
+    <div class="wm-swatch">
+      <div class="wm-bg" style="background:var(--background); border:1px solid var(--hairline);">
+        <img src="../assets/rambla-wordmark.svg" alt="Rambla wordmark on bone">
+      </div>
+      <div class="wm-label">sobre bone — primario ✓</div>
+    </div>
+    <div class="wm-swatch">
+      <div class="wm-bg" style="background:var(--amber);">
+        <img src="../assets/rambla-wordmark.svg" alt="Rambla wordmark on amber — white" style="filter:brightness(0) invert(1);">
+      </div>
+      <div class="wm-label">sobre amber — blanco ✓</div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:color-mix(in oklch,oklch(0.62 0.22 27) 8%,transparent);border:1px solid color-mix(in oklch,oklch(0.62 0.22 27) 25%,transparent);border-radius:8px;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="oklch(0.62 0.22 27)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;color:oklch(0.48 0.18 27);">Sobre fondos claros (bone, white): wordmark natural. Sobre amber: wordmark blanco (filter invert). No usar sobre fondos oscuros.</span>
+  </div>
+
+  <hr>
+  <div class="section-label">Wordmark — tamaños</div>
+  <div style="display:flex;flex-direction:column;gap:8px;padding:12px 16px;background:var(--surface);border-radius:10px;border:1px solid var(--hairline);">
+    <div style="display:flex;align-items:center;gap:16px;">
+      <img src="../assets/rambla-wordmark.svg" style="height:16px;width:auto;">
+      <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);letter-spacing:0.15em;text-transform:uppercase;">sm — h-7 (28px) · footer mobile</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <img src="../assets/rambla-wordmark.svg" style="height:28px;width:auto;">
+      <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);letter-spacing:0.15em;text-transform:uppercase;">md — h-9 (36px) · topbar</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <img src="../assets/rambla-wordmark.svg" style="height:40px;width:auto;">
+      <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);letter-spacing:0.15em;text-transform:uppercase;">lg — h-12 (48px) · footer desktop</span>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- Alternativa B: ícono sello vectorial -->
+  <div class="section-label">Alternativa B — ícono vectorial · contextos chicos</div>
+  <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;">
+
+    <!-- Tamaños -->
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div style="font-family:var(--font-mono);font-size:8px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted-foreground);margin-bottom:2px;">Tamaños</div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <!-- 16px -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <svg width="16" height="16" viewBox="0 0 67 67" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#FAB428" d="M65.97,31.75s-.03-.02-.05-.03l-.21-.13c-.11-.08-.23-.15-.35-.22l-4.39-2.68c-1.64-1-2.27-3.08-1.46-4.83l2.45-5.25c1.23-2.63-.84-5.6-3.73-5.37l-5.78.46c-1.92.15-3.65-1.16-4.02-3.05l-1.1-5.69c-.55-2.85-3.97-4.04-6.18-2.15l-4.4,3.77c-1.46,1.25-3.64,1.21-5.04-.11l-4.24-3.95c-2.12-1.98-5.59-.93-6.26,1.89l-1.35,5.64c-.45,1.87-2.23,3.11-4.14,2.88l-5.75-.71c-2.88-.36-5.07,2.53-3.96,5.21l2.22,5.35c.74,1.78.02,3.83-1.66,4.76l-5.07,2.81s-.04.02-.06.04c-1.11.64-1.54,1.73-1.45,2.78-.08.78.22,1.6,1.02,2.1.02,0,.03.02.05.03l.21.13c.11.08.23.15.35.22l4.39,2.68c1.64,1,2.27,3.08,1.46,4.83l-2.45,5.25c-1.23,2.63.84,5.6,3.73,5.37l5.78-.46c1.92-.15,3.65,1.16,4.02,3.05l1.1,5.69c.55,2.85,3.97,4.04,6.18,2.15l4.4-3.77c1.46-1.25,3.64-1.21,5.04.11l4.24,3.95c2.12,1.98,5.59.93,6.26-1.89l1.35-5.64c.45-1.87,2.23-3.11,4.14-2.88l5.75.71c2.88.36,5.07-2.53,3.96-5.21l-2.22-5.35c-.74-1.78-.02-3.83,1.66-4.76l5.07-2.81s.04-.02.06-.04c1.11-.64,1.54-1.73,1.45-2.78.08-.78-.22-1.6-1.02-2.1Z"/>
+            <path fill="white" d="M30.56,40.31c.16,0,.33.02.49.02,6.3.17,12.61-4.4,14.09-10.2,1.48-5.8-2.43-11.3-8.73-11.47-2.27-.06-4.67.9-6.57,2.16-.27.18-.63-.07-.6-.4.02-.22.04-.44.06-.67.02-.24-.16-.44-.4-.44h-6.95s-1.07,13.32.35,24.81c.25,1.99,1.95,3.48,3.95,3.48h4.72s-.22-1.31-.51-3.06c0,0,6.07,6.32,14.29,2.64v-9c0-.33-.35-.54-.64-.38-2.02,1.12-8.46,4.36-13.59,3.28-.65-.14-.61-.81.04-.77ZM29.2,32.75c.92-2.16,3.78-4.14,6.39-4.4,2.61-.27,3.99,1.27,3.07,3.44-.92,2.16-3.78,4.14-6.39,4.4-2.61.27-3.99-1.27-3.07-3.44Z"/>
+          </svg>
+          <span style="font-family:var(--font-mono);font-size:8px;color:var(--muted-foreground);">16</span>
+        </div>
+        <!-- 24px -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <svg width="24" height="24" viewBox="0 0 67 67" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#FAB428" d="M65.97,31.75s-.03-.02-.05-.03l-.21-.13c-.11-.08-.23-.15-.35-.22l-4.39-2.68c-1.64-1-2.27-3.08-1.46-4.83l2.45-5.25c1.23-2.63-.84-5.6-3.73-5.37l-5.78.46c-1.92.15-3.65-1.16-4.02-3.05l-1.1-5.69c-.55-2.85-3.97-4.04-6.18-2.15l-4.4,3.77c-1.46,1.25-3.64,1.21-5.04-.11l-4.24-3.95c-2.12-1.98-5.59-.93-6.26,1.89l-1.35,5.64c-.45,1.87-2.23,3.11-4.14,2.88l-5.75-.71c-2.88-.36-5.07,2.53-3.96,5.21l2.22,5.35c.74,1.78.02,3.83-1.66,4.76l-5.07,2.81s-.04.02-.06.04c-1.11.64-1.54,1.73-1.45,2.78-.08.78.22,1.6,1.02,2.1.02,0,.03.02.05.03l.21.13c.11.08.23.15.35.22l4.39,2.68c1.64,1,2.27,3.08,1.46,4.83l-2.45,5.25c-1.23,2.63.84,5.6,3.73,5.37l5.78-.46c1.92-.15,3.65,1.16,4.02,3.05l1.1,5.69c.55,2.85,3.97,4.04,6.18,2.15l4.4-3.77c1.46-1.25,3.64-1.21,5.04.11l4.24,3.95c2.12,1.98,5.59.93,6.26-1.89l1.35-5.64c.45-1.87,2.23-3.11,4.14-2.88l5.75.71c2.88.36,5.07-2.53,3.96-5.21l-2.22-5.35c-.74-1.78-.02-3.83,1.66-4.76l5.07-2.81s.04-.02.06-.04c1.11-.64,1.54-1.73,1.45-2.78.08-.78-.22-1.6-1.02-2.1Z"/>
+            <path fill="white" d="M30.56,40.31c.16,0,.33.02.49.02,6.3.17,12.61-4.4,14.09-10.2,1.48-5.8-2.43-11.3-8.73-11.47-2.27-.06-4.67.9-6.57,2.16-.27.18-.63-.07-.6-.4.02-.22.04-.44.06-.67.02-.24-.16-.44-.4-.44h-6.95s-1.07,13.32.35,24.81c.25,1.99,1.95,3.48,3.95,3.48h4.72s-.22-1.31-.51-3.06c0,0,6.07,6.32,14.29,2.64v-9c0-.33-.35-.54-.64-.38-2.02,1.12-8.46,4.36-13.59,3.28-.65-.14-.61-.81.04-.77ZM29.2,32.75c.92-2.16,3.78-4.14,6.39-4.4,2.61-.27,3.99,1.27,3.07,3.44-.92,2.16-3.78,4.14-6.39,4.4-2.61.27-3.99-1.27-3.07-3.44Z"/>
+          </svg>
+          <span style="font-family:var(--font-mono);font-size:8px;color:var(--muted-foreground);">24</span>
+        </div>
+        <!-- 40px -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <svg width="40" height="40" viewBox="0 0 67 67" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#FAB428" d="M65.97,31.75s-.03-.02-.05-.03l-.21-.13c-.11-.08-.23-.15-.35-.22l-4.39-2.68c-1.64-1-2.27-3.08-1.46-4.83l2.45-5.25c1.23-2.63-.84-5.6-3.73-5.37l-5.78.46c-1.92.15-3.65-1.16-4.02-3.05l-1.1-5.69c-.55-2.85-3.97-4.04-6.18-2.15l-4.4,3.77c-1.46,1.25-3.64,1.21-5.04-.11l-4.24-3.95c-2.12-1.98-5.59-.93-6.26,1.89l-1.35,5.64c-.45,1.87-2.23,3.11-4.14,2.88l-5.75-.71c-2.88-.36-5.07,2.53-3.96,5.21l2.22,5.35c.74,1.78.02,3.83-1.66,4.76l-5.07,2.81s-.04.02-.06.04c-1.11.64-1.54,1.73-1.45,2.78-.08.78.22,1.6,1.02,2.1.02,0,.03.02.05.03l.21.13c.11.08.23.15.35.22l4.39,2.68c1.64,1,2.27,3.08,1.46,4.83l-2.45,5.25c-1.23,2.63.84,5.6,3.73,5.37l5.78-.46c1.92-.15,3.65,1.16,4.02,3.05l1.1,5.69c.55,2.85,3.97,4.04,6.18,2.15l4.4-3.77c1.46-1.25,3.64-1.21,5.04.11l4.24,3.95c2.12,1.98,5.59.93,6.26-1.89l1.35-5.64c.45-1.87,2.23-3.11,4.14-2.88l5.75.71c2.88.36,5.07-2.53,3.96-5.21l-2.22-5.35c-.74-1.78-.02-3.83,1.66-4.76l5.07-2.81s.04-.02.06-.04c1.11-.64,1.54-1.73,1.45-2.78.08-.78-.22-1.6-1.02-2.1Z"/>
+            <path fill="white" d="M30.56,40.31c.16,0,.33.02.49.02,6.3.17,12.61-4.4,14.09-10.2,1.48-5.8-2.43-11.3-8.73-11.47-2.27-.06-4.67.9-6.57,2.16-.27.18-.63-.07-.6-.4.02-.22.04-.44.06-.67.02-.24-.16-.44-.4-.44h-6.95s-1.07,13.32.35,24.81c.25,1.99,1.95,3.48,3.95,3.48h4.72s-.22-1.31-.51-3.06c0,0,6.07,6.32,14.29,2.64v-9c0-.33-.35-.54-.64-.38-2.02,1.12-8.46,4.36-13.59,3.28-.65-.14-.61-.81.04-.77ZM29.2,32.75c.92-2.16,3.78-4.14,6.39-4.4,2.61-.27,3.99,1.27,3.07,3.44-.92,2.16-3.78,4.14-6.39,4.4-2.61.27-3.99-1.27-3.07-3.44Z"/>
+          </svg>
+          <span style="font-family:var(--font-mono);font-size:8px;color:var(--muted-foreground);">40</span>
+        </div>
+        <!-- 64px -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <svg width="64" height="64" viewBox="0 0 67 67" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#FAB428" d="M65.97,31.75s-.03-.02-.05-.03l-.21-.13c-.11-.08-.23-.15-.35-.22l-4.39-2.68c-1.64-1-2.27-3.08-1.46-4.83l2.45-5.25c1.23-2.63-.84-5.6-3.73-5.37l-5.78.46c-1.92.15-3.65-1.16-4.02-3.05l-1.1-5.69c-.55-2.85-3.97-4.04-6.18-2.15l-4.4,3.77c-1.46,1.25-3.64,1.21-5.04-.11l-4.24-3.95c-2.12-1.98-5.59-.93-6.26,1.89l-1.35,5.64c-.45,1.87-2.23,3.11-4.14,2.88l-5.75-.71c-2.88-.36-5.07,2.53-3.96,5.21l2.22,5.35c.74,1.78.02,3.83-1.66,4.76l-5.07,2.81s-.04.02-.06.04c-1.11.64-1.54,1.73-1.45,2.78-.08.78.22,1.6,1.02,2.1.02,0,.03.02.05.03l.21.13c.11.08.23.15.35.22l4.39,2.68c1.64,1,2.27,3.08,1.46,4.83l-2.45,5.25c-1.23,2.63.84,5.6,3.73,5.37l5.78-.46c1.92-.15,3.65,1.16,4.02,3.05l1.1,5.69c.55,2.85,3.97,4.04,6.18,2.15l4.4-3.77c1.46-1.25,3.64-1.21,5.04.11l4.24,3.95c2.12,1.98,5.59.93,6.26-1.89l1.35-5.64c.45-1.87,2.23-3.11,4.14-2.88l5.75.71c2.88.36,5.07-2.53,3.96-5.21l-2.22-5.35c-.74-1.78-.02-3.83,1.66-4.76l5.07-2.81s.04-.02.06-.04c1.11-.64,1.54-1.73,1.45-2.78.08-.78-.22-1.6-1.02-2.1Z"/>
+            <path fill="white" d="M30.56,40.31c.16,0,.33.02.49.02,6.3.17,12.61-4.4,14.09-10.2,1.48-5.8-2.43-11.3-8.73-11.47-2.27-.06-4.67.9-6.57,2.16-.27.18-.63-.07-.6-.4.02-.22.04-.44.06-.67.02-.24-.16-.44-.4-.44h-6.95s-1.07,13.32.35,24.81c.25,1.99,1.95,3.48,3.95,3.48h4.72s-.22-1.31-.51-3.06c0,0,6.07,6.32,14.29,2.64v-9c0-.33-.35-.54-.64-.38-2.02,1.12-8.46,4.36-13.59,3.28-.65-.14-.61-.81.04-.77ZM29.2,32.75c.92-2.16,3.78-4.14,6.39-4.4,2.61-.27,3.99,1.27,3.07,3.44-.92,2.16-3.78,4.14-6.39,4.4-2.61.27-3.99-1.27-3.07-3.44Z"/>
+          </svg>
+          <span style="font-family:var(--font-mono);font-size:8px;color:var(--muted-foreground);">64</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sobre fondos -->
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div style="font-family:var(--font-mono);font-size:8px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted-foreground);margin-bottom:2px;">Sobre fondos</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div class="asset-item">
+          <div class="asset-bg" style="background:var(--background);">
+            <svg width="40" height="40" viewBox="0 0 67 67" xmlns="http://www.w3.org/2000/svg"><path fill="#FAB428" d="M65.97,31.75s-.03-.02-.05-.03l-.21-.13c-.11-.08-.23-.15-.35-.22l-4.39-2.68c-1.64-1-2.27-3.08-1.46-4.83l2.45-5.25c1.23-2.63-.84-5.6-3.73-5.37l-5.78.46c-1.92.15-3.65-1.16-4.02-3.05l-1.1-5.69c-.55-2.85-3.97-4.04-6.18-2.15l-4.4,3.77c-1.46,1.25-3.64,1.21-5.04-.11l-4.24-3.95c-2.12-1.98-5.59-.93-6.26,1.89l-1.35,5.64c-.45,1.87-2.23,3.11-4.14,2.88l-5.75-.71c-2.88-.36-5.07,2.53-3.96,5.21l2.22,5.35c.74,1.78.02,3.83-1.66,4.76l-5.07,2.81s-.04.02-.06.04c-1.11.64-1.54,1.73-1.45,2.78-.08.78.22,1.6,1.02,2.1.02,0,.03.02.05.03l.21.13c.11.08.23.15.35.22l4.39,2.68c1.64,1,2.27,3.08,1.46,4.83l-2.45,5.25c-1.23,2.63.84,5.6,3.73,5.37l5.78-.46c1.92-.15,3.65,1.16,4.02,3.05l1.1,5.69c.55,2.85,3.97,4.04,6.18,2.15l4.4-3.77c1.46-1.25,3.64-1.21,5.04.11l4.24,3.95c2.12,1.98,5.59.93,6.26-1.89l1.35-5.64c.45-1.87,2.23-3.11,4.14-2.88l5.75.71c2.88.36,5.07-2.53,3.96-5.21l-2.22-5.35c-.74-1.78-.02-3.83,1.66-4.76l5.07-2.81s.04-.02.06-.04c1.11-.64,1.54-1.73,1.45-2.78.08-.78-.22-1.6-1.02-2.1Z"/><path fill="white" d="M30.56,40.31c.16,0,.33.02.49.02,6.3.17,12.61-4.4,14.09-10.2,1.48-5.8-2.43-11.3-8.73-11.47-2.27-.06-4.67.9-6.57,2.16-.27.18-.63-.07-.6-.4.02-.22.04-.44.06-.67.02-.24-.16-.44-.4-.44h-6.95s-1.07,13.32.35,24.81c.25,1.99,1.95,3.48,3.95,3.48h4.72s-.22-1.31-.51-3.06c0,0,6.07,6.32,14.29,2.64v-9c0-.33-.35-.54-.64-.38-2.02,1.12-8.46,4.36-13.59,3.28-.65-.14-.61-.81.04-.77ZM29.2,32.75c.92-2.16,3.78-4.14,6.39-4.4,2.61-.27,3.99,1.27,3.07,3.44-.92,2.16-3.78,4.14-6.39,4.4-2.61.27-3.99-1.27-3.07-3.44Z"/></svg>
+          </div>
+          <div class="asset-label">bone ✓</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Uso -->
+    <div style="display:flex;flex-direction:column;gap:5px;padding:10px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--hairline);align-self:flex-start;">
+      <div style="font-family:var(--font-mono);font-size:8px;text-transform:uppercase;letter-spacing:0.18em;color:var(--muted-foreground);margin-bottom:2px;">Cuándo usarlo</div>
+      <div style="font-size:12px;color:var(--ink);line-height:1.6;">favicon · app icon · avatar<br>TopBar mobile (≤ md)<br>merch · social profile pic<br>watermark en fotos</div>
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);margin-top:4px;">assets/rambla-ico.svg</div>
+    </div>
+
+  </div>
+
+  <hr>
+  <div class="section-label">Icon assets · sticker</div>
+  <div class="asset-grid">
+    <div class="asset-item">
+      <div class="asset-bg" style="background:var(--background); width:80px; height:80px;">
+        <img src="../assets/rambla-sticker-01.png" alt="Rambla sticker" style="height:68px;width:auto;">
+      </div>
+      <div class="asset-label">sticker-01.png</div>
+    </div>
+    <div class="asset-item">
+      <div class="asset-bg" style="background:var(--background);">
+        <img src="../assets/rambla-badge.png" alt="badge" style="height:48px;width:auto;">
+      </div>
+      <div class="asset-label">badge.png</div>
+    </div>
+    <div class="asset-item">
+      <div class="asset-bg" style="background:var(--amber);">
+        <img src="../assets/rambla-icon-seal.png" alt="seal" style="height:48px;width:auto;">
+      </div>
+      <div class="asset-label">icon-seal.png</div>
+    </div>
+    <div class="asset-item">
+      <div class="asset-bg" style="background:var(--background);">
+        <img src="../assets/rambla-icon-r.png" alt="R icon" style="height:48px;width:auto;">
+      </div>
+      <div class="asset-label">icon-r.png</div>
+    </div>
+    <div class="asset-item">
+      <div class="asset-bg" style="background:var(--background);">
+        <img src="../assets/rambla-icon-chair.png" alt="chair" style="height:48px;width:auto;">
+      </div>
+      <div class="asset-label">icon-chair.png</div>
+    </div>
+    <div class="asset-item">
+      <div class="asset-bg" style="background:var(--background);border-style:dashed;">
+        <img src="../assets/rambla-wordmark.svg" alt="wordmark webp" style="height:28px;width:auto;padding:0 6px;">
+      </div>
+      <div class="asset-label">wordmark.webp</div>
+    </div>
+  </div>
+
+  <hr>
+  <div class="section-label">TopBar seal — amber-on-scroll (65% snap)</div>
+  <div class="seal-row">
+    <div class="seal-state">
+      <div class="seal-chip" style="background:var(--background);">
+        <img src="../assets/rambla-badge.png" style="height:28px;width:auto;">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:8px;text-transform:uppercase;letter-spacing:0.15em;color:var(--muted-foreground);">Default</div>
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--ink);">seal-badge: amber</div>
+        </div>
+      </div>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:14px;color:var(--muted-foreground);align-self:center;">→</div>
+    <div class="seal-state">
+      <div class="seal-chip" style="background:var(--amber);border-color:var(--amber);">
+        <img src="../assets/rambla-badge.png" style="height:28px;width:auto;filter:brightness(0) invert(1);">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:8px;text-transform:uppercase;letter-spacing:0.15em;color:var(--ink)/60;">Snapped (≥65%)</div>
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--ink);">seal-badge: bone · R: amber</div>
+        </div>
+      </div>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);max-width:180px;line-height:1.6;align-self:center;padding-left:4px;">
+      CSS var <code style="background:var(--surface);padding:1px 4px;border-radius:3px;">--amber-pct</code> 0→100% calculado por la página vía scroll listener
+    </div>
+  </div>
+
+  <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted-foreground);letter-spacing:0.08em;line-height:1.7;padding:10px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--hairline);">
+    assets/rambla-wordmark.svg  ← amber natural sobre bone/white · filter:brightness(0)invert(1) sobre amber · no usar sobre ink<br>
+    Logo.tsx fetcha /api/settings/logo_url → fallback al asset local si no hay setting
+  </div>
+
+</body>
+</html>

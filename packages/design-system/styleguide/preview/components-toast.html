@@ -1,0 +1,215 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .state { display: flex; flex-direction: column; gap: 8px; }
+  .state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+  .state-tag .d { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .state-tag.ok    { color: var(--verde); }       .state-tag.ok .d    { background: var(--verde); }
+  .state-tag.undo  { color: var(--ink); }          .state-tag.undo .d  { background: var(--ink); }
+  .state-tag.err   { color: var(--destructive); }  .state-tag.err .d   { background: var(--destructive); }
+  .state-tag.info  { color: var(--azul); }         .state-tag.info .d  { background: var(--azul); }
+
+  .frame { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface); padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+
+  /* ── Toast base (light, default) ── */
+  .toast {
+    display: flex; align-items: center; gap: 10px;
+    min-width: 280px; max-width: 360px;
+    border-radius: var(--radius-md);
+    padding: 11px 13px;
+    background: var(--surface-elevated); color: var(--ink);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-lg);
+    position: relative; overflow: hidden;
+  }
+  /* left accent stripe by variant */
+  .toast::after { content: ""; position: absolute; top: 0; left: 0; bottom: 0; width: 3px; }
+  .toast.v-ok::after   { background: var(--verde); }
+  .toast.v-undo::after { background: var(--amber); }
+  .toast.v-err::after  { background: var(--destructive); }
+  .toast.v-info::after { background: var(--azul); }
+
+  .toast-icon { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; }
+  .toast-body { flex: 1; min-width: 0; }
+  .toast-title { font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.2; }
+  .toast-sub { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.04em; color: var(--muted-foreground); margin-top: 2px; }
+  .toast-action { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: oklch(0.5 0.1 70); background: transparent; border: none; cursor: pointer; flex-shrink: 0; padding: 4px 6px; }
+  .toast-close { width: 22px; height: 22px; border-radius: 50%; border: none; background: transparent; color: var(--muted-foreground); cursor: pointer; display: grid; place-items: center; flex-shrink: 0; }
+  /* progress bar */
+  .toast-progress { position: absolute; bottom: 0; left: 0; height: 2px; background: var(--amber); }
+
+  /* variants — icon bg */
+  .toast .toast-icon.ok   { background: color-mix(in oklch, var(--verde) 16%, transparent); color: var(--verde); }
+  .toast .toast-icon.undo { background: color-mix(in oklch, var(--amber) 20%, transparent); color: oklch(0.5 0.1 70); }
+  .toast .toast-icon.err  { background: color-mix(in oklch, var(--destructive) 12%, transparent); color: var(--destructive); }
+  .toast .toast-icon.info { background: color-mix(in oklch, var(--azul) 14%, transparent); color: var(--azul); }
+
+  /* ink variant (opcional — sobre superficies claras donde se quiera más contraste) */
+  .toast.ink { background: var(--ink); color: var(--background); border-color: var(--ink); }
+  .toast.ink .toast-title { color: var(--background); }
+  .toast.ink .toast-sub { color: oklch(0.985 0.005 90 / 60%); }
+  .toast.ink .toast-close { color: oklch(0.985 0.005 90 / 55%); }
+  .toast.ink .toast-action { color: var(--amber); }
+  .toast.ink .toast-icon.undo { color: var(--amber); }
+
+  /* ── Mobile frame ── */
+  .phone { border: 2px solid var(--ink); border-radius: 16px; overflow: hidden; max-width: 280px; background: var(--surface); }
+  .phone-content { height: 160px; background: repeating-linear-gradient(-45deg, oklch(0.14 0.01 60 / 3%) 0 1px, transparent 1px 20px); display: flex; align-items: flex-end; padding: 10px; }
+  .phone-content .toast { min-width: 0; width: 100%; max-width: 100%; }
+
+  /* stack demo */
+  .stack { display: flex; flex-direction: column; gap: 8px; }
+  .stack .toast:nth-child(2) { transform: scale(0.97); opacity: 0.9; }
+  .stack .toast:nth-child(3) { transform: scale(0.94); opacity: 0.75; }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Component · Toast</div>
+<div class="sub-eye">success · undo · error · info · stack · ink (opcional)</div>
+
+<div class="gallery">
+
+  <!-- Success -->
+  <div class="state">
+    <span class="state-tag ok"><span class="d"></span>Success · agregado al carrito</span>
+    <div class="frame">
+      <div class="toast v-ok">
+        <div class="toast-icon ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <div class="toast-body">
+          <div class="toast-title">Sony a7S III agregada</div>
+          <div class="toast-sub">3 jornadas · $ 73.500</div>
+        </div>
+        <button class="toast-action">Ver carrito</button>
+        <div class="toast-progress" style="width:60%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Undo -->
+  <div class="state">
+    <span class="state-tag undo"><span class="d"></span>Undo · quitado del carrito · deshacer</span>
+    <div class="frame">
+      <div class="toast v-undo">
+        <div class="toast-icon undo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
+        <div class="toast-body">
+          <div class="toast-title">Aputure 600D quitada</div>
+          <div class="toast-sub">del carrito</div>
+        </div>
+        <button class="toast-action">Deshacer</button>
+        <div class="toast-progress" style="width:80%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="state">
+    <span class="state-tag err"><span class="d"></span>Error · sin stock en esas fechas</span>
+    <div class="frame">
+      <div class="toast v-err">
+        <div class="toast-icon err"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
+        <div class="toast-body">
+          <div class="toast-title">No hay stock el 14 jun</div>
+          <div class="toast-sub">probá otras fechas</div>
+        </div>
+        <button class="toast-close"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info / stack -->
+  <div class="state">
+    <span class="state-tag info"><span class="d"></span>Info · stack (máx 3) · ink (opcional)</span>
+    <div class="frame">
+      <div class="stack">
+        <div class="toast v-info">
+          <div class="toast-icon info"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div>
+          <div class="toast-body">
+            <div class="toast-title">Fechas actualizadas</div>
+            <div class="toast-sub">14–17 jun · 3 jornadas</div>
+          </div>
+          <button class="toast-close"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="toast ink">
+          <div class="toast-icon ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <div class="toast-body">
+            <div class="toast-title">Pedido enviado</div>
+            <div class="toast-sub">te respondemos en 2 h</div>
+          </div>
+        </div>
+        <div class="toast v-undo">
+          <div class="toast-icon undo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></div>
+          <div class="toast-body"><div class="toast-title">Item quitado</div></div>
+          <button class="toast-action">Deshacer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile -->
+  <div class="state">
+    <span class="state-tag ok"><span class="d"></span>Mobile · bottom full-width sobre el contenido</span>
+    <div class="phone">
+      <div class="phone-content">
+        <div class="toast v-undo">
+          <div class="toast-icon undo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
+          <div class="toast-body">
+            <div class="toast-title">Aputure 600D quitada</div>
+            <div class="toast-sub">del carrito</div>
+          </div>
+          <button class="toast-action">Deshacer</button>
+          <div class="toast-progress" style="width:70%;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<pre class="code"><span class="c">// Toast con undo — el patrón clave de Rambla</span>
+toast.<span class="k">undo</span>({
+  title: <span class="s">'Aputure 600D quitada'</span>,
+  action: <span class="s">'Deshacer'</span>,
+  duration: <span class="k">5000</span>,          <span class="c">// 5s para errores/undo, 3s para success</span>
+  onUndo: () =&gt; restoreItem(item),
+});
+
+<span class="c">// Variantes</span>
+toast.<span class="k">success</span>(msg)  <span class="c">// verde · 3s · auto-dismiss</span>
+toast.<span class="k">undo</span>(msg)     <span class="c">// amber action · 5s · acción reversible</span>
+toast.<span class="k">error</span>(msg)    <span class="c">// destructive · 5s · close manual</span>
+toast.<span class="k">info</span>(msg)     <span class="c">// azul · 3s</span>
+
+<span class="c">// Stack máx 3 — los viejos se comprimen (scale + opacity) y salen FIFO</span>
+<span class="c">// Light por defecto (superficie clara + stripe de color a la izquierda)</span>
+<span class="c">// Posición: bottom-center (mobile) / bottom-right (desktop), sobre el CartMiniBar</span></pre>
+
+<div class="note">
+  <b>Undo es obligatorio</b> en toda acción destructiva (quitar del carrito, borrar fechas). 5s de ventana. ·
+  <b>Light por defecto</b> — superficie clara con stripe de color a la izquierda (verde/amber/destructive/azul) e ícono tinte. Mismo tono cálido del sistema. ·
+  <b>Ink</b> es opcional, solo para confirmaciones fuertes (pedido enviado). ·
+  <b>Progress bar amber</b> marca el tiempo restante antes del auto-dismiss. Pausa en hover. ·
+  <b>Nunca</b> más de 3 toasts a la vez — los nuevos empujan a los viejos hacia afuera.
+</div>
+
+</body>
+</html>

@@ -4,6 +4,10 @@ Objetivo: **invertir la fuente de verdad**. Hoy `src/styles.css` y `src/componen
 
 Elegí **una** de las dos estrategias.
 
+> **Atajo:** los pasos de reescritura de imports están automatizados en
+> `scripts/migrate-imports.mjs` (dry-run por defecto, `--apply` para escribir).
+> Y `PR.md` trae la descripción del PR lista para pegar.
+
 ---
 
 ## Estrategia A — Workspace package (recomendada, limpia)
