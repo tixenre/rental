@@ -837,11 +837,15 @@ def list_equipos(
         # Filtrar kits/combos que no pueden armarse ni una vez (stock de
         # componentes insuficiente, sin considerar reservas). Solo para catálogo
         # público — el admin los sigue viendo para poder corregirlos.
+        # Solo aplica a kits (los que tienen kit_componentes) para no afectar
+        # equipos hoja con cantidad=0. Las claves de stock_teo son str(id).
         if not is_admin:
             stock_teo = _stock_sin_reservas(conn)
-            # Es "kit" cualquier equipo que tenga componentes esenciales; para
-            # hojas, _derivar_compuestos devuelve su propio stock → no filtra.
-            equipos = [e for e in equipos if stock_teo.get(e["id"], e.get("cantidad", 0)) > 0]
+            equipos = [
+                e for e in equipos
+                if not e.get("kit")
+                or stock_teo.get(str(e["id"]), 0) > 0
+            ]
 
         if desde and hasta:
             equipos = _attach_disponibilidad(conn, equipos, desde, hasta)
