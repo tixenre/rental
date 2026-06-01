@@ -10,6 +10,16 @@ import { test, expect } from "@playwright/test";
  * horarios configurados queden deshabilitados en el calendario.
  */
 
+// El ViewIntroDialog se auto-abre 400ms después del primer render cuando no
+// hay localStorage.rambla.view_intro_seen. En CI esa key nunca existe → el
+// Dialog abre → su overlay bloquea los clicks. addInitScript inyecta la key
+// antes de que la página cargue, igual que si el usuario ya lo hubiera visto.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("rambla.view_intro_seen", "1");
+  });
+});
+
 async function abrirModal(page: import("@playwright/test").Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Elegir fechas" }).first().click();
