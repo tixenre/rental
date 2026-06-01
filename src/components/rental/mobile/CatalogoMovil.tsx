@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   Camera,
   Sun,
@@ -136,12 +136,10 @@ function HeroBanner({
   heroRef,
   equipCount,
   onDateOpen,
-  topbarHeight = 53,
 }: {
   heroRef: React.RefObject<HTMLDivElement | null>;
   equipCount: number;
   onDateOpen: () => void;
-  topbarHeight?: number;
 }) {
   const navigate = useNavigate();
   const photos = useHeroPhotos();
@@ -176,14 +174,11 @@ function HeroBanner({
   return (
     <div ref={heroRef} className="relative bg-amber">
       {/* Foto rotante — crossfade. Las imgs se apilan en la misma celda de
-          grid (gridArea "1/1") y se cruzan por opacidad. marginTop negativo
-          extiende la foto por detrás del topbar (que tiene z-40) para que
-          la imagen sea plena desde el borde superior de la pantalla. */}
+          grid (gridArea "1/1") y se cruzan por opacidad. */}
       <div
         className="relative overflow-hidden bg-ink"
         style={{
-          marginTop: -topbarHeight,
-          height: `calc(clamp(240px, 58vw, 340px) + ${topbarHeight}px)`,
+          height: "clamp(240px, 58vw, 340px)",
           display: "grid",
           gridTemplateColumns: "1fr",
           gridTemplateRows: "1fr",
@@ -203,17 +198,7 @@ function HeroBanner({
             loading="eager"
           />
         ))}
-        {/* Top gradient — da contraste para que los íconos del topbar
-            sean legibles sobre la foto. */}
-        <div
-          className="pointer-events-none"
-          style={{
-            gridArea: "1 / 1",
-            zIndex: 1,
-            background: "linear-gradient(to bottom, rgba(0,0,0,0.28) 0%, transparent 28%)",
-          }}
-        />
-        {/* Bottom gradient */}
+        {/* Overlay + "Conocé el estudio" — posicionados relativos al grid */}
         <div
           className="pointer-events-none bg-gradient-to-b from-transparent via-transparent to-ink/30"
           style={{ gridArea: "1 / 1", zIndex: 1 }}
@@ -1299,16 +1284,6 @@ export function CatalogoMovil() {
   const SEARCH_BAR_HEIGHT = 65;
   const CAT_TABS_STICKY_TOP = TOPBAR_HEIGHT + SEARCH_BAR_HEIGHT;
 
-  // Altura real del topbar (incluye env(safe-area-inset-top) en iPhone).
-  // Se mide tras el primer render para que el hero photo se extienda
-  // exactamente hasta el borde superior de pantalla.
-  const [topbarHeight, setTopbarHeight] = useState(TOPBAR_HEIGHT);
-  useLayoutEffect(() => {
-    if (topbarRef.current) {
-      setTopbarHeight(topbarRef.current.getBoundingClientRect().height);
-    }
-  }, []);
-
   // h-dvh (dynamic viewport) respeta la URL bar de safari iOS — antes
   // h-screen dejaba el cart-bar tapado cuando safari mostraba su UI.
   return (
@@ -1325,9 +1300,10 @@ export function CatalogoMovil() {
             topbar-snap. */}
         <header
           ref={topbarRef}
-          className="topbar-mobile sticky top-0 z-40 flex items-center gap-2.5 px-4 py-[10px] backdrop-blur-xl transition-colors"
+          className="topbar-mobile sticky top-0 z-40 flex items-center gap-2.5 px-4 py-[10px] border-b border-hairline backdrop-blur-xl transition-colors"
           style={{
-            background: "color-mix(in oklch, var(--amber) var(--amber-pct, 0%), transparent)",
+            background:
+              "color-mix(in oklch, var(--amber) var(--amber-pct, 0%), color-mix(in oklch, var(--background) 90%, transparent))",
             paddingTop: "max(10px, calc(env(safe-area-inset-top) + 4px))",
           }}
         >
@@ -1369,7 +1345,6 @@ export function CatalogoMovil() {
           heroRef={heroRef}
           equipCount={allEquipos?.length ?? 0}
           onDateOpen={() => setShowDateSheet(true)}
-          topbarHeight={topbarHeight}
         />
 
         {/* Search bar — sticky bajo el topbar. Los chips de "Populares"
