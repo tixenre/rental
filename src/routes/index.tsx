@@ -247,6 +247,39 @@ function Index() {
       return a.localeCompare(b, "es");
     });
   }, [allEquipos, backendCats]);
+
+  // Categorías raíz (top-level, parent_id === null). Dinámico — se deriva del
+  // árbol del backend para no hardcodear nombres.
+  const rootCatNames = useMemo(
+    () => new Set(backendCats.map((c: BackendCategoria) => c.nombre)),
+    [backendCats],
+  );
+
+  // Por cada raíz: el conjunto completo de nombres en su subárbol (raíz + hijos).
+  // Permite que un carrusel de "Iluminación" muestre también los "Modificadores".
+  const rootSubtrees = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    const collect = (node: BackendCategoria, rootName: string) => {
+      let set = map.get(rootName);
+      if (!set) {
+        set = new Set<string>();
+        map.set(rootName, set);
+      }
+      set.add(node.nombre);
+      node.children?.forEach((child) => collect(child, rootName));
+    };
+    backendCats.forEach((root: BackendCategoria) => collect(root, root.nombre));
+    return map;
+  }, [backendCats]);
+
+  // Solo categorías raíz con equipos (para carruseles y mosaico).
+  // Fallback a apiCategories si el árbol aún no cargó.
+  const rootApiCategories = useMemo(
+    () =>
+      rootCatNames.size > 0 ? apiCategories.filter((c) => rootCatNames.has(c)) : apiCategories,
+    [apiCategories, rootCatNames],
+  );
+
   const marcas = marcasData?.items ?? [];
 
   // Modo de view en la URL: ?view=grid | ?view=list. Si no está, default
@@ -689,6 +722,8 @@ function Index() {
         <GridMode
           allEquipos={allEquipos}
           apiCategories={apiCategories}
+          rootApiCategories={rootApiCategories}
+          rootSubtrees={rootSubtrees}
           marcas={marcas}
           selectedBrand={brand}
           onBrandSelect={(brandName) => setBrand(brandName)}
@@ -740,6 +775,8 @@ function Index() {
 function GridMode({
   allEquipos,
   apiCategories,
+  rootApiCategories,
+  rootSubtrees,
   marcas,
   selectedBrand,
   onBrandSelect,
@@ -752,6 +789,8 @@ function GridMode({
 }: {
   allEquipos: Equipment[];
   apiCategories: string[];
+  rootApiCategories: string[];
+  rootSubtrees: Map<string, Set<string>>;
   marcas: BackendMarca[];
   selectedBrand?: string | null;
   onBrandSelect: (brandName: string | null) => void;
@@ -776,16 +815,20 @@ function GridMode({
 
   const isFiltered = selectedCats.size > 0 || !!selectedBrand;
   const isSearching = q.length > 0;
-  // Si hay categorías seleccionadas, mostramos esas como secciones — pueden
-  // ser roots o sub-cats (ej. "Montura E"). Si solo hay filtro de marca o
-  // búsqueda, mostramos todas las roots del backend (matches() hace el resto).
-  const visibleCategories = selectedCats.size > 0 ? Array.from(selectedCats) : apiCategories;
+  // En browse mode mostramos solo categorías raíz. Al filtrar se usa la
+  // selección directa (puede ser raíz o sub-cat).
+  const visibleCategories = selectedCats.size > 0 ? Array.from(selectedCats) : rootApiCategories;
 
-  // Una categoría puede ser root o sub-cat. Esta helper matchea contra
-  // ambos: el `category` (root inferido por el mapper) y las refs en
-  // `categorias` (M2M completo). Reemplaza el viejo `e.category === c`.
-  const inCategory = (e: Equipment, c: string) =>
-    e.category === c || (e.categorias ?? []).some((cc) => cc.nombre === c);
+  // inCategory: matchea equipo contra una categoría. Si la categoría es raíz
+  // (tiene subárbol) incluye todos los equipos de sus descendientes. Si es
+  // una sub-cat seleccionada directamente, matcheo exacto.
+  const inCategory = (e: Equipment, c: string) => {
+    const subtree = rootSubtrees.get(c);
+    if (subtree) {
+      return (e.categorias ?? []).some((cc) => subtree.has(cc.nombre));
+    }
+    return e.category === c || (e.categorias ?? []).some((cc) => cc.nombre === c);
+  };
 
   // Ancho fijo de cards en carrusel para snap consistente
   const cardW = 260;
@@ -836,7 +879,7 @@ function GridMode({
       {!isFiltered && !isSearching && (
         <CategoryMosaic
           allEquipos={allEquipos}
-          categories={apiCategories}
+          categories={rootApiCategories}
           onSelect={onJumpToCategory}
           getCount={(c) => allEquipos.filter((e) => inCategory(e, c)).length}
         />
