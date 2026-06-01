@@ -1,0 +1,144 @@
+<!-- @dsCard group="Colors" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .pane-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .pane-label .d { width: 9px; height: 9px; border-radius: 50%; }
+
+  /* self-contained light/dark via scoping */
+  .pane { border-radius: var(--radius-lg); padding: 16px; border: 1px solid var(--hairline); }
+  .pane.light {
+    --background: oklch(0.985 0.005 90); --foreground: oklch(0.18 0.01 60);
+    --surface: oklch(0.97 0.008 85); --surface-elevated: oklch(1 0 0);
+    --hairline: oklch(0.18 0.01 60 / 12%); --muted-foreground: oklch(0.42 0.01 70);
+    background: oklch(0.985 0.005 90);
+  }
+  .pane.dark {
+    --background: oklch(0.16 0.01 60); --foreground: oklch(0.97 0.008 85);
+    --surface: oklch(0.2 0.01 60); --surface-elevated: oklch(0.24 0.01 60);
+    --hairline: oklch(1 0 0 / 12%); --muted-foreground: oklch(0.72 0.01 70);
+    background: oklch(0.16 0.01 60);
+  }
+
+  .demo { display: flex; flex-direction: column; gap: 12px; }
+  .demo-card { background: var(--surface-elevated); border: 1px solid var(--hairline); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .demo-photo { aspect-ratio: 16/10; background: var(--surface); display: grid; place-items: center; }
+  .demo-photo svg { color: var(--foreground); opacity: 0.18; }
+  .demo-body { padding: 12px; }
+  .demo-name { font-size: 15px; font-weight: 700; color: var(--foreground); }
+  .demo-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+  .demo-price { font-family: var(--font-mono); font-size: 16px; font-weight: 600; color: var(--foreground); }
+  .demo-add { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9999px; background: var(--ink, #1a1a18); }
+  .pane.dark .demo-add { background: var(--amber); }
+  .demo-add svg { color: var(--amber); }
+  .pane.dark .demo-add svg { color: #2a2620; }
+  .btn-cta { display: inline-flex; align-items: center; justify-content: center; padding: 9px 18px; border-radius: 9999px; background: var(--amber); color: oklch(0.14 0.01 60); font-weight: 700; font-size: 13px; border: none; }
+  .chips { display: flex; gap: 6px; }
+  .chip { padding: 4px 10px; border-radius: 9999px; background: var(--surface); border: 1px solid var(--hairline); font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-foreground); }
+
+  .swatches { display: flex; flex-direction: column; gap: 8px; }
+  .sw-row { display: flex; align-items: center; gap: 10px; }
+  .sw { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--hairline); flex-shrink: 0; }
+  .sw-name { font-family: var(--font-mono); font-size: 9px; color: var(--foreground); min-width: 132px; }
+  .sw-val { font-family: var(--font-mono); font-size: 8px; color: var(--muted-foreground); }
+
+  .frame { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface); padding: 16px; }
+  .section-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); margin: 4px 0 8px; }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Colors · Dark Mode</div>
+<div class="sub-eye">.dark en &lt;html&gt; · tokens semánticos auto-switch · amber permanece</div>
+
+<div class="split">
+  <div>
+    <div class="pane-label"><span class="d" style="background:#fff;border:1px solid var(--hairline);"></span>Light · bone</div>
+    <div class="pane light">
+      <div class="demo">
+        <div class="demo-card">
+          <div class="demo-photo"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="3.5"/></svg></div>
+          <div class="demo-body">
+            <div class="demo-name">sony a7s iii</div>
+            <div class="demo-foot"><span class="demo-price">$ 24.500</span><span class="demo-add"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></div>
+          </div>
+        </div>
+        <div class="chips"><span class="chip">cámaras</span><span class="chip">luces</span><span class="chip">audio</span></div>
+        <button class="btn-cta">Reservar</button>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="pane-label"><span class="d" style="background:#1a1714;"></span>Dark · warm near-black</div>
+    <div class="pane dark">
+      <div class="demo">
+        <div class="demo-card">
+          <div class="demo-photo"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="3.5"/></svg></div>
+          <div class="demo-body">
+            <div class="demo-name">sony a7s iii</div>
+            <div class="demo-foot"><span class="demo-price">$ 24.500</span><span class="demo-add"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></div>
+          </div>
+        </div>
+        <div class="chips"><span class="chip">cámaras</span><span class="chip">luces</span><span class="chip">audio</span></div>
+        <button class="btn-cta">Reservar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section-label">Token swap · .dark override</div>
+<div class="split">
+  <div class="frame">
+    <div class="swatches">
+      <div class="sw-row"><div class="sw" style="background:oklch(0.985 0.005 90);"></div><span class="sw-name">--background</span><span class="sw-val">0.985 → 0.16</span></div>
+      <div class="sw-row"><div class="sw" style="background:oklch(0.97 0.008 85);"></div><span class="sw-name">--surface</span><span class="sw-val">0.97 → 0.20</span></div>
+      <div class="sw-row"><div class="sw" style="background:oklch(1 0 0);"></div><span class="sw-name">--surface-elevated</span><span class="sw-val">1.0 → 0.24</span></div>
+      <div class="sw-row"><div class="sw" style="background:oklch(0.18 0.01 60);"></div><span class="sw-name">--foreground</span><span class="sw-val">0.18 → 0.97</span></div>
+    </div>
+  </div>
+  <div class="frame" style="background:oklch(0.16 0.01 60);border-color:oklch(1 0 0 /12%);">
+    <div class="swatches">
+      <div class="sw-row"><div class="sw" style="background:oklch(0.16 0.01 60);border-color:oklch(1 0 0 /20%);"></div><span class="sw-name" style="color:oklch(0.97 0.008 85);">--background</span><span class="sw-val" style="color:oklch(0.72 0.01 70);">dark base</span></div>
+      <div class="sw-row"><div class="sw" style="background:oklch(0.24 0.01 60);border-color:oklch(1 0 0 /20%);"></div><span class="sw-name" style="color:oklch(0.97 0.008 85);">--surface-elevated</span><span class="sw-val" style="color:oklch(0.72 0.01 70);">cards</span></div>
+      <div class="sw-row"><div class="sw" style="background:#FAB428;"></div><span class="sw-name" style="color:oklch(0.97 0.008 85);">--amber</span><span class="sw-val" style="color:oklch(0.72 0.01 70);">SIN cambio · acento</span></div>
+      <div class="sw-row"><div class="sw" style="background:oklch(0.97 0.008 85);border-color:oklch(1 0 0 /20%);"></div><span class="sw-name" style="color:oklch(0.97 0.008 85);">--foreground</span><span class="sw-val" style="color:oklch(0.72 0.01 70);">bone text</span></div>
+    </div>
+  </div>
+</div>
+
+<pre class="code"><span class="c">// Dark mode = toggle de clase en &lt;html&gt;, tokens hacen el resto</span>
+document.documentElement.classList.toggle(<span class="s">"dark"</span>)
+
+.dark {
+  --background: oklch(0.16 0.01 60);   <span class="c">// warm near-black</span>
+  --surface-elevated: oklch(0.24 0.01 60);
+  --foreground: oklch(0.97 0.008 85);
+  <span class="c">// --amber NO se redefine → mismo acento en ambos modos</span>
+}</pre>
+
+<div class="note">
+  <b>Dark mode</b> es solo un swap de tokens semánticos vía <code>.dark</code> en <code>&lt;html&gt;</code> — los componentes no cambian. ·
+  El <b>amber permanece idéntico</b> en ambos modos: es la constante de marca. ·
+  Negros y blancos son <b>cálidos</b> (hue 60–85), nunca neutros puros. · Las sombras siguen tintadas con ink; en dark suben un poco de opacidad.
+</div>
+
+</body>
+</html>

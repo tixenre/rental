@@ -1,0 +1,228 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye    { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .state { display: flex; flex-direction: column; gap: 8px; }
+  .state-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+  .state-tag .d { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .state-tag.default { color: var(--muted-foreground); } .state-tag.default .d { background: var(--muted-foreground); }
+  .state-tag.active  { color: oklch(0.5 0.1 70); }      .state-tag.active .d  { background: var(--amber); }
+  .state-tag.search  { color: var(--ink); }              .state-tag.search .d  { background: var(--ink); }
+  .state-tag.mobile  { color: var(--azul); }             .state-tag.mobile .d  { background: var(--azul); }
+
+  /* frame shell */
+  .frame { border: 1px solid var(--hairline); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-elevated); }
+
+  /* topbar stub */
+  .topbar { height: 48px; border-bottom: 1px solid var(--hairline); background: var(--background); display: flex; align-items: center; padding: 0 16px; gap: 10px; }
+  .wm { font-family: var(--font-display); font-weight: 900; font-size: 18px; text-transform: lowercase; color: var(--ink); }
+  .tb-icon { width: 30px; height: 30px; border-radius: 9999px; border: 1px solid var(--hairline); display: grid; place-items: center; color: var(--ink); flex-shrink: 0; }
+
+  /* searchbar row */
+  .searchbar { background: var(--background); border-bottom: 1px solid var(--hairline); padding: 6px 12px; display: flex; gap: 8px; }
+  .search-wrap { flex: 1; display: flex; align-items: center; gap: 7px; border: 1.5px solid var(--hairline); border-radius: 9999px; background: var(--surface); padding: 0 11px; height: 32px; transition: border-color 150ms; }
+  .search-wrap.active { border-color: var(--ink); background: var(--surface-elevated); }
+  .search-wrap svg { flex-shrink: 0; color: var(--muted-foreground); }
+  .search-wrap.active svg { color: oklch(0.5 0.1 70); }
+  .search-input { flex: 1; border: none; background: transparent; outline: none; font-family: var(--font-sans); font-size: 12px; color: var(--ink); }
+  .search-input::placeholder { color: var(--muted-foreground); }
+  .search-clear { font-size: 10px; color: var(--surface-elevated); background: var(--muted-foreground); border: none; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+
+  /* catbar */
+  .catbar { background: var(--background); border-bottom: 1px solid var(--hairline); position: relative; }
+  .catbar::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 32px; background: linear-gradient(to right, transparent, var(--background)); pointer-events: none; }
+  .catbar-inner { display: flex; overflow-x: auto; scrollbar-width: none; padding: 0 12px; gap: 0; }
+  .catbar-inner::-webkit-scrollbar { display: none; }
+
+  .cat-tab { display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; height: 38px; white-space: nowrap; flex-shrink: 0; font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: var(--muted-foreground); cursor: pointer; border-bottom: 2px solid transparent; transition: color 150ms, border-color 150ms; text-decoration: none; }
+  .cat-tab:hover { color: var(--ink); }
+  .cat-tab.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--amber); }
+  .cat-count { font-family: var(--font-mono); font-size: 8px; font-weight: 600; color: var(--muted-foreground); background: var(--surface); border: 1px solid var(--hairline); border-radius: 9999px; padding: 1px 5px; transition: background 150ms; }
+  .cat-tab.active .cat-count { background: color-mix(in oklch, var(--amber) 18%, transparent); color: oklch(0.45 0.1 70); border-color: color-mix(in oklch, var(--amber) 40%, transparent); }
+
+  /* pill variant */
+  .catbar-pills .cat-tab { border-bottom: none; border-radius: 9999px; height: 28px; padding: 0 10px; margin: 5px 0; font-size: 11px; }
+  .catbar-pills .cat-tab:hover { background: var(--surface); color: var(--ink); }
+  .catbar-pills .cat-tab.active { background: var(--amber); color: var(--ink); border-bottom: none; }
+  .catbar-pills .cat-tab.active .cat-count { background: oklch(0.14 0.01 60 / 12%); color: var(--ink); border-color: transparent; }
+
+  /* content placeholder */
+  .content-stub { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .row-stub { height: 52px; border-radius: 8px; background: var(--surface); border: 1px solid var(--hairline); }
+
+  /* mobile frame */
+  .mobile-outer { border: 2px solid var(--ink); border-radius: 14px; overflow: hidden; max-width: 340px; box-shadow: 0 4px 16px -4px oklch(0.14 0.01 60 / 12%); }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Components · CatBar</div>
+<div class="sub-eye">underline default · categoría activa · variante pill · mobile · (search = asset aparte)</div>
+
+<div class="gallery">
+
+  <!-- Todos (default) -->
+  <div class="state">
+    <span class="state-tag default"><span class="d"></span>Default · "Todos" activo · sin búsqueda</span>
+    <div class="frame">
+      <div class="topbar">
+        <span class="wm">rambla</span>
+        <div style="flex:1;"></div>
+        <div class="tb-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
+      </div>
+      <div class="searchbar">
+        <div class="search-wrap">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="search-input" placeholder="Buscar equipo…" readonly="">
+        </div>
+      </div>
+      <div class="catbar">
+        <div class="catbar-inner">
+          <a class="cat-tab active">Todos <span class="cat-count">187</span></a>
+          <a class="cat-tab">Cámaras <span class="cat-count">34</span></a>
+          <a class="cat-tab">Óptica <span class="cat-count">28</span></a>
+          <a class="cat-tab">Iluminación <span class="cat-count">41</span></a>
+          <a class="cat-tab">Audio <span class="cat-count">22</span></a>
+          <a class="cat-tab">Soportes <span class="cat-count">19</span></a>
+          <a class="cat-tab">Estabilización <span class="cat-count">11</span></a>
+          <a class="cat-tab">Packs <span class="cat-count">10</span></a>
+        </div>
+      </div>
+      <div class="content-stub">
+        <div class="row-stub"></div><div class="row-stub"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Categoría activa -->
+  <div class="state">
+    <span class="state-tag active"><span class="d"></span>Categoría activa · underline amber · count badge</span>
+    <div class="frame">
+      <div class="topbar">
+        <span class="wm">rambla</span>
+        <div style="flex:1;"></div>
+        <div class="tb-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
+      </div>
+      <div class="searchbar">
+        <div class="search-wrap">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="search-input" placeholder="Buscar equipo…" readonly="">
+        </div>
+      </div>
+      <div class="catbar">
+        <div class="catbar-inner">
+          <a class="cat-tab">Todos <span class="cat-count">187</span></a>
+          <a class="cat-tab">Cámaras <span class="cat-count">34</span></a>
+          <a class="cat-tab">Óptica <span class="cat-count">28</span></a>
+          <a class="cat-tab active">Iluminación <span class="cat-count">41</span></a>
+          <a class="cat-tab">Audio <span class="cat-count">22</span></a>
+          <a class="cat-tab">Soportes <span class="cat-count">19</span></a>
+          <a class="cat-tab">Estabilización <span class="cat-count">11</span></a>
+          <a class="cat-tab">Packs <span class="cat-count">10</span></a>
+        </div>
+      </div>
+      <div class="content-stub">
+        <div class="row-stub"></div><div class="row-stub"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Variante pill -->
+  <div class="state">
+    <span class="state-tag search"><span class="d"></span>Variante pill · para drawer / panel</span>
+    <div class="frame">
+      <div class="topbar">
+        <span class="wm">rambla</span>
+        <div style="flex:1;"></div>
+        <div class="tb-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
+      </div>
+      <div class="catbar catbar-pills" style="padding:0 6px;">
+        <div class="catbar-inner">
+          <a class="cat-tab active">Todos <span class="cat-count">187</span></a>
+          <a class="cat-tab">Cámaras <span class="cat-count">34</span></a>
+          <a class="cat-tab">Óptica <span class="cat-count">28</span></a>
+          <a class="cat-tab">Iluminación <span class="cat-count">41</span></a>
+          <a class="cat-tab">Audio <span class="cat-count">22</span></a>
+          <a class="cat-tab">Packs <span class="cat-count">10</span></a>
+        </div>
+      </div>
+      <div class="content-stub">
+        <div class="row-stub"></div><div class="row-stub"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile -->
+  <div class="state">
+    <span class="state-tag mobile"><span class="d"></span>Mobile (375px) · scroll horizontal + fade</span>
+    <div class="mobile-outer">
+      <div class="topbar" style="height:44px;padding:0 12px;">
+        <span class="wm" style="font-size:16px;">rambla</span>
+        <div style="flex:1;"></div>
+        <div class="tb-icon" style="width:28px;height:28px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
+      </div>
+      <div class="searchbar" style="padding:5px 10px;">
+        <div class="search-wrap" style="height:30px;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="search-input" style="font-size:11px;" placeholder="Buscar equipo…" readonly="">
+        </div>
+      </div>
+      <div class="catbar">
+        <div class="catbar-inner">
+          <a class="cat-tab" style="font-size:11px;height:34px;padding:0 7px;">Todos <span class="cat-count">187</span></a>
+          <a class="cat-tab active" style="font-size:11px;height:34px;padding:0 7px;">Cámaras <span class="cat-count">34</span></a>
+          <a class="cat-tab" style="font-size:11px;height:34px;padding:0 7px;">Óptica <span class="cat-count">28</span></a>
+          <a class="cat-tab" style="font-size:11px;height:34px;padding:0 7px;">Iluminación <span class="cat-count">41</span></a>
+          <a class="cat-tab" style="font-size:11px;height:34px;padding:0 7px;">Audio <span class="cat-count">22</span></a>
+          <a class="cat-tab" style="font-size:11px;height:34px;padding:0 7px;">Packs <span class="cat-count">10</span></a>
+        </div>
+      </div>
+      <div class="content-stub">
+        <div class="row-stub" style="height:44px;"></div>
+        <div class="row-stub" style="height:44px;"></div>
+        <div class="row-stub" style="height:44px;opacity:0.5;"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<pre class="code"><span class="c">// Sticky stack: topbar (z:50) → searchbar → catbar (z:40)</span>
+<span class="k">sticky top</span>-[56px] <span class="k">z</span>-[var(--z-cat-bar)]
+
+<span class="c">// Activo en URL — persiste al navegar</span>
+<span class="s">?cat=iluminacion</span>  → tab "Iluminación" activo al montar
+<span class="c">// Scroll al activo en mount:</span>
+el.scrollIntoView({ block: <span class="s">'nearest'</span>, inline: <span class="s">'center'</span> })
+
+<span class="c">// Conteos: sin fechas → inventario total</span>
+<span class="c">//          con fechas → items disponibles en ese período</span>
+<span class="c">// Al buscar: tabs colapsan a solo las categorías con resultados</span>
+<span class="c">// Al limpiar búsqueda: restaura estado anterior de catbar</span></pre>
+
+<div class="note">
+  <b>Stack sticky:</b> topbar → SearchBar → CatBar. El <b>SearchBar es un asset aparte</b> (con sus estados y sugerencias); acá se muestra solo como contexto del stack. ·
+  <b>Fade-out derecha</b> con <code>::after</code> gradient sobre el scroll del catbar. ·
+  <b>Variante pill</b> (active amber) disponible para drawer/panel; no recomendada para la página principal.
+</div>
+
+</body>
+</html>

@@ -52,14 +52,16 @@
   decisiones de criterio + preferencias (curado, enforceable por el supervisor).
 - **Consecuencias:** el criterio del proyecto queda cargado en cada sesión y revisable.
 
-### 2026-05-25 — Pre-lanzamiento: producción = ambiente de prueba ⏰
-- **Contexto:** la web aún no es pública; el dueño es el único usuario de prueba.
-- **Decisión:** probar en producción está OK por ahora (no hay clientes que se crucen algo roto).
-  No se arma preview/staging todavía (infra prematura).
-- **⏰ Disparador (vence esta decisión):** cuando la web salga al público (haya clientes reales),
-  esto deja de valer → ahí sí hace falta preview/staging y dejar de probar en prod. **El supervisor
-  debe avisar al acercarse el lanzamiento** (ej. issues con `launch-blocker`, o pedido explícito de
-  publicar).
+### 2026-06-01 — Staging → Prod: flujo desde v1.0.0 (reemplaza "producción = ambiente de prueba")
+- **Contexto:** v1.0.0 en prod. Se creó un ambiente Railway `dev` (rama `dev`) como staging.
+  El disparador ⏰ de la entrada anterior se cumplió — hay staging, no se prueba en prod.
+- **Decisión:** **prod es sagrado — no se prueba ahí.** El flujo es:
+  trabajar en `dev` (o branches que mergean a `dev`) → ver en Railway staging → PR `dev → main` → prod.
+- **Why:** prod tiene clientes potenciales y datos reales; un error visible no tiene red de contención.
+  El staging de Railway cubre la necesidad de ver cambios en vivo antes de mandar a prod.
+- **How to apply:** todo cambio va a `dev` primero. Solo se mergea a `main` cuando el staging
+  muestra que funciona. La BD de staging es una copia de prod del 2026-06-01; las migraciones
+  de `dev` corren en staging y no tocan prod hasta el merge.
 
 ### 2026-05-25 — Gate de estilo en CI: formato bloquea, lógica de React avisa
 - **Contexto:** el repo tenía `eslint.config.js` pero el tooling nunca se instaló ni corría; al
@@ -198,6 +200,28 @@
   (`test_gate_caracterizacion_c4.py`) + correctitud/concurrencia anidada real
   (`test_reservas_nested_db.py`, opt-in).
 
+### 2026-06-01 — Gotcha de Railway: fork de ambiente desincroniza la contraseña del Postgres
+- **Contexto:** el backend de staging (`dev`) tiraba 500 en cascada con
+  `psycopg2.OperationalError: FATAL: password authentication failed for user "postgres"`.
+  No era bug de código: al **forkear** el ambiente `dev` desde prod, el **volumen** del Postgres
+  quedó con una contraseña, pero la variable `POSTGRES_PASSWORD` se **regeneró sin correr el
+  `ALTER USER`** correspondiente → la variable mentía. Ni la variable de staging, ni la de prod,
+  abrían la BD (la contraseña real del volumen no coincidía con ninguna).
+- **Decisión / cómo arreglar:** la contraseña real vive **dentro del Postgres** (en disco), no en
+  una variable de entorno → **ninguna** edición de variables (ni Shared Variables) lo arregla. Hay
+  que **resetear la contraseña en la BD** para que matchee la variable, entrando por el socket local
+  (auth `peer`, sin contraseña) vía SSH al contenedor:
+  ```
+  railway ssh --service Postgres --environment dev \
+    "psql -U postgres -d railway -h /var/run/postgresql \
+     -c \"ALTER USER postgres WITH PASSWORD '<POSTGRES_PASSWORD de ese ambiente>';\""
+  ```
+  Después, alinear `DATABASE_URL` del backend a esa misma contraseña y redeploy.
+- **How to apply:** ante `password authentication failed` en un ambiente recién forkeado, es **esto**
+  — no perseguir variables. Reset por SSH + socket local. **Prod es sagrado**: no se leen sus
+  credenciales ni se prueba contra su BD para diagnosticar staging.
+- **Consecuencias:** receta directa para la próxima sesión que forkee un ambiente con DB.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
@@ -255,20 +279,11 @@
 - **⏰ Disparador:** si el repo vuelve a privado, el plan Free da 2.000 min/mes y el CI corre 6 jobs
   por push → ahí sí hay que cuidar la cuota (sacar `compileall`, cachear `npm ci`, terminar #487).
 
-### 2026-05-26 — Sesión local para trabajo visual/testeable; la sesión avisa ⏰
-- **What:** cuando una tarea se hace mejor en **local** —porque hay que correr y *ver* la app
-  (trabajo visual/UX, template del PDF, mobile, o validar un flujo con la app andando y datos
-  reales)— la sesión lo **avisa** y se arranca local. Para lo demás (lógica de backend, refactors,
-  fixes con tests, planificación, gobernanza) se sigue en la nube, que es lo que el dueño usa desde
-  las apps Mac/iPhone.
-- **Why:** la sesión en la nube corre en un contenedor efímero y aislado: no puede mostrar la app
-  corriendo ni tiene la BD real. Local es el **preview** que hoy falta y reduce el "probar directo
-  en prod" (ver decisión 2026-05-25 — producción = ambiente de prueba).
-- **How to apply:** la sesión detecta cuándo el trabajo es visual o necesita testeo en vivo y lo
-  **señala explícitamente antes de arrancar**; el dueño inicia la sesión local (el stack se levanta
-  con el script de #467 — Postgres + backend). El costo es el setup una vez (node/python/postgres).
-- **⏰ Disparador (revisar):** cuando exista preview/staging (post-launch), reevaluar si esto sigue
-  valiendo o si el preview reemplaza la necesidad de la sesión local.
+### 2026-05-26 — Sesión local para trabajo visual/testeable *(reemplazada 2026-06-01)*
+- *(Reemplazada por la decisión 2026-06-01 — Staging → Prod. El staging de Railway cubre
+  la necesidad de ver cambios en vivo. Ya no hace falta arrancar local para validar UX/flujos;
+  se pushea a `dev` y se ve en staging. La sesión local sigue siendo válida para debugging
+  muy específico sin acceso a Railway, pero no es el flujo default.)*
 
 ### 2026-05-26 — Al actualizar gobernanza, barrer todo el sistema de supervisión
 - **What:** cada vez que se edita un doc de gobernanza (`MEMORIA.md`, `CLAUDE.md`, `MANIFIESTO.md`,

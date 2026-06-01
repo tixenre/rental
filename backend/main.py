@@ -207,7 +207,19 @@ def spa_fallback(full_path: str):
     Devuelve index.html del nuevo frontend para cualquier ruta no reconocida.
     TanStack Router maneja el enrutamiento del lado del cliente.
     Las rutas /api/* y /static/* se capturan antes que esta.
+
+    Antes de caer al index.html, sirve archivos estáticos reales que viven en
+    la raíz del build de Vite (`public/` se copia a `dist/`): /estudio/*.jpg,
+    /favicon.png, /robots.txt, /icon-512.png, /manifest-admin.json, etc. Sin
+    esto, esos assets caen al catch-all y devuelven el HTML del SPA → imagen
+    rota. El mount /assets solo cubre dist/assets (bundles hasheados).
     """
+    if full_path:
+        front_root = FRONT_NEW.resolve()
+        candidate = (front_root / full_path).resolve()
+        # Guard anti path-traversal: el archivo tiene que vivir dentro de dist/.
+        if candidate.is_file() and candidate.is_relative_to(front_root):
+            return FileResponse(str(candidate))
     return _serve_frontend("index.html")
 
 # ── Init DB (non-blocking) ───────────────────────────────────────────────────

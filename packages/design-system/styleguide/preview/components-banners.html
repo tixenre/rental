@@ -1,0 +1,118 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .section-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); margin: 4px 0 2px; }
+
+  /* banner */
+  .banner { display: flex; align-items: flex-start; gap: 12px; padding: 13px 15px; border-radius: var(--radius-md); border: 1px solid; }
+  .banner .ico { flex-shrink: 0; margin-top: 1px; }
+  .banner .bd { flex: 1; }
+  .banner .ttl { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+  .banner .txt { font-size: 12.5px; line-height: 1.5; margin-top: 3px; }
+  .banner .act { font-family: var(--font-mono); font-size: 11px; font-weight: 600; text-decoration: none; border-bottom: 1.5px solid; padding-bottom: 1px; white-space: nowrap; }
+  .banner .x { flex-shrink: 0; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 9999px; border: none; background: transparent; cursor: pointer; opacity: 0.6; }
+
+  .b-info  { background: color-mix(in oklch,#1097DB 8%,var(--surface-elevated)); border-color: color-mix(in oklch,#1097DB 30%,transparent); }
+  .b-info .ico, .b-info .ttl { color: #0c6e9e; } .b-info .txt { color: oklch(0.4 0.04 240); } .b-info .act { color: #0c6e9e; border-color: #1097DB; } .b-info .x { color: #0c6e9e; }
+  .b-warn  { background: color-mix(in oklch,#FAB428 14%,var(--surface-elevated)); border-color: color-mix(in oklch,#FAB428 50%,transparent); }
+  .b-warn .ico, .b-warn .ttl { color: oklch(0.45 0.11 70); } .b-warn .txt { color: oklch(0.42 0.06 75); } .b-warn .act { color: oklch(0.45 0.11 70); border-color: var(--amber); } .b-warn .x { color: oklch(0.45 0.11 70); }
+  .b-err   { background: color-mix(in oklch,oklch(0.62 0.22 27) 8%,var(--surface-elevated)); border-color: color-mix(in oklch,oklch(0.62 0.22 27) 28%,transparent); }
+  .b-err .ico, .b-err .ttl { color: var(--destructive); } .b-err .txt { color: oklch(0.45 0.1 27); } .b-err .act { color: var(--destructive); border-color: var(--destructive); } .b-err .x { color: var(--destructive); }
+  .b-ok    { background: color-mix(in oklch,#009971 8%,var(--surface-elevated)); border-color: color-mix(in oklch,#009971 30%,transparent); }
+  .b-ok .ico, .b-ok .ttl { color: #00765a; } .b-ok .txt { color: oklch(0.42 0.06 165); } .b-ok .act { color: #00765a; border-color: #009971; } .b-ok .x { color: #00765a; }
+  .b-neutral { background: var(--surface); border-color: var(--hairline); }
+  .b-neutral .ico, .b-neutral .ttl { color: var(--ink); } .b-neutral .txt { color: var(--muted-foreground); } .b-neutral .act { color: var(--ink); border-color: var(--amber); }
+
+  .center { display: flex; align-items: center; }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Components · Banners · Callouts</div>
+<div class="sub-eye">Inline alert · info · warning · error · success · neutral · status palette tintada</div>
+
+<div class="section-label">Warning · sin stock para el rango</div>
+<div class="banner b-warn">
+  <span class="ico center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+  <div class="bd">
+    <div class="ttl">No hay stock para estas fechas</div>
+    <div class="txt">El Sony A7S III está reservado del 2 al 5 de junio. Probá con otro rango o sumá un equipo similar.</div>
+  </div>
+  <a class="act" href="#">Ver alternativas</a>
+</div>
+
+<div class="section-label">Info · nota de seña / depósito</div>
+<div class="banner b-info">
+  <span class="ico center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+  <div class="bd">
+    <div class="ttl">Esta reserva pide seña</div>
+    <div class="txt">Para confirmar la fecha dejás una seña que se descuenta del total. El resto lo abonás al retirar.</div>
+  </div>
+  <button class="x"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+  <div>
+    <div class="section-label">Error · pago rechazado</div>
+    <div class="banner b-err">
+      <span class="ico center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>
+      <div class="bd">
+        <div class="ttl">No pudimos confirmar el pago</div>
+        <div class="txt">Revisá los datos o probá otro medio.</div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="section-label">Success · reserva confirmada</div>
+    <div class="banner b-ok">
+      <span class="ico center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></span>
+      <div class="bd">
+        <div class="ttl">¡Reserva confirmada!</div>
+        <div class="txt">Te mandamos el detalle por mail.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section-label">Neutral · aviso de horario (full-width, banner de sitio)</div>
+<div class="banner b-neutral">
+  <span class="ico center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+  <div class="bd">
+    <div class="ttl">Retiros solo de lunes a sábado</div>
+    <div class="txt">El local atiende de 10 a 19 hs. Coordinamos la entrega por WhatsApp.</div>
+  </div>
+  <a class="act" href="#">Escribir</a>
+</div>
+
+<pre class="code"><span class="c">// Banner inline — tono = status palette tintada al 8–14% sobre surface</span>
+&lt;<span class="k">Banner</span> tone=<span class="s">"warning"</span> title=<span class="s">"No hay stock para estas fechas"</span>
+  action={{ label: <span class="s">"Ver alternativas"</span>, href }} dismissible /&gt;
+
+<span class="c">// tones: info(azul) · warning(amber) · error(destructive) · success(verde) · neutral</span>
+<span class="c">// NO confundir con Toast (efímero) ni EmptyState (pantalla vacía)</span></pre>
+
+<div class="note">
+  <b>Banners</b> = avisos contextuales <b>en línea</b>, persistentes mientras la condición exista. Tono con la <b>paleta de status tintada</b> (8–14% sobre surface) + borde e ícono al color pleno. ·
+  Título corto en voz "vos" + 1 línea de detalle + acción opcional subrayada en su color. · <b>No</b> es Toast (efímero, flota) ni EmptyState (pantalla sin datos). · Dismissible solo si no es bloqueante.
+</div>
+
+</body>
+</html>

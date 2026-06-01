@@ -6,7 +6,6 @@ import {
   LayoutGrid,
   List,
   ArrowRight,
-  Sparkles,
   Loader2,
   Search,
   X,
@@ -17,6 +16,12 @@ import {
 import { ViewToggle } from "@/components/rental/ViewToggle";
 import { Link } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/rental/PublicLayout";
+import { HeroSection } from "@/components/rental/HeroSection";
+import { ComoFunciona } from "@/components/rental/ComoFunciona";
+import { EstudioBand } from "@/components/rental/EstudioBand";
+import { FaqTeaser } from "@/components/rental/FaqTeaser";
+import { RentalDateModal } from "@/components/rental/RentalDateModal";
+import { useClienteSession } from "@/lib/iva";
 import { MobileStickyBar } from "@/components/rental/MobileStickyBar";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
@@ -242,6 +247,39 @@ function Index() {
       return a.localeCompare(b, "es");
     });
   }, [allEquipos, backendCats]);
+
+  // Categorías raíz (top-level, parent_id === null). Dinámico — se deriva del
+  // árbol del backend para no hardcodear nombres.
+  const rootCatNames = useMemo(
+    () => new Set(backendCats.map((c: BackendCategoria) => c.nombre)),
+    [backendCats],
+  );
+
+  // Por cada raíz: el conjunto completo de nombres en su subárbol (raíz + hijos).
+  // Permite que un carrusel de "Iluminación" muestre también los "Modificadores".
+  const rootSubtrees = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    const collect = (node: BackendCategoria, rootName: string) => {
+      let set = map.get(rootName);
+      if (!set) {
+        set = new Set<string>();
+        map.set(rootName, set);
+      }
+      set.add(node.nombre);
+      node.children?.forEach((child) => collect(child, rootName));
+    };
+    backendCats.forEach((root: BackendCategoria) => collect(root, root.nombre));
+    return map;
+  }, [backendCats]);
+
+  // Solo categorías raíz con equipos (para carruseles y mosaico).
+  // Fallback a apiCategories si el árbol aún no cargó.
+  const rootApiCategories = useMemo(
+    () =>
+      rootCatNames.size > 0 ? apiCategories.filter((c) => rootCatNames.has(c)) : apiCategories,
+    [apiCategories, rootCatNames],
+  );
+
   const marcas = marcasData?.items ?? [];
 
   // Modo de view en la URL: ?view=grid | ?view=list. Si no está, default
@@ -276,6 +314,9 @@ function Index() {
   const [disponiblesOnly, setDisponiblesOnly] = useState(false);
   const [favoritosOnly, setFavoritosOnly] = useState(false);
   const fav = useFavoritos();
+  const [dateModalOpen, setDateModalOpen] = useState(false);
+  const { data: clienteSession } = useClienteSession();
+  const isLogged = !!clienteSession;
   // Scroll-feel: `scrolled` se activa cuando el hero se tiñó >65% (mismo
   // umbral que el snap del topbar) → retinta el cat-bar para que combine con
   // el topbar amber. `spyCat` resalta el tab de la categoría en viewport
@@ -393,7 +434,7 @@ function Index() {
   const getDisponible = (item: Equipment) => item.disponible;
 
   // Hero scroll-amber: calcula --amber-pct para que el TopBar se tiña
-  const heroRef = useRef<HTMLElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const hero = heroRef.current;
     if (!hero) return;
@@ -438,48 +479,16 @@ function Index() {
   return (
     <PublicLayout topBar={{ amberOnScroll: true }}>
       <ViewIntroDialog onPick={(m) => setMode(m)} />
-      {/* Hero amarillo brand */}
-      <section
-        ref={heroRef}
-        className="relative overflow-hidden border-b hairline bg-amber text-ink"
-      >
-        <div className="absolute inset-0 grain opacity-40" />
-        <div className="relative px-6 py-12 lg:px-12 lg:py-16">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] sm:tracking-[0.3em] text-ink/70 break-words">
-            Catálogo · {isLoading ? "…" : allEquipos.length} equipos · Mar del Plata
-          </div>
-          <h1 className="mt-4 wordmark text-5xl sm:text-7xl md:text-[7rem] lg:text-[8.5rem] leading-[0.9] md:leading-[0.85] text-balance break-words">
-            {tagline[0]}
-            <br />
-            {tagline[1]}
-          </h1>
-          <p className="mt-6 max-w-xl text-base text-ink/80">
-            Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales. Elegí fechas
-            y armá tu pedido — te lo dejamos listo para retirar.
-          </p>
+      {/* Hero amber hifi */}
+      <div ref={heroRef}>
+        <HeroSection
+          tagline={tagline}
+          equipmentCount={isLoading ? undefined : allEquipos.length}
+          onDateOpen={() => setDateModalOpen(true)}
+        />
+      </div>
 
-          {/* CTA Estudio — protagonista del banner */}
-          <div className="mt-10 inline-flex max-w-2xl flex-col gap-4 rounded-3xl border-2 border-ink bg-ink p-6 sm:flex-row sm:items-center sm:gap-6 sm:p-7 shadow-lg">
-            <div className="flex-1">
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-amber px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.25em] text-ink">
-                <Sparkles className="h-3 w-3" /> Espacio Rambla
-              </div>
-              <div className="mt-3 font-display text-2xl sm:text-3xl text-amber">
-                Conocé el Estudio
-              </div>
-              <div className="text-sm text-amber/80 mt-1">
-                Foto y video · reservá por hora · pack de luces y grips opcional
-              </div>
-            </div>
-            <Link
-              to="/estudio"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-amber px-6 py-3 text-sm font-semibold text-ink transition hover:brightness-110"
-            >
-              Ver estudio <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
+      <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
 
       {/* Toggle Modo + búsqueda sticky. Al scrollear >65% (mismo umbral que
             el snap del topbar) se retinta de amber soft para combinar con el
@@ -514,47 +523,13 @@ function Index() {
           />
         </div>
 
-        {/* Desktop: cat-bar 2 filas (toggle+buscador / cat-tabs+disponibles)
-              siguiendo design handoff. Popular chips en su propia fila debajo
-              (solo en modo lista). */}
+        {/* Desktop: cat-bar 2 filas (cat-pills+filtros+toggle / buscador
+              full-width) siguiendo el handoff de Claude Design. Popular chips
+              en su propia fila debajo (solo en modo lista). */}
         <div className="hidden sm:block">
-          {/* Fila 1: ViewToggle (izq) + Buscador (der) */}
-          <div className="flex items-center gap-4 px-6 py-2.5 border-b hairline">
-            <ViewToggle
-              options={[
-                { value: "grid" as Mode, label: "Grid", icon: <LayoutGrid className="h-3 w-3" /> },
-                { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
-              ]}
-              value={mode}
-              onChange={setMode}
-            />
-
-            {/* Buscador protagonista — crece hasta 520px y se alinea a la
-                  derecha (design handoff §3.1). */}
-            <div className="relative ml-auto w-full max-w-[520px]">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar equipo, marca o categoría…"
-                aria-label="Buscar equipos"
-                className="w-full rounded-full border border-ink/15 bg-surface-elevated py-2.5 pl-11 pr-9 text-sm font-medium shadow-sm placeholder:font-normal placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
-              />
-              {query && (
-                <button
-                  onClick={() => setQuery("")}
-                  aria-label="Limpiar"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Fila 2: Cat-tabs (izq, scroll horizontal) + Disponibles (der) */}
-          <div className="flex items-center gap-3 pl-4 pr-6 overflow-x-auto scrollbar-none">
-            <div className="flex shrink-0">
+          {/* Fila 1: Cat-pills (izq, scroll) + Favoritos/Disponibles + ViewToggle (der) */}
+          <div className="flex items-center gap-3 px-6 py-2.5 border-b hairline">
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-none min-w-0">
               {["Todo", ...apiCategories].map((cat) => {
                 // En browse mode el highlight sigue al scroll-spy (spyCat),
                 // sin filtrar; al filtrar/buscar vuelve a basarse en selectedCats.
@@ -572,19 +547,19 @@ function Index() {
                       else setSelectedCats(new Set([cat]));
                     }}
                     className={cn(
-                      "flex items-baseline gap-1.5 px-3.5 pt-2.5 pb-2 whitespace-nowrap shrink-0 border-b-[2.5px] transition",
-                      isActive ? "border-amber" : "border-transparent hover:border-hairline",
+                      "inline-flex items-baseline gap-1.5 rounded-full border px-3.5 py-1.5 whitespace-nowrap shrink-0 text-sm transition",
+                      isActive
+                        ? "border-transparent bg-amber font-bold text-ink"
+                        : "border-hairline font-medium text-muted-foreground hover:border-ink hover:text-ink",
                     )}
                   >
+                    {cat}
                     <span
                       className={cn(
-                        "font-sans text-sm",
-                        isActive ? "font-bold text-ink" : "font-medium text-muted-foreground",
+                        "font-mono text-[9px] tracking-[0.1em] tabular",
+                        isActive ? "text-ink/70" : "text-muted-foreground",
                       )}
                     >
-                      {cat}
-                    </span>
-                    <span className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground tabular">
                       {count}
                     </span>
                   </button>
@@ -592,47 +567,78 @@ function Index() {
               })}
             </div>
 
-            <div className="flex-1 min-w-2" />
+            <div className="flex items-center gap-2 ml-auto shrink-0">
+              {/* Filtro Favoritos */}
+              {fav.count > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFavoritosOnly((v) => !v)}
+                  className={cn(
+                    "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
+                    favoritosOnly
+                      ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
+                      : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
+                  )}
+                  aria-pressed={favoritosOnly}
+                >
+                  <Heart className={cn("h-3 w-3", favoritosOnly && "fill-current")} />
+                  Favoritos
+                  <span className="font-mono text-[9px] tabular">{fav.count}</span>
+                </button>
+              )}
 
-            {/* Filtro Favoritos */}
-            {fav.count > 0 && (
+              {/* Filtro Disponibles — solo tiene efecto con fechas pickeadas */}
               <button
                 type="button"
-                onClick={() => setFavoritosOnly((v) => !v)}
+                onClick={() => setDisponiblesOnly((v) => !v)}
                 className={cn(
                   "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
-                  favoritosOnly
+                  disponiblesOnly
                     ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
                     : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
                 )}
-                aria-pressed={favoritosOnly}
+                aria-pressed={disponiblesOnly}
+                title="Mostrar solo equipos disponibles para las fechas elegidas"
               >
-                <Heart className={cn("h-3 w-3", favoritosOnly && "fill-current")} />
-                Favoritos
-                <span className="font-mono text-[9px] tabular">{fav.count}</span>
+                <Check className="h-3 w-3" />
+                Disponibles
               </button>
-            )}
 
-            {/* Filtro Disponibles — solo tiene efecto con fechas pickeadas */}
-            <button
-              type="button"
-              onClick={() => setDisponiblesOnly((v) => !v)}
-              className={cn(
-                "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
-                disponiblesOnly
-                  ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
-                  : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
+              <ViewToggle
+                options={[
+                  {
+                    value: "grid" as Mode,
+                    label: "Grid",
+                    icon: <LayoutGrid className="h-3 w-3" />,
+                  },
+                  { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
+                ]}
+                value={mode}
+                onChange={setMode}
+              />
+            </div>
+          </div>
+
+          {/* Fila 2: Buscador full-width */}
+          <div className="px-6 py-2.5">
+            <div className="relative w-full">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar equipo, marca o categoría…"
+                aria-label="Buscar equipos"
+                className="w-full rounded-full border border-ink/15 bg-surface-elevated py-2.5 pl-11 pr-9 text-sm font-medium shadow-sm placeholder:font-normal placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  aria-label="Limpiar"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               )}
-              aria-pressed={disponiblesOnly}
-              title="Mostrar solo equipos disponibles para las fechas elegidas"
-            >
-              <Check className="h-3 w-3" />
-              Disponibles
-            </button>
-
-            {/* Contador */}
-            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular shrink-0 pl-1">
-              {query.trim() || mode === "list" ? `${filtered.length}` : `${allEquipos.length}`}
             </div>
           </div>
         </div>
@@ -663,6 +669,9 @@ function Index() {
           ))}
         </div>
       )}
+
+      {/* Cómo funciona — bajo las barras, solo para usuarios no logueados */}
+      {!isLogged && <ComoFunciona onDateOpen={() => setDateModalOpen(true)} />}
 
       {/* Loading / Error states */}
       {isLoading ? (
@@ -710,6 +719,8 @@ function Index() {
         <GridMode
           allEquipos={allEquipos}
           apiCategories={apiCategories}
+          rootApiCategories={rootApiCategories}
+          rootSubtrees={rootSubtrees}
           marcas={marcas}
           selectedBrand={brand}
           onBrandSelect={(brandName) => setBrand(brandName)}
@@ -750,6 +761,9 @@ function Index() {
         />
       )}
 
+      <EstudioBand />
+      <FaqTeaser />
+
       <CartDrawer allEquipos={allEquipos} getDisponible={getDisponible} />
     </PublicLayout>
   );
@@ -758,6 +772,8 @@ function Index() {
 function GridMode({
   allEquipos,
   apiCategories,
+  rootApiCategories,
+  rootSubtrees,
   marcas,
   selectedBrand,
   onBrandSelect,
@@ -770,6 +786,8 @@ function GridMode({
 }: {
   allEquipos: Equipment[];
   apiCategories: string[];
+  rootApiCategories: string[];
+  rootSubtrees: Map<string, Set<string>>;
   marcas: BackendMarca[];
   selectedBrand?: string | null;
   onBrandSelect: (brandName: string | null) => void;
@@ -794,16 +812,20 @@ function GridMode({
 
   const isFiltered = selectedCats.size > 0 || !!selectedBrand;
   const isSearching = q.length > 0;
-  // Si hay categorías seleccionadas, mostramos esas como secciones — pueden
-  // ser roots o sub-cats (ej. "Montura E"). Si solo hay filtro de marca o
-  // búsqueda, mostramos todas las roots del backend (matches() hace el resto).
-  const visibleCategories = selectedCats.size > 0 ? Array.from(selectedCats) : apiCategories;
+  // En browse mode mostramos solo categorías raíz. Al filtrar se usa la
+  // selección directa (puede ser raíz o sub-cat).
+  const visibleCategories = selectedCats.size > 0 ? Array.from(selectedCats) : rootApiCategories;
 
-  // Una categoría puede ser root o sub-cat. Esta helper matchea contra
-  // ambos: el `category` (root inferido por el mapper) y las refs en
-  // `categorias` (M2M completo). Reemplaza el viejo `e.category === c`.
-  const inCategory = (e: Equipment, c: string) =>
-    e.category === c || (e.categorias ?? []).some((cc) => cc.nombre === c);
+  // inCategory: matchea equipo contra una categoría. Si la categoría es raíz
+  // (tiene subárbol) incluye todos los equipos de sus descendientes. Si es
+  // una sub-cat seleccionada directamente, matcheo exacto.
+  const inCategory = (e: Equipment, c: string) => {
+    const subtree = rootSubtrees.get(c);
+    if (subtree) {
+      return (e.categorias ?? []).some((cc) => subtree.has(cc.nombre));
+    }
+    return e.category === c || (e.categorias ?? []).some((cc) => cc.nombre === c);
+  };
 
   // Ancho fijo de cards en carrusel para snap consistente
   const cardW = 260;
@@ -854,7 +876,7 @@ function GridMode({
       {!isFiltered && !isSearching && (
         <CategoryMosaic
           allEquipos={allEquipos}
-          categories={apiCategories}
+          categories={rootApiCategories}
           onSelect={onJumpToCategory}
           getCount={(c) => allEquipos.filter((e) => inCategory(e, c)).length}
         />

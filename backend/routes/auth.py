@@ -35,6 +35,11 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 # / CLIENTE_REDIRECT_URI tienen prioridad — si están seteadas se respetan
 # tal cual (útil para staging u otros entornos custom).
 def _default_oauth_base() -> str:
+    # SITE_URL seteado explícitamente via env var → es el dominio canónico
+    # (prod: www.ramblarental.com.ar, staging: rambla-rental-dev.up.railway.app).
+    site_url = os.getenv("SITE_URL", "").strip()
+    if site_url:
+        return site_url
     if settings.is_railway:
         return "https://ramblarental.up.railway.app"
     return "http://localhost:8000"

@@ -122,7 +122,12 @@ def _get_descuento_jornadas(conn, jornadas: int) -> float:
     ).fetchall()
     if not rows:
         return 0.0
-    puntos = [(r["jornadas"], r["pct"]) for r in rows]
+    # `pct` es NUMERIC en la DB (migración g1a2b3c4d5e6) → psycopg lo devuelve
+    # como Decimal. Se coerce a float acá para que la interpolación
+    # (`t * (p1 - p0)` con t float) no rompa con `float * Decimal` → TypeError
+    # → cotizar 500 → totales en $0. Pasaba en alquileres de jornadas
+    # intermedias (las que interpolan entre puntos ancla).
+    puntos = [(int(r["jornadas"]), float(r["pct"])) for r in rows]
     if jornadas <= puntos[0][0]:
         return float(puntos[0][1])
     if jornadas >= puntos[-1][0]:
@@ -691,24 +696,16 @@ def cotizar(data: CotizarRequest, request: Request):
 
         # Precios desde el backend. Equipos inexistentes/eliminados se ignoran
         # (cotización best-effort: el carrito puede tener algo que ya no está).
-        # Batch: 1 query para todos los ítems en vez de N (una por ítem).
-        ids_validos = [it.equipo_id for it in data.items if it.cantidad > 0]
-        precios_map: dict = {}
-        if ids_validos:
-            ph = ",".join("?" * len(ids_validos))
-            precios_map = {
-                r["id"]: r
-                for r in conn.execute(
-                    f"SELECT id, precio_jornada, tipo FROM equipos"
-                    f" WHERE id IN ({ph}) AND eliminado_at IS NULL",
-                    ids_validos,
-                ).fetchall()
-            }
+        # Fetch por-ítem (lookup por PK indexada): se revirtió el batch `IN (...)`
+        # de #643 que devolvía precios_map vacío en prod → total $0 (regresión).
         items_para_total = []
         for it in data.items:
             if it.cantidad <= 0:
                 continue
-            row = precios_map.get(it.equipo_id)
+            row = conn.execute(
+                "SELECT precio_jornada, tipo FROM equipos WHERE id=? AND eliminado_at IS NULL",
+                (it.equipo_id,),
+            ).fetchone()
             if not row:
                 continue
             # C3 #635: el precio de un COMBO se deriva en vivo de sus componentes

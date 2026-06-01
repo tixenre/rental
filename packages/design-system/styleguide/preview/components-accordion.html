@@ -1,0 +1,122 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--background); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+
+  .t-eyebrow { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted-foreground); }
+  .sub-eye { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted-foreground); }
+  .note { font-family: var(--font-sans); font-size: 11px; line-height: 1.6; color: var(--muted-foreground); border-top: 1px dashed var(--hairline); padding-top: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note code { font-family: var(--font-mono); font-size: 10px; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .col-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 9px; display: flex; align-items: center; gap: 6px; }
+  .col-label .d { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); }
+
+  .acc { border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface-elevated); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .item { border-bottom: 1px solid var(--hairline); }
+  .item:last-child { border-bottom: none; }
+  .q { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 17px; cursor: pointer; user-select: none; transition: background 120ms; }
+  .q:hover { background: var(--surface); }
+  .q .txt { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.35; }
+  .q .chev { flex-shrink: 0; color: var(--muted-foreground); transition: transform var(--duration-base) var(--ease-out), color var(--duration-base); }
+  .item.open .chev { transform: rotate(180deg); color: var(--amber); }
+  .a { max-height: 0; overflow: hidden; transition: max-height var(--duration-slow) var(--ease-default); }
+  .item.open .a { max-height: 220px; }
+  .a-inner { padding: 0 17px 16px; font-size: 13.5px; line-height: 1.6; color: var(--muted-foreground); }
+  .a-inner a { color: var(--ink); border-bottom: 1.5px solid var(--amber); text-decoration: none; }
+
+  /* category accordion (nav) */
+  .navacc .item.open .q { background: var(--surface); }
+  .navacc .cnt { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
+  .sublist { display: flex; flex-direction: column; }
+  .sub { display: flex; align-items: center; justify-content: space-between; padding: 9px 17px 9px 30px; font-size: 13px; color: var(--ink); cursor: pointer; transition: color 120ms; }
+  .sub:hover { color: var(--amber); }
+  .sub .n { font-family: var(--font-mono); font-size: 10px; color: var(--muted-foreground); }
+
+  pre.code { font-family: var(--font-mono); font-size: 10.5px; background: var(--ink); color: var(--background); padding: 14px 16px; border-radius: var(--radius-sm); overflow-x: auto; line-height: 1.7; }
+  .k { color: var(--amber-hot); } .s { color: var(--rosa); } .c { color: oklch(0.6 0.01 70); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="t-eyebrow">Components · Accordion · FAQ</div>
+<div class="sub-eye">Radix Accordion · chevron rotate · single + multiple · navegación por categoría</div>
+
+<div class="split">
+  <div>
+    <div class="col-label"><span class="d"></span>FAQ · /preguntas-frecuentes</div>
+    <div class="acc">
+      <div class="item open">
+        <div class="q" onclick="tog(this)"><span class="txt">¿Cómo reservo un equipo?</span><svg class="chev" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></div>
+        <div class="a"><div class="a-inner">Elegí las fechas, agregá los equipos al carrito y confirmá. Te mandamos el presupuesto y, cuando lo aceptás, queda reservado. Podés <a href="#">crear tu cuenta</a> para seguir todo desde el portal.</div></div>
+      </div>
+      <div class="item">
+        <div class="q" onclick="tog(this)"><span class="txt">¿Piden depósito o seña?</span><svg class="chev" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></div>
+        <div class="a"><div class="a-inner">Sí, una seña para confirmar la fecha. El monto depende del equipo y se descuenta del total.</div></div>
+      </div>
+      <div class="item">
+        <div class="q" onclick="tog(this)"><span class="txt">¿Qué pasa si llueve el día del rodaje?</span><svg class="chev" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></div>
+        <div class="a"><div class="a-inner">Reprogramás sin costo avisando con 24 hs de anticipación. Hablá con nosotros por <a href="#">WhatsApp</a>.</div></div>
+      </div>
+      <div class="item">
+        <div class="q" onclick="tog(this)"><span class="txt">¿Tienen estudio para alquilar?</span><svg class="chev" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></div>
+        <div class="a"><div class="a-inner">Sí, el estudio de foto/video se alquila aparte o combinado con equipos. Mirá disponibilidad en la sección Estudio.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="col-label"><span class="d"></span>Accordion de categorías · sidebar</div>
+    <div class="acc navacc">
+      <div class="item open">
+        <div class="q" onclick="tog(this)"><span class="txt">Cámaras</span><span style="display:flex;align-items:center;gap:8px;"><span class="cnt">12</span><svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span></div>
+        <div class="a" style="max-height:200px;"><div class="sublist" style="padding-bottom:8px;">
+          <div class="sub"><span>Mirrorless</span><span class="n">7</span></div>
+          <div class="sub"><span>Cine</span><span class="n">3</span></div>
+          <div class="sub"><span>Action / POV</span><span class="n">2</span></div>
+        </div></div>
+      </div>
+      <div class="item">
+        <div class="q" onclick="tog(this)"><span class="txt">Luces</span><span style="display:flex;align-items:center;gap:8px;"><span class="cnt">9</span><svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span></div>
+        <div class="a"><div class="sublist" style="padding-bottom:8px;"><div class="sub"><span>LED panel</span><span class="n">5</span></div><div class="sub"><span>COB</span><span class="n">4</span></div></div></div>
+      </div>
+      <div class="item">
+        <div class="q" onclick="tog(this)"><span class="txt">Audio</span><span style="display:flex;align-items:center;gap:8px;"><span class="cnt">6</span><svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span></div>
+        <div class="a"><div class="sublist" style="padding-bottom:8px;"><div class="sub"><span>Micrófonos</span><span class="n">4</span></div><div class="sub"><span>Grabadores</span><span class="n">2</span></div></div></div>
+      </div>
+      <div class="item">
+        <div class="q" onclick="tog(this)"><span class="txt">Gimbals</span><span style="display:flex;align-items:center;gap:8px;"><span class="cnt">4</span><svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span></div>
+        <div class="a"><div class="sublist" style="padding-bottom:8px;"><div class="sub"><span>Pro</span><span class="n">2</span></div><div class="sub"><span>Compactos</span><span class="n">2</span></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<pre class="code"><span class="c">// Radix Accordion — FAQ usa type="single" collapsible</span>
+&lt;<span class="k">Accordion</span> type=<span class="s">"single"</span> collapsible&gt;
+  &lt;<span class="k">AccordionItem</span> value=<span class="s">"reserva"</span>&gt;
+    &lt;<span class="k">AccordionTrigger</span>&gt;¿Cómo reservo un equipo?&lt;/<span class="k">AccordionTrigger</span>&gt;
+    &lt;<span class="k">AccordionContent</span>&gt;…&lt;/<span class="k">AccordionContent</span>&gt;
+  &lt;/<span class="k">AccordionItem</span>&gt;
+&lt;/<span class="k">Accordion</span>&gt;
+<span class="c">// chevron rota 180° · content slide 350ms ease-default · multiple en sidebar</span></pre>
+
+<div class="note">
+  <b>FAQ</b> usa <code>type="single" collapsible</code> — una abierta a la vez. El <b>sidebar de categorías</b> usa <code>type="multiple"</code>. ·
+  Chevron rota 180° y se prende en amber al abrir. · Content con slide de 350ms <code>ease-default</code>. · Respuestas en voz "vos", links subrayados en amber.
+</div>
+
+<script>
+  function tog(el){ const item=el.closest('.item'); const acc=item.closest('.acc'); if(!acc.classList.contains('navacc')){ acc.querySelectorAll('.item.open').forEach(i=>{ if(i!==item) i.classList.remove('open'); }); } item.classList.toggle('open'); }
+</script>
+
+</body>
+</html>
