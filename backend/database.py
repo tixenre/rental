@@ -336,7 +336,7 @@ def init_db():
             email             TEXT NOT NULL UNIQUE,
             direccion         TEXT NOT NULL,
             cuit              TEXT NOT NULL,
-            descuento         FLOAT DEFAULT 0,
+            descuento         NUMERIC(5,2) DEFAULT 0,
             perfil_impuestos  TEXT DEFAULT 'consumidor_final',
             razon_social      TEXT,
             domicilio_fiscal  TEXT,
@@ -368,7 +368,7 @@ def init_db():
             fecha_hasta      TIMESTAMP,
             monto_total      INTEGER DEFAULT 0,
             monto_pagado     INTEGER DEFAULT 0,
-            descuento_pct    FLOAT DEFAULT 0,
+            descuento_pct    NUMERIC(5,2) DEFAULT 0,
             fuente           TEXT DEFAULT 'sistema',
             numero_pedido    INTEGER,
             created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1065,7 +1065,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS descuentos_jornada (
             id         SERIAL PRIMARY KEY,
             jornadas   INTEGER NOT NULL UNIQUE,
-            pct        FLOAT   NOT NULL,
+            pct        NUMERIC(5,2) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
