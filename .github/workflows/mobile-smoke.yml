@@ -2,12 +2,12 @@ name: Mobile smoke tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
   pull_request:
-    branches: [main]
+    branches: [main, dev]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'

@@ -128,19 +128,32 @@ function RamblaSeal() {
 }
 
 /* ── HeroBanner ──────────────────────────────────────────────────── */
-// Hero amber del catálogo móvil (mock Catálogo Móvil - Lista.html §HeroBanner).
-// Eyebrow + headline brand "un lugar / donde pasan / cosas" + body + card
-// Estudio negro con CTA amber. El heroRef se usa para el amber-on-scroll del
-// topbar (cuando el bottom del hero llega al topbar, el topbar está full
-// amber y el seal/pill snapean a inverted).
+// Hero amber del catálogo móvil. Foto rotante (igual que el desktop hero) +
+// eyebrow + headline + CTA "Elegir fechas" + card Estudio.
+// El heroRef ancla el amber-on-scroll del topbar.
+const HERO_PHOTOS = [
+  "/estudio/Rambla_Estudio_S7V9470.jpg",
+  "/estudio/Rambla_Estudio_S7V9483.jpg",
+  "/estudio/Rambla_Estudio_S7V9510-HDR-Edit.jpg",
+  "/estudio/Rambla_Estudio_S7V9519-HDR.jpg",
+];
+
 function HeroBanner({
   heroRef,
   equipCount,
+  onDateOpen,
 }: {
   heroRef: React.RefObject<HTMLDivElement | null>;
   equipCount: number;
+  onDateOpen: () => void;
 }) {
   const navigate = useNavigate();
+  const [photoIdx, setPhotoIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setPhotoIdx((i) => (i + 1) % HERO_PHOTOS.length), 4500);
+    return () => clearInterval(id);
+  }, []);
 
   const { data: taglinesData } = useQuery({
     queryKey: ["settings", "hero_taglines"],
@@ -162,24 +175,77 @@ function HeroBanner({
   const tagline = taglines[taglineIdx % taglines.length];
 
   return (
-    <div ref={heroRef} className="relative bg-amber" style={{ padding: "28px 20px 32px" }}>
-      <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-4">
-        Catálogo · {equipCount} equipos · Mar del Plata
+    <div ref={heroRef} className="relative bg-amber">
+      {/* Foto rotante — igual que el desktop hero */}
+      <div
+        className="relative w-full overflow-hidden bg-ink"
+        style={{ height: "clamp(220px, 56vw, 320px)" }}
+      >
+        {HERO_PHOTOS.map((src, i) => (
+          <img
+            key={i}
+            src={src}
+            alt="El Estudio — Rambla Rental"
+            className="absolute inset-0 w-full h-full object-cover transition-opacity"
+            style={{ opacity: i === photoIdx ? 1 : 0, transitionDuration: "900ms" }}
+            loading={i === 0 ? "eager" : "lazy"}
+          />
+        ))}
+        {/* Overlay + "Conocé el estudio" */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-ink/30 pointer-events-none" />
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/estudio" })}
+          className="absolute left-4 bottom-4 inline-flex items-center gap-1.5 bg-ink text-amber font-bold text-[13px] tracking-[-0.01em] px-4 py-2.5 rounded-full"
+        >
+          Conocé el estudio
+          <ChevronRight size={13} strokeWidth={2.5} />
+        </button>
+        {/* Navigation dots */}
+        <div className="absolute right-4 bottom-5 flex gap-[5px]">
+          {HERO_PHOTOS.map((_, i) => (
+            <i
+              key={i}
+              className="block h-[5px] rounded-full transition-[width,background] duration-[250ms]"
+              style={{
+                width: i === photoIdx ? 14 : 5,
+                background: i === photoIdx ? "var(--amber)" : "rgba(255,255,255,0.45)",
+              }}
+            />
+          ))}
+        </div>
       </div>
 
-      <div className="font-display text-[46px] font-black text-ink leading-[1] tracking-[-0.02em] mb-[18px]">
-        {tagline[0]}
-        <br />
-        {tagline[1]}
-      </div>
+      {/* Copy section — amber */}
+      <div style={{ padding: "24px 20px 28px" }}>
+        <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-3">
+          Catálogo · {equipCount} equipos · Mar del Plata
+        </div>
 
-      <p className="font-sans text-[15px] leading-[1.55] text-ink/75 mb-7">
-        Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales. Elegí fechas y
-        armá tu pedido — te lo dejamos listo para retirar.
-      </p>
+        <div className="font-display text-[42px] font-black text-ink leading-[1] tracking-[-0.02em] mb-4">
+          {tagline[0]}
+          <br />
+          {tagline[1]}
+        </div>
+
+        <p className="font-sans text-[14px] leading-[1.55] text-ink/72 mb-6">
+          Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales en Mar del
+          Plata.
+        </p>
+
+        {/* CTA principal */}
+        <button
+          type="button"
+          onClick={onDateOpen}
+          className="w-full flex items-center justify-center gap-2 py-4 rounded-full bg-ink text-amber font-sans text-[15px] font-bold transition active:scale-[0.97]"
+        >
+          <Calendar size={16} />
+          Elegir fechas
+        </button>
+      </div>
 
       {/* Card Estudio — ink bg con CTA amber */}
-      <div className="rounded-2xl bg-ink p-5">
+      <div className="mx-5 mb-7 rounded-2xl bg-ink p-5">
         <div className="inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_oklch,var(--amber)_35%,transparent)] bg-[color-mix(in_oklch,var(--amber)_12%,transparent)] px-3 py-1 mb-3">
           <svg
             width="10"
@@ -197,7 +263,7 @@ function HeroBanner({
           </span>
         </div>
 
-        <div className="font-display text-[28px] font-black text-amber leading-[1.1] mb-2">
+        <div className="font-display text-[26px] font-black text-amber leading-[1.1] mb-2">
           Conocé el Estudio
         </div>
 
@@ -1300,7 +1366,11 @@ export function CatalogoMovil() {
 
         {/* Hero banner amber — eyebrow + headline brand + Estudio card.
             Anclado al heroRef del amber-on-scroll del topbar. */}
-        <HeroBanner heroRef={heroRef} equipCount={allEquipos?.length ?? 0} />
+        <HeroBanner
+          heroRef={heroRef}
+          equipCount={allEquipos?.length ?? 0}
+          onDateOpen={() => setShowDateSheet(true)}
+        />
 
         {/* Search bar — sticky bajo el topbar. Los chips de "Populares"
             scrollean fuera (no son sticky). */}
