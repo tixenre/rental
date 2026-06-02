@@ -1258,6 +1258,26 @@ def init_db():
             UNIQUE (estudio_id, equipo_id)
         )
     """)
+
+    # Registro de búsquedas del catálogo público (analítica interna). Acompaña a
+    # la migración i1c2d3e4f5a6 — acá garantizamos su creación en cada boot
+    # (init_db corre siempre y es idempotente), sin depender de la cadena de
+    # alembic. query_text = término crudo; query_norm = normalizado para agrupar.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS search_queries (
+            id           SERIAL PRIMARY KEY,
+            query_text   VARCHAR(120) NOT NULL,
+            query_norm   VARCHAR(120) NOT NULL,
+            result_count INTEGER NOT NULL DEFAULT 0,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_search_queries_norm ON search_queries(query_norm)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_search_queries_created ON search_queries(created_at)"
+    )
     # Seed idempotente: inserta la fila singleton si no existe, con los valores
     # del copy original de src/data/studio.ts. Precios en 0 (el dueño los setea).
     import json as _json
