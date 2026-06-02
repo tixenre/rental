@@ -8,6 +8,7 @@
 
 import { authedJson, authedPostJson, authedFetch } from "./authedFetch";
 import { toLocalISO } from "./rental-dates";
+import { trackSolicitarPedido } from "./analytics";
 
 export type OrderStatus =
   | "borrador"
@@ -167,6 +168,22 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   };
 
   const created = await authedPostJson<Record<string, unknown>>("/api/cliente/pedidos", body);
+
+  // Analytics: pedido solicitado (no-op si GA no está activo). El valor es el
+  // total del alquiler = Σ(precio_jornada × cantidad) × jornadas.
+  trackSolicitarPedido({
+    value: items.reduce((acc, it) => acc + Math.round(it.pricePerDay) * it.qty, 0) * input.days,
+    days: input.days,
+    items: items.map((it) => ({
+      item_id: String(it.backendId),
+      item_name: it.name,
+      item_brand: it.brand,
+      item_category: it.category,
+      quantity: it.qty,
+      price: Math.round(it.pricePerDay),
+    })),
+  });
+
   return adaptOrder(created);
 }
 

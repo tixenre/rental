@@ -71,6 +71,22 @@ class Settings(BaseSettings):
         return self.RAILWAY_ENVIRONMENT is not None
 
     @property
+    def is_production(self) -> bool:
+        """True solo en el ambiente PRODUCTIVO de Railway. Staging (`dev`),
+        previews y local quedan afuera.
+
+        Se usa para no contaminar las analíticas de prod desde staging: el
+        ambiente `dev` corre con una BD copiada de prod (ver MEMORIA), así que
+        compartiría el mismo `ga4_measurement_id` — pero no debe trackear.
+        Falla hacia 'sí es prod' ante un nombre de entorno desconocido (mejor
+        ver datos en prod que apagarlos en silencio); bloquea solo los nombres
+        de no-producción conocidos y el local (RAILWAY_ENVIRONMENT vacío)."""
+        env = (self.RAILWAY_ENVIRONMENT or "").strip().lower()
+        if not env:
+            return False
+        return env not in {"dev", "staging", "development", "preview", "test", "local"}
+
+    @property
     def admin_emails(self) -> set[str]:
         return {e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip()}
 

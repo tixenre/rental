@@ -7,6 +7,7 @@
  */
 
 import { authedPostJson } from "@/lib/authedFetch";
+import { trackReservarEstudio } from "@/lib/analytics";
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -235,6 +236,13 @@ export function apiGetEstudio() {
   return get<EstudioConfig>("/api/estudio");
 }
 
+/** Config pública de analítica. El backend devuelve el Measurement ID de GA4
+ *  solo en producción (null en staging/local) para no contaminar las métricas
+ *  de prod con tráfico de prueba. */
+export function apiGetAnalyticsConfig() {
+  return get<{ ga4_id: string | null }>("/api/analytics-config");
+}
+
 export type EstudioPackEquipo = {
   id: number;
   nombre: string;
@@ -262,11 +270,14 @@ export type EstudioReservaBody = {
 
 /** Crea una reserva real del estudio (entra como solicitud, estado='presupuesto').
  *  Requiere cliente logueado: usa authedPostJson (manda la cookie de sesión). */
-export function apiCrearReservaEstudio(body: EstudioReservaBody) {
-  return authedPostJson<{ id: number; numero_pedido: number | null }>(
+export async function apiCrearReservaEstudio(body: EstudioReservaBody) {
+  const res = await authedPostJson<{ id: number; numero_pedido: number | null }>(
     "/api/estudio/reservas",
     body,
   );
+  // Analytics: estudio reservado (no-op si GA no está activo).
+  trackReservarEstudio({ horas: body.horas, conPack: body.con_pack ?? false });
+  return res;
 }
 
 // NOTA: la creación de pedidos se movió a `src/lib/orders.ts → createOrder()`
