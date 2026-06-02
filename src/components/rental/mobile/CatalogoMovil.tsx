@@ -183,7 +183,7 @@ function HeroBanner({
         className="relative overflow-hidden bg-ink"
         style={{
           width: "100%",
-          aspectRatio: "4 / 3",
+          height: "clamp(260px, 55dvh, 480px)",
           transform: "translateZ(0)",
         }}
       >
