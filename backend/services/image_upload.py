@@ -345,14 +345,21 @@ def _trim_and_square(img, padding_pct: float = 0.06):
     return canvas
 
 
-def _optimize_image(content: bytes) -> tuple[bytes, str, int, int]:
-    """Optimiza la imagen: auto-orient + trim de bordes + cuadrado con fondo
-    blanco + resize a 1200x1200 + WebP q=85. Devuelve (bytes, ct, w, h).
+def _optimize_image(content: bytes, *, square: bool = True) -> tuple[bytes, str, int, int]:
+    """Optimiza la imagen y la guarda como WebP q=85. Devuelve (bytes, ct, w, h).
     Si algo falla, devuelve el contenido original como fallback.
 
-    El trim+cuadrado normaliza el tamaño visual de los productos en el grid:
-    sin esto, los PNG con mucho whitespace alrededor se ven chicos comparados
-    con los que llenan el frame.
+    Dos modos según el destino de la foto:
+
+    - `square=True` (default) → **fotos de EQUIPOS**: auto-orient + trim de bordes +
+      cuadrado con fondo blanco + resize a 1200x1200. El trim+cuadrado normaliza el
+      tamaño visual de los productos en el grid: sin esto, los PNG con mucho whitespace
+      alrededor se ven chicos comparados con los que llenan el frame.
+
+    - `square=False` → **fotos de branding/estudio (hero)**: son fotografías apaisadas
+      reales que deben verse **enteras, sin marco**. Mantiene el aspect ratio original
+      (NO trim, NO cuadrado, NO fondo blanco horneado) y solo limita el lado más largo
+      a 1600px. Cuadrarlas con fondo blanco les metía barras crema en el hero.
     """
     try:
         from PIL import Image, ImageOps
@@ -368,16 +375,36 @@ def _optimize_image(content: bytes) -> tuple[bytes, str, int, int]:
         if img.mode not in ("RGB", "RGBA"):
             img = img.convert("RGBA" if "A" in img.mode else "RGB")
 
-        # Trim + cuadrado con fondo blanco (#8 — tamaños inconsistentes)
-        try:
-            img = _trim_and_square(img, padding_pct=0.06)
-        except Exception as e:
-            logger.warning("optimize_image: trim_and_square falló, sigo sin trim: %s", e)
+        if square:
+            # Trim + cuadrado con fondo blanco (#8 — tamaños inconsistentes)
+            try:
+                img = _trim_and_square(img, padding_pct=0.06)
+            except Exception as e:
+                logger.warning("optimize_image: trim_and_square falló, sigo sin trim: %s", e)
 
-        # Resize a 1200x1200 (cuadrado) si excede
-        TARGET_SIDE = 1200
-        if img.width > TARGET_SIDE:
-            img = img.resize((TARGET_SIDE, TARGET_SIDE), Image.Resampling.LANCZOS)
+            # Resize a 1200x1200 (cuadrado) si excede
+            TARGET_SIDE = 1200
+            if img.width > TARGET_SIDE:
+                img = img.resize((TARGET_SIDE, TARGET_SIDE), Image.Resampling.LANCZOS)
+        else:
+            # Branding/estudio: mantener aspect ratio. Aplanar transparencia sobre
+            # blanco (WebP la soporta, pero el hero las muestra opacas) y limitar el
+            # lado más largo a 1600px sin deformar.
+            if img.mode == "RGBA":
+                bg = Image.new("RGB", img.size, (255, 255, 255))
+                bg.paste(img, mask=img.split()[-1])
+                img = bg
+            else:
+                img = img.convert("RGB")
+
+            MAX_SIDE = 1600
+            longest = max(img.width, img.height)
+            if longest > MAX_SIDE:
+                scale = MAX_SIDE / longest
+                img = img.resize(
+                    (round(img.width * scale), round(img.height * scale)),
+                    Image.Resampling.LANCZOS,
+                )
 
         out = BytesIO()
         img.save(out, format="WEBP", quality=85, method=6)
