@@ -258,7 +258,9 @@ async def upload_foto(request: Request):
     if len(raw) > 20 * 1024 * 1024:
         raise HTTPException(413, "Archivo muy grande (máx 20 MB)")
 
-    content, ctype, w, h = _optimize_image(raw)
+    # square=False: las fotos del estudio son branding/hero (apaisadas), no productos
+    # → se guardan con su aspect ratio, sin cuadrado-con-fondo-blanco (que metía marco).
+    content, ctype, w, h = _optimize_image(raw, square=False)
     ext = _ext_from_ctype(ctype)
     path = _foto_path_estudio()
     url = _upload_to_r2(path, content, ctype)
@@ -297,7 +299,8 @@ def upload_foto_from_url(body: UploadFromUrlBody, request: Request):
     _validate_ssrf_only(url)
 
     raw, raw_ctype = _download_image_bytes(url)
-    content, ctype, w, h = _optimize_image(raw)
+    # square=False: branding/hero (apaisada), mantiene aspect ratio sin marco blanco.
+    content, ctype, w, h = _optimize_image(raw, square=False)
     ext = _ext_from_ctype(ctype)
     path = _foto_path_estudio()
     public_url = _upload_to_r2(path, content, ctype)

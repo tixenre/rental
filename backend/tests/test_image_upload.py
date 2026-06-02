@@ -79,3 +79,37 @@ class TestOptimizeImage:
         except Exception as e:  # noqa: BLE001
             pytest.fail(f"_optimize_image reventó con basura en vez de degradar: {e}")
         assert isinstance(content, bytes)
+
+
+class TestOptimizeImageBranding:
+    """square=False → fotos de branding/estudio (hero): mantienen aspect ratio,
+    sin cuadrado-con-fondo-blanco. Regresión del marco crema en el hero mobile."""
+
+    def test_mantiene_aspect_ratio_apaisado(self):
+        # Una foto 3:2 apaisada NO debe volverse cuadrada.
+        content, ctype, w, h = _optimize_image(_png_bytes(3000, 2000), square=False)
+        assert ctype == "image/webp"
+        assert w != h, "branding NO debe ser cuadrado"
+        assert abs((w / h) - 1.5) < 0.01, "debe preservar el ratio 3:2 original"
+
+    def test_limita_lado_mas_largo_a_1600(self):
+        content, ctype, w, h = _optimize_image(_png_bytes(4050, 2700), square=False)
+        assert max(w, h) == 1600
+        assert abs((w / h) - 1.5) < 0.01
+
+    def test_no_upscale(self):
+        # Una imagen chica no se agranda.
+        content, ctype, w, h = _optimize_image(_png_bytes(800, 600), square=False)
+        assert (w, h) == (800, 600)
+
+    def test_sin_marco_blanco_en_los_bordes(self):
+        # El bug: cuadrar con fondo blanco metía píxeles blancos en las esquinas.
+        # Con square=False, una foto de color sólido no debe tener esquinas blancas.
+        content, ctype, w, h = _optimize_image(
+            _png_bytes(1500, 1000, color=(30, 60, 90)), square=False
+        )
+        img = Image.open(BytesIO(content)).convert("RGB")
+        px = img.load()
+        for x, y in [(2, 2), (w - 3, 2), (2, h - 3), (w - 3, h - 3)]:
+            r, g, b = px[x, y]
+            assert min(r, g, b) < 230, f"esquina ({x},{y}) quedó blanca: {(r, g, b)}"
