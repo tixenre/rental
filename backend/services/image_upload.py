@@ -487,6 +487,26 @@ def _upload_to_r2(path: str, content: bytes, content_type: str) -> str:
     return f"{cfg['public_base']}/{path}"
 
 
+def _delete_from_r2(path: str) -> bool:
+    """Borra un objeto de R2 (best-effort). Devuelve True si se borró, False si
+    no se pudo (R2 sin configurar, error de red, etc.).
+
+    NO eleva: el borrado de la foto en la base es la fuente de verdad y no debe
+    quedar trabado si R2 falla. Si no se puede borrar, se loguea el huérfano para
+    poder limpiarlo después, pero la request sigue.
+    """
+    if not path:
+        return False
+    try:
+        cfg = _r2_config()
+        client = _get_r2_client(cfg)
+        client.delete_object(Bucket=cfg["bucket"], Key=path)
+        return True
+    except Exception as e:  # noqa: BLE001 — best-effort, nunca rompe el borrado
+        logger.warning("delete_from_r2: no se pudo borrar '%s' (huérfano en R2): %s", path, e)
+        return False
+
+
 def _upload_to_supabase_storage(path: str, content: bytes, content_type: str) -> str:
     """Sube `content` al bucket equipos-fotos vía REST API usando service role.
     Devuelve la URL pública. Eleva HTTPException si falla.

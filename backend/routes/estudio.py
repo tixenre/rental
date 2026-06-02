@@ -20,6 +20,7 @@ from routes.alquileres import (
     get_disponibilidad,
 )
 from services.image_upload import (
+    _delete_from_r2,
     _download_image_bytes,
     _ext_from_ctype,
     _optimize_image,
@@ -330,15 +331,21 @@ def delete_foto(foto_id: int, request: Request):
     conn = get_db()
     try:
         cur = conn.execute(
-            "SELECT id FROM estudio_fotos WHERE id = ? AND estudio_id = 1",
+            "SELECT path FROM estudio_fotos WHERE id = ? AND estudio_id = 1",
             (foto_id,),
         )
-        if not cur.fetchone():
+        row = cur.fetchone()
+        if not row:
             raise HTTPException(404, "Foto no encontrada")
+        path = row["path"]
         conn.execute("DELETE FROM estudio_fotos WHERE id = ?", (foto_id,))
         conn.commit()
     finally:
         conn.close()
+
+    # Limpiar el archivo en R2 (best-effort: la fila ya se borró, que es la
+    # fuente de verdad; si R2 falla se loguea el huérfano y la request sigue).
+    _delete_from_r2(path)
 
     return {"ok": True}
 
