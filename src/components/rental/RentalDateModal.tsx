@@ -87,15 +87,6 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
     return false;
   }, [startDate, endDate, diasBloqueados]);
 
-  // Primer día bloqueado dentro del rango — para el error con fecha específica
-  const primerDiaBloqueado = useMemo(() => {
-    if (!startDate || !endDate || diasBloqueados.size === 0) return null;
-    for (let d = startOfDay(startDate); d <= startOfDay(endDate); d = addDays(d, 1)) {
-      if (diasBloqueados.has(ymd(d))) return d;
-    }
-    return null;
-  }, [startDate, endDate, diasBloqueados]);
-
   const franjaRetiro = franjaParaFecha(horarios, startDate);
   const franjaDevolucion = franjaParaFecha(horarios, endDate);
   const devolucionCerrada = !!endDate && !diaAbierto(horarios, endDate);
