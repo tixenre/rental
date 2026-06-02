@@ -172,16 +172,18 @@ function HeroBanner({
   const tagline = taglines[taglineIdx % taglines.length];
 
   return (
-    <div ref={heroRef}>
+    <div ref={heroRef} className="bg-ink">
       {/* Foto rotante — crossfade con position:absolute + inset:0.
           transform:translateZ(0) en el contenedor fuerza GPU compositing,
           necesario para que overflow:hidden funcione bien en Safari iOS
-          (known bug con imgs absolutas en contenedores de altura fija). */}
+          (known bug con imgs absolutas en contenedores de altura fija).
+          bg-ink en el outer div: cualquier gap subpíxel entre topbar y foto
+          queda invisible (oscuro = mismo color que la foto). */}
       <div
         className="relative overflow-hidden bg-ink"
         style={{
           width: "100%",
-          height: "clamp(240px, 58vw, 340px)",
+          aspectRatio: "4 / 3",
           transform: "translateZ(0)",
         }}
       >
