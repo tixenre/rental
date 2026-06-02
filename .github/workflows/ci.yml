@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, dev]
     # Cambios solo-docs no disparan el CI (ahorro de minutos de Actions).
     # Si un PR toca código + docs, igual corre (paths-ignore solo saltea
     # cuando TODOS los archivos cambiados matchean estos globs).
@@ -10,7 +10,7 @@ on:
       - '**/*.md'
       - 'docs/**'
   push:
-    branches: [main]
+    branches: [main, dev]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'

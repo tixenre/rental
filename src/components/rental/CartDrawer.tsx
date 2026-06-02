@@ -339,6 +339,10 @@ export function CartDrawer({
                       {list.map(({ it, qty }) => {
                         const cap = getDisponible?.(it) ?? it.cantidad ?? Infinity;
                         const reachedMax = qty >= cap;
+                        // Un ítem es "no disponible" si el catálogo calculó su
+                        // disponibilidad (hay fechas seleccionadas) y es 0.
+                        const noDisponible =
+                          !!startDate && getDisponible?.(it) !== undefined && cap === 0;
                         const lineaBruta = it.pricePerDay * qty * (d || 1);
                         const lineaDto =
                           descuentoPct > 0 ? Math.round((lineaBruta * descuentoPct) / 100) : 0;
@@ -346,7 +350,11 @@ export function CartDrawer({
                         return (
                           <li
                             key={it.id}
-                            className="flex gap-3 rounded-lg border hairline bg-surface p-3"
+                            className={`flex gap-3 rounded-lg border p-3 transition-colors ${
+                              noDisponible
+                                ? "border-destructive/30 bg-destructive/5"
+                                : "hairline bg-surface"
+                            }`}
                           >
                             <div className="h-16 w-20 shrink-0 overflow-hidden rounded">
                               {it.fotoUrl ? (
@@ -366,6 +374,12 @@ export function CartDrawer({
                               <div className="line-clamp-2 font-sans text-sm font-bold leading-tight">
                                 {it.name}
                               </div>
+                              {noDisponible && (
+                                <div className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-destructive uppercase tracking-wide">
+                                  <AlertCircle className="h-3 w-3 shrink-0" />
+                                  No disponible en estas fechas
+                                </div>
+                              )}
                               <div className="mt-2 flex items-center justify-between gap-2">
                                 <StepperPill
                                   qty={qty}

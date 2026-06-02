@@ -233,3 +233,78 @@ class TestDevBypassEnabled:
         with pytest.raises(HTTPException) as exc:
             auth_dev_login()
         assert exc.value.status_code == 404
+
+
+# ── auth_middleware: assets estáticos de dist root son públicos ───────────────
+
+
+class _FakeURL:
+    def __init__(self, path):
+        self.path = path
+
+
+class _MiddlewareRequest:
+    """Request mínimo para auth_middleware: solo necesita .url.path."""
+    def __init__(self, path):
+        self.url = _FakeURL(path)
+        self.cookies = {}
+
+
+class TestAuthMiddlewareStaticAssets:
+    """Regresión: los archivos estáticos de la raíz del build (fotos del
+    estudio, favicon, icons, manifest, robots) NO deben redirigir a /login.
+
+    Bug original: `/estudio/*.jpg` y `/favicon.png` caían al guard de sesión
+    (307 → /login) → imagen rota en el hero del catálogo. El guard de datos
+    (/api/*, /admin/*) tiene que seguir intacto.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _no_session(self, monkeypatch):
+        # Sin sesión: el peor caso para un asset público.
+        monkeypatch.setattr("middleware.get_session", lambda req: None)
+
+    async def _classify(self, path):
+        """Corre el middleware con un call_next sentinela. Devuelve
+        'PASS' si llamó a call_next, o la respuesta de redirect/401."""
+        from middleware import auth_middleware
+
+        sentinel = object()
+
+        async def call_next(_req):
+            return sentinel
+
+        result = await auth_middleware(_MiddlewareRequest(path), call_next)
+        return "PASS" if result is sentinel else result
+
+    @pytest.mark.parametrize("path", [
+        "/estudio/Rambla_Estudio_S7V9470.jpg",
+        "/estudio/Rambla_Estudio_S7V9519-HDR.jpg",
+        "/favicon.png",
+        "/apple-touch-icon.png",
+        "/icon-512.png",
+        "/manifest-admin.json",
+        "/robots.txt",
+        "/wordmark.svg",
+    ])
+    async def test_assets_estaticos_pasan(self, path):
+        assert await self._classify(path) == "PASS", path
+
+    async def test_pagina_admin_redirige_a_login(self):
+        from fastapi.responses import RedirectResponse
+
+        res = await self._classify("/admin/equipos")
+        assert isinstance(res, RedirectResponse)
+        assert res.headers["location"] == "/login"
+
+    @pytest.mark.parametrize("path", [
+        "/api/pedidos",
+        "/api/admin/inventario",
+        "/api/admin/export.json",  # extensión NO debe abrir un endpoint de datos
+    ])
+    async def test_api_protegida_sigue_401(self, path):
+        from fastapi.responses import JSONResponse
+
+        res = await self._classify(path)
+        assert isinstance(res, JSONResponse)
+        assert res.status_code == 401

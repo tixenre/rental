@@ -20,6 +20,7 @@ from routes.alquileres import (
     get_disponibilidad,
 )
 from services.image_upload import (
+    _delete_from_r2,
     _download_image_bytes,
     _ext_from_ctype,
     _optimize_image,
@@ -258,7 +259,9 @@ async def upload_foto(request: Request):
     if len(raw) > 20 * 1024 * 1024:
         raise HTTPException(413, "Archivo muy grande (máx 20 MB)")
 
-    content, ctype, w, h = _optimize_image(raw)
+    # square=False: las fotos del estudio son branding/hero (apaisadas), no productos
+    # → se guardan con su aspect ratio, sin cuadrado-con-fondo-blanco (que metía marco).
+    content, ctype, w, h = _optimize_image(raw, square=False)
     ext = _ext_from_ctype(ctype)
     path = _foto_path_estudio()
     url = _upload_to_r2(path, content, ctype)
@@ -297,7 +300,8 @@ def upload_foto_from_url(body: UploadFromUrlBody, request: Request):
     _validate_ssrf_only(url)
 
     raw, raw_ctype = _download_image_bytes(url)
-    content, ctype, w, h = _optimize_image(raw)
+    # square=False: branding/hero (apaisada), mantiene aspect ratio sin marco blanco.
+    content, ctype, w, h = _optimize_image(raw, square=False)
     ext = _ext_from_ctype(ctype)
     path = _foto_path_estudio()
     public_url = _upload_to_r2(path, content, ctype)
@@ -327,15 +331,21 @@ def delete_foto(foto_id: int, request: Request):
     conn = get_db()
     try:
         cur = conn.execute(
-            "SELECT id FROM estudio_fotos WHERE id = ? AND estudio_id = 1",
+            "SELECT path FROM estudio_fotos WHERE id = ? AND estudio_id = 1",
             (foto_id,),
         )
-        if not cur.fetchone():
+        row = cur.fetchone()
+        if not row:
             raise HTTPException(404, "Foto no encontrada")
+        path = row["path"]
         conn.execute("DELETE FROM estudio_fotos WHERE id = ?", (foto_id,))
         conn.commit()
     finally:
         conn.close()
+
+    # Limpiar el archivo en R2 (best-effort: la fila ya se borró, que es la
+    # fuente de verdad; si R2 falla se loguea el huérfano y la request sigue).
+    _delete_from_r2(path)
 
     return {"ok": True}
 

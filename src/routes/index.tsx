@@ -47,6 +47,7 @@ import { useFavoritos } from "@/hooks/useFavoritos";
 import type { BackendMarca, BackendCategoria } from "@/lib/api";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { useCart } from "@/lib/cart-store";
+import { toast } from "sonner";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -185,8 +186,23 @@ type Mode = "grid" | "list";
 
 function Index() {
   // Datos de la API
-  const { startDate, endDate } = useCart();
+  const { startDate, endDate, items, setQty } = useCart();
   const { data: allEquipos = [], isLoading, isError } = useEquipos(startDate, endDate);
+
+  // Reconciliación: elimina del carrito items cuyo ID ya no existe en el catálogo
+  // (equipo borrado, ocultado o archivado después de que el cliente lo agregó).
+  // Se corre solo cuando el catálogo cargó exitosamente y tiene datos.
+  useEffect(() => {
+    if (isLoading || allEquipos.length === 0) return;
+    const validIds = new Set(allEquipos.map((e) => String(e.id)));
+    const fantasmas = Object.keys(items).filter((id) => !validIds.has(id));
+    if (fantasmas.length === 0) return;
+    fantasmas.forEach((id) => setQty(id, 0));
+    toast("Actualizamos tu carrito: algunos equipos ya no están disponibles.", {
+      duration: 5000,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allEquipos, isLoading]);
   const { data: backendCats = [] } = useCategorias();
   const { data: marcasData } = useMarcas();
 

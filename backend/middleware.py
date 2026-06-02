@@ -38,6 +38,21 @@ PUBLIC_API = (
     "/api/estudio",
 )
 
+# Archivos estáticos que viven en la raíz del build de Vite (`public/` se copia
+# a `dist/`): fotos del estudio (/estudio/*.jpg), favicon, icons, manifest,
+# robots, fuentes, etc. Son públicos por naturaleza y los sirve el spa_fallback
+# de main.py (que ya tiene guard anti-traversal y solo devuelve archivos reales
+# de dist/). Sin esto, el auth_middleware los bloquea y redirige a /login → la
+# imagen/asset queda roto. Se matchea por extensión (las rutas del SPA son URLs
+# limpias sin extensión) y se excluye /api/ para no abrir endpoints de datos.
+STATIC_EXTENSIONS = (
+    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".svg", ".ico",
+    ".json", ".txt", ".xml", ".webmanifest",
+    ".woff", ".woff2", ".ttf", ".otf",
+    ".css", ".js", ".map", ".mp4", ".webm", ".pdf",
+)
+
+
 
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
@@ -47,6 +62,9 @@ async def auth_middleware(request: Request, call_next):
     if any(path.startswith(p) for p in PUBLIC_PREFIXES):
         return await call_next(request)
     if any(path.startswith(p) for p in PUBLIC_API):
+        return await call_next(request)
+    # Assets estáticos de dist root (no-/api/ con extensión de archivo).
+    if not path.startswith("/api/") and path.endswith(STATIC_EXTENSIONS):
         return await call_next(request)
 
     session = get_session(request)
