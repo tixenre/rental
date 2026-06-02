@@ -173,18 +173,17 @@ function HeroBanner({
 
   return (
     <div ref={heroRef} className="bg-ink">
-      {/* Foto rotante 3:2 full-bleed. Crossfade con divs de background-image
-          (NO <img>): background-size:cover es a prueba de balas en todos los
-          browsers — no es elemento reemplazado, no tiene fallback a tamaño
-          intrínseco, nunca deja marco/letterbox blanco. El aspectRatio 3/2
-          matchea la proporción nativa de las fotos del estudio → se ven enteras
-          sin recorte, a todo el ancho, pegadas al topbar arriba y a la sección
-          amber abajo. bg-ink tapa cualquier gap subpíxel. */}
+      {/* Foto rotante 16:9 full-bleed (banner cinematográfico). Crossfade con
+          divs de background-image (NO <img>): background-size:cover es a prueba
+          de balas en todos los browsers y recorta la foto para llenar el 16:9
+          (las fotos del estudio son apaisadas ~3:2 → se recorta arriba/abajo).
+          A todo el ancho, pegada al topbar arriba y a la sección amber abajo.
+          bg-ink tapa cualquier gap subpíxel. */}
       <div
         className="relative overflow-hidden bg-ink"
         style={{
           width: "100%",
-          aspectRatio: "3 / 2",
+          aspectRatio: "16 / 9",
         }}
         role="img"
         aria-label="El Estudio — Rambla Rental"
