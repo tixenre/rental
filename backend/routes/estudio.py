@@ -27,6 +27,8 @@ from services.image_upload import (
     _upload_to_r2,
     _validate_ssrf_only,
 )
+from services.media import DISPLAY_KEEP_ASPECT, collect_asset_keys, purge_r2, store_upload
+from services.media_fastapi import media_http
 
 router = APIRouter()
 
@@ -114,7 +116,7 @@ def _build_response(row, fotos: list) -> dict:
     }
 
 
-def _insert_foto(conn, url: str, path: str) -> dict:
+def _insert_foto(conn, url: str, path: str, media_id: int | None = None) -> dict:
     cur = conn.execute(
         "SELECT COALESCE(MAX(orden), -1) + 1 AS next_orden FROM estudio_fotos WHERE estudio_id = 1",
         (),
@@ -125,9 +127,9 @@ def _insert_foto(conn, url: str, path: str) -> dict:
     is_first = cur2.fetchone()["cnt"] == 0
 
     conn.execute(
-        "INSERT INTO estudio_fotos (estudio_id, url, path, orden, es_principal) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (1, url, path, orden, is_first),
+        "INSERT INTO estudio_fotos (estudio_id, url, path, orden, es_principal, media_id) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (1, url, path, orden, is_first, media_id),
     )
     conn.commit()
 
@@ -259,28 +261,29 @@ async def upload_foto(request: Request):
     if len(raw) > 20 * 1024 * 1024:
         raise HTTPException(413, "Archivo muy grande (máx 20 MB)")
 
-    # square=False: las fotos del estudio son branding/hero (apaisadas), no productos
-    # → se guardan con su aspect ratio, sin cuadrado-con-fondo-blanco (que metía marco).
-    content, ctype, w, h = _optimize_image(raw, square=False)
-    ext = _ext_from_ctype(ctype)
-    path = _foto_path_estudio()
-    url = _upload_to_r2(path, content, ctype)
-
     conn = get_db()
     try:
-        foto = _insert_foto(conn, url, path)
+        with media_http():
+            asset = store_upload(
+                raw, kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn,
+            )
+        display = asset.variant("display")
+        foto = _insert_foto(conn, url=display.url, path=display.key, media_id=asset.id)
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
     return {
         "id": foto["id"],
-        "public_url": url,
-        "path": path,
-        "size": len(content),
+        "public_url": display.url,
+        "path": display.key,
+        "size": display.bytes,
         "size_original": len(raw),
-        "content_type": ctype,
-        "width": w or None,
-        "height": h or None,
+        "content_type": display.content_type,
+        "width": display.width or None,
+        "height": display.height or None,
     }
 
 
@@ -299,28 +302,31 @@ def upload_foto_from_url(body: UploadFromUrlBody, request: Request):
 
     _validate_ssrf_only(url)
 
-    raw, raw_ctype = _download_image_bytes(url)
-    # square=False: branding/hero (apaisada), mantiene aspect ratio sin marco blanco.
-    content, ctype, w, h = _optimize_image(raw, square=False)
-    ext = _ext_from_ctype(ctype)
-    path = _foto_path_estudio()
-    public_url = _upload_to_r2(path, content, ctype)
+    raw, _raw_ctype = _download_image_bytes(url)
 
     conn = get_db()
     try:
-        foto = _insert_foto(conn, public_url, path)
+        with media_http():
+            asset = store_upload(
+                raw, kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn,
+            )
+        display = asset.variant("display")
+        foto = _insert_foto(conn, url=display.url, path=display.key, media_id=asset.id)
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
     return {
         "id": foto["id"],
-        "public_url": public_url,
-        "path": path,
-        "size": len(content),
+        "public_url": display.url,
+        "path": display.key,
+        "size": display.bytes,
         "size_original": len(raw),
-        "content_type": ctype,
-        "width": w or None,
-        "height": h or None,
+        "content_type": display.content_type,
+        "width": display.width or None,
+        "height": display.height or None,
     }
 
 
@@ -331,21 +337,32 @@ def delete_foto(foto_id: int, request: Request):
     conn = get_db()
     try:
         cur = conn.execute(
-            "SELECT path FROM estudio_fotos WHERE id = ? AND estudio_id = 1",
+            "SELECT path, media_id FROM estudio_fotos WHERE id = ? AND estudio_id = 1",
             (foto_id,),
         )
         row = cur.fetchone()
         if not row:
             raise HTTPException(404, "Foto no encontrada")
         path = row["path"]
+        media_id = row["media_id"]
+
+        # Recolectar keys R2 ANTES del DELETE (cascade borrará las filas de variants)
+        r2_keys: list[str] = []
+        if media_id:
+            r2_keys = collect_asset_keys(conn, media_id)
+
         conn.execute("DELETE FROM estudio_fotos WHERE id = ?", (foto_id,))
+        if media_id:
+            conn.execute("DELETE FROM media_assets WHERE id = ?", (media_id,))
         conn.commit()
     finally:
         conn.close()
 
-    # Limpiar el archivo en R2 (best-effort: la fila ya se borró, que es la
-    # fuente de verdad; si R2 falla se loguea el huérfano y la request sigue).
-    _delete_from_r2(path)
+    # Best-effort R2 cleanup (después del commit — la DB es la fuente de verdad)
+    if r2_keys:
+        purge_r2(r2_keys)
+    elif path:
+        _delete_from_r2(path)  # fallback legacy (fotos sin media_id)
 
     return {"ok": True}
 
