@@ -112,8 +112,10 @@ export function PhotoGallery({
                 </div>
               )}
 
-              {/* Controles superpuestos al hover */}
-              <div className="absolute inset-0 flex flex-col justify-between p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+              {/* Controles superpuestos. En táctil (sin hover) van SIEMPRE
+                  visibles — si no, en mobile no hay forma de borrar/reordenar.
+                  En desktop (hover disponible) se revelan al pasar el mouse. */}
+              <div className="absolute inset-0 flex flex-col justify-between p-1.5 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
                 {/* Arriba: borrar */}
                 <div className="flex justify-end">
                   <button
