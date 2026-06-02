@@ -236,6 +236,13 @@ export function apiGetEstudio() {
   return get<EstudioConfig>("/api/estudio");
 }
 
+/** Config pública de analítica. El backend devuelve el Measurement ID de GA4
+ *  solo en producción (null en staging/local) para no contaminar las métricas
+ *  de prod con tráfico de prueba. */
+export function apiGetAnalyticsConfig() {
+  return get<{ ga4_id: string | null }>("/api/analytics-config");
+}
+
 export type EstudioPackEquipo = {
   id: number;
   nombre: string;

@@ -6,6 +6,7 @@ import ReactDOM from "react-dom/client";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import { initGA, trackPageView } from "./lib/analytics";
+import { apiGetAnalyticsConfig } from "./lib/api";
 
 // Solo activo si VITE_SENTRY_DSN está seteado — dev/CI no lo necesitan.
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined;
@@ -47,17 +48,35 @@ const router = createRouter({
   scrollRestoration: true,
 });
 
-// Google Analytics 4 — solo activo si VITE_GA4_ID está seteada (igual que Sentry).
+// Google Analytics 4.
+// El Measurement ID se administra desde el back-office (/admin/settings → Google
+// Analytics) y el backend solo lo expone en producción (staging/local devuelven
+// null → no contaminan las métricas de prod). VITE_GA4_ID es un override opcional
+// de ops: si está seteada gana, y fuerza una propiedad GA en cualquier ambiente.
 // Cobertura: solo catálogo público. Salteamos /admin (interno/noindex) y /cliente
-// (área privada logueada). El pageview SPA se manda en cada navegación resuelta.
-const GA4_ID = import.meta.env.VITE_GA4_ID as string | undefined;
-if (GA4_ID) {
-  initGA(GA4_ID);
-  router.subscribe("onResolved", () => {
+// (área privada). El pageview SPA se manda en cada navegación resuelta.
+function startAnalytics(measurementId: string) {
+  initGA(measurementId);
+  const sendPageView = () => {
     const path = router.state.location.pathname;
     if (path.startsWith("/admin") || path.startsWith("/cliente")) return;
     trackPageView(path);
-  });
+  };
+  sendPageView(); // pageview inicial (el fetch async puede resolver post-carga)
+  router.subscribe("onResolved", sendPageView);
+}
+
+const GA4_OVERRIDE = import.meta.env.VITE_GA4_ID as string | undefined;
+if (GA4_OVERRIDE) {
+  startAnalytics(GA4_OVERRIDE);
+} else {
+  apiGetAnalyticsConfig()
+    .then((cfg) => {
+      if (cfg.ga4_id) startAnalytics(cfg.ga4_id);
+    })
+    .catch(() => {
+      /* sin analítica si el endpoint no responde — no rompe el catálogo */
+    });
 }
 
 declare module "@tanstack/react-router" {

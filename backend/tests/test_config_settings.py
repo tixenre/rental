@@ -40,3 +40,15 @@ def test_is_railway_y_cookie_secure():
     assert local.is_railway is False
     assert local.cookie_secure is False
     assert Settings(RAILWAY_ENVIRONMENT=None, COOKIE_SECURE="true").cookie_secure is True
+
+
+def test_is_production_solo_en_prod():
+    # Producción: cualquier nombre que no sea de los no-prod conocidos.
+    assert Settings(RAILWAY_ENVIRONMENT="production").is_production is True
+    assert Settings(RAILWAY_ENVIRONMENT="PRODUCTION").is_production is True
+    # Staging/preview/local NO son prod → no trackean (no ensucian analíticas).
+    for env in ("dev", "staging", "development", "preview", "test", "local"):
+        assert Settings(RAILWAY_ENVIRONMENT=env).is_production is False, env
+    # Sin la variable (local fuera de Railway) tampoco es prod.
+    assert Settings(RAILWAY_ENVIRONMENT=None).is_production is False
+    assert Settings(RAILWAY_ENVIRONMENT="").is_production is False

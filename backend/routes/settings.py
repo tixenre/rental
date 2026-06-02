@@ -145,6 +145,8 @@ ALLOWED_SETTINGS_KEYS = {
     "business_phone_display",  # Display human-readable del teléfono ("+54 9 223 585 2510").
     "business_email",          # Email de contacto público ("hola@rambla.studio").
     "business_instagram",      # Handle de IG sin @ ("ramblarental").
+    # ── Analítica ────────────────────────────────────────────────────
+    "ga4_measurement_id",      # Measurement ID de Google Analytics 4 ("G-XXXXXXXXXX"). Vacío = GA apagado.
 }
 
 # Keys cuyo valor puede borrarse (volver al default) desde la UI. El resto
@@ -155,7 +157,35 @@ CLEARABLE_SETTINGS_KEYS = {
     "business_phone_display",
     "business_email",
     "business_instagram",
+    "ga4_measurement_id",  # Vaciarlo apaga Google Analytics.
 }
+
+# Formato de un Measurement ID de GA4: 'G-' seguido de alfanuméricos.
+_GA4_ID = re.compile(r"^G-[A-Z0-9]{4,}$")
+
+
+@router.get("/analytics-config")
+def analytics_config():
+    """Config pública de analítica para el front del catálogo.
+
+    Devuelve el Measurement ID de GA4 SOLO en producción. En staging (`dev`,
+    que corre con una BD copiada de prod) y en local devuelve `null` para no
+    contaminar las analíticas de prod con tráfico de prueba. El `ga4_id` no es
+    secreto (queda visible en el HTML del sitio público), así que es lectura
+    abierta — el único gate es el ambiente."""
+    from config import settings as app_settings
+
+    if not app_settings.is_production:
+        return {"ga4_id": None}
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT value FROM app_settings WHERE key = ?", ("ga4_measurement_id",)
+        ).fetchone()
+        value = row["value"].strip() if row and row["value"] else None
+        return {"ga4_id": value or None}
+    finally:
+        conn.close()
 
 
 @router.get("/settings/{key}")
@@ -250,6 +280,15 @@ def update_setting(key: str, payload: dict, request: Request):
             value = str(v)
         except (ValueError, TypeError) as e:
             raise HTTPException(400, f"Valor inválido para '{key}': debe ser un entero >= 0 ({e})")
+    if key == "ga4_measurement_id":
+        # GA4 IDs son case-insensitive pero conviven mejor en mayúscula.
+        value = value.upper()
+        if not _GA4_ID.match(value):
+            raise HTTPException(
+                400,
+                "Measurement ID inválido. Tiene que ser como 'G-XXXXXXXXXX' "
+                "(lo sacás de Google Analytics → Admin → Flujos de datos → Web).",
+            )
     if key == "horarios_retiro":
         value = _validar_horarios(value)
     if key == "faq_json":

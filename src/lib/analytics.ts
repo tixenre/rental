@@ -1,9 +1,11 @@
 /**
  * analytics.ts — integración con Google Analytics 4 (gtag.js).
  *
- * Fuente ÚNICA de tracking del front. Se activa SOLO si `VITE_GA4_ID` está
- * seteada (mismo patrón que Sentry en `main.tsx`): dev/CI/local sin la variable
- * no cargan nada ni mandan datos. Sin banner de consentimiento: GA carga directo
+ * Fuente ÚNICA de tracking del front. El Measurement ID se administra desde el
+ * back-office (/admin/settings → Google Analytics) y el backend solo lo expone
+ * en producción (`/api/analytics-config`); `VITE_GA4_ID` es un override opcional
+ * de ops. El wiring (fetch + init + pageviews) vive en `main.tsx`. Si no hay ID,
+ * nada se carga ni se manda. Sin banner de consentimiento: GA carga directo
  * (decisión 2026-06-02 — integración GA, solo catálogo público, sin consent).
  *
  * Cobertura: solo el catálogo público. El page-view tracking (en `main.tsx`)
