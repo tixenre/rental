@@ -753,7 +753,7 @@ export const adminApi = {
     authedPostJson<KitComponente[]>(`/api/equipos/${id}/kit`, {
       componente_id,
       cantidad,
-      descuento_pct: descuento_pct ?? null,
+      descuento_pct: descuento_pct ?? 0,
       esencial: esencial ?? true,
     }),
   removeKitItem: async (id: number, componente_id: number) => {
