@@ -1350,6 +1350,10 @@ export const adminApi = {
   // estadísticas
   getEstadisticas: () => authedJson<EstadisticasData>("/api/estadisticas"),
 
+  // analítica de búsquedas del catálogo público
+  getBusquedas: (dias?: number) =>
+    authedJson<BusquedasData>(`/api/admin/busquedas${dias && dias > 0 ? `?dias=${dias}` : ""}`),
+
   uploadLogo: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();
     fd.append("file", file);
@@ -1447,6 +1451,22 @@ export type CalendarioPedido = {
   fecha_hasta: string;
   monto_total: number;
   equipos: string | null;
+};
+
+/** Una fila agregada de búsquedas: un término normalizado con cuántas veces se
+ *  buscó, un ejemplo del texto crudo, la última vez, y (en `top`) el máximo de
+ *  resultados que llegó a dar. */
+export type BusquedaRow = {
+  query_norm: string;
+  veces: number;
+  texto: string;
+  ultima: string | null;
+  max_resultados?: number;
+};
+
+export type BusquedasData = {
+  top: BusquedaRow[];
+  zero: BusquedaRow[];
 };
 
 export type EstadisticasData = {

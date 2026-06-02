@@ -1,5 +1,6 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -10,11 +11,14 @@ import {
   Calculator,
   Heart,
   Repeat,
+  Search,
+  SearchX,
 } from "lucide-react";
 
 import { adminApi } from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const Route = createLazyFileRoute("/admin/estadisticas")({
   component: EstadisticasPage,
@@ -204,7 +208,85 @@ function EstadisticasPage() {
           </div>
         </>
       )}
+
+      <BusquedasSection />
     </div>
+  );
+}
+
+const VENTANAS: { label: string; dias?: number }[] = [
+  { label: "30 días", dias: 30 },
+  { label: "90 días", dias: 90 },
+  { label: "Todo" },
+];
+
+function BusquedasSection() {
+  const [dias, setDias] = useState<number | undefined>(30);
+  const q = useQuery({
+    queryKey: ["admin", "busquedas", dias ?? "all"],
+    queryFn: () => adminApi.getBusquedas(dias),
+  });
+  const data = q.data;
+  const fmtFecha = (s: string | null) => (s ? new Date(s).toLocaleDateString("es-AR") : "—");
+
+  return (
+    <section className="space-y-3 border-t hairline pt-6">
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="font-display text-2xl text-ink">Qué busca la gente</h2>
+          <p className="text-sm text-muted-foreground">
+            Términos del buscador del catálogo. Lo que buscan y da <strong>0 resultados</strong> es
+            demanda que todavía no estás cubriendo.
+          </p>
+        </div>
+        <div className="flex gap-1">
+          {VENTANAS.map((v) => (
+            <button
+              key={v.label}
+              onClick={() => setDias(v.dias)}
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-medium border hairline transition",
+                dias === v.dias ? "bg-ink text-background" : "text-muted-foreground hover:text-ink",
+              )}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
+      {q.error && (
+        <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          Error: {(q.error as Error).message}
+        </div>
+      )}
+
+      {data && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Section title="Más buscado" subtitle="Ordenado por cantidad de búsquedas">
+            <RankList
+              items={data.top.map((r) => ({
+                primary: r.texto,
+                secondary: `${fmtFecha(r.ultima)} · ${r.max_resultados ?? 0} resultados`,
+                value: `${r.veces}×`,
+              }))}
+              icon={Search}
+            />
+          </Section>
+          <Section title="Buscado sin resultados" subtitle="Demanda no cubierta (0 resultados)">
+            <RankList
+              items={data.zero.map((r) => ({
+                primary: r.texto,
+                secondary: `última vez: ${fmtFecha(r.ultima)}`,
+                value: `${r.veces}×`,
+              }))}
+              icon={SearchX}
+            />
+          </Section>
+        </div>
+      )}
+    </section>
   );
 }
 

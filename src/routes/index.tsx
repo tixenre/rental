@@ -16,6 +16,7 @@ import {
 import { ViewToggle } from "@/components/rental/ViewToggle";
 import { Link } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/rental/PublicLayout";
+import { logSearch } from "@/lib/search-log";
 import { HeroSection } from "@/components/rental/HeroSection";
 import { ComoFunciona } from "@/components/rental/ComoFunciona";
 import { EstudioBand } from "@/components/rental/EstudioBand";
@@ -419,6 +420,12 @@ function Index() {
     }
     return list;
   }, [selectedCats, brand, query, disponiblesOnly, favoritosOnly, fav, allEquipos, specFilters]);
+
+  // Analítica interna: registra qué busca la gente (con cuántos resultados vio).
+  // Debounce + dedupe viven en el módulo; acá solo avisamos en cada cambio.
+  useEffect(() => {
+    logSearch(query, filtered.length);
+  }, [query, filtered.length]);
 
   // Specs filtrables — descubiertas del subset cat/brand/query (sin
   // aplicar spec-filters todavía, para que los valores disponibles no
