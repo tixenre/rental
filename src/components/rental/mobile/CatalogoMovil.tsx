@@ -173,35 +173,34 @@ function HeroBanner({
 
   return (
     <div ref={heroRef} className="bg-ink">
-      {/* Foto rotante — crossfade con position:absolute + inset:0.
-          transform:translateZ(0) en el contenedor fuerza GPU compositing,
-          necesario para que overflow:hidden funcione bien en Safari iOS
-          (known bug con imgs absolutas en contenedores de altura fija).
-          bg-ink en el outer div: cualquier gap subpíxel entre topbar y foto
-          queda invisible (oscuro = mismo color que la foto). */}
+      {/* Foto rotante 16:9 full-bleed. Crossfade con divs de background-image
+          (NO <img>): background-size:cover es a prueba de balas en todos los
+          browsers — no es elemento reemplazado, no tiene fallback a tamaño
+          intrínseco, nunca deja marco/letterbox blanco. El aspectRatio 16/9 a
+          full-width fija el alto exacto → foto pegada al topbar arriba y a la
+          sección amber abajo, sin huecos. bg-ink tapa cualquier gap subpíxel. */}
       <div
         className="relative overflow-hidden bg-ink"
         style={{
           width: "100%",
-          height: "clamp(260px, 55dvh, 480px)",
-          transform: "translateZ(0)",
+          aspectRatio: "16 / 9",
         }}
+        role="img"
+        aria-label="El Estudio — Rambla Rental"
       >
         {photos.map((src, i) => (
-          <img
+          <div
             key={src}
-            src={src}
-            alt="El Estudio — Rambla Rental"
+            aria-hidden
             style={{
               position: "absolute",
               inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
+              backgroundImage: `url(${src})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
               opacity: i === photoIdx ? 1 : 0,
               transition: "opacity 900ms",
             }}
-            loading="eager"
           />
         ))}
         {/* Gradient overlay */}
