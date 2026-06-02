@@ -237,6 +237,30 @@
   credenciales ni se prueba contra su BD para diagnosticar staging.
 - **Consecuencias:** receta directa para la próxima sesión que forkee un ambiente con DB.
 
+### 2026-06-02 — Google Analytics: sin consent, solo catálogo público, ID administrado desde el back-office
+- **Contexto:** se integró GA4 al front. Decisiones del dueño: sin banner de consentimiento (GA
+  carga directo), medir páginas vistas + 3 eventos de negocio (`add_to_cart`, `solicitar_pedido`,
+  `reservar_estudio`), cobertura **solo catálogo público** (`/admin` y `/cliente` quedan fuera del
+  conteo), y el Measurement ID se administra **desde el back-office** (`/admin/settings`), no por
+  variable de entorno.
+- **Decisión:** el tracking vive en un módulo único `src/lib/analytics.ts` (sin React); cada evento
+  se dispara en **un solo punto canónico** (carrito → `cart-store.ts`, pedido → `orders.createOrder`,
+  estudio → `api.apiCrearReservaEstudio`). El ID se guarda en `app_settings.ga4_measurement_id` y el
+  front lo lee en runtime de `GET /api/analytics-config`. `VITE_GA4_ID` queda como **override opcional
+  de ops** (gana, cualquier ambiente).
+- **Gate por entorno (clave):** ese endpoint **solo expone el ID en producción** (`settings.is_production`
+  en `backend/config.py`). Como staging (`dev`) corre con **BD copiada de prod** (decisión 2026-06-01),
+  sin el gate compartiría el ID y ensuciaría las métricas reales con tráfico de prueba. `is_production`
+  usa una **lista negra** de nombres no-prod (`dev/staging/development/preview/test/local`) y falla hacia
+  "sí es prod" ante un nombre desconocido (mejor medir de más que apagar prod en silencio).
+- **⚠️ Gotcha operativo:** la lista negra es fija. **Al crear un ambiente Railway nuevo que no sea
+  producción** (ej. `qa`, `sandbox`, `dev2`), agregar su nombre a `is_production` **o** dejar
+  `VITE_GA4_ID` vacío ahí — si no, ese ambiente trackearía contra la propiedad de prod. Disparador ⏰:
+  cada vez que se cree un ambiente nuevo.
+- **Consecuencias:** no recrear tracking ad-hoc ni un segundo punto de disparo por evento — todo pasa
+  por `analytics.ts` y los puntos canónicos. WhatsApp/otros canales y la cobertura del portal `/cliente`
+  (con rutas sanitizadas) quedan como follow-ups si se piden.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
