@@ -243,6 +243,15 @@ export function apiGetAnalyticsConfig() {
   return get<{ ga4_id: string | null }>("/api/analytics-config");
 }
 
+/** Registra una búsqueda del catálogo público (analítica interna). Best-effort:
+ *  el wrapper con debounce vive en `src/lib/search-log.ts`. */
+export function apiLogSearch(query: string, resultCount: number) {
+  return post<{ ok: boolean; logged: boolean }>("/api/search-log", {
+    query,
+    result_count: resultCount,
+  });
+}
+
 export type EstudioPackEquipo = {
   id: number;
   nombre: string;

@@ -35,6 +35,7 @@ import { PriceBlock } from "@/components/rental/equipment/shared/PriceBlock";
 import { FavButton } from "@/components/rental/equipment/shared/FavButton";
 import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
+import { logSearch } from "@/lib/search-log";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { useHeroPhotos } from "@/lib/studio/hero-photos";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
@@ -1250,6 +1251,12 @@ export function CatalogoMovil() {
       return matchCat && matchQ && matchStock && matchBrand;
     });
   }, [allEquipos, matchesActiveTab, query, stockOnly, selectedBrand]);
+
+  // Analítica interna: registra qué busca la gente (con cuántos resultados vio).
+  // Mismo módulo único que el catálogo desktop (debounce + dedupe adentro).
+  useEffect(() => {
+    logSearch(query, filteredEquipos.length);
+  }, [query, filteredEquipos.length]);
 
   // Filtros activos (para el badge del botón "Filtros"). Excluye categoría
   // (esa la elige el tab) y búsqueda (esa tiene su propio input visible).
