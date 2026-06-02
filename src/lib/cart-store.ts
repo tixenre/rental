@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { startOfDay } from "date-fns";
 import { snapTo30 } from "@/components/rental/time-utils";
 import { computeJornadas } from "@/lib/rental-dates";
+import { trackAddToCart } from "@/lib/analytics";
 
 type DrawerPlacement = "right" | "bottom";
 
@@ -36,7 +37,10 @@ export const useCart = create<CartState>()(
       endTime: "09:00",
       drawerOpen: false,
       drawerPlacement: "right" as DrawerPlacement,
-      add: (id) => set((s) => ({ items: { ...s.items, [id]: (s.items[id] ?? 0) + 1 } })),
+      add: (id) => {
+        trackAddToCart(id);
+        set((s) => ({ items: { ...s.items, [id]: (s.items[id] ?? 0) + 1 } }));
+      },
       remove: (id) =>
         set((s) => {
           const next = { ...s.items };

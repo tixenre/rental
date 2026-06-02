@@ -7,6 +7,7 @@
  */
 
 import { authedPostJson } from "@/lib/authedFetch";
+import { trackReservarEstudio } from "@/lib/analytics";
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -262,11 +263,14 @@ export type EstudioReservaBody = {
 
 /** Crea una reserva real del estudio (entra como solicitud, estado='presupuesto').
  *  Requiere cliente logueado: usa authedPostJson (manda la cookie de sesión). */
-export function apiCrearReservaEstudio(body: EstudioReservaBody) {
-  return authedPostJson<{ id: number; numero_pedido: number | null }>(
+export async function apiCrearReservaEstudio(body: EstudioReservaBody) {
+  const res = await authedPostJson<{ id: number; numero_pedido: number | null }>(
     "/api/estudio/reservas",
     body,
   );
+  // Analytics: estudio reservado (no-op si GA no está activo).
+  trackReservarEstudio({ horas: body.horas, conPack: body.con_pack ?? false });
+  return res;
 }
 
 // NOTA: la creación de pedidos se movió a `src/lib/orders.ts → createOrder()`

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ReactDOM from "react-dom/client";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import { initGA, trackPageView } from "./lib/analytics";
 
 // Solo activo si VITE_SENTRY_DSN está seteado — dev/CI no lo necesitan.
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined;
@@ -45,6 +46,19 @@ const router = createRouter({
   // equipos. Default scroll-to-top en navegaciones forward.
   scrollRestoration: true,
 });
+
+// Google Analytics 4 — solo activo si VITE_GA4_ID está seteada (igual que Sentry).
+// Cobertura: solo catálogo público. Salteamos /admin (interno/noindex) y /cliente
+// (área privada logueada). El pageview SPA se manda en cada navegación resuelta.
+const GA4_ID = import.meta.env.VITE_GA4_ID as string | undefined;
+if (GA4_ID) {
+  initGA(GA4_ID);
+  router.subscribe("onResolved", () => {
+    const path = router.state.location.pathname;
+    if (path.startsWith("/admin") || path.startsWith("/cliente")) return;
+    trackPageView(path);
+  });
+}
 
 declare module "@tanstack/react-router" {
   interface Register {
