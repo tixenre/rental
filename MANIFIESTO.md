@@ -45,9 +45,9 @@ Detalles de setup en [`README.md`](README.md). Detalles de Railway en [`docs/DEP
 
 ### Workflow
 
-**Branch + PR siempre.** Todo cambio va en una rama dedicada y se mergea por PR contra `main` — corra Claude donde corra (apps de Mac/iPhone sobre sesiones en la nube, o la CLI local). **No se commitea directo a `main`.**
+**Branch + PR para lo grande; bugfixes chicos directo a `dev`.** Lo grande / sensible / arquitectónico / que toca el core de reservas o lo que ve el usuario va en una rama dedicada y se mergea por PR — corra Claude donde corra (apps de Mac/iPhone sobre sesiones en la nube, o la CLI local). Los **bugfixes chicos se commitean directo a `dev`** y se promueven en lote con un solo PR `dev → main` (ver `docs/MEMORIA.md` *2026-06-03*). **Nunca se commitea directo a `main`.**
 
-Una **iniciativa** = una **rama** (`claude/<descripcion>`) = una **PR** con N commits atómicos adentro. El dev server (local) o el deploy reflejan los cambios para probar.
+Una **iniciativa** (lo grande) = una **rama** (`claude/<descripcion>`) = una **PR** con N commits atómicos adentro. El deploy de staging (`dev`) refleja los cambios para probar.
 
 ```
 Edit → commit atómico en la rama → (N veces) → push → PR → supervisor + CI → merge
@@ -101,10 +101,12 @@ Body explica el **por qué**, no el **qué**. Bullets si hay varios efectos.
 - Si la iniciativa tiene issue de tracking: linkear con `Closes #N`.
 - **CI verde antes de mergear** (TypeScript typecheck, Python tests, Build frontend, mobile-smoke). La sesión **no propone merge con CI en rojo**.
 - **Antes de abrir/mergear: despachar el agente `supervisor`** — revisión read-only de scope / forma / drift, que resume en claro y deja el plan de prueba. (Instrucción, no gate de sistema: en las apps no hay hooks.)
-- **Merge según tamaño** (el supervisor ayuda a clasificar):
-  - **Trivial / small** con CI verde + supervisor OK → **auto-merge** (CI verde → GitHub mergea sola, borra la branch).
-  - **Sensible / arquitectónico / grande**, o que toca lo que ve el usuario → **PR draft + el dueño prueba** antes de mergear. GitHub no auto-mergea drafts. (Pre-lanzamiento: el dueño prueba en prod, ver §6.)
-  - **Opt-out por PR**: pedir explícitamente "no auto-merge esta" — se deja sin habilitar.
+- **La sesión mergea a `dev`; el dueño gatea staging + promoción** (el supervisor ayuda a clasificar):
+  - Mergear a `dev` = mostrar en staging, no es prod → lo hace la **sesión**.
+  - **Trivial / small / mediano** con CI verde + supervisor OK → la sesión mergea a `dev` (directo, o **auto-merge** de GitHub si los checks corren). El dueño no clickea.
+  - **Sensible / arquitectónico / grande**, o que toca lo que ve el usuario → la sesión **avisa antes** de meterlo a `dev` (el dueño puede frenarlo), y después mergea.
+  - Los gates del dueño: **probar la conducta en staging** + **aprobar la promoción `dev → main`** (puerta a prod, siempre manual). Ver `docs/MEMORIA.md` *2026-06-03 — Quién clickea el merge*.
+  - **Opt-out por PR**: pedir explícitamente "no mergees esta sola" — se deja para que el dueño la mergee.
 - Conflicts con main: rebase / merge desde el branch (no force-push a main).
 
 Detalle completo del flow en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
