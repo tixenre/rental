@@ -267,15 +267,24 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
-  // Galería del lightbox: foto principal + fotos de los items del kit (si
-  // los hay). Permite al cliente explorar el equipo en detalle. Se filtran
-  // los items sin foto.
+  // Galería del lightbox (#125): fotos del equipo (equipo_fotos, principal
+  // primero) + fotos de los items del kit (si los hay). Si el equipo no tiene
+  // galería multi-foto, cae a la foto principal. Se deduplica por url.
   const lightboxPhotos: Array<{ url: string; alt: string }> = (() => {
     const out: Array<{ url: string; alt: string }> = [];
-    if (item.fotoUrl) out.push({ url: item.fotoUrl, alt: item.name });
-    for (const inc of item.includes ?? []) {
-      if (inc.fotoUrl) out.push({ url: inc.fotoUrl, alt: inc.name });
+    const seen = new Set<string>();
+    const push = (url: string | null | undefined, alt: string) => {
+      if (url && !seen.has(url)) {
+        seen.add(url);
+        out.push({ url, alt });
+      }
+    };
+    if (item.fotos && item.fotos.length > 0) {
+      for (const f of item.fotos) push(f.url, item.name);
+    } else {
+      push(item.fotoUrl, item.name);
     }
+    for (const inc of item.includes ?? []) push(inc.fotoUrl, inc.name);
     return out;
   })();
 
@@ -417,7 +426,10 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           {/* Foto hero */}
           <button
             type="button"
-            onClick={() => setLightboxOpen(true)}
+            onClick={() => {
+              setLightboxIndex(0);
+              setLightboxOpen(true);
+            }}
             disabled={!item.fotoUrl}
             className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-white border hairline group cursor-zoom-in disabled:cursor-default"
             aria-label={item.fotoUrl ? `Ver foto ampliada de ${item.name}` : item.name}
@@ -440,6 +452,38 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
               <EmptyImage category={item.category} brand={item.brand} />
             )}
           </button>
+
+          {/* Galería multi-foto (#125): miniaturas si hay más de una foto.
+              Cada una abre el lightbox en ese índice. */}
+          {lightboxPhotos.length > 1 && (
+            <div
+              className="flex gap-2 overflow-x-auto pb-1"
+              role="list"
+              aria-label={`Más fotos de ${item.name}`}
+            >
+              {lightboxPhotos.map((p, i) => (
+                <button
+                  key={p.url}
+                  type="button"
+                  role="listitem"
+                  onClick={() => {
+                    setLightboxIndex(i);
+                    setLightboxOpen(true);
+                  }}
+                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border hairline bg-white cursor-zoom-in transition hover:border-ink/30"
+                  aria-label={`Ver foto ${i + 1} de ${lightboxPhotos.length}`}
+                >
+                  <img
+                    src={p.url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-contain p-1"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Precio + agregar (desktop — en la col visual) */}
           <div className="hidden md:flex items-center justify-between gap-3 rounded-xl border hairline bg-surface px-4 py-3">
