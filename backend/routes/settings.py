@@ -604,8 +604,10 @@ async def upload_logo(request: Request):
     # Path FIJO — R2 sobreescribe.
     path = f"branding/logo.{ext}"
 
-    from services.image_upload import _upload_to_r2
-    public_url = _upload_to_r2(path, content, ctype)
+    from services.media.storage import put as _r2_put
+    from services.media_fastapi import media_http
+    with media_http():
+        public_url = _r2_put(path, content, ctype)
 
     # Cache buster: cada upload genera un ?v=<timestamp> distinto. El
     # navegador descarga la versión nueva sin esperar TTL del CDN.
@@ -657,8 +659,10 @@ async def upload_og_image(request: Request):
 
     path = f"branding/og-image.{ext}"
 
-    from services.image_upload import _upload_to_r2
-    public_url = _upload_to_r2(path, content, ctype)
+    from services.media.storage import put as _r2_put
+    from services.media_fastapi import media_http
+    with media_http():
+        public_url = _r2_put(path, content, ctype)
 
     import time as _time
     versioned_url = f"{public_url}?v={int(_time.time())}"

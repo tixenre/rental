@@ -338,10 +338,12 @@ async def admin_upload_marca_logo(marca_id: int, request: Request):
         nombre = marca["nombre"]
 
         if is_svg:
-            from services.image_upload import _upload_to_r2
+            from services.media.storage import put as _r2_put
+            from services.media_fastapi import media_http
             content = _sanitize_svg(raw_content)
             path = _logo_path(marca_id, nombre, "svg")
-            public_url = _upload_to_r2(path, content, "image/svg+xml")
+            with media_http():
+                public_url = _r2_put(path, content, "image/svg+xml")
             conn.execute(
                 "UPDATE marcas SET logo_url = ?, updated_at = NOW() WHERE id = ?",
                 (public_url, marca_id),

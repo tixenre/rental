@@ -116,17 +116,9 @@ class TestOptimizeImageAspecto:
             assert min(r, g, b) < 230, f"esquina ({x},{y}) quedó blanca: {(r, g, b)}"
 
 
-# ── security: paridad de allowlist con image_upload (anti-drift) ─────────────
+# ── security: allowlist canónico (vive en services/media/security.py) ────────
 
 class TestSecurityParidad:
-    def test_allowlist_identico_al_legacy(self):
-        from services.media.security import _ALLOWED_PHOTO_HOSTS as media_hosts
-        from services.image_upload import _ALLOWED_PHOTO_HOSTS as legacy_hosts
-        assert media_hosts == legacy_hosts, (
-            "El allowlist de media.security divergió del legacy image_upload. "
-            "Mantenerlos sincronizados — son el mismo código de seguridad."
-        )
-
     @pytest.mark.parametrize("host,expected", [
         ("bhphotovideo.com", True),
         ("cdn.bhphotovideo.com", True),
