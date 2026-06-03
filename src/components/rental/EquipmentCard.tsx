@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { StepperPill } from "./equipment/shared/StepperPill";
 import { PriceBlock } from "./equipment/shared/PriceBlock";
 import { FavButton } from "./equipment/shared/FavButton";
+import { ShareButton } from "./equipment/shared/ShareButton";
 
 /**
  * EquipmentCard — grid card del catálogo público.
@@ -132,8 +133,11 @@ export function EquipmentCard({
           )}
         </div>
 
-        {/* Favorito */}
-        <FavButton itemId={item.id} className="absolute right-2 top-2" />
+        {/* Acciones de la card: favorito + compartir (apilados arriba-derecha) */}
+        <div className="absolute right-2 top-2 flex flex-col gap-1">
+          <FavButton itemId={item.id} />
+          <ShareButton item={item} />
+        </div>
 
         {/* No disponible overlay — rojo suave */}
         {sinStock && (

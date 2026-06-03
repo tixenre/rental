@@ -160,7 +160,7 @@ def clean_extras(extras: dict) -> dict:
 LENTE_SPECS_ORDER = [
     "lens_mount", "distancia_focal", "apertura", "formato",
     "diametro_filtro", "linea",
-    "angulo_vision", "distancia_minima_m", "magnificacion",
+    "angulo_vision", "distancia_minima_cm", "magnificacion",
     "hojas_diafragma",
     "estabilizacion", "autofocus",
     "construccion_optica",

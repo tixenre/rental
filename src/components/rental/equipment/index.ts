@@ -18,5 +18,6 @@ export { EquipmentRow } from "../EquipmentRow";
 export { StepperPill } from "./shared/StepperPill";
 export { PriceBlock } from "./shared/PriceBlock";
 export { FavButton } from "./shared/FavButton";
+export { ShareButton } from "./shared/ShareButton";
 export { SpecsGrid } from "./shared/SpecsGrid";
 export type { EquipmentViewMode } from "./types";

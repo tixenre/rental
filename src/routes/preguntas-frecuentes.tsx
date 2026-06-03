@@ -11,6 +11,7 @@ import {
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { useFaqGroups } from "@/data/faq";
 import { whatsappUrl } from "@/data/contact";
+import { SITE_URL } from "@/lib/site";
 
 export const Route = createFileRoute("/preguntas-frecuentes")({
   head: () => ({
@@ -22,13 +23,13 @@ export const Route = createFileRoute("/preguntas-frecuentes")({
           "Respuestas a las preguntas más comunes sobre alquiler de equipos audiovisuales en Rambla Rental: reservas, pago, retiro, devolución, seguros.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://ramblarental.com/preguntas-frecuentes" },
+      { property: "og:url", content: `${SITE_URL}/preguntas-frecuentes` },
       { property: "og:title", content: "Preguntas frecuentes — Rambla Rental" },
       {
         property: "og:description",
         content: "Reservas, pago, retiro, devolución, seguros.",
       },
-      { property: "og:image", content: "https://ramblarental.com/icon-512.png" },
+      { property: "og:image", content: `${SITE_URL}/icon-512.png` },
       { property: "og:locale", content: "es_AR" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "Preguntas frecuentes — Rambla Rental" },
@@ -37,7 +38,7 @@ export const Route = createFileRoute("/preguntas-frecuentes")({
     // El structured data FAQPage (JSON-LD) se inyecta en el componente desde
     // las FAQ EN VIVO (editables en el back-office), no acá — así los rich
     // snippets de Google reflejan lo que el admin configuró. Ver FaqPage.
-    links: [{ rel: "canonical", href: "https://ramblarental.com/preguntas-frecuentes" }],
+    links: [{ rel: "canonical", href: `${SITE_URL}/preguntas-frecuentes` }],
   }),
   component: FaqPage,
 });

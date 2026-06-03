@@ -21,9 +21,8 @@ import {
 } from "@/lib/api";
 import { backendToEquipment } from "@/hooks/useEquipos";
 import { buildCategoriaSlug, findCategoriaBySlug } from "@/lib/categoria-slug";
+import { SITE_URL } from "@/lib/site";
 import { type Equipment } from "@/data/equipment";
-
-const SITE_URL = "https://ramblarental.com";
 
 type LoaderData = {
   categoria: BackendCategoria | null;

@@ -55,8 +55,9 @@ def _trim_and_square(img, padding_pct: float = 0.06):
     return canvas
 
 
-def _optimize_image(content: bytes, *, square: bool = True) -> tuple[bytes, str, int, int]:
-    """Optimiza la imagen y la guarda como WebP q=85. Devuelve (bytes, ct, w, h).
+def _optimize_image(content: bytes, *, square: bool = True, fmt: str = "webp") -> tuple[bytes, str, int, int]:
+    """Optimiza la imagen y la guarda como WebP q=85 (o JPEG q=82 si fmt='jpeg').
+    Devuelve (bytes, ct, w, h).
     Si algo falla, devuelve el contenido original como fallback.
 
     - `square=True` → fotos de EQUIPOS: trim + cuadrado + fondo blanco + 1200×1200.
@@ -102,6 +103,13 @@ def _optimize_image(content: bytes, *, square: bool = True) -> tuple[bytes, str,
                 )
 
         out = __import__("io").BytesIO()
+        if fmt == "jpeg":
+            # JPEG no soporta alpha: aplanar a RGB por las dudas (el path square ya
+            # devuelve RGB, pero si el trim falló podría quedar RGBA).
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            img.save(out, format="JPEG", quality=82, optimize=True, progressive=True)
+            return out.getvalue(), "image/jpeg", img.width, img.height
         img.save(out, format="WEBP", quality=85, method=6)
         return out.getvalue(), "image/webp", img.width, img.height
     except Exception as e:

@@ -12,4 +12,4 @@ Disallow: /cliente/
 Disallow: /api/
 
 # Sitemap dinámico generado por el backend.
-Sitemap: https://ramblarental.com/sitemap.xml
+Sitemap: https://www.ramblarental.com.ar/sitemap.xml
