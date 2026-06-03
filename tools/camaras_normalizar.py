@@ -210,7 +210,7 @@ SPECS_ORDER = [
     # Connectivity
     "wireless", "mobile_app_compatible",
     # Power / physical
-    "battery", "power_consumption_w",
+    "battery", "consumo_w",
     "dimensions_mm", "materials", "operating_conditions",
     "capture_type",
     "peso_g",
@@ -395,11 +395,11 @@ def canonicalizar_specs(specs: dict, extras: dict) -> dict:
         if n is not None:
             out["focus_points"] = n
 
-    # power_consumption_w: consumo_w → number
-    if "power_consumption_w" not in out:
+    # consumo_w: consumo_w → number
+    if "consumo_w" not in out:
         n = _coerce_number(extras.get("consumo_w"))
         if n is not None:
-            out["power_consumption_w"] = n
+            out["consumo_w"] = n
 
     # built_in_microphone: presencia de string ≠ "No" → True
     if "built_in_microphone" not in out:

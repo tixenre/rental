@@ -6,7 +6,7 @@
     "fuente_alternativa": "eBay listings para Zeiss Jena vintage (vía patches manuales)",
     "ubicacion_htmls": "~/Desktop/Paginas/Lentes/",
     "schema": {
-      "specs": "15 spec_keys canónicos (lens_mount, distancia_focal [rango mm], apertura [rango f/], formato, diametro_filtro, linea, angulo_vision, distancia_minima_m, magnificacion, hojas_diafragma, estabilizacion, autofocus, construccion_optica, peso_g, dimensiones)",
+      "specs": "15 spec_keys canónicos (lens_mount, distancia_focal [rango mm], apertura [rango f/], formato, diametro_filtro, linea, angulo_vision, distancia_minima_cm, magnificacion, hojas_diafragma, estabilizacion, autofocus, construccion_optica, peso_g, dimensiones)",
       "extras": "~15 campos estructurados (focus_type, optical_design_raw, etc.)",
       "ficha": "raw B&H/eBay — secciones tal cual aparecen"
     },
