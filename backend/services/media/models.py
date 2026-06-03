@@ -8,6 +8,7 @@ class DeriveSpec:
     """Especificación para derivar una variante a partir del original."""
     name: str    # 'display' | 'square' | 'nobg' | 'og' | 'bg:#hex' …
     square: bool  # pasado a _optimize_image
+    fmt: str = "webp"  # formato de salida: 'webp' (default) | 'jpeg' (ej. OG para WhatsApp)
 
 
 @dataclass

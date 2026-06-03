@@ -7,13 +7,15 @@ import logging
 import os
 import threading
 import uuid
+import html as _html
+import re
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -40,7 +42,8 @@ if _sentry_dsn:
         send_default_pii=False,
     )
 
-from database import init_db, FRONT, FRONT_NEW
+from database import init_db, get_db, row_to_dict, FRONT, FRONT_NEW
+from config import SITE_URL
 from routes.equipos          import router as equipos_router
 from routes.alquileres       import router as alquileres_router
 from routes.clientes         import router as clientes_router
@@ -208,9 +211,100 @@ def login_page():
 def admin():
     return _serve_frontend("admin.html")
 
-@app.get("/equipo/{id}", include_in_schema=False)
-def equipo_page(id: int):
-    return _serve_frontend("index.html")
+def _inject_og_meta(html_text: str, *, title: str, description: str, image: str, url: str) -> str:
+    """Reemplaza los meta OG/Twitter del index.html con los de un equipo puntual."""
+    def _set(text: str, attr: str, key: str, value: str) -> str:
+        pat = re.compile(r'(<meta\s+' + attr + r'="' + re.escape(key) + r'"\s+content=")[^"]*(")')
+        return pat.sub(lambda m: m.group(1) + _html.escape(value, quote=True) + m.group(2), text, count=1)
+
+    for attr, key, value in (
+        ("property", "og:title", title),
+        ("property", "og:description", description),
+        ("property", "og:image", image),
+        ("property", "og:url", url),
+        ("name", "twitter:title", title),
+        ("name", "twitter:description", description),
+        ("name", "twitter:image", image),
+    ):
+        html_text = _set(html_text, attr, key, value)
+    html_text = re.sub(r"<title>[^<]*</title>", "<title>" + _html.escape(title) + "</title>", html_text, count=1)
+    return html_text
+
+
+@app.get("/equipo/{id_or_slug}", include_in_schema=False)
+def equipo_page(id_or_slug: str):
+    """Sirve el SPA para la ficha del equipo.
+
+    Acepta id puro (`47`) o slug-id (`sony-fx3-47`) — antes exigía `int`, así que
+    una URL con slug (la que genera el botón Compartir) tiraba 422 (#637-adyacente).
+    Además inyecta los meta OG/Twitter del equipo en el HTML server-side para que
+    los crawlers de WhatsApp/redes (que NO ejecutan JS) muestren la foto y el
+    nombre reales en la preview del link. Ante cualquier error cae al index.html
+    plano — nunca rompe la página.
+    """
+    try:
+        m = re.search(r"(\d+)$", id_or_slug)
+        index_file = FRONT_NEW / "index.html"
+        if not m or not index_file.exists():
+            return _serve_frontend("index.html")
+        equipo_id = int(m.group(1))
+        conn = get_db()
+        try:
+            row = conn.execute(
+                """
+                SELECT e.nombre, e.foto_url, e.nombre_publico,
+                       (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
+                       ef.descripcion
+                FROM equipos e
+                LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
+                WHERE e.id = ?
+                """,
+                (equipo_id,),
+            ).fetchone()
+            # Variante OG (jpg) de la foto principal — la que WhatsApp sí renderiza.
+            og_row = conn.execute(
+                """
+                SELECT mv.url FROM equipo_fotos ef
+                JOIN media_variants mv ON mv.asset_id = ef.media_id
+                WHERE ef.equipo_id = ? AND mv.name = 'og'
+                ORDER BY ef.es_principal DESC, ef.orden ASC, ef.id ASC
+                LIMIT 1
+                """,
+                (equipo_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return _serve_frontend("index.html")
+        d = row_to_dict(row)
+        nombre = (d.get("nombre_publico") or "").strip()
+        if not nombre:
+            marca = (d.get("marca") or "").strip()
+            base = (d.get("nombre") or "").strip()
+            nombre = f"{marca} {base}".strip() if marca and marca.lower() not in base.lower() else base
+        title = f"{nombre} — Rambla Rental" if nombre else "Rambla Rental"
+        desc = (d.get("descripcion") or "").strip()
+        if len(desc) > 200:
+            desc = desc[:197].rstrip() + "…"
+        if not desc:
+            desc = f"Alquilá {nombre} en Rambla Rental, Mar del Plata." if nombre else "Alquiler de equipos audiovisuales en Mar del Plata."
+        # Preferir la variante OG (jpg) de la principal; fallback a foto_url (webp)
+        # para fotos que todavía no tienen og (pre-backfill).
+        og_url = (og_row["url"] if og_row else "") or ""
+        if og_url.startswith("http"):
+            image = og_url
+        else:
+            foto = (d.get("foto_url") or "").strip()
+            image = foto if foto.startswith("http") else (f"{SITE_URL}{foto}" if foto else f"{SITE_URL}/icon-512.png")
+        url = f"{SITE_URL}/equipo/{id_or_slug}"
+        html_text = _inject_og_meta(
+            index_file.read_text(encoding="utf-8"),
+            title=title, description=desc, image=image, url=url,
+        )
+        return HTMLResponse(content=html_text)
+    except Exception:
+        logger.warning("OG injection falló para /equipo/%s — sirvo index plano", id_or_slug, exc_info=True)
+        return _serve_frontend("index.html")
 
 @app.get("/cliente", include_in_schema=False)
 def cliente_login_page():

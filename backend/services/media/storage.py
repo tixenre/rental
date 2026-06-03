@@ -75,6 +75,19 @@ def put(key: str, content: bytes, content_type: str) -> str:
     return f"{cfg['public_base']}/{key}"
 
 
+def get(key: str) -> bytes:
+    """Descarga el objeto `key` de R2 y devuelve sus bytes. Eleva MediaError si falla.
+    Usado por backfills que necesitan re-derivar variantes desde el original guardado.
+    """
+    cfg = _r2_config()
+    client = _get_r2_client(cfg)
+    try:
+        resp = client.get_object(Bucket=cfg["bucket"], Key=key)
+        return resp["Body"].read()
+    except Exception as e:
+        raise MediaError(502, f"R2 get falló para '{key}': {e}")
+
+
 def delete_object(key: str) -> bool:
     """Borra un objeto de R2 (best-effort). Devuelve True si se borró, False si no.
     Nunca eleva: el borrado de la DB es la fuente de verdad.
