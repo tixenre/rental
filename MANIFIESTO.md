@@ -193,7 +193,7 @@ Puntos de entrada para no grepear:
 ### Base de datos
 
 - **Postgres puro** (migró de SQLite). El wrapper `PGCursor` traduce placeholders `?`→`%s` para no reescribir cientos de queries.
-- **Migraciones**: schema base con `CREATE IF NOT EXISTS` en `backend/database.py::init_db()`. Cambios incrementales con Alembic (`backend/migrations/versions/`).
+- **Migraciones**: dos capas. (1) schema base con `CREATE IF NOT EXISTS` en `backend/database.py::init_db()` (idempotente, corre en cada arranque — es el bootstrap real). (2) cambios incrementales con Alembic (`backend/migrations/versions/`). Si el `upgrade head` del arranque falla, se loguea y la app sigue → puede quedar **drift silencioso** (BD trabada en una revisión vieja). **Convención: toda tabla/columna nueva va TAMBIÉN en `init_db()`** (no solo en una migración). Visibilidad en `GET /health/migrations`; modelo + runbook de reparación en [`docs/RUNBOOK_MIGRACIONES.md`](docs/RUNBOOK_MIGRACIONES.md).
 - **Soft delete**: equipos tienen `eliminado_at TIMESTAMP NULL`. Las listas filtran `IS NULL` por default. Endpoint `POST /equipos/:id/restore`. Vista "papelera" en lista admin. Bulk delete en papelera = hard delete (action `delete_permanent`).
 
 ### Storage de fotos

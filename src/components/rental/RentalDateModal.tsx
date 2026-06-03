@@ -381,6 +381,14 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
 
         {/* ── Calendario ────────────────────────────────────────────── */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex justify-center px-2 sm:px-4 pb-2 border-t hairline">
+          {nostockDates.length > 0 && (
+            <p className="flex w-full items-start gap-1.5 px-4 pt-3 pb-1 text-[11px] text-muted-foreground">
+              <span className="mt-0.5 h-2 w-2 shrink-0 rounded-sm bg-destructive/30 ring-1 ring-destructive/40" />
+              {nostockDates.length >= 100
+                ? "Sin stock libre en este período — podés elegir fechas igual, quedan sujetas a confirmación."
+                : "Días en rojo = sin stock disponible para tu carrito. Podés seleccionarlos; quedan sujetos a confirmación."}
+            </p>
+          )}
           <Calendar
             mode="single"
             selected={startDate}

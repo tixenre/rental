@@ -261,6 +261,29 @@
   por `analytics.ts` y los puntos canónicos. WhatsApp/otros canales y la cobertura del portal `/cliente`
   (con rutas sanitizadas) quedan como follow-ups si se piden.
 
+### 2026-06-03 — Esquema en dos capas: `init_db()` (bootstrap) + Alembic; toda tabla nueva va TAMBIÉN en `init_db()`
+- **Contexto:** el 500 de "Qué busca la gente" (#687) destapó que las migraciones de prod no llegaban
+  al head: la tabla `search_queries` vivía solo en una migración Alembic y nunca se creó. Causa raíz
+  (#690): el arranque corre `alembic upgrade head` y, si una migración **aborta por los datos** (ej.
+  `f5b8d2e4a9c1` corta si hay slugs duplicados en `equipos`), el error se loguea y la app sigue → la BD
+  queda **trabada en una revisión vieja en silencio**. No se reproduce en local (sin esos datos).
+- **Decisión:** el esquema vive en **dos capas**: (1) `backend/database.py::init_db()` —bootstrap
+  idempotente (`CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`), corre en cada arranque, es
+  el que **garantiza que las tablas existan**— y (2) Alembic, para cambios incrementales (sobre todo
+  migraciones de datos). **Toda tabla/columna nueva va TAMBIÉN en `init_db()`**, no solo en una
+  migración. La visibilidad del estado de migraciones es **fuente única** en
+  `backend/migration_state.py` (no recrear el chequeo ad-hoc), expuesta en `GET /health/migrations`.
+- **Why:** si las migraciones se traban, una tabla creada solo en una migración no existe en prod;
+  `init_db()` es la red. La cadena de migraciones **no se basta sola desde una BD vacía** (una
+  migración de datos hace `UPDATE equipos`) → el único bootstrap soportado es `init_db()` + upgrade.
+- **How to apply:** el supervisor marca como hallazgo cualquier tabla/columna nueva que aparezca solo
+  en una migración Alembic sin su equivalente idempotente en `init_db()`, o cualquier chequeo de
+  estado de migraciones reimplementado fuera de `migration_state.py`. El test
+  `backend/tests/test_alembic_upgrade_db.py` (opt-in + job CI `db-migrations`) corre init_db + upgrade
+  contra Postgres real y exige llegar al head. Modelo + runbook de reparación de prod en
+  [`docs/RUNBOOK_MIGRACIONES.md`](RUNBOOK_MIGRACIONES.md). La **Parte B** (destrabar prod) sigue
+  pendiente en #690.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
