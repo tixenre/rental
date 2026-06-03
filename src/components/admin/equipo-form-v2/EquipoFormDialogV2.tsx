@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   Loader2,
   Upload,
@@ -72,6 +72,16 @@ import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
 import { adminApi, type Equipo, type EquipoInput, type CategoriaAdmin } from "@/lib/admin/api";
 import type { ContenidoIncluidoItem } from "@/data/equipment";
 import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
+import {
+  getEquipoFotos,
+  uploadEquipoFoto,
+  uploadEquipoFotoFromUrl,
+  deleteEquipoFoto,
+  reorderEquipoFotos,
+  type EquipoFoto,
+  type EquipoFotoOrdenItem,
+} from "@/lib/equipment/equipoFotos";
+import { PhotoGallery, type GalleryFoto } from "@/components/common/PhotoGallery";
 import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
 import { KitEditor } from "./KitEditor";
@@ -235,6 +245,64 @@ export function EquipoFormDialogV2({
   const [pickingPhotoUrl, setPickingPhotoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadingToR2, setUploadingToR2] = useState(false);
+  const [galleryUploading, setGalleryUploading] = useState(false);
+
+  // ── Galería multi-foto (edit mode) ────────────────────────────────
+  const fotosQ = useQuery({
+    queryKey: ["admin", "equipo-fotos", initial?.id],
+    queryFn: () => getEquipoFotos(initial!.id),
+    enabled: !!initial?.id && open,
+  });
+  const fotos: GalleryFoto[] = (fotosQ.data ?? []).map((f: EquipoFoto) => ({
+    id: f.id,
+    url: f.url,
+    orden: f.orden,
+    es_principal: f.es_principal,
+  }));
+
+  const deleteFotoMut = useMutation({
+    mutationFn: (fotoId: number) => deleteEquipoFoto(initial!.id, fotoId),
+    onSuccess: () => {
+      toast.success("Foto eliminada");
+      void qc.invalidateQueries({ queryKey: ["admin", "equipo-fotos", initial?.id] });
+      void qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
+    },
+    onError: (e) => toast.error("Error eliminando foto", { description: (e as Error).message }),
+  });
+
+  const reorderFotoMut = useMutation({
+    mutationFn: (items: EquipoFotoOrdenItem[]) => reorderEquipoFotos(initial!.id, items),
+    onSuccess: (data) => {
+      qc.setQueryData(["admin", "equipo-fotos", initial?.id], data.fotos);
+    },
+    onError: (e) => toast.error("Error reordenando fotos", { description: (e as Error).message }),
+  });
+
+  async function handleGalleryUpload(files: FileList) {
+    if (!initial?.id) return;
+    setGalleryUploading(true);
+    try {
+      await Promise.all(Array.from(files).map((f) => uploadEquipoFoto(initial.id, f)));
+      toast.success(files.length === 1 ? "Foto subida" : `${files.length} fotos subidas`);
+      await qc.invalidateQueries({ queryKey: ["admin", "equipo-fotos", initial.id] });
+      void qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
+    } catch (e) {
+      toast.error("Error subiendo foto", { description: (e as Error).message });
+    } finally {
+      setGalleryUploading(false);
+    }
+  }
+
+  function handleGalleryReorder(reordered: GalleryFoto[]) {
+    reorderFotoMut.mutate(
+      reordered.map((f) => ({ id: f.id, orden: f.orden, es_principal: f.es_principal })),
+    );
+  }
+
+  function handleGallerySetPrincipal(id: number) {
+    const updated = fotos.map((f) => ({ id: f.id, orden: f.orden, es_principal: f.id === id }));
+    reorderFotoMut.mutate(updated);
+  }
 
   // CREATE mode: archivo local que se sube después de crear el equipo.
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -609,8 +677,9 @@ export function EquipoFormDialogV2({
     }
     setPickingPhotoUrl(externalUrl);
     try {
-      const r2url = await uploadExternalUrlToBucket(initial.id, externalUrl);
-      form.setValue("foto_url", r2url, { shouldDirty: true });
+      await uploadEquipoFotoFromUrl(initial.id, externalUrl);
+      await qc.invalidateQueries({ queryKey: ["admin", "equipo-fotos", initial.id] });
+      void qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
       toast.success("Foto seleccionada y subida");
     } catch (e) {
       toast.error(`No se pudo subir: ${e instanceof Error ? e.message : ""}`);
@@ -1156,25 +1225,27 @@ export function EquipoFormDialogV2({
               IDENTIFICACIÓN — foto + nombres + marca/modelo
           ════════════════════════════════════════════════════════════════ */}
       <section className="space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-3">
-          {/* Foto card */}
-          <div className="space-y-1">
-            <PhotoCard
-              url={fotoActual}
-              pendingFile={pendingFile}
-              hasInitial={!!initial?.id}
-              onClear={() => {
-                setPendingFile(null);
-                if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
-                setPendingFilePreview("");
-                form.setValue("foto_url", "", { shouldDirty: true });
-              }}
-              onUpload={handleUpload}
-              onSubirAR2={subirFotoUrlAR2}
-              uploading={uploading}
-              uploadingToR2={uploadingToR2}
-            />
-          </div>
+        <div className={`grid grid-cols-1 ${!isEdit ? "sm:grid-cols-[160px_1fr]" : ""} gap-3`}>
+          {/* Foto card — solo en CREATE mode; en EDIT la galería toma el mando */}
+          {!isEdit && (
+            <div className="space-y-1">
+              <PhotoCard
+                url={fotoActual}
+                pendingFile={pendingFile}
+                hasInitial={false}
+                onClear={() => {
+                  setPendingFile(null);
+                  if (pendingFilePreview) URL.revokeObjectURL(pendingFilePreview);
+                  setPendingFilePreview("");
+                  form.setValue("foto_url", "", { shouldDirty: true });
+                }}
+                onUpload={handleUpload}
+                onSubirAR2={subirFotoUrlAR2}
+                uploading={uploading}
+                uploadingToR2={uploadingToR2}
+              />
+            </div>
+          )}
 
           <div className="space-y-3">
             <Field
@@ -1276,6 +1347,27 @@ export function EquipoFormDialogV2({
           </div>
         )}
       </section>
+
+      {/* ════════════════════════════════════════════════════════════════
+              GALERÍA DE FOTOS — solo en edit mode
+          ════════════════════════════════════════════════════════════════ */}
+      {isEdit && (
+        <section className="space-y-2 pt-2 border-t hairline">
+          <p className="text-xs font-medium text-ink/80">Galería de fotos</p>
+          <p className="text-[11px] text-muted-foreground">
+            La foto marcada como principal aparece en la ficha pública y en el catálogo.
+          </p>
+          <PhotoGallery
+            fotos={fotos}
+            onUpload={handleGalleryUpload}
+            onDelete={(id) => deleteFotoMut.mutate(id)}
+            onReorder={handleGalleryReorder}
+            onSetPrincipal={handleGallerySetPrincipal}
+            uploading={galleryUploading}
+            disabled={deleteFotoMut.isPending || reorderFotoMut.isPending}
+          />
+        </section>
+      )}
 
       {/* ════════════════════════════════════════════════════════════════
               PRECIO Y STOCK

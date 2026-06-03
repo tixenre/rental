@@ -3290,6 +3290,8 @@ from services.image_upload import (
     _validate_external_image_url,
     _validate_ssrf_only,
 )
+from services.media import DISPLAY_SQUARE, collect_asset_keys, purge_r2, store_upload
+from services.media_fastapi import media_http
 
 
 def _foto_path(equipo_id: int, ext: str) -> str:
@@ -3336,10 +3338,9 @@ def admin_upload_foto_from_url(
     payload: UploadFotoFromUrlInput,
     request: Request,
 ):
-    """Descarga imagen externa, la optimiza (resize + WebP) y la sube a Cloudflare R2.
+    """Descarga imagen externa, la optimiza y la sube a Cloudflare R2.
+    Crea una fila en equipo_fotos y sincroniza equipos.foto_url con la principal.
     Devuelve {public_url, path, size, content_type}.
-
-    Reemplaza el upload directo desde el browser y el storage de Supabase.
     """
     require_admin(request)
 
@@ -3347,32 +3348,33 @@ def admin_upload_foto_from_url(
     if not url:
         raise HTTPException(400, "URL vacía")
 
-    # Si ya es una URL del propio bucket R2 (público), no rehospedamos
     cfg_pub = (os.getenv("R2_PUBLIC_BASE") or "").rstrip("/")
     if cfg_pub and url.startswith(cfg_pub + "/"):
         return {"public_url": url, "path": None, "skipped": True}
 
-    # SSRF guard: el host debe estar en el allowlist y resolver a IP pública.
-    # (No hay bypass: para un dominio legítimo nuevo, agregarlo a
-    # _ALLOWED_PHOTO_HOSTS — la foto siempre termina sirviéndose desde R2.)
     _validate_external_image_url(url)
+    raw_content, _raw_ctype = _download_image_bytes(url)
 
-    raw_content, raw_ctype = _download_image_bytes(url)
-    # Optimización: resize a max 1600px + WebP q=85
-    content, ctype, w, h = _optimize_image(raw_content)
-    ext = _ext_from_ctype(ctype)
-
-    path = _foto_path(equipo_id, ext)
-    public_url = _upload_to_r2(path, content, ctype)
+    conn = get_db()
+    try:
+        with media_http():
+            asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE], conn=conn)
+        display = asset.variant("display")
+        foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
     return {
-        "public_url": public_url,
-        "path": path,
-        "size": len(content),
+        "public_url": display.url,
+        "path": display.key,
+        "size": display.bytes,
         "size_original": len(raw_content),
-        "content_type": ctype,
-        "width": w or None,
-        "height": h or None,
+        "content_type": display.content_type,
+        "width": display.width or None,
+        "height": display.height or None,
     }
 
 
@@ -3383,8 +3385,9 @@ async def admin_upload_foto_file(
     equipo_id: int,
     request: Request,
 ):
-    """Sube un archivo (multipart/form-data, campo `file`) a R2 después de
-    optimizarlo. Devuelve {public_url, path, ...}.
+    """Sube un archivo (multipart/form-data, campo `file`) a R2 con pipeline
+    no-destructivo: guarda el original + variante cuadrada 1200×1200.
+    Crea una fila en equipo_fotos y sincroniza equipos.foto_url.
     """
     require_admin(request)
 
@@ -3399,21 +3402,271 @@ async def admin_upload_foto_file(
     if len(raw_content) > 20 * 1024 * 1024:
         raise HTTPException(413, "Archivo muy grande (máx 20MB)")
 
-    content, ctype, w, h = _optimize_image(raw_content)
-    ext = _ext_from_ctype(ctype)
-
-    path = _foto_path(equipo_id, ext)
-    public_url = _upload_to_r2(path, content, ctype)
+    conn = get_db()
+    try:
+        with media_http():
+            asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE], conn=conn)
+        display = asset.variant("display")
+        foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
     return {
-        "public_url": public_url,
-        "path": path,
-        "size": len(content),
+        "public_url": display.url,
+        "path": display.key,
+        "size": display.bytes,
         "size_original": len(raw_content),
-        "content_type": ctype,
-        "width": w or None,
-        "height": h or None,
+        "content_type": display.content_type,
+        "width": display.width or None,
+        "height": display.height or None,
     }
+
+
+# ── Galería multi-foto de equipos (F2) ───────────────────────────────────────
+
+
+def _get_equipo_fotos(conn, equipo_id: int) -> list[dict]:
+    rows = conn.execute(
+        "SELECT id, url, path, media_id, orden, es_principal, created_at "
+        "FROM equipo_fotos WHERE equipo_id = ? ORDER BY orden, id",
+        (equipo_id,),
+    ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "url": r["url"],
+            "path": r["path"],
+            "media_id": r["media_id"],
+            "orden": r["orden"],
+            "es_principal": bool(r["es_principal"]),
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+        }
+        for r in rows
+    ]
+
+
+def _insert_equipo_foto(conn, equipo_id: int, url: str, path: str, media_id: int | None = None) -> dict:
+    """Inserta una fila en equipo_fotos y sincroniza equipos.foto_url con la principal.
+    La primera foto del equipo se marca como principal automáticamente.
+    """
+    cur = conn.execute(
+        "SELECT COALESCE(MAX(orden), -1) + 1 AS next_orden FROM equipo_fotos WHERE equipo_id = ?",
+        (equipo_id,),
+    )
+    orden = cur.fetchone()["next_orden"]
+
+    cur2 = conn.execute("SELECT COUNT(*) AS cnt FROM equipo_fotos WHERE equipo_id = ?", (equipo_id,))
+    is_first = cur2.fetchone()["cnt"] == 0
+
+    conn.execute(
+        "INSERT INTO equipo_fotos (equipo_id, url, path, media_id, orden, es_principal) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (equipo_id, url, path, media_id, orden, is_first),
+    )
+
+    if is_first:
+        conn.execute("UPDATE equipos SET foto_url = ? WHERE id = ?", (url, equipo_id))
+
+    conn.commit()
+
+    cur3 = conn.execute(
+        "SELECT id, url, path, media_id, orden, es_principal, created_at "
+        "FROM equipo_fotos WHERE equipo_id = ? ORDER BY id DESC LIMIT 1",
+        (equipo_id,),
+    )
+    r = cur3.fetchone()
+    return {
+        "id": r["id"],
+        "url": r["url"],
+        "path": r["path"],
+        "media_id": r["media_id"],
+        "orden": r["orden"],
+        "es_principal": bool(r["es_principal"]),
+        "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+    }
+
+
+@router.get("/admin/equipos/{equipo_id}/fotos")
+def get_equipo_fotos(equipo_id: int, request: Request):
+    require_admin(request)
+    conn = get_db()
+    try:
+        eq = conn.execute("SELECT id FROM equipos WHERE id = ?", (equipo_id,)).fetchone()
+        if not eq:
+            raise HTTPException(404, "Equipo no encontrado")
+        return {"fotos": _get_equipo_fotos(conn, equipo_id)}
+    finally:
+        conn.close()
+
+
+@router.post("/admin/equipos/{equipo_id}/fotos", status_code=201)
+async def upload_equipo_foto(equipo_id: int, request: Request):
+    """Sube una foto (multipart, campo 'file') al equipo. Guarda original + variante cuadrada."""
+    require_admin(request)
+
+    form = await request.form()
+    file = form.get("file")
+    if file is None or not hasattr(file, "read"):
+        raise HTTPException(400, "Falta el campo 'file'")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "Archivo vacío")
+    if len(raw) > 20 * 1024 * 1024:
+        raise HTTPException(413, "Archivo muy grande (máx 20 MB)")
+
+    conn = get_db()
+    try:
+        eq = conn.execute("SELECT id FROM equipos WHERE id = ?", (equipo_id,)).fetchone()
+        if not eq:
+            raise HTTPException(404, "Equipo no encontrado")
+        with media_http():
+            asset = store_upload(raw, kind="equipo", derive_specs=[DISPLAY_SQUARE], conn=conn)
+        display = asset.variant("display")
+        foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return foto
+
+
+class EquipoFotoFromUrlBody(BaseModel):
+    url: str
+
+
+@router.post("/admin/equipos/{equipo_id}/fotos/from-url", status_code=201)
+def upload_equipo_foto_from_url(equipo_id: int, body: EquipoFotoFromUrlBody, request: Request):
+    """Descarga URL externa y la agrega a la galería del equipo."""
+    require_admin(request)
+
+    url = (body.url or "").strip()
+    if not url:
+        raise HTTPException(400, "URL vacía")
+
+    cfg_pub = (os.getenv("R2_PUBLIC_BASE") or "").rstrip("/")
+    if cfg_pub and url.startswith(cfg_pub + "/"):
+        raise HTTPException(400, "La URL ya está en el bucket — subí el archivo directamente")
+
+    _validate_external_image_url(url)
+    raw, _raw_ctype = _download_image_bytes(url)
+
+    conn = get_db()
+    try:
+        eq = conn.execute("SELECT id FROM equipos WHERE id = ?", (equipo_id,)).fetchone()
+        if not eq:
+            raise HTTPException(404, "Equipo no encontrado")
+        with media_http():
+            asset = store_upload(raw, kind="equipo", derive_specs=[DISPLAY_SQUARE], conn=conn)
+        display = asset.variant("display")
+        foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return foto
+
+
+@router.delete("/admin/equipos/{equipo_id}/fotos/{foto_id}")
+def delete_equipo_foto(equipo_id: int, foto_id: int, request: Request):
+    require_admin(request)
+
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "SELECT url, path, media_id, es_principal FROM equipo_fotos "
+            "WHERE id = ? AND equipo_id = ?",
+            (foto_id, equipo_id),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Foto no encontrada")
+
+        media_id = row["media_id"]
+        path = row["path"]
+        was_principal = bool(row["es_principal"])
+
+        r2_keys: list[str] = []
+        if media_id:
+            r2_keys = collect_asset_keys(conn, media_id)
+
+        conn.execute("DELETE FROM equipo_fotos WHERE id = ?", (foto_id,))
+        if media_id:
+            conn.execute("DELETE FROM media_assets WHERE id = ?", (media_id,))
+
+        # Si era la principal, promover la siguiente en orden
+        if was_principal:
+            next_foto = conn.execute(
+                "SELECT id, url FROM equipo_fotos WHERE equipo_id = ? ORDER BY orden, id LIMIT 1",
+                (equipo_id,),
+            ).fetchone()
+            if next_foto:
+                conn.execute(
+                    "UPDATE equipo_fotos SET es_principal = TRUE WHERE id = ?", (next_foto["id"],)
+                )
+                conn.execute("UPDATE equipos SET foto_url = ? WHERE id = ?", (next_foto["url"], equipo_id))
+            else:
+                conn.execute("UPDATE equipos SET foto_url = NULL WHERE id = ?", (equipo_id,))
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    if r2_keys:
+        purge_r2(r2_keys)
+    elif path:
+        from services.image_upload import _delete_from_r2
+        _delete_from_r2(path)
+
+    return {"ok": True}
+
+
+class EquipoFotoOrdenItem(BaseModel):
+    id: int
+    orden: int
+    es_principal: bool
+
+
+class EquipoFotoReorderBody(BaseModel):
+    fotos: list[EquipoFotoOrdenItem]
+
+
+@router.patch("/admin/equipos/{equipo_id}/fotos/orden")
+def reorder_equipo_fotos(equipo_id: int, body: EquipoFotoReorderBody, request: Request):
+    require_admin(request)
+
+    conn = get_db()
+    try:
+        principal_url: str | None = None
+        for f in body.fotos:
+            conn.execute(
+                "UPDATE equipo_fotos SET orden = ?, es_principal = ? "
+                "WHERE id = ? AND equipo_id = ?",
+                (f.orden, f.es_principal, f.id, equipo_id),
+            )
+            if f.es_principal:
+                row = conn.execute(
+                    "SELECT url FROM equipo_fotos WHERE id = ?", (f.id,)
+                ).fetchone()
+                if row:
+                    principal_url = row["url"]
+
+        if principal_url is not None:
+            conn.execute("UPDATE equipos SET foto_url = ? WHERE id = ?", (principal_url, equipo_id))
+
+        conn.commit()
+        fotos = _get_equipo_fotos(conn, equipo_id)
+    finally:
+        conn.close()
+
+    return {"fotos": fotos}
 
 
 # ── Admin: diagnóstico de R2 (sin exponer secretos) ─────────────────────────
