@@ -39,9 +39,11 @@ pytestmark = [
 
 # Equipos: Rambla, Pablo, Tincho. Pedidos. Ids altos para no chocar con datos.
 E_RAMBLA, E_PABLO, E_TINCHO = 9_300_001, 9_300_002, 9_300_003
-P_CRUCE, P_PARCIAL, P_MIXTO, P_LEGACY = 9_300_101, 9_300_102, 9_300_103, 9_300_104
+P_CRUCE, P_PARCIAL, P_MIXTO, P_LEGACY, P_SOBRE = (
+    9_300_101, 9_300_102, 9_300_103, 9_300_104, 9_300_105,
+)
 ALL_EQ = (E_RAMBLA, E_PABLO, E_TINCHO)
-ALL_PED = (P_CRUCE, P_PARCIAL, P_MIXTO, P_LEGACY)
+ALL_PED = (P_CRUCE, P_PARCIAL, P_MIXTO, P_LEGACY, P_SOBRE)
 
 
 def _limpiar(conn):
@@ -107,6 +109,12 @@ def setup():
 
         # P_LEGACY: marcado pagado por la columna SIN ledger → debe caer en reconciliación.
         _pedido(conn, P_LEGACY, 50000, [(E_RAMBLA, 50000)], monto_pagado=50000)
+
+        # P_SOBRE: cobrado 80k pero el total quedó en 50k (editado a la baja tras cobrar)
+        # → sobrepagado, debe caer en reconciliación. Saldado en julio (mes neutral
+        # para no contaminar las aserciones de junio).
+        _pedido(conn, P_SOBRE, 50000, [(E_RAMBLA, 50000)], monto_pagado=80000)
+        _pago(conn, P_SOBRE, 80000, "2026-07-20T10:00:00", "pago")
 
         conn.commit()
     finally:
@@ -183,4 +191,6 @@ def test_reconciliacion_caza_pagado_sin_ledger(setup):
         conn.close()
     # P_LEGACY está marcado pagado por la columna pero sin ledger → debe listarse.
     assert P_LEGACY in rec["pagados_sin_ledger"]["ids"], rec["pagados_sin_ledger"]
+    # P_SOBRE se cobró por encima de su total actual → sobrepagado.
+    assert P_SOBRE in rec["sobrepagados"]["ids"], rec["sobrepagados"]
     assert rec["ok"] is False

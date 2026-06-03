@@ -53,7 +53,21 @@ def reconciliar(conn) -> dict:
         """
     ).fetchall()
 
-    # 3. Dueños fuera del modelo de comisiones → en el reporte cobrarían como un
+    # 3. Sobrepagados: se cobró MÁS que el total actual del pedido. Pasa típicamente
+    #    al editar un pedido (sacar un ítem) DESPUÉS de cobrarlo: el reporte imputa el
+    #    monto_total nuevo (más bajo) y la diferencia cobrada quedaría fuera.
+    sobrepagados = conn.execute(
+        """
+        SELECT a.id
+        FROM alquileres a
+        WHERE a.estado <> 'cancelado'
+          AND a.monto_total > 0
+          AND a.monto_pagado > a.monto_total
+        ORDER BY a.id
+        """
+    ).fetchall()
+
+    # 4. Dueños fuera del modelo de comisiones → en el reporte cobrarían como un
     #    "beneficiario" fantasma (100% a sí mismos). Suele ser un typo en equipos.dueno.
     modelo = cargar_modelo(conn)
     canonicos = set(modelo.keys())
@@ -70,10 +84,12 @@ def reconciliar(conn) -> dict:
 
     pagados_sin_ledger = chk(sin_ledger)
     monto_pagado_divergente = chk(divergentes)
+    sobrepagados_chk = chk(sobrepagados)
 
     ok = (
         pagados_sin_ledger["cantidad"] == 0
         and monto_pagado_divergente["cantidad"] == 0
+        and sobrepagados_chk["cantidad"] == 0
         and len(no_canonicos) == 0
     )
 
@@ -81,5 +97,6 @@ def reconciliar(conn) -> dict:
         "ok": ok,
         "pagados_sin_ledger": pagados_sin_ledger,
         "monto_pagado_divergente": monto_pagado_divergente,
+        "sobrepagados": sobrepagados_chk,
         "duenos_no_canonicos": no_canonicos,
     }

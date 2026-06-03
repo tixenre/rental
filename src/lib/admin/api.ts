@@ -1509,6 +1509,7 @@ export type ReconciliacionData = {
   ok: boolean;
   pagados_sin_ledger: { cantidad: number; ids: number[] };
   monto_pagado_divergente: { cantidad: number; ids: number[] };
+  sobrepagados: { cantidad: number; ids: number[] };
   duenos_no_canonicos: string[];
 };
 

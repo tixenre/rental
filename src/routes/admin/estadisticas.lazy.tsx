@@ -380,6 +380,12 @@ function LiquidacionReporte() {
                 suma de sus pagos: #{recon.monto_pagado_divergente.ids.join(", #")}
               </li>
             )}
+            {recon.sobrepagados.cantidad > 0 && (
+              <li>
+                {recon.sobrepagados.cantidad} pedido(s) con más cobrado que su total actual (¿lo
+                editaste después de cobrar?): #{recon.sobrepagados.ids.join(", #")}
+              </li>
+            )}
             {recon.duenos_no_canonicos.length > 0 && (
               <li>Dueños fuera del reparto configurado: {recon.duenos_no_canonicos.join(", ")}</li>
             )}
