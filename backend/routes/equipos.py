@@ -898,6 +898,18 @@ def get_equipo(id_or_slug: str):
             WHERE kc.equipo_id = ?  ORDER BY kc.orden ASC, e.nombre ASC
         """, (actual_id,)).fetchall()
         equipo["kit"] = [row_to_dict(r) for r in kit]
+        # Galería multi-foto (#125): el catálogo público expone las fotos de
+        # `equipo_fotos` (principal primero) para que la ficha muestre la galería,
+        # no solo `foto_url`. Shape liviano (url + es_principal) — sin internals.
+        fotos = conn.execute(
+            "SELECT url, es_principal FROM equipo_fotos "
+            "WHERE equipo_id = ? AND url IS NOT NULL AND url <> '' "
+            "ORDER BY es_principal DESC, orden ASC, id ASC",
+            (actual_id,),
+        ).fetchall()
+        equipo["fotos"] = [
+            {"url": r["url"], "es_principal": bool(r["es_principal"])} for r in fotos
+        ]
         return equipo
     finally:
         conn.close()

@@ -63,6 +63,8 @@ export type Equipment = {
   includes?: IncludedItem[];
   // Campos extra del backend (opcionales para mantener compat con datos locales)
   fotoUrl?: string | null;
+  /** Galería multi-foto (#125): fotos del equipo, principal primero. Solo en el detalle. */
+  fotos?: { url: string; esPrincipal?: boolean }[];
   cantidad?: number; // stock total
   _backendId?: number; // ID numérico original, para POST /api/alquileres
   // Ficha técnica extendida (enriquecida desde Firecrawl + IA)
