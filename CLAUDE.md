@@ -12,9 +12,12 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 
 ## Cómo trabajamos (esencial)
 
-- **Branch + PR siempre.** Una iniciativa = una rama (`claude/<desc>`) = una PR con commits
-  atómicos (Conventional Commits en español: `feat(scope):`, `fix(scope):`, `refactor`, `chore`,
-  `docs`, ...). No commitear directo a `main`.
+- **Branch + PR para lo grande; bugfixes chicos van directo a `dev`.** Lo grande / sensible /
+  arquitectónico / que toca reservas o lo que ve el usuario = una rama (`claude/<desc>`) = una PR.
+  Los **bugfixes chicos se commitean directo a `dev`** (se ven juntos en staging; un solo PR
+  `dev → main` cuando el lote está listo) — ver `docs/MEMORIA.md` *2026-06-03*. Commits atómicos
+  (Conventional Commits en español: `feat(scope):`, `fix(scope):`, `refactor`, `chore`, `docs`, ...).
+  **Nunca commitear directo a `main`.**
 - **La conversación es para decisiones y la forma de hacer las cosas — no para el ruido de cada
   commit/diff.** El trabajo de revisión pesada va al subagente `supervisor` (contexto aislado).
 - **Antes de abrir/mergear una PR: despachar el agente `supervisor`** — revisión read-only de
