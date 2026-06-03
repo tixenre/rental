@@ -65,7 +65,7 @@ MANUAL_SPEC_PATCHES: dict[str, dict] = {
         "netflix_approved": False,              # a7V no es Netflix approved
         "processor": "BIONZ XR",
         "rango_dinamico_stops": 15,             # Sony declara ~15 stops (vs 16 stops claim "Color")
-        # "power_consumption_w": None,          # TODO: investigar (datasheet Sony)
+        # "consumo_w": None,          # TODO: investigar (datasheet Sony)
         # "recording_limit_min": None,          # Sin límite con cooling
         # "time_code": None,                    # a7V NO tiene TC In/Out dedicado
     },
@@ -78,7 +78,7 @@ MANUAL_SPEC_PATCHES: dict[str, dict] = {
         "netflix_approved": False,
         "processor": "BIONZ XR",
         "rango_dinamico_stops": 15,             # Similar al sensor de la FX3
-        # "power_consumption_w": None,          # TODO: investigar
+        # "consumo_w": None,          # TODO: investigar
         # "recording_limit_min": None,          # ZV-E1 NO tiene fan, sí tiene límite por temp en 4K60p
         # "time_code": None,                    # No tiene TC dedicado
     },
@@ -99,7 +99,7 @@ MANUAL_SPEC_PATCHES: dict[str, dict] = {
         # "display_type": "4.0\" LCD Touchscreen (en monitor unit)",  # TODO: confirmar
         # "focus_points": None,                 # Dual Pixel CMOS AF (sin "points" numéricos)
         # "gamma_curve": "Canon Log 3, Canon Log, Wide DR, BT.709",   # TODO: confirmar
-        # "power_consumption_w": 21,            # TODO: verificar (datasheet Canon)
+        # "consumo_w": 21,            # TODO: verificar (datasheet Canon)
         # "recording_limit_min": None,          # Sin límite
         # "shutter_speed": "1/2 to 1/2000",     # TODO: confirmar rango
         # "tripod_mount": "1/4\"-20 + 3/8\"-16", # TODO: confirmar
@@ -118,7 +118,7 @@ MANUAL_SPEC_PATCHES: dict[str, dict] = {
         # "focus_points": None,                 # AF detector reciente, sin grid clásico
         # "gamma_curve": "REDLogFilm, REDgamma4, IPP2",  # TODO: confirmar
         # "iso_extendido": [200, 12800],        # TODO: verificar rango
-        # "power_consumption_w": None,          # TODO: investigar (~50W approx con módulos)
+        # "consumo_w": None,          # TODO: investigar (~50W approx con módulos)
         # "recording_limit_min": None,
         # "shoe_mount": None,                   # N/A KOMODO standalone no tiene shoe
         # "shutter_speed": "Cinema (variable angle 1°-360°)",  # TODO
@@ -164,7 +164,7 @@ MANUAL_SPEC_PATCHES: dict[str, dict] = {
         # "focus_points": None,                 # AF por contraste sin grid
         # "gamma_curve": "GP-Log",              # HEROlog gamma
         # "iso_extendido": None,                # Suele coincidir con nativo en action cams
-        # "power_consumption_w": None,          # TODO: investigar
+        # "consumo_w": None,          # TODO: investigar
         # "power_io": "USB-C",
         # "other_io": None,                     # N/A
         # "rango_dinamico_stops": None,         # GoPro no publica

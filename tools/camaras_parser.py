@@ -716,7 +716,7 @@ def map_camara_extras(secciones: dict, title: str = "") -> dict:
 
     # ── Power ─────────────────────────────────────────────────────────
     _add("battery", _parse_bateria(secciones))
-    _add("power_consumption_w", _parse_consumo_w(secciones))
+    _add("consumo_w", _parse_consumo_w(secciones))
 
     # ── Physical ──────────────────────────────────────────────────────
     _add("dimensiones_cm", _parse_dimensiones_cm(secciones))

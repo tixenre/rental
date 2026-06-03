@@ -480,7 +480,7 @@ def map_lente_specs(secciones: dict, title: str = "") -> dict:
     _add("diametro_filtro", _parse_filter_size(secciones))
     _add("linea", _parse_linea(title))
     _add("angulo_vision", _parse_angulo_vision(secciones))
-    _add("distancia_minima_m", _parse_min_focus_cm(secciones))  # cm en spec_template
+    _add("distancia_minima_cm", _parse_min_focus_cm(secciones))  # valor en cm (key canónica)
     _add("magnificacion", _parse_magnificacion(secciones))
     _add("hojas_diafragma", _parse_iris_blades(secciones))
 
@@ -850,7 +850,7 @@ _LENTES_META = {
         "specs": (
             "15 spec_keys canónicos (lens_mount, distancia_focal [rango mm], "
             "apertura [rango f/], formato, diametro_filtro, linea, angulo_vision, "
-            "distancia_minima_m, magnificacion, hojas_diafragma, estabilizacion, "
+            "distancia_minima_cm, magnificacion, hojas_diafragma, estabilizacion, "
             "autofocus, construccion_optica, peso_g, dimensiones)"
         ),
         "extras": "~15 campos estructurados (focus_type, optical_design_raw, etc.)",

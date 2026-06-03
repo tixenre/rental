@@ -62,7 +62,9 @@ CAT = CategoriaRegistry(
         SpecDef(key="angulo_vision", label="Ángulo de visión", tipo="rango", unidad="°",
                 prioridad=65, ayuda="Lista: [v] fijo, [min, max] zoom",
                 aliases=["Angle of View", "Diagonal Angle of View", "Field of View"]),
-        SpecDef(key="distancia_minima_m", label="Distancia mínima de foco",
+        # distancia_minima_cm: la unidad canónica es cm (antes la key decía '_m'
+        # pero la unidad ya era cm — renombrada por #535 para alinear key↔unidad).
+        SpecDef(key="distancia_minima_cm", label="Distancia mínima de foco",
                 tipo="number", unidad="cm", prioridad=70),
         SpecDef(key="magnificacion", label="Magnificación máxima", tipo="string",
                 prioridad=75, ayuda="Ej: 0.32x"),

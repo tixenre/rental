@@ -6,7 +6,7 @@
     "fuente_alternativa": "eBay listings para Zeiss Jena vintage (vía patches manuales)",
     "ubicacion_htmls": "~/Desktop/Paginas/Lentes/",
     "schema": {
-      "specs": "15 spec_keys canónicos (lens_mount, distancia_focal [rango mm], apertura [rango f/], formato, diametro_filtro, linea, angulo_vision, distancia_minima_m, magnificacion, hojas_diafragma, estabilizacion, autofocus, construccion_optica, peso_g, dimensiones)",
+      "specs": "15 spec_keys canónicos (lens_mount, distancia_focal [rango mm], apertura [rango f/], formato, diametro_filtro, linea, angulo_vision, distancia_minima_cm, magnificacion, hojas_diafragma, estabilizacion, autofocus, construccion_optica, peso_g, dimensiones)",
       "extras": "~15 campos estructurados (focus_type, optical_design_raw, etc.)",
       "ficha": "raw B&H/eBay — secciones tal cual aparecen"
     },
@@ -44,7 +44,7 @@
           84,
           122
         ],
-        "distancia_minima_m": 28.0,
+        "distancia_minima_cm": 28.0,
         "magnificacion": "0.14x",
         "hojas_diafragma": 9,
         "estabilizacion": false,
@@ -211,7 +211,7 @@
           34,
           84
         ],
-        "distancia_minima_m": 21.0,
+        "distancia_minima_cm": 21.0,
         "magnificacion": "0.32x",
         "hojas_diafragma": 11,
         "estabilizacion": false,
@@ -378,7 +378,7 @@
           12,
           34
         ],
-        "distancia_minima_m": 40.0,
+        "distancia_minima_cm": 40.0,
         "hojas_diafragma": 11,
         "estabilizacion": true,
         "autofocus": true,
@@ -544,7 +544,7 @@
           44.2,
           76.5
         ],
-        "distancia_minima_m": 28.0,
+        "distancia_minima_cm": 28.0,
         "magnificacion": "0.23x",
         "hojas_diafragma": 9,
         "estabilizacion": false,
@@ -711,7 +711,7 @@
           34.3,
           84.1
         ],
-        "distancia_minima_m": 37.0,
+        "distancia_minima_cm": 37.0,
         "magnificacion": "0.21x",
         "hojas_diafragma": 9,
         "estabilizacion": true,
@@ -876,7 +876,7 @@
         "angulo_vision": [
           63.4
         ],
-        "distancia_minima_m": 30.0,
+        "distancia_minima_cm": 30.0,
         "magnificacion": "0.19x",
         "hojas_diafragma": 9,
         "estabilizacion": false,
@@ -1041,7 +1041,7 @@
         "angulo_vision": [
           46.8
         ],
-        "distancia_minima_m": 40.0,
+        "distancia_minima_cm": 40.0,
         "magnificacion": "0.18x",
         "hojas_diafragma": 9,
         "estabilizacion": false,
@@ -1207,7 +1207,7 @@
           12,
           34
         ],
-        "distancia_minima_m": 150.0,
+        "distancia_minima_cm": 150.0,
         "magnificacion": "0.16x",
         "hojas_diafragma": 8,
         "estabilizacion": false,
@@ -1379,7 +1379,7 @@
         "angulo_vision": [
           85
         ],
-        "distancia_minima_m": 47.0,
+        "distancia_minima_cm": 47.0,
         "magnificacion": "2x",
         "hojas_diafragma": 7,
         "estabilizacion": false,
@@ -1533,7 +1533,7 @@
         "formato": "Full-frame",
         "diametro_filtro": 49,
         "linea": "Pancolar",
-        "distancia_minima_m": 35.0,
+        "distancia_minima_cm": 35.0,
         "hojas_diafragma": 8,
         "estabilizacion": false,
         "autofocus": false,
@@ -1627,7 +1627,7 @@
         "formato": "Full-frame",
         "diametro_filtro": 49,
         "linea": "Flektogon",
-        "distancia_minima_m": 20.0,
+        "distancia_minima_cm": 20.0,
         "hojas_diafragma": 6,
         "estabilizacion": false,
         "autofocus": false,
@@ -1720,7 +1720,7 @@
         "angulo_vision": [
           18
         ],
-        "distancia_minima_m": 100.0,
+        "distancia_minima_cm": 100.0,
         "hojas_diafragma": 6,
         "estabilizacion": false,
         "autofocus": false,
