@@ -80,11 +80,12 @@ def setup():
             "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (?,?,?,?)",
             (E_RAMBLA, "Equipo Rambla", 5, "Rambla"),
         )
-        # P_JUNIO: 100k de Pablo, saldado el 15/6 → cuenta para junio.
+        # P_JUNIO: 100k de Pablo, alquiler y saldo en junio → cuenta para junio
+        # (fecha_desde dentro del clean start, ver liquidacion.LIQUIDACION_INICIO).
         conn.execute(
-            """INSERT INTO alquileres (id, cliente_nombre, estado, monto_total, monto_pagado)
-               VALUES (?,?,?,?,?)""",
-            (P_JUNIO, "Cliente", "finalizado", 100000, 100000),
+            """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, monto_total, monto_pagado)
+               VALUES (?,?,?,?,?,?)""",
+            (P_JUNIO, "Cliente", "finalizado", "2026-06-05T08:00:00", 100000, 100000),
         )
         conn.execute(
             "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (?,?,?,?)",

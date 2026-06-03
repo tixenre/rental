@@ -8,10 +8,15 @@ del reporte).
 """
 
 from .comisiones import cargar_modelo
-from .liquidacion import SALDADO_CTE
+from .liquidacion import LIQUIDACION_INICIO, SALDADO_CTE
 
 # Tope de ids de muestra a devolver por chequeo (no inundar la UI).
 _SAMPLE = 25
+
+# Corte del clean start (ver liquidacion.LIQUIDACION_INICIO): los chequeos de
+# integridad solo miran pedidos cuyo alquiler entra en la ventana de liquidación.
+# Un pedido pre-junio 2026 ya no afecta al reporte → no debe ensuciar el semáforo.
+_CLEAN_START = f"AND a.fecha_desde >= '{LIQUIDACION_INICIO}'"
 
 
 def reconciliar(conn) -> dict:
@@ -23,7 +28,7 @@ def reconciliar(conn) -> dict:
     #    monto_pagado >= monto_total, pero el ledger de pagos no llega al total
     #    (típico del endpoint legacy que setea la columna sin registrar el pago).
     sin_ledger = conn.execute(
-        """
+        f"""
         SELECT a.id
         FROM alquileres a
         LEFT JOIN (
@@ -34,6 +39,7 @@ def reconciliar(conn) -> dict:
           AND a.monto_total > 0
           AND a.monto_pagado >= a.monto_total
           AND COALESCE(p.pagado, 0) < a.monto_total
+          {_CLEAN_START}
         ORDER BY a.id
         """
     ).fetchall()
@@ -41,7 +47,7 @@ def reconciliar(conn) -> dict:
     # 2. La columna monto_pagado no coincide con la suma del ledger (cache stale o
     #    escritura por fuera del recálculo).
     divergentes = conn.execute(
-        """
+        f"""
         SELECT a.id
         FROM alquileres a
         LEFT JOIN (
@@ -50,6 +56,7 @@ def reconciliar(conn) -> dict:
         ) p ON p.pedido_id = a.id
         WHERE a.estado <> 'cancelado'
           AND a.monto_pagado <> COALESCE(p.pagado, 0)
+          {_CLEAN_START}
         ORDER BY a.id
         """
     ).fetchall()
@@ -58,12 +65,13 @@ def reconciliar(conn) -> dict:
     #    al editar un pedido (sacar un ítem) DESPUÉS de cobrarlo: el reporte imputa el
     #    monto_total nuevo (más bajo) y la diferencia cobrada quedaría fuera.
     sobrepagados = conn.execute(
-        """
+        f"""
         SELECT a.id
         FROM alquileres a
         WHERE a.estado <> 'cancelado'
           AND a.monto_total > 0
           AND a.monto_pagado > a.monto_total
+          {_CLEAN_START}
         ORDER BY a.id
         """
     ).fetchall()

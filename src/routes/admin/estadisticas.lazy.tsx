@@ -432,7 +432,7 @@ function LiquidacionReporte() {
         <a href="/admin/settings" className="underline hover:text-ink">
           Ajustes
         </a>
-        .
+        . Arranque limpio: los alquileres anteriores a junio 2026 no se cuentan.
       </p>
 
       {recon && recon.ok && (

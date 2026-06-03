@@ -39,11 +39,11 @@ pytestmark = [
 
 # Equipos: Rambla, Pablo, Tincho. Pedidos. Ids altos para no chocar con datos.
 E_RAMBLA, E_PABLO, E_TINCHO = 9_300_001, 9_300_002, 9_300_003
-P_CRUCE, P_PARCIAL, P_MIXTO, P_LEGACY, P_SOBRE = (
-    9_300_101, 9_300_102, 9_300_103, 9_300_104, 9_300_105,
+P_CRUCE, P_PARCIAL, P_MIXTO, P_LEGACY, P_SOBRE, P_PREJUNIO = (
+    9_300_101, 9_300_102, 9_300_103, 9_300_104, 9_300_105, 9_300_106,
 )
 ALL_EQ = (E_RAMBLA, E_PABLO, E_TINCHO)
-ALL_PED = (P_CRUCE, P_PARCIAL, P_MIXTO, P_LEGACY, P_SOBRE)
+ALL_PED = (P_CRUCE, P_PARCIAL, P_MIXTO, P_LEGACY, P_SOBRE, P_PREJUNIO)
 
 
 def _limpiar(conn):
@@ -60,12 +60,15 @@ def _equipo(conn, eid, nombre, dueno):
     )
 
 
-def _pedido(conn, pid, monto_total, items, monto_pagado=0, estado="finalizado"):
+def _pedido(conn, pid, monto_total, items, monto_pagado=0, estado="finalizado",
+            fecha_desde="2026-06-05T08:00:00"):
+    # fecha_desde default DENTRO del clean start (junio 2026) → cuenta para la
+    # liquidación. Los tests que prueban la exclusión pasan una fecha anterior.
     conn.execute(
         """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
                                    monto_total, monto_pagado)
            VALUES (?,?,?,?,?,?,?)""",
-        (pid, "Cliente liquidación", estado, "2026-01-05T08:00:00", "2026-01-06T20:00:00",
+        (pid, "Cliente liquidación", estado, fecha_desde, "2026-06-06T20:00:00",
          monto_total, monto_pagado),
     )
     for equipo_id, subtotal in items:
@@ -116,6 +119,12 @@ def setup():
         _pedido(conn, P_SOBRE, 50000, [(E_RAMBLA, 50000)], monto_pagado=80000)
         _pago(conn, P_SOBRE, 80000, "2026-07-20T10:00:00", "pago")
 
+        # P_PREJUNIO: alquiler de MAYO (antes del clean start), pagado 100% en JUNIO.
+        # NO debe contar para la liquidación: el corte es por fecha del alquiler.
+        _pedido(conn, P_PREJUNIO, 100000, [(E_RAMBLA, 100000)], monto_pagado=100000,
+                fecha_desde="2026-05-15T08:00:00")
+        _pago(conn, P_PREJUNIO, 100000, "2026-06-20T10:00:00", "pago")
+
         conn.commit()
     finally:
         conn.close()
@@ -160,8 +169,26 @@ def test_cruce_se_atribuye_al_mes_de_saldado(setup):
 def test_parcial_no_aparece(setup):
     junio = _liquidar("2026-06-01", "2026-06-30")
     # P_PARCIAL (40k de 100k) no está saldado → no suma. El total de junio son los
-    # dos pedidos saldados (100k + 100k = 200k), no incluye el parcial.
+    # dos pedidos saldados (100k + 100k = 200k), no incluye el parcial NI el
+    # P_PREJUNIO (alquiler de mayo, fuera del clean start) aunque saldó en junio.
     assert junio["resumen"]["total"] == 200000, junio["resumen"]
+
+
+def test_clean_start_excluye_alquiler_previo_a_junio(setup):
+    # P_PREJUNIO: alquiler de mayo, pagado 100% el 20/6. El corte es por fecha del
+    # alquiler → NO cuenta para la liquidación de junio, pese a saldar en junio.
+    junio = _liquidar("2026-06-01", "2026-06-30")
+    pedidos_dia = {d["dia"]: d["total"] for d in junio["por_dia"]}
+    # No hay bucket el 20/6 (solo entró P_PREJUNIO ese día, y está excluido).
+    assert "2026-06-20" not in pedidos_dia, pedidos_dia
+    # Y el total de junio no incluye sus 100k.
+    assert junio["resumen"]["total"] == 200000, junio["resumen"]
+
+    # Tampoco aparece reabriendo el rango a todo 2026 (el corte no depende del rango).
+    anio = _liquidar("2026-01-01", "2026-12-31")
+    # Solo cuentan los saldados DENTRO del clean start: junio (200k) + julio
+    # (P_SOBRE 50k de total, saldó 80k pero imputa el total). P_PREJUNIO fuera.
+    assert all(m["mes"] >= "2026-06" for m in anio["por_mes"]), anio["por_mes"]
 
 
 def test_prorrateo_conserva_la_plata(setup):
