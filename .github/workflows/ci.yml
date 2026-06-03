@@ -83,6 +83,49 @@ jobs:
           export ADMIN_EMAILS=admin@test.com
           python -m pytest tests/ -v --tb=short
 
+  db-migrations:
+    name: Migraciones Alembic (Postgres real)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          # El nombre lleva 'test' a propósito: el guard del test se niega a
+          # correr (es destructivo) si la DATABASE_URL no parece de prueba.
+          POSTGRES_DB: rambla_rental_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - name: Install dev dependencies
+        run: |
+          cd backend
+          pip install -r requirements-dev.txt
+      - name: Run migraciones contra Postgres real
+        run: |
+          cd backend
+          # Corre la cadena completa de migraciones contra una BD descartable y
+          # exige llegar al head. Caza roturas estructurales antes de mergear.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export ALEMBIC_DB_TEST=1
+          python -m pytest tests/test_alembic_upgrade_db.py -v --tb=short -m integration
+
   build:
     name: Build frontend
     runs-on: ubuntu-latest
