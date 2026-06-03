@@ -130,12 +130,15 @@ def test_upgrade_con_datos_legacy_llega_al_head(clean_db):
        DBs SIN datos legacy (el INSERT nunca se ejecutaba); con datos abortaba la
        cadena (transacción única). Las columnas legacy ya no existen en el
        esquema canónico (las dropea `a1b3c5e7f9d2`), así que las recreamos.
-    2. `l1m2n3o4p5q6` hace `INSERT INTO equipo_fotos (... url ...)`, pero en prod
-       `equipo_fotos` preexistía SIN `url` (init_db viejo + CREATE IF NOT EXISTS);
-       la columna recién se agrega en `n1o2p3q4r5s6` (head), DESPUÉS del backfill.
-       Lo simulamos dropeando `url` y sembrando un equipo con `foto_url`.
+    2. En prod preexistía una `equipo_fotos` LEGACY/AJENA (otro esquema:
+       `bytes`/`content_type` NOT NULL, sin `url`) que `CREATE IF NOT EXISTS` de
+       k1l2m3n4o5p6 no parcheaba → el backfill de l1m2 abortaba (primero por
+       columnas faltantes, después por NOT NULL de las ajenas). El fix: k1l2
+       detecta la tabla ajena (sin `url`) y la descarta antes de crear la
+       canónica. Lo simulamos creando esa tabla ajena (vacía, como en prod).
 
-    Se siembra un equipo mapeable + se exige que `upgrade head` llegue al head.
+    Se siembra un equipo mapeable + uno con `foto_url` y se exige que
+    `upgrade head` llegue al head.
     """
     from alembic import command
     from database import init_db, get_db
@@ -149,17 +152,17 @@ def test_upgrade_con_datos_legacy_llega_al_head(clean_db):
         # spec_def `lens_mount` en su categoría raíz.
         for col in ("montura", "formato", "resolucion", "peso", "dimensiones", "alimentacion"):
             conn.execute(f"ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS {col} TEXT")
-        # Bug 2: equipo_fotos como en prod, una versión vieja a la que le faltan
-        # `url` y `media_id` (los logs de prod muestran que k1l2m3n4o5p6 pasa —
-        # su índice usa `orden`, que existe — y l1m2 falla primero por `url` y
-        # luego por `media_id`). Fuerza a l1m2 a agregar esas columnas faltantes.
+        # Bug 2: equipo_fotos LEGACY/ajena como en prod (otro esquema, sin `url`,
+        # con `bytes`/`content_type` NOT NULL). k1l2 debe detectarla (sin `url`)
+        # y descartarla antes de crear la canónica; sin ese fix, l1m2 aborta.
         conn.execute("DROP TABLE IF EXISTS equipo_fotos CASCADE")
         conn.execute(
             "CREATE TABLE equipo_fotos ("
             " id SERIAL PRIMARY KEY,"
-            " equipo_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,"
-            " orden INTEGER NOT NULL DEFAULT 0,"
-            " es_principal BOOLEAN NOT NULL DEFAULT FALSE)"
+            " equipo_id INTEGER NOT NULL,"
+            " bytes INTEGER NOT NULL,"
+            " content_type TEXT NOT NULL,"
+            " width INTEGER)"
         )
         # Equipo con foto_url para que el backfill de equipo_fotos (l1m2) inserte.
         conn.execute("INSERT INTO equipos (id, nombre, foto_url) VALUES (9001, 'repro #690', 'https://x/f.jpg') ON CONFLICT DO NOTHING")

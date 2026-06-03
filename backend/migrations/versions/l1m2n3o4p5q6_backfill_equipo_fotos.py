@@ -17,20 +17,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # En prod, equipo_fotos puede preexistir como una versión vieja y MÍNIMA
-    # (la creó un init_db viejo; k1l2m3n4o5p6 usa CREATE TABLE IF NOT EXISTS y no
-    # la parchea), sin las columnas que este backfill escribe. Las migraciones
-    # que las agregan (ej. n1o2p3q4r5s6 para `url`) corren DESPUÉS de este
-    # backfill → el INSERT abortaba con "column ... does not exist". Garantizamos
-    # idempotentemente TODAS las columnas del INSERT antes de usarlas, con los
-    # mismos tipos del esquema canónico (database.py::init_db).
-    op.execute(sa.text("ALTER TABLE equipo_fotos ADD COLUMN IF NOT EXISTS url TEXT"))
-    op.execute(sa.text(
-        "ALTER TABLE equipo_fotos ADD COLUMN IF NOT EXISTS media_id BIGINT "
-        "REFERENCES media_assets(id) ON DELETE SET NULL"
-    ))
-    op.execute(sa.text("ALTER TABLE equipo_fotos ADD COLUMN IF NOT EXISTS orden INTEGER NOT NULL DEFAULT 0"))
-    op.execute(sa.text("ALTER TABLE equipo_fotos ADD COLUMN IF NOT EXISTS es_principal BOOLEAN NOT NULL DEFAULT FALSE"))
+    # La tabla canónica `equipo_fotos` la garantiza k1l2m3n4o5p6 (que descarta
+    # cualquier tabla legacy/ajena preexistente y crea la correcta), así que acá
+    # solo hacemos el backfill.
     op.execute(sa.text("""
         INSERT INTO equipo_fotos (equipo_id, url, media_id, orden, es_principal)
         SELECT e.id, e.foto_url, NULL, 0, TRUE
