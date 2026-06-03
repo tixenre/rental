@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { StepperPill } from "@/components/rental/equipment/shared/StepperPill";
 import { PriceBlock } from "@/components/rental/equipment/shared/PriceBlock";
 import { FavButton } from "@/components/rental/equipment/shared/FavButton";
+import { ShareButton } from "@/components/rental/equipment/shared/ShareButton";
 import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
 import { logSearch } from "@/lib/search-log";
@@ -716,7 +717,10 @@ function FichaSheet({ eq, onClose, onAddToCart, inCart, jornadas, fechaDesde }: 
             </div>
             <div className="font-sans text-base font-bold text-ink mt-0.5">{eq.name}</div>
           </div>
-          <SheetClose onClose={onClose} />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <ShareButton item={eq} size="md" />
+            <SheetClose onClose={onClose} />
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>

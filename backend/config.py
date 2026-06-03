@@ -37,8 +37,9 @@ class Settings(BaseSettings):
     )
 
     # ── URLs ────────────────────────────────────────────────────────────
-    # URL pública del sitio. Override con env var SITE_URL si cambia el dominio.
-    SITE_URL: str = "https://ramblarental.com"
+    # URL pública del sitio (dominio canónico). Override con env var SITE_URL
+    # por ambiente (prod ya la tiene seteada; este default cubre local/dev).
+    SITE_URL: str = "https://www.ramblarental.com.ar"
 
     # ── Auth / seguridad ────────────────────────────────────────────────
     # Firma de la cookie de sesión. Sin esto la app no puede autenticar:
