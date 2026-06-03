@@ -160,11 +160,17 @@ def upgrade() -> None:
                 continue  # la cat no declara este spec_key
 
             # 3. Insertar a equipo_specs idempotente.
+            # `equipo_specs` no tiene columna `id` (PK compuesta
+            # equipo_id+spec_def_id) → RETURNING equipo_id, no `id`. El
+            # `RETURNING id` original solo funcionaba en DBs sin datos legacy
+            # (el INSERT nunca se ejecutaba); en prod, con datos, abortaba la
+            # migración. fetchone() distingue insert (devuelve fila) de
+            # ON CONFLICT (devuelve nada) igual que antes.
             result = conn.execute(sa.text("""
                 INSERT INTO equipo_specs (equipo_id, spec_def_id, value)
                 VALUES (:eid, :sd, :val)
                 ON CONFLICT (equipo_id, spec_def_id) DO NOTHING
-                RETURNING id
+                RETURNING equipo_id
             """), {"eid": equipo_id, "sd": sd.id, "val": value})
             if result.fetchone():
                 col_inserted += 1
