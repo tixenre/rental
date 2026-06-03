@@ -339,10 +339,8 @@ export function CartDrawer({
                       {list.map(({ it, qty }) => {
                         const cap = getDisponible?.(it) ?? it.cantidad ?? Infinity;
                         const reachedMax = qty >= cap;
-                        // Un ítem es "no disponible" si el catálogo calculó su
-                        // disponibilidad (hay fechas seleccionadas) y es 0.
                         const noDisponible =
-                          !!startDate && getDisponible?.(it) !== undefined && cap === 0;
+                          !!startDate && getDisponible?.(it) !== undefined && cap < qty;
                         const lineaBruta = it.pricePerDay * qty * (d || 1);
                         const lineaDto =
                           descuentoPct > 0 ? Math.round((lineaBruta * descuentoPct) / 100) : 0;

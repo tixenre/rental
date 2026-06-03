@@ -41,7 +41,7 @@ def calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id=No
     # Stock propio de cada equipo (correcto para hojas; los compuestos se derivan).
     cantidad = {
         r["id"]: r["cantidad"]
-        for r in conn.execute("SELECT id, cantidad FROM equipos").fetchall()
+        for r in conn.execute("SELECT id, cantidad FROM equipos WHERE eliminado_at IS NULL").fetchall()
     }
 
     # Items reservados (directos) por pedidos activos que se pisan con el rango

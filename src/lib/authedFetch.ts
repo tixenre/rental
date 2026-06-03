@@ -39,7 +39,13 @@ export async function authedJson<T>(path: string, init: AuthedFetchInit = {}): P
       if (typeof detail === "string") {
         message = detail;
       } else if (Array.isArray(detail)) {
-        message = detail.join("; ");
+        message = detail
+          .map((e: unknown) =>
+            e && typeof e === "object" && "msg" in e
+              ? String((e as { msg: unknown }).msg)
+              : JSON.stringify(e),
+          )
+          .join("; ");
       } else if (detail && typeof detail === "object") {
         const errs = (detail as { errores?: unknown }).errores;
         if (Array.isArray(errs)) {
