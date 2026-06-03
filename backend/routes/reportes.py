@@ -16,6 +16,13 @@ from database import get_db
 from admin_guard import require_admin
 from reportes.liquidacion import liquidar
 from reportes.reconciliacion import reconciliar
+from reportes.cierres import (
+    cerrar_mes,
+    mes_de_rango,
+    reabrir_mes,
+    snapshot_de,
+    validar_mes,
+)
 
 router = APIRouter()
 
@@ -69,7 +76,20 @@ def reporte_liquidacion(
     _validar_rango(desde, hasta)
     conn = get_db()
     try:
-        data = liquidar(conn, desde, hasta)
+        # Si el rango es exactamente un mes calendario, ese mes es "cerrable": si
+        # ya está cerrado se sirve la FOTO inmutable (inmune a cambios posteriores
+        # de modelo/pedidos); si está abierto se calcula en vivo + se marca el
+        # estado para que el front ofrezca "Cerrar mes" (#721).
+        mes = mes_de_rango(desde, hasta)
+        snap = snapshot_de(conn, mes) if mes else None
+        if snap is not None:
+            data = snap
+        else:
+            data = liquidar(conn, desde, hasta)
+            if mes:
+                data["cerrado"] = False
+        if mes:
+            data["mes"] = mes
     finally:
         conn.close()
     data["desde"] = desde
@@ -94,3 +114,37 @@ def reporte_reconciliacion(request: Request):
         return reconciliar(conn)
     finally:
         conn.close()
+
+
+def _validar_mes_http(mes: str) -> None:
+    try:
+        validar_mes(mes)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/admin/reportes/cierres/{mes}")
+def cerrar_mes_liquidacion(request: Request, mes: str):
+    """Cierra un mes: congela la foto inmutable del reporte (números + modelo).
+    Idempotente: re-cerrar recalcula la foto con los datos actuales (#721)."""
+    admin = require_admin(request)
+    _validar_mes_http(mes)
+    conn = get_db()
+    try:
+        return cerrar_mes(conn, mes, admin.get("email"))
+    finally:
+        conn.close()
+
+
+@router.delete("/admin/reportes/cierres/{mes}")
+def reabrir_mes_liquidacion(request: Request, mes: str):
+    """Reabre un mes cerrado: borra la foto → el reporte vuelve a calcularse en
+    vivo (para corregir; después se vuelve a cerrar) (#721)."""
+    require_admin(request)
+    _validar_mes_http(mes)
+    conn = get_db()
+    try:
+        reabierto = reabrir_mes(conn, mes)
+    finally:
+        conn.close()
+    return {"mes": mes, "cerrado": False, "reabierto": reabierto}
