@@ -17,13 +17,14 @@ from collections import defaultdict
 
 from .comisiones import cargar_modelo, repartir
 
-
-def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
-    """Filas `(fecha, dueno, equipo, monto)`: el monto prorrateado que cada equipo
-    aportó, fechado en el día en que su pedido quedó saldado, dentro del rango."""
-    from database import row_to_dict
-    sql = """
-        WITH acum AS (
+# Fragmento SQL compartido (#88, #721): define cuándo un pedido quedó "saldado"
+# — el día en que el acumulado de pagos cruzó su `monto_total`. Es lógica de
+# plata, así que vive en UN solo lugar y se compone como CTE tanto por el reporte
+# (`filas_atribucion`) como por la reconciliación (chequeo de mes cerrado), para
+# que las dos no puedan divergir. Expone las CTEs `acum` y `saldado(pedido_id,
+# fecha_saldado)`. Se inserta justo después de `WITH`.
+SALDADO_CTE = """
+        acum AS (
             SELECT ap.pedido_id,
                    ap.fecha,
                    SUM(ap.monto) OVER (
@@ -39,7 +40,16 @@ def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
               AND al.monto_total > 0
               AND a.acumulado >= al.monto_total
             GROUP BY a.pedido_id
-        ),
+        )
+"""
+
+
+def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
+    """Filas `(fecha, dueno, equipo, monto)`: el monto prorrateado que cada equipo
+    aportó, fechado en el día en que su pedido quedó saldado, dentro del rango."""
+    from database import row_to_dict
+    sql = f"""
+        WITH {SALDADO_CTE},
         en_rango AS (
             SELECT pedido_id, fecha_saldado
             FROM saldado

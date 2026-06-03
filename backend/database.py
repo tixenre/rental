@@ -1079,6 +1079,22 @@ def init_db():
         )
     """)
 
+    # Cierres de liquidación (#721). Cerrar un mes congela una FOTO inmutable del
+    # reporte de ese mes (los números Y el modelo de comisiones con que se calculó)
+    # → cambiar el modelo o editar un pedido viejo ya no reescribe un mes liquidado.
+    # `mes` es 'YYYY-MM'. Reabrir = borrar la fila (vuelve a calcularse en vivo).
+    # Motor: backend/reportes/cierres.py. Va TAMBIÉN en una migración (esquema en
+    # dos capas, decisión 2026-06-03).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS liquidacion_cierres (
+            mes           VARCHAR(7) PRIMARY KEY,
+            snapshot_json TEXT NOT NULL,
+            modelo_json   TEXT NOT NULL,
+            cerrado_por   VARCHAR(255),
+            cerrado_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # ── Reconciliación con migraciones ──────────────────────────────────────
     # Estas tablas/columnas históricamente vivían SOLO en migraciones Alembic.
     # Las replicamos acá (idempotente) para que init_db produzca un esquema

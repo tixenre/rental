@@ -8,6 +8,7 @@ del reporte).
 """
 
 from .comisiones import cargar_modelo
+from .liquidacion import SALDADO_CTE
 
 # Tope de ids de muestra a devolver por chequeo (no inundar la UI).
 _SAMPLE = 25
@@ -67,6 +68,47 @@ def reconciliar(conn) -> dict:
         """
     ).fetchall()
 
+    # 4bis. Mes cerrado desactualizado (#721): un pedido saldado dentro de un mes
+    #    YA CERRADO recibió actividad DESPUÉS del cierre (se editó el pedido, o
+    #    entró/cambió un pago) → la foto inmutable quedó vieja. No es un error: hay
+    #    que reabrir el mes y volver a cerrarlo para incorporar el cambio. Si la
+    #    tabla de cierres no existe todavía (init_db no corrió), el chequeo es vacío.
+    mes_cerrado_pedidos: list[int] = []
+    meses_afectados: list[str] = []
+    try:
+        filas_stale = conn.execute(
+            f"""
+            WITH {SALDADO_CTE}
+            SELECT DISTINCT al.id AS id, c.mes AS mes
+            FROM saldado s
+            JOIN alquileres al ON al.id = s.pedido_id
+            JOIN liquidacion_cierres c
+              ON to_char(s.fecha_saldado::date, 'YYYY-MM') = c.mes
+            WHERE al.updated_at > c.cerrado_at
+               OR EXISTS (
+                   SELECT 1 FROM alquiler_pagos ap
+                   WHERE ap.pedido_id = al.id AND ap.created_at > c.cerrado_at
+               )
+            ORDER BY al.id
+            """
+        ).fetchall()
+        for r in filas_stale:
+            d = row_to_dict(r)
+            mes_cerrado_pedidos.append(d["id"])
+            if d["mes"] not in meses_afectados:
+                meses_afectados.append(d["mes"])
+        meses_afectados.sort()
+    except Exception:
+        # Tabla inexistente u otro problema de esquema: no romper el semáforo.
+        # Un error aborta la transacción en Postgres → rollback para que los
+        # chequeos siguientes (cargar_modelo, dueños) puedan seguir consultando.
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        mes_cerrado_pedidos = []
+        meses_afectados = []
+
     # 4. Dueños fuera del modelo de comisiones → en el reporte cobrarían como un
     #    "beneficiario" fantasma (100% a sí mismos). Suele ser un typo en equipos.dueno.
     modelo = cargar_modelo(conn)
@@ -85,11 +127,17 @@ def reconciliar(conn) -> dict:
     pagados_sin_ledger = chk(sin_ledger)
     monto_pagado_divergente = chk(divergentes)
     sobrepagados_chk = chk(sobrepagados)
+    mes_cerrado_stale = {
+        "cantidad": len(mes_cerrado_pedidos),
+        "ids": mes_cerrado_pedidos[:_SAMPLE],
+        "meses": meses_afectados,
+    }
 
     ok = (
         pagados_sin_ledger["cantidad"] == 0
         and monto_pagado_divergente["cantidad"] == 0
         and sobrepagados_chk["cantidad"] == 0
+        and mes_cerrado_stale["cantidad"] == 0
         and len(no_canonicos) == 0
     )
 
@@ -98,5 +146,6 @@ def reconciliar(conn) -> dict:
         "pagados_sin_ledger": pagados_sin_ledger,
         "monto_pagado_divergente": monto_pagado_divergente,
         "sobrepagados": sobrepagados_chk,
+        "mes_cerrado_desactualizado": mes_cerrado_stale,
         "duenos_no_canonicos": no_canonicos,
     }

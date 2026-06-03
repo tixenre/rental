@@ -109,3 +109,41 @@ class TestAgregar:
         assert d["resumen"]["total"] == 0
         assert d["resumen"]["pedidos"] == 0
         assert d["por_mes"] == [] and d["por_dia"] == [] and d["por_dueno"] == []
+
+
+class TestCierresPuros:
+    """Helpers puros de cierres.py (#721): no tocan DB."""
+
+    def test_validar_mes_acepta_formato(self):
+        from reportes.cierres import validar_mes
+
+        validar_mes("2026-06")  # no lanza
+
+    @pytest.mark.parametrize("malo", ["2026-13", "2026-00", "2026-6", "junio", "2026/06", ""])
+    def test_validar_mes_rechaza(self, malo):
+        from reportes.cierres import validar_mes
+
+        with pytest.raises(ValueError):
+            validar_mes(malo)
+
+    def test_rango_mes(self):
+        from reportes.cierres import rango_mes
+
+        assert rango_mes("2026-06") == ("2026-06-01", "2026-06-30")
+        assert rango_mes("2026-02") == ("2026-02-01", "2026-02-28")  # no bisiesto
+        assert rango_mes("2024-02") == ("2024-02-01", "2024-02-29")  # bisiesto
+        assert rango_mes("2026-12") == ("2026-12-01", "2026-12-31")
+
+    def test_mes_de_rango_detecta_mes_calendario(self):
+        from reportes.cierres import mes_de_rango
+
+        assert mes_de_rango("2026-06-01", "2026-06-30") == "2026-06"
+        assert mes_de_rango("2026-02-01", "2026-02-28") == "2026-02"
+
+    def test_mes_de_rango_none_si_no_es_mes_exacto(self):
+        from reportes.cierres import mes_de_rango
+
+        assert mes_de_rango("2026-01-01", "2026-12-31") is None  # año entero
+        assert mes_de_rango("2026-06-01", "2026-06-15") is None  # medio mes
+        assert mes_de_rango("2026-06-02", "2026-06-30") is None  # no arranca el 1
+        assert mes_de_rango("2026-06-01", "2026-07-31") is None  # dos meses
