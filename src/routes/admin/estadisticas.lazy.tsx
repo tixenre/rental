@@ -13,6 +13,7 @@ import {
   Repeat,
   Search,
   SearchX,
+  Download,
 } from "lucide-react";
 
 import { adminApi } from "@/lib/admin/api";
@@ -209,8 +210,134 @@ function EstadisticasPage() {
         </>
       )}
 
+      <ReportesSection />
       <BusquedasSection />
     </div>
+  );
+}
+
+function ReportesSection() {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const localISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const now = new Date();
+  const [desde, setDesde] = useState(localISO(new Date(now.getFullYear(), now.getMonth(), 1)));
+  const [hasta, setHasta] = useState(localISO(now));
+  const [dueno, setDueno] = useState("");
+  const [downloading, setDownloading] = useState(false);
+
+  const q = useQuery({
+    queryKey: ["admin", "reporte-dueno", desde, hasta, dueno],
+    queryFn: () => adminApi.getReporteDueno(desde, hasta, dueno || undefined),
+    enabled: !!desde && !!hasta && desde <= hasta,
+  });
+  const data = q.data;
+
+  const descargarCsv = async () => {
+    setDownloading(true);
+    try {
+      const blob = await adminApi.reporteDuenoCsv(desde, hasta, dueno || undefined);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reporte-duenos_${desde}_a_${hasta}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <section className="space-y-3 border-t hairline pt-6">
+      <div>
+        <h2 className="font-display text-2xl text-ink">Reportes — liquidación por dueño</h2>
+        <p className="text-sm text-muted-foreground">
+          Ingreso neto (sin IVA, ya con descuentos) que generaron los equipos de cada dueño en el
+          rango. Solo pedidos confirmados, retirados y finalizados.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="text-xs text-muted-foreground">
+          Desde
+          <input
+            type="date"
+            value={desde}
+            max={hasta}
+            onChange={(e) => setDesde(e.target.value)}
+            className="block mt-1 rounded-md border hairline bg-background px-2 py-1 text-sm text-ink"
+          />
+        </label>
+        <label className="text-xs text-muted-foreground">
+          Hasta
+          <input
+            type="date"
+            value={hasta}
+            min={desde}
+            onChange={(e) => setHasta(e.target.value)}
+            className="block mt-1 rounded-md border hairline bg-background px-2 py-1 text-sm text-ink"
+          />
+        </label>
+        <label className="text-xs text-muted-foreground">
+          Dueño (opcional)
+          <input
+            type="text"
+            value={dueno}
+            placeholder="Todos"
+            onChange={(e) => setDueno(e.target.value)}
+            className="block mt-1 rounded-md border hairline bg-background px-2 py-1 text-sm text-ink"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={descargarCsv}
+          disabled={downloading || !data || data.duenos.length === 0}
+          className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+        >
+          <Download className="h-4 w-4" /> {downloading ? "Generando…" : "Exportar CSV"}
+        </button>
+      </div>
+
+      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
+      {q.error && (
+        <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          Error: {(q.error as Error).message}
+        </div>
+      )}
+
+      {data && data.duenos.length === 0 && (
+        <div className="text-sm text-muted-foreground">Sin pedidos en el rango elegido.</div>
+      )}
+
+      {data && data.duenos.length > 0 && (
+        <>
+          <div className="text-sm text-muted-foreground">
+            Total del rango:{" "}
+            <span className="font-semibold text-ink tabular-nums">{fmtArs(data.total_ars)}</span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {data.duenos.map((d) => (
+              <Section
+                key={d.dueno}
+                title={d.dueno}
+                subtitle={`${fmtArs(d.ingreso_ars)} · ${d.pedidos} pedido${d.pedidos !== 1 ? "s" : ""} · ${d.items} ítem${d.items !== 1 ? "s" : ""}`}
+              >
+                <RankList
+                  icon={Package}
+                  items={d.equipos.map((eq) => ({
+                    primary: eq.equipo,
+                    secondary: `${eq.veces}× alquilado`,
+                    value: fmtArs(eq.ingreso_ars),
+                  }))}
+                />
+              </Section>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

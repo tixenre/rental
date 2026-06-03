@@ -1354,6 +1354,19 @@ export const adminApi = {
   getBusquedas: (dias?: number) =>
     authedJson<BusquedasData>(`/api/admin/busquedas${dias && dias > 0 ? `?dias=${dias}` : ""}`),
 
+  // Reportes (#88) — liquidación por dueño
+  getReporteDueno: (desde: string, hasta: string, dueno?: string) =>
+    authedJson<ReporteDuenoData>(
+      `/api/admin/reportes/dueno?desde=${desde}&hasta=${hasta}` +
+        (dueno ? `&dueno=${encodeURIComponent(dueno)}` : ""),
+    ),
+  reporteDuenoCsv: (desde: string, hasta: string, dueno?: string) =>
+    authedFetch(
+      `/api/admin/reportes/dueno?desde=${desde}&hasta=${hasta}` +
+        (dueno ? `&dueno=${encodeURIComponent(dueno)}` : "") +
+        `&formato=csv`,
+    ).then((r) => r.blob()),
+
   uploadLogo: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();
     fd.append("file", file);
@@ -1467,6 +1480,23 @@ export type BusquedaRow = {
 export type BusquedasData = {
   top: BusquedaRow[];
   zero: BusquedaRow[];
+};
+
+// Reporte por dueño (#88, fase 1)
+export type ReporteDuenoEquipo = { equipo: string; ingreso_ars: number; veces: number };
+export type ReporteDuenoRow = {
+  dueno: string;
+  ingreso_ars: number;
+  items: number;
+  pedidos: number;
+  equipos: ReporteDuenoEquipo[];
+};
+export type ReporteDuenoData = {
+  desde: string;
+  hasta: string;
+  dueno: string | null;
+  total_ars: number;
+  duenos: ReporteDuenoRow[];
 };
 
 export type EstadisticasData = {
