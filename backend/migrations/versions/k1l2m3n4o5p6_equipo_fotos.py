@@ -17,6 +17,28 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Reparación de prod (#690): en prod preexistía una `equipo_fotos` LEGACY/ajena
+    # con un esquema totalmente distinto (columnas `bytes`/`content_type` NOT NULL,
+    # etc.) que `CREATE TABLE IF NOT EXISTS` no parchea y que el backfill (l1m2) no
+    # puede poblar. Se detecta por la AUSENCIA de la columna canónica `url` y se
+    # descarta. Una `equipo_fotos` canónica (que SÍ tiene `url`) nunca se toca →
+    # seguro para cualquier entorno con datos. En prod se verificó 0 filas.
+    op.execute(sa.text("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = 'equipo_fotos'
+            ) AND NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'equipo_fotos'
+                  AND column_name = 'url'
+            ) THEN
+                DROP TABLE equipo_fotos CASCADE;
+            END IF;
+        END $$;
+    """))
+
     op.execute(sa.text("""
         CREATE TABLE IF NOT EXISTS equipo_fotos (
             id           SERIAL PRIMARY KEY,
