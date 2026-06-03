@@ -1391,7 +1391,7 @@ def init_db():
     """)
     conn.execute("ALTER TABLE estudio_fotos ADD COLUMN IF NOT EXISTS media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
 
-    # ── Galería multi-foto de equipos (F2 — j1k2l3m4n5o6) ───────────────────────
+    # ── Galería multi-foto de equipos (F2 — k1l2m3n4o5p6) ───────────────────────
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipo_fotos (
             id           SERIAL PRIMARY KEY,

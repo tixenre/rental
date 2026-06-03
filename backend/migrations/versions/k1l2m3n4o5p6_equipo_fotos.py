@@ -1,7 +1,7 @@
 """equipo_fotos (galería multi-foto de equipos) + marcas.media_id (F2)
 
-Revision ID: j1k2l3m4n5o6
-Revises: i1j2k3l4m5n6
+Revision ID: k1l2m3n4o5p6
+Revises: j1k2l3m4n5o6
 Create Date: 2026-06-03
 """
 
@@ -10,8 +10,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "j1k2l3m4n5o6"
-down_revision: Union[str, Sequence[str], None] = ("i1j2k3l4m5n6", "i1c2d3e4f5a6")
+revision: str = "k1l2m3n4o5p6"
+down_revision: Union[str, Sequence[str], None] = "j1k2l3m4n5o6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
