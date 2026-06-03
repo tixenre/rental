@@ -149,8 +149,18 @@ def test_upgrade_con_datos_legacy_llega_al_head(clean_db):
         # spec_def `lens_mount` en su categoría raíz.
         for col in ("montura", "formato", "resolucion", "peso", "dimensiones", "alimentacion"):
             conn.execute(f"ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS {col} TEXT")
-        # Bug 2: equipo_fotos como en prod, SIN la columna url.
-        conn.execute("ALTER TABLE equipo_fotos DROP COLUMN IF EXISTS url")
+        # Bug 2: equipo_fotos como en prod, una versión vieja a la que le faltan
+        # `url` y `media_id` (los logs de prod muestran que k1l2m3n4o5p6 pasa —
+        # su índice usa `orden`, que existe — y l1m2 falla primero por `url` y
+        # luego por `media_id`). Fuerza a l1m2 a agregar esas columnas faltantes.
+        conn.execute("DROP TABLE IF EXISTS equipo_fotos CASCADE")
+        conn.execute(
+            "CREATE TABLE equipo_fotos ("
+            " id SERIAL PRIMARY KEY,"
+            " equipo_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,"
+            " orden INTEGER NOT NULL DEFAULT 0,"
+            " es_principal BOOLEAN NOT NULL DEFAULT FALSE)"
+        )
         # Equipo con foto_url para que el backfill de equipo_fotos (l1m2) inserte.
         conn.execute("INSERT INTO equipos (id, nombre, foto_url) VALUES (9001, 'repro #690', 'https://x/f.jpg') ON CONFLICT DO NOTHING")
         conn.execute("INSERT INTO categorias (id, nombre, parent_id) VALUES (9001, 'repro', NULL) ON CONFLICT DO NOTHING")
