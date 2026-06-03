@@ -115,6 +115,22 @@ def _validar_faq(value: str) -> str:
     return json.dumps(out, ensure_ascii=False)
 
 
+def _validar_comisiones(value: str) -> str:
+    """Valida el modelo de reparto de comisiones (#88) y lo re-serializa.
+    La forma/validación canónica vive en el motor de reportes."""
+    from reportes.comisiones import validar_modelo
+
+    try:
+        data = json.loads(value)
+    except (json.JSONDecodeError, TypeError) as e:
+        raise HTTPException(400, f"comisiones_modelo debe ser JSON válido ({e})")
+    try:
+        validar_modelo(data)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return json.dumps(data, ensure_ascii=False)
+
+
 # ── App settings (key/value config global) ───────────────────────────────────
 #
 # Tipo de cambio, defaults y otras configs globales que el admin edita
@@ -147,6 +163,8 @@ ALLOWED_SETTINGS_KEYS = {
     "business_instagram",      # Handle de IG sin @ ("ramblarental").
     # ── Analítica ────────────────────────────────────────────────────
     "ga4_measurement_id",      # Measurement ID de Google Analytics 4 ("G-XXXXXXXXXX"). Vacío = GA apagado.
+    # ── Reportes ─────────────────────────────────────────────────────
+    "comisiones_modelo",       # Reparto de ingresos por dueño (#88). JSON {dueño: {beneficiario: %}}.
 }
 
 # Keys cuyo valor puede borrarse (volver al default) desde la UI. El resto
@@ -295,6 +313,8 @@ def update_setting(key: str, payload: dict, request: Request):
         value = _validar_faq(value)
     if key == "hero_taglines":
         value = _validar_hero_taglines(value)
+    if key == "comisiones_modelo":
+        value = _validar_comisiones(value)
     actor = (session.get("email") or session.get("user_id") or "admin")[:255]
     conn = get_db()
     try:

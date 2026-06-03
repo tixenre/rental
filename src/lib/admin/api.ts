@@ -1354,18 +1354,13 @@ export const adminApi = {
   getBusquedas: (dias?: number) =>
     authedJson<BusquedasData>(`/api/admin/busquedas${dias && dias > 0 ? `?dias=${dias}` : ""}`),
 
-  // Reportes (#88) — liquidación por dueño
-  getReporteDueno: (desde: string, hasta: string, dueno?: string) =>
-    authedJson<ReporteDuenoData>(
-      `/api/admin/reportes/dueno?desde=${desde}&hasta=${hasta}` +
-        (dueno ? `&dueno=${encodeURIComponent(dueno)}` : ""),
+  // Reportes (#88) — liquidación por dueño (pedidos 100% pagados, repartidos)
+  getLiquidacion: (desde: string, hasta: string) =>
+    authedJson<LiquidacionData>(`/api/admin/reportes/liquidacion?desde=${desde}&hasta=${hasta}`),
+  liquidacionCsv: (desde: string, hasta: string) =>
+    authedFetch(`/api/admin/reportes/liquidacion?desde=${desde}&hasta=${hasta}&formato=csv`).then(
+      (r) => r.blob(),
     ),
-  reporteDuenoCsv: (desde: string, hasta: string, dueno?: string) =>
-    authedFetch(
-      `/api/admin/reportes/dueno?desde=${desde}&hasta=${hasta}` +
-        (dueno ? `&dueno=${encodeURIComponent(dueno)}` : "") +
-        `&formato=csv`,
-    ).then((r) => r.blob()),
 
   uploadLogo: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();
@@ -1482,21 +1477,30 @@ export type BusquedasData = {
   zero: BusquedaRow[];
 };
 
-// Reporte por dueño (#88, fase 1)
-export type ReporteDuenoEquipo = { equipo: string; ingreso_ars: number; veces: number };
-export type ReporteDuenoRow = {
-  dueno: string;
-  ingreso_ars: number;
-  items: number;
-  pedidos: number;
-  equipos: ReporteDuenoEquipo[];
+// Liquidación por dueño (#88): ingreso 100% pagado, atribuido al mes/día de
+// saldado y repartido entre beneficiarios según el modelo de comisiones.
+export type PorBeneficiario = Record<string, number>;
+export type LiquidacionPunto = {
+  total: number;
+  por_beneficiario: PorBeneficiario;
 };
-export type ReporteDuenoData = {
+export type LiquidacionMes = LiquidacionPunto & { mes: string };
+export type LiquidacionDia = LiquidacionPunto & { dia: string };
+export type LiquidacionDueno = {
+  dueno: string;
+  monto_generado: number;
+  reparto: PorBeneficiario;
+  equipos: { equipo: string; monto: number }[];
+};
+export type LiquidacionData = {
   desde: string;
   hasta: string;
-  dueno: string | null;
-  total_ars: number;
-  duenos: ReporteDuenoRow[];
+  beneficiarios: string[];
+  modelo: Record<string, Record<string, number>>;
+  resumen: LiquidacionPunto;
+  por_mes: LiquidacionMes[];
+  por_dia: LiquidacionDia[];
+  por_dueno: LiquidacionDueno[];
 };
 
 export type EstadisticasData = {

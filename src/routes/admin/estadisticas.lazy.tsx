@@ -14,12 +14,17 @@ import {
   Search,
   SearchX,
   Download,
+  ChevronLeft,
+  ChevronRight,
+  Wallet,
 } from "lucide-react";
 
 import { adminApi } from "@/lib/admin/api";
+import type { LiquidacionMes } from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export const Route = createLazyFileRoute("/admin/estadisticas")({
   component: EstadisticasPage,
@@ -44,202 +49,250 @@ function EstadisticasPage() {
         </div>
         <h1 className="font-display text-3xl text-ink">Estadísticas</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Solo se contabilizan pedidos confirmados, retirados y finalizados.
+          Métricas del negocio y reportes de liquidación.
         </p>
       </header>
 
-      {statsQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
-      {statsQ.error && (
-        <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          Error: {(statsQ.error as Error).message}
-        </div>
-      )}
+      <Tabs defaultValue="resumen">
+        <TabsList>
+          <TabsTrigger value="resumen">
+            <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
+            Resumen
+          </TabsTrigger>
+          <TabsTrigger value="reportes">
+            <Wallet className="h-3.5 w-3.5 mr-1.5" />
+            Reportes
+          </TabsTrigger>
+        </TabsList>
 
-      {data && (
-        <>
-          {/* KPIs */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Kpi icon={DollarSign} label="Facturado total" value={fmtArs(data.totales.total_ars)} />
-            <Kpi icon={Calendar} label="Pedidos" value={String(data.totales.total_pedidos ?? 0)} />
-            <Kpi icon={Users} label="Clientes" value={String(data.totales.total_clientes ?? 0)} />
-            <Kpi
-              icon={TrendingUp}
-              label="Mejor mes"
-              value={data.mejor_peor_mes.mejor_mes ?? "—"}
-              sub={fmtArs(data.mejor_peor_mes.mejor_total)}
-            />
-          </div>
+        <TabsContent value="resumen" className="space-y-6 mt-6">
+          <p className="text-xs text-muted-foreground">
+            Solo se contabilizan pedidos confirmados, retirados y finalizados.
+          </p>
 
-          {/* KPIs derivados: ticket promedio + LTV. Calculados en frontend
+          {statsQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
+          {statsQ.error && (
+            <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              Error: {(statsQ.error as Error).message}
+            </div>
+          )}
+
+          {data && (
+            <>
+              {/* KPIs */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Kpi
+                  icon={DollarSign}
+                  label="Facturado total"
+                  value={fmtArs(data.totales.total_ars)}
+                />
+                <Kpi
+                  icon={Calendar}
+                  label="Pedidos"
+                  value={String(data.totales.total_pedidos ?? 0)}
+                />
+                <Kpi
+                  icon={Users}
+                  label="Clientes"
+                  value={String(data.totales.total_clientes ?? 0)}
+                />
+                <Kpi
+                  icon={TrendingUp}
+                  label="Mejor mes"
+                  value={data.mejor_peor_mes.mejor_mes ?? "—"}
+                  sub={fmtArs(data.mejor_peor_mes.mejor_total)}
+                />
+              </div>
+
+              {/* KPIs derivados: ticket promedio + LTV. Calculados en frontend
               porque ya tenemos todos los totales — no hace falta backend. */}
-          {(() => {
-            const t = data.totales;
-            const ticket = t.total_pedidos ? Math.round(t.total_ars / t.total_pedidos) : 0;
-            const ltv = t.total_clientes ? Math.round(t.total_ars / t.total_clientes) : 0;
-            const pedidosPorCliente = t.total_clientes
-              ? (t.total_pedidos / t.total_clientes).toFixed(1)
-              : "0";
-            return (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <Kpi
-                  icon={Calculator}
-                  label="Ticket promedio"
-                  value={fmtArs(ticket)}
-                  sub="Facturado / Pedidos"
-                />
-                <Kpi
-                  icon={Heart}
-                  label="LTV cliente"
-                  value={fmtArs(ltv)}
-                  sub="Facturado / Clientes"
-                />
-                <Kpi
-                  icon={Repeat}
-                  label="Pedidos / cliente"
-                  value={pedidosPorCliente}
-                  sub="Frecuencia promedio"
-                />
-              </div>
-            );
-          })()}
-
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Por mes (sparkline) */}
-            <Section title="Facturación por mes" subtitle="Últimos 24 meses">
-              <BarChart
-                data={[...data.por_mes]
-                  .slice(0, 12)
-                  .reverse()
-                  .map((m) => ({
-                    label: m.mes,
-                    value: Number(m.total_ars) || 0,
-                  }))}
-              />
-            </Section>
-
-            {/* Crecimiento */}
-            <Section title="Crecimiento mes a mes" subtitle="% vs mes anterior">
-              <div className="space-y-1.5">
-                {data.crecimiento.slice(0, 8).map((c) => (
-                  <div key={c.mes} className="flex items-center justify-between text-sm">
-                    <span className="font-mono text-xs text-muted-foreground">{c.mes}</span>
-                    <span className="tabular-nums text-ink">{fmtArs(c.total_ars)}</span>
-                    <span
-                      className={`inline-flex items-center gap-1 font-mono text-xs tabular-nums w-20 justify-end ${
-                        c.crecimiento_pct >= 0 ? "text-verde" : "text-destructive"
-                      }`}
-                    >
-                      {c.crecimiento_pct >= 0 ? (
-                        <TrendingUp className="h-3 w-3" />
-                      ) : (
-                        <TrendingDown className="h-3 w-3" />
-                      )}
-                      {c.crecimiento_pct >= 0 ? "+" : ""}
-                      {c.crecimiento_pct}%
-                    </span>
+              {(() => {
+                const t = data.totales;
+                const ticket = t.total_pedidos ? Math.round(t.total_ars / t.total_pedidos) : 0;
+                const ltv = t.total_clientes ? Math.round(t.total_ars / t.total_clientes) : 0;
+                const pedidosPorCliente = t.total_clientes
+                  ? (t.total_pedidos / t.total_clientes).toFixed(1)
+                  : "0";
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <Kpi
+                      icon={Calculator}
+                      label="Ticket promedio"
+                      value={fmtArs(ticket)}
+                      sub="Facturado / Pedidos"
+                    />
+                    <Kpi
+                      icon={Heart}
+                      label="LTV cliente"
+                      value={fmtArs(ltv)}
+                      sub="Facturado / Clientes"
+                    />
+                    <Kpi
+                      icon={Repeat}
+                      label="Pedidos / cliente"
+                      value={pedidosPorCliente}
+                      sub="Frecuencia promedio"
+                    />
                   </div>
-                ))}
+                );
+              })()}
+
+              <div className="grid lg:grid-cols-2 gap-6">
+                {/* Por mes (sparkline) */}
+                <Section title="Facturación por mes" subtitle="Últimos 24 meses">
+                  <BarChart
+                    data={[...data.por_mes]
+                      .slice(0, 12)
+                      .reverse()
+                      .map((m) => ({
+                        label: m.mes,
+                        value: Number(m.total_ars) || 0,
+                      }))}
+                  />
+                </Section>
+
+                {/* Crecimiento */}
+                <Section title="Crecimiento mes a mes" subtitle="% vs mes anterior">
+                  <div className="space-y-1.5">
+                    {data.crecimiento.slice(0, 8).map((c) => (
+                      <div key={c.mes} className="flex items-center justify-between text-sm">
+                        <span className="font-mono text-xs text-muted-foreground">{c.mes}</span>
+                        <span className="tabular-nums text-ink">{fmtArs(c.total_ars)}</span>
+                        <span
+                          className={`inline-flex items-center gap-1 font-mono text-xs tabular-nums w-20 justify-end ${
+                            c.crecimiento_pct >= 0 ? "text-verde" : "text-destructive"
+                          }`}
+                        >
+                          {c.crecimiento_pct >= 0 ? (
+                            <TrendingUp className="h-3 w-3" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3" />
+                          )}
+                          {c.crecimiento_pct >= 0 ? "+" : ""}
+                          {c.crecimiento_pct}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+
+                {/* Top equipos */}
+                <Section title="Top equipos" subtitle="Por facturación">
+                  <RankList
+                    items={data.top_equipos.map((e) => ({
+                      primary: e.equipo,
+                      secondary: `${e.veces}× alquilado`,
+                      value: fmtArs(e.total_ars),
+                    }))}
+                    icon={Package}
+                  />
+                </Section>
+
+                {/* Top clientes */}
+                <Section title="Top clientes" subtitle="Por facturación">
+                  <RankList
+                    items={data.top_clientes.map((c) => ({
+                      primary: c.cliente,
+                      secondary: `${c.pedidos} pedidos`,
+                      value: fmtArs(c.total_ars),
+                    }))}
+                    icon={Users}
+                  />
+                </Section>
+
+                {/* Equipos más guardados como favoritos */}
+                {(data.favoritos_equipo?.length ?? 0) > 0 && (
+                  <Section
+                    title="Equipos más guardados"
+                    subtitle="Equipos que los clientes marcan como favoritos"
+                  >
+                    <RankList
+                      items={(data.favoritos_equipo ?? []).map((e) => ({
+                        primary: e.equipo,
+                        secondary: `${e.clientes_unicos} cliente${e.clientes_unicos !== 1 ? "s" : ""}`,
+                        value: `${e.total_favoritos}×`,
+                      }))}
+                      icon={Heart}
+                    />
+                  </Section>
+                )}
+
+                {/* Recurrentes */}
+                <Section title="Clientes recurrentes" subtitle="Más de 1 alquiler">
+                  <RankList
+                    items={data.clientes_recurrentes.map((c) => ({
+                      primary: c.cliente,
+                      secondary: `${c.veces_alquiladas}× alquilado`,
+                      value: fmtArs(c.total_ars),
+                    }))}
+                    icon={Users}
+                  />
+                </Section>
+
+                {/* Por dueño */}
+                <Section title="Por dueño" subtitle="Reparto de equipos">
+                  <RankList
+                    items={data.por_dueno.map((d) => ({
+                      primary: d.dueno,
+                      secondary: `${d.items} ítems`,
+                      value: fmtArs(d.total_ars),
+                    }))}
+                    icon={Package}
+                  />
+                </Section>
               </div>
-            </Section>
+            </>
+          )}
 
-            {/* Top equipos */}
-            <Section title="Top equipos" subtitle="Por facturación">
-              <RankList
-                items={data.top_equipos.map((e) => ({
-                  primary: e.equipo,
-                  secondary: `${e.veces}× alquilado`,
-                  value: fmtArs(e.total_ars),
-                }))}
-                icon={Package}
-              />
-            </Section>
+          <BusquedasSection />
+        </TabsContent>
 
-            {/* Top clientes */}
-            <Section title="Top clientes" subtitle="Por facturación">
-              <RankList
-                items={data.top_clientes.map((c) => ({
-                  primary: c.cliente,
-                  secondary: `${c.pedidos} pedidos`,
-                  value: fmtArs(c.total_ars),
-                }))}
-                icon={Users}
-              />
-            </Section>
-
-            {/* Equipos más guardados como favoritos */}
-            {(data.favoritos_equipo?.length ?? 0) > 0 && (
-              <Section
-                title="Equipos más guardados"
-                subtitle="Equipos que los clientes marcan como favoritos"
-              >
-                <RankList
-                  items={(data.favoritos_equipo ?? []).map((e) => ({
-                    primary: e.equipo,
-                    secondary: `${e.clientes_unicos} cliente${e.clientes_unicos !== 1 ? "s" : ""}`,
-                    value: `${e.total_favoritos}×`,
-                  }))}
-                  icon={Heart}
-                />
-              </Section>
-            )}
-
-            {/* Recurrentes */}
-            <Section title="Clientes recurrentes" subtitle="Más de 1 alquiler">
-              <RankList
-                items={data.clientes_recurrentes.map((c) => ({
-                  primary: c.cliente,
-                  secondary: `${c.veces_alquiladas}× alquilado`,
-                  value: fmtArs(c.total_ars),
-                }))}
-                icon={Users}
-              />
-            </Section>
-
-            {/* Por dueño */}
-            <Section title="Por dueño" subtitle="Reparto de equipos">
-              <RankList
-                items={data.por_dueno.map((d) => ({
-                  primary: d.dueno,
-                  secondary: `${d.items} ítems`,
-                  value: fmtArs(d.total_ars),
-                }))}
-                icon={Package}
-              />
-            </Section>
-          </div>
-        </>
-      )}
-
-      <ReportesSection />
-      <BusquedasSection />
+        <TabsContent value="reportes" className="mt-6">
+          <LiquidacionReporte />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
-function ReportesSection() {
+function LiquidacionReporte() {
   const pad = (n: number) => String(n).padStart(2, "0");
-  const localISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const now = new Date();
-  const [desde, setDesde] = useState(localISO(new Date(now.getFullYear(), now.getMonth(), 1)));
-  const [hasta, setHasta] = useState(localISO(now));
-  const [dueno, setDueno] = useState("");
+  const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const [anchor, setAnchor] = useState(() => new Date());
   const [downloading, setDownloading] = useState(false);
 
-  const q = useQuery({
-    queryKey: ["admin", "reporte-dueno", desde, hasta, dueno],
-    queryFn: () => adminApi.getReporteDueno(desde, hasta, dueno || undefined),
-    enabled: !!desde && !!hasta && desde <= hasta,
+  const y = anchor.getFullYear();
+  const m = anchor.getMonth();
+  const mesDesde = iso(new Date(y, m, 1));
+  const mesHasta = iso(new Date(y, m + 1, 0)); // último día del mes
+  const anioDesde = iso(new Date(y, 0, 1));
+  const anioHasta = iso(new Date(y, 11, 31));
+
+  const mesQ = useQuery({
+    queryKey: ["admin", "liquidacion", "mes", mesDesde, mesHasta],
+    queryFn: () => adminApi.getLiquidacion(mesDesde, mesHasta),
   });
-  const data = q.data;
+  const anioQ = useQuery({
+    queryKey: ["admin", "liquidacion", "anio", anioDesde, anioHasta],
+    queryFn: () => adminApi.getLiquidacion(anioDesde, anioHasta),
+  });
+  const mes = mesQ.data;
+  const anio = anioQ.data;
+
+  const mesLabel = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(
+    anchor,
+  );
+  const beneficiarios = mes?.beneficiarios ?? anio?.beneficiarios ?? [];
+  const err = (mesQ.error || anioQ.error) as Error | null;
 
   const descargarCsv = async () => {
     setDownloading(true);
     try {
-      const blob = await adminApi.reporteDuenoCsv(desde, hasta, dueno || undefined);
+      const blob = await adminApi.liquidacionCsv(mesDesde, mesHasta);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `reporte-duenos_${desde}_a_${hasta}.csv`;
+      a.download = `liquidacion_${mesDesde}_a_${mesHasta}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -249,95 +302,153 @@ function ReportesSection() {
     }
   };
 
-  return (
-    <section className="space-y-3 border-t hairline pt-6">
-      <div>
-        <h2 className="font-display text-2xl text-ink">Reportes — liquidación por dueño</h2>
-        <p className="text-sm text-muted-foreground">
-          Ingreso neto (sin IVA, ya con descuentos) que generaron los equipos de cada dueño en el
-          rango. Solo pedidos confirmados, retirados y finalizados.
-        </p>
-      </div>
+  const shiftMonth = (delta: number) => setAnchor(new Date(y, m + delta, 1));
 
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="text-xs text-muted-foreground">
-          Desde
-          <input
-            type="date"
-            value={desde}
-            max={hasta}
-            onChange={(e) => setDesde(e.target.value)}
-            className="block mt-1 rounded-md border hairline bg-background px-2 py-1 text-sm text-ink"
-          />
-        </label>
-        <label className="text-xs text-muted-foreground">
-          Hasta
-          <input
-            type="date"
-            value={hasta}
-            min={desde}
-            onChange={(e) => setHasta(e.target.value)}
-            className="block mt-1 rounded-md border hairline bg-background px-2 py-1 text-sm text-ink"
-          />
-        </label>
-        <label className="text-xs text-muted-foreground">
-          Dueño (opcional)
-          <input
-            type="text"
-            value={dueno}
-            placeholder="Todos"
-            onChange={(e) => setDueno(e.target.value)}
-            className="block mt-1 rounded-md border hairline bg-background px-2 py-1 text-sm text-ink"
-          />
-        </label>
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => shiftMonth(-1)}
+            className="rounded-md border hairline p-1.5 text-ink hover:bg-ink/5 transition"
+            aria-label="Mes anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="font-display text-lg text-ink capitalize min-w-[9rem] text-center">
+            {mesLabel}
+          </span>
+          <button
+            type="button"
+            onClick={() => shiftMonth(1)}
+            className="rounded-md border hairline p-1.5 text-ink hover:bg-ink/5 transition"
+            aria-label="Mes siguiente"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
         <button
           type="button"
           onClick={descargarCsv}
-          disabled={downloading || !data || data.duenos.length === 0}
+          disabled={downloading}
           className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
         >
           <Download className="h-4 w-4" /> {downloading ? "Generando…" : "Exportar CSV"}
         </button>
       </div>
 
-      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
-      {q.error && (
+      <p className="text-xs text-muted-foreground">
+        Solo pedidos 100% pagados. Cada pedido cuenta en el mes/día en que quedó saldado. El reparto
+        entre dueños se configura en{" "}
+        <a href="/admin/settings" className="underline hover:text-ink">
+          Ajustes
+        </a>
+        .
+      </p>
+
+      {err && (
         <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          Error: {(q.error as Error).message}
+          Error: {err.message}
         </div>
       )}
 
-      {data && data.duenos.length === 0 && (
-        <div className="text-sm text-muted-foreground">Sin pedidos en el rango elegido.</div>
-      )}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi icon={DollarSign} label={`Total ${mesLabel}`} value={fmtArs(mes?.resumen.total)} />
+        {beneficiarios.map((b) => (
+          <Kpi
+            key={b}
+            icon={Wallet}
+            label={b}
+            value={fmtArs(mes?.resumen.por_beneficiario[b] ?? 0)}
+          />
+        ))}
+      </div>
 
-      {data && data.duenos.length > 0 && (
-        <>
-          <div className="text-sm text-muted-foreground">
-            Total del rango:{" "}
-            <span className="font-semibold text-ink tabular-nums">{fmtArs(data.total_ars)}</span>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {data.duenos.map((d) => (
-              <Section
-                key={d.dueno}
-                title={d.dueno}
-                subtitle={`${fmtArs(d.ingreso_ars)} · ${d.pedidos} pedido${d.pedidos !== 1 ? "s" : ""} · ${d.items} ítem${d.items !== 1 ? "s" : ""}`}
-              >
-                <RankList
-                  icon={Package}
-                  items={d.equipos.map((eq) => ({
-                    primary: eq.equipo,
-                    secondary: `${eq.veces}× alquilado`,
-                    value: fmtArs(eq.ingreso_ars),
-                  }))}
-                />
-              </Section>
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Section title="Día a día" subtitle={`Lo que entró cada día de ${mesLabel}`}>
+          <BarChart
+            data={(mes?.por_dia ?? []).map((d) => ({ label: d.dia, value: d.total }))}
+            labelFn={(l) => l.slice(8)}
+          />
+        </Section>
+
+        <Section title={`Mes a mes · ${y}`} subtitle="Total y reparto por mes">
+          <MesAMesTabla meses={anio?.por_mes ?? []} beneficiarios={beneficiarios} />
+        </Section>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        {(mes?.por_dueno ?? []).map((d) => (
+          <Section
+            key={d.dueno}
+            title={d.dueno}
+            subtitle={`Generó ${fmtArs(d.monto_generado)} · reparte ${beneficiarios
+              .filter((b) => d.reparto[b])
+              .map((b) => `${b} ${fmtArs(d.reparto[b])}`)
+              .join(" · ")}`}
+          >
+            <RankList
+              icon={Package}
+              items={d.equipos.map((eq) => ({
+                primary: eq.equipo,
+                secondary: "generado",
+                value: fmtArs(eq.monto),
+              }))}
+            />
+          </Section>
+        ))}
+        {mes && mes.por_dueno.length === 0 && (
+          <div className="text-sm text-muted-foreground">Sin pedidos saldados en {mesLabel}.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MesAMesTabla({
+  meses,
+  beneficiarios,
+}: {
+  meses: LiquidacionMes[];
+  beneficiarios: string[];
+}) {
+  if (!meses.length) return <div className="text-sm text-muted-foreground">Sin datos</div>;
+  const fmtMes = (mes: string) => {
+    const [yy, mm] = mes.split("-").map(Number);
+    return new Intl.DateTimeFormat("es-AR", { month: "short" }).format(new Date(yy, mm - 1, 1));
+  };
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-xs text-muted-foreground">
+            <th className="text-left font-normal py-1">Mes</th>
+            {beneficiarios.map((b) => (
+              <th key={b} className="text-right font-normal py-1">
+                {b}
+              </th>
             ))}
-          </div>
-        </>
-      )}
-    </section>
+            <th className="text-right font-normal py-1">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {meses.map((mes) => (
+            <tr key={mes.mes} className="border-t hairline">
+              <td className="py-1.5 text-ink capitalize">{fmtMes(mes.mes)}</td>
+              {beneficiarios.map((b) => (
+                <td key={b} className="py-1.5 text-right tabular-nums text-muted-foreground">
+                  {fmtArs(mes.por_beneficiario[b] ?? 0)}
+                </td>
+              ))}
+              <td className="py-1.5 text-right tabular-nums text-ink font-medium">
+                {fmtArs(mes.total)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -458,7 +569,13 @@ function Section({
   );
 }
 
-function BarChart({ data }: { data: { label: string; value: number }[] }) {
+function BarChart({
+  data,
+  labelFn = (l) => l.slice(5),
+}: {
+  data: { label: string; value: number }[];
+  labelFn?: (label: string) => string;
+}) {
   if (!data.length) return <div className="text-sm text-muted-foreground">Sin datos</div>;
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
@@ -473,7 +590,7 @@ function BarChart({ data }: { data: { label: string; value: number }[] }) {
             style={{ height: `${(d.value / max) * 100}%` }}
           />
           <div className="text-[9px] font-mono text-muted-foreground truncate w-full text-center">
-            {d.label.slice(5)}
+            {labelFn(d.label)}
           </div>
         </div>
       ))}
