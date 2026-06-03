@@ -57,8 +57,10 @@ class TestAgregar:
     def _filas(self):
         # Un pedido de Pablo saldado en mayo, uno de Rambla saldado en junio.
         return [
-            {"fecha": "2026-05-10", "dueno": "Pablo", "equipo": "Sony FX3", "monto": 100000},
-            {"fecha": "2026-06-03", "dueno": "Rambla", "equipo": "Canon R5", "monto": 40000},
+            {"fecha": "2026-05-10", "pedido_id": 1, "dueno": "Pablo",
+             "equipo": "Sony FX3", "monto": 100000},
+            {"fecha": "2026-06-03", "pedido_id": 2, "dueno": "Rambla",
+             "equipo": "Canon R5", "monto": 40000},
         ]
 
     def test_resumen_total_y_reparto(self):
@@ -86,7 +88,24 @@ class TestAgregar:
         assert duenos["Pablo"]["reparto"]["Rambla"] == 45000
         assert duenos["Pablo"]["equipos"][0]["equipo"] == "Sony FX3"
 
+    def test_cuenta_veces_alquilado(self):
+        # Mismo equipo de Pablo en 2 pedidos distintos → veces == 2; total pedidos == 3.
+        filas = [
+            {"fecha": "2026-06-03", "pedido_id": 1, "dueno": "Pablo",
+             "equipo": "Sony FX3", "monto": 100000},
+            {"fecha": "2026-06-10", "pedido_id": 2, "dueno": "Pablo",
+             "equipo": "Sony FX3", "monto": 60000},
+            {"fecha": "2026-06-15", "pedido_id": 3, "dueno": "Rambla",
+             "equipo": "Canon R5", "monto": 40000},
+        ]
+        d = agregar(filas, DEFAULT_MODELO)
+        assert d["resumen"]["pedidos"] == 3
+        pablo = {x["dueno"]: x for x in d["por_dueno"]}["Pablo"]
+        assert pablo["pedidos"] == 2
+        assert pablo["equipos"][0]["veces"] == 2
+
     def test_filas_vacias(self):
         d = agregar([], DEFAULT_MODELO)
         assert d["resumen"]["total"] == 0
+        assert d["resumen"]["pedidos"] == 0
         assert d["por_mes"] == [] and d["por_dia"] == [] and d["por_dueno"] == []

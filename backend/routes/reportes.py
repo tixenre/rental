@@ -47,11 +47,14 @@ def _liquidacion_csv(data: dict) -> str:
 
     w.writerow([])
     w.writerow(["Detalle por dueño"])
-    w.writerow(["Dueño", "Equipo", "Generado (ARS)"])
+    w.writerow(["Dueño", "Equipo", "Veces alquilado", "Generado (ARS)"])
     for d in data["por_dueno"]:
         for eq in d["equipos"]:
-            w.writerow([d["dueno"], eq["equipo"], eq["monto"]])
-        w.writerow([f"{d['dueno']} — TOTAL GENERADO", "", d["monto_generado"]])
+            w.writerow([d["dueno"], eq["equipo"], eq.get("veces", ""), eq["monto"]])
+        w.writerow([
+            f"{d['dueno']} — TOTAL ({d.get('pedidos', 0)} alquileres)",
+            "", "", d["monto_generado"],
+        ])
     return buf.getvalue()
 
 

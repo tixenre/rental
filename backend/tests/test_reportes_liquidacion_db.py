@@ -180,6 +180,18 @@ def test_buckets_diarios(setup):
     assert dias.get("2026-06-15") == 100000  # P_MIXTO
 
 
+def test_veces_alquilado(setup):
+    junio = _liquidar("2026-06-01", "2026-06-30")
+    # En junio hay 2 pedidos saldados (P_CRUCE + P_MIXTO).
+    assert junio["resumen"]["pedidos"] == 2
+    duenos = {d["dueno"]: d for d in junio["por_dueno"]}
+    # El equipo de Pablo salió en ambos (P_CRUCE y P_MIXTO) → 2 veces.
+    pablo = duenos["Pablo"]
+    fx = {e["equipo"]: e for e in pablo["equipos"]}["Equipo Pablo"]
+    assert fx["veces"] == 2
+    assert pablo["pedidos"] == 2
+
+
 def test_reconciliacion_caza_pagado_sin_ledger(setup):
     from database import get_db
     from reportes.reconciliacion import reconciliar

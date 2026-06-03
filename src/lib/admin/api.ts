@@ -1490,15 +1490,16 @@ export type LiquidacionDia = LiquidacionPunto & { dia: string };
 export type LiquidacionDueno = {
   dueno: string;
   monto_generado: number;
+  pedidos: number;
   reparto: PorBeneficiario;
-  equipos: { equipo: string; monto: number }[];
+  equipos: { equipo: string; monto: number; veces: number }[];
 };
 export type LiquidacionData = {
   desde: string;
   hasta: string;
   beneficiarios: string[];
   modelo: Record<string, Record<string, number>>;
-  resumen: LiquidacionPunto;
+  resumen: LiquidacionPunto & { pedidos: number };
   por_mes: LiquidacionMes[];
   por_dia: LiquidacionDia[];
   por_dueno: LiquidacionDueno[];

@@ -424,29 +424,42 @@ function LiquidacionReporte() {
         </Section>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {(mes?.por_dueno ?? []).map((d) => (
-          <Section
-            key={d.dueno}
-            title={d.dueno}
-            subtitle={`Generó ${fmtArs(d.monto_generado)} · reparte ${beneficiarios
-              .filter((b) => d.reparto[b])
-              .map((b) => `${b} ${fmtArs(d.reparto[b])}`)
-              .join(" · ")}`}
-          >
-            <RankList
-              icon={Package}
-              items={d.equipos.map((eq) => ({
-                primary: eq.equipo,
-                secondary: "generado",
-                value: fmtArs(eq.monto),
-              }))}
-            />
-          </Section>
-        ))}
-        {mes && mes.por_dueno.length === 0 && (
-          <div className="text-sm text-muted-foreground">Sin pedidos saldados en {mesLabel}.</div>
-        )}
+      <div className="space-y-3">
+        <h3 className="font-display text-lg text-ink">
+          Resumen por dueño
+          {mes ? (
+            <span className="text-sm font-normal text-muted-foreground">
+              {" "}
+              · este mes hubo {mes.resumen.pedidos} alquiler
+              {mes.resumen.pedidos !== 1 ? "es" : ""} cobrado
+              {mes.resumen.pedidos !== 1 ? "s" : ""}
+            </span>
+          ) : null}
+        </h3>
+        <div className="grid lg:grid-cols-2 gap-6">
+          {(mes?.por_dueno ?? []).map((d) => (
+            <Section
+              key={d.dueno}
+              title={`${d.dueno} · ${d.pedidos} alquiler${d.pedidos !== 1 ? "es" : ""}`}
+              subtitle={`Generó ${fmtArs(d.monto_generado)} · reparte ${beneficiarios
+                .filter((b) => d.reparto[b])
+                .map((b) => `${b} ${fmtArs(d.reparto[b])}`)
+                .join(" · ")}`}
+            >
+              <RankList
+                icon={Package}
+                items={d.equipos.map((eq) => ({
+                  primary: eq.equipo,
+                  secondary: `${eq.veces}× alquilado`,
+                  value: fmtArs(eq.monto),
+                }))}
+              />
+            </Section>
+          ))}
+          {mes && mes.por_dueno.length === 0 && (
+            <div className="text-sm text-muted-foreground">Sin pedidos saldados en {mesLabel}.</div>
+          )}
+        </div>
       </div>
     </div>
   );
