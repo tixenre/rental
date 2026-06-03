@@ -11,7 +11,7 @@ import smtplib
 import uuid
 from email.message import EmailMessage
 
-from .base import EmailBackend, EmailBackendError, SendResult
+from .base import Attachment, EmailBackend, EmailBackendError, SendResult
 
 
 class SmtpBackend(EmailBackend):
@@ -34,6 +34,7 @@ class SmtpBackend(EmailBackend):
         html: str,
         text: str,
         from_addr: str,
+        attachments: list[Attachment] | None = None,
     ) -> SendResult:
         msg = EmailMessage()
         msg["From"] = from_addr
@@ -45,6 +46,14 @@ class SmtpBackend(EmailBackend):
         msg["Message-ID"] = message_id
         msg.set_content(text)
         msg.add_alternative(html, subtype="html")
+        for a in attachments or []:
+            maintype, _, subtype = a.mimetype.partition("/")
+            msg.add_attachment(
+                a.content,
+                maintype=maintype or "application",
+                subtype=subtype or "octet-stream",
+                filename=a.filename,
+            )
 
         try:
             with smtplib.SMTP(self.host, self.port, timeout=20) as s:

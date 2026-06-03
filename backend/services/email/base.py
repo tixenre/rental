@@ -10,6 +10,14 @@ from dataclasses import dataclass
 
 
 @dataclass
+class Attachment:
+    """Un adjunto de email. `content` son los bytes crudos del archivo."""
+    filename: str
+    content: bytes
+    mimetype: str = "application/pdf"
+
+
+@dataclass
 class SendResult:
     """Resultado de un envío exitoso. `provider_id` es lo que devuelve el
     provider (Resend: UUID del mensaje; SMTP: Message-ID header) para poder
@@ -36,5 +44,6 @@ class EmailBackend:
         html: str,
         text: str,
         from_addr: str,
+        attachments: list[Attachment] | None = None,
     ) -> SendResult:
         raise NotImplementedError
