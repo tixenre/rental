@@ -29,6 +29,9 @@
   `main`. Una iniciativa = una rama = una PR con N commits atómicos.
 - **Consecuencias:** trazabilidad uniforme corra Claude donde corra; se descarta el modo
   local-first.
+- **Matiz (2026-06-03):** el "rama+PR siempre" se relajó **solo para bugfixes chicos**, que pueden
+  ir **directo a `dev`** sin PR por feature (ver decisión *2026-06-03 — Bugfixes chicos*). Lo
+  inamovible es **nunca commitear directo a `main`** — eso no cambió.
 
 ### 2026-05-25 — Merge según tamaño
 - **Contexto:** auto-merge para todo era riesgoso para cambios sensibles; bloquear todo era lento.
@@ -214,6 +217,10 @@
   prolijo **y** `main` con revert quirúrgico.
 - **How to apply:** al mergear una rama a `dev`, usar squash con título `tipo: desc (#PR)`. Al promover
   `dev → main`, usar merge commit. No squashear nunca la PR de promoción a prod.
+- **Alcance (2026-06-03):** el `rama → dev = squash` aplica a las PRs que **sí** pasan por rama —es
+  decir, lo grande/sensible/arquitectónico. Los **bugfixes chicos van directo a `dev`** sin PR
+  (ver decisión *2026-06-03 — Bugfixes chicos*); ahí no hay squash. El `dev → main = merge commit`
+  no cambia: sigue siendo la única vía a prod y conserva el revert por unidad.
 
 ### 2026-06-01 — Gotcha de Railway: fork de ambiente desincroniza la contraseña del Postgres
 - **Contexto:** el backend de staging (`dev`) tiraba 500 en cascada con
@@ -283,6 +290,28 @@
   contra Postgres real y exige llegar al head. Modelo + runbook de reparación de prod en
   [`docs/RUNBOOK_MIGRACIONES.md`](RUNBOOK_MIGRACIONES.md). La **Parte B** (destrabar prod) sigue
   pendiente en #690.
+
+### 2026-06-03 — Bugfixes chicos: push directo a `dev`; rama+PR solo para lo grande
+- **Contexto:** abrir un PR a `dev` por cada bug chico, solo para verlo en staging, era pura fricción
+  cuando hay **varios fixes en paralelo** (el modo de trabajo habitual del dueño). El paso "PR para
+  previsualizar" no aportaba: el dueño no revisa diffs y prod no se toca en esa etapa.
+- **Decisión:** los **bugfixes chicos van directo a `dev`** (sin PR por feature). Se ven juntos en
+  staging y se abre **un** PR `dev → main` cuando el lote está listo. Lo **grande / sensible /
+  arquitectónico / que toca el core de reservas o lo que ve el usuario** sigue en **rama + PR
+  dedicada** — la regla *Merge según tamaño* (2026-05-25) queda intacta; esto solo define el camino
+  del caso chico. El triage honesto es la pieza que carga el peso: en el momento en que un fix deja
+  de ser trivial, gradúa a rama+PR.
+- **Why (es seguro):** **prod es sagrado y no se toca acá** — solo se alcanza por el PR `dev → main`,
+  que conserva su gate completo (supervisor + CI + el dueño prueba). CI corre en cada push a `dev`;
+  la BD de staging es copia de prod (2026-06-01), no prod. Lo peor que puede pasar es romper staging,
+  que es justamente para lo que existe. Es trunk-based con rama de integración (`dev`): patrón sano
+  para un dueño solo + Claude + CI + supervisor al promover, no un atajo.
+- **Barandas:** (1) commits atómicos con Conventional Commits → revert por commit posible en `main`
+  aunque no se agrupe por PR; (2) el **supervisor corre antes de promover `dev → main`** (sobre el
+  lote); (3) **mantener `dev` cerca de `main`** (promover seguido, no dejar laburo a medias en `dev`
+  al promover) para no perder el todo-o-nada de la promoción.
+- **Consecuencias:** matiza *Branch + PR siempre* (2026-05-25) y *Método de merge según etapa*
+  (2026-06-01) — ver las notas agregadas ahí. Lo inamovible: **nunca directo a `main`**.
 
 ---
 

@@ -45,9 +45,9 @@ Detalles de setup en [`README.md`](README.md). Detalles de Railway en [`docs/DEP
 
 ### Workflow
 
-**Branch + PR siempre.** Todo cambio va en una rama dedicada y se mergea por PR contra `main` — corra Claude donde corra (apps de Mac/iPhone sobre sesiones en la nube, o la CLI local). **No se commitea directo a `main`.**
+**Branch + PR para lo grande; bugfixes chicos directo a `dev`.** Lo grande / sensible / arquitectónico / que toca el core de reservas o lo que ve el usuario va en una rama dedicada y se mergea por PR — corra Claude donde corra (apps de Mac/iPhone sobre sesiones en la nube, o la CLI local). Los **bugfixes chicos se commitean directo a `dev`** y se promueven en lote con un solo PR `dev → main` (ver `docs/MEMORIA.md` *2026-06-03*). **Nunca se commitea directo a `main`.**
 
-Una **iniciativa** = una **rama** (`claude/<descripcion>`) = una **PR** con N commits atómicos adentro. El dev server (local) o el deploy reflejan los cambios para probar.
+Una **iniciativa** (lo grande) = una **rama** (`claude/<descripcion>`) = una **PR** con N commits atómicos adentro. El deploy de staging (`dev`) refleja los cambios para probar.
 
 ```
 Edit → commit atómico en la rama → (N veces) → push → PR → supervisor + CI → merge
