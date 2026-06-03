@@ -153,8 +153,32 @@ app.include_router(cliente_portal_router)
 
 @app.get("/health", include_in_schema=False)
 def health():
-    """Health check endpoint para Railway."""
-    return {"status": "ok"}
+    """Health check endpoint para Railway (liveness).
+
+    Siempre responde `status: "ok"` para no tumbar el deploy — la app arranca
+    aunque las migraciones fallen (decisión deliberada). Incluye un resumen del
+    estado de migraciones para ver el drift de un vistazo; el detalle vive en
+    `/health/migrations`.
+    """
+    import migration_state
+    mig = migration_state.get_status()
+    return {
+        "status": "ok",
+        "migrations": {"checked": mig["checked"], "ok": mig["ok"]},
+    }
+
+
+@app.get("/health/migrations", include_in_schema=False)
+def health_migrations():
+    """Estado detallado de las migraciones Alembic: revisión aplicada vs head
+    esperado, y el error si el `upgrade head` del arranque falló.
+
+    Pensado para chequear sin entrar a los logs de Railway si la BD quedó
+    trabada en una revisión vieja (ver docs/RUNBOOK_MIGRACIONES.md). Responde
+    200 siempre; mirar el campo `ok`.
+    """
+    import migration_state
+    return migration_state.get_status()
 
 # ── Páginas ──────────────────────────────────────────────────────────────────
 
@@ -239,10 +263,18 @@ def _run_alembic_migrations() -> None:
     from pathlib import Path
     from alembic import command
     from alembic.config import Config
+    import migration_state
     backend_root = Path(__file__).resolve().parent
     cfg = Config(str(backend_root / "alembic.ini"))
     cfg.set_main_option("script_location", str(backend_root / "migrations"))
-    command.upgrade(cfg, "head")
+    try:
+        command.upgrade(cfg, "head")
+    except Exception as e:
+        # Capturar el estado ANTES de re-lanzar, para que /health muestre que
+        # la BD quedó trabada (drift) aunque la app siga arrancando.
+        migration_state.record_failure(e, cfg)
+        raise
+    migration_state.record_success(cfg)
 
 
 def _seed_registry() -> None:
