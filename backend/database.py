@@ -1355,6 +1355,61 @@ def init_db():
         centinela_id = cur_cent.fetchone()["id"]
         conn.execute("UPDATE estudio SET equipo_id = ? WHERE id = 1", (centinela_id,))
 
+    # ── Media pipeline no-destructivo (F1 — i1j2k3l4m5n6) ──────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS media_assets (
+            id           BIGSERIAL PRIMARY KEY,
+            kind         TEXT NOT NULL,
+            original_key TEXT,
+            original_ct  TEXT,
+            width        INTEGER,
+            height       INTEGER,
+            bytes        INTEGER,
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS media_variants (
+            id           BIGSERIAL PRIMARY KEY,
+            asset_id     BIGINT NOT NULL REFERENCES media_assets(id) ON DELETE CASCADE,
+            name         TEXT NOT NULL,
+            key          TEXT,
+            url          TEXT,
+            content_type TEXT NOT NULL DEFAULT 'image/webp',
+            width        INTEGER,
+            height       INTEGER,
+            bytes        INTEGER,
+            params       JSONB DEFAULT '{}',
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(asset_id, name)
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_media_variants_asset
+        ON media_variants(asset_id)
+    """)
+    conn.execute("ALTER TABLE estudio_fotos ADD COLUMN IF NOT EXISTS media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
+
+    # ── Galería multi-foto de equipos (F2 — k1l2m3n4o5p6) ───────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS equipo_fotos (
+            id           SERIAL PRIMARY KEY,
+            equipo_id    INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            media_id     BIGINT REFERENCES media_assets(id) ON DELETE SET NULL,
+            url          TEXT NOT NULL,
+            path         TEXT,
+            orden        INTEGER NOT NULL DEFAULT 0,
+            es_principal BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_equipo_fotos_equipo_orden
+        ON equipo_fotos(equipo_id, orden)
+    """)
+    conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
+
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
 
     # Seed the sequence to the current max so nextval never collides with existing data.
@@ -1478,7 +1533,7 @@ def attach_kit(conn, equipos: list[dict]) -> list[dict]:
                kc.descuento_pct, kc.esencial,
                e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
         FROM kit_componentes kc
-        JOIN equipos e ON e.id = kc.componente_id
+        JOIN equipos e ON e.id = kc.componente_id AND e.eliminado_at IS NULL
         WHERE kc.equipo_id IN ({placeholders})
         ORDER BY kc.equipo_id, kc.orden ASC, e.nombre ASC
     """, ids)

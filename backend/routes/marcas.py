@@ -309,24 +309,10 @@ async def admin_upload_marca_logo(marca_id: int, request: Request):
     - SVG: se sube tal cual (con sanitize defensivo de <script> y on*).
       Se sirve con `Content-Type: image/svg+xml`. El frontend puede
       inlinearlo para teñirlo via `currentColor`.
-    - Raster (PNG/JPEG/WebP): se optimiza con Pillow → WebP q=85, igual
-      que las fotos de equipos.
+    - Raster (PNG/JPEG/WebP): pipeline no-destructivo — guarda original
+      + variante display vía `store_upload`; actualiza `logo_url` y `media_id`.
     """
     require_admin(request)
-
-    # Import lazy para evitar ciclo entre marcas.py ↔ equipos.py
-    from services.image_upload import _optimize_image, _ext_from_ctype, _upload_to_r2
-
-    conn = get_db()
-    try:
-        marca = conn.execute(
-            "SELECT id, nombre FROM marcas WHERE id = %s", (marca_id,)
-        ).fetchone()
-        if not marca:
-            raise HTTPException(404, "Marca no encontrada")
-        nombre = marca["nombre"] if isinstance(marca, dict) else marca[1]
-    finally:
-        conn.close()
 
     form = await request.form()
     file = form.get("file")
@@ -340,36 +326,63 @@ async def admin_upload_marca_logo(marca_id: int, request: Request):
         raise HTTPException(413, "Logo muy grande (máx 5MB)")
 
     filename = getattr(file, "filename", None)
-    if _is_svg(raw_content, filename):
-        # SVG: sanitize y subir tal cual.
-        content = _sanitize_svg(raw_content)
-        ctype = "image/svg+xml"
-        ext = "svg"
-        w, h = None, None
-    else:
-        # Raster: optimizar a WebP.
-        content, ctype, w, h = _optimize_image(raw_content)
-        ext = _ext_from_ctype(ctype)
-
-    path = _logo_path(marca_id, nombre, ext)
-    public_url = _upload_to_r2(path, content, ctype)
+    is_svg = _is_svg(raw_content, filename)
 
     conn = get_db()
     try:
-        conn.execute(
-            "UPDATE marcas SET logo_url = %s, updated_at = NOW() WHERE id = %s",
-            (public_url, marca_id),
-        )
-        conn.commit()
+        marca = conn.execute(
+            "SELECT id, nombre FROM marcas WHERE id = ?", (marca_id,)
+        ).fetchone()
+        if not marca:
+            raise HTTPException(404, "Marca no encontrada")
+        nombre = marca["nombre"]
+
+        if is_svg:
+            from services.image_upload import _upload_to_r2
+            content = _sanitize_svg(raw_content)
+            path = _logo_path(marca_id, nombre, "svg")
+            public_url = _upload_to_r2(path, content, "image/svg+xml")
+            conn.execute(
+                "UPDATE marcas SET logo_url = ?, updated_at = NOW() WHERE id = ?",
+                (public_url, marca_id),
+            )
+            conn.commit()
+            return {
+                "public_url": public_url,
+                "path": path,
+                "size": len(content),
+                "size_original": len(raw_content),
+                "content_type": "image/svg+xml",
+                "width": None,
+                "height": None,
+            }
+        else:
+            from services.media import DISPLAY_KEEP_ASPECT, store_upload
+            from services.media_fastapi import media_http
+            with media_http():
+                asset = store_upload(
+                    raw_content, kind="marca", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn
+                )
+            display = asset.variant("display")
+            conn.execute(
+                "UPDATE marcas SET logo_url = ?, media_id = ?, updated_at = NOW() WHERE id = ?",
+                (display.url, asset.id, marca_id),
+            )
+            conn.commit()
+            return {
+                "public_url": display.url,
+                "path": display.key,
+                "size": display.bytes,
+                "size_original": len(raw_content),
+                "content_type": display.content_type,
+                "width": display.width,
+                "height": display.height,
+            }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
-
-    return {
-        "public_url": public_url,
-        "path": path,
-        "size": len(content),
-        "size_original": len(raw_content),
-        "content_type": ctype,
-        "width": w,
-        "height": h,
-    }
