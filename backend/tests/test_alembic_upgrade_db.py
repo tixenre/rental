@@ -122,14 +122,20 @@ def test_initdb_mas_upgrade_llega_al_head(clean_db):
 def test_upgrade_con_datos_legacy_llega_al_head(clean_db):
     """Regresión #690: el camino de prod NO es solo init_db()+upgrade en vacío.
 
-    La migración `e8f4d9c2b1a3` backfillea `equipo_specs` desde columnas legacy
-    de `equipo_fichas` con `INSERT ... RETURNING`. `equipo_specs` tiene PK
-    compuesta y NO columna `id`, así que el `RETURNING id` original solo pasaba
-    en DBs SIN datos legacy (el INSERT nunca se ejecutaba — caso staging/local);
-    en prod, con datos, abortaba la cadena entera (transacción única) y la dejaba
-    trabada. Las columnas legacy ya no existen en el esquema canónico (las dropea
-    `a1b3c5e7f9d2`), así que las recreamos + sembramos un equipo mapeable para
-    reproducir prod y exigir que `upgrade head` llegue igual al head.
+    Cubre DOS bugs reales que solo se disparaban en prod (DB de larga vida con
+    datos + tablas viejas), no en init_db en vacío:
+
+    1. `e8f4d9c2b1a3` backfillea `equipo_specs` con `INSERT ... RETURNING id`,
+       pero `equipo_specs` tiene PK compuesta y NO columna `id`. Solo pasaba en
+       DBs SIN datos legacy (el INSERT nunca se ejecutaba); con datos abortaba la
+       cadena (transacción única). Las columnas legacy ya no existen en el
+       esquema canónico (las dropea `a1b3c5e7f9d2`), así que las recreamos.
+    2. `l1m2n3o4p5q6` hace `INSERT INTO equipo_fotos (... url ...)`, pero en prod
+       `equipo_fotos` preexistía SIN `url` (init_db viejo + CREATE IF NOT EXISTS);
+       la columna recién se agrega en `n1o2p3q4r5s6` (head), DESPUÉS del backfill.
+       Lo simulamos dropeando `url` y sembrando un equipo con `foto_url`.
+
+    Se siembra un equipo mapeable + se exige que `upgrade head` llegue al head.
     """
     from alembic import command
     from database import init_db, get_db
@@ -137,13 +143,16 @@ def test_upgrade_con_datos_legacy_llega_al_head(clean_db):
 
     init_db()
 
-    # Recrear el escenario de prod: columnas legacy (pre-drop) + un equipo cuyo
-    # `montura` mapea a un spec_def `lens_mount` en su categoría raíz.
     conn = get_db()
     try:
+        # Bug 1: columnas legacy (pre-drop) + equipo con `montura` mapeable a un
+        # spec_def `lens_mount` en su categoría raíz.
         for col in ("montura", "formato", "resolucion", "peso", "dimensiones", "alimentacion"):
             conn.execute(f"ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS {col} TEXT")
-        conn.execute("INSERT INTO equipos (id, nombre) VALUES (9001, 'repro #690') ON CONFLICT DO NOTHING")
+        # Bug 2: equipo_fotos como en prod, SIN la columna url.
+        conn.execute("ALTER TABLE equipo_fotos DROP COLUMN IF EXISTS url")
+        # Equipo con foto_url para que el backfill de equipo_fotos (l1m2) inserte.
+        conn.execute("INSERT INTO equipos (id, nombre, foto_url) VALUES (9001, 'repro #690', 'https://x/f.jpg') ON CONFLICT DO NOTHING")
         conn.execute("INSERT INTO categorias (id, nombre, parent_id) VALUES (9001, 'repro', NULL) ON CONFLICT DO NOTHING")
         conn.execute("INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (9001, 9001, 0) ON CONFLICT DO NOTHING")
         conn.execute("INSERT INTO spec_definitions (categoria_raiz_id, spec_key, label, tipo) VALUES (9001, 'lens_mount', 'Montura', 'enum') ON CONFLICT DO NOTHING")
