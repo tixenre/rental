@@ -1391,6 +1391,25 @@ def init_db():
     """)
     conn.execute("ALTER TABLE estudio_fotos ADD COLUMN IF NOT EXISTS media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
 
+    # ── Galería multi-foto de equipos (F2 — j1k2l3m4n5o6) ───────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS equipo_fotos (
+            id           SERIAL PRIMARY KEY,
+            equipo_id    INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            media_id     BIGINT REFERENCES media_assets(id) ON DELETE SET NULL,
+            url          TEXT NOT NULL,
+            path         TEXT,
+            orden        INTEGER NOT NULL DEFAULT 0,
+            es_principal BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_equipo_fotos_equipo_orden
+        ON equipo_fotos(equipo_id, orden)
+    """)
+    conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
+
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
 
     # Seed the sequence to the current max so nextval never collides with existing data.
