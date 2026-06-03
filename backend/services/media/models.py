@@ -1,0 +1,39 @@
+"""Dataclasses del módulo media."""
+from dataclasses import dataclass, field
+from typing import Optional
+
+
+@dataclass
+class DeriveSpec:
+    """Especificación para derivar una variante a partir del original."""
+    name: str    # 'display' | 'square' | 'nobg' | 'og' | 'bg:#hex' …
+    square: bool  # pasado a _optimize_image
+
+
+@dataclass
+class MediaVariant:
+    id: int
+    asset_id: int
+    name: str
+    key: str
+    url: str
+    content_type: str
+    width: int
+    height: int
+    bytes: int
+
+
+@dataclass
+class MediaAsset:
+    id: int
+    kind: str
+    original_key: Optional[str]
+    original_ct: Optional[str]
+    width: Optional[int]
+    height: Optional[int]
+    bytes: Optional[int]
+    variants: list[MediaVariant] = field(default_factory=list)
+
+    def variant(self, name: str) -> Optional[MediaVariant]:
+        """Devuelve la variante con `name`, o None si no existe."""
+        return next((v for v in self.variants if v.name == name), None)
