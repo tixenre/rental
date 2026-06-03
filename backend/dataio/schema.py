@@ -156,7 +156,7 @@ class Equipo(_Base):
     bh_url: str | None = None
     dueno: str | None = "Rambla"
     visible_catalogo: int = 1
-    estado: str = "ok"
+    estado: str = "operativo"
     ficha_completa: bool = False
     eliminado_at: str | None = None  # ISO timestamp o null
 

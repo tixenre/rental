@@ -274,7 +274,7 @@ def init_db():
             bh_url           TEXT,
             dueno            TEXT DEFAULT 'Rambla',
             visible_catalogo INTEGER DEFAULT 1,
-            estado           TEXT DEFAULT 'ok',
+            estado           TEXT DEFAULT 'operativo',
             created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -315,6 +315,14 @@ def init_db():
     # admin, ranking y specs — no es un producto alquilable suelto. Es distinto
     # de visible_catalogo=0 (un producto real oculto sigue siendo producto).
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS es_recurso_interno BOOLEAN NOT NULL DEFAULT FALSE")
+
+    # Migration (#637): el default histórico del schema era 'ok', un valor que no
+    # existe en el enum de la app (operativo / en_mantenimiento / fuera_servicio).
+    # Un equipo creado sin estado explícito quedaba en 'ok' y el dropdown del admin
+    # no matcheaba ninguna opción. Se alinea el default y se normalizan las filas
+    # viejas que hayan quedado en 'ok'. Idempotente: el UPDATE es no-op tras la 1ra corrida.
+    conn.execute("ALTER TABLE equipos ALTER COLUMN estado SET DEFAULT 'operativo'")
+    conn.execute("UPDATE equipos SET estado = 'operativo' WHERE estado = 'ok'")
 
     # Tabla de marcas (brands)
     conn.execute("""
