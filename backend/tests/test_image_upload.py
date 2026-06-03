@@ -1,16 +1,16 @@
-"""Tests de `services/image_upload.py` — optimización de imágenes (sin red/R2).
+"""Tests de procesamiento de imágenes — optimización (sin red/R2).
 
-Cubre las funciones puras de procesamiento que NO tenían tests antes de
-extraerse de equipos.py (#501 Fase 3): `_optimize_image` (auto-orient + trim +
-cuadrado + resize 1200 + WebP) y `_ext_from_ctype`. La descarga anti-SSRF y el
-upload a R2 NO se testean acá (SSRF está en test_ssrf.py; R2 necesita red real).
+Cubre `_optimize_image` (auto-orient + trim + cuadrado + resize 1200 + WebP)
+y `_ext_from_ctype`. La descarga anti-SSRF y el upload a R2 NO se testean acá
+(SSRF está en test_ssrf.py; R2 necesita red real).
 """
 from io import BytesIO
 
 import pytest
 from PIL import Image
 
-from services.image_upload import _delete_from_r2, _ext_from_ctype, _optimize_image
+from services.media.processing import _ext_from_ctype, _optimize_image
+from services.media.storage import delete_object as _delete_from_r2
 
 pytestmark = pytest.mark.unit
 

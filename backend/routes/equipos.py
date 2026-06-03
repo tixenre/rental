@@ -2909,7 +2909,8 @@ async def admin_upload_html_source(
         raise HTTPException(400, "HTML inválido (no es UTF-8)")
 
     path = f"equipos/{id}/source.html"
-    html_source_url = _upload_to_r2(path, content, "text/html; charset=utf-8")
+    with media_http():
+        html_source_url = _upload_to_r2(path, content, "text/html; charset=utf-8")
 
     conn = get_db()
     try:
@@ -3298,19 +3299,9 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
 # dominios conocidos, (3) la IP resuelta del host no es privada/loopback.
 
 
-# Procesamiento/upload de imágenes: extraído a services/image_upload.py
-# (issue #501 Fase 3). _foto_path se queda acá (usa get_db).
-from services.image_upload import (
-    _download_image_bytes,
-    _ext_from_ctype,
-    _get_r2_client,
-    _optimize_image,
-    _r2_config,
-    _upload_to_r2,
-    _upload_to_supabase_storage,
-    _validate_external_image_url,
-    _validate_ssrf_only,
-)
+from services.media.processing import _ext_from_ctype, _optimize_image
+from services.media.security import _download_image_bytes, _validate_external_image_url, _validate_ssrf_only
+from services.media.storage import _get_r2_client, _r2_config, put as _upload_to_r2
 from services.media import DISPLAY_SQUARE, collect_asset_keys, purge_r2, store_upload
 from services.media_fastapi import media_http
 
@@ -3373,12 +3364,11 @@ def admin_upload_foto_from_url(
     if cfg_pub and url.startswith(cfg_pub + "/"):
         return {"public_url": url, "path": None, "skipped": True}
 
-    _validate_external_image_url(url)
-    raw_content, _raw_ctype = _download_image_bytes(url)
-
     conn = get_db()
     try:
         with media_http():
+            _validate_external_image_url(url)
+            raw_content, _raw_ctype = _download_image_bytes(url)
             asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE], conn=conn)
         display = asset.variant("display")
         foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
@@ -3574,15 +3564,14 @@ def upload_equipo_foto_from_url(equipo_id: int, body: EquipoFotoFromUrlBody, req
     if cfg_pub and url.startswith(cfg_pub + "/"):
         raise HTTPException(400, "La URL ya está en el bucket — subí el archivo directamente")
 
-    _validate_external_image_url(url)
-    raw, _raw_ctype = _download_image_bytes(url)
-
     conn = get_db()
     try:
         eq = conn.execute("SELECT id FROM equipos WHERE id = ?", (equipo_id,)).fetchone()
         if not eq:
             raise HTTPException(404, "Equipo no encontrado")
         with media_http():
+            _validate_external_image_url(url)
+            raw, _raw_ctype = _download_image_bytes(url)
             asset = store_upload(raw, kind="equipo", derive_specs=[DISPLAY_SQUARE], conn=conn)
         display = asset.variant("display")
         foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
@@ -3643,7 +3632,7 @@ def delete_equipo_foto(equipo_id: int, foto_id: int, request: Request):
     if r2_keys:
         purge_r2(r2_keys)
     elif path:
-        from services.image_upload import _delete_from_r2
+        from services.media.storage import delete_object as _delete_from_r2
         _delete_from_r2(path)
 
     return {"ok": True}
@@ -3717,7 +3706,8 @@ def admin_storage_diag(request: Request):
     try:
         sample = b"R2 smoke test " + str(int(_time.time())).encode()
         path = f"diag/smoke-{int(_time.time())}.txt"
-        public_url = _upload_to_r2(path, sample, "text/plain")
+        with media_http():
+            public_url = _upload_to_r2(path, sample, "text/plain")
         verify = httpx.get(public_url, timeout=10.0)
         ok = verify.status_code == 200 and verify.content == sample
         return {

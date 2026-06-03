@@ -19,14 +19,8 @@ from routes.alquileres import (
     _next_numero_pedido,
     get_disponibilidad,
 )
-from services.image_upload import (
-    _delete_from_r2,
-    _download_image_bytes,
-    _ext_from_ctype,
-    _optimize_image,
-    _upload_to_r2,
-    _validate_ssrf_only,
-)
+from services.media.security import _download_image_bytes, _validate_ssrf_only
+from services.media.storage import delete_object as _delete_from_r2
 from services.media import DISPLAY_KEEP_ASPECT, collect_asset_keys, purge_r2, store_upload
 from services.media_fastapi import media_http
 
@@ -300,13 +294,11 @@ def upload_foto_from_url(body: UploadFromUrlBody, request: Request):
     if not url:
         raise HTTPException(400, "URL vacía")
 
-    _validate_ssrf_only(url)
-
-    raw, _raw_ctype = _download_image_bytes(url)
-
     conn = get_db()
     try:
         with media_http():
+            _validate_ssrf_only(url)
+            raw, _raw_ctype = _download_image_bytes(url)
             asset = store_upload(
                 raw, kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn,
             )
