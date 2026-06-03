@@ -1,5 +1,5 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   TrendingUp,
@@ -19,7 +19,11 @@ import {
   Wallet,
   CheckCircle2,
   AlertTriangle,
+  Lock,
+  LockOpen,
 } from "lucide-react";
+
+import { toast } from "sonner";
 
 import { adminApi } from "@/lib/admin/api";
 import type { LiquidacionMes } from "@/lib/admin/api";
@@ -287,6 +291,44 @@ function LiquidacionReporte() {
   });
   const recon = reconQ.data;
 
+  // Cierre del mes (#721). `mesKey` = el mes que se está viendo ('YYYY-MM').
+  const mesKey = `${y}-${pad(m + 1)}`;
+  const cerrado = mes?.cerrado === true;
+  const qc = useQueryClient();
+  const invalidarLiquidacion = () => qc.invalidateQueries({ queryKey: ["admin", "liquidacion"] });
+  const cerrarM = useMutation({
+    mutationFn: () => adminApi.cerrarMes(mesKey),
+    onSuccess: async () => {
+      await invalidarLiquidacion();
+      toast.success(`${mesLabel} cerrado — la foto quedó congelada.`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const reabrirM = useMutation({
+    mutationFn: () => adminApi.reabrirMes(mesKey),
+    onSuccess: async () => {
+      await invalidarLiquidacion();
+      toast.success(`${mesLabel} reabierto — vuelve a calcularse en vivo.`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const cierreBusy = cerrarM.isPending || reabrirM.isPending;
+  const onReabrir = () => {
+    if (
+      window.confirm(
+        `¿Reabrir ${mesLabel}? El reporte vuelve a calcularse en vivo y la foto ` +
+          `congelada se descarta. Vas a poder cerrarlo de nuevo cuando termines de corregir.`,
+      )
+    ) {
+      reabrirM.mutate();
+    }
+  };
+  const cerradoAtLabel = mes?.cerrado_at
+    ? new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric" }).format(
+        new Date(mes.cerrado_at),
+      )
+    : null;
+
   const mesLabel = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(
     anchor,
   );
@@ -336,15 +378,53 @@ function LiquidacionReporte() {
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
-        <button
-          type="button"
-          onClick={descargarCsv}
-          disabled={downloading}
-          className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
-        >
-          <Download className="h-4 w-4" /> {downloading ? "Generando…" : "Exportar CSV"}
-        </button>
+        <div className="flex items-center gap-2">
+          {cerrado ? (
+            <button
+              type="button"
+              onClick={onReabrir}
+              disabled={cierreBusy}
+              className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+            >
+              <LockOpen className="h-4 w-4" /> {reabrirM.isPending ? "Reabriendo…" : "Reabrir mes"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => cerrarM.mutate()}
+              disabled={cierreBusy || !mes || mes.resumen.pedidos === 0}
+              title={
+                mes && mes.resumen.pedidos === 0
+                  ? "No hay pedidos saldados este mes para cerrar"
+                  : "Congelar la foto de este mes"
+              }
+              className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+            >
+              <Lock className="h-4 w-4" /> {cerrarM.isPending ? "Cerrando…" : "Cerrar mes"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={descargarCsv}
+            disabled={downloading}
+            className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+          >
+            <Download className="h-4 w-4" /> {downloading ? "Generando…" : "Exportar CSV"}
+          </button>
+        </div>
       </div>
+
+      {cerrado && (
+        <div className="flex items-center gap-2 rounded-md border hairline border-ink/15 bg-ink/[0.03] px-3 py-2 text-sm text-ink">
+          <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span>
+            <span className="font-medium">Mes cerrado</span>
+            {cerradoAtLabel ? ` el ${cerradoAtLabel}` : ""}
+            {mes?.cerrado_por ? ` por ${mes.cerrado_por}` : ""}. Los números están congelados —
+            cambiar el reparto o editar un pedido no los altera. Reabrí para recalcular.
+          </span>
+        </div>
+      )}
 
       <p className="text-xs text-muted-foreground">
         Solo pedidos 100% pagados. Cada pedido cuenta en el mes/día en que quedó saldado. El reparto
@@ -384,6 +464,14 @@ function LiquidacionReporte() {
               <li>
                 {recon.sobrepagados.cantidad} pedido(s) con más cobrado que su total actual (¿lo
                 editaste después de cobrar?): #{recon.sobrepagados.ids.join(", #")}
+              </li>
+            )}
+            {recon.mes_cerrado_desactualizado.cantidad > 0 && (
+              <li>
+                {recon.mes_cerrado_desactualizado.cantidad} pedido(s) editados/pagados dentro de un
+                mes ya cerrado ({recon.mes_cerrado_desactualizado.meses.join(", ")}): la foto quedó
+                vieja → reabrí ese mes y volvé a cerrarlo. #
+                {recon.mes_cerrado_desactualizado.ids.join(", #")}
               </li>
             )}
             {recon.duenos_no_canonicos.length > 0 && (

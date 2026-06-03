@@ -1371,6 +1371,14 @@ export const adminApi = {
       (r) => r.blob(),
     ),
   getReconciliacion: () => authedJson<ReconciliacionData>("/api/admin/reportes/reconciliacion"),
+  // Cierre de mes (#721): congelar/reabrir la foto inmutable de un mes liquidado.
+  cerrarMes: (mes: string) =>
+    authedJson<LiquidacionData>(`/api/admin/reportes/cierres/${mes}`, { method: "POST" }),
+  reabrirMes: (mes: string) =>
+    authedJson<{ mes: string; cerrado: boolean; reabierto: boolean }>(
+      `/api/admin/reportes/cierres/${mes}`,
+      { method: "DELETE" },
+    ),
 
   uploadLogo: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();
@@ -1512,6 +1520,13 @@ export type LiquidacionData = {
   por_mes: LiquidacionMes[];
   por_dia: LiquidacionDia[];
   por_dueno: LiquidacionDueno[];
+  // Cierre del mes (#721): presentes solo cuando el rango es exactamente un mes
+  // calendario (la vista mensual). `cerrado` true → los números vienen de la foto
+  // inmutable. `mes` es 'YYYY-MM'.
+  mes?: string;
+  cerrado?: boolean;
+  cerrado_por?: string | null;
+  cerrado_at?: string | null;
 };
 
 // Reconciliación de datos de liquidación (#88, hardening): semáforo de confianza.
@@ -1520,6 +1535,9 @@ export type ReconciliacionData = {
   pagados_sin_ledger: { cantidad: number; ids: number[] };
   monto_pagado_divergente: { cantidad: number; ids: number[] };
   sobrepagados: { cantidad: number; ids: number[] };
+  // Mes cerrado desactualizado (#721): pedidos saldados en un mes ya cerrado que
+  // recibieron actividad después del cierre → la foto quedó vieja, hay que reabrir.
+  mes_cerrado_desactualizado: { cantidad: number; ids: number[]; meses: string[] };
   duenos_no_canonicos: string[];
 };
 
