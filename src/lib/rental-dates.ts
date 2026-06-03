@@ -142,7 +142,7 @@ export function diaAbierto(
   horarios: HorariosSemana | null,
   date: Date | null | undefined,
 ): boolean {
-  if (!horarios || !date) return true;
+  if (!horarios || !date || Object.keys(horarios).length === 0) return true;
   return !!horarios[diaKey(date)];
 }
 
