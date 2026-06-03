@@ -136,14 +136,10 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   const hasRange = hasStart && !!endDate;
 
   // ── Calendar modifiers ────────────────────────────────────────────────
-  // nostock: días sin stock para el carrito actual (fondo rojo + punto)
-  // closed:  días cerrados según horarios (fondo rojo, tachado)
-  // rango:   período seleccionado (fondo amber soft)
-  const nostockDates = useMemo(
-    () => [...diasBloqueados].map((s) => new Date(s + "T12:00:00")),
-    [diasBloqueados],
-  );
-
+  // closed: días cerrados según horarios (fondo rojo, tachado)
+  // rango:  período seleccionado (fondo amber soft)
+  // nostock no se muestra en el calendario — el feedback de disponibilidad
+  // vive en el CartDrawer, donde el usuario puede actuar directamente.
   const closedDates = useMemo(() => {
     if (!horarios) return [];
     const out: Date[] = [];
@@ -156,13 +152,11 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
 
   const calModifiers = {
     ...(hasRange ? { rango: { from: startDate!, to: endDate! } } : {}),
-    ...(nostockDates.length > 0 ? { nostock: nostockDates } : {}),
     ...(closedDates.length > 0 ? { closed: closedDates } : {}),
   };
 
   const calModifiersClassNames = {
     rango: "bg-amber-soft/70 text-ink",
-    nostock: "rdp-nostock", // → src/styles.css (@layer utilities)
     closed: "rdp-closed", // → src/styles.css (@layer utilities)
   };
 
