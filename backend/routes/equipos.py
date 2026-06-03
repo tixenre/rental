@@ -290,8 +290,8 @@ MAX_PHOTO_CANDIDATES_TO_VALIDATE = 8
 
 # /buscar-fotos: cuántos validamos y cuántos devolvemos. Este flow inspecciona
 # más fuentes (Wikipedia, reviews, manufacturer) por eso el límite es mayor.
-MAX_PHOTO_CANDIDATES_BUSCAR_VALIDATE = 18
-MAX_PHOTO_CANDIDATES_BUSCAR_RETURN   = 10
+MAX_PHOTO_CANDIDATES_BUSCAR_VALIDATE = 24
+MAX_PHOTO_CANDIDATES_BUSCAR_RETURN   = 16
 
 
 # ── Modelos ──────────────────────────────────────────────────────────────────
@@ -3232,6 +3232,27 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
                     seen_lc.add(u.lower())
                     all_cands.append(u)
                     direct_url_cands.add(u.lower())
+
+            # 2b) B&H carrusel: si algún candidato sigue el patrón del CDN de B&H
+            #     (static.bhphotovideo.com/c/product/{SKU}-{ANGLE}/{slug}), derivar
+            #     los demás ángulos del carrusel sin hacer HEAD requests extra
+            #     (el CDN bloquea cross-origin; los ángulos son de confianza).
+            _BH_CDN_RE = re.compile(
+                r"(https://static\.bhphotovideo\.com/c/product/\d+)-[A-Z0-9]+/([^?]+)",
+                re.IGNORECASE,
+            )
+            for base_cand in list(all_cands):
+                m_bh = _BH_CDN_RE.match(base_cand)
+                if not m_bh:
+                    continue
+                base_prefix, slug = m_bh.group(1), m_bh.group(2)
+                for angle in ("MAIN", "REAR", "SL01", "SL02", "SL03", "SL04", "SL05", "SL06", "SL07"):
+                    u = f"{base_prefix}-{angle}/{slug}"
+                    if u.lower() not in seen_lc:
+                        seen_lc.add(u.lower())
+                        all_cands.append(u)
+                        direct_url_cands.add(u.lower())
+                break  # solo necesitamos un candidato base para el patrón
 
             # 3) Firecrawl para más candidatos (especialmente imgs del body).
             for u in _extract_images_from_page(direct_url, client, trust_url=True):

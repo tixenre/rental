@@ -249,4 +249,24 @@ def _download_image_bytes(url: str) -> tuple[bytes, str]:
         if status != 403:
             break
 
+    # httpx fallback: algunos CDNs (B&H, Adorama) bloquean el cliente HTTP
+    # de bajo nivel por TLS fingerprint pero aceptan httpx. Seguro: la URL
+    # ya pasó _validate_external_image_url (allowlist + IP check) arriba.
+    # follow_redirects=False para no seguir redirects no validados.
+    if last_status == 403:
+        try:
+            import httpx as _httpx
+            r = _httpx.get(
+                url,
+                headers=_headers(primary_referer),
+                follow_redirects=False,
+                timeout=20.0,
+            )
+            if r.status_code == 200:
+                ctype = r.headers.get("content-type", "image/jpeg")
+                if ctype.lower().startswith("image/") and len(r.content) >= 1024:
+                    return r.content, ctype
+        except Exception:
+            pass
+
     raise MediaError(502, f"No se pudo descargar la imagen (error {last_status})")
