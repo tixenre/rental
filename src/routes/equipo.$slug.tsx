@@ -37,9 +37,9 @@ import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { priceBreakdown } from "@/lib/pricing";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { buildCategoriaSlug } from "@/lib/categoria-slug";
+import { SITE_URL } from "@/lib/site";
+import { shareEquipo } from "@/lib/share";
 import { type Equipment } from "@/data/equipment";
-
-const SITE_URL = "https://ramblarental.com";
 
 async function fetchEquipo(id: string): Promise<Equipment | null> {
   const res = await fetch(`/api/equipos/${id}`);
@@ -322,18 +322,12 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   }, [disponibilidadQ.data, bestEffortComponents]);
 
   const handleShare = async () => {
-    if (typeof window === "undefined") return;
-    const url = `${window.location.origin}/equipo/${item.id}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: item.name, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1800);
-      }
-    } catch {
-      /* cancelled */
+    // URL canónica (dominio oficial + slug-id), no window.location.origin.
+    // Lógica compartida con las cards del catálogo — ver @/lib/share.
+    const result = await shareEquipo(item);
+    if (result === "copied") {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
     }
   };
 
