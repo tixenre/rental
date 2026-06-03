@@ -221,6 +221,35 @@ def test_registry_iluminacion_no_tiene_power_consumption_w():
     )
 
 
+def test_registry_consumo_w_camaras_canonico():
+    """Cámaras usa el spec_key canónico 'consumo_w' (antes 'power_consumption_w'),
+    el mismo que Iluminación, con aliases de extracción."""
+    from specs import REGISTRY
+    cat = REGISTRY.get("Cámaras")
+    assert cat is not None
+    assert cat.get_spec("power_consumption_w") is None, (
+        "power_consumption_w fue renombrado a consumo_w en Cámaras (#535)"
+    )
+    spec = cat.get_spec("consumo_w")
+    assert spec is not None, "Cámaras debe tener spec 'consumo_w'"
+    assert "Power" in spec.aliases
+    assert "Wattage" in spec.aliases
+
+
+def test_registry_lentes_distancia_minima_cm_canonica():
+    """La key de distancia mínima de foco es 'distancia_minima_cm' (alineada con
+    su unidad cm), no la vieja 'distancia_minima_m' (#535)."""
+    from specs import REGISTRY
+    cat = REGISTRY.get("Lentes")
+    assert cat is not None
+    assert cat.get_spec("distancia_minima_m") is None, (
+        "distancia_minima_m fue renombrada a distancia_minima_cm"
+    )
+    spec = cat.get_spec("distancia_minima_cm")
+    assert spec is not None, "Lentes debe tener spec 'distancia_minima_cm'"
+    assert spec.unidad == "cm"
+
+
 def test_registry_distancia_focal_tiene_alias_focal_length():
     from specs import REGISTRY
     cat = REGISTRY.get("Lentes")

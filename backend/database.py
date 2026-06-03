@@ -1153,6 +1153,34 @@ def init_db():
     conn.execute("ALTER TABLE solicitudes_modificacion ADD COLUMN IF NOT EXISTS cambios_json JSONB")
     conn.execute("ALTER TABLE spec_definitions ADD COLUMN IF NOT EXISTS tabla_columnas JSONB")
 
+    # Canonización de spec_keys (#535): renombres idempotentes en spec_definitions.
+    # ORDEN CRÍTICO: esto corre en init_db (siempre, antes del seeder y sin depender
+    # de Alembic) para que el seeder NO purgue la key vieja con CASCADE — eso borraría
+    # los equipo_specs de esos specs. El rename preserva la MISMA fila (mismo id), así
+    # que equipo_specs y categoria_spec_templates quedan intactos (FK por id, no por key).
+    # Guard NOT EXISTS: evita violar UNIQUE(categoria_raiz_id, spec_key) si la canónica
+    # ya existiera (un merge real se resolvería en migración, no acá).
+    conn.execute("""
+        UPDATE spec_definitions sd
+           SET spec_key = 'consumo_w', label = 'Consumo eléctrico', updated_at = NOW()
+         WHERE sd.spec_key = 'power_consumption_w'
+           AND sd.categoria_raiz_id = (SELECT id FROM categorias WHERE nombre = 'Cámaras')
+           AND NOT EXISTS (
+               SELECT 1 FROM spec_definitions x
+                WHERE x.categoria_raiz_id = sd.categoria_raiz_id AND x.spec_key = 'consumo_w'
+           )
+    """)
+    conn.execute("""
+        UPDATE spec_definitions sd
+           SET spec_key = 'distancia_minima_cm', updated_at = NOW()
+         WHERE sd.spec_key = 'distancia_minima_m'
+           AND sd.categoria_raiz_id = (SELECT id FROM categorias WHERE nombre = 'Lentes')
+           AND NOT EXISTS (
+               SELECT 1 FROM spec_definitions x
+                WHERE x.categoria_raiz_id = sd.categoria_raiz_id AND x.spec_key = 'distancia_minima_cm'
+           )
+    """)
+
     # Fechas TEXT → tipo nativo (migración e2c6f4a8b1d7). Las fechas se
     # guardaban como strings ISO; ahora son TIMESTAMP/DATE. Idempotente: solo
     # convierte si la columna sigue siendo 'text'. Defensivo: limpia valores

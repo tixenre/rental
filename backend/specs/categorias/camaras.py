@@ -121,8 +121,12 @@ CAT = CategoriaRegistry(
                 prioridad=140, en_card=True,
                 ayuda="Modelo de batería nativa. Ej: NP-FZ100, BP-A30, BP-955",
                 aliases=["Battery Type", "Battery Pack", "Battery Model"]),
-        SpecDef(key="power_consumption_w", label="Consumo", tipo="number", unidad="W",
-                prioridad=145),
+        # consumo_w: canónico, mismo spec_key que Iluminación (extracción/aliases
+        # compartidos). Antes era 'power_consumption_w' — renombrado por #535.
+        SpecDef(key="consumo_w", label="Consumo eléctrico", tipo="number", unidad="W",
+                prioridad=145,
+                aliases=["Power", "Wattage", "Power Consumption", "Power Draw",
+                         "Power Input", "Rated Power"]),
         # ─── Captura / sensor adicional ───────────────────────────────
         SpecDef(
             key="capture_type", label="Tipo de captura", tipo="enum",
