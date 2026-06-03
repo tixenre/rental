@@ -51,6 +51,7 @@ def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
             GROUP BY pedido_id
         )
         SELECT r.fecha_saldado::date                              AS fecha,
+               al.id                                              AS pedido_id,
                COALESCE(e.dueno, 'Rambla')                        AS dueno,
                e.nombre                                           AS equipo,
                al.monto_total * pi.subtotal::numeric / NULLIF(t.suma_items, 0) AS monto
@@ -77,12 +78,18 @@ def agregar(filas: list[dict], modelo: dict) -> dict:
     dueno_generado: dict[str, float] = defaultdict(float)
     dueno_reparto: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     dueno_equipos: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    # Conteo de "veces alquilado" = pedidos DISTINTOS (solo cobrados), para el
+    # resumen mensual por dueño.
+    pedidos_global: set = set()
+    dueno_pedidos: dict[str, set] = defaultdict(set)
+    equipo_pedidos: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
 
     for f in filas:
         monto = float(f["monto"] or 0)
         if monto == 0:
             continue
         dueno = f["dueno"]
+        equipo = f["equipo"]
         fecha = str(f["fecha"])
         mes, dia = fecha[:7], fecha[:10]
 
@@ -90,7 +97,13 @@ def agregar(filas: list[dict], modelo: dict) -> dict:
         mes_total[mes] += monto
         dia_total[dia] += monto
         dueno_generado[dueno] += monto
-        dueno_equipos[dueno][f["equipo"]] += monto
+        dueno_equipos[dueno][equipo] += monto
+
+        pid = f.get("pedido_id")
+        if pid is not None:
+            pedidos_global.add(pid)
+            dueno_pedidos[dueno].add(pid)
+            equipo_pedidos[dueno][equipo].add(pid)
 
         for benef, m in repartir(dueno, monto, modelo).items():
             por_benef[benef] += m
@@ -113,9 +126,17 @@ def agregar(filas: list[dict], modelo: dict) -> dict:
         {
             "dueno": dn,
             "monto_generado": int(round(dueno_generado[dn])),
+            "pedidos": len(dueno_pedidos[dn]),
             "reparto": rd(dueno_reparto[dn]),
             "equipos": sorted(
-                ({"equipo": e, "monto": int(round(v))} for e, v in dueno_equipos[dn].items()),
+                (
+                    {
+                        "equipo": e,
+                        "monto": int(round(v)),
+                        "veces": len(equipo_pedidos[dn][e]),
+                    }
+                    for e, v in dueno_equipos[dn].items()
+                ),
                 key=lambda x: x["monto"],
                 reverse=True,
             ),
@@ -124,7 +145,11 @@ def agregar(filas: list[dict], modelo: dict) -> dict:
     ]
 
     return {
-        "resumen": {"total": int(round(total)), "por_beneficiario": rd(por_benef)},
+        "resumen": {
+            "total": int(round(total)),
+            "pedidos": len(pedidos_global),
+            "por_beneficiario": rd(por_benef),
+        },
         "por_mes": por_mes,
         "por_dia": por_dia,
         "por_dueno": por_dueno,
