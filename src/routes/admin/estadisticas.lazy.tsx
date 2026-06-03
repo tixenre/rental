@@ -17,6 +17,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Wallet,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 
 import { adminApi } from "@/lib/admin/api";
@@ -279,6 +281,12 @@ function LiquidacionReporte() {
   const mes = mesQ.data;
   const anio = anioQ.data;
 
+  const reconQ = useQuery({
+    queryKey: ["admin", "liquidacion", "reconciliacion"],
+    queryFn: () => adminApi.getReconciliacion(),
+  });
+  const recon = reconQ.data;
+
   const mesLabel = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(
     anchor,
   );
@@ -346,6 +354,38 @@ function LiquidacionReporte() {
         </a>
         .
       </p>
+
+      {recon && recon.ok && (
+        <div className="flex items-center gap-2 rounded-md border hairline border-verde/30 bg-verde/5 px-3 py-2 text-sm text-verde">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          Datos de liquidación consistentes.
+        </div>
+      )}
+      {recon && !recon.ok && (
+        <div className="rounded-md border hairline border-amber/40 bg-amber/5 px-3 py-2 text-sm text-ink space-y-1">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber" />
+            Revisá estos datos — pueden afectar los números del reporte:
+          </div>
+          <ul className="list-disc pl-6 text-xs text-muted-foreground space-y-0.5">
+            {recon.pagados_sin_ledger.cantidad > 0 && (
+              <li>
+                {recon.pagados_sin_ledger.cantidad} pedido(s) marcados pagados pero sin pagos
+                registrados (no aparecen en el reporte): #{recon.pagados_sin_ledger.ids.join(", #")}
+              </li>
+            )}
+            {recon.monto_pagado_divergente.cantidad > 0 && (
+              <li>
+                {recon.monto_pagado_divergente.cantidad} pedido(s) con monto pagado distinto a la
+                suma de sus pagos: #{recon.monto_pagado_divergente.ids.join(", #")}
+              </li>
+            )}
+            {recon.duenos_no_canonicos.length > 0 && (
+              <li>Dueños fuera del reparto configurado: {recon.duenos_no_canonicos.join(", ")}</li>
+            )}
+          </ul>
+        </div>
+      )}
 
       {err && (
         <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">

@@ -1361,6 +1361,7 @@ export const adminApi = {
     authedFetch(`/api/admin/reportes/liquidacion?desde=${desde}&hasta=${hasta}&formato=csv`).then(
       (r) => r.blob(),
     ),
+  getReconciliacion: () => authedJson<ReconciliacionData>("/api/admin/reportes/reconciliacion"),
 
   uploadLogo: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();
@@ -1501,6 +1502,14 @@ export type LiquidacionData = {
   por_mes: LiquidacionMes[];
   por_dia: LiquidacionDia[];
   por_dueno: LiquidacionDueno[];
+};
+
+// Reconciliación de datos de liquidación (#88, hardening): semáforo de confianza.
+export type ReconciliacionData = {
+  ok: boolean;
+  pagados_sin_ledger: { cantidad: number; ids: number[] };
+  monto_pagado_divergente: { cantidad: number; ids: number[] };
+  duenos_no_canonicos: string[];
 };
 
 export type EstadisticasData = {

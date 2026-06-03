@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from database import get_db
 from admin_guard import require_admin
 from reportes.liquidacion import liquidar
+from reportes.reconciliacion import reconciliar
 
 router = APIRouter()
 
@@ -79,3 +80,14 @@ def reporte_liquidacion(
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
     return data
+
+
+@router.get("/admin/reportes/reconciliacion")
+def reporte_reconciliacion(request: Request):
+    """Chequeos de integridad de los datos de liquidación (semáforo de confianza)."""
+    require_admin(request)
+    conn = get_db()
+    try:
+        return reconciliar(conn)
+    finally:
+        conn.close()
