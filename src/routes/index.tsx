@@ -17,6 +17,7 @@ import { ViewToggle } from "@/components/rental/ViewToggle";
 import { Link } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { logSearch } from "@/lib/search-log";
+import { SITE_URL } from "@/lib/site";
 import { HeroSection } from "@/components/rental/HeroSection";
 import { ComoFunciona } from "@/components/rental/ComoFunciona";
 import { EstudioBand } from "@/components/rental/EstudioBand";
@@ -70,8 +71,6 @@ type IndexSearch = {
    *  deep-linking desde la página de detalle u otros entry points. */
   cat?: string;
 };
-
-const SITE_URL = "https://ramblarental.com";
 
 async function fetchOgImage(): Promise<string> {
   try {

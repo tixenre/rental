@@ -3,8 +3,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { LAST_UPDATED, TERMS_SECTIONS } from "@/data/legal";
-
-const SITE_URL = "https://ramblarental.com";
+import { SITE_URL } from "@/lib/site";
 
 export const Route = createFileRoute("/terminos")({
   head: () => ({

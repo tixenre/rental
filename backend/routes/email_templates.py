@@ -50,8 +50,8 @@ _PREVIEW_CONTEXT: dict[str, Any] = {
     "notas": "Necesito un trípode extra.",
     "items_html": _PREVIEW_ITEMS_HTML,
     "items_text": "- Sony FX3 × 1\n- RØDE NTG × 2",
-    "admin_url": "https://ramblarental.com/admin/pedidos/1234",
-    "portal_url": "https://ramblarental.com/cliente/portal",
+    "admin_url": "https://www.ramblarental.com.ar/admin/pedidos/1234",
+    "portal_url": "https://www.ramblarental.com.ar/cliente/portal",
 }
 
 

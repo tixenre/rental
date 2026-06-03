@@ -1261,6 +1261,15 @@ export const adminApi = {
     return authedJson<PedidosListResp>(`/api/alquileres?${sp.toString()}`);
   },
   getPedido: (id: number) => authedJson<Pedido>(`/api/alquileres/${id}`),
+  enviarDocumentos: (id: number, payload: { docs: string[]; to?: string; mensaje?: string }) =>
+    authedJson<{ ok: true; to: string; docs: string[]; provider?: string }>(
+      `/api/alquileres/${id}/enviar-documentos`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    ),
   setPedidoEstado: (id: number, estado: PedidoEstado) =>
     authedJson<Pedido>(`/api/alquileres/${id}`, {
       method: "PATCH",
@@ -1353,6 +1362,15 @@ export const adminApi = {
   // analítica de búsquedas del catálogo público
   getBusquedas: (dias?: number) =>
     authedJson<BusquedasData>(`/api/admin/busquedas${dias && dias > 0 ? `?dias=${dias}` : ""}`),
+
+  // Reportes (#88) — liquidación por dueño (pedidos 100% pagados, repartidos)
+  getLiquidacion: (desde: string, hasta: string) =>
+    authedJson<LiquidacionData>(`/api/admin/reportes/liquidacion?desde=${desde}&hasta=${hasta}`),
+  liquidacionCsv: (desde: string, hasta: string) =>
+    authedFetch(`/api/admin/reportes/liquidacion?desde=${desde}&hasta=${hasta}&formato=csv`).then(
+      (r) => r.blob(),
+    ),
+  getReconciliacion: () => authedJson<ReconciliacionData>("/api/admin/reportes/reconciliacion"),
 
   uploadLogo: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();
@@ -1467,6 +1485,42 @@ export type BusquedaRow = {
 export type BusquedasData = {
   top: BusquedaRow[];
   zero: BusquedaRow[];
+};
+
+// Liquidación por dueño (#88): ingreso 100% pagado, atribuido al mes/día de
+// saldado y repartido entre beneficiarios según el modelo de comisiones.
+export type PorBeneficiario = Record<string, number>;
+export type LiquidacionPunto = {
+  total: number;
+  por_beneficiario: PorBeneficiario;
+};
+export type LiquidacionMes = LiquidacionPunto & { mes: string };
+export type LiquidacionDia = LiquidacionPunto & { dia: string };
+export type LiquidacionDueno = {
+  dueno: string;
+  monto_generado: number;
+  pedidos: number;
+  reparto: PorBeneficiario;
+  equipos: { equipo: string; monto: number; veces: number }[];
+};
+export type LiquidacionData = {
+  desde: string;
+  hasta: string;
+  beneficiarios: string[];
+  modelo: Record<string, Record<string, number>>;
+  resumen: LiquidacionPunto & { pedidos: number };
+  por_mes: LiquidacionMes[];
+  por_dia: LiquidacionDia[];
+  por_dueno: LiquidacionDueno[];
+};
+
+// Reconciliación de datos de liquidación (#88, hardening): semáforo de confianza.
+export type ReconciliacionData = {
+  ok: boolean;
+  pagados_sin_ledger: { cantidad: number; ids: number[] };
+  monto_pagado_divergente: { cantidad: number; ids: number[] };
+  sobrepagados: { cantidad: number; ids: number[] };
+  duenos_no_canonicos: string[];
 };
 
 export type EstadisticasData = {

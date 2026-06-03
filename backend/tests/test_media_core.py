@@ -82,6 +82,23 @@ class TestOptimizeImageSquare:
             pytest.fail(f"_optimize_image reventó con basura: {e}")
         assert isinstance(content, bytes)
 
+    def test_fmt_jpeg_devuelve_jpeg_cuadrado(self):
+        """fmt='jpeg' (variante OG para WhatsApp) → JPEG cuadrado, no webp."""
+        from services.media.processing import _optimize_image
+        content, ctype, w, h = _optimize_image(_png_bytes(400, 300), square=True, fmt="jpeg")
+        assert ctype == "image/jpeg"
+        assert content[:3] == b"\xff\xd8\xff", "magic bytes de JPEG"
+        assert w == h, "debe ser cuadrado"
+
+    def test_fmt_jpeg_aplana_rgba(self):
+        """Una PNG con alpha no debe romper el encode JPEG (se aplana a RGB)."""
+        from services.media.processing import _optimize_image
+        rgba = BytesIO()
+        Image.new("RGBA", (300, 300), (200, 50, 50, 128)).save(rgba, format="PNG")
+        content, ctype, w, h = _optimize_image(rgba.getvalue(), square=True, fmt="jpeg")
+        assert ctype == "image/jpeg"
+        assert content[:3] == b"\xff\xd8\xff"
+
 
 # ── processing._optimize_image (square=False) ────────────────────────────────
 

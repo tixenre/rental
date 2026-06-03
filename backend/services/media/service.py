@@ -73,8 +73,8 @@ def store_upload(
         # 3. Derivar variantes
         variants_data: list[tuple[str, str, str, str, int, int, int]] = []
         for spec in derive_specs:
-            v_content, v_ct, v_w, v_h = _optimize_image(raw, square=spec.square)
-            v_key = f"media/{kind}/{asset_id}/{spec.name}.webp"
+            v_content, v_ct, v_w, v_h = _optimize_image(raw, square=spec.square, fmt=spec.fmt)
+            v_key = f"media/{kind}/{asset_id}/{spec.name}.{_ext_from_ctype(v_ct)}"
             v_url = storage.put(v_key, v_content, v_ct)
             uploaded_keys.append(v_key)
             variants_data.append((spec.name, v_key, v_url, v_ct, v_w, v_h, len(v_content)))

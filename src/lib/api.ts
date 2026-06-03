@@ -100,6 +100,9 @@ export type BackendEquipo = {
     descuento_pct?: number | null;
   }>;
   categorias?: BackendCategoriaRef[];
+  /** Galería multi-foto (#125): fotos de equipo_fotos, principal primero.
+   *  Solo presente en el detalle (`GET /equipos/{id}`), no en el listado. */
+  fotos?: Array<{ url: string; es_principal?: boolean }>;
   ficha?: BackendFicha;
   specs_destacados?: { label: string; value: string }[];
   /** Specs estructuradas (Fase D): dict keyed por spec_key, fuente única

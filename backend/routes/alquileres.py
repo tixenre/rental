@@ -16,7 +16,7 @@ from rate_limit import limiter
 from pdf import _pedido_html, _albaran_html, _contrato_html, _packing_list_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin, is_admin_email
 from routes.auth import get_session
-from services.email import send_email
+from services.email import send_email, send_raw_email, Attachment
 from services.email.service import get_admin_to
 from services.precios import calcular_total, jornadas_periodo, precio_combo
 from config import SITE_URL
@@ -73,9 +73,11 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
         SELECT pi.*, e.nombre,
                (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
                e.foto_url, e.cantidad AS stock_total,
-               e.nombre_publico, e.nombre_publico_largo
+               e.nombre_publico, e.nombre_publico_largo,
+               ef.contenido_incluido_json
         FROM alquiler_items pi
         JOIN equipos e ON e.id = pi.equipo_id
+        LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
         WHERE pi.pedido_id = ?
     """, (pedido_id,)).fetchall()
     items = [row_to_dict(r) for r in rows]
@@ -1445,6 +1447,77 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
 # cliente—, vuelve a servir el PDF viejo. `no-store` lo fuerza a re-pedirlo.
 _DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
+# Documentos del pedido y su etiqueta legible (para la UI de envío por mail).
+DOCUMENTOS = {
+    "pdf": "Cotización",
+    "albaran": "Remito / Albarán",
+    "contrato": "Contrato",
+    "packing-list": "Packing list",
+}
+
+
+def _add_componentes(conn, items: list[dict]) -> None:
+    """Agrega `componentes` a cada item (kits). Compartido por albarán y contrato."""
+    for item in items:
+        comp_rows = conn.execute("""
+            SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca,
+                   ec.modelo, ec.serie, ec.valor_reposicion,
+                   ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
+            FROM kit_componentes kc
+            JOIN equipos ec ON ec.id = kc.componente_id
+            WHERE kc.equipo_id = ?
+        """, (item["equipo_id"],)).fetchall()
+        item["componentes"] = [row_to_dict(c) for c in comp_rows]
+
+
+def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
+    """Construye el HTML + filename de un documento del pedido. Fuente ÚNICA
+    usada por los GET de descarga y por el envío por mail."""
+    if kind == "pdf":
+        row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Pedido no encontrado")
+        pedido = row_to_dict(row)
+        pedido["items"] = _get_alquiler_items(conn, id)
+        _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
+        _enriquecer_pedido_con_total(conn, pedido)
+        return _pedido_html(pedido), _pedido_filename(pedido)
+
+    if kind == "albaran":
+        row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Pedido no encontrado")
+        pedido = row_to_dict(row)
+        items = conn.execute("""
+            SELECT pi.cantidad, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
+                   e.nombre_publico, e.nombre_publico_largo, pi.equipo_id
+            FROM alquiler_items pi
+            JOIN equipos e ON e.id = pi.equipo_id
+            WHERE pi.pedido_id = ?
+            ORDER BY e.nombre
+        """, (id,)).fetchall()
+        pedido["items"] = [row_to_dict(i) for i in items]
+        _add_componentes(conn, pedido["items"])
+        return _albaran_html(pedido), _pedido_filename(pedido, suffix="albaran")
+
+    if kind == "packing-list":
+        row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Pedido no encontrado")
+        pedido = row_to_dict(row)
+        _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
+        pedido["items"] = _get_alquiler_items(conn, id)
+        pedido["items"].sort(key=lambda it: (it.get("nombre") or "").lower())
+        return _packing_list_html(pedido), _pedido_filename(pedido, suffix="packing-list")
+
+    if kind == "contrato":
+        pedido = _get_alquiler_detail(conn, id)
+        _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
+        _add_componentes(conn, pedido["items"])
+        return _contrato_html(pedido), _pedido_filename(pedido, suffix="contrato")
+
+    raise HTTPException(400, f"Documento inválido: {kind}")
+
 
 @router.get("/alquileres/{id}/pdf")
 async def pedido_pdf(id: int, request: Request, format: str = "pdf"):
@@ -1452,24 +1525,13 @@ async def pedido_pdf(id: int, request: Request, format: str = "pdf"):
     require_admin(request)
     conn = get_db()
     try:
-        row  = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
-        if not row:
-            raise HTTPException(404, "Pedido no encontrado")
-        pedido = row_to_dict(row)
-        pedido["items"] = _get_alquiler_items(conn, id)
-        _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
-        # Desglose canónico (bruto/descuento/neto/IVA) para que el PDF muestre
-        # exactamente lo mismo que admin/portal — una sola fuente de verdad.
-        _enriquecer_pedido_con_total(conn, pedido)
+        html, filename = _doc_html(conn, id, "pdf")
     finally:
         conn.close()
-
-    html = _pedido_html(pedido)
     if format == "html":
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html, headers=_DOC_NO_CACHE)
     pdf_bytes = await _render_pdf(html)
-    filename  = _pedido_filename(pedido)
     return Response(
         content    = pdf_bytes,
         media_type = "application/pdf",
@@ -1483,39 +1545,13 @@ async def pedido_albaran(id: int, request: Request, format: str = "pdf"):
     require_admin(request)
     conn = get_db()
     try:
-        row  = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
-        if not row:
-            raise HTTPException(404, "Pedido no encontrado")
-        pedido = row_to_dict(row)
-        items  = conn.execute("""
-            SELECT pi.cantidad, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
-                   e.nombre_publico, e.nombre_publico_largo, pi.equipo_id
-            FROM alquiler_items pi
-            JOIN equipos e ON e.id = pi.equipo_id
-            WHERE pi.pedido_id = ?
-            ORDER BY e.nombre
-        """, (id,)).fetchall()
-        pedido["items"] = [row_to_dict(i) for i in items]
-
-        # Agregar componentes a cada item
-        for item in pedido["items"]:
-            comp_rows = conn.execute("""
-                SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.modelo, ec.serie, ec.valor_reposicion,
-                       ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
-                FROM kit_componentes kc
-                JOIN equipos ec ON ec.id = kc.componente_id
-                WHERE kc.equipo_id = ?
-            """, (item['equipo_id'],)).fetchall()
-            item['componentes'] = [row_to_dict(c) for c in comp_rows]
+        html, filename = _doc_html(conn, id, "albaran")
     finally:
         conn.close()
-
-    html = _albaran_html(pedido)
     if format == "html":
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html, headers=_DOC_NO_CACHE)
     pdf_bytes = await _render_pdf(html)
-    filename  = _pedido_filename(pedido, suffix="albaran")
     return Response(
         content    = pdf_bytes,
         media_type = "application/pdf",
@@ -1529,45 +1565,13 @@ async def pedido_packing_list(id: int, request: Request, format: str = "pdf"):
     require_admin(request)
     conn = get_db()
     try:
-        row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
-        if not row:
-            raise HTTPException(404, "Pedido no encontrado")
-        pedido = row_to_dict(row)
-        _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
-
-        items = conn.execute("""
-            SELECT pi.cantidad, e.nombre,
-                   (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
-                   e.modelo, e.foto_url,
-                   e.nombre_publico, e.nombre_publico_largo, pi.equipo_id,
-                   ef.contenido_incluido_json
-            FROM alquiler_items pi
-            JOIN equipos e ON e.id = pi.equipo_id
-            LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
-            WHERE pi.pedido_id = ?
-            ORDER BY e.nombre
-        """, (id,)).fetchall()
-        pedido["items"] = [row_to_dict(i) for i in items]
-
-        for item in pedido["items"]:
-            comp_rows = conn.execute("""
-                SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca,
-                       ec.modelo, ec.foto_url,
-                       ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
-                FROM kit_componentes kc
-                JOIN equipos ec ON ec.id = kc.componente_id
-                WHERE kc.equipo_id = ?
-            """, (item["equipo_id"],)).fetchall()
-            item["componentes"] = [row_to_dict(c) for c in comp_rows]
+        html_content, filename = _doc_html(conn, id, "packing-list")
     finally:
         conn.close()
-
-    html_content = _packing_list_html(pedido)
     if format == "html":
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html_content, headers=_DOC_NO_CACHE)
     pdf_bytes = await _render_pdf(html_content)
-    filename = _pedido_filename(pedido, suffix="packing-list")
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -1581,33 +1585,109 @@ async def pedido_contrato(id: int, request: Request, format: str = "pdf"):
     require_admin(request)
     conn    = get_db()
     try:
-        pedido  = _get_alquiler_detail(conn, id)
-        _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
-
-        # Agregar componentes a cada item
-        for item in pedido["items"]:
-            comp_rows = conn.execute("""
-                SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.modelo, ec.serie, ec.valor_reposicion,
-                       ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
-                FROM kit_componentes kc
-                JOIN equipos ec ON ec.id = kc.componente_id
-                WHERE kc.equipo_id = ?
-            """, (item['equipo_id'],)).fetchall()
-            item['componentes'] = [row_to_dict(c) for c in comp_rows]
+        html, filename = _doc_html(conn, id, "contrato")
     finally:
         conn.close()
-
-    html = _contrato_html(pedido)
     if format == "html":
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html, headers=_DOC_NO_CACHE)
     pdf_bytes = await _render_pdf(html)
-    filename  = _pedido_filename(pedido, suffix="contrato")
     return Response(
         content    = pdf_bytes,
         media_type = "application/pdf",
         headers    = {"Content-Disposition": f'attachment; filename="{filename}"', **_DOC_NO_CACHE},
     )
+
+
+# ── Enviar documentos por mail (#725) ─────────────────────────────────────────
+
+class EnviarDocsRequest(BaseModel):
+    docs: list[str]                       # subconjunto de DOCUMENTOS
+    to: Optional[str] = None              # override del destinatario (default: cliente)
+    mensaje: Optional[str] = None         # mensaje opcional del admin
+
+
+@router.post("/alquileres/{id}/enviar-documentos")
+async def enviar_documentos(id: int, data: EnviarDocsRequest, request: Request):
+    """Manda al cliente los documentos elegidos (cotización/remito/contrato/
+    packing-list) adjuntos en PDF. Reusa el renderer único (`_doc_html`) y el
+    mailer (`send_raw_email`)."""
+    require_admin(request)
+
+    docs = [d for d in (data.docs or []) if d in DOCUMENTOS]
+    if not docs:
+        raise HTTPException(400, "Elegí al menos un documento válido.")
+
+    # Resolver destinatario + metadatos del pedido (dentro de la conexión).
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT numero_pedido, cliente_nombre, cliente_email, cliente_id "
+            "FROM alquileres WHERE id=?",
+            (id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Pedido no encontrado")
+        ped = row_to_dict(row)
+        destinatario = (data.to or ped.get("cliente_email") or "").strip()
+        if not destinatario and ped.get("cliente_id"):
+            c = conn.execute(
+                "SELECT email FROM clientes WHERE id=?", (ped["cliente_id"],)
+            ).fetchone()
+            if c and c["email"]:
+                destinatario = c["email"].strip()
+        if not destinatario or "@" not in destinatario:
+            raise HTTPException(400, "El pedido no tiene un email de cliente válido.")
+
+        # Renderizar el HTML de cada documento (con la conexión abierta).
+        docs_html = [(kind, *_doc_html(conn, id, kind)) for kind in docs]
+    finally:
+        conn.close()
+
+    # Renderizar los PDFs fuera de la conexión (Playwright, async).
+    adjuntos: list[Attachment] = []
+    for _kind, html, filename in docs_html:
+        pdf_bytes = await _render_pdf(html)
+        adjuntos.append(Attachment(filename=filename, content=pdf_bytes))
+
+    numero = ped.get("numero_pedido") or id
+    nombre = (ped.get("cliente_nombre") or "").strip()
+    nombres_docs = [DOCUMENTOS[k] for k in docs]
+    subject = f"Documentos de tu pedido #{numero}"
+
+    saludo = f"Hola {nombre}," if nombre else "Hola,"
+    mensaje_html = ""
+    if data.mensaje and data.mensaje.strip():
+        # Escapado básico: el mensaje lo escribe el admin, pero por las dudas.
+        import html as _html_mod
+        mensaje_html = f"<p>{_html_mod.escape(data.mensaje.strip())}</p>"
+    lista_docs = "".join(f"<li>{d}</li>" for d in nombres_docs)
+    body_html = (
+        f"<p>{saludo}</p>"
+        f"<p>Te adjuntamos los siguientes documentos de tu pedido <strong>#{numero}</strong>:</p>"
+        f"<ul>{lista_docs}</ul>"
+        f"{mensaje_html}"
+        f"<p>Cualquier duda, respondé este mail. ¡Gracias!</p>"
+    )
+    text = (
+        f"{saludo}\n\nTe adjuntamos los documentos de tu pedido #{numero}: "
+        f"{', '.join(nombres_docs)}.\n\n"
+        f"{(data.mensaje.strip() + chr(10) + chr(10)) if (data.mensaje and data.mensaje.strip()) else ''}"
+        f"Cualquier duda, respondé este mail. ¡Gracias!"
+    )
+
+    res = send_raw_email(
+        to=destinatario,
+        subject=subject,
+        body_html=body_html,
+        text=text,
+        attachments=adjuntos,
+        alquiler_id=id,
+        log_key="documentos_cliente",
+    )
+    if not res.get("ok"):
+        raise HTTPException(502, f"No se pudo enviar el mail: {res.get('error', 'error desconocido')}")
+    return {"ok": True, "to": destinatario, "docs": docs, "provider": res.get("provider")}
 
 
 # ── Descuentos por jornadas ───────────────────────────────────────────────────

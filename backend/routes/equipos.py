@@ -898,6 +898,18 @@ def get_equipo(id_or_slug: str):
             WHERE kc.equipo_id = ?  ORDER BY kc.orden ASC, e.nombre ASC
         """, (actual_id,)).fetchall()
         equipo["kit"] = [row_to_dict(r) for r in kit]
+        # Galería multi-foto (#125): el catálogo público expone las fotos de
+        # `equipo_fotos` (principal primero) para que la ficha muestre la galería,
+        # no solo `foto_url`. Shape liviano (url + es_principal) — sin internals.
+        fotos = conn.execute(
+            "SELECT url, es_principal FROM equipo_fotos "
+            "WHERE equipo_id = ? AND url IS NOT NULL AND url <> '' "
+            "ORDER BY es_principal DESC, orden ASC, id ASC",
+            (actual_id,),
+        ).fetchall()
+        equipo["fotos"] = [
+            {"url": r["url"], "es_principal": bool(r["es_principal"])} for r in fotos
+        ]
         return equipo
     finally:
         conn.close()
@@ -3301,7 +3313,7 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
 from services.media.security import _download_image_bytes, _validate_external_image_url
 from services.media.storage import _r2_config
 from services.media.storage import delete_object as _delete_from_r2, put as _put_r2
-from services.media import DISPLAY_SQUARE, collect_asset_keys, purge_r2, store_upload
+from services.media import DISPLAY_SQUARE, OG_SQUARE_JPEG, collect_asset_keys, purge_r2, store_upload
 from services.media_fastapi import media_http
 
 
@@ -3370,7 +3382,7 @@ def admin_upload_foto_from_url(
     conn = get_db()
     try:
         with media_http():
-            asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE], conn=conn)
+            asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE, OG_SQUARE_JPEG], conn=conn)
         display = asset.variant("display")
         foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
     except Exception:
@@ -3417,7 +3429,7 @@ async def admin_upload_foto_file(
     conn = get_db()
     try:
         with media_http():
-            asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE], conn=conn)
+            asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE, OG_SQUARE_JPEG], conn=conn)
         display = asset.variant("display")
         foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
     except Exception:
@@ -3536,7 +3548,7 @@ async def upload_equipo_foto(equipo_id: int, request: Request):
         if not eq:
             raise HTTPException(404, "Equipo no encontrado")
         with media_http():
-            asset = store_upload(raw, kind="equipo", derive_specs=[DISPLAY_SQUARE], conn=conn)
+            asset = store_upload(raw, kind="equipo", derive_specs=[DISPLAY_SQUARE, OG_SQUARE_JPEG], conn=conn)
         display = asset.variant("display")
         foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
     except Exception:
@@ -3575,7 +3587,7 @@ def upload_equipo_foto_from_url(equipo_id: int, body: EquipoFotoFromUrlBody, req
         if not eq:
             raise HTTPException(404, "Equipo no encontrado")
         with media_http():
-            asset = store_upload(raw, kind="equipo", derive_specs=[DISPLAY_SQUARE], conn=conn)
+            asset = store_upload(raw, kind="equipo", derive_specs=[DISPLAY_SQUARE, OG_SQUARE_JPEG], conn=conn)
         display = asset.variant("display")
         foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
     except Exception:
