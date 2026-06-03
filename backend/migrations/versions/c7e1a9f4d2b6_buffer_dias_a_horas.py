@@ -23,6 +23,16 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Si buffer_horas_alquiler ya existe (fue creado directo por la UI antes de
+    # que corriera esta migración), solo borramos el key viejo para no violar el PK.
+    op.execute(
+        """
+        DELETE FROM app_settings
+         WHERE key = 'buffer_dias_alquiler'
+           AND EXISTS (SELECT 1 FROM app_settings WHERE key = 'buffer_horas_alquiler')
+        """
+    )
+    # Caso normal: solo existe el key viejo — renombrarlo + convertir días → horas.
     op.execute(
         """
         UPDATE app_settings
@@ -30,6 +40,7 @@ def upgrade() -> None:
                value = CAST(CAST(value AS INTEGER) * 24 AS TEXT)
          WHERE key = 'buffer_dias_alquiler'
            AND value ~ '^[0-9]+$'
+           AND NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'buffer_horas_alquiler')
         """
     )
 
