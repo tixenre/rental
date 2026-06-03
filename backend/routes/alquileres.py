@@ -73,9 +73,11 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
         SELECT pi.*, e.nombre,
                (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
                e.foto_url, e.cantidad AS stock_total,
-               e.nombre_publico, e.nombre_publico_largo
+               e.nombre_publico, e.nombre_publico_largo,
+               ef.contenido_incluido_json
         FROM alquiler_items pi
         JOIN equipos e ON e.id = pi.equipo_id
+        LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
         WHERE pi.pedido_id = ?
     """, (pedido_id,)).fetchall()
     items = [row_to_dict(r) for r in rows]
@@ -1535,30 +1537,13 @@ async def pedido_packing_list(id: int, request: Request, format: str = "pdf"):
         pedido = row_to_dict(row)
         _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
 
-        items = conn.execute("""
-            SELECT pi.cantidad, e.nombre,
-                   (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
-                   e.modelo, e.foto_url,
-                   e.nombre_publico, e.nombre_publico_largo, pi.equipo_id,
-                   ef.contenido_incluido_json
-            FROM alquiler_items pi
-            JOIN equipos e ON e.id = pi.equipo_id
-            LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
-            WHERE pi.pedido_id = ?
-            ORDER BY e.nombre
-        """, (id,)).fetchall()
-        pedido["items"] = [row_to_dict(i) for i in items]
-
-        for item in pedido["items"]:
-            comp_rows = conn.execute("""
-                SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca,
-                       ec.modelo, ec.foto_url,
-                       ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
-                FROM kit_componentes kc
-                JOIN equipos ec ON ec.id = kc.componente_id
-                WHERE kc.equipo_id = ?
-            """, (item["equipo_id"],)).fetchall()
-            item["componentes"] = [row_to_dict(c) for c in comp_rows]
+        # Fetch unificado (#638): mismo helper que el albarán/detalle (ítems +
+        # componentes batcheados + contenido_incluido_json), sin duplicar la
+        # query ni el N+1 que tenía este endpoint. El packing-list es una lista
+        # física de chequeo → se ordena alfabético para el operario (preserva el
+        # `ORDER BY e.nombre` que tenía la query inline).
+        pedido["items"] = _get_alquiler_items(conn, id)
+        pedido["items"].sort(key=lambda it: (it.get("nombre") or "").lower())
     finally:
         conn.close()
 
