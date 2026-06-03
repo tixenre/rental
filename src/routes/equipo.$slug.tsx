@@ -265,7 +265,10 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const [descExpanded, setDescExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
+  // Foto seleccionada de la galería: manda en el preview grande (hero) Y en el
+  // índice donde abre el lightbox. Las miniaturas la cambian; el swipe del
+  // lightbox también la sincroniza (#125).
+  const [selectedPhoto, setSelectedPhoto] = useState(0);
 
   // Galería del lightbox (#125): fotos del equipo (equipo_fotos, principal
   // primero) + fotos de los items del kit (si los hay). Si el equipo no tiene
@@ -287,6 +290,11 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
     for (const inc of item.includes ?? []) push(inc.fotoUrl, inc.name);
     return out;
   })();
+
+  // URL que se muestra en el preview grande: la foto seleccionada de la galería,
+  // con fallback a la principal. Clamp por si el índice quedó fuera de rango.
+  const heroUrl =
+    lightboxPhotos[selectedPhoto]?.url ?? lightboxPhotos[0]?.url ?? item.fotoUrl ?? null;
 
   const DESC_LIMIT = 320;
   const desc = item.description ?? "";
@@ -426,18 +434,15 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           {/* Foto hero */}
           <button
             type="button"
-            onClick={() => {
-              setLightboxIndex(0);
-              setLightboxOpen(true);
-            }}
-            disabled={!item.fotoUrl}
+            onClick={() => setLightboxOpen(true)}
+            disabled={!heroUrl}
             className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-white border hairline group cursor-zoom-in disabled:cursor-default"
-            aria-label={item.fotoUrl ? `Ver foto ampliada de ${item.name}` : item.name}
+            aria-label={heroUrl ? `Ver foto ampliada de ${item.name}` : item.name}
           >
-            {item.fotoUrl ? (
+            {heroUrl ? (
               <>
                 <img
-                  src={item.fotoUrl}
+                  src={heroUrl}
                   alt={item.name}
                   loading="eager"
                   decoding="async"
@@ -454,7 +459,8 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           </button>
 
           {/* Galería multi-foto (#125): miniaturas si hay más de una foto.
-              Cada una abre el lightbox en ese índice. */}
+              Cada una se muestra en el preview grande al clickearla; la foto
+              grande abre el lightbox (con swipe entre todas). */}
           {lightboxPhotos.length > 1 && (
             <div
               className="flex gap-2 overflow-x-auto pb-1"
@@ -466,12 +472,14 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                   key={p.url}
                   type="button"
                   role="listitem"
-                  onClick={() => {
-                    setLightboxIndex(i);
-                    setLightboxOpen(true);
-                  }}
-                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border hairline bg-white cursor-zoom-in transition hover:border-ink/30"
-                  aria-label={`Ver foto ${i + 1} de ${lightboxPhotos.length}`}
+                  onClick={() => setSelectedPhoto(i)}
+                  aria-pressed={i === selectedPhoto}
+                  className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border bg-white cursor-pointer transition ${
+                    i === selectedPhoto
+                      ? "border-ink ring-1 ring-ink"
+                      : "hairline hover:border-ink/30"
+                  }`}
+                  aria-label={`Mostrar foto ${i + 1} de ${lightboxPhotos.length}`}
                 >
                   <img
                     src={p.url}
@@ -611,8 +619,8 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
         open={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
         photos={lightboxPhotos}
-        index={lightboxIndex}
-        onIndexChange={setLightboxIndex}
+        index={selectedPhoto}
+        onIndexChange={setSelectedPhoto}
       />
     </article>
   );
