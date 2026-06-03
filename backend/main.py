@@ -261,6 +261,17 @@ def equipo_page(id_or_slug: str):
                 """,
                 (equipo_id,),
             ).fetchone()
+            # Variante OG (jpg) de la foto principal — la que WhatsApp sí renderiza.
+            og_row = conn.execute(
+                """
+                SELECT mv.url FROM equipo_fotos ef
+                JOIN media_variants mv ON mv.asset_id = ef.media_id
+                WHERE ef.equipo_id = ? AND mv.name = 'og'
+                ORDER BY ef.es_principal DESC, ef.orden ASC, ef.id ASC
+                LIMIT 1
+                """,
+                (equipo_id,),
+            ).fetchone()
         finally:
             conn.close()
         if not row:
@@ -277,8 +288,14 @@ def equipo_page(id_or_slug: str):
             desc = desc[:197].rstrip() + "…"
         if not desc:
             desc = f"Alquilá {nombre} en Rambla Rental, Mar del Plata." if nombre else "Alquiler de equipos audiovisuales en Mar del Plata."
-        foto = (d.get("foto_url") or "").strip()
-        image = foto if foto.startswith("http") else (f"{SITE_URL}{foto}" if foto else f"{SITE_URL}/icon-512.png")
+        # Preferir la variante OG (jpg) de la principal; fallback a foto_url (webp)
+        # para fotos que todavía no tienen og (pre-backfill).
+        og_url = (og_row["url"] if og_row else "") or ""
+        if og_url.startswith("http"):
+            image = og_url
+        else:
+            foto = (d.get("foto_url") or "").strip()
+            image = foto if foto.startswith("http") else (f"{SITE_URL}{foto}" if foto else f"{SITE_URL}/icon-512.png")
         url = f"{SITE_URL}/equipo/{id_or_slug}"
         html_text = _inject_og_meta(
             index_file.read_text(encoding="utf-8"),
