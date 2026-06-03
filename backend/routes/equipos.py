@@ -290,8 +290,8 @@ MAX_PHOTO_CANDIDATES_TO_VALIDATE = 8
 
 # /buscar-fotos: cuántos validamos y cuántos devolvemos. Este flow inspecciona
 # más fuentes (Wikipedia, reviews, manufacturer) por eso el límite es mayor.
-MAX_PHOTO_CANDIDATES_BUSCAR_VALIDATE = 18
-MAX_PHOTO_CANDIDATES_BUSCAR_RETURN   = 10
+MAX_PHOTO_CANDIDATES_BUSCAR_VALIDATE = 24
+MAX_PHOTO_CANDIDATES_BUSCAR_RETURN   = 16
 
 
 # ── Modelos ──────────────────────────────────────────────────────────────────
@@ -1385,9 +1385,8 @@ def delete_equipo(id: int):
     if html_source_url:
         try:
             cfg = _r2_config()
-            client = _get_r2_client(cfg)
             key = html_source_url.removeprefix(f"{cfg['public_base']}/")
-            client.delete_object(Bucket=cfg["bucket"], Key=key)
+            _delete_from_r2(key)
         except Exception as _e:
             logger.warning("delete_equipo: no se pudo borrar HTML blob de R2: %s", _e)
 
@@ -2909,7 +2908,8 @@ async def admin_upload_html_source(
         raise HTTPException(400, "HTML inválido (no es UTF-8)")
 
     path = f"equipos/{id}/source.html"
-    html_source_url = _upload_to_r2(path, content, "text/html; charset=utf-8")
+    with media_http():
+        html_source_url = _put_r2(path, content, "text/html; charset=utf-8")
 
     conn = get_db()
     try:
@@ -3233,6 +3233,27 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
                     all_cands.append(u)
                     direct_url_cands.add(u.lower())
 
+            # 2b) B&H carrusel: si algún candidato sigue el patrón del CDN de B&H
+            #     (static.bhphotovideo.com/c/product/{SKU}-{ANGLE}/{slug}), derivar
+            #     los demás ángulos del carrusel sin hacer HEAD requests extra
+            #     (el CDN bloquea cross-origin; los ángulos son de confianza).
+            _BH_CDN_RE = re.compile(
+                r"(https://static\.bhphotovideo\.com/c/product/\d+)-[A-Z0-9]+/([^?]+)",
+                re.IGNORECASE,
+            )
+            for base_cand in list(all_cands):
+                m_bh = _BH_CDN_RE.match(base_cand)
+                if not m_bh:
+                    continue
+                base_prefix, slug = m_bh.group(1), m_bh.group(2)
+                for angle in ("MAIN", "REAR", "SL01", "SL02", "SL03", "SL04", "SL05", "SL06", "SL07"):
+                    u = f"{base_prefix}-{angle}/{slug}"
+                    if u.lower() not in seen_lc:
+                        seen_lc.add(u.lower())
+                        all_cands.append(u)
+                        direct_url_cands.add(u.lower())
+                break  # solo necesitamos un candidato base para el patrón
+
             # 3) Firecrawl para más candidatos (especialmente imgs del body).
             for u in _extract_images_from_page(direct_url, client, trust_url=True):
                 if u.lower() not in seen_lc:
@@ -3277,19 +3298,9 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
 # dominios conocidos, (3) la IP resuelta del host no es privada/loopback.
 
 
-# Procesamiento/upload de imágenes: extraído a services/image_upload.py
-# (issue #501 Fase 3). _foto_path se queda acá (usa get_db).
-from services.image_upload import (
-    _download_image_bytes,
-    _ext_from_ctype,
-    _get_r2_client,
-    _optimize_image,
-    _r2_config,
-    _upload_to_r2,
-    _upload_to_supabase_storage,
-    _validate_external_image_url,
-    _validate_ssrf_only,
-)
+from services.media.security import _download_image_bytes, _validate_external_image_url
+from services.media.storage import _r2_config
+from services.media.storage import delete_object as _delete_from_r2, put as _put_r2
 from services.media import DISPLAY_SQUARE, collect_asset_keys, purge_r2, store_upload
 from services.media_fastapi import media_http
 
@@ -3352,8 +3363,9 @@ def admin_upload_foto_from_url(
     if cfg_pub and url.startswith(cfg_pub + "/"):
         return {"public_url": url, "path": None, "skipped": True}
 
-    _validate_external_image_url(url)
-    raw_content, _raw_ctype = _download_image_bytes(url)
+    with media_http():
+        _validate_external_image_url(url)
+        raw_content, _raw_ctype = _download_image_bytes(url)
 
     conn = get_db()
     try:
@@ -3553,8 +3565,9 @@ def upload_equipo_foto_from_url(equipo_id: int, body: EquipoFotoFromUrlBody, req
     if cfg_pub and url.startswith(cfg_pub + "/"):
         raise HTTPException(400, "La URL ya está en el bucket — subí el archivo directamente")
 
-    _validate_external_image_url(url)
-    raw, _raw_ctype = _download_image_bytes(url)
+    with media_http():
+        _validate_external_image_url(url)
+        raw, _raw_ctype = _download_image_bytes(url)
 
     conn = get_db()
     try:
@@ -3622,7 +3635,6 @@ def delete_equipo_foto(equipo_id: int, foto_id: int, request: Request):
     if r2_keys:
         purge_r2(r2_keys)
     elif path:
-        from services.image_upload import _delete_from_r2
         _delete_from_r2(path)
 
     return {"ok": True}
@@ -3696,7 +3708,8 @@ def admin_storage_diag(request: Request):
     try:
         sample = b"R2 smoke test " + str(int(_time.time())).encode()
         path = f"diag/smoke-{int(_time.time())}.txt"
-        public_url = _upload_to_r2(path, sample, "text/plain")
+        with media_http():
+            public_url = _put_r2(path, sample, "text/plain")
         verify = httpx.get(public_url, timeout=10.0)
         ok = verify.status_code == 200 and verify.content == sample
         return {
