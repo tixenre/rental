@@ -139,7 +139,9 @@ export function EquipmentCard({
         {sinStock && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/60">
             <span className="rounded-full border border-destructive/30 bg-destructive/10 px-[10px] py-[5px] text-center font-mono text-[8px] uppercase leading-snug tracking-[0.15em] text-destructive">
-              No disponible en la fecha seleccionada
+              {disponible !== undefined
+                ? "Sin disponibilidad en estas fechas"
+                : "Sin stock disponible"}
             </span>
           </div>
         )}

@@ -87,6 +87,15 @@ export function CartDrawer({
       return getDisponible?.(it) !== undefined && cap < qty;
     });
 
+  const nombresSinDisp = hayNoDisponible
+    ? list
+        .filter(({ it, qty }) => {
+          const cap = getDisponible?.(it) ?? it.cantidad ?? Infinity;
+          return getDisponible?.(it) !== undefined && cap < qty;
+        })
+        .map(({ it }) => it.name)
+    : [];
+
   const { data: clienteSession } = useClienteSession();
 
   // Total calculado por el BACKEND (fuente única, /api/cotizar). El front no
@@ -343,94 +352,112 @@ export function CartDrawer({
                 ) : (
                   <>
                     <ul className="space-y-2.5">
-                      {list.map(({ it, qty }) => {
-                        const cap = getDisponible?.(it) ?? it.cantidad ?? Infinity;
-                        const reachedMax = qty >= cap;
-                        const noDisponible =
-                          !!startDate && getDisponible?.(it) !== undefined && cap < qty;
-                        const lineaBruta = it.pricePerDay * qty * (d || 1);
-                        const lineaDto =
-                          descuentoPct > 0 ? Math.round((lineaBruta * descuentoPct) / 100) : 0;
-                        const lineaNeta = lineaBruta - lineaDto;
-                        return (
-                          <li
-                            key={it.id}
-                            className={`flex gap-3 rounded-lg border p-3 transition-colors ${
-                              noDisponible
-                                ? "border-destructive/30 bg-destructive/5"
-                                : "hairline bg-surface"
-                            }`}
-                          >
-                            <div className="h-16 w-20 shrink-0 overflow-hidden rounded">
-                              {it.fotoUrl ? (
-                                <img
-                                  src={it.fotoUrl}
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <EmptyImage category={it.category} brand={it.brand} />
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-                                {it.brand}
-                              </div>
-                              <div className="line-clamp-2 font-sans text-sm font-bold leading-tight">
-                                {it.name}
-                              </div>
-                              {noDisponible && (
-                                <div className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-destructive uppercase tracking-wide">
-                                  <AlertCircle className="h-3 w-3 shrink-0" />
-                                  No disponible en estas fechas
-                                </div>
-                              )}
-                              <div className="mt-2 flex items-center justify-between gap-2">
-                                <StepperPill
-                                  qty={qty}
-                                  onIncrement={() => {
-                                    if (!reachedMax) add(it.id);
-                                  }}
-                                  onDecrement={() => remove(it.id)}
-                                  maxReached={reachedMax}
-                                  size="lg"
-                                />
-                                <div className="text-right">
-                                  <div className="text-xs tabular text-ink">
-                                    {formatARS(it.pricePerDay * qty)}
-                                    <span className="text-muted-foreground"> /día</span>
-                                  </div>
-                                  {d > 0 && (
-                                    <div className="hidden sm:flex items-center justify-end gap-1 mt-0.5 text-[11px] tabular">
-                                      {lineaDto > 0 && (
-                                        <span className="line-through text-muted-foreground/60">
-                                          {formatARS(lineaBruta)}
-                                        </span>
-                                      )}
-                                      <span
-                                        className={
-                                          lineaDto > 0
-                                            ? "text-verde font-medium"
-                                            : "text-muted-foreground"
-                                        }
-                                      >
-                                        {formatARS(lineaNeta)}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => setQty(it.id, 0)}
-                              aria-label={`Quitar ${it.name} del carrito`}
-                              className="grid h-8 w-8 shrink-0 place-items-center self-start rounded-full text-muted-foreground hover:bg-surface hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+                      {[...list]
+                        .sort((a, b) => {
+                          const aCap = getDisponible?.(a.it) ?? a.it.cantidad ?? Infinity;
+                          const bCap = getDisponible?.(b.it) ?? b.it.cantidad ?? Infinity;
+                          const aND =
+                            !!startDate && getDisponible?.(a.it) !== undefined && aCap < a.qty;
+                          const bND =
+                            !!startDate && getDisponible?.(b.it) !== undefined && bCap < b.qty;
+                          return aND === bND ? 0 : aND ? -1 : 1;
+                        })
+                        .map(({ it, qty }) => {
+                          const cap = getDisponible?.(it) ?? it.cantidad ?? Infinity;
+                          const reachedMax = qty >= cap;
+                          const noDisponible =
+                            !!startDate && getDisponible?.(it) !== undefined && cap < qty;
+                          const lineaBruta = it.pricePerDay * qty * (d || 1);
+                          const lineaDto =
+                            descuentoPct > 0 ? Math.round((lineaBruta * descuentoPct) / 100) : 0;
+                          const lineaNeta = lineaBruta - lineaDto;
+                          return (
+                            <li
+                              key={it.id}
+                              className={`flex gap-3 rounded-lg border p-3 transition-colors ${
+                                noDisponible
+                                  ? "border-destructive/30 bg-destructive/5"
+                                  : "hairline bg-surface"
+                              }`}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </li>
-                        );
-                      })}
+                              <div className="h-16 w-20 shrink-0 overflow-hidden rounded">
+                                {it.fotoUrl ? (
+                                  <img
+                                    src={it.fotoUrl}
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <EmptyImage category={it.category} brand={it.brand} />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                                  {it.brand}
+                                </div>
+                                <div className="line-clamp-2 font-sans text-sm font-bold leading-tight">
+                                  {it.name}
+                                </div>
+                                {noDisponible && (
+                                  <div className="mt-1 flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1 text-[10px] font-semibold text-destructive uppercase tracking-wide">
+                                      <AlertCircle className="h-3 w-3 shrink-0" />
+                                      Sin stock en estas fechas
+                                    </div>
+                                    <button
+                                      onClick={() => remove(it.id)}
+                                      className="flex items-center gap-1 text-[10px] font-medium text-destructive/80 underline underline-offset-2 transition hover:text-destructive"
+                                    >
+                                      Quitar
+                                    </button>
+                                  </div>
+                                )}
+                                <div className="mt-2 flex items-center justify-between gap-2">
+                                  <StepperPill
+                                    qty={qty}
+                                    onIncrement={() => {
+                                      if (!reachedMax) add(it.id);
+                                    }}
+                                    onDecrement={() => remove(it.id)}
+                                    maxReached={reachedMax}
+                                    size="lg"
+                                  />
+                                  <div className="text-right">
+                                    <div className="text-xs tabular text-ink">
+                                      {formatARS(it.pricePerDay * qty)}
+                                      <span className="text-muted-foreground"> /día</span>
+                                    </div>
+                                    {d > 0 && (
+                                      <div className="hidden sm:flex items-center justify-end gap-1 mt-0.5 text-[11px] tabular">
+                                        {lineaDto > 0 && (
+                                          <span className="line-through text-muted-foreground/60">
+                                            {formatARS(lineaBruta)}
+                                          </span>
+                                        )}
+                                        <span
+                                          className={
+                                            lineaDto > 0
+                                              ? "text-verde font-medium"
+                                              : "text-muted-foreground"
+                                          }
+                                        >
+                                          {formatARS(lineaNeta)}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => setQty(it.id, 0)}
+                                aria-label={`Quitar ${it.name} del carrito`}
+                                className="grid h-8 w-8 shrink-0 place-items-center self-start rounded-full text-muted-foreground hover:bg-surface hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </li>
+                          );
+                        })}
                     </ul>
 
                     {/* Notas opcionales */}
@@ -524,7 +551,10 @@ export function CartDrawer({
                 {hayNoDisponible ? (
                   <p className="flex items-center justify-center gap-1.5 text-center text-xs text-destructive">
                     <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    Hay ítems sin stock en estas fechas — cambiá las fechas o quitá los ítems
+                    {nombresSinDisp.length === 1
+                      ? `${nombresSinDisp[0]} no tiene stock en estas fechas`
+                      : `${nombresSinDisp.join(" y ")} no tienen stock en estas fechas`}
+                    {" — "}quitálos del carrito o cambiá las fechas.
                   </p>
                 ) : !startDate || !endDate ? (
                   <p className="flex items-center justify-center gap-1.5 text-center text-xs text-amber">

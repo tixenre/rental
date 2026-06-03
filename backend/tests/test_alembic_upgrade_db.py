@@ -119,6 +119,71 @@ def test_initdb_mas_upgrade_llega_al_head(clean_db):
     )
 
 
+def test_upgrade_con_datos_legacy_llega_al_head(clean_db):
+    """Regresión #690: el camino de prod NO es solo init_db()+upgrade en vacío.
+
+    Cubre DOS bugs reales que solo se disparaban en prod (DB de larga vida con
+    datos + tablas viejas), no en init_db en vacío:
+
+    1. `e8f4d9c2b1a3` backfillea `equipo_specs` con `INSERT ... RETURNING id`,
+       pero `equipo_specs` tiene PK compuesta y NO columna `id`. Solo pasaba en
+       DBs SIN datos legacy (el INSERT nunca se ejecutaba); con datos abortaba la
+       cadena (transacción única). Las columnas legacy ya no existen en el
+       esquema canónico (las dropea `a1b3c5e7f9d2`), así que las recreamos.
+    2. `l1m2n3o4p5q6` hace `INSERT INTO equipo_fotos (... url ...)`, pero en prod
+       `equipo_fotos` preexistía SIN `url` (init_db viejo + CREATE IF NOT EXISTS);
+       la columna recién se agrega en `n1o2p3q4r5s6` (head), DESPUÉS del backfill.
+       Lo simulamos dropeando `url` y sembrando un equipo con `foto_url`.
+
+    Se siembra un equipo mapeable + se exige que `upgrade head` llegue al head.
+    """
+    from alembic import command
+    from database import init_db, get_db
+    import migration_state
+
+    init_db()
+
+    conn = get_db()
+    try:
+        # Bug 1: columnas legacy (pre-drop) + equipo con `montura` mapeable a un
+        # spec_def `lens_mount` en su categoría raíz.
+        for col in ("montura", "formato", "resolucion", "peso", "dimensiones", "alimentacion"):
+            conn.execute(f"ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS {col} TEXT")
+        # Bug 2: equipo_fotos como en prod, una versión vieja a la que le faltan
+        # `url` y `media_id` (los logs de prod muestran que k1l2m3n4o5p6 pasa —
+        # su índice usa `orden`, que existe — y l1m2 falla primero por `url` y
+        # luego por `media_id`). Fuerza a l1m2 a agregar esas columnas faltantes.
+        conn.execute("DROP TABLE IF EXISTS equipo_fotos CASCADE")
+        conn.execute(
+            "CREATE TABLE equipo_fotos ("
+            " id SERIAL PRIMARY KEY,"
+            " equipo_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,"
+            " orden INTEGER NOT NULL DEFAULT 0,"
+            " es_principal BOOLEAN NOT NULL DEFAULT FALSE)"
+        )
+        # Equipo con foto_url para que el backfill de equipo_fotos (l1m2) inserte.
+        conn.execute("INSERT INTO equipos (id, nombre, foto_url) VALUES (9001, 'repro #690', 'https://x/f.jpg') ON CONFLICT DO NOTHING")
+        conn.execute("INSERT INTO categorias (id, nombre, parent_id) VALUES (9001, 'repro', NULL) ON CONFLICT DO NOTHING")
+        conn.execute("INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (9001, 9001, 0) ON CONFLICT DO NOTHING")
+        conn.execute("INSERT INTO spec_definitions (categoria_raiz_id, spec_key, label, tipo) VALUES (9001, 'lens_mount', 'Montura', 'enum') ON CONFLICT DO NOTHING")
+        conn.execute("INSERT INTO equipo_fichas (equipo_id, montura) VALUES (9001, 'EF') ON CONFLICT (equipo_id) DO UPDATE SET montura = 'EF'")
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Posicionar Alembic justo antes del backfill y correr toda la cadena.
+    cfg = _alembic_config()
+    command.stamp(cfg, "d7e9b3c5a8f2")  # down_revision de e8f4d9c2b1a3
+    command.upgrade(cfg, "head")
+
+    head = migration_state._head_revision(cfg)
+    current = migration_state._current_revision()
+    assert current == head, (
+        f"Con datos legacy presentes, la cadena quedó en {current!r} pero el "
+        f"head es {head!r} — una migración de backfill rompe sobre datos reales."
+    )
+
+
 def test_record_success_marca_ok(clean_db):
     """El módulo de visibilidad reporta `ok=True` cuando la BD está en el head."""
     from alembic import command

@@ -136,14 +136,10 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
   const hasRange = hasStart && !!endDate;
 
   // ── Calendar modifiers ────────────────────────────────────────────────
-  // nostock: días sin stock para el carrito actual (fondo rojo + punto)
-  // closed:  días cerrados según horarios (fondo rojo, tachado)
-  // rango:   período seleccionado (fondo amber soft)
-  const nostockDates = useMemo(
-    () => [...diasBloqueados].map((s) => new Date(s + "T12:00:00")),
-    [diasBloqueados],
-  );
-
+  // closed: días cerrados según horarios (fondo rojo, tachado)
+  // rango:  período seleccionado (fondo amber soft)
+  // nostock no se muestra en el calendario — el feedback de disponibilidad
+  // vive en el CartDrawer, donde el usuario puede actuar directamente.
   const closedDates = useMemo(() => {
     if (!horarios) return [];
     const out: Date[] = [];
@@ -156,13 +152,11 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
 
   const calModifiers = {
     ...(hasRange ? { rango: { from: startDate!, to: endDate! } } : {}),
-    ...(nostockDates.length > 0 ? { nostock: nostockDates } : {}),
     ...(closedDates.length > 0 ? { closed: closedDates } : {}),
   };
 
   const calModifiersClassNames = {
     rango: "bg-amber-soft/70 text-ink",
-    nostock: "rdp-nostock", // → src/styles.css (@layer utilities)
     closed: "rdp-closed", // → src/styles.css (@layer utilities)
   };
 
@@ -381,14 +375,6 @@ export function RentalDateModal({ open, onOpenChange }: Props) {
 
         {/* ── Calendario ────────────────────────────────────────────── */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex justify-center px-2 sm:px-4 pb-2 border-t hairline">
-          {nostockDates.length > 0 && (
-            <p className="flex w-full items-start gap-1.5 px-4 pt-3 pb-1 text-[11px] text-muted-foreground">
-              <span className="mt-0.5 h-2 w-2 shrink-0 rounded-sm bg-destructive/30 ring-1 ring-destructive/40" />
-              {nostockDates.length >= 100
-                ? "Sin stock libre en este período — podés elegir fechas igual, quedan sujetas a confirmación."
-                : "Días en rojo = sin stock disponible para tu carrito. Podés seleccionarlos; quedan sujetos a confirmación."}
-            </p>
-          )}
           <Calendar
             mode="single"
             selected={startDate}
