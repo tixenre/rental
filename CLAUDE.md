@@ -23,12 +23,16 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 - **Antes de abrir/mergear una PR: despachar el agente `supervisor`** — revisión read-only de
   scope / forma / drift, que resume en lenguaje claro y deja el plan de prueba. (Instrucción, no
   gate de sistema: en las apps de Mac/iPhone no hay hooks.)
-- **Merge según tamaño:** trivial/small con CI verde + supervisor OK → auto-merge; sensible /
-  arquitectónico / grande, o que toca lo que ve el usuario → **PR draft + el dueño prueba** primero.
-- **No proponer merge con CI en rojo.**
+- **La sesión mergea a `dev`; el dueño gatea staging + promoción.** Mergear a `dev` = mostrar en
+  staging (no es prod) → lo hace la sesión: chico/mediano con supervisor OK + checks verdes se
+  mergea solo (directo o con auto-merge de GitHub); grande / sensible / que toca reservas o lo que
+  ve el usuario se **avisa antes** de meterlo a `dev`. El dueño no clickea merges ya verificados —
+  sus gates son **probar en staging** y **aprobar la promoción `dev → main`** (la puerta a prod).
+  Ver `docs/MEMORIA.md` *2026-06-03 — Quién clickea el merge*.
+- **No proponer ni hacer merge con CI en rojo.**
 - **El dueño testea, no revisa código.** Acompañar cada cambio testeable con un **plan de prueba
-  en lenguaje claro** ("andá a /X, hacé Y, tenés que ver Z"). Pre-lanzamiento: el dueño prueba en
-  prod (decisión con disparador en `docs/MEMORIA.md`).
+  en lenguaje claro** ("andá a /X, hacé Y, tenés que ver Z"). El dueño prueba en **staging**; la
+  promoción `dev → main` es su gate a prod.
 
 ## Memoria — dónde vive qué
 

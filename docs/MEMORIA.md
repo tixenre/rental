@@ -38,6 +38,10 @@
 - **Decisión:** trivial/small con CI verde + supervisor OK → auto-merge. Sensible / arquitectónico
   / grande, o que toca lo que ve el usuario → PR draft + el dueño prueba antes de mergear.
 - **Consecuencias:** el supervisor clasifica el tamaño en su veredicto.
+- **Matiz (2026-06-03):** en el flujo de dos etapas, el "el dueño prueba antes de mergear" se
+  **reubica** — el dueño prueba en **staging** (después del merge a `dev`), no antes; lo que el dueño
+  mergea con su criterio es la **promoción `dev → main`** (la puerta a prod). El merge a `dev` lo
+  hace la **sesión** (ver decisión *2026-06-03 — Quién clickea el merge*).
 
 ### 2026-05-25 — Modus operandi durable, sesión efímera
 - **Contexto:** las sesiones son efímeras; el plan de una iniciativa larga no puede vivir solo en
@@ -312,6 +316,24 @@
   al promover) para no perder el todo-o-nada de la promoción.
 - **Consecuencias:** matiza *Branch + PR siempre* (2026-05-25) y *Método de merge según etapa*
   (2026-06-01) — ver las notas agregadas ahí. Lo inamovible: **nunca directo a `main`**.
+
+### 2026-06-03 — Quién clickea el merge: la sesión mergea a `dev`; el dueño gatea staging + promoción
+- **Contexto:** el dueño no quiere ser el botón de merge de cambios que la sesión ya aprobó
+  (supervisor OK) y con CI verde. El criterio de "el código está bien" lo cubren supervisor + CI;
+  clickear merge es trabajo mecánico sin valor.
+- **Decisión:** **mergear a `dev` = mostrar en staging**, no es la puerta a prod → lo hace **la
+  sesión**, no el dueño:
+  - **Chico / mediano** con supervisor OK + checks verdes → la sesión mergea a `dev` (directo si ya
+    están verdes; con **auto-merge de GitHub** si están corriendo, mergea solo al ponerse verde).
+    El dueño no toca nada.
+  - **Grande / sensible / que toca reservas o lo que ve el usuario** → la sesión **avisa antes** de
+    meterlo a `dev` (el dueño puede frenarlo), y recién después mergea.
+- **Los gates del dueño** (donde sí aporta criterio) quedan en: (1) **probar la conducta en
+  staging**, y (2) **aprobar la promoción `dev → main`** — esa es la puerta a prod (sagrada),
+  siempre manual del dueño. Nunca se mergea con **CI en rojo**.
+- **Consecuencias:** refina *Merge según tamaño* (2026-05-25). Cada PR a `dev` llega con su plan de
+  prueba en lenguaje claro para que el dueño sepa qué tocar en staging. El supervisor sigue corriendo
+  antes de cada merge a `dev` (chico/mediano) y antes de la promoción.
 
 ---
 
