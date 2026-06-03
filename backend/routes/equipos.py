@@ -1677,7 +1677,9 @@ def add_kit_item(id: int, data: KitItem):
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
-        if not conn.execute("SELECT id FROM equipos WHERE id=?", (data.componente_id,)).fetchone():
+        if not conn.execute(
+            "SELECT id FROM equipos WHERE id=? AND eliminado_at IS NULL", (data.componente_id,)
+        ).fetchone():
             raise HTTPException(404, "Componente no encontrado")
         if _crea_ciclo_kit(conn, id, data.componente_id):
             raise HTTPException(

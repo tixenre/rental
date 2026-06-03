@@ -1514,7 +1514,7 @@ def attach_kit(conn, equipos: list[dict]) -> list[dict]:
                kc.descuento_pct, kc.esencial,
                e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
         FROM kit_componentes kc
-        JOIN equipos e ON e.id = kc.componente_id
+        JOIN equipos e ON e.id = kc.componente_id AND e.eliminado_at IS NULL
         WHERE kc.equipo_id IN ({placeholders})
         ORDER BY kc.equipo_id, kc.orden ASC, e.nombre ASC
     """, ids)
